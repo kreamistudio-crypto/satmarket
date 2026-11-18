@@ -1527,6 +1527,131 @@ def main():
     con.close()
     prova("...e il registro non resta orfano", 0, resti)
 
+    # ---- 18. IL ROTTO RIPROVA DA SOLO (18 nov 2026) ------------------
+    # I due collegamenti di un negozio vero erano fermi da settimane per
+    # qualche timeout di fila: il rotto non riprovava mai, e nessuno se
+    # ne accorgeva. Adesso il giro lo rilegge una volta al giorno, e se
+    # risponde torna attivo da solo e lo dice al venditore.
+    print("\n[il collegamento rotto riprova da solo una volta al giorno]")
+    come(VENDITORE)
+    CATALOGO_WOO[:] = [prodotto_woo(81, "Adesivo arancione", "3.00",
+                                    stock=40)]
+    rid = collega(fonte="woo", url="https://rotto.it")
+
+    def rotto(**colonne):
+        con = SRV.db()
+        sets = ", ".join(f"{k}=?" for k in colonne)
+        con.execute(f"UPDATE connettori SET {sets} WHERE id=?",
+                    (*colonne.values(), rid))
+        con.commit()
+        con.close()
+
+    def riga_rotto():
+        con = SRV.db()
+        r = con.execute("SELECT stato, errori_di_fila, ultimo_giro "
+                        "FROM connettori WHERE id=?", (rid,)).fetchone()
+        con.close()
+        return tuple(r)
+
+    ieri = int(time.time()) - SRV.CONNETTORI_RIPROVA_ERRORE_S - 3600
+    rotto(stato="errore", errori_di_fila=5, ultimo_giro=int(time.time()))
+    quante = len(NOTIFICHE)
+    giro()
+    prova("rotto da meno di un giorno: il giro non lo tocca",
+          ("errore", 5, []), (*riga_rotto()[:2], annunci(rid)))
+    rotto(ultimo_giro=ieri)
+    ERRORE_API[0] = "timed out"
+    giro()
+    ERRORE_API[0] = None
+    r = riga_rotto()
+    prova("dopo un giorno riprova; se tace resta rotto e conta",
+          ("errore", 6), r[:2])
+    prova("...e il prossimo tentativo e' fra un giorno", True,
+          r[2] > ieri)
+    # (il Woo di prima, attivo, conta i suoi errori per conto suo: qui
+    # si guarda solo quel che il giro scrive di QUESTO negozio)
+    prova("...senza riscrivere al venditore ogni giorno", [],
+          [x for _, x in NOTIFICHE[quante:] if "rotto.it" in x])
+    rotto(ultimo_giro=ieri)
+    giro()
+    prova("se il sito risponde torna attivo, col conto azzerato",
+          ("attivo", 0), riga_rotto()[:2])
+    prova("...e il catalogo entra", ["Adesivo arancione"],
+          [a["titolo"] for a in annunci(rid) if a["stato"] == "attivo"])
+    prova("...e il venditore sa che e' ripartito", True,
+          any(t == VENDITORE and "risponde di nuovo" in x
+              for t, x in NOTIFICHE[quante:]))
+    # il primo avviso promette la riprova: e' vero da oggi, quindi lo dice
+    rotto(errori_di_fila=SRV.CONNETTORI_ERRORI_MAX - 1)
+    ERRORE_API[0] = "timed out"
+    giro()
+    ERRORE_API[0] = None
+    avviso = ([x for t, x in NOTIFICHE[quante:] if "non risponde" in x
+               and "rotto.it" in x] or [""])[-1]
+    prova("l'avviso del collegamento fermo dice che riprovo da solo",
+          ("errore", True), (riga_rotto()[0],
+                             "una volta al giorno" in avviso))
+    # IN PAUSA NON RIPROVA: il gesto del venditore vince sull'orologio
+    rotto(stato="pausa", ultimo_giro=ieri)
+    giro()
+    prova("in pausa non si riprova mai", ("pausa", ieri),
+          (riga_rotto()[0], riga_rotto()[2]))
+
+    print("\n[lo stesso negozio con altre maiuscole e' un doppione]")
+    come(999)     # il moderatore vede la sezione e non ha negozi suoi
+    esito = errore(SRV.salva_connettore, None, corpo={
+        "fonte": "woo", "url_negozio": "https://ROTTO.it",
+        "credenziali": {"consumer_key": "ck_x", "consumer_secret": "cs_y"},
+        "consegna": "spedizione", "spedizione_eur": 5})
+    prova("«ROTTO.it» quando c'e' «rotto.it»: si rifiuta", (400, True),
+          (esito and esito[0], bool(esito) and "già collegato" in esito[1]))
+    con = SRV.db()
+    try:
+        con.execute("INSERT INTO connettori(tg_id,fonte,url_negozio,"
+                    "credenziali) VALUES(999,'woo','https://Rotto.IT','x')")
+        doppio = "entrato"
+    except sqlite3.IntegrityError:
+        doppio = "rifiutato"
+    con.close()
+    prova("...e lo rifiuta il database stesso, non solo l'endpoint",
+          "rifiutato", doppio)
+    # IL DATABASE DI IERI, coi doppioni gia' dentro e l'indice che non
+    # puo' nascere: la cintura dell'endpoint tiene, e del negozio si
+    # riprova solo la riga piu' giovane
+    con = SRV.db()
+    con.execute("DROP INDEX idx_connettori_url_senza_maiuscole")
+    cur = con.execute(
+        "INSERT INTO connettori(tg_id,fonte,url_negozio,credenziali,"
+        "consegna,spedizione_eur,zona,creato,stato,ultimo_giro) "
+        "VALUES(?,?,?,?,?,?,?,?,'errore',?)",
+        (VENDITORE, "woo", "https://ROTTO.it",
+         SRV._cifra_contenuto(json.dumps({"consumer_key": "ck",
+                                          "consumer_secret": "cs"})),
+         "spedizione", 5.0, "Carmagnola (TO)", int(time.time()), ieri))
+    giovane = cur.lastrowid
+    con.commit()
+    con.close()
+    rotto(stato="errore", ultimo_giro=ieri)
+    giro()
+    con = SRV.db()
+    stati = {r[0]: r[1] for r in con.execute(
+        "SELECT id, stato FROM connettori WHERE id IN (?,?)",
+        (rid, giovane))}
+    con.close()
+    prova("doppioni di ieri: riparte solo il piu' giovane",
+          {rid: "errore", giovane: "attivo"}, stati)
+    esito = errore(SRV.salva_connettore, None, corpo={
+        "fonte": "woo", "url_negozio": "https://Rotto.it",
+        "credenziali": {"consumer_key": "ck_x", "consumer_secret": "cs_y"},
+        "consegna": "spedizione", "spedizione_eur": 5})
+    prova("...e senza indice la cintura dell'endpoint rifiuta lo stesso",
+          (400, True),
+          (esito and esito[0], bool(esito) and "già collegato" in esito[1]))
+    SRV.init_db()
+    prova("all'avvio, coi doppioni dentro, l'indice non nasce e "
+          "nessuno cade", True, True)
+    come(VENDITORE)
+
     print("\n" + "=" * 62)
     print(f"  {PASSATE} passate, {FALLITE} fallite")
     print("=" * 62)

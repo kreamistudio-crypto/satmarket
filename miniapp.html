@@ -49618,7 +49618,7 @@ async function renderConnettori(){
     const daDire = !!c.tariffe_da_dire;
     const colore = rotto ? 'var(--danger)' : pausa ? 'var(--muted)' : 'var(--ink)';
     const stato = daDire ? '⏳ aspetta i costi di spedizione'
-                : rotto ? '⚠️ non risponde' : pausa ? '⏸ in pausa'
+                : rotto ? '⚠️ non risponde · riprovo da solo ogni giorno' : pausa ? '⏸ in pausa'
                 : c.in_corso ? '🔄 lo sto leggendo…' : quandoGiro(c.ultimo_giro);
     return `<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
       <div style="display:flex;align-items:center;gap:6px">

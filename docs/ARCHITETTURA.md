@@ -27484,7 +27484,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   seguire un Location scritto da chi risponde vorrebbe dire
   consegnarlo a un indirizzo mai giudicato); un negozio muto non
   spegne NIENTE (si conta l'errore, e a `CONNETTORI_ERRORI_MAX` il
-  collegamento si dichiara rotto con UN avviso); e le credenziali non
+  collegamento si dichiara rotto con UN avviso; dal 18 nov 2026 il rotto
+  si riprova UNA volta al giorno, `CONNETTORI_RIPROVA_ERRORE_S`, e se
+  risponde torna 'attivo' da solo col suo avviso; di un negozio scritto
+  con maiuscole diverse si riprova solo la riga più giovane, e
+  `idx_connettori_url_senza_maiuscole` su (fonte, lower(url_negozio))
+  non lascia nascere doppioni — Cantieri, «I negozi collegati rotti
+  ripartono da soli»); e le credenziali non
   entrano mai in un `print` né in `ultimo_errore` — un token in un
   journal è un token pubblico.
   `url_api_ammesso` è `url_foto_ammesso` con DUE strette (solo https,

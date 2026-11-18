@@ -91729,3 +91729,52 @@ inviato». SCARTATO: contare comunque ma «tollerato» (il marchio resta e
 spiega male). PROVATO: `prove_onchain_ritiro` (giudice e preavviso con
 la richiesta), `collaudo_p2p_onchain` (dopo la richiesta, a chi compra
 `rinuncia_conta` falso). NON PROVATO: un telefono vero.
+
+## I negozi collegati rotti ripartono da soli, e lo stesso negozio non si collega due volte con altre maiuscole (18 nov 2026, cantiere connettori-ripartono; Andrea: «Sì, fallo, fai questa correzione»)
+
+COSA C'ERA. Un collegamento che falliva cinque giri di fila
+(`CONNETTORI_ERRORI_MAX`) passava in 'errore' e il giro dell'ora non lo
+guardava più, per sempre: si riaccendeva solo con ▶️ dal venditore. È
+successo ai due collegamenti WooCommerce di SWAG.btc.pub (fermi dal 19 set
+e dal 6 ott per dei timeout), e nessuno se n'è accorto. L'avviso al
+venditore a quella soglia C'ERA già (un messaggio, una volta sola): non
+diceva però che cosa sarebbe successo dopo. E la UNIQUE(fonte, url_negozio)
+distingue le maiuscole: «swag» e «SWAG» erano due righe dello stesso sito.
+DECISO. 1) LA RIPROVA DEL GIORNO: il giro prende anche le righe in 'errore'
+con `ultimo_giro` più vecchio di `CONNETTORI_RIPROVA_ERRORE_S` (un giorno;
+anche il giro fallito scrive `ultimo_giro`, quindi il conto riparte da
+ogni tentativo). Se il negozio tace si conta l'errore e non si riscrive al
+venditore (l'avviso parte solo a `== CONNETTORI_ERRORI_MAX`). Se risponde,
+`_chiudi_giro_connettore` lo rimette 'attivo' SOLO da 'errore' (una pausa
+messa nel frattempo vince) e il bot scrive «Il tuo negozio risponde di
+nuovo». Pausa e «costi da dire» restano fuori dal giro come prima.
+2) L'AVVISO DEL FERMO dice che si riprova da solo una volta al giorno, e
+la riga nel cassetto «⚠️ non risponde · riprovo da solo ogni giorno».
+3) I DOPPIONI: indice `idx_connettori_url_senza_maiuscole` su
+(fonte, lower(url_negozio)), giudice nel database come la UNIQUE di
+sempre. Dove un doppione c'è già (la produzione, coi due di SWAG) l'indice
+non può nascere: `init_db` lo dice nel journal a ogni avvio e va avanti, e
+vale la cintura in `salva_connettore` (una SELECT con lower(), sulle righe
+nuove e sugli indirizzi cambiati: ritoccare le tariffe di un doppione di
+ieri resta possibile). E del negozio doppio il giro riprova SOLO la riga
+più giovane (chiavi scritte per ultime): tornati vivi tutt'e due sarebbero
+un catalogo con due padroni.
+SCARTATE: normalizzare l'host in minuscolo dentro `_url_connettore` (un
+ritocco a un doppione di ieri sarebbe diventato un cambio di indirizzo, con
+prova di rete e scontro con l'altra riga); una colonna nuova
+`url_minuscolo` (l'indice su espressione fa la stessa cosa senza dati da
+tenere in pari); un tetto ai giorni di riprova (una lettura al giorno non
+pesa, nemmeno su un sito morto).
+RESTA DA FARE (Andrea): in produzione il doppione vecchio di SWAG resta in
+'errore' coi suoi annunci fermi; finché c'è, l'indice non nasce. Toglierlo
+è una cancellazione e chiede il suo sì.
+PROVATO: `collaudo_connettori` sezione 18 (rotto da meno di un giorno non
+si tocca; dopo un giorno riprova e, se tace, conta senza riscrivere; se
+risponde torna attivo, il catalogo entra e il venditore lo sa; l'avviso
+dice la riprova; in pausa mai; «ROTTO.it» rifiutato dall'endpoint e dal
+database; database di ieri senza indice: riparte solo il più giovane, la
+cintura rifiuta, `init_db` non cade), con controprove (tolta la riprova,
+tolto il ritorno ad 'attivo', tolto il filtro del più giovane, tolta la
+cintura: ognuna fa diventare rossa la sua prova); suite severa e collaudi
+della CI nel venv senza coincurve.
+NON PROVATO: un negozio vero che torna su dopo giorni.

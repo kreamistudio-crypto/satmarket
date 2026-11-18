@@ -10119,6 +10119,20 @@ def init_db():
                     "categoria TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
+    # I DOPPIONI SENZA MAIUSCOLE (18 nov 2026): lo stesso negozio non si
+    # collega due volte nemmeno scritto «SWAG» invece di «swag». Un
+    # indice e non una colonna nuova: il giudice e' lo stesso database,
+    # come per la UNIQUE di sempre. Dove un doppione c'e' gia' l'indice
+    # non nasce (e lo si dice nel journal a ogni avvio): resta la
+    # cintura in `salva_connettore`, e il doppione si toglie a mano.
+    try:
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "idx_connettori_url_senza_maiuscole "
+                    "ON connettori(fonte, lower(url_negozio))")
+    except sqlite3.IntegrityError:
+        print("⚠️ Negozi collegati: c'e' lo stesso negozio scritto con "
+              "maiuscole diverse, l'indice dei doppioni aspetta che se "
+              "ne tolga uno (vale la guardia del collegamento)")
     # LE TARIFFE IN SATS DI UN NEGOZIO COLLEGATO (set 2026): la valuta
     # e le tre colonne fisse. Le righe di ieri nascono 'eur' a zero
     # sats, cioe' esattamente com'erano: nessun catalogo cambia prezzo.
@@ -99780,6 +99794,17 @@ try:
 except ImportError:
     CONNETTORI_ERRORI_MAX = 5
 
+# OGNI QUANTO RIPROVA UN COLLEGAMENTO ROTTO (18 nov 2026, cantiere
+# connettori-ripartono): prima un collegamento in 'errore' restava
+# fermo per sempre, e se il venditore non toccava ▶️ nessuno se ne
+# accorgeva (i due di SWAG.btc.pub, fermi dal 19 set e dal 6 ott per
+# qualche timeout di fila). Adesso il giro dell'ora lo rilegge UNA
+# volta al giorno — il giorno si conta da `ultimo_giro`, che anche un
+# giro fallito scrive — e se il negozio risponde torna 'attivo' da
+# solo. Una lettura al giorno non pesa su nessuno, nemmeno su un sito
+# morto o su un token revocato.
+CONNETTORI_RIPROVA_ERRORE_S = 86400
+
 # Quanti negozi puo' collegare un venditore. Due sono il caso vero
 # (uno Shopify e un Woo, o il negozio e il magazzino), tre lasciano
 # aria; oltre non e' piu' «il mio negozio».
@@ -100559,9 +100584,21 @@ async def sincronizza_connettori():
     con = db()
     # chi aspetta i costi di spedizione non si legge (set 2026): letto,
     # il suo catalogo entrerebbe in vetrina a spedizione zero
+    # I ROTTI RIPROVANO UNA VOLTA AL GIORNO (18 nov 2026): quelli in
+    # 'errore' entrano nel giro quando l'ultimo tentativo ha piu' di
+    # un giorno. DI UN NEGOZIO SI RIPROVA SOLO LA RIGA PIU' GIOVANE: i
+    # doppioni scritti con maiuscole diverse nati prima della guardia
+    # (`idx_connettori_url_senza_maiuscole`) tornati vivi insieme
+    # sarebbero un catalogo con due padroni — la piu' giovane ha le
+    # chiavi scritte per ultime, e la vecchia resta ferma com'era.
     collegati = con.execute(
-        "SELECT * FROM connettori WHERE stato='attivo' "
-        "AND tariffe_da_dire=0 ORDER BY id").fetchall()
+        "SELECT * FROM connettori c WHERE ("
+        "stato='attivo' OR (stato='errore' AND ultimo_giro<? "
+        "AND NOT EXISTS (SELECT 1 FROM connettori g WHERE "
+        "g.fonte=c.fonte AND g.id>c.id "
+        "AND lower(g.url_negozio)=lower(c.url_negozio)))) "
+        "AND tariffe_da_dire=0 ORDER BY id",
+        (int(time.time()) - CONNETTORI_RIPROVA_ERRORE_S,)).fetchall()
     con.close()
     if not collegati:
         return
@@ -100747,9 +100784,12 @@ async def _connettore_in_errore(c: dict, errore: str):
             f"Ho provato {quanti} volte a leggere il catalogo di "
             f"{html.escape(c['url_negozio'])} e non ci sono riuscito.\n\n"
             f"I tuoi annunci restano dove sono, ma non si aggiornano "
-            f"più. Controlla il collegamento dal Profilo, in "
-            f"«📥 Carica tanti annunci insieme / catalogo esterno»: se il token è "
-            f"scaduto basta rifarlo.")
+            f"più. Riprovo da solo una volta al giorno: appena il sito "
+            f"risponde il collegamento riparte, e te lo dico.\n\n"
+            f"Se invece hai cambiato le chiavi, controlla il collegamento "
+            f"dal Profilo, in "
+            f"«📥 Carica tanti annunci insieme / catalogo esterno»: se il "
+            f"token è scaduto basta rifarlo.")
 
 
 async def nostr_del_negozio(connettore_id: int,
@@ -100861,8 +100901,25 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
     con.execute("UPDATE connettori SET ultimo_giro=?, ultimo_esito=?, "
                 "ultimo_errore='', errori_di_fila=0 WHERE id=?",
                 (int(time.time()), json.dumps(esito), c["id"]))
+    # IL ROTTO CHE RISPONDE TORNA ATTIVO (18 nov 2026): e' la riprova
+    # del giorno andata bene. Solo da 'errore': un venditore che nel
+    # frattempo l'ha messo in pausa lo ritrova in pausa, il suo gesto
+    # vince sul nostro orologio.
+    ripartito = con.execute(
+        "UPDATE connettori SET stato='attivo' WHERE id=? "
+        "AND stato='errore'", (c["id"],)).rowcount == 1
     con.commit()
     con.close()
+    if ripartito:
+        print(f"🔌 Connettore #{c['id']} ({c['fonte']}): risponde di "
+              "nuovo, torna attivo")
+        await notifica(
+            c["tg_id"],
+            f"🔌 <b>Il tuo negozio risponde di nuovo</b>\n\n"
+            f"Ho riletto il catalogo di "
+            f"{html.escape(c['url_negozio'])}: il collegamento è "
+            f"ripartito da solo, e i tuoi annunci tornano ad aggiornarsi "
+            f"ogni ora.")
     if not (esito["nuovi"] or esito["spenti"] or esito["in_revisione"]
             or esito["falliti"] or esito.get("consegna_corretta")):
         return
@@ -101635,6 +101692,23 @@ async def salva_connettore(req: Request,
 
     adesso = int(time.time())
     con = db()
+    # LO STESSO NEGOZIO SCRITTO CON ALTRE MAIUSCOLE (18 nov 2026): la
+    # UNIQUE(fonte, url_negozio) le distingue, e «https://swag...» e
+    # «https://SWAG...» erano diventati due collegamenti dello stesso
+    # sito. Il giudice e' l'indice `idx_connettori_url_senza_maiuscole`;
+    # questa domanda e' la cintura per i database dove l'indice non e'
+    # potuto nascere perche' un doppione c'era gia' (vedi `init_db`). Si
+    # fa sulle righe nuove e su un indirizzo cambiato: chi ritocca le
+    # tariffe di un doppione di ieri non si sente dire di no.
+    if not vecchio or vecchio["url_negozio"].lower() != url.lower():
+        gemello = con.execute(
+            "SELECT 1 FROM connettori WHERE fonte=? AND id!=? "
+            "AND lower(url_negozio)=lower(?)",
+            (fonte, cid or 0, url)).fetchone()
+        if gemello:
+            con.close()
+            raise HTTPException(400, "Questo negozio è già collegato a un "
+                                     "account Barattolo")
     try:
         if vecchio:
             con.execute(

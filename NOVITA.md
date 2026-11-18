@@ -698,3 +698,9 @@ frase: Negli scambi on-chain, se chi vende chiede di annullare e chi compra acce
 dove: P2P → uno scambio on-chain dopo «🙏 Chiedi a chi compra di annullare»: il foglio di «↩️ Rinuncio» non avvisa più del «non completato».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-18 · connettori-ripartono
+frase: Chi ha collegato un negozio Shopify o WooCommerce non deve più riaccenderlo a mano se il sito è rimasto giù per qualche ora: Barattolo riprova da solo una volta al giorno e, appena il negozio risponde, il collegamento riparte e il bot te lo dice.
+dove: Profilo → «📥 Carica tanti annunci insieme» → «Catalogo esterno»: la riga del negozio fermo dice «⚠️ non risponde · riprovo da solo ogni giorno»; i messaggi del bot «Il collegamento col tuo negozio non risponde» e «Il tuo negozio risponde di nuovo».
+leva: nessuna
+pubblico: no

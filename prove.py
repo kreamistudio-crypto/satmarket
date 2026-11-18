@@ -113979,8 +113979,11 @@ def prove_connettore_interrompibile():
         fatti.append(riga["id"])
         g["_SI_CHIUDE"].set()        # lo spegnimento arriva durante il primo
 
+    # (18 nov 2026, connettori-ripartono) la SELECT del giro prende anche
+    # i rotti da un giorno, e il giorno e' questa costante
     g.update(CONNETTORI_NEGOZIO_APERTI=True, _prossimo_giro_connettori=0.0,
              SECONDI_SYNC_CONNETTORI=3600, db=lambda: Righe(),
+             CONNETTORI_RIPROVA_ERRORE_S=86400,
              cambio_per_import=lambda: {}, _un_connettore=uno_finto)
     _aio.run(g["sincronizza_connettori"]())
     prova("...e se arriva a meta' giro, il collegamento dopo non comincia",
