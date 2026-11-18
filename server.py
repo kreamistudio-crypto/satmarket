@@ -24445,6 +24445,9 @@ def numeri_assistente() -> str:
         f"- Scambi P2P pagati in franchi svizzeri (CHF): {si(p2p_chf_ammesso(0))}.",
         # (16 nov 2026, cantiere p2p-monete) ETH, Monero e USDe come metodi
         f"- Scambi P2P pagati in ETH, Monero (XMR) o USDe: {si(p2p_coin_ammesso(0))}.",
+        # (18 nov 2026, cantiere bitcoin-only) l'interruttore del Filtro
+        f"- Interruttore «No altcoin» nel Filtro del P2P: "
+        f"{si(bool(P2P_BITCOIN_ONLY_ATTIVO))}.",
         f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
         # (12 nov 2026, cantiere sapere-onchain) le due leve del P2P che
         # il libro di Tappo spiega e che dal pannello arrivavano solo come
@@ -37862,6 +37865,14 @@ def _leve_stato():
                          "minuto",
                   spento="i tre metodi non compaiono, e il libro nasconde "
                          "gli ordini che li portano"),
+            # «₿ BITCOIN ONLY» (18 nov 2026, cantiere bitcoin-only)
+            _leva("No altcoin nel Filtro P2P", "P2P_BITCOIN_ONLY_ATTIVO",
+                  bool(P2P_BITCOIN_ONLY_ATTIVO),
+                  acceso="nel Filtro del libro P2P c'è l'interruttore che "
+                         "nasconde gli scambi in USDT, USDe, ETH e XMR "
+                         "(spento di serie, il telefono ricorda la scelta)",
+                  spento="l'interruttore non c'è e il libro mostra tutte "
+                         "le monete, come ieri"),
             _leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",
                   bool(P2P_USDT_SOLO_ADMIN),
                   acceso="gli ordini in USDT li vedono solo i moderatori "
@@ -52877,6 +52888,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # ...e i metodi ETH e XMR (13 nov 2026, cantiere eth-xmr): solo
     # sull'istanza di prova. Vedi «ETH E XMR NEL P2P».
     profilo["p2p_coin"] = p2p_coin_ammesso(user["id"])
+    # ...e l'interruttore «₿ Bitcoin only» del Filtro (18 nov 2026,
+    # cantiere bitcoin-only): la leva lo OFFRE, la scelta sta nel telefono
+    profilo["p2p_bitcoin_only"] = bool(P2P_BITCOIN_ONLY_ATTIVO)
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -60217,6 +60231,23 @@ if not isinstance(P2P_COIN_ATTIVO, bool):
     print("[p2p] P2P_COIN_ATTIVO non e' True/False: ETH, Monero e USDe "
           "restano spenti", flush=True)
     P2P_COIN_ATTIVO = False
+# «₿ BITCOIN ONLY» NEL LIBRO P2P (18 nov 2026, cantiere bitcoin-only, dal
+# gruppo Telegram: «per quelli come me ai quali interessa solo bitcoin»).
+# L'interruttore nel Filtro del libro che nasconde in un colpo gli
+# scambi pagati in USDT, USDe, ETH e XMR; SPENTO di serie per chi guarda
+# (Andrea: «non di default altrimenti uno manco sa che ci sono altri
+# scambi»), e il telefono si ricorda la scelta. Tutto vive nel browser:
+# qui c'e' solo la leva che lo OFFRE, accesa di serie (regola del 14 nov
+# 2026), interruttore d'emergenza `P2P_BITCOIN_ONLY_ATTIVO = False`.
+# Storta: spenta, e si dice.
+try:
+    from config import P2P_BITCOIN_ONLY_ATTIVO
+except ImportError:
+    P2P_BITCOIN_ONLY_ATTIVO = True
+if not isinstance(P2P_BITCOIN_ONLY_ATTIVO, bool):
+    print("[p2p] P2P_BITCOIN_ONLY_ATTIVO non e' True/False: l'interruttore "
+          "«No altcoin» resta spento", flush=True)
+    P2P_BITCOIN_ONLY_ATTIVO = False
 # IL TETTO DEL COLLAUDO (20 ott 2026, decisione di Andrea con Alan): sul
 # collaudo il P2P parla col coordinatore VERO, quindi ordini e sats sono
 # veri; un ordine dal collaudo non supera P2P_MAX_SATS_PROVA sats, di
