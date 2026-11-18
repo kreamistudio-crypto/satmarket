@@ -330,14 +330,14 @@ def main():
           (1, True, True, True, True),
           (len(per.get(("telegram", COMPRA), [])),
            "🔔 <b>Vende</b> ha pubblicato 3 nuovi annunci" in per.get(("telegram", COMPRA), [""])[0],
-           "• Miele di acacia" in per.get(("telegram", COMPRA), [""])[0],
-           "• Lampada da tavolo" in per.get(("telegram", COMPRA), [""])[0],
+           f'• <a href="{SRV.URL_PUBBLICO}/annuncio/{a1}">Miele di acacia</a>' in per.get(("telegram", COMPRA), [""])[0],
+           f'• <a href="{SRV.URL_PUBBLICO}/annuncio/{a3}">Lampada da tavolo</a>' in per.get(("telegram", COMPRA), [""])[0],
            "/negozio/neg333\">🫙 Apri il suo negozio" in per.get(("telegram", COMPRA), [""])[0]))
     prova("Terzo («tutti» con la categoria): UN messaggio coi DUE della categoria, e il tocco apre il reparto",
           (1, True, True, False, True, True),
           (len(per.get(("telegram", TERZO), [])),
            "🆕 <b>2 nuovi annunci nel mercatino</b>" in per.get(("telegram", TERZO), [""])[0],
-           "• Noci sgusciate" in per.get(("telegram", TERZO), [""])[0],
+           f'• <a href="{SRV.URL_PUBBLICO}/annuncio/{a2}">Noci sgusciate</a>' in per.get(("telegram", TERZO), [""])[0],
            "Lampada" in per.get(("telegram", TERZO), [""])[0],
            f"Il tuo filtro: {CAT}" in per.get(("telegram", TERZO), [""])[0],
            "/categoria/alimenti-e-bevande\">🫙 Apri Esplora" in per.get(("telegram", TERZO), [""])[0]))

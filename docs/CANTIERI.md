@@ -91212,3 +91212,54 @@ DA GUARDARE DAL VIVO: il cassetto a 375 px con l'interruttore e la
 tendina, la classifica di «Un tempo per te» coi clienti veri, e un
 ordine vero che passa la soglia (il messaggio «Hai venduto» con la
 riga del regalo).
+
+## «🫙 Apri Esplora» portava sulla home chi voleva il prodotto: i titoli degli avvisi diventano link (18 nov 2026, cantiere apri-esplora-annuncio; segnalazione di un utente via Tappo: «Se clicco su "Apri Esplora" negli annunci vengo indirizzato nella home di barattolo, anziché alla pagina specifica del prodotto»; Andrea: succede da Telegram)
+
+IL GUASTO. «🫙 Apri Esplora» sta in fondo ai due avvisi del mercatino del
+bot (`_testo_avviso_mercatino_tutti`, `_testo_avviso_mercatino_segui`
+senza negozio). Per progetto (9-10 ott, «Gli avvisi del mercatino» e il
+terzo sì) porta a Esplora coi filtri di chi lo riceve: `casa` senza
+filtri, cioè la home. Funzionava com'era scritto; ma i titoli sopra
+erano testo nudo, e il solo tocco del messaggio era quello: chi voleva
+il prodotto toccava Esplora e finiva sulla home — anche con UN annuncio
+solo. Non è il guasto del 16 nov (notifica-apre-annuncio, la parola
+`annuncio_<n>` che la pagina non rileggeva): quello è già in produzione.
+Non è nemmeno n8n: il messaggio lo scrive il server.
+
+COSA CAMBIA. 1) Ogni titolo dell'elenco è un link al suo annuncio
+(`_link_annuncio_avviso`, nuovo, usato da `_titoli_avviso_mercatino`):
+vale per tutt'e due gli avvisi. Senza numero, storto o zero, il titolo
+resta nudo; un titolo vuoto non fa un link vuoto. 2) Nell'avviso dei
+nuovi annunci, con UN annuncio solo il tocco in fondo diventa «🫙 Apri
+l'annuncio», come in quello di chi segue da sempre. Con più d'uno
+«🫙 Apri Esplora» resta, coi filtri: per sfogliare è giusto.
+IL LINK È QUELLO DEL SITO (`/annuncio/<n>`) anche a leva
+`TELEGRAM_MINIAPP_LINK` accesa: è la regola già scritta per «🫙 Apri
+l'annuncio» di chi segue («GLI ANNUNCI E I NEGOZI RESTANO SUL SITO… l'anteprima
+con la foto», `prove_link_dentro_telegram`), e adesso l'anteprima del
+messaggio è la foto del primo annuncio invece della scheda del bot.
+LA NOTIFICA DEL TELEFONO: `push_carico` prende il primo link del testo
+(dal 16 nov), quindi con più annunci il tocco apre il PRIMO annuncio e
+non più Esplora; con uno solo, quell'annuncio. Scelto così e detto qui:
+è il verso che l'utente chiedeva.
+
+STRADE SCARTATE. Cambiare la destinazione di «Apri Esplora» (sarebbe
+rimasta sbagliata col nome che ha, e avrebbe rovesciato il terzo sì).
+Il link della Mini App (`startapp=annuncio_<n>`) sui titoli: si perde
+l'anteprima con la foto, ed è la decisione del 10 ott.
+
+PROVATO. `prove_avvisi_mercatino`: i sei testi attesi riscritti coi
+titoli-link e «Apri l'annuncio» per l'uno-solo, più tre prove nuove (i
+titoli e i loro casi storti; uno solo senza numero resta Esplora coi
+filtri; con più d'uno il primo link è il primo annuncio ed Esplora resta
+in fondo). Controprova: titoli nudi e uno-solo su Esplora rimessi a
+mano, otto rosse; ripristinato, verdi. `prove_link_dentro_telegram` e i
+due banchi prendono il pezzo nuovo. Suite severa intera e collaudi della
+CI nel venv senza coincurve (verbale sotto).
+NON PROVATO: il tocco su un telefono vero dentro Telegram.
+VERBALE: sull'albero rebasato su develop 43bfd225 (nessun simbolo in
+comune coi commit arrivati), suite severa intera 30202/0 in un venv come
+il passo «Le prove» della CI (senza httpx né coincurve, nostr-tools con
+IDENTITA_NODE_MODULES), e collaudi della CI 156/0 senza coincurve e
+senza variabili del proxy. `collaudo_avvisi_mercatino` cercava i titoli
+nudi: ora li cerca coi loro link (rosso al primo giro, verde dopo).

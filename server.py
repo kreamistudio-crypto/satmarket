@@ -85294,10 +85294,29 @@ def _passa_avviso_mercatino(pref: dict, a: dict, cambio: float) -> bool:
     return int(a.get("prezzo_sats") or 0) <= int(tetto)
 
 
+def _link_annuncio_avviso(riga: dict) -> str:
+    """PURA: la pagina dell'annuncio di una riga dell'avviso, o '' se la
+    riga non ne porta il numero. Resta il link del SITO anche a leva
+    `TELEGRAM_MINIAPP_LINK` accesa, come «🫙 Apri l'annuncio» di chi
+    segue: e' quello che da' l'anteprima con la foto."""
+    try:
+        n = int(riga.get("annuncio_id") or 0)
+    except (TypeError, ValueError):
+        return ""
+    return f"{URL_PUBBLICO}/annuncio/{n}" if n > 0 else ""
+
+
 def _titoli_avviso_mercatino(righe: list) -> str:
-    """PURA: i primi titoli, uno per riga col puntino, e «…e altri N»."""
-    testo = "".join(f"\n• {html.escape(str(r.get('titolo') or '')[:60])}"
-                    for r in righe[:TITOLI_AVVISO_MERCATINO])
+    """PURA: i primi titoli, uno per riga col puntino, e «…e altri N».
+    OGNI TITOLO E' UN LINK al suo annuncio (18 nov 2026, cantiere
+    apri-esplora-annuncio): un utente toccava «🫙 Apri Esplora» per
+    vedere il prodotto e finiva sulla home — Esplora coi filtri e'
+    giusta per sfogliare, ma il prodotto si apre dal suo titolo."""
+    testo = ""
+    for r in righe[:TITOLI_AVVISO_MERCATINO]:
+        titolo = html.escape(str(r.get('titolo') or '')[:60])
+        link = _link_annuncio_avviso(r)
+        testo += f"\n• <a href=\"{link}\">{titolo}</a>" if link and titolo else f"\n• {titolo}"
     resto = len(righe) - TITOLI_AVVISO_MERCATINO
     if resto > 0:
         testo += "\n…e " + ("un altro" if resto == 1 else f"altri {resto}")
@@ -85343,6 +85362,13 @@ def _testo_avviso_mercatino_tutti(righe: list, pref: dict) -> str:
     if filtro:
         testo += f"\nIl tuo filtro: {filtro}"
     testo += _titoli_avviso_mercatino(righe)
+    # (18 nov 2026, cantiere apri-esplora-annuncio) con un annuncio solo il
+    # tocco apre QUELL'annuncio, come nel messaggio di chi segue: «🫙 Apri
+    # Esplora» portava sulla home chi voleva il prodotto
+    link = _link_annuncio_avviso(righe[0]) if n == 1 else ""
+    if link:
+        testo += f"\n\n<a href=\"{link}\">🫙 Apri l'annuncio</a>"
+        return testo
     # (10 ott 2026) dentro Telegram, a leva accesa, il tocco apre la Mini App
     # su Esplora con gli stessi filtri (`_link_esplora_telegram`)
     testo += (f"\n\n<a href=\"{_link_esplora_telegram(_link_esplora_avvisi(pref))}\">"
@@ -85359,8 +85385,8 @@ def _testo_avviso_mercatino_segui(righe: list, nome: str, negozio: str) -> str:
     testo = f"🔔 <b>{chi}</b> ha pubblicato {n} {'nuovo annuncio' if n == 1 else 'nuovi annunci'}"
     testo += _titoli_avviso_mercatino(righe)
     cod = re.sub(r"[^A-Za-z0-9_]", "", str(negozio or ""))
-    if n == 1 and righe[0].get("annuncio_id"):
-        testo += f"\n\n<a href=\"{URL_PUBBLICO}/annuncio/{int(righe[0]['annuncio_id'])}\">🫙 Apri l'annuncio</a>"
+    if n == 1 and _link_annuncio_avviso(righe[0]):
+        testo += f"\n\n<a href=\"{_link_annuncio_avviso(righe[0])}\">🫙 Apri l'annuncio</a>"
     elif cod:
         testo += f"\n\n<a href=\"{URL_PUBBLICO}/negozio/{cod}\">🫙 Apri il suo negozio</a>"
     else:

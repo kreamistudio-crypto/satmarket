@@ -2303,3 +2303,11 @@ frase: Premi fedeltà dei negozi: le soglie ora si scrivono in euro o in sats, e
 dove: Profilo → «🎀 Premi fedeltà»: l'interruttore «€ euro / ₿ sats», la tendina del regalo («✏️ Lo scrivo io» o un articolo 🎁), e sotto «🏆 I tuoi clienti» → «Guarda chi ha speso di più da te»; la pagina di un negozio, riga «🎁 Hai un premio da riscuotere»; la scheda di un articolo di quel negozio; i messaggi del bot «Premio fedeltà!», «Ordine pagato» e «Hai venduto».
 leva: PREMI_FEDELTA_ATTIVI e CLASSIFICA_CLIENTI_ATTIVA (accese di serie)
 pubblico: sì
+
+<!-- pezzo novita-103 | novita -->
+## Novità · 2026-11-18 · apri-esplora-annuncio
+
+frase: Negli avvisi dei nuovi annunci ogni titolo adesso è un link: toccandolo si apre la pagina di quel prodotto. Se l'annuncio nuovo è uno solo, il bottone in fondo diventa «🫙 Apri l'annuncio»; «🫙 Apri Esplora» resta per sfogliare tutti i nuovi coi tuoi filtri.
+dove: il bot, l'avviso «🆕 N nuovi annunci nel mercatino» e quello «🔔 … ha pubblicato» di un venditore che segui.
+leva: nessuna
+pubblico: sì

@@ -60589,7 +60589,8 @@ def prove_link_dentro_telegram():
         amb.update({"html": __import__("html"), "time": time, "TITOLI_AVVISO_MERCATINO": 3})
         j = src.index("CATEGORIE = (")
         exec(src[j:src.index(")", j) + 1], amb)
-        for f in ("_fmt_eur", "_fmt_sats", "slug_categoria", "_titoli_avviso_mercatino",
+        for f in ("_fmt_eur", "_fmt_sats", "slug_categoria", "_link_annuncio_avviso",
+                  "_titoli_avviso_mercatino",
                   "_link_esplora_avvisi", "_frase_filtro_avvisi_mercatino",
                   "_testo_avviso_mercatino_tutti", "_testo_avviso_mercatino_segui"):
             exec(_senza_prosa(pezzo(f)), amb)
@@ -121712,7 +121713,8 @@ def prove_avvisi_mercatino():
     exec(src[i:src.index(")", i) + 1], amb)
     for f in ("_campo_riga", "_fmt_eur", "_fmt_sats", "slug_categoria", "in_ferie",
               "_leve_avvisi_mercatino", "_pref_avvisi_mercatino", "_passa_avviso_mercatino",
-              "_titoli_avviso_mercatino", "_link_esplora_avvisi", "_frase_filtro_avvisi_mercatino",
+              "_link_annuncio_avviso", "_titoli_avviso_mercatino", "_link_esplora_avvisi",
+              "_frase_filtro_avvisi_mercatino",
               "_testo_avviso_mercatino_tutti", "_testo_avviso_mercatino_segui"):
         exec(_senza_prosa(pezzo(f)), amb)
     amb.update(MERCATINO_AVVISI_NUOVI=True, MERCATINO_AVVISI_NUOVI_MINUTI=60,
@@ -121768,24 +121770,46 @@ def prove_avvisi_mercatino():
     R = lambda *t: [{"annuncio_id": i + 1, "titolo": x} for i, x in enumerate(t)]
     prova("il messaggio «nuovi annunci»: quanti, il filtro della persona, i PRIMI TRE titoli, «…e altri», il tocco",
           "🆕 <b>5 nuovi annunci nel mercatino</b>\nIl tuo filtro: Elettronica · Motori, fino a 50.000 sats"
-          "\n• Uno\n• Due &lt;b&gt;\n• Tre\n…e altri 2"
+          "\n• <a href=\"https://barattolo.store/annuncio/1\">Uno</a>\n• <a href=\"https://barattolo.store/annuncio/2\">Due &lt;b&gt;</a>\n• <a href=\"https://barattolo.store/annuncio/3\">Tre</a>\n…e altri 2"
           "\n\n<a href=\"https://barattolo.store/?max=50000&valuta=sats\">🫙 Apri Esplora</a>",
           testo(R("Uno", "Due <b>", "Tre", "Quattro", "Cinque"), P(True, ["Elettronica", "Motori"], 50000, "sats")))
-    prova("uno solo, senza filtri: al singolare, niente riga del filtro, niente «…e altri»",
-          "🆕 <b>1 nuovo annuncio nel mercatino</b>\n• Uno\n\n<a href=\"https://barattolo.store/\">🫙 Apri Esplora</a>",
+    prova("uno solo, senza filtri: al singolare, niente riga del filtro, niente «…e altri», "
+          "e il tocco apre QUELL'annuncio, non Esplora (18 nov 2026, apri-esplora-annuncio)",
+          "🆕 <b>1 nuovo annuncio nel mercatino</b>\n• <a href=\"https://barattolo.store/annuncio/1\">Uno</a>"
+          "\n\n<a href=\"https://barattolo.store/annuncio/1\">🫙 Apri l'annuncio</a>",
           testo(R("Uno"), P(True, [], 0, "sats")))
     prova("quattro: «…e un altro»; il filtro in euro con la virgola", True,
           "\n…e un altro\n" in testo(R("a", "b", "c", "d"), P(True, [], 0, "sats"))
           and "Il tuo filtro: fino a 12,50 €" in testo(R("a"), P(True, [], 12.5, "eur")))
     segui_t = amb["_testo_avviso_mercatino_segui"]
     prova("il messaggio di chi segue: il nome (scappato), quanti, i titoli, il negozio con piu' d'uno",
-          "🔔 <b>Anna &amp; C.</b> ha pubblicato 2 nuovi annunci\n• Uno\n• Due"
+          "🔔 <b>Anna &amp; C.</b> ha pubblicato 2 nuovi annunci\n• <a href=\"https://barattolo.store/annuncio/1\">Uno</a>\n• <a href=\"https://barattolo.store/annuncio/2\">Due</a>"
           "\n\n<a href=\"https://barattolo.store/negozio/ab12cd34\">🫙 Apri il suo negozio</a>",
           segui_t(R("Uno", "Due"), "Anna & C.", "ab12cd34"))
     prova("...con uno solo il tocco apre l'annuncio; senza nome ne' codice, un ripiego onesto",
-          ("🔔 <b>Anna</b> ha pubblicato 1 nuovo annuncio\n• Uno\n\n<a href=\"https://barattolo.store/annuncio/1\">🫙 Apri l'annuncio</a>",
-           "🔔 <b>Un venditore che segui</b> ha pubblicato 2 nuovi annunci\n• Uno\n• Due\n\n<a href=\"https://barattolo.store/\">🫙 Apri Esplora</a>"),
+          ("🔔 <b>Anna</b> ha pubblicato 1 nuovo annuncio\n• <a href=\"https://barattolo.store/annuncio/1\">Uno</a>\n\n<a href=\"https://barattolo.store/annuncio/1\">🫙 Apri l'annuncio</a>",
+           "🔔 <b>Un venditore che segui</b> ha pubblicato 2 nuovi annunci\n• <a href=\"https://barattolo.store/annuncio/1\">Uno</a>\n• <a href=\"https://barattolo.store/annuncio/2\">Due</a>\n\n<a href=\"https://barattolo.store/\">🫙 Apri Esplora</a>"),
           (segui_t(R("Uno"), "Anna", "ab12cd34"), segui_t(R("Uno", "Due"), "", "")))
+    # «APRI ESPLORA» PORTAVA SULLA HOME CHI VOLEVA IL PRODOTTO (18 nov 2026,
+    # cantiere apri-esplora-annuncio, segnalazione di un utente): ogni titolo
+    # apre il suo annuncio, e con uno solo il tocco in fondo e' l'annuncio
+    tit = amb["_titoli_avviso_mercatino"]
+    prova("i titoli sono link al loro annuncio; senza numero (o storto, o zero) resta il "
+          "titolo nudo, e un titolo vuoto non fa un link vuoto",
+          ['\n• <a href="https://barattolo.store/annuncio/7">Bici &amp; casco</a>',
+           "\n• Senza numero", "\n• Storto", "\n• Zero", "\n• "],
+          [tit([{"annuncio_id": 7, "titolo": "Bici & casco"}]), tit([{"titolo": "Senza numero"}]),
+           tit([{"annuncio_id": "x7", "titolo": "Storto"}]), tit([{"annuncio_id": 0, "titolo": "Zero"}]),
+           tit([{"annuncio_id": 3, "titolo": ""}])])
+    prova("...uno solo senza numero: il tocco resta «🫙 Apri Esplora» coi filtri", True,
+          testo([{"titolo": "Uno"}], P(True, ["Motori"], 0, "sats")).endswith(
+              '<a href="https://barattolo.store/categoria/motori">🫙 Apri Esplora</a>'))
+    prova("...con piu' d'uno il PRIMO link del messaggio e' il primo annuncio (lo prende il "
+          "tocco sulla notifica del telefono, `push_carico`), e Esplora resta in fondo",
+          ["https://barattolo.store/annuncio/1", "🫙 Apri Esplora"],
+          (lambda t: [re.search(r'href="([^"]+)"', t).group(1),
+                      t.rsplit(">", 2)[-2].rsplit("<", 1)[0]])(
+              testo(R("Uno", "Due"), P(True, [], 0, "sats"))))
 
     # --- 3) IL BANCO: la coda vera, su sqlite -----------------------------------
     schema = ""
@@ -121871,9 +121895,9 @@ def prove_avvisi_mercatino():
     avvisi = scarica(con, T)
     prova("IL PRIMO MESSAGGIO PARTE SUBITO, uno per persona e per venditore seguito: a 111 i cinque di Anna "
           "coi primi tre titoli, a 222 i suoi tre col filtro e il reparto; a 555 DUE (chi segue e «tutti»)",
-          {111: ["🔔 <b>Anna</b> ha pubblicato 5 nuovi annunci\n• Cuffie\n• Casco\n• Telecamera\n…e altri 2" + LINK_ANNA],
+          {111: ["🔔 <b>Anna</b> ha pubblicato 5 nuovi annunci\n• <a href=\"https://barattolo.store/annuncio/1\">Cuffie</a>\n• <a href=\"https://barattolo.store/annuncio/2\">Casco</a>\n• <a href=\"https://barattolo.store/annuncio/3\">Telecamera</a>\n…e altri 2" + LINK_ANNA],
            222: ["🆕 <b>3 nuovi annunci nel mercatino</b>\nIl tuo filtro: Elettronica, fino a 50.000 sats"
-                 "\n• Cuffie\n• Radio\n• Cavo\n\n<a href=\"https://barattolo.store/categoria/elettronica?max=50000&valuta=sats\">🫙 Apri Esplora</a>"],
+                 "\n• <a href=\"https://barattolo.store/annuncio/1\">Cuffie</a>\n• <a href=\"https://barattolo.store/annuncio/4\">Radio</a>\n• <a href=\"https://barattolo.store/annuncio/6\">Cavo</a>\n\n<a href=\"https://barattolo.store/categoria/elettronica?max=50000&valuta=sats\">🫙 Apri Esplora</a>"],
            333: 1, 555: 2, 999: 1, -5: 1},
           {tg: ([t for x, t, _ in avvisi if x == tg] if tg in (111, 222) else len([1 for x, _, _ in avvisi if x == tg]))
            for tg in (111, 222, 333, 555, 999, -5)})
@@ -121888,7 +121912,7 @@ def prove_avvisi_mercatino():
     sessantuno = scarica(con, T + 61 * 60)
     prova("RAGGRUPPATI: a un minuto e a quattordici niente; a sedici esce chi segue (finestra 15) con TUTT'E DUE; "
           "a sessantuno esce «tutti» (finestra 60) con tutt'e due — anche a 333 (2 e 3 € stanno sotto i 20)",
-          ([], [], {111: "🔔 <b>Anna</b> ha pubblicato 2 nuovi annunci\n• Tastiera\n• Monitor" + LINK_ANNA, 555: 2, -5: 2},
+          ([], [], {111: "🔔 <b>Anna</b> ha pubblicato 2 nuovi annunci\n• <a href=\"https://barattolo.store/annuncio/10\">Tastiera</a>\n• <a href=\"https://barattolo.store/annuncio/11\">Monitor</a>" + LINK_ANNA, 555: 2, -5: 2},
            {222: "🆕 <b>2 nuovi annunci nel mercatino</b>", 333: 1, 999: 0}),
           ([x for x, _, _ in presto], [x for x, _, _ in meta],
            {111: [t for x, t, _ in sedici if x == 111][0], 555: [t for x, t, _ in sedici if x == 555][0].count("•"),
