@@ -172063,7 +172063,40 @@ def prove_etichetta_alimenti():
     prova("...il server la legge in pubblica E in modifica prima di "
           "scrivere", 2,
           src.count("etichetta = etichetta_da_payload(d, "
-                    "categoria_valida(d.get(\"categoria\")))"))
+                    "categoria_valida(d.get(\"categoria\"))"))
+
+    # --- 3b) LA TABELLA OBBLIGATORIA (18 nov 2026) --------------------------
+    prova("3b) la leva della tabella obbligatoria nasce ACCESA e solo "
+          "False la spegne", [True] * 4,
+          ["except ImportError:\n    ETICHETTA_OBBLIGATORIA = True" in src,
+           "ETICHETTA_OBBLIGATORIA = ETICHETTA_OBBLIGATORIA is not False"
+           in src,
+           "\nETICHETTA_OBBLIGATORIA = True\n" in es,
+           bool(re.search(r'"ETICHETTA_OBBLIGATORIA", ETICHETTA_OBBLIGATORIA,',
+                          src))])
+    prova("...il form la sa da /api/me, e solo un false esplicito la spegne",
+          [True, True],
+          ['profilo["etichetta_obbligatoria"] = ETICHETTA_OBBLIGATORIA'
+           in src,
+           "etichettaObbligatoria = me.etichetta_obbligatoria !== false;"
+           in mini])
+    m = re.search(r"ESENZIONI_ETICHETTA = \((.*?)\)\n", src, re.S)
+    srv_es = re.findall(r'"(\w+)"', m.group(1)) if m else []
+    m = re.search(r"const ESENZIONI_ETICHETTA = \[(.*?)\];", mini, re.S)
+    cli_es = re.findall(r"\['(\w+)',", m.group(1)) if m else []
+    prova("...i motivi d'esenzione, uguali e nello stesso ordine nei due "
+          "lati", (6, True), (len(srv_es), srv_es == cli_es))
+    prova("...SOLO pubblica esige la chiave (`nuovo`): in modifica la "
+          "chiave assente conserva gli annunci di prima", [1, True],
+          [src.count("nuovo=True)"),
+           "categoria_valida(d.get(\"categoria\")),\n"
+           "                                     nuovo=True)"
+           in pezzo("pubblica")])
+    pub = mini[mini.index("async function publish(){"):]
+    pub = pub[:pub.index("if (editandoId) { await salvaModifica(t, p); return; }")]
+    prova("...il form la controlla PRIMA del viaggio, per pubblica e "
+          "modifica (sta prima del bivio)", True,
+          "const manca = etichettaMancante();" in pub)
 
     # --- 4) LA RESA, fatta girare -----------------------------------------
     _node = _sh.which("node")
@@ -172073,8 +172106,10 @@ def prove_etichetta_alimenti():
         return
     corpo = "\n".join([
         re.search(r"const esc = s => .*?\n.*?\n", mini, re.S).group(0),
-        re.search(r"const CAT_ETICHETTA = .*?const UNITA_PESO = .*?;\n",
-                  mini, re.S).group(0),
+        re.search(r"const CAT_ETICHETTA = .*?const ESENZIONI_ETICHETTA = "
+                  r".*?\]\];\n", mini, re.S).group(0),
+        re.search(r"const CAMPI_ETICHETTA = \[.*?\]\];\n", mini,
+                  re.S).group(0),
         "let etichettaSell = {valori: {}};",
         "const el = () => null;",
         pezzo_js(mini, "let etichettaEnergiaAuto = '';",
@@ -172098,6 +172133,11 @@ fuori.push(etichettaSell.valori.kcal);
 etichettaSell = {valori: {kcal: '99'}}; etichettaEnergiaAuto = '';
 scriviValoreEtichetta('kj', '1000');
 fuori.push(etichettaSell.valori.kcal);
+fuori.push(htmlEtichetta({esente: 'artigiano', ingredienti: 'Fichi'}));
+fuori.push(htmlEtichetta({esente: 'inventato'}));
+fuori.push(htmlEtichetta({origine: '<b>Italia</b>', conservazione: 'In frigo',
+  lotto: 'L24', scadenza: '2027-12-31'}));
+fuori.push(htmlEtichetta({scadenza: '31/12/2027'}));
 console.log(JSON.stringify(fuori));
 """
     f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -172108,7 +172148,8 @@ console.log(JSON.stringify(fuori));
                 timeout=60, encoding="utf-8")
     os.unlink(f.name)
     try:
-        h, vuota1, vuota2, k1, k2, k3 = _js.loads(r.stdout.strip())
+        (h, vuota1, vuota2, k1, k2, k3, hes, hign, hcampi,
+         hdata) = _js.loads(r.stdout.strip())
     except Exception:
         prova("4) il programma della resa gira", "", r.stderr[-300:])
         return
@@ -172124,6 +172165,106 @@ console.log(JSON.stringify(fuori));
     prova("l'energia scritta in kJ completa i kcal, e segue i ritocchi",
           ["239", "500"], [k1, k2])
     prova("...ma i kcal scritti a mano non si toccano", "99", k3)
+    prova("la scheda dice il motivo d'esenzione al posto della tabella, "
+          "e un motivo ignoto non disegna niente",
+          [True, True, ""],
+          ["Non dovuti per legge: artigianale" in hes,
+           "Fichi" in hes, hign])
+    prova("i campi facoltativi del 18 nov: origine scappata, conservazione, "
+          "lotto, e la scadenza alla italiana; una data storta non esce",
+          [False, True, True, True, True, ""],
+          ["<b>Italia" in hcampi, "&lt;b&gt;Italia" in hcampi,
+           "In frigo" in hcampi, "L24" in hcampi, "31/12/2027" in hcampi,
+           hdata])
+    m = re.search(r"CAMPI_ETICHETTA = \((.*?)\)\n_RE_DATA", src, re.S)
+    srv_c = re.findall(r'\("(\w+)", "', m.group(1)) if m else []
+    m = re.search(r"const CAMPI_ETICHETTA = \[(.*?)\];", mini, re.S)
+    cli_c = re.findall(r"\['(\w+)', '", m.group(1)) if m else []
+    prova("...e i campi sono gemelli nei due lati", (3, True),
+          (len(srv_c), srv_c == cli_c))
+
+    # --- 5) IL CONTROLLO DEL FORM, fatto girare (18 nov 2026) --------------
+    corpo = "\n".join([
+        re.search(r"const CAT_ETICHETTA = .*?let etichettaObbligatoria = true;\n",
+                  mini, re.S).group(0),
+        "let editandoNostr = false, CAT = 'Alimenti e bevande', SCAD = null;",
+        "const el = id => id === 'sellCat' ? {value: CAT}"
+        " : id === 'etScad' ? SCAD : null;",
+        pezzo_js(mini, "const etichettaVuota = () =>", "let etichettaSell"),
+        "let etichettaSell = etichettaVuota();",
+        pezzo_js(mini, "function etichettaDaScheda(e){",
+                 "function renderEtichettaForm(){"),
+        pezzo_js(mini, "function etichettaMancante(){",
+                 "function scegliAllergene("),
+        pezzo_js(mini, "function etichettaPayload(){",
+                 "/* LA SCHEDA: una tabella uguale per tutti"),
+    ])
+    prog = corpo + """
+const fuori = {};
+const tab = {kcal: '304', grassi: '0', saturi: '0', carboidrati: '82',
+             zuccheri: '80', proteine: '0', sale: '0'};
+fuori.vuota = etichettaMancante() !== '';
+etichettaSell.valori = {...tab, sale: ''};
+fuori.meta = etichettaMancante() !== '';
+etichettaSell.valori = {...tab};
+fuori.intera = etichettaMancante();
+etichettaSell.valori = {...tab, kcal: '', kj: '1272'};
+fuori.soloKj = etichettaMancante();
+etichettaSell = etichettaVuota(); etichettaSell.nonDovuta = true;
+fuori.senzaMotivo = /Scegli perch/.test(etichettaMancante());
+etichettaSell.esente = 'fresco'; etichettaSell.valori = {...tab};
+fuori.esente = etichettaMancante();
+fuori.payloadEsente = etichettaPayload().etichetta;
+etichettaSell = null;
+fuori.carica = /caricando/.test(etichettaMancante());
+etichettaSell = etichettaVuota();
+CAT = 'Elettronica'; fuori.fuori = etichettaMancante();
+CAT = 'Alimenti e bevande'; etichettaObbligatoria = false;
+fuori.spenta = etichettaMancante();
+etichettaObbligatoria = true; editandoNostr = true;
+fuori.nostr = etichettaMancante();
+editandoNostr = false;
+fuori.daScheda = etichettaDaScheda({esente: 'erbe'});
+fuori.daSchedaTab = etichettaDaScheda({esente: 'erbe', valori: {kcal: 1}}).nonDovuta;
+etichettaSell = etichettaVuota(); etichettaDisegnata = etichettaSell;
+SCAD = {value: '2027-12-31'};
+fuori.scad = etichettaPayload().etichetta.scadenza;
+etichettaSell = etichettaVuota();
+fuori.scadNuovo = etichettaPayload().etichetta.scadenza;
+console.log(JSON.stringify(fuori));
+"""
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    f.write(prog)
+    f.close()
+    r = _sp.run([_node, f.name], capture_output=True, text=True,
+                timeout=60, encoding="utf-8")
+    os.unlink(f.name)
+    try:
+        o = _js.loads(r.stdout.strip())
+    except Exception:
+        prova("5) il programma del controllo gira", "", r.stderr[:400])
+        return
+    prova("5) negli alimenti il form ferma la tabella vuota o a meta', e "
+          "lascia passare quella intera (l'energia basta in kJ)",
+          [True, True, "", ""],
+          [o.get("vuota"), o.get("meta"), o.get("intera"), o.get("soloKj")])
+    prova("...«Non dovuta per legge» vuole il motivo, e col motivo passa "
+          "senza mandare i valori", [True, "", {}, "fresco"],
+          [o.get("senzaMotivo"), o.get("esente"),
+           (o.get("payloadEsente") or {}).get("valori"),
+           (o.get("payloadEsente") or {}).get("esente")])
+    prova("...aspetta la scheda in modifica; fuori categoria, a leva spenta "
+          "e sulla strada firmata non ferma niente",
+          [True, "", "", ""],
+          [o.get("carica"), o.get("fuori"), o.get("spenta"), o.get("nostr")])
+    prova("...la modifica ritrova il motivo dalla scheda, ma non sopra una "
+          "tabella", [True, "erbe", False],
+          [(o.get("daScheda") or {}).get("nonDovuta"),
+           (o.get("daScheda") or {}).get("esente"), o.get("daSchedaTab")])
+    prova("la scadenza si legge dal selettore di casa, e un form rimesso a "
+          "nuovo non eredita quella di prima", ["2027-12-31", ""],
+          [o.get("scad"), o.get("scadNuovo")])
 
 
 def prove_esauriti_eliminabili():

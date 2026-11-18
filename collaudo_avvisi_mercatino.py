@@ -207,7 +207,11 @@ def corpo_annuncio(titolo, categoria, sats):
     return {"titolo": titolo, "prezzo_sats": sats, "categoria": categoria,
             "zona": "Torino (TO)", "descrizione": "Una cosa", "consegna": "ritiro",
             "quantita": 1, "condizione": "nuovo",
-            "foto": ["foto-di-cartone"]}
+            "foto": ["foto-di-cartone"],
+            # (18 nov 2026) negli alimenti la tabella nutrizionale e'
+            # obbligatoria: il motivo d'esenzione la sostituisce, e
+            # fuori dagli alimenti la chiave si butta in silenzio
+            "etichetta": {"esente": "artigiano"}}
 
 
 def pubblica(tg_id, titolo, categoria=CAT, sats=30000):

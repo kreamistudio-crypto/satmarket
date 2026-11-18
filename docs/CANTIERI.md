@@ -90800,3 +90800,77 @@ IDENTITA_NODE_MODULES) e collaudi della CI (155 verdi) nel venv senza
 coincurve, sull'albero di develop 8190d60d.
 NON PROVATO: la pulizia su un archivio vero di un anno (il primo giro
 utile sarà a novembre 2027).
+
+## La tabella nutrizionale obbligatoria (18 nov 2026, cantiere etichetta-obbligatoria; Andrea: «per chi inserisce un prodotto alimentare deve essere obbligatorio»)
+
+PERCHÉ. Il 17 nov l'etichetta degli alimenti era nata FACOLTATIVA, per
+non fermare i piccoli produttori che la legge esenta (voce «L'etichetta
+degli alimenti»). Il giorno dopo Andrea la vuole obbligatoria. La
+proposta, approvata con un «Ok», tiene quel perché senza lasciare la
+porta aperta a chi semplicemente non la scrive: la TABELLA si esige, e
+chi non la deve lo DICHIARA scegliendo il motivo.
+
+DECISO. In «Alimenti e bevande» un annuncio si pubblica (e si modifica
+dal form) solo con la tabella intera O con «Non dovuta per legge» e uno
+dei sei motivi di `ESENZIONI_ETICHETTA`, presi dall'Allegato V e
+dall'art. 16 del Reg. UE 1169/2011 su un testo che un utente ha mandato
+ad Andrea: prodotto non trasformato di un solo ingrediente (frutta,
+verdura), spezie/erbe/sale/caffè/tè, acqua o aceto, alcolici oltre
+l'1,2%, confezione sotto i 25 cm², artigianale in piccole quantità
+venduto da chi lo fa. Il motivo si legge nella scheda al posto della
+tabella («Non dovuti per legge: …»). Con la tabella il motivo non si
+scrive: la tabella vince. Ingredienti, allergeni e peso restano
+facoltativi, e Andrea ha chiesto di aggiungere, sempre facoltativi,
+origine, conservazione, lotto e scadenza (`CAMPI_ETICHETTA`, una riga
+ciascuno con le regole degli ingredienti; la scadenza è una data
+AAAA-MM-GG, e una data passata NON si rifiuta: il «da consumarsi
+preferibilmente entro» si vende anche dopo, e chi compra la legge prima
+di pagare; nel form si sceglie col selettore di casa, perché la suite
+vieta i selettori di sistema, con «Senza scadenza» per toglierla). IL CLIENT DI IERI: in pubblica la chiave assente è un 400
+che dice di aggiornare l'app (`nuovo=True`); in modifica resta
+«conserva», ed è il patto che lascia in pace gli annunci già online e
+gli importati (CSV, negozi collegati, Nostr) finché il form non li
+ritocca: lì la tabella si chiede, come la condizione al primo ritocco.
+Il form la controlla prima del viaggio delle foto (`etichettaMancante`,
+prima del bivio pubblica/modifica). LA LEVA `ETICHETTA_OBBLIGATORIA`
+nasce accesa (regola del 14 nov), sta nel pannello e in `/api/me`;
+spenta, la tabella torna facoltativa come il 17 nov (il motivo, se
+scelto, si scrive lo stesso). Conta solo con `ETICHETTA_ALIMENTI` accesa.
+
+SCARTATO. L'obbligo senza esenzione: fermerebbe proprio chi la legge
+esenta (il perché del 17 nov). Spegnere o nascondere gli annunci già
+online senza tabella, o bloccare gli import di alimenti: si mettono in
+regola al primo ritocco. I «formaggi stagionati» del testo dell'utente:
+nell'Allegato V non ci sono. Rifiutare una scadenza passata.
+
+PROVATO. `prove_etichetta_alimenti` estesa (la leva nuova, i gemelli dei
+motivi, `nuovo` solo in pubblica, il controllo prima del bivio; in node
+il controllo del form su tabella vuota, a metà, intera e coi soli kJ,
+«non dovuta» senza e col motivo, la scheda che aspetta, fuori
+categoria, leva spenta, strada firmata; la scheda col motivo e coi
+campi nuovi, scappati). `collaudo_etichetta_alimenti` sul server vero:
+il client di ieri respinto senza righe, la tabella vuota e quella senza
+valori respinte, il motivo ignoto respinto, i sei motivi che passano e
+si rileggono, la tabella che vince sul motivo, la leva spenta che torna
+al 17 nov, in modifica la chiave vuota respinta, il motivo al posto
+della tabella e l'annuncio di prima ritoccato dal client di ieri; i
+campi nuovi (riletti, troppo lunghi, col link, la scadenza storta).
+`collaudo_avvisi_mercatino` pubblicava alimenti senza tabella: ora col
+motivo. Giro dal vivo in Chromium a 390 e 320 px sul server vero:
+form compilato dai campi veri e pubblicato, scheda riletta, «Non dovuta
+per legge» coi motivi che vanno a capo (a 320 px il bottoncino lungo
+usciva dal riquadro: `flex-shrink` e `max-width` sui soli motivi), la
+scadenza scelta a tocchi che resta dopo un ridisegno e si toglie,
+nessun errore in console, nessuno scorrimento orizzontale. Dopo il
+rebase su develop (8190d60d, la fotografia dell'annuncio, e 690299f5,
+il suo storico di un anno: conflitti solo di testo nel pannello delle
+leve e nei documenti) suite severa e
+collaudi della CI rigirati interi sull'albero finale. Anche i collaudi
+fuori dalla CI che pubblicano alimenti: `collaudo_duplicato` ora col
+motivo, `collaudo_consegna_firmata`, `collaudo_connettori` e
+`collaudo_categoria_negozio` verdi così.
+
+DA GUARDARE. Gli import continuano a non portare l'etichetta. Gli
+annunci alimentari già online senza tabella restano visibili finché
+nessuno li modifica: se Andrea li vuole in regola prima, serve un
+avviso ai loro venditori (non fatto, non chiesto).

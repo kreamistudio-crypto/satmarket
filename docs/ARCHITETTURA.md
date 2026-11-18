@@ -36869,7 +36869,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   porta. Prove: `prove_domande_compratore`, `collaudo_domande_compratore`.
 - L'ETICHETTA DEGLI ALIMENTI (17 nov 2026, cantiere etichetta-alimenti;
   il perché in CANTIERI, «L'etichetta degli alimenti»). Solo in
-  «Alimenti e bevande» (`CATEGORIA_ETICHETTA`), FACOLTATIVA: ingredienti,
+  «Alimenti e bevande» (`CATEGORIA_ETICHETTA`), FACOLTATIVA fino al 18 nov
+  (poi la tabella è obbligatoria, sotto): ingredienti,
   i 14 allergeni dell'Allegato II (`ALLERGENI_UE`, chiavi interne; i nomi
   li scrive il gemello `ALLERGENI_UE` del client), peso netto con unità
   (`UNITA_PESO`) e la tabella dell'art. 30 per 100 g o 100 ml
@@ -36896,6 +36897,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `ETICHETTA_ALIMENTI` nasce accesa (solo False spegne), sta nel pannello
   e in `/api/me` (`etichetta_alimenti`). Prove: `prove_etichetta_alimenti`,
   `collaudo_etichetta_alimenti`.
+  LA TABELLA OBBLIGATORIA (18 nov 2026, cantiere etichetta-obbligatoria;
+  CANTIERI, «La tabella nutrizionale obbligatoria»): con
+  `ETICHETTA_OBBLIGATORIA` (accesa di serie, pannello, `/api/me`
+  `etichetta_obbligatoria`) `etichetta_da_payload` esige in «Alimenti e
+  bevande» la tabella intera O `esente` con una chiave di
+  `ESENZIONI_ETICHETTA` (fresco, erbe, acqua, alcolici, piccola,
+  artigiano: Allegato V e art. 16; i nomi nel gemello del client). Con la
+  tabella `esente` non si scrive. `nuovo=True` (solo `pubblica`) fa 400
+  anche la chiave ASSENTE; in modifica l'assente resta «conserva», così
+  gli annunci di prima e gli importati si mettono in regola al primo
+  ritocco dal form. I campi facoltativi `CAMPI_ETICHETTA` (origine,
+  conservazione, lotto: una riga, niente link, filtro parole) e
+  `scadenza` (AAAA-MM-GG, una data passata non si rifiuta; nel form il
+  selettore di casa `selettoreCasaCampo('etScad', soloData)`, riletto da
+  `etichettaLeggiScadenza` solo se il campo a schermo è dello stesso
+  stato, `etichettaDisegnata`). IL CLIENT:
+  «Non dovuta per legge» (`scegliNonDovuta`, `scegliEsenzione`) nasconde
+  la griglia; `etichettaMancante` ferma il tocco in `publish` prima del
+  bivio pubblica/modifica; la scheda dice «Non dovuti per legge: …».
 - LA FOTOGRAFIA DELL'ANNUNCIO ALL'ACQUISTO (18 nov 2026, cantiere
   fotografia-annuncio). Tabella `ordine_fotografie(ordine_id,
   annuncio_id, dati, creato)`, chiave (ordine, annuncio): `dati` è il

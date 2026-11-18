@@ -413,9 +413,13 @@ FEEDBACK_MODIFICA_GIORNI = 7
 # In «Alimenti e bevande» chi vende puo' scrivere ingredienti, i 14
 # allergeni UE, il peso netto e la tabella nutrizionale (per 100 g o
 # 100 ml), e la scheda li mostra prima di comprare (Reg. UE 1169/2011,
-# art. 14). Facoltativa per chi vende. Nasce ACCESA (le leve nuove sono
+# art. 14). Nasce ACCESA (le leve nuove sono
 # accese di serie): la riga serve per SPEGNERLA, e solo False spegne.
 ETICHETTA_ALIMENTI = True
+# La tabella nutrizionale OBBLIGATORIA (18 nov 2026): un alimento si
+# pubblica solo con la tabella intera o col motivo per cui la legge non
+# la chiede. Nasce ACCESA; False la rende di nuovo facoltativa.
+ETICHETTA_OBBLIGATORIA = True
 
 # --- La fotografia dell'annuncio all'acquisto (18 nov 2026) -----------
 # Al pagamento l'ordine salva l'annuncio com'era (testo, condizione,
