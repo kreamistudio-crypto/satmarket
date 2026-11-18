@@ -10332,6 +10332,16 @@ def init_db():
                     # piazza per sempre un evento nostro che nessuno sa
                     # piu' di avere.
                     "nostr_event_vecchio TEXT DEFAULT ''",
+                    # nostr_impronta (18 nov 2026, cantiere negozi-su-
+                    # nostr): l'impronta dell'ultimo evento mandato in
+                    # piazza (o accodato alla firma) per questo annuncio,
+                    # '' = nessuno. Serve al riallineamento dei negozi
+                    # collegati (`nostr_del_negozio`): il giro orario non
+                    # dice QUALI righe ha cambiato, e confrontare
+                    # l'impronta di adesso con questa e' il modo di
+                    # ripubblicare solo cio' che in piazza direbbe
+                    # un'altra cosa.
+                    "nostr_impronta TEXT DEFAULT ''",
                     "valuta TEXT DEFAULT 'sats'",
                     "prezzo_eur REAL DEFAULT 0",
                     "nostr_origine_d TEXT DEFAULT ''",
@@ -37406,6 +37416,16 @@ def _leve_stato():
                   "NOSTR_NSEC_PIATTAFORMA", _NOSTR is not None,
                   spento="gli annunci non escono come eventi NIP-99 (manca "
                          "la nsec della piattaforma, o coincurve)"),
+            _leva("I prodotti dei negozi collegati su Nostr",
+                  "NEGOZI_SU_NOSTR", bool(NEGOZI_SU_NOSTR),
+                  acceso="a fine di ogni giro del negozio un evento NIP-99 "
+                         "per prodotto (le varianti sono uno solo, col "
+                         "prezzo «da»), al più "
+                         f"{MAX_NOSTR_NEGOZIO_PER_GIRO} a giro; tolto dal "
+                         "negozio = cancellato anche dai relay",
+                  spento="i prodotti dei negozi collegati restano solo in "
+                         "vetrina: niente eventi nuovi né aggiornamenti, e "
+                         "quel che è già in piazza resta com'è"),
             _leva("Post automatici", "POST_AUTOMATICI", bool(POST_AUTOMATICI),
                   spento="i nuovi annunci non vengono raccontati da nessuna "
                          "parte (il ciclo di vita dei post già fatti "
@@ -58475,6 +58495,25 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         # l'utente firma con la SUA. Uno spreco dichiarato, in
         # cambio di un posto solo — e la coda si riempie solo dopo
         # il gate _NOSTR, quindi la chiave c'e' di sicuro.
+        # Una FAMIGLIA di varianti di un negozio collegato e' un evento
+        # solo, col titolo, il prezzo e lo stato di tutte (18 nov 2026,
+        # cantiere negozi-su-nostr): la stessa riga che firmerebbe la
+        # piattaforma, `annuncio_per_nostr`. La coda e' gia' intestata
+        # alla testa della famiglia; se la famiglia non c'e' piu', la
+        # firma non ha niente da dire e si salta.
+        if a.get("famiglia"):
+            con = db()
+            vista, stato = annuncio_per_nostr(con, a, stato)
+            if vista is None:
+                # (e la riga di coda se ne va: resterebbe a chiedere
+                # per sempre una firma che non dice niente)
+                con.execute("DELETE FROM firme_nostr WHERE annuncio_id=? "
+                            "AND azione<>'ritira'", (a["id"],))
+                con.commit()
+            con.close()
+            if vista is None:
+                continue
+            a = {**vista, "azione": a["azione"]}
         base = evento_annuncio(a, stato)
         evento = evento_non_firmato(sua, 30402, base["tags"],
                                     base["content"], base["created_at"])
@@ -80328,6 +80367,12 @@ def evento_annuncio(a: dict, status: str) -> dict:
     else:
         prezzo_tag = ["price", str(a["prezzo_sats"]), "sats"]
         prezzo_txt = f"{a['prezzo_sats']} sats"
+    # LA FAMIGLIA DI VARIANTI (18 nov 2026, cantiere negozi-su-nostr):
+    # in piazza va UN evento per prodotto, col prezzo della variante
+    # disponibile piu' economica (`annuncio_per_nostr`). Il tag resta un
+    # numero, com'e' giusto; il «da» lo legge la persona nel content.
+    if (a.get("varianti_n") or 0) > 1:
+        prezzo_txt = f"da {prezzo_txt}"
     tags = [["d", f"barattolo-{a['id']}"],
             ["title", a["titolo"]],
             ["summary", (a["descrizione"] or a["titolo"])[:200]],
@@ -82243,24 +82288,116 @@ def accoda_firma(con, annuncio_id: int, tg_id: int, azione: str):
         (annuncio_id, tg_id, azione, int(time.time())))
 
 
+def annuncio_per_nostr(con, a: dict, status: str):
+    """LA RIGA CHE VA IN PIAZZA al posto di `a`, e con quale stato:
+    `(riga, status)`, oppure `(None, status)` se in piazza non ci va
+    niente (18 nov 2026, cantiere negozi-su-nostr; Andrea: «le varianti
+    no, però un articolo sì»).
+
+    Un annuncio senza famiglia e' se stesso, e lo stato lo dice chi
+    chiama: e' il mondo di sempre, byte per byte.
+    UNA FAMIGLIA DI VARIANTI (solo i negozi collegati ne fanno) e' UN
+    evento solo, e la testa e' la variante PIU' VECCHIA, qualunque sia
+    il suo stato: le righe non si cancellano mai, quindi il suo id — e
+    con lui il tag `d` — non cambia per tutta la vita del prodotto. Il
+    capofila della vetrina (la piu' economica disponibile) cambia
+    invece a ogni esaurito, e un `d` legato a lui farebbe un evento
+    nuovo, e una cancellazione, ogni volta.
+    Dentro c'e' il CAPOFILA, con la stessa regola di `SQL_CAPOFILA`
+    (prezzo, poi id): suo il prezzo, il testo e le foto; della famiglia
+    il titolo (`famiglia_titolo`) e i disponibili (la somma delle
+    varianti vive); della testa l'id, la data, l'evento e chi l'ha
+    firmato. Lo STATO e' della famiglia e non di chi chiama: un ordine
+    su una variante chiede «sold» per la SUA riga, e la famiglia resta
+    attiva finche' una sorella e' disponibile. Tutte esaurite = «sold»;
+    tutte tolte (rimosse, in revisione) = None, cioe' la lapide."""
+    if not a.get("famiglia"):
+        return a, status
+    sorelle = con.execute("SELECT * FROM annunci WHERE famiglia=? "
+                          "ORDER BY id", (a["famiglia"],)).fetchall()
+    if not sorelle:
+        return None, status
+    testa = sorelle[0]
+    vive = [s for s in sorelle if s["stato"] == "attivo"]
+    finite = [s for s in sorelle if s["stato"] == "venduto"]
+    if vive:
+        status, gruppo = "active", vive
+    elif finite:
+        status, gruppo = "sold", finite
+    else:
+        return None, status
+    capo = min(gruppo, key=lambda s: (s["prezzo_sats"] or 0, s["id"]))
+    riga = dict(capo)
+    riga.update(
+        id=testa["id"], creato=testa["creato"],
+        venditore_id=testa["venditore_id"],
+        nostr_event_id=testa["nostr_event_id"] or "",
+        nostr_autore=testa["nostr_autore"] or "",
+        titolo=(capo["famiglia_titolo"] or capo["titolo"]),
+        quantita=(sum(max(s["quantita"] or 1, 1) for s in vive)
+                  if vive else capo["quantita"]),
+        varianti_n=len(gruppo))
+    return riga, status
+
+
+def _impronta_nostr(evento: dict) -> str:
+    """L'impronta di quel che un evento DICE in piazza: tag e testo,
+    senza firma, id e ora (che cambiano a ogni firma anche quando non
+    cambia niente). La legge il riallineamento dei negozi collegati."""
+    return hashlib.sha256(json.dumps(
+        [evento["tags"], evento["content"]], ensure_ascii=False,
+        separators=(",", ":")).encode()).hexdigest()
+
+
 async def annuncio_su_nostr(annuncio_id: int, status: str,
                             solo_aggiornamento: bool = False):
     """Pubblica (o ripubblica con nuovo status) un annuncio su Nostr.
     Gira in sottofondo e non deve MAI disturbare chi usa la Mini App:
     qualsiasi intoppo finisce in console e basta.
-    solo_aggiornamento=True: agisci solo se l'evento esiste gia'."""
+    solo_aggiornamento=True: agisci solo se l'evento esiste gia'.
+    Torna True quando l'evento e' partito o e' in coda alla firma del
+    venditore (18 nov 2026: lo chiede il riallineamento dei negozi;
+    tutti gli altri chiamanti lo ignorano, com'era)."""
     if not _NOSTR:
-        return
+        return False
     try:
         con = db()
         a = con.execute("SELECT * FROM annunci WHERE id=?",
                         (annuncio_id,)).fetchone()
-        u = con.execute("SELECT npub, npub_verificata, npub_accesso "
-                        "FROM utenti WHERE tg_id=?",
-                        (a["venditore_id"],)).fetchone() if a else None
         if not a or a["contatto_nostr"]:
             con.close()
-            return   # importato da Nostr: l'evento e' gia' del venditore
+            return False   # importato da Nostr: l'evento e' gia' suo
+        # I NEGOZI COLLEGATI (18 nov 2026, cantiere negozi-su-nostr): la
+        # leva e' l'interruttore d'emergenza di tutti i loro eventi,
+        # anche dei ganci di sempre (ordini, modifiche); e una variante
+        # parla per la sua FAMIGLIA, con l'id della testa e lo stato di
+        # tutte (`annuncio_per_nostr`). Da qui in giu' `a` e' la riga
+        # che va in piazza, e `annuncio_id` il suo id.
+        if da_connettore(a) and not NEGOZI_SU_NOSTR:
+            con.close()
+            return False
+        a, status = annuncio_per_nostr(con, dict(a), status)
+        if a is None:
+            con.close()
+            return False   # la famiglia non c'e' piu': la lapide la
+                           # decide il riallineamento, non un gancio
+        annuncio_id = a["id"]
+        riga_piazza = a
+
+        def segna_impronta():
+            # Il ramo del venditore: l'evento lo firmera' lui, ma
+            # l'impronta di quel che dira' si segna adesso, o il
+            # riallineamento busserebbe ogni ora. Solo i negozi
+            # collegati la leggono: per gli altri resta vuota, e niente
+            # cambia nel loro mondo.
+            if riga_piazza.get("fonte"):
+                con.execute("UPDATE annunci SET nostr_impronta=? "
+                            "WHERE id=?", (_impronta_nostr(evento_annuncio(
+                                riga_piazza, status)), annuncio_id))
+                con.commit()
+        u = con.execute("SELECT npub, npub_verificata, npub_accesso "
+                        "FROM utenti WHERE tg_id=?",
+                        (a["venditore_id"],)).fetchone()
         # IL BIVIO (ago 2026): se il venditore ha una chiave Nostr sua,
         # l'annuncio va sul SUO account e non sul nostro — e' la sua
         # reputazione, non la nostra. Ma la nsec ce l'ha solo lui,
@@ -82278,42 +82415,51 @@ async def annuncio_su_nostr(annuncio_id: int, status: str,
         if chiave_nostr_provata(u) \
                 and not annunci_sul_suo_profilo(con, a["venditore_id"]):
             if a["nostr_autore"]:
+                # (il suo evento aspetta la SUA cancellazione: l'impronta
+                # si segna, o il riallineamento busserebbe ogni ora)
+                segna_impronta()
                 con.close()
-                return
+                return True
         elif chiave_nostr_provata(u):
             gia = con.execute("SELECT azione FROM firme_nostr "
                               "WHERE annuncio_id=?",
                               (annuncio_id,)).fetchone()
             if gia and gia["azione"] == "pubblica":
+                segna_impronta()
                 con.close()
-                return   # deve ancora nascere: l'evento nascera' gia'
-                         # col suo stato di adesso, riletto alla firma
+                return True  # deve ancora nascere: l'evento nascera'
+                             # gia' col suo stato di adesso, riletto
+                             # alla firma
             if a["nostr_event_id"]:
                 accoda_firma(con, annuncio_id, a["venditore_id"], status)
             elif not solo_aggiornamento:
                 accoda_firma(con, annuncio_id, a["venditore_id"], "pubblica")
             con.commit()
+            segna_impronta()
             con.close()
-            return
+            return True
         con.close()
         if solo_aggiornamento and not a["nostr_event_id"]:
-            return
+            return False
         evento = evento_annuncio(dict(a), status)
+        impronta = _impronta_nostr(evento) if a.get("fonte") else ""
         ok = await _spedisci_ai_relay(evento)
         if not ok:
             print(f"⚠️ Annuncio #{annuncio_id}: nessun relay ha "
                   f"accettato l'evento Nostr ({status})")
-            return
+            return False
         con = db()
-        con.execute("UPDATE annunci SET nostr_event_id=? WHERE id=?",
-                    (evento["id"], annuncio_id))
+        con.execute("UPDATE annunci SET nostr_event_id=?, nostr_impronta=? "
+                    "WHERE id=?", (evento["id"], impronta, annuncio_id))
         con.commit()
         con.close()
         print(f"🟣 Annuncio #{annuncio_id} su Nostr ({status}, "
               f"{ok}/{len(RELAYS_VERIFICA)} relay)")
+        return True
     except Exception as e:
         print(f"⚠️ Pubblicazione Nostr saltata per l'annuncio "
               f"#{annuncio_id}: {e}")
+        return False
 
 
 def _lapide_nostra(annuncio_id: int, event_id: str) -> dict:
@@ -98880,6 +99026,28 @@ try:
 except ImportError:
     CONNETTORI_NEGOZIO_APERTI = False
 
+# I PRODOTTI DEI NEGOZI COLLEGATI IN PIAZZA (18 nov 2026, cantiere
+# negozi-su-nostr). Fino a oggi il giro dei negozi metteva i prodotti in
+# vetrina e basta: 2.387 annunci vivi che su Nostr non c'erano, e che le
+# classifiche dei marketplace (Nostrology) non potevano vedere. Andrea,
+# davanti ai numeri: «le varianti no, però un articolo sì» — UN evento
+# per prodotto (`annuncio_per_nostr`), allineato a fine di ogni giro da
+# `nostr_del_negozio`. Nasce ACCESA, la regola delle leve nuove (14 nov
+# 2026): e' l'interruttore d'emergenza, False e riavvia — nessun evento
+# nuovo, nessun aggiornamento e nessuna lapide dei negozi; quel che e'
+# gia' in piazza resta com'e'.
+try:
+    from config import NEGOZI_SU_NOSTR
+except ImportError:
+    NEGOZI_SU_NOSTR = True
+
+# Quanti eventi al massimo per negozio e per giro (pubblicazioni e
+# lapidi insieme). E' il respiro dei relay, non un limite del catalogo:
+# gli arretrati escono a scaglioni, un'ora dopo l'altra, invece che in
+# una raffica di centinaia di eventi dalla stessa chiave — il modo di
+# farsi prendere per spam.
+MAX_NOSTR_NEGOZIO_PER_GIRO = 100
+
 # CHI VEDE LA PORTA (set 2026, decisione di Andrea, dalla segnalazione
 # di un venditore): il collegamento vive in una sezione di «📥 Importa in
 # blocco / catalogo esterno», e PER ORA la vedono solo i negozi GIA'
@@ -99920,6 +100088,10 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
         if avviso:
             esito["saltati"].append({"titolo": "", "perche": avviso})
         await _chiudi_giro_connettore(c, esito)
+        # ...e la piazza Nostr, a giro chiuso e col report gia' scritto:
+        # un relay lento non ritarda niente di cio' che legge il
+        # venditore (18 nov 2026, cantiere negozi-su-nostr)
+        await nostr_del_negozio(c["id"])
     finally:
         _CONNETTORI_IN_CORSO.discard(c["id"])
 
@@ -99953,6 +100125,105 @@ async def _connettore_in_errore(c: dict, errore: str):
             f"più. Controlla il collegamento dal Profilo, in "
             f"«📥 Carica tanti annunci insieme / catalogo esterno»: se il token è "
             f"scaduto basta rifarlo.")
+
+
+async def nostr_del_negozio(connettore_id: int,
+                            senza_tetto: bool = False) -> dict:
+    """I PRODOTTI DI UN NEGOZIO COLLEGATO IN PIAZZA (18 nov 2026,
+    cantiere negozi-su-nostr). Gira a fine di ogni giro del negozio, e
+    dopo lo scollegamento.
+
+    UN RIALLINEAMENTO E NON DEI GANCI, ed e' la scelta che regge il
+    resto: il giro (`riconcilia_connettore`, in un thread, col database
+    suo) crea, aggiorna, esaurisce, riaccende e spegne righe in cinque
+    posti diversi, e non dice quali. Un gancio per ognuno sarebbe cinque
+    posti da tenere d'accordo — e il sesto, domani, dimenticato. Qui
+    invece si chiede a ogni prodotto cosa DIREBBE adesso in piazza
+    (`annuncio_per_nostr` + `evento_annuncio`), e si confronta con
+    l'impronta dell'ultimo evento mandato: diversa = si ripubblica.
+    Cosi' i prodotti di ieri escono senza uno script a mano, e ogni
+    cambio di prezzo, giacenza o foto arriva al giro dopo.
+
+    UN EVENTO PER PRODOTTO: la testa della famiglia (la variante piu'
+    vecchia) o l'articolo singolo. Una variante che non e' la testa e
+    ha un evento suo (non dovrebbe esistere: e' la rete) prende la
+    lapide. Un prodotto mai uscito e gia' esaurito non nasce
+    «venduto»: non c'e' niente da dire a nessuno. Uno tolto dal negozio
+    (o scollegato, o in revisione) che in piazza c'era prende la lapide
+    NIP-09.
+
+    A SCAGLIONI: al piu' MAX_NOSTR_NEGOZIO_PER_GIRO eventi, a lotti di
+    LOTTO_NOSTR col respiro PAUSA_NOSTR — il ritmo dell'import CSV. Il
+    resto aspetta il giro dopo: le impronte dicono da sole chi manca.
+    `senza_tetto` e' dello SCOLLEGAMENTO: di la' un giro dopo non passa
+    mai piu' (la riga del collegamento non c'e'), quindi le lapidi
+    partono tutte adesso, sempre a lotti.
+    Fail-open come tutto il Nostr: un intoppo e' una riga in console."""
+    fatti = {"pubblicati": 0, "ritirati": 0, "rimandati": 0}
+    if not _NOSTR or not NEGOZI_SU_NOSTR:
+        return fatti
+    try:
+        con = db()
+        righe = con.execute(
+            "SELECT * FROM annunci WHERE connettore_id=? "
+            "AND contatto_nostr='' ORDER BY id",
+            (connettore_id,)).fetchall()
+        teste, da_fare = {}, []
+        for r in righe:
+            chiave = r["famiglia"] or f"#{r['id']}"
+            if chiave not in teste:
+                teste[chiave] = r
+            elif r["nostr_event_id"]:
+                da_fare.append(("ritira", r["id"], ""))
+        for t in teste.values():
+            if t["famiglia"]:
+                riga, status = annuncio_per_nostr(con, dict(t), "active")
+            else:
+                status = {"attivo": "active",
+                          "venduto": "sold"}.get(t["stato"], "")
+                riga = dict(t) if status else None
+            if riga is None:
+                if t["nostr_event_id"]:
+                    da_fare.append(("ritira", t["id"], ""))
+                continue
+            if status == "sold" and not t["nostr_event_id"] \
+                    and not t["nostr_impronta"]:
+                continue
+            if _impronta_nostr(evento_annuncio(riga, status)) \
+                    != (t["nostr_impronta"] or ""):
+                da_fare.append(("pubblica", t["id"], status))
+        con.close()
+        # le lapidi prima: costano poco e tolgono di mezzo il falso
+        da_fare.sort(key=lambda x: x[0] != "ritira")
+        if not senza_tetto:
+            fatti["rimandati"] = max(
+                len(da_fare) - MAX_NOSTR_NEGOZIO_PER_GIRO, 0)
+            da_fare = da_fare[:MAX_NOSTR_NEGOZIO_PER_GIRO]
+        for i in range(0, len(da_fare), LOTTO_NOSTR):
+            if _SI_CHIUDE.is_set():
+                break
+            for gesto, aid, status in da_fare[i:i + LOTTO_NOSTR]:
+                if gesto == "ritira":
+                    await ritira_da_nostr(aid)
+                    con = db()
+                    con.execute("UPDATE annunci SET nostr_impronta='' "
+                                "WHERE id=?", (aid,))
+                    con.commit()
+                    con.close()
+                    fatti["ritirati"] += 1
+                elif await annuncio_su_nostr(aid, status):
+                    fatti["pubblicati"] += 1
+            if i + LOTTO_NOSTR < len(da_fare):
+                await asyncio.sleep(PAUSA_NOSTR)
+        if fatti["pubblicati"] or fatti["ritirati"] or fatti["rimandati"]:
+            print(f"🟣 Negozio #{connettore_id} su Nostr: "
+                  f"{fatti['pubblicati']} pubblicati, "
+                  f"{fatti['ritirati']} ritirati, "
+                  f"{fatti['rimandati']} al prossimo giro")
+    except Exception as e:
+        print(f"⚠️ Negozio #{connettore_id}: riallineamento Nostr "
+              f"saltato: {e}")
+    return fatti
 
 
 async def _chiudi_giro_connettore(c: dict, esito: dict):
@@ -100891,6 +101162,12 @@ async def scollega_connettore(conn_id: int, x_tg_init_data: str = Header(""),
                 (conn_id, user["id"]))
     con.commit()
     con.close()
+    # ...e via dalla piazza Nostr anche loro, in sottofondo: le righe
+    # spente qui sopra sono «tolte dal negozio» per il riallineamento,
+    # e senza tetto, perche' un giro dopo non passera' mai piu'
+    # (18 nov 2026, cantiere negozi-su-nostr)
+    if spenti:
+        asyncio.create_task(nostr_del_negozio(conn_id, senza_tetto=True))
     return {"ok": True, "spenti": spenti}
 
 

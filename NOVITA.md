@@ -668,3 +668,9 @@ frase: Negli scambi on-chain chi ha messo i sats nel deposito può chiedere a ch
 dove: P2P → «I miei scambi» → uno scambio on-chain col deposito fatto: il bottone «🙏 Chiedi a chi compra di annullare».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-18 · negozi-su-nostr
+frase: I prodotti dei negozi collegati (Shopify e WooCommerce) adesso escono anche su Nostr, come tutti gli altri annunci di Barattolo: un annuncio per prodotto, con le varianti (taglie, colori) raccolte in uno solo col prezzo «da». Si aggiornano da soli quando cambiano prezzo o disponibilità, e un prodotto tolto dal negozio sparisce anche da lì.
+dove: nessun bottone: succede da solo a ogni giro del negozio (una volta all'ora); i prodotti si vedono in qualunque app Nostr che mostra gli annunci (NIP-99).
+leva: NEGOZI_SU_NOSTR (accesa di serie)
+pubblico: sì

@@ -8119,6 +8119,49 @@
   **79 eventi** col tag client, e dev.nostrolo.gy/marketplaces mostra
   «Barattolo» **TERZO, con 82 annunci**. Verificato, non più da
   guardare.
+  I PRODOTTI DEI NEGOZI COLLEGATI IN PIAZZA (18 nov 2026, cantiere
+  negozi-su-nostr; Andrea: «le varianti no, però un articolo sì»). Il
+  giro dei negozi (`riconcilia_connettore`) non chiamava mai
+  `annuncio_su_nostr`: 2.387 annunci vivi su 2.837 mai usciti, e su
+  Nostrology Barattolo contava solo i 395 nati qui. Ora: UN EVENTO PER
+  PRODOTTO. Il giudice è `annuncio_per_nostr(con, a, status)` →
+  `(riga, status)` o `(None, …)`: senza famiglia la riga è se stessa e
+  lo stato è di chi chiama (il mondo di sempre); una FAMIGLIA di
+  varianti è un evento solo, intestato alla TESTA — la variante più
+  vecchia, qualunque sia il suo stato, perché le righe non si
+  cancellano mai e il `d` non deve cambiare per tutta la vita del
+  prodotto (il capofila della vetrina cambia a ogni esaurito, e un `d`
+  suo farebbe un evento nuovo e una lapide ogni volta). Dentro c'è il
+  capofila (regola di `SQL_CAPOFILA`: prezzo, poi id) per prezzo,
+  testo e foto; `famiglia_titolo` per il titolo; i pezzi sommati delle
+  vive; `varianti_n`, che fa scrivere «Prezzo: da …» nel content (il
+  tag `price` resta un numero). Lo STATO è della famiglia: almeno una
+  viva = active, tutte esaurite = sold, tutte tolte = None. Lo chiedono
+  in DUE: il funnel `annuncio_su_nostr`, PRIMA del bivio (la firma del
+  venditore e la nostra dicono la stessa cosa; un gancio di ordine su
+  una variante ripubblica la famiglia e non dice mai «sold» per lei),
+  e la coda `firme_nostr_da_fare` (la famiglia sparita butta la sua
+  riga di coda).
+  IL RIALLINEAMENTO E NON I GANCI: `nostr_del_negozio(connettore_id)`
+  gira a fine di ogni giro (`_un_connettore`, DOPO
+  `_chiudi_giro_connettore`: un relay lento non ritarda il report) e
+  allo scollegamento. Il giro crea, aggiorna, esaurisce, riaccende e
+  spegne in cinque posti e non dice quali: invece di cinque ganci, per
+  ogni testa si costruisce l'evento che direbbe adesso e si confronta
+  la sua impronta (`_impronta_nostr`: sha256 di tag e content, senza
+  firma né ora) con `annunci.nostr_impronta`, scritta dal funnel a
+  ogni evento partito o accodato alla firma (solo per le righe con
+  `fonte`; per le altre resta vuota). Diversa = si ripubblica; testa
+  senza riga di piazza ma con un evento = lapide; mai uscito e già
+  esaurito = niente (non nasce «sold»); una variante non-testa con un
+  evento suo = lapide (la rete). A scaglioni:
+  `MAX_NOSTR_NEGOZIO_PER_GIRO` = 100 (lapidi prima), lotti
+  LOTTO_NOSTR con PAUSA_NOSTR; gli arretrati escono ai giri dopo da
+  soli. Lo scollegamento passa `senza_tetto=True`: di là un giro dopo
+  non passa più. La leva `NEGOZI_SU_NOSTR` (accesa di serie, pannello
+  «I prodotti dei negozi collegati su Nostr») ferma riallineamento E
+  ganci; quel che è in piazza resta. `ripubblica_tag_client.py` lascia
+  fuori le famiglie (la sola testa direbbe il titolo di una variante).
   E IL BIVIO VALE ANCHE ALL'INDIETRO (ago 2026, decisione di Andrea):
   `trasloca_annunci_nostr` nell'orologio porta sull'account del
   venditore gli annunci finiti in piazza a nome NOSTRO prima che lui

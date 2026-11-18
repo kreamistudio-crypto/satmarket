@@ -101,8 +101,13 @@ def main() -> int:
     con.row_factory = sqlite3.Row
 
     # Il perimetro: i soli eventi che possiamo rifirmare NOI.
+    # (18 nov 2026) Le FAMIGLIE di varianti dei negozi collegati no: il
+    # loro evento parla per tutte le sorelle e lo tiene in pari il giro
+    # del negozio (`server.nostr_del_negozio`); rifirmato da qui con la
+    # sola riga della testa direbbe il titolo e il prezzo di una variante.
     nostri = con.execute(
         "SELECT * FROM annunci WHERE stato='attivo' AND contatto_nostr=''"
+        "  AND COALESCE(famiglia,'')=''"
         "  AND nostr_event_id<>'' AND nostr_autore='' ORDER BY id").fetchall()
     bivio = con.execute(
         "SELECT COUNT(*) FROM annunci WHERE stato='attivo'"

@@ -1873,6 +1873,16 @@ CONNETTORI_NEGOZIO_APERTI = False
 # rispondeva di no. True = la porta torna per tutti.
 CONNETTORI_NEGOZIO_PER_TUTTI = False
 
+# I PRODOTTI DEI NEGOZI COLLEGATI ANCHE SU NOSTR (18 nov 2026). A fine
+# di ogni giro del negozio un evento NIP-99 per PRODOTTO (una famiglia
+# di varianti e' un evento solo, col prezzo «da»), firmato da Barattolo
+# — o dal negoziante, se ha la sua chiave e ha scelto «sul mio profilo».
+# Al piu' 100 eventi per negozio e per giro: gli arretrati escono a
+# scaglioni. Tolto dal negozio (o scollegato) = cancellato anche dai
+# relay. Serve NOSTR_NSEC_PIATTAFORMA. Accesa di serie: False e riavvia
+# e' l'interruttore d'emergenza (quel che e' gia' in piazza resta).
+NEGOZI_SU_NOSTR = True
+
 # Quanti prodotti si leggono per collegamento a ogni giro. MILLE dal 1
 # ott 2026 (era 200: un negozio da mille prodotti non entrava mai per
 # intero, i lettori si fermavano sempre allo stesso punto).

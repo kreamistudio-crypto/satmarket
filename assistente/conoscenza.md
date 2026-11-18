@@ -149,7 +149,7 @@ Gli annunci esauriti: quando vendi l'ultimo pezzo l'annuncio diventa «Esaurito�
 <!-- pezzo libro-014 | libro -->
 ## Libro · Vendere nel mercatino (2/5)
 
-Hai un catalogo grande? Nel Profilo, nel gruppo «Annunci», c'è «📥 Carica tanti annunci insieme»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri.
+Hai un catalogo grande? Nel Profilo, nel gruppo «Annunci», c'è «📥 Carica tanti annunci insieme»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri. Dal 18 novembre 2026 i prodotti di un negozio collegato escono anche su Nostr, come gli altri annunci: un annuncio per prodotto (le varianti, per esempio le taglie, sono un annuncio solo col prezzo «da»), entro qualche ora dall'entrata, e si aggiornano da soli; un prodotto tolto dal negozio sparisce anche da lì.
 
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.
 
@@ -159,10 +159,10 @@ Le commissioni del mercatino: Barattolo non prende commissioni, né a chi vende 
 
 Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (zero commissioni di Barattolo, solo quelle della rete) e lo scambio P2P (la commissione del coordinatore, spiegata più sotto). Mescolarli confonde.
 
-Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
-
 <!-- pezzo libro-015 | libro -->
 ## Libro · Vendere nel mercatino (3/5)
+
+Le donazioni: chi vuole sostenere Barattolo con qualche sats può mandarli all'indirizzo Lightning zap@barattolo.store (si incolla nel wallet come destinatario, si sceglie l'importo e si invia), oppure con uno zap al profilo Nostr «Barattolo», che accetta anche bitcoin on-chain. Sono un regalo libero: non danno vantaggi nell'app e non sono mai obbligatorie. Se qualcuno chiede come donare, dai questo indirizzo e ringrazia di cuore.
 
 Quando arriva un ordine il bot ti avvisa. Spedisci, segna il corriere e il codice di tracciamento nell'ordine, e aspetta la conferma di chi compra. Se spedisci una busta senza codice scegli «✉️ Posta senza tracciamento» fra i corrieri: non serve fingere una consegna a mano. Hai scritto un codice sbagliato, o hai segnato «Consegna a mano» su un ordine che invece hai spedito? Nell'ordine c'è il bottone per correggerlo, e chi compra viene avvisato. L'indirizzo di chi compra lo vedi solo tu, per stampare l'etichetta: non usarlo per altro. Nel messaggio «Hai venduto» e in cima al riquadro «📦 Spedisci» dell'ordine c'è il giorno entro cui spedire: cinque giorni dal pagamento, il giorno in cui parte il promemoria (non si annulla niente da solo: è un impegno con chi ha comprato). Accanto c'è «📖 Come si spedisce?», la guida in quattro passi: imballa, compra l'etichetta, consegna il pacco, segna come spedito. Nei passi dell'ordine compaiono anche l'ora del pagamento e quella della spedizione, e chi compra legge entro quando il venditore spedisce. Non hai ancora l'etichetta? Nel riquadro della spedizione c'è il link «Spedisci con Packlink» (Poste, BRT, InPost e altri, da 5,48 €): si paga là, in euro, non in sats; nell'ordine incolla il codice del corriere, non quello dell'ordine Packlink.
 
@@ -2328,4 +2328,12 @@ pubblico: sì
 frase: Negli scambi on-chain chi ha messo i sats nel deposito può chiedere a chi compra di annullare: il bot glielo scrive, e se è d'accordo tocca «Rinuncio» e i sats tornano indietro. Si chiede prima che chi compra dica di aver pagato.
 dove: P2P → «I miei scambi» → uno scambio on-chain col deposito fatto: il bottone «🙏 Chiedi a chi compra di annullare».
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-106 | novita -->
+## Novità · 2026-11-18 · negozi-su-nostr
+
+frase: I prodotti dei negozi collegati (Shopify e WooCommerce) adesso escono anche su Nostr, come tutti gli altri annunci di Barattolo: un annuncio per prodotto, con le varianti (taglie, colori) raccolte in uno solo col prezzo «da». Si aggiornano da soli quando cambiano prezzo o disponibilità, e un prodotto tolto dal negozio sparisce anche da lì.
+dove: nessun bottone: succede da solo a ogni giro del negozio (una volta all'ora); i prodotti si vedono in qualunque app Nostr che mostra gli annunci (NIP-99).
+leva: NEGOZI_SU_NOSTR (accesa di serie)
 pubblico: sì

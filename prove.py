@@ -113759,6 +113759,9 @@ def prove_connettore_interrompibile():
         async def in_errore(c, e):
             st["errori"].append(e)
 
+        async def niente_nostr(cid, senza_tetto=False):
+            return {}
+
         async def chiudi(c, esito):
             st["chiusi"] += 1
 
@@ -113794,7 +113797,10 @@ def prove_connettore_interrompibile():
                   "CONNETTORI_VARIANTI_MAX_S": 480,
                   "_segno_varianti": lambda c: 0,
                   "_salva_foto_connettore": lambda *a: None,
-                  "_chiudi_giro_connettore": chiudi})
+                  "_chiudi_giro_connettore": chiudi,
+                  # (18 nov 2026) la piazza Nostr a giro chiuso: qui
+                  # non c'entra, e una scena senza relay non la chiama
+                  "nostr_del_negozio": niente_nostr})
         c = {"id": 7, "fonte": "finto", "credenziali": "",
              "url_negozio": "https://negozio.example"}
         return g, st, mod, c
@@ -118691,6 +118697,121 @@ def prove_rimborso_motivo():
     prova("la rotta risponde al motivo ignoto con un 409 che lo nomina",
           True, 'esito.get("motivo_ignoto") is not None' in ep
           and "non so come disfare" in ep)
+
+
+def prove_negozi_su_nostr():
+    """I PRODOTTI DEI NEGOZI COLLEGATI SU NOSTR (18 nov 2026, cantiere
+    negozi-su-nostr; Andrea: «le varianti no, però un articolo sì»).
+
+    Il giro vero, coi relay finti, lo fa `collaudo_negozi_su_nostr`. Qui
+    il giudice della riga che va in piazza su sqlite vero, e le cuciture
+    che il collaudo da solo non vede: chi lo chiama, in che ordine, e
+    la leva nei suoi tre posti."""
+    import sqlite3
+    print("\n[i prodotti dei negozi collegati su Nostr]")
+    amb = {}
+    exec(pezzo("annuncio_per_nostr"), amb)
+    giudice = amb["annuncio_per_nostr"]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, famiglia TEXT,"
+                " famiglia_titolo TEXT, titolo TEXT, stato TEXT,"
+                " prezzo_sats INTEGER, quantita INTEGER, creato INTEGER,"
+                " venditore_id INTEGER, nostr_event_id TEXT,"
+                " nostr_autore TEXT, descrizione TEXT)")
+
+    def metti(*righe):
+        con.execute("DELETE FROM annunci")
+        for r in righe:
+            con.execute("INSERT INTO annunci VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        r + ("taglia " + r[3].split()[-1],))
+
+    def riga(aid):
+        return dict(con.execute("SELECT * FROM annunci WHERE id=?",
+                                (aid,)).fetchone())
+
+    # 1. Il mondo di sempre: senza famiglia la riga e' se stessa, e lo
+    #    stato e' di chi chiama (un ordine dice «sold», e sold sia).
+    metti((1, "", "", "Miele", "attivo", 700, 3, 10, 7, "", ""))
+    prova("un annuncio senza famiglia e' se stesso, con lo stato di chi "
+          "chiama", (riga(1), "sold"), giudice(con, riga(1), "sold"))
+
+    # 2. La famiglia: l'id e la data della TESTA (la piu' vecchia, anche
+    #    se non e' piu' in vendita), il prezzo del capofila (la piu'
+    #    economica viva, a parita' la piu' vecchia), il titolo del
+    #    prodotto, i pezzi di tutte le vive.
+    fam = [(10, "f:1", "Maglietta", "Maglietta — S", "rimosso", 2000, 1,
+            100, 7, "ev10", ""),
+           (11, "f:1", "Maglietta", "Maglietta — M", "attivo", 1800, 2,
+            101, 7, "", ""),
+           (12, "f:1", "Maglietta", "Maglietta — L", "attivo", 1800, 3,
+            102, 7, "", ""),
+           (13, "f:1", "Maglietta", "Maglietta — XL", "venduto", 1500, 0,
+            103, 7, "", "")]
+    metti(*fam)
+    r, st = giudice(con, riga(12), "sold")
+    prova("la famiglia parla con l'id e la data della testa, anche "
+          "tolta", (10, 100, "ev10"), (r["id"], r["creato"],
+                                       r["nostr_event_id"]))
+    prova("...col prezzo del capofila vivo (non dell'esaurita piu' "
+          "economica)", 1800, r["prezzo_sats"])
+    prova("...a parita' di prezzo la piu' vecchia (la regola della "
+          "vetrina): il testo e' della M", "taglia M", r["descrizione"])
+    prova("...il titolo del prodotto, i pezzi di tutte le vive e quante "
+          "sono", ("Maglietta", 5, 2), (r["titolo"], r["quantita"],
+                                        r["varianti_n"]))
+    prova("...e lo stato e' della famiglia, non di chi chiama", "active",
+          st)
+
+    # 3. Tutte esaurite = «sold»; tutte tolte = None, cioe' la lapide.
+    metti(*[f[:4] + ("venduto" if f[0] != 10 else "rimosso",) + f[5:]
+            for f in fam])
+    prova("tutte esaurite: la famiglia e' venduta", "sold",
+          giudice(con, riga(11), "active")[1])
+    metti(*[f[:4] + ("rimosso",) + f[5:] for f in fam])
+    prova("tutte tolte: in piazza non va niente", None,
+          giudice(con, riga(11), "active")[0])
+
+    # 4. Le cuciture. Il riallineamento parte a giro CHIUSO (dopo il
+    #    report: un relay lento non ritarda il venditore), e lo
+    #    scollegamento manda le lapidi senza tetto — di la' un giro dopo
+    #    non passera' mai piu'.
+    giro = pezzo("_un_connettore")
+    prova("il giro del negozio finisce col riallineamento Nostr", True,
+          0 < giro.index("_chiudi_giro_connettore(c, esito)")
+          < giro.index("nostr_del_negozio(c[\"id\"])"))
+    prova("lo scollegamento manda tutte le lapidi", True,
+          "nostr_del_negozio(conn_id, senza_tetto=True)"
+          in pezzo("scollega_connettore"))
+    # La riga di piazza passa dal giudice PRIMA del bivio: la firma del
+    # venditore e quella della piattaforma devono dire la stessa cosa.
+    funnel = pezzo("annuncio_su_nostr")
+    prova("il funnel chiede al giudice prima del bivio", True,
+          funnel.index("annuncio_per_nostr(") <
+          funnel.index("chiave_nostr_provata"))
+    prova("...e la coda delle firme gli chiede la stessa riga", True,
+          "annuncio_per_nostr(" in pezzo("firme_nostr_da_fare"))
+    prova("la leva ferma anche i ganci di sempre", True,
+          "da_connettore(a) and not NEGOZI_SU_NOSTR" in funnel)
+    prova("il riallineamento confronta l'impronta (mai tutto a ogni "
+          "giro)", True,
+          "nostr_impronta" in pezzo("nostr_del_negozio")
+          and "MAX_NOSTR_NEGOZIO_PER_GIRO" in pezzo("nostr_del_negozio"))
+
+    # 5. La leva nei suoi tre posti, accesa (la regola del 14 nov 2026).
+    esempio = open(os.path.join(QUI, "config_esempio.py"),
+                   encoding="utf-8").read()
+    prova("la leva e' accesa nel codice", True,
+          "    NEGOZI_SU_NOSTR = True\n" in _SORGENTE)
+    prova("...nel config d'esempio", True,
+          "\nNEGOZI_SU_NOSTR = True\n" in esempio)
+    prova("...e sta nel pannello delle leve", True,
+          '"NEGOZI_SU_NOSTR", bool(NEGOZI_SU_NOSTR)' in _SORGENTE)
+    for nome, elenco in (("collaudi.txt", "collaudo_negozi_su_nostr\n"),
+                         ("compila.txt", "collaudo_negozi_su_nostr.py\n")):
+        prova(f"il collaudo sta in ci/{nome}", True,
+              elenco in open(os.path.join(QUI, "ci", nome),
+                             encoding="utf-8").read())
 
 
 def prove_connettori_categoria():
@@ -154981,6 +155102,9 @@ def prove_negozi_grandi():
         async def in_errore(c, e):
             st["errori"].append(e)
 
+        async def niente_nostr(cid, senza_tetto=False):
+            return {}
+
         g = {"asyncio": _aio, "json": json, "time": time,
              "print": lambda *a, **k: None, "db": db_b,
              "_SI_CHIUDE": _th.Event(), "_CONNETTORI_IN_CORSO": set(),
@@ -154997,7 +155121,10 @@ def prove_negozi_grandi():
              "_salva_foto_connettore": lambda *a: None,
              # la categoria delle righe (16 nov 2026): qui si contano
              # nascite e giudizi, la categoria ha la sua sezione
-             "categorie_righe_negozio": lambda righe, c: None}
+             "categorie_righe_negozio": lambda righe, c: None,
+             # la piazza Nostr a giro chiuso (18 nov 2026): qui si
+             # contano nascite e giudizi, Nostr ha la sua sezione
+             "nostr_del_negozio": niente_nostr}
         g.update(leve)
         exec(blocco_msg, g)
         # LA PAROLA DEL REGISTRO (25 ott 2026, cantiere
@@ -212281,7 +212408,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni serie_classifica serie_brace finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria negozi_su_nostr avvisi_barattolo serie_giorni serie_classifica serie_brace finestra ordini_prova tutorial
     caccia_a_tappo
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
@@ -213466,6 +213593,7 @@ def main():
               prove_audit_tornata_tutto,
               prove_ripubblica_p2p,
               prove_connettori_categoria,
+              prove_negozi_su_nostr,
               prove_filtro_onchain_tutto,
               prove_bitcoin_only_p2p,
               prove_avvisi_barattolo,
