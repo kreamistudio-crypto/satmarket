@@ -2029,6 +2029,110 @@ def main():
     SRV._p2p_onchain_rifai_foto()
     lnd_srv.shutdown()
 
+    # ---- 11b) l'ammanco tollerato (18 nov 2026) ----------------------------
+    print("\n[l'ammanco tollerato: pochi sats in meno da uno swap li copre il margine]")
+    tetto = SRV.P2P_ONCHAIN_APERTI_MAX
+    SRV.P2P_ONCHAIN_APERTI_MAX = 100
+    FISSO_AMMANCO = "tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"   # BIP-173
+    # lo scambio vero: 270.503 chiesti, 270.444 arrivati da Chainflip
+    om = pubblica(999).json()
+    gesto(888, om["id"], "prendi")
+    om = uno(999, om["id"])
+    tollera = om["ammanco_ok_sats"]
+    prova("la pagina sa quanti ne possono mancare: meta' del margine, al "
+          "piu' il tetto", min(SRV.P2P_ONCHAIN_AMMANCO_MAX_SATS,
+                               om["margine_sats"] // 2), tollera)
+    prova("...e su una riga senza margine niente: PURA",
+          0, SRV.p2p_onchain_ammanco_tollerato({"margine_sats": 0}))
+    paga(om, quanto=om["importo_sats"] - tollera - 1)
+    prova("un sats oltre la tolleranza: resta preso (serve un'altra "
+          "transazione)", "preso", gesto(999, om["id"], "controlla").json()["stato"])
+    banco.DETTO.clear()
+    paga(om, quanto=om["importo_sats"] - 59)
+    d = gesto(999, om["id"], "controlla").json()
+    prova("59 sats in meno: depositato, e chi compra manda gli euro",
+          ("depositato", om["importo_sats"] - 59, True),
+          (d["stato"], d["ricevuti_sats"],
+           detto_a(888, "deposito di garanzia 2-di-3")))
+    prova("...chi vende sa che l'ammanco lo copre il margine, chi compra "
+          "non ne sente parlare", (True, False),
+          (detto_a(999, "<b>59 sats in meno</b>"), detto_a(888, "in meno")))
+    om = uno(999, om["id"])
+    # chi compra, a questo punto del giro, non ha un wallet vivo: gliene
+    # si da' uno fisso, quel che conta qui e' il conto delle uscite
+    con = SRV._p2p_onchain_db()
+    con.execute("UPDATE p2p_onchain_ordini SET incasso=? WHERE id IN (?, ?)",
+                (FISSO_AMMANCO, om["id"], om["id"]))
+    con.commit()
+    con.close()
+    om = uno(999, om["id"])
+    resto = om["margine_sats"] - 59 - 300
+    giusto_m = [(om["incasso"], om["sats"])] + (
+        [(om["rimborso"], resto)] if resto >= SRV.ONCHAIN_POLVERE else [])
+    r = gesto(999, om["id"], "proposta", verso="venditore",
+              psbt=psbt_di(om, giusto_m, 999).to_string())
+    prova("il rilascio passa dal giudice di sempre: il prezzo esatto a chi "
+          "compra, la rete dentro il margine che resta", 200, r.status_code)
+    om2 = pubblica(999).json()
+    gesto(888, om2["id"], "prendi")
+    om2 = uno(999, om2["id"])
+    paga(om2, quanto=om2["importo_sats"] - 59)
+    gesto(999, om2["id"], "controlla")
+    con = SRV._p2p_onchain_db()
+    con.execute("UPDATE p2p_onchain_ordini SET incasso=? WHERE id=?",
+                (FISSO_AMMANCO, om2["id"]))
+    con.commit()
+    con.close()
+    om2 = uno(999, om2["id"])
+    r = gesto(999, om2["id"], "proposta", verso="venditore",
+              psbt=psbt_di(om2, [(om2["incasso"], om2["sats"]),
+                                 (om2["rimborso"], om2["margine_sats"] - 50)],
+                           999).to_string())
+    prova("...ma il resto non puo' fingere che i 59 ci siano: rete a zero o "
+          "sotto, 400", 400, r.status_code)
+
+    print("\n[annulla e riprendi i sats: il deposito che non vale non resta chiuso]")
+    prova("su un deposito valido non si riprende: 409", 409,
+          gesto(999, om["id"], "riprendi").status_code)
+    o3 = pubblica(999).json()
+    gesto(888, o3["id"], "prendi")
+    o3 = uno(999, o3["id"])
+    corto = o3["importo_sats"] - 5000
+    paga(o3, confermata=False, quanto=corto)
+    r = gesto(999, o3["id"], "riprendi")
+    prova("visti ma non confermati: 409, si aspetta la prima conferma",
+          (409, True), (r.status_code, "prima conferma" in r.json()["detail"]))
+    paga(o3, quanto=corto)
+    r = gesto(999, o3["id"], "annulla")
+    prova("«Annulla» con i sats sull'indirizzo indica a chi ha depositato "
+          "il tasto nuovo", (409, True),
+          (r.status_code, "Annulla e riprendi" in r.json()["detail"]))
+    prova("chi compra bitcoin non riprende i sats di un altro: 403", 403,
+          gesto(888, o3["id"], "riprendi").status_code)
+    banco.DETTO.clear()
+    r = gesto(999, o3["id"], "riprendi")
+    d = r.json()
+    prova("5.000 sats in meno, confermati: annullato, e Barattolo ha firmato "
+          "il rimborso verso chi ha depositato",
+          (200, "annullato", "compratore", "deposito-incompleto"),
+          (r.status_code, d["stato"], (d.get("proposta") or {}).get("verso"),
+           (d.get("proposta") or {}).get("barattolo")))
+    prova("...chi compra sa di non mandare niente, chi vende di aprire l'app",
+          (True, True), (detto_a(888, "Non mandare niente"),
+                         detto_a(999, "Barattolo ha firmato il rimborso")))
+    uscite = PSBT.from_string(d["proposta"]["psbt"]).tx.vout
+    prova("...un'uscita sola, al wallet di chi ha depositato, dentro il margine",
+          (1, True), (len(uscite),
+                      0 < corto - uscite[0].value <= o3["margine_sats"]))
+    prova("...una seconda volta: 409", 409,
+          gesto(999, o3["id"], "riprendi").status_code)
+    r = gesto(999, o3["id"], "firma", tx=cofirma(999, uno(999, o3["id"])))
+    prova("la seconda firma del suo telefono: rimborsato, e nessuno ci "
+          "rimette la reputazione", (200, "rimborsato", ""),
+          (r.status_code, r.json()["stato"],
+           uno(999, o3["id"]).get("non_completato") or ""))
+    SRV.P2P_ONCHAIN_APERTI_MAX = tetto
+
     # ---- 12) gli avvisi, tutti ----------------------------------------------
     print("\n[ogni avviso a una parte porta il bottone del suo scambio]")
     # (17 nov 2026) l'avviso della recensione ricevuta e' quello di sempre,

@@ -74103,11 +74103,15 @@ async function battitoDepositoOnchainP2P(){
   osservaDepositoOnchainP2P();
 }
 /* PURA: il deposito di questo scambio si vede in rete? Visti almeno
-   l'importo (prezzo + margine), o gia' confermato e passato oltre. */
+   l'importo (prezzo + margine), meno l'ammanco che il margine copre
+   (18 nov 2026, `ammanco_ok_sats`), o gia' confermato e passato oltre. */
 function depositoVistoOnchainP2P(o){
   if (!o) return false;
   if (o.stato && o.stato !== 'preso') return o.stato !== 'annullato' && o.stato !== 'scaduto';
-  return (Number(o.visti_sats) || 0) >= (Number(o.importo_sats) || 1);
+  /* la soglia di `sogliaDepositoOnchainP2P`, scritta qui: questo giudice
+     deve restare puro e da solo */
+  return (Number(o.visti_sats) || 0)
+    >= Math.max(1, (Number(o.importo_sats) || 0) - (Number(o.ammanco_ok_sats) || 0));
 }
 
 /* DOVE RICEVE CHI COMPRA, CHIESTO LI' (30 ott 2026, Alan alla prima
@@ -75615,7 +75619,12 @@ function schedaOnchainP2P(o){
            la finestra del deposito la scritta dice perche' */
         + ((deposito || ricevo) && !o.visti_sats
            ? g('annulla', deposito ? 'Annulla (non deposito)'
-               : Date.now() / 1000 > o.deposito_entro ? 'Rinuncia: il deposito non è arrivato' : '✕ Annulla') : '');
+               : Date.now() / 1000 > o.deposito_entro ? 'Rinuncia: il deposito non è arrivato' : '✕ Annulla') : '')
+        /* (18 nov 2026) ANNULLA E RIPRENDI I SATS: un deposito confermato
+           ma che non vale (mancano piu' sats di quanti il margine ne
+           copre) non resta piu' chiuso nel 2-di-3 */
+        + (deposito && Number(o.ricevuti_sats) > 0 && !o.proposta
+           ? g('riprendi', '↩️ Annulla e riprendi i sats') : '');
       break;
     case 'depositato':
       /* BARATTOZON ON-CHAIN (17 nov 2026): il PayCode nel riquadro qui
@@ -75735,7 +75744,11 @@ function schedaOnchainP2P(o){
            : o.non_completato === 'altro' ? ' A chi comprava è stato contato come <b>scambio non completato</b>.' : ''); break;
     case 'annullato': testo = (o.chiuso_perche === 'paracadute'
         ? '🪂 Annullato dal paracadute' + (haParacaduteP2P(versiParacaduteOcP2P(o)) ? ' (' + etichettaParacaduteP2P(versiParacaduteOcP2P(o)) + ')' : '') + ': BTC si è mosso oltre la soglia da quando l\'hai pubblicato. Puoi ripubblicarlo al prezzo nuovo.'
-        : 'Annullato prima del deposito.') + (o.ricevuti_sats ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
+        : o.proposta && o.proposta.barattolo === 'deposito-incompleto'
+        ? 'Annullato da chi vende: il deposito non era completo. Barattolo ha firmato il rimborso e i sats tornano a chi li aveva depositati.'
+        : 'Annullato prima del deposito.')
+        + (o.ricevuti_sats && !(o.proposta && o.proposta.barattolo === 'deposito-incompleto')
+           ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
     case 'scaduto': testo = 'Scaduto nel libro senza essere preso.'; break;
   }
   /* (1 nov 2026, presa-altra-rete) chi compra riceve in Lightning: chi
@@ -75839,7 +75852,7 @@ function schedaOnchainP2P(o){
       + '</div>' : '';
   /* i sats visti e non ancora confermati, a chi aspetta il deposito */
   if (o.stato === 'preso' && o.visti_sats && !mod)
-    testo += '<br>👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: si aspetta la conferma.';
+    testo += '<br>' + rigaVistiOnchainP2P(o, 'si aspetta');
   const uscita = o.txid_uscita
     ? '<div class="trust-note"><span>🔗</span><span>Transazione: <a href="' + esc(espl) + '/tx/' + esc(o.txid_uscita)
       + '" target="_blank" rel="noopener" class="mono">' + esc(o.txid_uscita.slice(0, 16)) + '…</a></span></div>' : '';
@@ -76490,6 +76503,25 @@ function passiOnchainP2P(o){
   return {passi, prog: PROG[o.stato] != null ? PROG[o.stato] : 0, fermo};
 }
 
+/* PURA: quanti sats bastano perche' il deposito valga. L'AMMANCO
+   TOLLERATO (18 nov 2026, uno swap Chainflip ne ha mangiati 59): il
+   server ne lascia mancare fino a meta' del margine per la rete
+   (`p2p_onchain_ammanco_tollerato`) e lo dice in `ammanco_ok_sats`. */
+function sogliaDepositoOnchainP2P(o){
+  const chiesto = Number(o && o.importo_sats) || 0;
+  return Math.max(1, chiesto - (Number(o && o.ammanco_ok_sats) || 0));
+}
+/* PURA: la riga dei sats visti e non confermati. Sotto la soglia dice
+   quanti ne mancano: «aspetto la conferma» su un deposito corto non
+   arriverebbe mai (uno scambio vero, 18 nov 2026). */
+function rigaVistiOnchainP2P(o, chi){
+  const visti = Number(o.visti_sats) || 0;
+  const manca = sogliaDepositoOnchainP2P(o) - visti;
+  return '👀 Visti in rete ' + fmt(visti) + ' sats: '
+    + (manca > 0 ? 'ne mancano <b>' + fmt(manca) + '</b> perché il deposito valga.'
+       : chi + ' la conferma.');
+}
+
 function copiaOnchainP2P(testo){
   if (!navigator.clipboard) return toast('Copia a mano l\'indirizzo', 3000);
   navigator.clipboard.writeText(testo).then(() => toast('📋 Indirizzo copiato', 2500),
@@ -76572,7 +76604,7 @@ function renderDepositoOnchainP2P(){
       + (Number(o.quota_sats) > 0 ? ' e ' + fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0)) + ' di commissione (la tua metà)' : '') + '.'
       + (prova ? ' Rete di prova (' + esc(onchainRete().nome) + ').' : '') + '</div>'
     + rigaCifraBtc(o.importo_sats)   /* il wallet on-chain la vuole in BTC (cifra-btc) */
-    + (o.visti_sats ? '<div class="hint">👀 Visti in rete ' + fmt(o.visti_sats) + ' sats: aspetto la conferma.</div>' : '')
+    + (o.visti_sats ? '<div class="hint">' + rigaVistiOnchainP2P(o, 'aspetto') + '</div>' : '')
     + '<div class="qr" id="p2pOcDepositoQr"></div>'
     + '<div class="invoice" id="p2pOcDepositoIndirizzo"></div>'
     + '<div class="pay-scade" id="p2pOcDepositoScadeRiga" style="display:none">'
@@ -76947,6 +76979,14 @@ function gestoOnchainP2P(btn, id, cosa){
       corpo: 'Nessun sats si è mosso: lo scambio si chiude qui e l\'altra parte lo sa subito.',
       poi: () => eseguiGestoOnchainP2P(id, 'annulla', {})});
   }
+  if (cosa === 'riprendi') {
+    return chiediConferma({titolo: '↩️ Annulli e riprendi i sats?', etichetta: 'Annulla e riprendi',
+      vestito: 'allarme',
+      corpo: 'Il deposito non è completo, quindi chi compra non ha ancora mandato niente. Lo scambio si chiude, '
+        + 'Barattolo firma il rimborso verso il tuo wallet e il tuo telefono mette la seconda firma: '
+        + 'i sats tornano a te, meno la commissione di rete.',
+      poi: () => eseguiGestoOnchainP2P(id, 'riprendi', {})});
+  }
   if (cosa === 'disputa') {
     const motivo = String((el('p2pOcMotivo') || {}).value || '').trim().slice(0, 500);
     return chiediConferma({titolo: '⚖️ Apri una disputa?', etichetta: 'Apri la disputa',
@@ -76973,6 +77013,7 @@ async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
       : corpo && corpo.contanti ? '💵 Detto a chi vende: conta i contanti e libera i sats'
       : '💶 Detto a chi vende: controlla il conto e libera i sats', 5000);
     else if (cosa === 'disputa') toast('⚖️ Disputa aperta: un moderatore guarderà', 5000);
+    else if (cosa === 'riprendi') toast('↩️ Annullato: Barattolo ha firmato il rimborso. Tocca «✍️ Metti la seconda firma»', 7000);
     else toast('₿ Fatto', 3000);
   } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }

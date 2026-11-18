@@ -47459,7 +47459,9 @@ def prove_fogli_di_casa():
     # CENTOVENTISETTE (18 nov 2026, cantiere barattozon-oc-carta): «🧾 Il tuo
     # PayCode Amazon» on-chain (`apriPayCodeBzOcP2P`), il foglio dei dati
     # aperto da «🧾 Il tuo PayCode» come su Lightning.
-    prova("i gesti che passano dalla domanda unica sono centoventisette (dal 30 ott "
+    # CENTOVENTOTTO (18 nov 2026, cantiere ammanco-p2p-onchain): «↩️ Annulli
+    # e riprendi i sats?» di chi ha depositato meno del dovuto.
+    prova("i gesti che passano dalla domanda unica sono centoventotto (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47476,8 +47478,9 @@ def prove_fogli_di_casa():
           "contanti on-chain; «Brucia la cauzione» e «Metà mandata» del "
           "moderatore sulla cauzione on-chain; «Chi compra non ha scelto dove "
           "ricevere» davanti a «Ricevuti» on-chain; dal 18 nov il foglio «🧾 Il "
-          "tuo PayCode Amazon» di Barattozon on-chain in «Compra BTC»)",
-          127, solo_codice(mini).count("chiediConferma({"))
+          "tuo PayCode Amazon» di Barattozon on-chain in «Compra BTC»; «Annulli "
+          "e riprendi i sats?» del deposito on-chain incompleto)",
+          128, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -182945,8 +182948,10 @@ def prove_canale_admin():
           # mandata»: nelle dispute (sono soldi, e li muove un moderatore)
           # (18 nov 2026, reso-spese-venditore) il reso a spese del
           # venditore senza etichetta: nelle dispute (decide il «Rimborso»)
+          # (18 nov 2026, ammanco-p2p-onchain) «Annulla e riprendi i sats»:
+          # Barattolo ha firmato un rimborso da solo, nella moderazione
           {"assistenza": 1, "dispute": 10, "dm": 1, "errori": 36,
-           "liquidita": 5, "moderazione": 24, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 25, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -182981,7 +182986,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "113 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "114 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -183002,7 +183007,8 @@ def prove_canale_admin():
           "uscite firmate; l'indirizzo del rimborso P2P on-chain scritto "
           "a disputa aperta; e la cauzione on-chain bruciata con la sua "
           "meta' mandata; dal 18 nov il reso a spese del venditore senza "
-          "etichetta)", 113,
+          "etichetta, e la firma di Barattolo sul deposito incompleto "
+          "annullato)", 114,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
