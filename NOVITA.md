@@ -632,3 +632,9 @@ frase: Nel P2P c'è l'interruttore «No altcoin»: lo accendi una volta e vedi s
 dove: P2P → «Filtro», la prima riga «No altcoin», poi «Applica». Spento di serie.
 leva: P2P_BITCOIN_ONLY_ATTIVO (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · ammanco-p2p-onchain
+frase: Negli scambi on-chain un deposito con pochi sats in meno (succede con gli swap) non blocca più lo scambio: li copre il margine per la rete e si va avanti. Se ne mancano di più, chi ha depositato può toccare «↩️ Annulla e riprendi i sats» e riaverli sul suo wallet.
+dove: P2P → «I miei scambi» → uno scambio on-chain preso: la riga «👀 Visti in rete … ne mancano N» e il bottone «↩️ Annulla e riprendi i sats» di chi ha depositato; il messaggio del bot «Sono arrivati N sats in meno».
+leva: nessuna
+pubblico: sì

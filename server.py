@@ -110077,7 +110077,10 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         proposta = {"verso": o["proposta_verso"], "psbt": o["proposta_psbt"],
                     "mia": int(o["proposta_da"] or 0) == tg_id,
                     "il": o["proposta_il"],
-                    "barattolo": "disputa" if o["decisione_da"] else ""}
+                    # (18 nov 2026) perche' ha firmato Barattolo: 'disputa',
+                    # o 'deposito-incompleto' (`p2p_onchain_riprendi`)
+                    "barattolo": ((o["decisione_perche"] or "disputa")
+                                  if o["decisione_da"] else "")}
     indirizzo = None
     if o["indirizzo_id"]:
         ind = con.execute("SELECT * FROM onchain_indirizzi WHERE id=?",
@@ -110100,6 +110103,8 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         **_p2p_onchain_foglio(o),
         "margine_sats": int(o["margine_sats"] or 0),
         "importo_sats": int(o["importo_sats"] or 0),
+        # (18 nov 2026) quanti ne possono mancare senza fermare lo scambio
+        "ammanco_ok_sats": p2p_onchain_ammanco_tollerato(o),
         "visti_sats": int(o["visti_sats"] or 0),
         "ricevuti_sats": int(o["ricevuti_sats"] or 0),
         "utxo": json.loads(o["utxo"] or "[]"),
@@ -110774,8 +110779,10 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
         elif o["stato"] == "preso":
             if int(o["visti_sats"] or 0) or int(o["ricevuti_sats"] or 0):
                 raise HTTPException(409, "Ci sono già dei sats sull'indirizzo: "
-                                         "ora si esce solo col rimborso o con "
-                                         "una disputa")
+                                         + ("tocca «↩️ Annulla e riprendi i sats»"
+                                            if int(o["depositante_id"] or 0) == int(user["id"])
+                                            else "ora si esce solo col rimborso o con "
+                                                 "una disputa"))
             # (17 nov 2026, cantiere onchain-controparte, Andrea: «non
             # c'è nessun pulsante "X Annulla". I sats non sono ancora
             # stati messi in garanzia») CHI RICEVE ANNULLA QUANDO VUOLE,
@@ -110803,6 +110810,109 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
                               f"Era {_p2p_onchain_quanto(o)}.\n\nNessun sats si è mosso.",
                        _p2p_onchain_bottone(o))
     return {"ok": True}
+
+
+# ANNULLA E RIPRENDI I SATS (18 nov 2026, cantiere ammanco-p2p-onchain,
+# Andrea: «aggiungi anche la possibilità di annullare l'ordine»). Un
+# deposito che NON vale (resta 'preso': mancano piu' sats di quanti il
+# margine ne copre) teneva i sats chiusi nel 2-di-3, e «Annulla» diceva
+# «ci sono gia' dei sats: si esce col rimborso o con una disputa» — ma il
+# rimborso lo propone solo chi compra («Rinuncio») e la disputa si apre
+# solo da 'depositato'. Chi aveva depositato non aveva un tasto suo.
+# Adesso lo ha: lo scambio si chiude 'annullato' e BARATTOLO FIRMA IL
+# RIMBORSO verso il wallet di chi ha depositato (`_onchain_psbt_barattolo`,
+# lo stesso giudice della disputa); la seconda firma la mette il suo
+# telefono, come dopo una disputa vinta. Perche' la terza chiave puo'
+# firmare da sola qui, senza un moderatore: lo scambio non e' MAI stato
+# 'depositato', quindi chi compra non e' mai stato invitato a mandare
+# euro, e non perde niente; e i sats vanno solo all'indirizzo che il seme
+# di chi li ha messi ha firmato (il suo telefono lo rilegge prima della
+# seconda firma, `onchainRimborsoAtteso`). Servono monete CONFERMATE: su
+# quelle viste e basta non si scrive una transazione.
+def p2p_onchain_riprendi_perche(o) -> str:
+    """PURA: '' se chi ha depositato puo' annullare e riprendersi i sats
+    adesso, sennò il perche'."""
+    if o["stato"] != "preso":
+        return ("Il deposito è già valido: lo scambio va avanti, o si "
+                "esce con la disputa" if o["stato"] in ("depositato", "euro_inviati")
+                else "Questo scambio non si annulla più")
+    if o["proposta_psbt"] or o["decisione_da"]:
+        return "Su questo scambio c'è già una firma: manca solo la seconda"
+    if not int(o["ricevuti_sats"] or 0):
+        return ("I sats sono visti in rete ma non ancora confermati: "
+                "riprova dopo la prima conferma" if int(o["visti_sats"] or 0)
+                else "Sull'indirizzo non c'è niente: usa «Annulla»")
+    if not o["rimborso"]:
+        return ("Prima scrivi dove riavere i sats: un indirizzo del tuo "
+                "wallet nel riquadro «Dove tornano i sats?»")
+    return ""
+
+
+@app.post("/api/p2p/onchain/{oid}/riprendi")
+async def p2p_onchain_riprendi(oid: int, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """«Annulla e riprendi i sats»: solo chi ha depositato, solo su un
+    deposito che non vale. Vedi sopra."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_firma", user["id"])
+    _onchain_serve_embit()
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
+            raise HTTPException(403, "Annulla e riprende i sats chi li ha depositati")
+    finally:
+        con.close()
+    # la rete guardata adesso: un deposito diventato valido va avanti
+    try:
+        await _p2p_onchain_controlla(oid)
+    except Exception:
+        raise HTTPException(503, "mempool non risponde: non annullo alla "
+                                 "cieca, riprova fra poco")
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        perche = p2p_onchain_riprendi_perche(o)
+        if perche:
+            raise HTTPException(409, perche)
+        try:
+            psbt = _onchain_psbt_barattolo(con, o, "compratore")
+        except ValueError as e:
+            raise HTTPException(409, f"Barattolo non può firmare: {e}")
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+            " proposta_verso='compratore', proposta_psbt=?, proposta_da=0,"
+            " proposta_il=?, decisione_da=?, decisione_il=?,"
+            " decisione_perche='deposito-incompleto', aggiornato=?"
+            " WHERE id=? AND stato='preso' AND proposta_psbt='' AND decisione_da=0",
+            (adesso, psbt, adesso, int(user["id"]), adesso, adesso, oid))
+        con.commit()
+        if not cur.rowcount:
+            raise HTTPException(409, "Lo scambio è cambiato un attimo fa: riapri")
+        o = _p2p_onchain_carica(con, oid)
+        fuori = _p2p_onchain_per(con, o, user["id"])
+    finally:
+        con.close()
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(oid))
+    await _notifica_p2p_onchain(o, o["ricevente_id"],
+        "❌ <b>Chi vende ha annullato lo scambio on-chain</b> di "
+        f"{_p2p_onchain_quanto(o)}: il deposito non era completo, e i sats "
+        "tornano a lui.\n\nNon mandare niente: lo scambio è chiuso.",
+        _p2p_onchain_bottone(o))
+    await _notifica_p2p_onchain(o, o["depositante_id"],
+        "↩️ <b>Scambio annullato, Barattolo ha firmato il rimborso.</b>\n\n"
+        "Apri Barattolo: il tuo telefono mette la seconda firma e i sats "
+        "tornano al tuo wallet (meno la commissione di rete).",
+        _p2p_onchain_bottone(o))
+    await notifica_admin(argomento="moderazione", testo=
+        f"↩️ Scambio P2P on-chain #{int(oid)}: chi ha depositato ha annullato "
+        f"un deposito incompleto ({_fmt_sats(int(o['ricevuti_sats'] or 0))} di "
+        f"{_fmt_sats(int(o['importo_sats'] or 0))} sats). Barattolo ha firmato "
+        "il rimborso verso il suo wallet.")
+    return fuori
 
 
 def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple:
@@ -111783,10 +111893,44 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
     return fuori
 
 
+# L'AMMANCO TOLLERATO (18 nov 2026, cantiere ammanco-p2p-onchain; uno
+# scambio vero fermo: chi vendeva ha depositato da uno swap Chainflip /
+# FixedFloat e sono arrivati 270.444 sats invece di 270.503, 59 in meno
+# mangiati dalle commissioni dello swap. Il server voleva almeno
+# l'importo, e lo scambio restava su «si aspetta la conferma» per sempre;
+# annullare non si poteva piu', i sats erano gia' sull'indirizzo).
+# Chi deposita da uno swap non sceglie al sats quanto arriva: un ammanco
+# piccolo lo COPRE IL MARGINE PER LA RETE, che e' tre volte la
+# commissione stimata alla presa (`onchain_margine`). Se ne tollera al
+# piu' META' (e mai oltre `P2P_ONCHAIN_AMMANCO_MAX_SATS`): resta almeno
+# una volta e mezza la stima, e il giudice dei PSBT non cambia — prezzo
+# e quota escono esatti, la rete prende quel che resta, sempre > 0.
+# Strade scartate: chiedere un'altra transazione per pochi sats (costa
+# piu' dell'ammanco), e prenderli dalla commissione di Barattolo (la
+# quota e' un'uscita esatta che entrambi i telefoni ricontrollano).
+P2P_ONCHAIN_AMMANCO_MAX_SATS = 1000
+
+
+def p2p_onchain_ammanco_tollerato(o) -> int:
+    """PURA: quanti sats possono mancare al deposito di `o` senza
+    fermarlo. Meta' del margine per la rete, al piu' il tetto."""
+    try:
+        margine = int(o["margine_sats"] or 0)
+    except (IndexError, KeyError):
+        return 0
+    return max(0, min(P2P_ONCHAIN_AMMANCO_MAX_SATS, margine // 2))
+
+
+def _p2p_onchain_testo_ammanco(ammanco: int) -> str:
+    return (f"\n\nℹ️ Sono arrivati <b>{_fmt_sats(ammanco)} sats in meno</b> del "
+            "chiesto (succede con gli swap): li copre il margine per la rete, "
+            "non devi mandare altro.")
+
+
 async def _p2p_onchain_controlla(oid: int) -> str:
     """LA SORVEGLIANZA, come `onchain_controlla`: chiede a mempool le
     monete dell'indirizzo di uno scambio preso. Con una conferma e
-    almeno l'importo → 'depositato', e chi compra sa che puo' mandare gli
+    almeno l'importo, meno l'ammanco tollerato → 'depositato', e chi compra sa che puo' mandare gli
     euro. Le monete non confermate si vedono ma non contano. Si rilegge
     anche su uno scambio gia' avanti o chiuso con l'indirizzo (la coda
     dei ritardatari: un deposito arrivato DOPO l'annullo si vede qui, e
@@ -111819,7 +111963,8 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                     " aggiornato=? WHERE id=?",
                     (visti, ricevuti, json.dumps(buone), adesso, o["id"]))
         stato = o["stato"]
-        if stato == "preso" and ricevuti >= int(o["importo_sats"]):
+        soglia = int(o["importo_sats"]) - p2p_onchain_ammanco_tollerato(o)
+        if stato == "preso" and ricevuti >= soglia:
             cur = con.execute("UPDATE p2p_onchain_ordini SET stato='depositato',"
                               " depositato_il=? WHERE id=? AND stato='preso'",
                               (adesso, o["id"]))
@@ -111840,6 +111985,11 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                      f"Chi compra sta per mandarti {euro} €: quando li vedi sul tuo "
                      "conto, apri lo scambio e tocca «Ricevuti: libera i sats». Mai prima."
                      f"\n\n⏳ Chi compra ha <b>{ore} ore</b> per pagare.")]
+                ammanco = int(o["importo_sats"]) - ricevuti
+                if ammanco > 0:
+                    avvisi = [(chi, testo + _p2p_onchain_testo_ammanco(ammanco)
+                               if chi == o["depositante_id"] else testo)
+                              for chi, testo in avvisi]
         con.commit()
     finally:
         con.close()

@@ -90932,3 +90932,89 @@ develop 89947d52 (col nome «No altcoin»); dopo l'ultimo rebase su 20e5f9c6
 (etichetta-obbligatoria, nessun simbolo in comune) di nuovo la suite intera
 e i collaudi che quel cantiere tocca.
 NON PROVATO: un telefono vero dentro Telegram.
+
+## L'ammanco tollerato nel deposito P2P on-chain: pochi sats in meno da uno swap li copre il margine (18 nov 2026, cantiere ammanco-p2p-onchain; uno scambio vero fermo, segnalato da chi vendeva ad Alan: «invece di 270503 sono arrivati leggermente di meno, 270444. Cosa succede in questi casi?» e «Vorrei annullare invece di inviare altri Satoshi perché non vale la pena fare una nuova transazione per 59 Satoshi»; la correzione in produzione chiesta da Andrea al coordinatore)
+
+IL CASO. Chi vendeva BTC ha depositato nel 2-di-3 passando da uno swap
+(Chainflip / FixedFloat: tiene stablecoin e cambia al momento). Lo swap
+si è mangiato 59 sats di commissioni: 270.444 invece di 270.503.
+`_p2p_onchain_controlla` voleva `ricevuti >= importo_sats`, quindi lo
+scambio restava su «👀 Visti in rete …: si aspetta la conferma» PER
+SEMPRE, una frase falsa (la conferma c'era, mancavano i sats). Annullare
+non si poteva più (sats già sull'indirizzo): l'unica uscita era la
+rinuncia di chi compra, o un'altra transazione per 59 sats.
+
+DECISO. Un ammanco piccolo lo COPRE IL MARGINE PER LA RETE. Il margine
+nasce alla presa come tre volte la commissione stimata (`onchain_margine`,
+almeno 500): se ne tollera al più la METÀ, e mai oltre
+`P2P_ONCHAIN_AMMANCO_MAX_SATS = 1000` (`p2p_onchain_ammanco_tollerato`,
+pura). Resta almeno una volta e mezza la stima per la rete. Il giudice
+dei PSBT NON cambia: il prezzo a chi compra e la quota di Barattolo
+escono esatti, il resto del margine (se sopra la polvere) torna a chi
+ha depositato, e la rete prende quel che avanza, che resta > 0 proprio
+perché l'ammanco sta sotto metà margine. Lo stesso vale per la firma di
+Barattolo in disputa (`_onchain_psbt_barattolo` già tagliava la rete al
+totale). Chi ha depositato lo legge nell'avviso del deposito confermato
+(«ℹ️ Sono arrivati N sats in meno del chiesto … non devi mandare
+altro»); chi compra no, per lui non cambia niente. La pagina riceve
+`ammanco_ok_sats` e la usa in `depositoVistoOnchainP2P`; sotto la soglia
+la riga dei visti dice «ne mancano N perché il deposito valga» invece di
+«aspetto la conferma» (`rigaVistiOnchainP2P`).
+
+STRADE SCARTATE. Chiedere sempre la transazione in più: per pochi sats
+costa più dell'ammanco, ed è quello che ha fatto dire all'utente «non
+vale la pena». Prenderli dalla commissione di Barattolo: la quota è
+un'uscita esatta che server e due telefoni ricontrollano, cambiarla
+vuol dire toccare tre giudici. Una tolleranza fissa in sats senza
+legarla al margine: con un margine da 500 e un ammanco da 600 la rete
+andrebbe a zero o sotto, e il rilascio non partirebbe più.
+
+NON TOCCATO (notato): il mercatino on-chain (`onchain_controlla`) ha la
+stessa regola «almeno l'importo»; l'utente non ci è passato.
+
+PROVATO. `collaudo_p2p_onchain` (nuova sezione 11b): la pagina legge la
+tolleranza, un sats oltre resta «preso», 59 in meno diventa
+«depositato» con l'avviso solo a chi ha depositato, il rilascio giusto
+passa il giudice, un rilascio che finge i 59 sats presenti è un 400.
+NON PROVATO: uno swap vero.
+
+ANNULLA E RIPRENDI I SATS (seguito, stesso giorno; Andrea: «ok
+ottimo, aggiungi anche la possibilità di annullare l'ordine»). Un
+deposito confermato che NON vale (oltre la tolleranza) teneva i sats
+chiusi: «Annulla» diceva «si esce col rimborso o con una disputa», ma il
+rimborso lo propone solo chi compra («Rinuncio») e la disputa si apre
+solo da 'depositato'. Ora chi ha depositato ha `POST
+/api/p2p/onchain/{oid}/riprendi`: lo scambio va 'annullato' e BARATTOLO
+FIRMA IL RIMBORSO (`_onchain_psbt_barattolo`, verso compratore, lo
+stesso giudice della disputa) con `decisione_perche='deposito-incompleto'`;
+la seconda firma la mette il suo telefono (`daFirmareOnchainP2P` e le
+co-firme in sottofondo di sempre). Perché la terza chiave può firmare
+da sola SENZA un moderatore: lo scambio non è mai stato 'depositato',
+quindi chi compra non è mai stato invitato a pagare e non perde niente;
+i sats vanno solo all'indirizzo firmato dal seme di chi li ha messi, e
+il suo telefono lo rilegge. Le guardie (`p2p_onchain_riprendi_perche`,
+pura): solo 'preso', solo monete CONFERMATE (sulle viste non si scrive
+una transazione), nessuna firma già in giro, rimborso scelto. Nessun
+«non completato» a nessuno (`_p2p_onchain_mancato` vuole un deposito
+valido), nessuna recensione (non c'è disputa). La proposta dice a
+pagina il perché (`proposta.barattolo`), e «Annullato» lo scrive. Il
+moderatore riceve un avviso. Provato nella stessa sezione del collaudo
+(9 prove: valido 409, non confermato 409, «Annulla» che indica il tasto,
+403 a chi compra, la firma di Barattolo con un'uscita sola dentro il
+margine, una seconda volta 409, la seconda firma che chiude
+«rimborsato» senza «non completato»).
+
+DA DECIDERE (Andrea, non costruito): il rimborso verso chi deposita da
+uno swap. L'utente: «Non va bene se torna al mittente» (non ci torna:
+va al wallet del Profilo o all'indirizzo scritto nello scambio, mai al
+mittente) e «Localbitcoins aveva un portafoglio interno … così diventa
+macchinoso», «i tempi come minimo si raddoppiano. Potresti perdere
+utenti». Tre strade, da scegliere: (a) com'è oggi, più chiaro (il
+riquadro «Dove tornano i sats?» chiesto PRIMA del deposito, con la
+frase «mai all'indirizzo da cui mandi»); (b) il rimborso che può uscire
+in Lightning o in un'altra moneta con lo swap che c'è già (nessuna
+custodia, ma un passo e una tariffa in più); (c) un portafoglio interno
+alla LocalBitcoins: il più semplice per chi usa gli swap, ma è custodia
+di sats altrui sul server, contro la regola di non tenere i fondi degli
+utenti (e il nodo di cartone del MiCA). Proposta: (a) subito, (b) se
+gli intermediari crescono, (c) no.
