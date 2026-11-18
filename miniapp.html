@@ -41175,7 +41175,7 @@ function openOrder(id){
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">${etichettaCodiciAdmin(o, 'venditore') || '⚡ Dai i sats al venditore'}</button>
           ${bottoneMenoSpese(o, s)}
         </div>`:''}
-      ${isAdmin ? pannelloResoAdmin(o, s) + pannelloSpeseReseAdmin(o, s) : ''}
+      ${isAdmin ? pannelloResoAdmin(o, s) + pannelloSpeseReseAdmin(o, s) + pannelloFotografiaAdmin(o, s) : ''}
       ${pannelloSpeseVenditore(o)}
       ${o.role==='buyer' && s==='refund' && !o.onchain ? refundPanel(o) : ''}
       ${o.role==='buyer' && s==='refunded' && o.speseReseSats ? `<div class="trust-note">↩️ <span>Disputa decisa: il <b>rimborso meno ${nomeQuotaVenditore(o)}</b> è stato inviato al tuo wallet.</span></div>`:''}
@@ -51014,6 +51014,88 @@ function corpoMenoSpese(o){
   return `Al venditore vanno le spese di spedizione: ${fmt(spese)} sats.\n`
        + `All'acquirente torna il resto: ${fmt((Number(o.listing.price) || 0) - spese)} sats.\n`
        + 'Nessuna commissione.\n\nLa decisione è definitiva.';
+}
+/* LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026, cantiere fotografia-
+   annuncio, Andrea: «c'è un modo per risalire all'annuncio
+   originale?»). Al pagamento il server si tiene l'annuncio com'era
+   (`ordine_fotografie`); qui il moderatore lo apre A MANO — una
+   lettura, mai in polling — e vede i campi cambiati dopo l'acquisto,
+   «all'acquisto» sopra e «oggi» sotto. Tutto quel che arriva è testo
+   di chi vende: passa da esc(), sempre. Le foto sono nomi della stessa
+   forma di quelle dell'annuncio: la miniatura, e se manca sparisce. */
+const FOTOGRAFIA_NOMI = {titolo:'Titolo', descrizione:'Descrizione',
+  categoria:'Categoria', sottocategoria:'Sottocategoria',
+  condizione:'Condizione', prezzo_sats:'Prezzo (sats)', valuta:'Valuta',
+  prezzo_eur:'Prezzo (€)', opzioni:'Opzioni', etichetta:'Etichetta alimenti',
+  zona:'Zona', consegna:'Consegna', spedizione_sats:'Spedizione (sats)',
+  spedizione_eur:'Spedizione (€)', spedizione_punto_sats:'Spedizione al punto (sats)',
+  taglia_pacco:'Taglia del pacco', anche_digitale:'Anche digitale',
+  servizio_dove:'Dove si svolge', durata_min:'Durata (minuti)', foto:'Foto'};
+function dataFotografia(ts){
+  return ts ? new Date(ts*1000).toLocaleString('it-IT',
+    {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+}
+/* PURA: un valore della fotografia, già in HTML sicuro */
+function valoreFotografia(campo, v){
+  if (campo === 'foto') {
+    const l = Array.isArray(v) ? v : [];
+    if (!l.length) return '<i>nessuna foto</i>';
+    return l.map(n => `<img src="${esc(fotoUrl(fotoMini(n)))}" alt="" loading="lazy"`
+      + ` style="width:64px;height:64px;object-fit:cover;border-radius:8px;margin:2px"`
+      + ` onerror="this.remove()">`).join('');
+  }
+  if (v === null || v === undefined || v === '' || v === 0) return '<i>vuoto</i>';
+  if (typeof v === 'number') return esc(fmt(v));
+  return `<span style="white-space:pre-wrap">${esc(v)}</span>`;
+}
+/* PURA: il corpo del confronto, dalla risposta del server */
+function corpoFotografiaAdmin(d){
+  const fot = (d && d.fotografie) || [];
+  if (!fot.length) return `<div class="hint" style="margin-top:10px">Questo ordine è stato pagato prima che esistesse la fotografia dell'annuncio (18 nov 2026)${d && d.attiva === false ? ', oppure la leva è spenta' : ''}: l'originale non c'è.</div>`;
+  return fot.map(f => {
+    const A = f.allora || {}, O = f.oggi;
+    const testa = `<div style="margin-top:12px"><b>${esc(A.titolo || 'Annuncio')}</b>`
+      + `<br><span class="eur-hint">Fotografato al pagamento, il ${esc(dataFotografia(f.il))}`
+      + `${A.modificato ? ` · ritoccato l'ultima volta prima dell'acquisto il ${esc(dataFotografia(A.modificato))}` : ''}</span></div>`;
+    const campi = Object.keys(FOTOGRAFIA_NOMI).filter(k => k in A);
+    const tutto = campi.map(k => `<div style="margin-top:6px"><b>${FOTOGRAFIA_NOMI[k]}</b><br>${valoreFotografia(k, A[k])}</div>`).join('');
+    if (!O) return testa + `<div class="hint" style="margin-top:6px">L'annuncio non esiste più. Ecco com'era all'acquisto:</div>${tutto}`;
+    const diversi = (f.diversi || []).filter(k => FOTOGRAFIA_NOMI[k]);
+    if (!diversi.length) return testa + `<div class="hint" style="margin-top:6px">✅ Nessuna differenza: l'annuncio è uguale a quando è stato pagato.</div>`;
+    return testa
+      + `<div class="hint" style="margin-top:6px;color:var(--danger)">⚠️ ${diversi.length === 1 ? 'Un campo è cambiato' : diversi.length + ' campi sono cambiati'} dopo l'acquisto${O.modificato ? ` (ultimo ritocco il ${esc(dataFotografia(O.modificato))})` : ''}:</div>`
+      + diversi.map(k => `<div style="margin-top:8px"><b>${FOTOGRAFIA_NOMI[k]}</b>`
+        + `<div style="margin-top:2px">📸 <b>All'acquisto:</b> ${valoreFotografia(k, A[k])}</div>`
+        + `<div style="margin-top:2px">✏️ <b>Oggi:</b> ${valoreFotografia(k, O[k])}</div></div>`).join('')
+      + `<details style="margin-top:10px"><summary>Tutto l'annuncio all'acquisto</summary>${tutto}</details>`;
+  }).join('');
+}
+function pannelloFotografiaAdmin(o, s){
+  if (o.role !== 'admin' || s === 'creato') return '';
+  return `<div class="payout" id="fotografiaAdmin">
+      <h4>📸 L'annuncio al momento dell'acquisto</h4>
+      <div class="hint">Com'era l'annuncio quando i sats sono entrati, confrontato con quello di oggi.</div>
+      <button class="btn ghost" style="margin-top:10px" onclick="apriFotografiaAdmin(${Number(o.id) || 0}, this)">📸 Confronta con l'annuncio di oggi</button>
+      <div id="fotografiaAdminCorpo"></div>
+    </div>`;
+}
+async function apriFotografiaAdmin(id, btn){
+  haptic();
+  if (DEMO) { toast('La fotografia si legge col backend attivo'); return; }
+  const dove = el('fotografiaAdminCorpo');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch(`${API_BASE}/admin/orders/${id}/fotografia`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riesco a leggere la fotografia'); return; }
+    if (dove) dove.innerHTML = corpoFotografiaAdmin(d);
+    if (btn) btn.remove();
+  } catch (e) {
+    toast('Non riesco a leggere la fotografia');
+  } finally {
+    if (btn && btn.isConnected) btn.disabled = false;
+  }
 }
 /* PURA: sul reso in corso il moderatore non aveva nessun bottone. Qui
    ne trova UNO, quello di oggi, e solo dove c'e' una cifra da

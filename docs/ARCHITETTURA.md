@@ -36896,6 +36896,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `ETICHETTA_ALIMENTI` nasce accesa (solo False spegne), sta nel pannello
   e in `/api/me` (`etichetta_alimenti`). Prove: `prove_etichetta_alimenti`,
   `collaudo_etichetta_alimenti`.
+- LA FOTOGRAFIA DELL'ANNUNCIO ALL'ACQUISTO (18 nov 2026, cantiere
+  fotografia-annuncio). Tabella `ordine_fotografie(ordine_id,
+  annuncio_id, dati, creato)`, chiave (ordine, annuncio): `dati` è il
+  JSON dei campi `FOTOGRAFIA_CAMPI` (testo, categoria, condizione,
+  prezzo, opzioni, etichetta, zona, consegna e spedizione, elenco delle
+  foto, `modificato`). La scrive `_fotografa_annunci` dentro
+  `_incassa_ordine`, dopo il CAS a 'locked' e prima che lo stock scali,
+  nella stessa transazione, `INSERT OR IGNORE` (mai riscritta), in un
+  try che non ferma l'incasso. I FILE NON SI COPIANO: `modifica_annuncio`
+  salta le foto vecchie che `_foto_protette_da_ordini` trova nominate
+  dalla fotografia di un ordine non chiuso (`FOTOGRAFIA_ORDINI_CHIUSI` =
+  released, refunded, annullato); a ordine chiuso il file resta. La
+  guardia che c'era già resta il primo muro: ad affare aperto (anche solo
+  creato) la modifica del venditore è rifiutata. Rotta
+  `GET /api/admin/orders/{id}/fotografia` (solo admin): com'era, com'è
+  (`_fotografia_di` della riga di oggi, None se sparito) e `diversi`
+  (`_differenze_fotografia`, senza `modificato`, vuoti equivalenti).
+  Nella pagina dell'ordine, per il moderatore, `pannelloFotografiaAdmin`
+  (accanto a `pannelloResoAdmin`) e `apriFotografiaAdmin` →
+  `corpoFotografiaAdmin`, tutto in `esc()`. Leva
+  `ORDINE_FOTOGRAFIA_ATTIVA`, accesa di serie, nel pannello. Prove:
+  `prove_fotografia_annuncio`, `collaudo_fotografia_annuncio`.
 - LE NOVITÀ PER GLI UTENTI (`NOVITA.md`, 10 nov 2026, cantiere novita).
   Il file in cima al repo dove ogni cantiere che porta qualcosa di
   VISIBILE scrive una voce: `## data · nome`, poi `frase:` (per gli

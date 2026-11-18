@@ -7197,6 +7197,23 @@ def init_db():
         ON ordine_righe(ordine_id);
     CREATE INDEX IF NOT EXISTS idx_righe_annuncio
         ON ordine_righe(annuncio_id);
+    CREATE TABLE IF NOT EXISTS ordine_fotografie(
+        -- LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026, cantiere
+        -- fotografia-annuncio, Andrea: «c'e' un modo per risalire
+        -- all'annuncio originale?»). Al pagamento l'ordine si tiene
+        -- l'annuncio COM'ERA — testo, condizione, prezzo, consegna,
+        -- elenco delle foto — in JSON (`FOTOGRAFIA_CAMPI`), una riga
+        -- per annuncio (il set ne ha piu' d'una). Si scrive UNA volta
+        -- e non si riscrive mai: e' la prova del moderatore se chi
+        -- vende ritocca l'annuncio dopo la vendita.
+        ordine_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        dati TEXT NOT NULL DEFAULT '',
+        creato INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(ordine_id, annuncio_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_fotografie_annuncio
+        ON ordine_fotografie(annuncio_id);
     CREATE TABLE IF NOT EXISTS sessioni(
         -- login web dal browser: nel DB c'e' SOLO l'hash del token,
         -- il token vero vive nel cookie dell'utente e basta
@@ -33228,13 +33245,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         con.execute("UPDATE annunci SET foto=? WHERE id=?",
                     (json.dumps(nomi), annuncio_id))
         con.commit()
+        # LE FOTO DELLA FOTOGRAFIA RESTANO (18 nov 2026): se un ordine
+        # ancora aperto le nomina, sono la prova del moderatore.
+        protette = (_foto_protette_da_ordini(con, annuncio_id)
+                    if ORDINE_FOTOGRAFIA_ATTIVA else set())
         con.close()
         # SOLO ADESSO le vecchie se ne vanno: le nuove sono sul disco E
         # nel database. Prima si cancellavano in testa, e un guasto a
         # meta' lasciava l'annuncio senza niente; adesso lascerebbe al
         # massimo dei file in piu'.
         for v in vecchie:
-            if v.startswith("http") or v in nomi:
+            if v.startswith("http") or v in nomi or v in protette:
                 continue
             # Con la foto piena se ne va anche la miniatura gemella
             for da_togliere in (v, v[:-4] + "_min.jpg"):
@@ -37279,6 +37300,16 @@ def _leve_stato():
                          "comprare",
                   spento="il form non la offre e la scheda non la mostra; "
                          "quelle già scritte restano nel database"),
+            # LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026): accesa di
+            # serie, la leva e' l'interruttore d'emergenza
+            _leva("Fotografia dell'annuncio all'acquisto",
+                  "ORDINE_FOTOGRAFIA_ATTIVA", ORDINE_FOTOGRAFIA_ATTIVA,
+                  acceso="al pagamento l'ordine salva l'annuncio com'era, "
+                         "e in disputa il moderatore lo vede accanto a "
+                         "quello di oggi con le differenze",
+                  spento="gli ordini nuovi non salvano l'annuncio e le foto "
+                         "cambiate si cancellano come prima; le fotografie "
+                         "già salvate restano visibili"),
             # L'ASSISTENZA IN APP (3 nov 2026): spenta di serie
             _leva("Assistenza in app", "ASSISTENZA_ATTIVA",
                   bool(ASSISTENZA_ATTIVA),
@@ -48293,6 +48324,121 @@ def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
 BOTTONE_ORDINE_VENDUTO = "📦 Apri l'ordine"
 
 
+# ══ LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026, cantiere fotografia-
+# annuncio) ══
+# Il caso: un telefono arrivato col blocco FRP (ordine #284) e la
+# domanda di Andrea — «se il venditore modificasse l'annuncio per
+# raffreddare il compratore, c'e' un modo per risalire all'originale?».
+# Non c'era: la modifica riscrive le colonne, cancella le foto vecchie,
+# e su Nostr il NIP-99 sostituisce l'evento. Restavano solo il titolo e
+# l'unitario di `ordine_righe`.
+# ADESSO al pagamento (`_incassa_ordine`, l'unico passaggio a 'locked'
+# di ogni strada: Lightning, on-chain, swap, riacciuffo) l'ordine si
+# tiene una copia dei campi qui sotto in `ordine_fotografie`, e il
+# moderatore la vede accanto all'annuncio di oggi con le differenze
+# (`/api/admin/orders/{id}/fotografia`).
+# LE FOTO NON SI COPIANO: si copia l'ELENCO dei nomi, e `modifica_
+# annuncio` non cancella piu' un file nominato dalla fotografia di un
+# ordine ancora aperto (`_foto_protette_da_ordini`). Il costo e' quindi
+# zero file in piu' finche' chi vende non cambia le foto con un ordine
+# in corso — il caso raro, ed e' proprio quello da tenere.
+# LO SPAZIO (misurato il 18 nov in produzione: 126 ordini in tutto,
+# descrizione piu' lunga 4 KB): al massimo qualche KB per ordine, meno
+# di 1 MB per l'intera storia. La velocita': un INSERT nella stessa
+# transazione del pagamento, niente in vetrina.
+# Accesa di serie (regola di Andrea del 14 nov): spenta, al pagamento
+# non si fotografa e le foto vecchie si cancellano come prima; le
+# fotografie gia' scritte restano e il moderatore le vede ancora.
+try:
+    from config import ORDINE_FOTOGRAFIA_ATTIVA
+    if not isinstance(ORDINE_FOTOGRAFIA_ATTIVA, bool):
+        print("[fotografia] ORDINE_FOTOGRAFIA_ATTIVA non e' True/False: "
+              "la fotografia dell'annuncio resta accesa")
+    ORDINE_FOTOGRAFIA_ATTIVA = ORDINE_FOTOGRAFIA_ATTIVA is not False
+except ImportError:
+    ORDINE_FOTOGRAFIA_ATTIVA = True
+
+# I campi dell'annuncio che fanno la promessa a chi compra. Niente
+# contatori (viste, quantita') ne' colonne tecniche: quelle cambiano da
+# sole e accenderebbero «differenze» che nessuno ha fatto. `modificato`
+# c'e' per dire QUANDO l'annuncio era stato ritoccato l'ultima volta.
+FOTOGRAFIA_CAMPI = (
+    "titolo", "descrizione", "categoria", "sottocategoria", "condizione",
+    "prezzo_sats", "valuta", "prezzo_eur", "opzioni", "etichetta",
+    "zona", "consegna", "spedizione_sats", "spedizione_eur",
+    "spedizione_punto_sats", "taglia_pacco", "anche_digitale",
+    "servizio_dove", "durata_min", "foto", "modificato")
+# Chiusi davvero: da qui un moderatore non decide piu' niente, e le foto
+# vecchie possono andarsene. Tutto il resto (anche 'confirmed' e
+# 'refund', che `risolvi_disputa` riapre con `disputata`) e' aperto.
+FOTOGRAFIA_ORDINI_CHIUSI = ("released", "refunded", "annullato")
+
+
+def _fotografia_di(a) -> dict:
+    """PURA: i campi di FOTOGRAFIA_CAMPI di una riga annunci, con la
+    lista delle foto gia' decodificata (si confronta per elementi)."""
+    chiavi = a.keys() if hasattr(a, "keys") else a
+    dati = {k: a[k] for k in FOTOGRAFIA_CAMPI if k in chiavi}
+    try:
+        foto = json.loads(dati.get("foto") or "[]")
+    except (TypeError, ValueError):
+        foto = []
+    dati["foto"] = [f for f in foto if isinstance(f, str)] \
+        if isinstance(foto, list) else []
+    return dati
+
+
+def _fotografa_annunci(con, ordine_id: int, annunci_ids, adesso: int) -> int:
+    """Scrive la fotografia di ogni annuncio dell'ordine, nella
+    transazione del chiamante (niente commit qui). INSERT OR IGNORE:
+    la prima fotografia e' quella buona e non si riscrive mai. Torna
+    quante righe ha scritto."""
+    scritte = 0
+    for aid in dict.fromkeys(i for i in annunci_ids if i):
+        a = con.execute("SELECT * FROM annunci WHERE id=?",
+                        (aid,)).fetchone()
+        if not a:
+            continue
+        cur = con.execute(
+            "INSERT OR IGNORE INTO ordine_fotografie(ordine_id, annuncio_id,"
+            " dati, creato) VALUES(?,?,?,?)",
+            (ordine_id, aid, json.dumps(_fotografia_di(a),
+                                        ensure_ascii=False), adesso))
+        scritte += cur.rowcount
+    return scritte
+
+
+def _foto_protette_da_ordini(con, annuncio_id: int) -> set:
+    """I nomi delle foto che la fotografia di un ordine ANCORA APERTO
+    di questo annuncio nomina: `modifica_annuncio` non li cancella.
+    A ordine chiuso il file resta dov'e' (nessuno lo chiede piu', e
+    sono pochi KB in casi rari): la pulizia non vale il rischio di
+    togliere la prova a una disputa riaperta."""
+    nomi = set()
+    segnaposto = ",".join("?" * len(FOTOGRAFIA_ORDINI_CHIUSI))
+    for r in con.execute(
+            "SELECT f.dati FROM ordine_fotografie f JOIN ordini o "
+            "ON o.id=f.ordine_id WHERE f.annuncio_id=? "
+            f"AND o.stato NOT IN ({segnaposto})",
+            (annuncio_id, *FOTOGRAFIA_ORDINI_CHIUSI)):
+        try:
+            nomi.update(json.loads(r["dati"]).get("foto") or [])
+        except (TypeError, ValueError, AttributeError):
+            continue
+    return nomi
+
+
+def _differenze_fotografia(allora: dict, oggi: dict) -> list:
+    """PURA: i campi cambiati fra la fotografia e l'annuncio di oggi,
+    nell'ordine di FOTOGRAFIA_CAMPI. `modificato` non conta (e' la
+    data del ritocco, non il ritocco). I vuoti si equivalgono: None,
+    '' e 0 di una colonna nata dopo non sono una modifica."""
+    def norm(v):
+        return "" if v in (None, 0, 0.0) else v
+    return [k for k in FOTOGRAFIA_CAMPI if k != "modificato"
+            and k in allora and norm(allora.get(k)) != norm(oggi.get(k))]
+
+
 async def _incassa_ordine(ordine_id: int) -> dict:
     """I sats sono in cassaforte: l'ordine passa a LOCKED, lo stock
     scala, le offerte si chiudono, le notifiche partono. Estratto da
@@ -48330,6 +48476,16 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     pezzi = o["quantita"] or 1
     righe = _righe_ordine(con, o)
     e_set = not o["annuncio_id"]
+    # LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026): l'annuncio com'e' nel
+    # momento in cui i sats entrano, PRIMA che lo stock scali. Mai un
+    # ostacolo all'incasso: un guasto qui e' una riga in console, e
+    # l'ordine passa a locked lo stesso.
+    if ORDINE_FOTOGRAFIA_ATTIVA:
+        try:
+            _fotografa_annunci(con, ordine_id,
+                               [r["annuncio_id"] for r in righe], adesso_pag)
+        except Exception as e:
+            print(f"[fotografia] ordine {ordine_id}: non fotografato ({e})")
     a = None
     esauriti, taglie = [], []
     for r in righe:
@@ -89700,6 +89856,46 @@ async def correggi_tracking_venditore(ordine_id: int, req: Request,
     return {"ok": True, "corriere": corriere, "tracking": tracking,
             "corretto_il": ora, "aggiunto": aggiunto, "da_mano": da_mano,
             "senza": senza}
+
+
+@app.get("/api/admin/orders/{ordine_id}/fotografia")
+async def fotografia_ordine(ordine_id: int,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN (18 nov 2026, cantiere fotografia-annuncio): l'annuncio
+    com'era al pagamento accanto a quello di oggi, coi campi cambiati.
+    Una lettura e basta: si apre a mano dal riquadro del moderatore,
+    mai in polling. Un ordine pagato prima del cantiere non ha
+    fotografie, e la lista vuota lo dice."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        o = con.execute("SELECT id, pagato_il FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        if not o:
+            raise HTTPException(404, "Ordine non trovato")
+        fotografie = []
+        for f in con.execute(
+                "SELECT annuncio_id, dati, creato FROM ordine_fotografie "
+                "WHERE ordine_id=? ORDER BY rowid", (ordine_id,)).fetchall():
+            try:
+                allora = json.loads(f["dati"])
+            except (TypeError, ValueError):
+                continue
+            a = con.execute("SELECT * FROM annunci WHERE id=?",
+                            (f["annuncio_id"],)).fetchone()
+            oggi = _fotografia_di(a) if a else None
+            fotografie.append({
+                "annuncio_id": f["annuncio_id"], "il": f["creato"],
+                "allora": allora, "oggi": oggi,
+                "diversi": (_differenze_fotografia(allora, oggi)
+                            if oggi is not None else [])})
+    finally:
+        con.close()
+    return {"ordine_id": ordine_id, "pagato_il": o["pagato_il"] or 0,
+            "attiva": ORDINE_FOTOGRAFIA_ATTIVA, "fotografie": fotografie}
 
 
 @app.post("/api/admin/orders/{ordine_id}/tracking")
