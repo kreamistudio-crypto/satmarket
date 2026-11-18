@@ -90617,3 +90617,71 @@ Amazon, lo paghi in contanti al tabacchino e tocchi «🧾 Ho pagato al
 tabacchino»», il nome vero del gesto nella scheda. PROVATO:
 `prove_barattozon_onchain`, banco node delle tre frasi (Vendi BTC,
 Compra BTC, un ordine qualsiasi); controprova rossa.
+
+## Il reso a spese del venditore: la quinta decisione del moderatore (18 nov 2026, cantiere reso-spese-venditore; Andrea, su un caso vero: «siccome lui ha ricevuto un oggetto bloccato, le spese di spedizione dovrebbe accollarsele il venditore»)
+
+IL CASO. Un compratore riceve un telefono col blocco FRP e deve
+rispedirlo; non vuole pagare l'etichetta in euro, anche per non dare i
+suoi dati. Andrea ricordava un modo per far pagare il reso al venditore:
+non c'era. C'era solo l'opposto, «Rimborso meno le spese di spedizione»
+(13 ott), dove le spese vanno A chi vende. Il reso di sempre rimborsa
+alla consegna e il viaggio di ritorno non lo copriva nessuno, cioè lo
+pagava chi compra.
+
+COSA SI È DECISO (Andrea, sulle dieci righe, «va bene 3 giorni»).
+1. Un quinto bottone per il moderatore, «📦 Reso a spese del
+   venditore», accanto a «Reso». NESSUNO STATO NUOVO (regola 4): la
+   strada è quella del reso, e cambia un segno sull'ordine.
+2. L'etichetta la crea chi vende, prepagata, e la manda nella chat
+   dell'ordine (già aperta durante il reso, cifrata, coi PDF). Barattolo
+   non tocca euro: la stessa obiezione che ha fermato l'integrazione di
+   Packlink (17 nov).
+3. Tre giorni. Passati quelli, chi compra tocca «⏰ Il venditore non ha
+   mandato l'etichetta» e avvisa i moderatori, che decidono il
+   «Rimborso». Niente scatta da solo.
+4. Vale anche on-chain (il reso fa la stessa strada); il P2P non c'entra.
+
+COM'È FATTO. `ordini.reso_venditore_il` (quando è stato deciso; 0 = reso
+di sempre) nello STESSO UPDATE condizionato del reso, sotto il lucchetto;
+`ordini.etichetta_mancante_il` (l'avviso, una volta sola). Le guardie del
+reso valgono anche qui: il pagamento in volo (409) e il moderatore che è
+parte (403). La rotta `POST /api/orders/{id}/reso-etichetta-mancante`:
+solo chi compra, solo a `return_pending` deciso così, solo dopo i tre
+giorni (prima un 400 con la data), e NON MUOVE SATS — Barattolo la chat
+non la legge e non può sapere se l'etichetta c'è; la legge il moderatore.
+`GIORNI_ETICHETTA_RESO = 3` nel server e il gemello con lo stesso nome
+nella pagina: non è una leva del config, perché una riga sul VPS
+cambierebbe il server e non la data che la pagina dice. Nella pagina:
+il bottone fra le decisioni, la riga «🏷️ Il reso lo paga il venditore»
+(con «non pagare niente», la data e «💬 Guarda la chat») nel riquadro di
+chi rispedisce, il riquadro «🏷️ Il reso è a tue spese» con «💬 Manda
+l'etichetta in chat» per chi vende, e per il moderatore, nei resi decisi
+così, il «↩️ Rimborsa subito l'acquirente (100%)» dentro
+`pannelloResoAdmin`: il server lo accettava già da un reso in corso, ma
+la pagina non lo offriva.
+
+STRADE SCARTATE. Chi compra paga e Barattolo gli rende dei sats in più:
+nel deposito ci sono solo i sats dell'ordine, e a chi vende non si può
+prendere niente oltre quelli. Il rimborso automatico allo scadere dei
+tre giorni: Barattolo non vede la chat, quindi non sa se l'etichetta è
+arrivata; decide una persona. I giorni come leva del config (vedi sopra).
+
+PROVATO. `collaudo_reso_spese_venditore.py` nuovo, sul server vero col
+nodo di cartone (34 prove: la decisione e i due testi, l'avviso prima
+del tempo rifiutato anche a chi vende e a un estraneo, l'avviso dopo
+il tempo una volta sola, il rimborso da un reso in corso, la strada di
+sempre spedito/ricevuto/rimborsato, il reso di sempre che resta com'era,
+le guardie), in `ci/collaudi.txt` e `ci/compila.txt`; controprova: tolto
+il controllo dei giorni e scritto l'istante anche sul reso di sempre, 7
+rosse. `prove_reso_spese_venditore` nuova (la forma del server, la
+pagina fatta girare in node: i tre riquadri, l'avviso, il foglio del
+moderatore); controprova: bottone d'avviso sempre acceso e riquadro di
+chi vende staccato, 2 rosse. Ritoccate tre prove vecchie che leggevano
+la forma di ieri: la riga degli esiti in `prove_rimborso_meno_spese`, il
+ramo del reso in `prove_disputa_cambia_strada` (e il suo banco prende
+le due colonne nuove). Suite severa intera e collaudi della CI, anche
+nel venv senza coincurve.
+NON PROVATO: un telefono vero, e un moderatore vero che decide.
+DA GUARDARE: il «Rimborso» a reso in corso c'è solo per i resi a spese
+del venditore; per un reso di sempre incagliato la pagina continua a
+offrire solo «meno le spese» (notato, non toccato).

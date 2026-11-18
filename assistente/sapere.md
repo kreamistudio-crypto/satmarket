@@ -87,6 +87,7 @@ Finché i sats sono nel deposito puoi aprire una disputa dalla pagina del tuo or
 - i sats vanno al venditore;
 - i sats tornano a te meno le spese di spedizione, che restano al venditore (per esempio un pacco tornato indietro per un indirizzo sbagliato).
 Se l'oggetto va restituito, il rimborso parte dopo che è tornato indietro.
+Il reso a spese del venditore (dal 18 novembre 2026): se l'oggetto è arrivato rotto, bloccato o diverso dall'annuncio, il moderatore può decidere che a pagare la spedizione di ritorno sia il venditore. Il venditore crea un'etichetta di reso prepagata e la manda nella chat dell'ordine entro 3 giorni; chi ha comprato non paga niente, usa quell'etichetta, rispedisce e scrive il tracciamento nell'ordine. Il rimborso parte quando il venditore riceve l'oggetto. Se in 3 giorni l'etichetta non arriva, chi ha comprato tocca «⏰ Il venditore non ha mandato l'etichetta» nella pagina dell'ordine: avvisa i moderatori, che guardano la chat e possono rimborsarlo subito. Barattolo non paga e non vende etichette.
 
 Aprire una disputa non è un'accusa: spesso è un malinteso che si chiarisce in mezza giornata. Prima di aprirla conviene scrivere all'altra persona.
 

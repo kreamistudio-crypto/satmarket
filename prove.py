@@ -5474,6 +5474,12 @@ def prove_pagamenti_in_volo(attrezzi=False):
             vero.execute(
                 "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,?,0,?,0,0,"
                 "'','','',0,'nodo',0,0,'')", (stato, invoice))
+            # (18 nov 2026) il reso a spese del venditore scrive i suoi
+            # due istanti nello stesso UPDATE del reso: in coda, per non
+            # spostare le VALUES posizionali qui sopra
+            for col in ("reso_venditore_il", "etichetta_mancante_il"):
+                vero.execute(f"ALTER TABLE ordini ADD COLUMN {col} INT "
+                             "DEFAULT 0")
             vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
                          "vendite_ok INT, acquisti_ok INT)")
             vero.execute("INSERT INTO utenti VALUES(222,?,0,0)", (address,))
@@ -9524,7 +9530,7 @@ def prove_disputa_cambia_strada():
 
     # --- SENTINELLE ---------------------------------------------------
     rd = codice(pezzo("risolvi_disputa"))
-    reso = rd[rd.index('if esito == "reso" and stato == "dispute"'):]
+    reso = rd[rd.index('if esito in ("reso", "reso_venditore") and stato == "dispute"'):]
     prova("il reso si scrive SOTTO il lucchetto dell'ordine, come le due "
           "uscite", True,
           "async with _lucchetti_ordine[ordine_id]:" in reso
@@ -28439,7 +28445,7 @@ def prove_rimborso_meno_spese():
     # --- 2) LA ROTTA: definitiva, e solo da dove si puo' ----------------
     rd = codice(pezzo("risolvi_disputa"))
     prova("la rotta conosce il quarto esito", True,
-          'if esito not in ("venditore", "rimborso", "reso", "meno_spese"):'
+          'if esito not in ("venditore", "rimborso", "reso", "meno_spese",'
           in rd)
     i_g = rd.find("raise HTTPException(400, MSG_MENO_SPESE_DECISO)")
     i_q = rd.find('if esito == "meno_spese":')
@@ -38997,6 +39003,247 @@ def prove_posizione_vetrina():
           mini.count("pickerTrigger.focus();"))
     prova("...e sono due, entrambi con preventScroll", 2,
           mini.count("pickerTrigger.focus({preventScroll:true})"))
+
+
+def prove_reso_spese_venditore():
+    """IL RESO A SPESE DEL VENDITORE (18 nov 2026, cantiere
+    «reso-spese-venditore», ok di Andrea).
+
+    Il quinto esito del moderatore: il reso di sempre (nessuno stato
+    nuovo), ma l'etichetta la paga chi vende e la manda nella chat
+    dell'ordine entro GIORNI_ETICHETTA_RESO. Passati quelli chi compra
+    avvisa i moderatori, che decidono il «Rimborso»: niente scatta da
+    solo. Qui la FORMA e la pagina fatta girare; il giro vero (decisione,
+    avviso prima e dopo il tempo, rimborso, la strada di sempre, le
+    guardie) sta in collaudo_reso_spese_venditore.py."""
+    print("\n[il reso a spese del venditore]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: l'esito, l'istante, la rotta -------------------
+    giorni_srv = re.search(r"\nGIORNI_ETICHETTA_RESO = (\d+)\n", src)
+    giorni_pag = re.search(r"\nconst GIORNI_ETICHETTA_RESO = (\d+);\n", mini)
+    prova("i giorni per l'etichetta: 3 nel server (decisione di Andrea)",
+          "3", giorni_srv and giorni_srv.group(1))
+    prova("...e il gemello della pagina dice lo stesso numero",
+          giorni_srv and giorni_srv.group(1),
+          giorni_pag and giorni_pag.group(1))
+    prova("...e non e' una leva del config (la pagina non la vedrebbe)",
+          False, "from config import GIORNI_ETICHETTA_RESO" in src)
+    prova("l'esito nuovo e' fra quelli che il moderatore puo' prendere",
+          True, '    if esito not in ("venditore", "rimborso", "reso", '
+                '"meno_spese",\n                     "reso_venditore"):' in src)
+    prova("...con la guardia del pagamento in volo, come il reso", True,
+          '    if esito in ("reso", "reso_venditore") and (_campo(o, '
+          '"payout_stato")' in src)
+    prova("l'istante si scrive nello STESSO UPDATE condizionato del reso",
+          True, "\"payout_verso='', aggiornato=?, reso_venditore_il=?, \"\n"
+                "                \"etichetta_mancante_il=0 WHERE id=? AND "
+                "stato='dispute' \"" in src)
+    prova("le due colonne nascono con la migrazione", [1, 1],
+          [src.count('    for colonna in ("reso_venditore_il", '
+                     '"etichetta_mancante_il"):'),
+           src.count('            con.execute(f"ALTER TABLE ordini ADD '
+                     'COLUMN "\n                        f"{colonna} INTEGER '
+                     'DEFAULT 0")')])
+    prova("la rotta dell'avviso c'e', ed e' una sola", 1,
+          src.count('@app.post("/api/orders/{ordine_id}/reso-etichetta-'
+                    'mancante")'))
+    corpo = pezzo("reso_etichetta_mancante")
+    prova("...solo chi compra, solo a reso deciso cosi' e non ancora "
+          "spedito", True,
+          "\"SELECT * FROM ordini WHERE id=? AND compratore_id=? \"\n"
+          "                    \"AND stato='return_pending' \"\n"
+          "                    \"AND COALESCE(reso_venditore_il,0)>0\"" in corpo)
+    prova("...prima del tempo si rifiuta", True,
+          "    if adesso < deciso + GIORNI_ETICHETTA_RESO * 86400:" in corpo)
+    prova("...una volta sola (UPDATE condizionato)", True,
+          "AND COALESCE(etichetta_mancante_il,0)=0\"" in corpo)
+    prova("...e NON muove sats: nessuna uscita chiamata da li'",
+          [False] * 4, ["_rimborsa_compratore" in corpo,
+                        "_sblocca_sats" in corpo, "paga_venditore" in corpo,
+                        "_onchain_decide" in corpo])
+
+    # --- 2) LA PAGINA: la forma ---------------------------------------
+    prova("il quinto bottone sta fra le decisioni della disputa", 1,
+          mini.count("          <button class=\"btn ghost\" onclick=\""
+                     "adminResolve('reso_venditore', this)\">📦 Reso a spese "
+                     "del venditore</button>\n"))
+    prova("la riga dell'ordine porta i due istanti", [1, 1],
+          [mini.count("    resoVenditoreIl:o.reso_venditore_il||0,\n"),
+           mini.count("    etichettaMancanteIl:o.etichetta_mancante_il||0,\n")])
+    prova("il riquadro di chi compra ha la riga dell'etichetta", 1,
+          mini.count("          ${rigaEtichettaResoCompratore(o, "
+                     "Math.floor(Date.now()/1000))}\n"))
+    prova("chi vende ha il suo riquadro a reso da spedire", 1,
+          mini.count("      ${s==='return_pending' ? "
+                     "pannelloEtichettaResoVenditore(o) : ''}\n"))
+
+    # --- 3) LA PAGINA, fatta girare -----------------------------------
+    try:
+        prog = (
+            r"""
+const fmt = n => String(n);
+const esc = s => String(s);
+const dataAppuntamento = ts => 'D' + ts;
+const DEMO = false, API_BASE = '/api';
+const authHdr = () => 'x', haptic = () => {};
+const toasts = [], segnati = [], chiamate = [];
+const toast = t => toasts.push(t);
+let currentOrder = null, conferma = null, risposta = {ok:true, corpo:{}};
+let p2pChatMercSpenta = false;
+const segnaOrdine = (o, c) => { segnati.push(c); Object.assign(o, c); };
+const ridisegnaOrdine = () => {};
+const bottoneInAttesa = () => () => {};
+const chiediConferma = c => { conferma = c; };
+const corpoCodiciAdmin = () => '';
+const corpoMenoSpese = () => '';
+const onchainFirmatoDaBarattolo = () => ({});
+const fetch = async (u, o) => { chiamate.push([u, o.method, o.body || '']);
+  return {ok: risposta.ok, json: async () => risposta.corpo}; };
+"""
+            + _riga_js(mini, "const STATI_MENO_SPESE = ")
+            + _riga_js(mini, "const GIORNI_ETICHETTA_RESO = ")
+            + "".join(_fn_js(mini, f) for f in (
+                "function speseTrattenibili(o){",
+                "function bottoneMenoSpese(o, s){",
+                "function pannelloResoAdmin(o, s){",
+                "function scadenzaEtichettaReso(o){",
+                "function rigaEtichettaResoCompratore(o, ora){",
+                "function pannelloEtichettaResoVenditore(o){",
+                "async function etichettaResoMancante(btn){",
+                "async function adminResolve(esito, btn){"))
+            + r"""
+const T0 = 1000000, G = 86400;
+const ord = x => Object.assign({id:7, role:'buyer', state:'return_pending',
+  consegnaScelta:'spedizione', spedSats:0, listing:{price:50000},
+  speseReseSats:0, resoVenditoreIl:0, etichettaMancanteIl:0, chat:'aperta'}, x);
+(async () => {
+const fuori = {};
+const c = (x, ora) => rigaEtichettaResoCompratore(ord(x), ora);
+fuori.scade = scadenzaEtichettaReso(ord({resoVenditoreIl:T0}));
+fuori.compra = {
+  sempre: c({}, T0 + 9 * G),
+  primo: c({resoVenditoreIl:T0}, T0 + 60),
+  quasi: c({resoVenditoreIl:T0}, T0 + 3 * G - 1),
+  scaduto: c({resoVenditoreIl:T0}, T0 + 3 * G),
+  avvisato: c({resoVenditoreIl:T0, etichettaMancanteIl:T0 + 4 * G}, T0 + 5 * G),
+  senzaChat: c({resoVenditoreIl:T0, chat:''}, T0 + 60)};
+const v = x => pannelloEtichettaResoVenditore(ord(Object.assign({role:'seller'}, x)));
+fuori.vende = {sempre: v({}), deciso: v({resoVenditoreIl:T0}),
+  avvisato: v({resoVenditoreIl:T0, etichettaMancanteIl:T0 + 4 * G}),
+  compratore: v({role:'buyer', resoVenditoreIl:T0}),
+  senzaChat: v({resoVenditoreIl:T0, chat:'chiusa'})};
+const a = (x, s) => pannelloResoAdmin(ord(Object.assign({role:'admin'}, x)), s || 'return_pending');
+fuori.admin = {sempre: a({}), deciso: a({resoVenditoreIl:T0}),
+  spedito: a({resoVenditoreIl:T0}, 'return_shipped'),
+  avvisato: a({resoVenditoreIl:T0, etichettaMancanteIl:T0 + 4 * G}),
+  disputa: a({resoVenditoreIl:T0}, 'dispute'),
+  firmato: a({resoVenditoreIl:T0, onchain:{proposta:{barattolo:'x'}}})};
+// l'avviso dalla pagina
+currentOrder = ord({resoVenditoreIl:T0});
+risposta = {ok:true, corpo:{ok:true, etichetta_mancante_il: T0 + 4 * G}};
+await etichettaResoMancante({});
+fuori.avviso = [chiamate[0], currentOrder.etichettaMancanteIl, toasts[toasts.length-1]];
+currentOrder = ord({resoVenditoreIl:T0}); chiamate.length = 0;
+risposta = {ok:false, corpo:{detail:'Il venditore ha 3 giorni'}};
+await etichettaResoMancante({});
+fuori.avvisoNo = [currentOrder.etichettaMancanteIl, toasts[toasts.length-1]];
+// la decisione dal foglio del moderatore
+currentOrder = ord({role:'admin', state:'dispute'}); chiamate.length = 0;
+await adminResolve('reso_venditore', {});
+fuori.foglio = [conferma.titolo, conferma.corpo, chiamate.length];
+risposta = {ok:true, corpo:{ok:true, stato:'return_pending', reso_venditore_il:T0}};
+await conferma.poi();
+fuori.deciso = [chiamate[0], currentOrder.state, currentOrder.resoVenditoreIl,
+                toasts[toasts.length-1]];
+currentOrder = ord({role:'admin', state:'dispute', resoVenditoreIl:5});
+await adminResolve('reso', {});
+risposta = {ok:true, corpo:{ok:true, stato:'return_pending'}};
+await conferma.poi();
+fuori.resoSempre = [currentOrder.resoVenditoreIl, toasts[toasts.length-1]];
+console.log(JSON.stringify(fuori));
+})();
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("la pagina del reso a spese del venditore", "node non installato")
+        return
+    T0, G = 1000000, 86400
+    prova("pagina: la scadenza e' la decisione piu' tre giorni",
+          T0 + 3 * G, out.get("scade"))
+    cp = out.get("compra") or {}
+    prova("chi compra, reso di sempre: nessuna riga in piu'", "",
+          cp.get("sempre"))
+    p = cp.get("primo") or ""
+    prova("chi compra, reso a spese del venditore: chi paga, non pagare, "
+          "la data, la chat", [True] * 4,
+          ["Il reso lo paga il venditore" in p, "non pagare niente" in p,
+           f"D{T0 + 3 * G}" in p, "vaiAllaChatP2P()" in p])
+    prova("...e prima dei tre giorni nessun bottone d'avviso", [False, False],
+          ["etichettaResoMancante" in p,
+           "etichettaResoMancante" in (cp.get("quasi") or "")])
+    prova("allo scoccare dei tre giorni il bottone c'e'", True,
+          "onclick=\"etichettaResoMancante(this)\">⏰ Il venditore non ha "
+          "mandato l'etichetta</button>" in (cp.get("scaduto") or ""))
+    av = cp.get("avvisato") or ""
+    prova("ad avviso dato: la riga col quando, e niente secondo bottone",
+          (True, False), (f"Hai avvisato i moderatori il D{T0 + 4 * G}" in av,
+                          "etichettaResoMancante" in av))
+    prova("senza chat aperta non si porta a una chat che non c'e'", False,
+          "vaiAllaChatP2P" in (cp.get("senzaChat") or ""))
+    vd = out.get("vende") or {}
+    prova("chi vende, reso di sempre: niente riquadro", "", vd.get("sempre"))
+    d = vd.get("deciso") or ""
+    prova("chi vende, a sue spese: il titolo, la data e il bottone per la "
+          "chat", [True] * 3,
+          ["🏷️ Il reso è a tue spese" in d, f"D{T0 + 3 * G}" in d,
+           "onclick=\"vaiAllaChatP2P()\">💬 Manda l'etichetta in chat"
+           "</button>" in d])
+    prova("...ad avviso dato glielo si dice", True,
+          "ha avvisato i moderatori che non è arrivata" in
+          (vd.get("avvisato") or ""))
+    prova("...il riquadro non lo vede chi compra, e senza chat niente "
+          "bottone", ("", False),
+          (vd.get("compratore"), "vaiAllaChatP2P" in (vd.get("senzaChat") or "")))
+    ad = out.get("admin") or {}
+    RIMB = ("onclick=\"adminResolve('rimborso', this)\">↩️ Rimborsa subito "
+            "l'acquirente (100%)</button>")
+    prova("moderatore, reso di sempre senza spese trattenibili: come ieri, "
+          "niente", "", ad.get("sempre"))
+    prova("moderatore, a spese del venditore: il «Rimborso» c'e', nei due "
+          "stati del reso", [True, True],
+          [RIMB in (ad.get("deciso") or ""), RIMB in (ad.get("spedito") or "")])
+    prova("...con la scadenza, e ad avviso dato col quando", [True, True],
+          [f"entro il D{T0 + 3 * G}" in (ad.get("deciso") or ""),
+           f"ha avvisato il D{T0 + 4 * G}" in (ad.get("avvisato") or "")])
+    prova("...ma non sulla disputa (li' c'e' il pannello di sempre) ne' a "
+          "firma on-chain gia' data", ["", ""],
+          [ad.get("disputa"), ad.get("firmato")])
+    av = out.get("avviso") or []
+    prova("l'avviso dalla pagina: la rotta giusta, la riga segnata, il "
+          "toast", [["/api/orders/7/reso-etichetta-mancante", "POST", ""],
+                    T0 + 4 * G, "⏰ Moderatori avvisati: guardano la chat e "
+                                "decidono"], av)
+    prova("...e un rifiuto del server resta un rifiuto", [0, "Il venditore "
+          "ha 3 giorni"], out.get("avvisoNo"))
+    fg = out.get("foglio") or []
+    prova("il foglio del moderatore: titolo, i tre giorni, e niente parte "
+          "prima del «Decidi così»", (["Reso a spese del venditore?"], True, 0),
+          (fg[:1], "entro 3 giorni" in (fg[1] if len(fg) > 1 else ""),
+           fg[2] if len(fg) > 2 else None))
+    dc = out.get("deciso") or []
+    prova("...deciso: la rotta di sempre con l'esito nuovo, la riga e il "
+          "toast", ["/api/admin/orders/7/risolvi", "return_pending", T0,
+                    "📦 Deciso: reso a spese del venditore"],
+          [dc[0][0], dc[1], dc[2], dc[3]] if len(dc) == 4 else dc)
+    prova("...e il corpo porta l'esito «reso_venditore»", True,
+          bool(dc) and '"esito":"reso_venditore"' in (dc[0][2] or ""))
+    prova("il reso di sempre azzera il segno sulla riga, e dice il suo "
+          "toast", [0, "📦 Deciso: rimborso previa restituzione"],
+          out.get("resoSempre"))
 
 
 def _node_banco(js):
@@ -182294,7 +182541,9 @@ def prove_canale_admin():
           # (17 nov 2026 sera, onchain-contanti) la cauzione on-chain
           # bruciata, con la meta' da mandare a mano, e il timbro «Metà
           # mandata»: nelle dispute (sono soldi, e li muove un moderatore)
-          {"assistenza": 1, "dispute": 9, "dm": 1, "errori": 36,
+          # (18 nov 2026, reso-spese-venditore) il reso a spese del
+          # venditore senza etichetta: nelle dispute (decide il «Rimborso»)
+          {"assistenza": 1, "dispute": 10, "dm": 1, "errori": 36,
            "liquidita": 5, "moderazione": 24, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -182330,7 +182579,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "112 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "113 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -182350,7 +182599,8 @@ def prove_canale_admin():
           "raccolte la nuova da approvare, la segnalata, la fermata e le "
           "uscite firmate; l'indirizzo del rimborso P2P on-chain scritto "
           "a disputa aperta; e la cauzione on-chain bruciata con la sua "
-          "meta' mandata)", 112,
+          "meta' mandata; dal 18 nov il reso a spese del venditore senza "
+          "etichetta)", 113,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -210713,6 +210963,7 @@ CATEGORIE = {
     valuta_soglia suggerimenti libro_mastro canale_bot podio_riepilogo
     vetrina_negozio vetrina_canale cambio consegna_payload_punto
     reti_corriere punti_corrieri richiesta_punti indirizzo_giusto rimborso_meno_spese
+    reso_spese_venditore
     annulla_chiude punti_barattolo presa_in_carico punti_pubblici
     punti_salvati punto_ritiro_ui pagina_acquisto posizione_vetrina liste_ritorno
     impersonazione avviso_spedizione tracciamento_nei_messaggi
@@ -211540,6 +211791,7 @@ def main():
               prove_richiesta_punti,
               prove_indirizzo_giusto,
               prove_rimborso_meno_spese,
+              prove_reso_spese_venditore,
               prove_annulla_chiude,
               prove_punti_barattolo, prove_presa_in_carico,
               prove_punti_pubblici,

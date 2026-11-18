@@ -20469,6 +20469,11 @@ function mapOrder(o){
        riga non arriva: il server la toglie. */
     speseReseSats:o.spese_rese_sats||0,
     speseRigaId:o.spese_riga_id||0, speseRigaStato:o.spese_riga_stato||'',
+    /* IL RESO A SPESE DEL VENDITORE (18 nov 2026): quando e' stato
+       deciso (0 = il reso di sempre) e quando chi compra ha avvisato i
+       moderatori che l'etichetta non e' arrivata */
+    resoVenditoreIl:o.reso_venditore_il||0,
+    etichettaMancanteIl:o.etichetta_mancante_il||0,
     /* LA ZONA APPLICATA (set 2026): e' la ricevuta di QUALE tariffa
        e' stata pagata, e la leggono l'inciso del conto e — in
        disputa — il moderatore. '' non e' un buco ma il mondo di
@@ -41166,6 +41171,7 @@ function openOrder(id){
           ${etichettaCodiciAdmin(o, 'nota')}
           <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">${etichettaCodiciAdmin(o, 'rimborso') || '↩️ Rimborsa subito l\'acquirente (100%)'}</button>
           <button class="btn ghost" onclick="adminResolve('reso', this)">📦 Rimborso previa restituzione dell'oggetto</button>
+          <button class="btn ghost" onclick="adminResolve('reso_venditore', this)">📦 Reso a spese del venditore</button>
           <button class="btn orange" style="margin-top:10px" onclick="adminResolve('venditore', this)">${etichettaCodiciAdmin(o, 'venditore') || '⚡ Dai i sats al venditore'}</button>
           ${bottoneMenoSpese(o, s)}
         </div>`:''}
@@ -41178,12 +41184,14 @@ function openOrder(id){
         <div class="payout">
           <h4>↩️ Rispedisci l'oggetto per il rimborso</h4>
           <div class="hint">La disputa prevede il <b>rimborso previa restituzione</b>: accordati col venditore per l'indirizzo (chat), rispedisci l'oggetto e inserisci qui il tracciamento. Il rimborso di <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> parte quando il venditore riceve il reso.</div>
+          ${rigaEtichettaResoCompratore(o, Math.floor(Date.now()/1000))}
           ${selettoreCorriere('resoCorriere')}
           <textarea id="resoTracking" style="min-height:38px" placeholder="Numero di tracciamento del reso"></textarea>
           <div class="hint" style="margin-top:6px">💡 ${AVVISO_INTERMEDIARIO}</div>
           <div class="hint avviso-tracking" id="resoAvviso" style="display:none"></div>
           <button class="btn orange" onclick="resoSpedito()">↩️ Ho rispedito l'oggetto</button>
         </div>`:''}
+      ${s==='return_pending' ? pannelloEtichettaResoVenditore(o) : ''}
       ${o.role==='seller' && s==='return_shipped' && !(o.onchain && o.onchain.proposta && o.onchain.proposta.barattolo) ? `
         <div class="payout">
           <h4>↩️ Reso in arrivo</h4>
@@ -51011,14 +51019,78 @@ function corpoMenoSpese(o){
    ne trova UNO, quello di oggi, e solo dove c'e' una cifra da
    trattenere: un pannello senza bottoni sarebbe un vicolo cieco. */
 function pannelloResoAdmin(o, s){
-  if (o.speseReseSats || !['return_pending', 'return_shipped'].includes(s)
-      || !speseTrattenibili(o)) return '';
+  if (o.speseReseSats || !['return_pending', 'return_shipped'].includes(s)) return '';
+  /* A SPESE DEL VENDITORE (18 nov 2026): se l'etichetta non arriva il
+     moderatore rimborsa chi ha comprato, e il bottone deve esserci
+     (il server il «Rimborso» da un reso in corso lo accetta da sempre,
+     ma qui non era offerto). On-chain, a firma di Barattolo gia' data,
+     no: la firma non si ritira. */
+  const firmato = o.onchain && o.onchain.proposta && o.onchain.proposta.barattolo;
+  const rimborso = o.resoVenditoreIl && !firmato ? `
+          <div class="hint" style="margin-top:10px">${o.etichettaMancanteIl
+            ? `⏰ L'acquirente ha avvisato il ${esc(dataAppuntamento(o.etichettaMancanteIl))} che l'etichetta del reso non è arrivata. Leggi la chat: se non c'è, rimborsalo.`
+            : `Reso a spese del venditore: l'etichetta deve mandarla lui in chat entro il ${esc(dataAppuntamento(scadenzaEtichettaReso(o)))}.`}</div>
+          <button class="btn primary" style="margin-top:12px" onclick="adminResolve('rimborso', this)">↩️ Rimborsa subito l'acquirente (100%)</button>` : '';
+  const meno = speseTrattenibili(o) ? bottoneMenoSpese(o, s) : '';
+  if (!rimborso && !meno) return '';
   return `
         <div class="payout" style="border-color:var(--danger)">
           <h4>⚖️ Decisione del moderatore</h4>
           <div class="hint">Il reso è in corso. Se si è incagliato puoi chiuderlo così: la scelta è definitiva.</div>
-          ${bottoneMenoSpese(o, s)}
+          ${rimborso}${meno}
         </div>`;
+}
+/* IL RESO A SPESE DEL VENDITORE (18 nov 2026, cantiere
+   reso-spese-venditore): i giorni per mandare l'etichetta, gemelli di
+   GIORNI_ETICHETTA_RESO del server. La scadenza e' un CONTO, non una
+   colonna: decisione + giorni, come `_data_etichetta_reso`. Il server
+   rifiuta l'avviso prima del tempo anche se la pagina sbagliasse. */
+const GIORNI_ETICHETTA_RESO = 3;
+function scadenzaEtichettaReso(o){
+  return o && o.resoVenditoreIl ? o.resoVenditoreIl + GIORNI_ETICHETTA_RESO * 86400 : 0;
+}
+/* PURA: il riquadro di chi compra a reso a spese del venditore, prima
+   che rispedisca. Dice di NON pagare, porta alla chat, e passati i
+   giorni offre l'avviso ai moderatori (una volta sola). `ora` in
+   secondi, per il banco. */
+function rigaEtichettaResoCompratore(o, ora){
+  if (!o.resoVenditoreIl) return '';
+  const scade = scadenzaEtichettaReso(o);
+  const vai = o.chat === 'aperta' && !p2pChatMercSpenta
+    ? `<button class="btn ghost" style="margin-top:10px" onclick="vaiAllaChatP2P()">💬 Guarda la chat</button>` : '';
+  const avviso = o.etichettaMancanteIl
+    ? `<div class="hint" style="margin-top:10px">⏰ Hai avvisato i moderatori il ${esc(dataAppuntamento(o.etichettaMancanteIl))}: guardano la chat e decidono.</div>`
+    : ora >= scade
+    ? `<button class="btn orange" style="margin-top:10px" onclick="etichettaResoMancante(this)">⏰ Il venditore non ha mandato l'etichetta</button>`
+    : '';
+  return `<div class="hint" style="margin-top:6px">🏷️ <b>Il reso lo paga il venditore.</b> Ti manda l'etichetta prepagata nella chat dell'ordine entro il <b>${esc(dataAppuntamento(scade))}</b>: <b>non pagare niente</b>, usa la sua.</div>${vai}${avviso}`;
+}
+/* PURA: il riquadro di chi vende a reso a sue spese, finche' chi
+   compra non ha rispedito. */
+function pannelloEtichettaResoVenditore(o){
+  if (o.role !== 'seller' || !o.resoVenditoreIl) return '';
+  const vai = o.chat === 'aperta' && !p2pChatMercSpenta
+    ? `<button class="btn primary" style="margin-top:12px" onclick="vaiAllaChatP2P()">💬 Manda l'etichetta in chat</button>` : '';
+  return `
+        <div class="payout">
+          <h4>🏷️ Il reso è a tue spese</h4>
+          <div class="hint">Il moderatore ha deciso il reso a tue spese. Crea un'etichetta di reso prepagata (mittente l'acquirente, destinatario tu) e mandala nella chat dell'ordine entro il <b>${esc(dataAppuntamento(scadenzaEtichettaReso(o)))}</b>.${o.etichettaMancanteIl ? ' ⏰ <b>L\'acquirente ha avvisato i moderatori che non è arrivata</b>: mandala subito, o un moderatore può rimborsarlo.' : ' Senza etichetta, un moderatore può rimborsare subito l\'acquirente.'}</div>
+          ${vai}
+        </div>`;
+}
+async function etichettaResoMancante(btn){
+  haptic();
+  const o = currentOrder;
+  if (DEMO) { toast('Serve il backend attivo'); return; }
+  const ripristina = bottoneInAttesa(btn, 'Avviso i moderatori…');
+  const r = await fetch(`${API_BASE}/orders/${o.id}/reso-etichetta-mancante`, {
+    method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+  const d = await r.json().catch(()=>({}));
+  ripristina();
+  if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+  segnaOrdine(o, {etichettaMancanteIl: d.etichetta_mancante_il || Math.floor(Date.now()/1000)});
+  toast('⏰ Moderatori avvisati: guardano la chat e decidono');
+  ridisegnaOrdine(o);
 }
 /* PURA: a decisione presa, le due meta' e a che punto sono. */
 function pannelloSpeseReseAdmin(o, s){
@@ -51250,6 +51322,9 @@ async function adminResolve(esito, btn){
     : esito==='reso'
     ? ['Rimborso previa restituzione?',
        'L\'acquirente dovrà rispedire l\'oggetto (con tracciamento); il rimborso partirà solo quando il venditore conferma di averlo ricevuto.']
+    : esito==='reso_venditore'
+    ? ['Reso a spese del venditore?',
+       `Come il reso, ma l'etichetta la paga il venditore: deve mandarla all'acquirente nella chat dell'ordine entro ${GIORNI_ETICHETTA_RESO} giorni. Se non arriva, l'acquirente avvisa i moderatori e potete rimborsarlo.`]
     : esito==='meno_spese'
     ? ['Rimborso meno le spese di spedizione?', corpoMenoSpese(o)]
     : ['Consegni i sats al venditore?', 'La decisione è definitiva.'];
@@ -51258,7 +51333,7 @@ async function adminResolve(esito, btn){
   const corpoCod = corpoCodiciAdmin(o, esito);
   /* on-chain la decisione E' la firma di Barattolo: chi vince la finisce
      col suo telefono, e una firma data non si ritira */
-  const corpoOc = o.onchain && esito !== 'reso'
+  const corpoOc = o.onchain && esito !== 'reso' && esito !== 'reso_venditore'
     ? corpo.split('\n\nLa decisione è definitiva.')[0] + '\n\n₿ Ordine on-chain: Barattolo firma adesso, e i sats partono quando chi vince apre l\'app. La firma non si ritira.'
     : corpoCod || corpo;
   chiediConferma({titolo, corpo: corpoOc, etichetta: 'Decidi così',
@@ -51281,7 +51356,9 @@ async function adminResolve(esito, btn){
           speseRigaStato: d.venditore_pagato ? 'riscosso' : 'da_riscuotere'} : {},
         /* on-chain la firma di Barattolo va nel riassunto dell'ordine:
            il riquadro la dice e i bottoni spariscono */
-        d.onchain && d.attesa_firma ? {onchain: onchainFirmatoDaBarattolo(o, d.attesa_firma, 'disputa')} : {}));
+        d.onchain && d.attesa_firma ? {onchain: onchainFirmatoDaBarattolo(o, d.attesa_firma, 'disputa')} : {},
+        /* il reso dice anche chi paga l'etichetta (18 nov 2026) */
+        d.stato === 'return_pending' ? {resoVenditoreIl: d.reso_venditore_il || 0, etichettaMancanteIl: 0} : {}));
       toast(d.onchain && d.attesa_firma
             ? (d.attesa_firma === 'venditore'
                 ? '₿ Firmato da Barattolo: i sats partono quando il venditore apre l\'app'
@@ -51294,6 +51371,7 @@ async function adminResolve(esito, btn){
                 : '⚖️ Deciso: rimborso meno le spese. Qui sotto vedi a che punto sono i due pagamenti')
           : d.stato==='refunded' ? '↩️ Acquirente rimborsato'
           : d.stato==='released' ? '⚡ Sats consegnati al venditore'
+          : d.stato==='return_pending' && d.reso_venditore_il ? '📦 Deciso: reso a spese del venditore'
           : d.stato==='return_pending' ? '📦 Deciso: rimborso previa restituzione'
           /* Al moderatore si dice quale dei due e' successo: «in attesa
              del metodo di incasso» quando il nodo tace manderebbe a

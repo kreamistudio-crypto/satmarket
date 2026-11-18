@@ -614,3 +614,9 @@ frase: La prima volta al giorno che apri il Profilo, la tua serie te lo dice: il
 dove: Profilo, la riga «🔥 N giorni di fila» sotto il nome e la fila dei sette giorni, il cerchio «oggi».
 leva: SERIE_GIORNI_ATTIVA (quella della serie, già accesa)
 pubblico: sì
+
+## 2026-11-18 · reso-spese-venditore
+frase: Se in disputa l'oggetto va restituito perché era rotto, bloccato o diverso dall'annuncio, il moderatore può decidere che la spedizione di ritorno la paghi il venditore: ti manda l'etichetta prepagata nella chat dell'ordine entro 3 giorni e tu non paghi niente. Se non arriva, con un tocco avvisi i moderatori, che possono rimborsarti subito.
+dove: Ordini → un ordine in reso deciso così: il riquadro «↩️ Rispedisci l'oggetto per il rimborso» con «🏷️ Il reso lo paga il venditore», e dopo 3 giorni il bottone «⏰ Il venditore non ha mandato l'etichetta». Chi vende vede «🏷️ Il reso è a tue spese» con «💬 Manda l'etichetta in chat». Il moderatore ha il bottone «📦 Reso a spese del venditore» fra le decisioni della disputa.
+leva: nessuna
+pubblico: sì

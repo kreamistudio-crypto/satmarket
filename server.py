@@ -1380,6 +1380,15 @@ try:
     from config import ORE_SILENZIO_DIGITALE
 except ImportError:
     ORE_SILENZIO_DIGITALE = 48     # consegnato ma mai rivelato: poi sblocco
+# IL RESO A SPESE DEL VENDITORE (18 nov 2026, cantiere
+# reso-spese-venditore, ok di Andrea): i giorni che chi vende ha per
+# mandare l'etichetta prepagata nella chat dell'ordine. Passati questi,
+# chi compra puo' avvisare i moderatori — e basta: a decidere il
+# «Rimborso» resta una persona, niente scatta da solo. NON e' una leva
+# del config, apposta: la pagina ha il suo gemello (stesso nome, in
+# miniapp.html) per dire la scadenza, e un config che la cambiasse da
+# una parte sola farebbe dire alla pagina una data sbagliata.
+GIORNI_ETICHETTA_RESO = 3
 # UN CODICE ALLA VOLTA (16 nov 2026, cantiere codici-uno-alla-volta,
 # idea e ok di Andrea): un ordine digitale da DUE PEZZI IN SU si
 # consegna in un riquadro per pezzo, e chi compra vede il codice
@@ -11596,6 +11605,20 @@ def init_db():
                     "spese_rese_sats INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # IL RESO A SPESE DEL VENDITORE (18 nov 2026): il quinto esito del
+    # moderatore, e nessuno STATO nuovo (la regola 4) — il reso fa la
+    # strada di sempre, e questi due istanti dicono solo chi paga
+    # l'etichetta e se chi compra ha dovuto chiamare un moderatore:
+    # · `reso_venditore_il` — quando e' stato deciso (0 = il reso e'
+    #   quello di sempre). Da li' partono i GIORNI_ETICHETTA_RESO;
+    # · `etichetta_mancante_il` — quando chi compra ha avvisato i
+    #   moderatori che l'etichetta non e' arrivata (una volta sola).
+    for colonna in ("reso_venditore_il", "etichetta_mancante_il"):
+        try:
+            con.execute(f"ALTER TABLE ordini ADD COLUMN "
+                        f"{colonna} INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
     try:
         con.execute("ALTER TABLE rimborsi_asta ADD COLUMN "
                     "ordine_id INTEGER DEFAULT 0")
@@ -44326,6 +44349,15 @@ def _quando_appuntamento(ts: int) -> str:
     s = time.localtime(ts)
     return (f"{GIORNI_IT[s.tm_wday]} {s.tm_mday} {MESI_IT[s.tm_mon - 1]} "
             f"alle {time.strftime('%H:%M', s)}")
+
+
+def _data_etichetta_reso(deciso_il: int) -> str:
+    """Fino a quando chi vende ha per mandare l'etichetta del reso a
+    sue spese: «sabato 21 novembre alle 08:44». La stessa resa
+    dell'appuntamento (ora del server), sullo stesso conto della pagina
+    (`scadenzaEtichettaReso`): decisione + GIORNI_ETICHETTA_RESO."""
+    return _quando_appuntamento(int(deciso_il)
+                                + GIORNI_ETICHETTA_RESO * 86400)
 
 
 def _quando_scade(ts: int) -> str:
@@ -89235,6 +89267,8 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     - esito='reso': rimborso PREVIA RESTITUZIONE: l'acquirente deve
       rispedire l'oggetto (con tracciamento); il rimborso parte solo
       quando il venditore conferma di averlo ricevuto.
+    - esito='reso_venditore' (18 nov 2026): lo stesso reso, ma
+      l'etichetta la paga chi vende — la manda nella chat dell'ordine.
     'venditore' e 'rimborso' funzionano anche come intervento d'ufficio
     su un reso che si e' incagliato.
 
@@ -89252,7 +89286,8 @@ async def risolvi_disputa(ordine_id: int, req: Request,
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
     esito = d.get("esito", "")
-    if esito not in ("venditore", "rimborso", "reso", "meno_spese"):
+    if esito not in ("venditore", "rimborso", "reso", "meno_spese",
+                     "reso_venditore"):
         raise HTTPException(400, "Esito non valido")
     con = db()
     # LA PORTA DEL TIMER (ago 2026): un ordine digitale chiuso da uno
@@ -89365,7 +89400,8 @@ async def risolvi_disputa(ordine_id: int, req: Request,
     # compra «rispedisci l'oggetto» vorrebbe dire rischiare che resti
     # senza oggetto e senza sats. Sta PRIMA della riapertura: un caso
     # che non si puo' ridecidere non si riapre nemmeno.
-    if esito == "reso" and (_campo(o, "payout_stato")
+    # Il reso a spese del venditore e' un reso: stessa guardia.
+    if esito in ("reso", "reso_venditore") and (_campo(o, "payout_stato")
                             in ("in_volo", "incerto", "uscito")):
         raise HTTPException(409, MSG_RESO_PAGAMENTO_IN_CORSO)
     if stato in ("confirmed", "refund"):
@@ -89399,7 +89435,7 @@ async def risolvi_disputa(ordine_id: int, req: Request,
         return await _poi_chat_mercatino(ordine_id, _sblocca_sats(ordine_id))
     if esito == "rimborso":
         return await _poi_chat_mercatino(ordine_id, _rimborsa_compratore(ordine_id))
-    if esito == "reso" and stato == "dispute":
+    if esito in ("reso", "reso_venditore") and stato == "dispute":
         # IL TIMBRO DI PRIMA SE NE VA CON LA DECISIONE DI PRIMA. Un «al
         # venditore» che non era riuscito a pagare lascia sulla riga
         # 'da_riprovare' verso il venditore, e i due giri dell'orologio
@@ -89411,19 +89447,46 @@ async def risolvi_disputa(ordine_id: int, req: Request,
         # SOTTO IL LUCCHETTO DELL'ORDINE, come le due uscite: il giro
         # che sta pagando in questo istante finisce prima, e qui si
         # trova l'ordine com'e' davvero — chiuso, e allora e' un 409.
+        # A SPESE DEL VENDITORE (18 nov 2026) cambia solo chi paga
+        # l'etichetta: lo dice `reso_venditore_il`, scritto nello STESSO
+        # UPDATE condizionato — un reso deciso a meta' non esiste.
+        adesso = int(time.time())
+        reso_venditore_il = adesso if esito == "reso_venditore" else 0
         async with _lucchetti_ordine[ordine_id]:
             con = db()
             cur = con.execute(
                 "UPDATE ordini SET stato='return_pending', payout_stato='', "
-                "payout_verso='', aggiornato=? WHERE id=? AND stato='dispute' "
+                "payout_verso='', aggiornato=?, reso_venditore_il=?, "
+                "etichetta_mancante_il=0 WHERE id=? AND stato='dispute' "
                 "AND COALESCE(payout_stato,'') "
                 "NOT IN ('incerto','in_volo','uscito')",
-                (int(time.time()), ordine_id))
+                (adesso, reso_venditore_il, ordine_id))
             con.commit()
             con.close()
         if cur.rowcount != 1:
             raise HTTPException(409, "Questa disputa è cambiata nel "
                                      "frattempo: riapri l'ordine e ricontrolla")
+        if reso_venditore_il:
+            scade = _data_etichetta_reso(reso_venditore_il)
+            await notifica(o["compratore_id"],
+                           "⚖️ <b>Disputa decisa: reso a spese del "
+                           "venditore.</b> Rispedirai l'oggetto, ma "
+                           "l'etichetta la paga lui: te la manda nella chat "
+                           f"dell'ordine entro il {scade}. <b>Non pagare "
+                           "niente</b>: usa la sua etichetta, poi inserisci "
+                           "il tracciamento nella Mini App. Il rimborso "
+                           "partirà quando il venditore riceve l'oggetto.")
+            await notifica(o["venditore_id"],
+                           "⚖️ <b>Disputa decisa: reso a tue spese.</b> "
+                           "Crea un'etichetta di reso prepagata (il "
+                           "mittente è l'acquirente, il destinatario sei "
+                           "tu) e <b>mandala nella chat dell'ordine entro "
+                           f"il {scade}</b>. Quando ricevi l'oggetto, "
+                           "confermalo nella Mini App e i sats verranno "
+                           "rimborsati all'acquirente. Senza etichetta, un "
+                           "moderatore può rimborsarlo subito.")
+            return {"ok": True, "stato": "return_pending",
+                    "reso_venditore_il": reso_venditore_il}
         await notifica(o["compratore_id"],
                        "⚖️ <b>Disputa decisa: rimborso previa restituzione.</b> "
                        "Rispedisci l'oggetto al venditore (accordatevi in chat "
@@ -89797,6 +89860,63 @@ async def reso_ricevuto(ordine_id: int, x_tg_init_data: str = Header(""),
         # la seconda firma e' del telefono di chi ha comprato
         return await _onchain_decide(ordine_id, "compratore", user["id"], "reso")
     return await _poi_chat_mercatino(ordine_id, _rimborsa_compratore(ordine_id))
+
+
+MSG_ETICHETTA_NON_ANCORA = ("Il venditore ha {giorni} giorni per mandarti "
+                            "l'etichetta: puoi avvisare i moderatori dal {scade}")
+
+
+@app.post("/api/orders/{ordine_id}/reso-etichetta-mancante")
+async def reso_etichetta_mancante(ordine_id: int,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """IL RESO A SPESE DEL VENDITORE SENZA ETICHETTA (18 nov 2026,
+    cantiere reso-spese-venditore). Passati i GIORNI_ETICHETTA_RESO,
+    chi ha comprato avvisa i moderatori che l'etichetta non e' arrivata.
+    E' SOLO UN AVVISO, ed e' la riga da non ammorbidire (decisione di
+    Andrea): niente si sblocca e niente si rimborsa da qui — Barattolo
+    non legge la chat cifrata, quindi non puo' sapere se l'etichetta
+    c'e'. A decidere il «Rimborso» e' un moderatore, che la chat la
+    puo' leggere. Una volta sola: `etichetta_mancante_il` lo ricorda,
+    e un secondo tocco non fa suonare di nuovo il gruppo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
+                    "AND stato='return_pending' "
+                    "AND COALESCE(reso_venditore_il,0)>0",
+                    (ordine_id, user["id"])).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    deciso = int(o["reso_venditore_il"] or 0)
+    adesso = int(time.time())
+    if adesso < deciso + GIORNI_ETICHETTA_RESO * 86400:
+        con.close()
+        raise HTTPException(400, MSG_ETICHETTA_NON_ANCORA.format(
+            giorni=GIORNI_ETICHETTA_RESO,
+            scade=_data_etichetta_reso(deciso)))
+    cur = con.execute("UPDATE ordini SET etichetta_mancante_il=? "
+                      "WHERE id=? AND stato='return_pending' "
+                      "AND COALESCE(etichetta_mancante_il,0)=0",
+                      (adesso, ordine_id))
+    con.commit()
+    con.close()
+    if cur.rowcount != 1:
+        # gia' avvisati: il gesto e' riuscito, non si suona due volte
+        return {"ok": True, "gia": True,
+                "etichetta_mancante_il": int(o["etichetta_mancante_il"] or 0)}
+    await notifica_admin(
+        f"⏰ <b>Reso a spese del venditore senza etichetta</b> "
+        f"sull'ordine #{ordine_id}. L'acquirente dice che in "
+        f"{GIORNI_ETICHETTA_RESO} giorni il venditore non gli ha mandato "
+        f"l'etichetta prepagata. Leggi la chat dell'ordine: se non c'è, "
+        f"puoi decidere «Rimborso».", argomento="dispute")
+    await notifica(o["venditore_id"],
+                   "⏰ <b>L'acquirente non ha ricevuto l'etichetta del "
+                   "reso</b> e ha avvisato i moderatori. Se non l'hai "
+                   "ancora fatto, mandala subito nella chat dell'ordine: "
+                   "senza etichetta un moderatore può rimborsarlo.")
+    return {"ok": True, "etichetta_mancante_il": adesso}
 
 
 @app.post("/api/orders/{ordine_id}/conferma")

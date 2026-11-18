@@ -22600,6 +22600,34 @@
   non a chi compra. Collaudo: `collaudo_rimborso_meno_spese.py` (i due
   pagamenti col nodo di cartone: uno che fallisce, il nodo muto, il
   server che cade a metà), nella gabbia della CI.
+  IL RESO A SPESE DEL VENDITORE (18 nov 2026, cantiere
+  «reso-spese-venditore»): la QUINTA decisione del moderatore,
+  `esito='reso_venditore'` di `risolvi_disputa`. È il reso di sempre
+  (`return_pending` → `return_shipped` → `refunded`, NESSUNO STATO
+  NUOVO) con le stesse guardie (pagamento in volo, moderatore che è
+  parte, riapertura del caso incagliato), e cambia solo CHI PAGA
+  L'ETICHETTA: chi vende la crea prepagata e la manda nella chat
+  dell'ordine (cifrata, aperta in `CHAT_MERCATINO_DISPUTA`, PDF
+  compresi). Barattolo non tocca euro né etichette. Il segno è
+  `ordini.reso_venditore_il` (0 = il reso di sempre), scritto nello
+  STESSO UPDATE condizionato del reso, e da lì partono
+  `GIORNI_ETICHETTA_RESO` (3, decisione di Andrea; NON è una leva del
+  config: la pagina ha il gemello `GIORNI_ETICHETTA_RESO` per dire la
+  data, e `_data_etichetta_reso`/`scadenzaEtichettaReso` fanno lo
+  stesso conto). Passati i giorni, chi compra avvisa i moderatori con
+  `POST /api/orders/{id}/reso-etichetta-mancante` (solo lui, solo a
+  `return_pending` deciso così, una volta: `etichetta_mancante_il`):
+  è SOLO UN AVVISO, la rotta non muove sats, perché Barattolo la chat
+  non la legge e non può sapere se l'etichetta c'è. Il moderatore la
+  legge e decide «Rimborso», che da un reso in corso il server accetta
+  da sempre e che la pagina adesso offre in `pannelloResoAdmin` per i
+  resi decisi così. NELLA PAGINA: il bottone fra le decisioni della
+  disputa, `rigaEtichettaResoCompratore` dentro il riquadro di chi
+  rispedisce (chi paga, «non pagare niente», la data, «💬 Guarda la
+  chat», poi l'avviso), `pannelloEtichettaResoVenditore` per chi vende
+  (con «💬 Manda l'etichetta in chat»). Reputazione: come il reso di
+  sempre, finisce `refunded` e conta come disputa persa da chi vende.
+  Collaudo: `collaudo_reso_spese_venditore.py`, nella gabbia della CI.
   L'INDIRIZZO DI CASA (ago 2026): lo SPECCHIO della busta — lì è il
   venditore a depositare per il compratore, qui il compratore per il
   venditore. Chi sceglie «🏠 Spedizione a casa» scrive l'indirizzo al
