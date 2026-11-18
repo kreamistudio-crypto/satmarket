@@ -90874,3 +90874,61 @@ DA GUARDARE. Gli import continuano a non portare l'etichetta. Gli
 annunci alimentari già online senza tabella restano visibili finché
 nessuno li modifica: se Andrea li vuole in regola prima, serve un
 avviso ai loro venditori (non fatto, non chiesto).
+
+## «₿ Bitcoin only» nel Filtro del P2P (18 nov 2026, cantiere bitcoin-only; dal gruppo Telegram, Manuele: «per quelli come me ai quali interessa solo bitcoin, ogni volta dover andare a scegliere di escludere le shitcoin mi sembra un po' esagerato»; lo staff aveva promesso l'opzione. Andrea: «chiamalo pure … però non di default altrimenti uno manco sa che ci sono altri scambi», poi il nome «₿ Bitcoin only» sulla scheda; e a lavoro finito: «non si dovrebbe chiamare Bitcoin only, perché il peer-to-peer è già Bitcoin only» → nell'app «No altcoin», nel codice resta `soloBtc` / P2P_BITCOIN_ONLY_ATTIVO)
+
+COSA. Un interruttore in cima al Filtro del libro P2P. Acceso (con «Applica»)
+il libro mostra solo gli scambi in euro e franchi: fuori quelli in USDT,
+USDe, ETH e XMR (Lightning e card on-chain), i due «Novità» delle monete e
+le loro card nella fila della home; e il banner di «I miei scambi» torna la
+coppia BTC-euro di prima (Andrea, a lavoro iniziato), nei quattro posti
+(testa e tre vuoti). SPENTO di serie; il telefono se lo ricorda
+(`barattolo_p2p_bitcoin_only` in localStorage, per dispositivo come
+l'ordinamento) e /api/me lo rimette nel filtro all'avvio. Leva
+`P2P_BITCOIN_ONLY_ATTIVO` (True di serie, storta = spenta) che lo OFFRE;
+senza monete visibili per chi guarda l'interruttore non c'è.
+
+LE DECISIONI. Vive DENTRO il filtro (`soloBtc` di `filtroVuotoP2P`): la
+pillola si accende, il vuoto sa dire quale vuoto è, e «Applica» resta il
+momento in cui il libro si muove. Ma «Azzera» NON lo spegne: è una
+preferenza, e chi azzera il metodo non sta chiedendo le altre monete; col
+solo «Bitcoin only» acceso e niente che passa, il vuoto dice «Nessuno
+scambio in euro o franchi» e offre «Mostra anche le altre monete». Chi si
+paga «solo in moneta» (`pagatoInMonetaP2P`): valuta USDT/ETH/XMR/USDE, o in
+euro con i metodi tutti in moneta (gli ordini del 13-16 nov); un ordine in
+euro che accetta SEPA *o* XMR resta, si paga in euro. Acceso nel foglio, la
+bozza perde valute e metodi in moneta (resterebbero scelti e invisibili). La
+fila della home li toglie PRIMA del taglio a sei. «Pubblica» e «I miei
+scambi» (la lista) non cambiano.
+LE MONETE SERVONO A PAGARE (Andrea: «la gente non ha capito che è solo un
+altro modo per pagare»): la frase sta sotto l'interruttore, nella seconda
+tappa dei due giri «Novità» (USDT/USDe ed ETH/XMR), nel sapere di Tappo, e
+nel post scritto per Andrea.
+
+STRADE SCARTATE. I nomi «Bitcoin only» (il P2P è già tutto bitcoin) ed
+«Euro only» (lascerebbe fuori i franchi, che restano). Acceso di serie (la prima lettura, era la richiesta del
+gruppo: Andrea no). L'interruttore accanto alla pillola Filtro, come nella
+proposta: la riga Ordina · Filtro · tema a 320 px è già piena, quindi sta
+nella prima riga del foglio, e fuori lo dice la pillola arancio. La scelta
+sul server per seguire l'utente su ogni dispositivo: per ora basta il
+telefono, come l'ordinamento.
+
+PROVATO. `prove_bitcoin_only_p2p` nuova (categoria p2p): giudici puri in
+node (libro, on-chain, pillola, vuoto, fila della home, memoria, banner),
+la leva del server (assente/True/False/storta), pannello, numeri di Tappo,
+/api/me, config d'esempio, i fili della pagina; controprova: giudice spento
+e gli USDT tornano. Ritoccate sette prove di forma che leggevano i pezzi
+toccati (l'id del banner nell'h2, il ripiego di `attrBannerScambiP2P` nei
+tre vuoti, il timbro della foto a cinque posti, la foto BTC-euro a due,
+`interruttore + rete` nel foglio, «Azzera» che tiene il Bitcoin only) e il
+banco dell'assistente prende la leva nuova (i numeri di Tappo la leggono).
+LEZIONE: la memoria (`localStorage`) sta FUORI dal blocco della tappa 2,
+accanto a quella dell'ordinamento: la sentinella del blocco l'ha detto.
+La pagina caricata in Chromium (Playwright) senza errori, e il giro
+interruttore → Applica → memoria → pillola girato dentro. Suite severa
+intera 30137/0 (nostr-tools con IDENTITA_NODE_MODULES, niente saltate) e
+collaudi della CI 155/0, nel venv senza coincurve, sull'albero rebasato su
+develop 89947d52 (col nome «No altcoin»); dopo l'ultimo rebase su 20e5f9c6
+(etichetta-obbligatoria, nessun simbolo in comune) di nuovo la suite intera
+e i collaudi che quel cantiere tocca.
+NON PROVATO: un telefono vero dentro Telegram.
