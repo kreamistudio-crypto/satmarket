@@ -91466,3 +91466,33 @@ fattura da 100 sats della prova di salvataggio; Andrea conferma che
 Luca l'ha salvato. Due fatture Muun vere lette col giudice unico: da
 1000 sats e 24 ore passa, senza importo prende il messaggio giusto.
 NON PROVATO: i testi nuovi su un telefono vero.
+
+## «Altro» svuotato e il merch Bitcoin in quattro voci (18 nov 2026, seguito del cantiere sottocategorie; Andrea: «Categorizza i prodotti che ci sono all'interno della categoria altro», «ci sono tantissime magliette, spille, cappellini», e sul merch diviso: «Sì»)
+PERCHÉ ERANO IN «ALTRO»: 2426 annunci su 2433 venivano dai negozi
+collegati (SWAG.btc.pub da solo 2345, varianti di taglia e colore), e
+`categoria_dal_negozio` combacia solo coi nomi INTERI: «CLOTHES», «HATS»,
+«EXTRAS» o «LIGHTNING.store» non sono nostri nomi, e il dubbio resta in
+«Altro» per scelta (16 nov). Le foto non erano raggiungibili da qui: la
+tassonomia vera l'ha data il negozio stesso, letta dal VPS sulla Store
+API pubblica di WooCommerce (nome e categorie di ogni prodotto).
+FATTO IN PRODUZIONE (script `sistema_altro.py`, copia prima
+`/root/prima-altro.db`): SWAG in Bitcoin (poster in «Poster e stampe»,
+il resto in «Abbigliamento e gadget», i buoni «$25 CREDIT» in Buoni ed
+esperienze), migliobruno e uhmami in Alimenti, il libro in Libri; restano
+7 annunci (prove, «Vapes», una sedia a rotelle, due senza nome chiaro).
+Poi `dividi_merch_swag.py` porta il merch SWAG nelle quattro voci nuove
+di Bitcoin: Cappellini, Spille e adesivi, Cover per telefono, Tazze,
+bicchieri e borracce (regole sul titolo, in ordine: «Cowboy Hat Stacker
+Button Pins» sono spille). In «Abbigliamento e gadget» restano magliette,
+felpe, calzini, borse e soprammobili; le parole del giudice silenzioso
+«cappello», «tazza», «adesiv» e «sticker» sono scese dalla voce merch
+alle nuove. Risultato in produzione: 186 cover, 138 spille e adesivi,
+58 cappellini, 23 tazze; 1832 restano in «Abbigliamento e gadget».
+TROVATO STRADA FACENDO: i due collegamenti a SWAG (1 e 3, account
+diversi, lo stesso sito scritto «swag» e «SWAG»: per questo
+UNIQUE(fonte, url_negozio) non li ha fermati) sono in stato «errore» dal
+19 set e dal 6 ott dopo 5 timeout del sito; oggi il sito risponde. Tappo
+ha scritto al proprietario del 3 di riaccenderlo dal Profilo.
+PROVATO: gli script su copie finte coi titoli veri (idempotenti),
+`prove_sottocategorie`, `prove_sottocategorie_vetrina`, collaudo della
+vetrina, suite severa.
