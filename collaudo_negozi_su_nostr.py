@@ -24,6 +24,8 @@ domande:
   · un prodotto tolto dal negozio prende la lapide NIP-09;
   · il tetto per giro manda gli arretrati a scaglioni;
   · la leva spenta ferma tutto;
+  · un negozio fermo (in errore) coi suoi annunci vivi in vetrina va in
+    piazza lo stesso, al giro dell'ora;
   · scollegare il negozio cancella dai relay tutto cio' che c'era.
 
 La chiave della piattaforma e' quella di coincurve dove c'e', se no un
@@ -296,6 +298,48 @@ def main():
     ev = giro(cid)
     prova("riaccesa, il giro dopo recupera: la spilla nasce e la tazza "
           "cambia prezzo", 2, len(ev))
+
+    # ---------------------------------------------------------------
+    print("\n[un negozio fermo: i suoi annunci vivi vanno in piazza lo stesso]")
+    # (18 nov 2026, sera: SWAG in errore dal 6 ottobre, 2.322 annunci in
+    # vetrina e nessuno in piazza; Andrea: «io voglio vederlo su
+    # Nostrology»). Un collegamento in errore, riprovato di recente
+    # (quindi non in questo giro): il giro dell'ora non lo legge, ma i
+    # suoi annunci vivi passano dal riallineamento lo stesso.
+    SRV.cambio_per_import = lambda: {"EUR": 100_000.0}
+    adesso = int(time.time())
+    con = SRV.db()
+    fermo = con.execute(
+        "INSERT INTO connettori(tg_id,fonte,url_negozio,credenziali,"
+        "consegna,zona,creato,stato,ultimo_giro) VALUES(?,'woo',"
+        "'https://fermo.test','plain:{}','ritiro','Pavia (PV)',?,"
+        "'errore',?)", (VENDE, adesso, adesso)).lastrowid
+    ids_fermo = [con.execute(
+        "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+        "prezzo_sats,zona,stato,creato,connettore_id,fonte,origine_chiave,"
+        "valuta,prezzo_eur,foto) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (VENDE, f"Barattolo fermo {k}", "Buono", "Altro", 1000 + k,
+         "Pavia (PV)", "attivo", adesso, fermo, "woo", str(k), "eur",
+         1.0 + k, "[]")).lastrowid for k in range(3)]
+    con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?",
+                (ids_fermo[2],))          # uno tolto: non nasce
+    con.commit()
+    con.close()
+
+    def giro_dell_ora():
+        SRV._prossimo_giro_connettori = 0
+        prima = len(SPEDITI)
+        asyncio.run(SRV.sincronizza_connettori())
+        return SPEDITI[prima:]
+    ev = giro_dell_ora()
+    prova("il giro dell'ora manda in piazza i due vivi del negozio fermo",
+          {f"barattolo-{i}" for i in ids_fermo[:2]},
+          {tag(e, "d") for e in ev
+           if tag(e, "d") in {f"barattolo-{i}" for i in ids_fermo}})
+    prova("...col nome di Barattolo", {"Barattolo"},
+          {tag(e, "client") for e in ev
+           if tag(e, "d") in {f"barattolo-{i}" for i in ids_fermo}})
+    prova("...e il giro dopo non rimanda niente", 0, len(giro_dell_ora()))
 
     # ---------------------------------------------------------------
     print("\n[scollegare cancella dai relay tutto cio' che c'era]")

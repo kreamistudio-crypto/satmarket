@@ -8162,6 +8162,20 @@
   «I prodotti dei negozi collegati su Nostr») ferma riallineamento E
   ganci; quel che è in piazza resta. `ripubblica_tag_client.py` lascia
   fuori le famiglie (la sola testa direbbe il titolo di una variante).
+  I NEGOZI FERMI ANCHE LORO (18 nov 2026, sera, cantiere
+  negozi-fermi-su-nostr; Andrea, davanti a SWAG in errore dal 6 ottobre
+  coi suoi 2.322 annunci ancora in vetrina: «io voglio vederlo su
+  Nostrology»). Il riallineamento parte a fine di un giro RIUSCITO, e
+  un collegamento in errore, in pausa o in attesa dei costi non ne ha:
+  i suoi annunci restavano vendibili in vetrina e assenti in piazza.
+  Ora `sincronizza_connettori`, dopo il ciclo e anche senza nessun
+  collegamento da leggere (via il `return` sul vuoto), chiama
+  `_nostr_dei_negozi_fermi(gia_allineati)`: ogni `connettore_id` con
+  annunci vivi o con un evento in piazza, tranne gli `attivo` di questo
+  giro e quelli in corso, passa da `nostr_del_negozio` col suo tetto.
+  Mai a spegnimento cominciato. La piazza dice quel che dice la
+  vetrina: le giacenze di un negozio fermo sono vecchie in tutt'e due,
+  e al primo giro riuscito l'impronta rimette in pari anche i relay.
   E IL BIVIO VALE ANCHE ALL'INDIETRO (ago 2026, decisione di Andrea):
   `trasloca_annunci_nostr` nell'orologio porta sull'account del
   venditore gli annunci finiti in piazza a nome NOSTRO prima che lui

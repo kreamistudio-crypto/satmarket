@@ -100627,19 +100627,57 @@ async def sincronizza_connettori():
         "AND tariffe_da_dire=0 ORDER BY id",
         (int(time.time()) - CONNETTORI_RIPROVA_ERRORE_S,)).fetchall()
     con.close()
-    if not collegati:
+    if collegati:
+        # il cambio si legge UNA volta per giro e vale per tutti: la
+        # lezione dell'import Nostr, dove dieci venditori erano dieci
+        # letture e dieci conversioni diverse nello stesso giro
+        cambio = cambio_per_import()
+        for riga in collegati:
+            if _SI_CHIUDE.is_set():
+                break
+            try:
+                await _un_connettore(dict(riga), cambio, importa_negozio)
+            except Exception as e:
+                print(f"⚠️ Connettore #{riga['id']} saltato: {e}")
+    # ...e la piazza Nostr dei negozi che questo giro non ha letto
+    # (18 nov 2026, sera): mai a spegnimento cominciato
+    if not _SI_CHIUDE.is_set():
+        await _nostr_dei_negozi_fermi({r["id"] for r in collegati
+                                       if r["stato"] == "attivo"})
+
+
+async def _nostr_dei_negozi_fermi(gia_allineati: set):
+    """I NEGOZI FERMI IN PIAZZA ANCHE LORO (18 nov 2026, sera, cantiere
+    negozi-fermi-su-nostr; Andrea, davanti a SWAG in errore dal 6 ottobre
+    coi suoi 2.322 annunci ancora in vetrina: «io voglio vederlo su
+    Nostrology»).
+
+    Il riallineamento (`nostr_del_negozio`) parte a fine di un giro
+    RIUSCITO, e un negozio in errore, in pausa o in attesa dei costi di
+    spedizione un giro riuscito non ce l'ha: i suoi annunci restano in
+    vetrina — si comprano — ma in piazza non arrivavano mai. La piazza
+    dice quel che dice la vetrina, ne' piu' ne' meno: qui, a ogni giro
+    dell'ora, ogni collegamento con annunci vivi (o con un evento ancora
+    in piazza) che questo giro non ha gia' allineato passa dal
+    riallineamento, col suo tetto. Quando il negozio torna a rispondere,
+    il giro aggiorna le righe e l'impronta fa ripartire gli eventi.
+    Anche i collegamenti RIPROVATI che falliscono di nuovo passano di
+    qui (non sono in `gia_allineati`); quelli riprovati con successo ci
+    passano una seconda volta, e trovano niente da fare."""
+    if not _NOSTR or not NEGOZI_SU_NOSTR:
         return
-    # il cambio si legge UNA volta per giro e vale per tutti: la
-    # lezione dell'import Nostr, dove dieci venditori erano dieci
-    # letture e dieci conversioni diverse nello stesso giro
-    cambio = cambio_per_import()
-    for riga in collegati:
+    con = db()
+    ids = [r[0] for r in con.execute(
+        "SELECT DISTINCT connettore_id FROM annunci WHERE connettore_id>0 "
+        "AND contatto_nostr='' AND (stato='attivo' OR nostr_event_id<>'') "
+        "ORDER BY connettore_id").fetchall()]
+    con.close()
+    for cid in ids:
         if _SI_CHIUDE.is_set():
             break
-        try:
-            await _un_connettore(dict(riga), cambio, importa_negozio)
-        except Exception as e:
-            print(f"⚠️ Connettore #{riga['id']} saltato: {e}")
+        if cid in gia_allineati or cid in _CONNETTORI_IN_CORSO:
+            continue
+        await nostr_del_negozio(cid)
 
 
 async def _un_connettore(c: dict, cambio: dict, importa_negozio):

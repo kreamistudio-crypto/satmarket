@@ -118950,6 +118950,22 @@ def prove_negozi_su_nostr():
     prova("il giro del negozio finisce col riallineamento Nostr", True,
           0 < giro.index("_chiudi_giro_connettore(c, esito)")
           < giro.index("nostr_del_negozio(c[\"id\"])"))
+    # I NEGOZI FERMI (18 nov 2026, sera): il giro dell'ora, DOPO il
+    # ciclo dei collegamenti letti, allinea anche chi non ha letto — in
+    # errore, in pausa, in attesa dei costi — e lo fa anche quando non
+    # c'e' nessun collegamento da leggere (il vecchio `return` sul vuoto
+    # li avrebbe saltati proprio la' dove sono tutti fermi).
+    ora = pezzo("sincronizza_connettori")
+    prova("il giro dell'ora allinea anche i negozi fermi, dopo il ciclo",
+          True, 0 < ora.index("for riga in collegati")
+          < ora.index("_nostr_dei_negozi_fermi("))
+    prova("...anche senza collegamenti da leggere", False,
+          "if not collegati:\n        return" in ora)
+    fermi = pezzo("_nostr_dei_negozi_fermi")
+    prova("...saltando chi questo giro ha gia' allineato o sta girando",
+          True, "gia_allineati" in fermi
+          and "_CONNETTORI_IN_CORSO" in fermi
+          and "nostr_del_negozio(cid)" in fermi)
     prova("lo scollegamento manda tutte le lapidi", True,
           "nostr_del_negozio(conn_id, senza_tetto=True)"
           in pezzo("scollega_connettore"))
