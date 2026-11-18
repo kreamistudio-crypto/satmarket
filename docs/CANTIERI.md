@@ -91351,3 +91351,13 @@ giudici puri, la fila della home, l'ordine delle pillole nel foglio; la
 controprova rompe `fuoriPerMoneteP2P`), suite severa e collaudi nel venv
 senza coincurve.
 NON PROVATO: un telefono vero dentro Telegram.
+
+## La linea sottile fra le voci della tendina (18 nov 2026, seguito del cantiere sottocategorie; Andrea: «tra una sottocategoria e l'altra ci dovrebbe essere una linea sottile che li separi», e fra tre anteprime «A: grigia piena»)
+Una riga di 1px col grigio dei bordi (`var(--line)`), da bordo a bordo
+della voce, disegnata con un `::before` sulle voci che ne seguono un'altra:
+niente `border-top`, che con gli angoli tondi delle voci si sarebbe
+piegato ai lati. La «✕ Torna a Tutto» ha già il suo bordo e resta fuori.
+SCARTATE: la linea arancio tenue rientrata e quella tratteggiata (le altre
+due anteprime). PROVATO: giro dal vivo in collaudo (tendina chiusa e con
+una voce scelta, tema scuro), `prove_sottocategorie_vetrina`, suite severa
+e collaudi della CI.
