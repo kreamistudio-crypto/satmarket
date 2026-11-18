@@ -91384,3 +91384,36 @@ venduto spenta → tre ✅, niente cancellato; sentinella della leva nei tre
 posti; i banchi della cancellazione la accendono), `collaudo_vetrina_pulita`
 (di serie il ✅, accesa la cancellazione) e `collaudo_modifica_massiva` (la
 pausa in blocco torna al ✅); suite severa e collaudi della CI.
+
+## La produzione ferma per tre minuti dalla pagina on-chain di prova (18 nov 2026, cantiere blocco-onchain-prova; Andrea alle 15:49 di Roma: «C'è barattolo che non si apre più»)
+COSA E' SUCCESSO. Dalle 14:46:32 alle 14:49:52 UTC `/api/salute` non
+rispondeva; la sentinella (Cantieri, «sentinella anti-blocco») ha
+scritto la pila e dopo 180 s ha fatto `os._exit(70)`, systemd ha rialzato
+il servizio in 5 s. La pila del filo principale: `onchain_prova` →
+`onchain_ammesso` → `leva_scrivibile` → `_leve_pannello_tabella`, fermo
+su sqlite; i 17 fili di AnyIO tutti liberi, cioè era il ciclo stesso.
+LA CAUSA, riprodotta. La rotta (async, codice sincrono dentro) chiedeva
+`onchain_ammesso` per ogni riga di `onchain_xpub` (120 in produzione,
+letto da Andrea con `sqlite3 -readonly`) MENTRE il cursore di quella
+SELECT era aperto. Il database è in journal «delete» (`PRAGMA
+journal_mode` letto sul VPS): il cursore aperto tiene il lucchetto di
+lettura, uno scrittore di un altro filo prende il PENDING e aspetta
+lui, e ogni connessione nuova di `leva_scrivibile` aspetta lo scrittore
+fino a `DB_BUSY_TIMEOUT` (15 s). Riga dopo riga: minuti, col ciclo fermo.
+La tabella `leve_pannello` c'è (contata sul VPS), quindi il CREATE non
+c'entra di suo: basta un lettore qualunque dentro il giro.
+DECISO: la lista si legge tutta (`fetchall`) prima delle domande, così
+il lucchetto cade prima della prima. Diff di una riga di sostanza.
+SCARTATO (non chiesto, in fondo al rapporto): passare il database a
+WAL (è in fila da tempo, tocca il VPS e il backup); portare la rotta
+in un filo (`def` invece di `async def`); leggere la leva una volta
+sola invece che per riga.
+PROVATO: `collaudo_onchain_prova_lucchetto` (nuovo, in ci/), che non
+dipende dall'orologio: dentro ogni `onchain_ammesso` della rotta una
+connessione senza pazienza chiede `BEGIN EXCLUSIVE`. Col codice vecchio
+«database is locked» dalla seconda chiamata in poi (controprova rossa),
+con la cura sempre libero. In locale con Python 3.13: un cursore aperto
+più uno scrittore che insiste fermano le letture annidate per tutto il
+timeout; con `fetchall` zero.
+NON PROVATO: il blocco del 17 nov 08:07 (senza pila) può avere avuto
+la stessa causa o un'altra; se torna, le righe «🧊 Sentinella».
