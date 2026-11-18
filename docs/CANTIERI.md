@@ -90761,3 +90761,42 @@ senza coincurve.
 NON PROVATO: un telefono vero, e un moderatore vero su una disputa vera.
 DA GUARDARE: il sync dei negozi collegati riscrive testo e prezzo anche ad
 affare aperto (la fotografia ora lo rende visibile, ma non lo impedisce).
+
+## Lo storico dell'annuncio dura un anno (18 nov 2026, seguito di fotografia-annuncio; Andrea: «terrei lo storico a prescindere, tanto non è roba così pesante, equivale ad un annuncio in più di peso, e poi eventualmente dopo un anno di storico si può eliminare quando è troppo indietro», e sui negozi collegati: «non li bloccare, tanto oramai si vede la differenza»)
+
+COSA CAMBIA. Prima le foto di una fotografia si salvavano solo con
+l'ordine aperto: a ordine chiuso, la modifica dopo le cancellava (e quelle
+salvate durante l'ordine restavano per sempre, senza che nessuno le
+togliesse). Adesso `_foto_protette_da_ordini` protegge ogni foto nominata
+da una fotografia ancora in archivio, qualunque sia lo stato dell'ordine,
+e `pulisci_fotografie_vecchie` (nell'`orologio`, ogni dieci minuti, quasi
+sempre una query vuota) toglie le fotografie più vecchie di
+`FOTOGRAFIA_GIORNI = 365` di un ordine CHIUSO (released, refunded,
+annullato: una disputa ferma da un anno tiene la sua prova), e con loro i
+file che non servono più né all'annuncio di oggi né a un'altra fotografia.
+Tocca solo nomi della forma `NOME_FOTO` con il prefisso `a<id>_` di
+quell'annuncio, e la miniatura gemella. Il peso resta quello detto da
+Andrea: al più le foto di un annuncio in più per ogni cambio di foto, per
+un anno. I negozi collegati che si aggiornano da soli NON si bloccano:
+decisione di Andrea, la differenza ora si vede.
+
+STRADE SCARTATE. Una leva per i giorni: è un numero che non cambia, e la
+leva della fotografia basta da interruttore. La pulizia in un giro
+notturno a parte: l'orologio dei dieci minuti c'è già, e la query costa
+niente.
+
+PROVATO. `prove_fotografia_annuncio` col blocco 3b (la pulizia su sqlite e
+una cartella veri: via la riga chiusa oltre l'anno, restano la disputa
+ferma e la giovane, la foto ancora nominata resta, il nome di un altro
+annuncio e il nome storto non si toccano, la miniatura se ne va con la
+foto, la pulizia gira nell'orologio dopo le scadenze); controprova: tolti
+il filtro sugli ordini chiusi, il controllo delle foto ancora servite e
+quello del prefisso, 4 rosse. `collaudo_fotografia_annuncio` con la scena
+5b sul server vero (ordine chiuso, foto cambiate: le vecchie restano;
+prima dell'anno la pulizia non tocca niente; dopo, via riga e file, restano
+le foto di oggi; il moderatore trova la lista vuota): 32 verdi. Suite
+severa intera (30109 passate, nessuna saltata, nostr-tools con
+IDENTITA_NODE_MODULES) e collaudi della CI (155 verdi) nel venv senza
+coincurve, sull'albero di develop 8190d60d.
+NON PROVATO: la pulizia su un archivio vero di un anno (il primo giro
+utile sarà a novembre 2027).

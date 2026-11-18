@@ -33245,8 +33245,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         con.execute("UPDATE annunci SET foto=? WHERE id=?",
                     (json.dumps(nomi), annuncio_id))
         con.commit()
-        # LE FOTO DELLA FOTOGRAFIA RESTANO (18 nov 2026): se un ordine
-        # ancora aperto le nomina, sono la prova del moderatore.
+        # LE FOTO DELLA FOTOGRAFIA RESTANO (18 nov 2026): se una
+        # fotografia in archivio (un anno) le nomina, sono lo storico.
         protette = (_foto_protette_da_ordini(con, annuncio_id)
                     if ORDINE_FOTOGRAFIA_ATTIVA else set())
         con.close()
@@ -37304,9 +37304,10 @@ def _leve_stato():
             # serie, la leva e' l'interruttore d'emergenza
             _leva("Fotografia dell'annuncio all'acquisto",
                   "ORDINE_FOTOGRAFIA_ATTIVA", ORDINE_FOTOGRAFIA_ATTIVA,
-                  acceso="al pagamento l'ordine salva l'annuncio com'era, "
-                         "e in disputa il moderatore lo vede accanto a "
-                         "quello di oggi con le differenze",
+                  acceso="al pagamento l'ordine salva l'annuncio com'era "
+                         "(testo e foto, per un anno), e in disputa il "
+                         "moderatore lo vede accanto a quello di oggi con "
+                         "le differenze",
                   spento="gli ordini nuovi non salvano l'annuncio e le foto "
                          "cambiate si cancellano come prima; le fotografie "
                          "già salvate restano visibili"),
@@ -48338,10 +48339,14 @@ BOTTONE_ORDINE_VENDUTO = "📦 Apri l'ordine"
 # moderatore la vede accanto all'annuncio di oggi con le differenze
 # (`/api/admin/orders/{id}/fotografia`).
 # LE FOTO NON SI COPIANO: si copia l'ELENCO dei nomi, e `modifica_
-# annuncio` non cancella piu' un file nominato dalla fotografia di un
-# ordine ancora aperto (`_foto_protette_da_ordini`). Il costo e' quindi
-# zero file in piu' finche' chi vende non cambia le foto con un ordine
-# in corso — il caso raro, ed e' proprio quello da tenere.
+# annuncio` non cancella piu' un file nominato da una fotografia in
+# archivio (`_foto_protette_da_ordini`). Il costo e' quindi zero file in
+# piu' finche' chi vende non cambia le foto, e al piu' le foto di un
+# annuncio in piu' quando le cambia.
+# LO STORICO DURA UN ANNO (Andrea, stesso giorno: «terrei lo storico a
+# prescindere [...] dopo un anno di storico si puo' eliminare»): testo e
+# foto restano anche a ordine chiuso, e `pulisci_fotografie_vecchie`
+# (nell'`orologio`) toglie righe e file oltre FOTOGRAFIA_GIORNI.
 # LO SPAZIO (misurato il 18 nov in produzione: 126 ordini in tutto,
 # descrizione piu' lunga 4 KB): al massimo qualche KB per ordine, meno
 # di 1 MB per l'intera storia. La velocita': un INSERT nella stessa
@@ -48368,10 +48373,14 @@ FOTOGRAFIA_CAMPI = (
     "zona", "consegna", "spedizione_sats", "spedizione_eur",
     "spedizione_punto_sats", "taglia_pacco", "anche_digitale",
     "servizio_dove", "durata_min", "foto", "modificato")
-# Chiusi davvero: da qui un moderatore non decide piu' niente, e le foto
-# vecchie possono andarsene. Tutto il resto (anche 'confirmed' e
-# 'refund', che `risolvi_disputa` riapre con `disputata`) e' aperto.
+# Chiusi davvero: da qui un moderatore non decide piu' niente, e passato
+# l'anno la fotografia puo' andarsene. Tutto il resto (anche 'confirmed'
+# e 'refund', che `risolvi_disputa` riapre con `disputata`) e' aperto, e
+# la sua fotografia resta anche oltre l'anno.
 FOTOGRAFIA_ORDINI_CHIUSI = ("released", "refunded", "annullato")
+# LO STORICO DURA UN ANNO (18 nov 2026, Andrea): testo e foto si tengono
+# anche a ordine chiuso, poi `pulisci_fotografie_vecchie` li toglie.
+FOTOGRAFIA_GIORNI = 365
 
 
 def _fotografia_di(a) -> dict:
@@ -48409,23 +48418,82 @@ def _fotografa_annunci(con, ordine_id: int, annunci_ids, adesso: int) -> int:
 
 
 def _foto_protette_da_ordini(con, annuncio_id: int) -> set:
-    """I nomi delle foto che la fotografia di un ordine ANCORA APERTO
-    di questo annuncio nomina: `modifica_annuncio` non li cancella.
-    A ordine chiuso il file resta dov'e' (nessuno lo chiede piu', e
-    sono pochi KB in casi rari): la pulizia non vale il rischio di
-    togliere la prova a una disputa riaperta."""
+    """I nomi delle foto che una fotografia ANCORA IN ARCHIVIO di questo
+    annuncio nomina: `modifica_annuncio` non li cancella. Lo storico si
+    tiene a prescindere dallo stato dell'ordine (Andrea, 18 nov 2026:
+    «terrei lo storico a prescindere, tanto non e' roba cosi' pesante»):
+    la fotografia vive FOTOGRAFIA_GIORNI, e finche' c'e' le sue foto
+    restano. Le toglie `pulisci_fotografie_vecchie`, con la riga."""
     nomi = set()
-    segnaposto = ",".join("?" * len(FOTOGRAFIA_ORDINI_CHIUSI))
     for r in con.execute(
-            "SELECT f.dati FROM ordine_fotografie f JOIN ordini o "
-            "ON o.id=f.ordine_id WHERE f.annuncio_id=? "
-            f"AND o.stato NOT IN ({segnaposto})",
-            (annuncio_id, *FOTOGRAFIA_ORDINI_CHIUSI)):
+            "SELECT dati FROM ordine_fotografie WHERE annuncio_id=?",
+            (annuncio_id,)):
         try:
             nomi.update(json.loads(r["dati"]).get("foto") or [])
         except (TypeError, ValueError, AttributeError):
             continue
     return nomi
+
+
+def pulisci_fotografie_vecchie(adesso: int = 0) -> dict:
+    """LA PULIZIA DELLO STORICO (18 nov 2026, Andrea: «dopo un anno di
+    storico si puo' eliminare quando e' troppo indietro»). Gira
+    nell'`orologio` ogni dieci minuti, ed e' quasi sempre una query
+    vuota. Toglie le fotografie piu' vecchie di FOTOGRAFIA_GIORNI di un
+    ordine CHIUSO (una disputa ferma da un anno tiene la sua prova), e
+    con loro i file delle foto che non servono piu' a nessuno: ne'
+    all'annuncio di oggi, ne' a un'altra fotografia rimasta. Solo nomi
+    della forma delle foto degli annunci (`a<id>_...`) di QUELL'annuncio:
+    un nome storto o di un altro annuncio non si tocca mai. Torna
+    quante righe e quanti file ha tolto."""
+    adesso = adesso or int(time.time())
+    soglia = adesso - FOTOGRAFIA_GIORNI * 86400
+    segnaposto = ",".join("?" * len(FOTOGRAFIA_ORDINI_CHIUSI))
+    con = db()
+    try:
+        vecchie = con.execute(
+            "SELECT f.ordine_id, f.annuncio_id, f.dati FROM "
+            "ordine_fotografie f JOIN ordini o ON o.id=f.ordine_id "
+            f"WHERE f.creato < ? AND o.stato IN ({segnaposto})",
+            (soglia, *FOTOGRAFIA_ORDINI_CHIUSI)).fetchall()
+        if not vecchie:
+            return {"righe": 0, "file": 0}
+        candidati = {}
+        for r in vecchie:
+            con.execute("DELETE FROM ordine_fotografie WHERE ordine_id=? "
+                        "AND annuncio_id=?", (r["ordine_id"], r["annuncio_id"]))
+            try:
+                foto = json.loads(r["dati"]).get("foto") or []
+            except (TypeError, ValueError, AttributeError):
+                foto = []
+            candidati.setdefault(r["annuncio_id"], set()).update(
+                f for f in foto if isinstance(f, str))
+        con.commit()
+        da_togliere = []
+        for aid, nomi in candidati.items():
+            a = con.execute("SELECT foto FROM annunci WHERE id=?",
+                            (aid,)).fetchone()
+            servono = set(_fotografia_di(a)["foto"]) if a else set()
+            servono |= _foto_protette_da_ordini(con, aid)
+            prefisso = f"a{aid}_"
+            for n in nomi - servono:
+                if (n.startswith(prefisso) and NOME_FOTO.match(n)
+                        and os.path.basename(n) == n
+                        and not n.endswith("_min.jpg")):
+                    da_togliere.append(n)
+    finally:
+        con.close()
+    tolti = 0
+    for n in da_togliere:
+        for f in (n, n[:-4] + "_min.jpg"):
+            try:
+                os.remove(os.path.join(FOTO_DIR, f))
+                tolti += 1
+            except OSError:
+                pass
+    print(f"📸 Storico degli annunci: tolte {len(vecchie)} fotografie "
+          f"oltre {FOTOGRAFIA_GIORNI} giorni e {tolti} file di foto")
+    return {"righe": len(vecchie), "file": tolti}
 
 
 def _differenze_fotografia(allora: dict, oggi: dict) -> list:
@@ -100274,6 +100342,12 @@ async def orologio():
             await controlla_scadenze()
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
+        try:
+            # lo storico degli annunci oltre l'anno (18 nov 2026):
+            # quasi sempre una query vuota
+            pulisci_fotografie_vecchie()
+        except Exception as e:
+            print(f"⚠️ Pulizia dello storico degli annunci saltata: {e}")
         try:
             # PRIMA DI TUTTO quel che e' gia' in volo: una riga decisa
             # qui puo' diventare da riprovare nello stesso battito, e

@@ -36905,9 +36905,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_incassa_ordine`, dopo il CAS a 'locked' e prima che lo stock scali,
   nella stessa transazione, `INSERT OR IGNORE` (mai riscritta), in un
   try che non ferma l'incasso. I FILE NON SI COPIANO: `modifica_annuncio`
-  salta le foto vecchie che `_foto_protette_da_ordini` trova nominate
-  dalla fotografia di un ordine non chiuso (`FOTOGRAFIA_ORDINI_CHIUSI` =
-  released, refunded, annullato); a ordine chiuso il file resta. La
+  salta le foto vecchie che `_foto_protette_da_ordini` trova nominate da
+  una fotografia in archivio, qualunque sia lo stato dell'ordine. LO
+  STORICO DURA UN ANNO: `pulisci_fotografie_vecchie`, nell'`orologio`,
+  toglie le fotografie oltre `FOTOGRAFIA_GIORNI` (365) di un ordine chiuso
+  (`FOTOGRAFIA_ORDINI_CHIUSI` = released, refunded, annullato) e i file
+  `a<id>_...` che non servono più né all'annuncio né a un'altra
+  fotografia, con la miniatura. La
   guardia che c'era già resta il primo muro: ad affare aperto (anche solo
   creato) la modifica del venditore è rifiutata. Rotta
   `GET /api/admin/orders/{id}/fotografia` (solo admin): com'era, com'è
