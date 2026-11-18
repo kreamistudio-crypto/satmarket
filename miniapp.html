@@ -14108,7 +14108,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = '4e3a739f0f';
+const LINGUA_VER = '64cd707b30';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -47089,7 +47089,13 @@ async function setAvvisiP2P(attivi){
 /* il nome di Barattozon NON si scrive qui: lo da' il catalogo dei
    metodi vestiti (`P2P_VESTE_METODI`, la sentinella «nessun posto
    scrive Barattozon a mano»), letto al disegno e non al carico */
-const P2P_AVVISI_TIPI = [['vendita', 'Vendita BTC'], ['acquisto', 'Acquisto BTC'],
+/* I NOMI SONO QUELLI DEI TAB DEL LIBRO, dal lato di chi legge (18 nov
+   2026, cantiere vetrina-pulita; un utente: «Non sempre e' segnato se e'
+   un buy o un sell»): gli ordini di chi VENDE (`vendita`) li compri tu, e
+   stanno in «Compra BTC»; quelli di chi COMPRA (`acquisto`) in «Vendi
+   BTC». Fino ad allora le chip dicevano «Vendita BTC / Acquisto BTC», il
+   lato di chi pubblica, e andavano rigirate a mente. Gli id restano. */
+const P2P_AVVISI_TIPI = [['vendita', 'Compra BTC'], ['acquisto', 'Vendi BTC'],
                          ['barattozon', '']];
 const nomeTipoAvvisiP2P = t =>
   t[1] || (vesteMetodoP2P(P2P_TABACCHINO) || {}).nome || t[0];
@@ -47115,6 +47121,14 @@ const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'So
    chi gli USDT li vede (`usdtVistoP2P`). Gemelle di VALUTE_AVVISI_NUOVI_P2P */
 /* il franco subito dopo l'euro, come nel catalogo (16 nov 2026) */
 const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['CHF', 'Solo franchi'], ['USDT', 'Solo USDT']];
+/* IL METODO DI PAGAMENTO DEGLI AVVISI (18 nov 2026, cantiere vetrina-pulita;
+   un utente: «filtrare le notifiche del bot per buy e per sell oltre che per
+   tipo di pagamento»): nessuno scelto = «Tutti», come prima; con dei metodi
+   scelti arriva l'ordine che ne accetta almeno uno. Gemelle di
+   METODI_AVVISI_NUOVI_P2P nel server. Barattozon non c'e': ha la sua chip
+   fra i tipi. I due svizzeri si vedono solo a chi vede i franchi. */
+const P2P_AVVISI_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contante per posta', 'TWINT', 'Bonifico CH'];
+const P2P_AVVISI_METODI_CHF = ['TWINT', 'Bonifico CH'];
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
    delle sei, spento se manca tutto (un server di ieri) */
@@ -47124,10 +47138,12 @@ function normalizzaAvvisiNuoviP2P(p){
   const soglia = String((p && p.soglia != null) ? p.soglia : '');
   const rete = String((p && p.rete) || '');
   const valuta = String((p && p.valuta) || '').toUpperCase();
+  const metodi = (p && Array.isArray(p.metodi)) ? P2P_AVVISI_METODI.filter(m => p.metodi.indexOf(m) >= 0) : [];
   return {attivo: !!(p && p.attivo), tipi: tipi.length ? tipi : tutti,
           soglia: P2P_AVVISI_SOGLIE.some(s => s[0] === soglia) ? soglia : '',
           rete: P2P_AVVISI_RETI.some(r => r[0] === rete) ? rete : '',
-          valuta: P2P_AVVISI_VALUTE.some(v => v[0] === valuta) ? valuta : ''};
+          valuta: P2P_AVVISI_VALUTE.some(v => v[0] === valuta) ? valuta : '',
+          metodi: metodi};
 }
 let myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);   // spento di serie
 function avvisiNuoviP2PInCasa(){
@@ -47198,6 +47214,16 @@ function contenutoAvvisiNuoviP2P(){
         pill(nomeTipoAvvisiP2P(t), p.tipi.indexOf(t[0]) >= 0,
              "scegliTipoAvvisiNuoviP2P('" + t[0] + "')")).join('')
     + '</div>'
+    /* i metodi (18 nov 2026): «Tutti» e' la lista vuota; ogni chip si
+       accende e si spegne da sola, e spegnere l'ultima torna a «Tutti» */
+    + '<div class="section-label">Metodo di pagamento</div>'
+    + '<div class="p2p-metodi">'
+    + pill('Tutti', !(p.metodi || []).length, "scegliMetodoAvvisiNuoviP2P('')")
+    + P2P_AVVISI_METODI.filter(m => P2P_AVVISI_METODI_CHF.indexOf(m) < 0
+        || (typeof chfVistoP2P === 'function' && chfVistoP2P())).map(m =>
+        pill(m, (p.metodi || []).indexOf(m) >= 0,
+             'scegliMetodoAvvisiNuoviP2P(' + (P2P_AVVISI_METODI.indexOf(m) + 1) + ')')).join('')
+    + '</div>'
     + '<div class="section-label">Convenienza</div>'
     + '<div class="p2p-metodi">'
     + pill('Tutti', p.soglia === '', "scegliSogliaAvvisiNuoviP2P('')")
@@ -47254,7 +47280,8 @@ async function setAvvisiNuoviP2P(patch){
     const r = await fetch(`${API_BASE}/me/avvisi-nuovi-p2p`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
        body: JSON.stringify({attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia,
-                             rete: voluto.rete || '', valuta: voluto.valuta || ''})});
+                             rete: voluto.rete || '', valuta: voluto.valuta || '',
+                             metodi: voluto.metodi || []})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(d.avvisi_nuovi_p2p);
@@ -47281,6 +47308,18 @@ function scegliReteAvvisiNuoviP2P(r){
 function scegliValutaAvvisiNuoviP2P(v){
   if (!myAvvisiNuoviP2P.attivo) return;
   setAvvisiNuoviP2P({valuta: v === 'EUR' || v === 'USDT' || v === 'CHF' ? v : ''});
+}
+/* il metodo arriva come POSIZIONE nel catalogo (1 = SEPA), '' = «Tutti»:
+   cosi' nell'onclick non viaggia un nome con gli spazi o gli apici */
+function scegliMetodoAvvisiNuoviP2P(n){
+  if (!myAvvisiNuoviP2P.attivo) return;
+  if (n === '' || n == null) { setAvvisiNuoviP2P({metodi: []}); return; }
+  const m = P2P_AVVISI_METODI[Number(n) - 1];
+  if (!m) return;
+  const metodi = (myAvvisiNuoviP2P.metodi || []).slice();
+  const i = metodi.indexOf(m);
+  if (i >= 0) metodi.splice(i, 1); else metodi.push(m);
+  setAvvisiNuoviP2P({metodi: P2P_AVVISI_METODI.filter(x => metodi.indexOf(x) >= 0)});
 }
 function scegliSogliaAvvisiNuoviP2P(s){
   if (!myAvvisiNuoviP2P.attivo) return;

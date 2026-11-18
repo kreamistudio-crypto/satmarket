@@ -413,7 +413,9 @@ async def prove():
     prova("...dice «1 nuovo ordine nel libro P2P», la cifra con UN «da» solo, i metodi e "
           "la convenienza", [True, True, False, True],
           ["<b>1 nuovo ordine nel libro P2P</b>" in testo,
-           "Per te: vendita BTC da 50,00 a 100,00 € via SEPA Instant, Revolut, "
+           # (18 nov 2026, vetrina-pulita) una riga per ordine, dal lato di
+           # chi legge: chi ha pubblicato vende, chi legge «Compra BTC»
+           "🟢 <b>Compra BTC</b> · da 50,00 a 100,00 € · SEPA Instant, Revolut · "
            "8% meno conveniente" in testo,
            "da da" in testo, "Apri il libro ordini" in testo])
     prova("...la riga e' timbrata, e al giro dopo non riparte", (True, []),

@@ -209,3 +209,4 @@ collaudo_lingua
 collaudo_reso_spese_venditore
 collaudo_fotografia_annuncio
 collaudo_sottocategorie_vetrina
+collaudo_vetrina_pulita

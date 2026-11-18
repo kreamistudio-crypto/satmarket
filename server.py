@@ -1133,6 +1133,17 @@ try:
     from config import POST_AUTOMATICI
 except ImportError:
     POST_AUTOMATICI = True
+# LA VETRINA CHE SI PULISCE DA SOLA (18 nov 2026, cantiere vetrina-pulita;
+# un utente: «messaggi effimeri per gli annunci di Barattolo Vetrina in
+# modo tale che spariscano quando sono scaduti o presi», Andrea: «Sì,
+# aprila»). Accesa: il post di un ordine P2P sparisce dai canali quando
+# l'ordine e' preso, annullato o scaduto, e quello di un annuncio quando
+# e' venduto. Spenta: com'era — i post P2P restano, l'annuncio venduto
+# prende il «✅ Venduto». E' l'interruttore d'emergenza: False e riavvia.
+try:
+    from config import VETRINA_SI_PULISCE
+except ImportError:
+    VETRINA_SI_PULISCE = True
 try:
     from config import TELEGRAM_CANALE_ID
 except ImportError:
@@ -7309,6 +7320,24 @@ def init_db():
         ritirato INTEGER NOT NULL,
         PRIMARY KEY(ordine_id, da_tg_id)
     );
+    CREATE TABLE IF NOT EXISTS post_p2p_canale(
+        -- I POST DEGLI ORDINI P2P NEI CANALI (18 nov 2026, cantiere
+        -- vetrina-pulita): uno per canale, per toglierlo quando l'ordine
+        -- esce dal libro (preso, annullato, scaduto). `ordine` e' l'id
+        -- del coordinatore; '' = il telefono l'ha annunciato prima di
+        -- saperlo (il nome provvisorio), e l'orologio lo collega dopo a
+        -- quello che la stessa persona ha dichiarato suo in quei minuti
+        -- (`_collega_post_p2p`). `canale` e' quello DOVE e' uscito: se
+        -- poi /canale lo cambia, il post si toglie lo stesso da li'.
+        canale TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        ordine TEXT DEFAULT '',
+        tg_id INTEGER DEFAULT 0,
+        creato INTEGER NOT NULL,
+        PRIMARY KEY(canale, message_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_post_p2p_canale_ordine
+        ON post_p2p_canale(ordine);
     CREATE TABLE IF NOT EXISTS coda_vetrina(
         -- LA CODA DEL CANALE (ott 2026, decisione di Andrea): gli
         -- annunci che il freno «uno per venditore» ha lasciato fuori
@@ -8359,6 +8388,11 @@ def init_db():
         quando INTEGER DEFAULT 0,
         accodato INTEGER DEFAULT 0,
         mandato INTEGER DEFAULT 0,
+        -- il `k` del libro (18 nov 2026, cantiere vetrina-pulita): 'sell'
+        -- o 'buy', perche' la riga del messaggio dica «Compra BTC» o
+        -- «Vendi BTC» anche per Barattozon; '' = riga di ieri, e decide
+        -- il tipo (`_lato_avviso_nuovo_p2p`)
+        lato TEXT DEFAULT '',
         PRIMARY KEY(tg_id, ordine)
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_nuovi_coda
@@ -9995,6 +10029,11 @@ def init_db():
                     # USDT li vede (`p2p_usdt_ammesso`): per gli altri
                     # vale tutte, cioe' l'euro.
                     "avvisi_nuovi_valuta TEXT DEFAULT ''",
+                    # IL METODO DEGLI AVVISI (18 nov 2026, cantiere
+                    # vetrina-pulita): i metodi voluti coi pipe ai bordi
+                    # ('|SEPA|Revolut|'), '' = tutti. Lo legge
+                    # `_pref_avvisi_nuovi_p2p`, come le altre.
+                    "avvisi_nuovi_metodi TEXT DEFAULT ''",
                     # GLI AVVISI DEL MERCATINO (9 ott 2026, richiesta di
                     # Andrea): «🆕 Avvisami dei nuovi annunci», 0 = SPENTO
                     # di serie, con le categorie volute coi pipe ai bordi
@@ -10155,6 +10194,12 @@ def init_db():
             con.execute(f"ALTER TABLE p2p_paracadute ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # il lato nella coda degli avvisi dei nuovi ordini (18 nov 2026,
+    # cantiere vetrina-pulita): vedi lo schema di `p2p_avvisi_nuovi`
+    try:
+        con.execute("ALTER TABLE p2p_avvisi_nuovi ADD COLUMN lato TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     # (le quattro colonne del gate e dell'eco su `chiavi_p2p` non si
     # aggiungono piu': dalla patch 0007 non le legge nessuno. Dove ci
     # sono gia' restano, morte — vedi lo schema)
@@ -21933,6 +21978,11 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_avvisi_nuovi WHERE tg_id=?",
                     (id_nostr,))
+        # ...e i post dei suoi ordini nei canali (18 nov 2026, vetrina-pulita):
+        # passano alla meta' Telegram, cosi' quello col nome provvisorio si
+        # collega ancora all'ordine dichiarato (che segue la stessa strada)
+        con.execute("UPDATE post_p2p_canale SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
         # ...e gli avvisi del mercatino (9 ott 2026): i venditori che la
         # meta' Nostr seguiva passano alla meta' Telegram, in unione; chi
         # seguiva la meta' Nostr COME VENDITORE segue ora quella Telegram
@@ -37349,6 +37399,16 @@ def _leve_stato():
                   spento="i nuovi annunci non vengono raccontati da nessuna "
                          "parte (il ciclo di vita dei post già fatti "
                          "continua)"),
+            # LA VETRINA CHE SI PULISCE (18 nov 2026): accesa di serie
+            _leva("I canali si puliscono da soli", "VETRINA_SI_PULISCE",
+                  bool(VETRINA_SI_PULISCE),
+                  acceso="il post di un ordine P2P sparisce dai canali "
+                         "quando l'ordine è preso, annullato o scaduto, e "
+                         "quello di un annuncio quando è venduto; oltre le "
+                         "48 ore Telegram non lascia cancellare, e il post "
+                         "si riscrive («non più disponibile», «✅ Venduto»)",
+                  spento="come prima: i post P2P restano nei canali, e "
+                         "l'annuncio venduto prende il «✅ Venduto»"),
             # il FATTO e non il valore, la regola dei segreti: qui
             # basta sapere se il bot ha un canale dove parlare. E si
             # chiede al giudice, non alla costante: dall'ago 2026 il
@@ -58074,7 +58134,8 @@ async def scegli_avvisi_p2p(req: Request, x_tg_init_data: str = Header(""),
 async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header(""),
                                   barattolo_sessione: str = Cookie("")):
     """«🔔 Avvisami dei nuovi ordini P2P» (9 ott 2026, richiesta di
-    Andrea): le TRE preferenze in una rotta sola — l'interruttore, i tipi
+    Andrea; dal 18 nov 2026 anche i METODI di pagamento, `metodi`):
+    le TRE preferenze in una rotta sola — l'interruttore, i tipi
     di ordine che vuole (vendita BTC, acquisto BTC, Barattozon, almeno
     uno) e la soglia di convenienza ('' = tutti, oppure 0 / 2 / 5 punti
     almeno a suo favore). Le salvano uguali il bottone della testata del
@@ -58127,16 +58188,37 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         r = con.execute("SELECT avvisi_nuovi_valuta FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
         valuta = str(r[0] or "") if r else ""
+    # I METODI (18 nov 2026, cantiere vetrina-pulita): una lista dal catalogo,
+    # [] = tutti. Un telefono di ieri non la manda, e allora resta quella
+    # scritta; un nome che il catalogo non ha e' un 400, non un filtro muto
+    if "metodi" in d:
+        grezzi_m = d.get("metodi")
+        if grezzi_m is None:
+            grezzi_m = []
+        if not isinstance(grezzi_m, list) or \
+                any(str(m) not in METODI_AVVISI_NUOVI_P2P for m in grezzi_m):
+            con.close()
+            raise HTTPException(400, "Metodo di pagamento sconosciuto")
+        metodi_txt = ("|" + "|".join(m for m in METODI_AVVISI_NUOVI_P2P
+                                     if m in grezzi_m) + "|") if grezzi_m else ""
+    else:
+        try:
+            r = con.execute("SELECT avvisi_nuovi_metodi FROM utenti WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+        except sqlite3.OperationalError:
+            r = None
+        metodi_txt = str(r[0] or "") if r else ""
     con.execute("UPDATE utenti SET avvisi_nuovi_p2p=?, avvisi_nuovi_tipi=?, "
-                "avvisi_nuovi_soglia=?, avvisi_nuovi_rete=?, avvisi_nuovi_valuta=? "
-                "WHERE tg_id=?",
-                (attivo, "|" + "|".join(tipi) + "|", soglia, rete, valuta, user["id"]))
+                "avvisi_nuovi_soglia=?, avvisi_nuovi_rete=?, avvisi_nuovi_valuta=?, "
+                "avvisi_nuovi_metodi=? WHERE tg_id=?",
+                (attivo, "|" + "|".join(tipi) + "|", soglia, rete, valuta, metodi_txt,
+                 user["id"]))
     con.commit()
     con.close()
     return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(
         {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": "|" + "|".join(tipi) + "|",
          "avvisi_nuovi_soglia": soglia, "avvisi_nuovi_rete": rete,
-         "avvisi_nuovi_valuta": valuta})}
+         "avvisi_nuovi_valuta": valuta, "avvisi_nuovi_metodi": metodi_txt})}
 
 
 # I MOTIVI DELLO SCONOSCIUTO (12 ott 2026, chi-e-l-altro): quando
@@ -69984,9 +70066,15 @@ async def annuncia_ordine_p2p_canale(req: Request,
             }
             caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,
                                           valuta, cifra_coin)
+            # i post usciti, per toglierli quando l'ordine esce dal libro
+            # (LA VETRINA CHE SI PULISCE, 18 nov 2026)
+            usciti = []
             if canale_id():
                 try:
-                    postato = bool(await _manda_post_canale(canale_id(), caption, []))
+                    mid = await _manda_post_canale(canale_id(), caption, [])
+                    postato = bool(mid)
+                    if mid:
+                        usciti.append((canale_id(), mid))
                 except Exception as e:
                     print(f"⚠️ Post P2P nel canale saltato: {e}")
             if vetrina_ok:
@@ -69999,16 +70087,22 @@ async def annuncia_ordine_p2p_canale(req: Request,
                                 "WHERE tg_id=?", (int(adesso_canale), user["id"]))
                     con.commit()
                     con.close()
-                    if await _manda_post_canale(canale_vetrina(), caption, []):
+                    mid = await _manda_post_canale(canale_vetrina(), caption, [])
+                    if mid:
                         postato = True
+                        usciti.append((canale_vetrina(), mid))
                 except Exception as e:
                     print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
             if canale_bitcoin_podcast():
                 try:
-                    if await _manda_post_canale(canale_bitcoin_podcast(), caption, []):
+                    mid = await _manda_post_canale(canale_bitcoin_podcast(), caption, [])
+                    if mid:
                         postato = True
+                        usciti.append((canale_bitcoin_podcast(), mid))
                 except Exception as e:
                     print(f"⚠️ Post P2P su BitcoinPodcast saltato: {e}")
+            _segna_post_p2p(usciti, ordine if buono else "", user["id"],
+                            int(adesso_canale))
             if postato and buono:
                 if len(_CANALE_POSTATI) > 5000:
                     _CANALE_POSTATI.clear()
@@ -70022,6 +70116,202 @@ async def annuncia_ordine_p2p_canale(req: Request,
 
 
 _CANALE_POSTATI: dict = {}      # ordine -> quando e' uscito il suo post (cura 4)
+
+
+# ═══ LA VETRINA CHE SI PULISCE (18 nov 2026, cantiere vetrina-pulita) ═══
+# Un utente: «Avrebbe senso mettere i messaggi effimeri per gli annunci di
+# Barattolo Vetrina in modo tale che spariscano quando sono scaduti o
+# presi?». Fino ad allora il post di un ordine P2P restava nei canali per
+# sempre: preso, annullato o scaduto, chi lo leggeva toccava «Apri lo
+# Scambio P2P» e non lo trovava piu'. Ora il server ricorda dove e' uscito
+# ogni post (`post_p2p_canale`) e lo toglie quando l'ordine esce dal libro.
+#
+# CHI LO DICE: due strade, la stessa delle sorelle.
+# • mostrod (eventi 0007): preso, annullato, scaduto → via subito
+#   (`_foto_dopo_evento_p2p`);
+# • la fotografia del libro, ogni minuto (`_giro_post_p2p_canale`): un
+#   ordine che il libro dice non piu' `pending`, o scaduto, o tolto per
+#   parola di mostrod. SOLO PROVE IN POSITIVO: un ordine che la fotografia
+#   non porta affatto NON si toglie — un relay che risponde vuoto non deve
+#   svuotare i canali. Quel che nessuno dice in una settimana si lascia
+#   stare e si dimentica (`P2P_POST_CANALE_MEMORIA_S`).
+#
+# IL NOME PROVVISORIO. Il telefono annuncia il post appena ha mandato
+# l'ordine al coordinatore, e spesso il nome vero non lo sa ancora: il
+# post si segna con `ordine` vuoto e col tg_id, e l'orologio lo collega
+# all'ordine che quella persona ha dichiarato suo (p2p_ordini, maker) nei
+# minuti attorno (`P2P_POST_CANALE_COLLEGA_S`). Il freno del canale (un
+# post ogni dieci minuti a persona) fa che i candidati siano uno.
+#
+# LE 48 ORE DI TELEGRAM: un messaggio piu' vecchio non si cancella. Allora
+# si RISCRIVE con «non piu' disponibile» (l'edit non ha scadenza), che e'
+# la stessa promessa: nessuno tocca piu' un ordine che non c'e'. Un post
+# gia' cancellato a mano («not found») vale come tolto.
+# ORDINE TORNATO NEL LIBRO (chi l'aveva preso non ha proseguito): il post
+# resta tolto. Ripubblicarlo vorrebbe dire un secondo post dello stesso
+# ordine, che e' la cosa che il freno del canale esiste per non fare.
+P2P_POST_CANALE_COLLEGA_S = (-120, 900)   # da quanto prima a quanto dopo il post
+P2P_POST_CANALE_MEMORIA_S = 7 * 86400     # oltre, il post si dimentica
+TESTO_POST_P2P_TOLTO = ("⌛ <b>Ordine P2P non più disponibile</b>\n"
+                        "È stato preso, annullato o è scaduto.")
+_TASK_POST_P2P: set = set()   # i ritiri in volo (il patto di `_TASK_SPED_STD`)
+
+
+def _segna_post_p2p(usciti, ordine: str, tg_id: int, quando: int) -> None:
+    """Ricorda i post appena usciti, uno per canale. Fail-open come il
+    post: una riga saltata vuol dire un post che resta, mai un gesto
+    rotto."""
+    if not usciti:
+        return
+    try:
+        con = db()
+        try:
+            con.executemany(
+                "INSERT OR IGNORE INTO post_p2p_canale(canale, message_id, ordine, "
+                "tg_id, creato) VALUES(?,?,?,?,?)",
+                [(str(c), int(m), str(ordine or ""), int(tg_id or 0), int(quando))
+                 for c, m in usciti])
+            con.commit()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Post P2P nel canale: riferimento non salvato ({e})", flush=True)
+
+
+def _post_p2p_da_ritirare(ordini, ultimi: dict, via: dict, adesso: int) -> set:
+    """PURA: fra gli `ordini` che hanno un post, quelli usciti dal libro.
+    Le prove sono solo IN POSITIVO: tolto per parola di mostrod (`via`),
+    oppure l'ultimo 38383 della fotografia che non e' piu' `pending`, o
+    `pending` ma col suo `expires_at` passato. Un ordine che la
+    fotografia non conosce resta: non sapere non e' un «e' finito»."""
+    fuori = set()
+    for o in ordini or []:
+        if not o:
+            continue
+        if o in (via or {}):
+            fuori.add(o)
+            continue
+        ev = (ultimi or {}).get(o)
+        if not ev:
+            continue
+        if _tag_evento_p2p(ev, "s") != "pending":
+            fuori.add(o)
+            continue
+        try:
+            scade = int(float(_tag_evento_p2p(ev, "expires_at") or 0))
+        except ValueError:
+            scade = 0
+        if scade and scade <= adesso:
+            fuori.add(o)
+    return fuori
+
+
+def _collega_post_p2p(con, adesso: int) -> int:
+    """I post nati col nome provvisorio prendono l'id vero: l'ordine che
+    la stessa persona ha dichiarato suo da maker nei minuti attorno al
+    post, e che non ha gia' un post suo. Torna quanti ne ha collegati.
+    Pura sulla connessione; non committa."""
+    prima, dopo = P2P_POST_CANALE_COLLEGA_S
+    collegati = 0
+    orfani = con.execute(
+        "SELECT DISTINCT tg_id, creato FROM post_p2p_canale WHERE ordine='' "
+        "AND tg_id<>0 AND creato>=?", (adesso - P2P_POST_CANALE_MEMORIA_S,)).fetchall()
+    for r in orfani:
+        o = con.execute(
+            "SELECT ordine FROM p2p_ordini WHERE tg_id=? AND maker=1 "
+            "AND creato BETWEEN ? AND ? AND ordine NOT IN "
+            "(SELECT ordine FROM post_p2p_canale) ORDER BY creato LIMIT 1",
+            (r["tg_id"], r["creato"] + prima, r["creato"] + dopo)).fetchone()
+        if o:
+            collegati += con.execute(
+                "UPDATE post_p2p_canale SET ordine=? WHERE ordine='' AND tg_id=? "
+                "AND creato=?", (o["ordine"], r["tg_id"], r["creato"])).rowcount
+    return collegati
+
+
+async def ritira_post_p2p(ordini) -> int:
+    """Toglie dai canali i post di questi ordini: cancella, e se Telegram
+    non lascia (oltre le 48 ore) riscrive «non piu' disponibile». La riga
+    se ne va solo quando uno dei due e' riuscito — un Telegram muto non
+    fa perdere il post, ci riprova il giro dopo. Fail-open; torna quanti
+    post ha tolto. A leva spenta non fa niente."""
+    ordini = sorted({str(o) for o in ordini or [] if o})
+    if not VETRINA_SI_PULISCE or not ordini:
+        return 0
+    try:
+        con = db()
+        try:
+            righe = [dict(r) for r in con.execute(
+                f"SELECT canale, message_id, ordine FROM post_p2p_canale WHERE ordine IN "
+                f"({','.join('?' * len(ordini))})", ordini)]
+        finally:
+            con.close()
+        tolti = []
+        for r in righe:
+            dati = {"chat_id": r["canale"], "message_id": r["message_id"]}
+            esito = await bot_api("deleteMessage", dati)
+            fatto = bool(esito and esito.get("ok"))
+            if not fatto and esito and "not found" in str(esito.get("description") or "").lower():
+                fatto = True          # gia' tolto a mano: e' quel che si voleva
+            if not fatto:
+                esito = await bot_api("editMessageText", {
+                    **dati, "text": TESTO_POST_P2P_TOLTO, "parse_mode": "HTML"})
+                fatto = bool(esito and esito.get("ok"))
+            if fatto:
+                tolti.append((r["canale"], r["message_id"]))
+        if tolti:
+            con = db()
+            try:
+                con.executemany("DELETE FROM post_p2p_canale WHERE canale=? AND message_id=?",
+                                tolti)
+                con.commit()
+            finally:
+                con.close()
+            print(f"🧹 Canali: {len(tolti)} post P2P tolti "
+                  f"({', '.join(o[:8] for o in ordini)})", flush=True)
+        return len(tolti)
+    except Exception as e:
+        print(f"⚠️ Canali: post P2P non tolti ({e})", flush=True)
+        return 0
+
+
+def _ritira_post_p2p_subito(ordine: str) -> None:
+    """Dal gancio sincrono degli eventi di mostrod: il ritiro parte in
+    sottofondo, e senza un loop resta il giro del minuto."""
+    if not VETRINA_SI_PULISCE or not ordine:
+        return
+    try:
+        t = asyncio.get_running_loop().create_task(ritira_post_p2p([ordine]))
+    except RuntimeError:
+        return
+    _TASK_POST_P2P.add(t)
+    t.add_done_callback(_TASK_POST_P2P.discard)
+
+
+async def _giro_post_p2p_canale():
+    """Un battito, dopo la fotografia: collega i post nati col nome
+    provvisorio, toglie quelli degli ordini usciti dal libro, dimentica
+    quelli che nessuno ha detto finiti in una settimana."""
+    if not VETRINA_SI_PULISCE:
+        return
+    adesso = int(time.time())
+    con = db()
+    try:
+        if _collega_post_p2p(con, adesso):
+            con.commit()
+        con.execute("DELETE FROM post_p2p_canale WHERE creato<?",
+                    (adesso - P2P_POST_CANALE_MEMORIA_S,))
+        con.commit()
+        ordini = [r[0] for r in con.execute(
+            "SELECT DISTINCT ordine FROM post_p2p_canale WHERE ordine<>''")]
+    finally:
+        con.close()
+    if not ordini or not _P2P_FOTO.get("quando"):
+        return
+    fuori = _post_p2p_da_ritirare(ordini, _P2P_FOTO.get("ultimi") or {},
+                                  _P2P_FOTO.get("via") or {}, adesso)
+    if fuori:
+        await ritira_post_p2p(fuori)
 
 
 # ---------- GLI AVVISI DELLO SCAMBIO P2P: MOSTRO E' L'UNICA FONTE ------
@@ -73251,6 +73541,13 @@ NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BT
 SOGLIE_AVVISI_NUOVI_P2P = ("-10", "-5", "-2", "0", "2", "5")   # le sei chip, gemelle di P2P_AVVISI_SOGLIE nel client
 RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
 VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
+# IL METODO DI PAGAMENTO DEGLI AVVISI (18 nov 2026, cantiere vetrina-pulita;
+# un utente: «Si possono filtrare le notifiche del bot per buy e per sell
+# oltre che per tipo di pagamento?», Andrea: «Sì, aprila»). Nessuno scelto =
+# tutti, come prima. Gemelle di P2P_AVVISI_METODI nel client, e una prova le
+# tiene uguali. Barattozon NON c'e': ha gia' la sua chip fra i tipi, e un
+# ordine Barattozon passa da quella e non da qui.
+METODI_AVVISI_NUOVI_P2P = ("SEPA", "SEPA Instant", "Revolut", "Satispay", "PayPal", "Wise", "Contanti", "Contante per posta", "TWINT", "Bonifico CH")
 TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato
 _P2P_NUOVI = {"noti": None}   # gli id che la fotografia conosceva al giro prima (None = mai guardata)
 
@@ -73272,7 +73569,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     non un default del database."""
     if not riga:
         return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": "", "rete": "",
-                "valuta": ""}
+                "valuta": "", "metodi": []}
     try:
         attivo = bool(int(_campo_riga(riga, "avvisi_nuovi_p2p", 0) or 0))
     except (TypeError, ValueError):
@@ -73289,7 +73586,12 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     valuta = str(_campo_riga(riga, "avvisi_nuovi_valuta", "") or "").strip().upper()
     if valuta not in VALUTE_AVVISI_NUOVI_P2P:
         valuta = ""
-    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valuta": valuta}
+    # i metodi (18 nov 2026): nell'ordine del catalogo, [] = tutti; un nome
+    # che il catalogo non ha piu' si perde, e se non ne resta nessuno vale tutti
+    metodi_txt = str(_campo_riga(riga, "avvisi_nuovi_metodi", "") or "")
+    metodi = [m for m in METODI_AVVISI_NUOVI_P2P if f"|{m}|" in metodi_txt]
+    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valuta": valuta,
+            "metodi": metodi}
 
 
 def _tipo_nuovo_p2p(lato: str, metodi) -> str:
@@ -73352,7 +73654,7 @@ def _convenienza_nuovo_p2p(lato: str, premio, sats, euro: float, cambio: float):
 
 
 def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
-                            valuta: str = "EUR") -> bool:
+                            valuta: str = "EUR", metodi=None) -> bool:
     """PURA: queste preferenze vogliono quest'ordine? Acceso, del tipo
     giusto, della RETE giusta (30 ott 2026: 'onchain' o 'ln', '' = tutte;
     chi chiama la spegne a chi l'on-chain non lo vede), della VALUTA
@@ -73365,6 +73667,14 @@ def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
     if pref.get("rete") and pref.get("rete") != rete:
         return False
     if pref.get("valuta") and pref.get("valuta") != valuta:
+        return False
+    # IL METODO (18 nov 2026, cantiere vetrina-pulita): con dei metodi scelti
+    # passa l'ordine che ne accetta almeno uno — i nomi come li DICE il libro
+    # (`_metodi_libro`). Barattozon no: la sua chip e' fra i tipi, e chi l'ha
+    # accesa lo vuole qualunque metodo abbia scelto per gli altri.
+    voluti = pref.get("metodi") or []
+    if voluti and tipo != "barattozon" and \
+            not any(str(m).strip() in voluti for m in metodi or []):
         return False
     soglia = pref.get("soglia") or ""
     if soglia == "":
@@ -73385,42 +73695,61 @@ def _frase_convenienza_p2p(conv) -> str:
 
 
 def _testo_avviso_nuovi_p2p(righe: list) -> str:
-    """PURA: il messaggio raggruppato — quanti ordini nuovi e di che tipo,
-    il piu' conveniente per chi legge (se almeno uno ha una convenienza
-    nota), e il tocco che apre il libro. Le righe portano `tipo`,
-    `conv`, `euro` e `metodi` gia' scritti come si leggono. Nessun
-    nome di chi ha pubblicato: il libro e' la pagina dove si guarda."""
+    """PURA: il messaggio raggruppato — quanti ordini nuovi, e UNA RIGA
+    PER ORDINE che dice prima di tutto cosa ci fai TU: «🟢 Compra BTC» o
+    «🔴 Vendi BTC», come i due tab del libro; poi la cifra, i metodi,
+    l'on-chain e la convenienza per chi legge. Le righe portano `tipo`,
+    `conv`, `euro`, `metodi` (gia' scritti come si leggono) e `lato`.
+    Nessun nome di chi ha pubblicato: il libro e' la pagina dove si
+    guarda.
+    PERCHE' COSI' (18 nov 2026, cantiere vetrina-pulita; un utente: «Non
+    sempre e' segnato se e' un buy o un sell, devo aprire il sito per
+    verificare»). Fino ad allora il messaggio contava i tipi dal lato di
+    chi PUBBLICA («vendita BTC: 2») e raccontava solo il piu' conveniente:
+    chi leggeva doveva rigirarlo da se', e Barattozon non diceva il lato
+    affatto. Il lato ora e' quello di chi legge, la stessa parola dei
+    tab, per ogni ordine. Oltre le cinque righe un «…e altri N»: il
+    messaggio resta un avviso, non una copia del libro."""
     n = len(righe)
     testo = (f"🔔 <b>{n} {'nuovo ordine' if n == 1 else 'nuovi ordini'} "
              "nel libro P2P</b>")
-    conti = []
-    for t in TIPI_AVVISI_NUOVI_P2P:
-        q = sum(1 for r in righe if r.get("tipo") == t)
-        if q:
-            conti.append(f"{NOMI_TIPI_AVVISI_NUOVI_P2P[t]}: {q}")
-    if conti:
-        testo += "\n" + " · ".join(conti)
-    # GLI ON-CHAIN SI DICONO (30 ott 2026): un ordine del libro on-chain
-    # di Barattolo si riconosce dal nome (`P2P_ONCHAIN_PREFISSO`), e il conto
-    # delle reti esce solo se ce n'e' almeno uno — a leva spenta il
-    # messaggio e' quello di ieri, byte per byte
-    oc = sum(1 for r in righe if _avviso_onchain_p2p(r))
-    if oc:
-        testo += f"\n₿ On-chain: {oc}" + (f" · ⚡ Lightning: {n - oc}" if n - oc else "")
-    noti = [r for r in righe if r.get("conv") is not None]
-    if noti:
-        m = max(noti, key=lambda r: float(r["conv"]))
-        cosa = NOMI_TIPI_AVVISI_NUOVI_P2P.get(m.get("tipo"), "ordine")
-        if _avviso_onchain_p2p(m):
-            cosa += " on-chain"
-        # «DA DA 50,00» (12 ott 2026, notte, cantiere libro-vuoto): la cifra
-        # di un intervallo porta gia' il suo «da» («da 50,00 a 100,00 €»,
-        # `_euro_libro`), e la frase gliene metteva davanti un altro
-        euro = str(m.get("euro") or "")
-        cifra = "" if not euro else f" {euro}" if euro.startswith("da ") else f" da {euro}"
-        via = f" via {html.escape(str(m['metodi']))}" if m.get("metodi") else ""
-        testo += (f"\n{'Il più conveniente per te' if n > 1 else 'Per te'}: "
-                  f"{cosa}{cifra}{via}, {_frase_convenienza_p2p(m['conv'])}")
+
+    def lato(r):
+        # il `k` del libro; le righe di ieri senza `lato` lo prendono dal
+        # tipo (Barattozon sta nel tab «Compra BTC»: chi pubblica vende)
+        k = str(r.get("lato") or "")
+        if k in ("sell", "buy"):
+            return k
+        return {"acquisto": "buy", "vendita": "sell",
+                "barattozon": "sell"}.get(r.get("tipo"), "")
+
+    # CHI LEGGE FA IL CONTRARIO di chi ha pubblicato: un `sell` lo compri
+    nomi = {"sell": "🟢 <b>Compra BTC</b>", "buy": "🔴 <b>Vendi BTC</b>"}
+    if n > 1:
+        conti = []
+        for k, nome in (("sell", "🟢 Compra BTC"), ("buy", "🔴 Vendi BTC")):
+            q = sum(1 for r in righe if lato(r) == k)
+            if q:
+                conti.append(f"{nome}: {q}")
+        if conti:
+            testo += "\n" + " · ".join(conti)
+    testo += "\n"
+    for r in righe[:5]:
+        pezzi = [nomi.get(lato(r), "🔁 <b>Ordine</b>")]
+        if r.get("tipo") == "barattozon":
+            pezzi[0] += f" con {NOMI_TIPI_AVVISI_NUOVI_P2P['barattozon']}"
+        if r.get("euro"):
+            pezzi.append(html.escape(str(r["euro"])))
+        # i metodi di Barattozon sono il tabacchino, gia' detto nel nome
+        if r.get("metodi") and r.get("tipo") != "barattozon":
+            pezzi.append(html.escape(str(r["metodi"])))
+        if _avviso_onchain_p2p(r):
+            pezzi.append("₿ on-chain")
+        if r.get("conv") is not None:
+            pezzi.append(_frase_convenienza_p2p(r["conv"]))
+        testo += "\n" + " · ".join(pezzi)
+    if n > 5:
+        testo += f"\n…e altri {n - 5}"
     # IL LINK DEL LIBRO, DENTRO TELEGRAM (10 ott 2026): a leva accesa apre
     # la Mini App sul libro (`startapp=p2p`), a leva spenta e' quello di
     # ieri, byte per byte. Si traduce QUI e non nel trasporto perche' un
@@ -73462,6 +73791,13 @@ def _persone_avvisi_nuovi_p2p(con):
     """Chi ha acceso gli avvisi dei nuovi ordini, con le sue preferenze.
     Un database di ieri senza la colonna della rete legge le altre: la
     rete vale tutte (`_pref_avvisi_nuovi_p2p`)."""
+    try:
+        return con.execute(
+            "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia, "
+            "avvisi_nuovi_rete, avvisi_nuovi_valuta, avvisi_nuovi_metodi FROM utenti "
+            "WHERE avvisi_nuovi_p2p=1").fetchall()
+    except sqlite3.OperationalError:
+        pass
     try:
         return con.execute(
             "SELECT tg_id, avvisi_nuovi_p2p, avvisi_nuovi_tipi, avvisi_nuovi_soglia, "
@@ -73561,15 +73897,15 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
             if (chf and not p2p_chf_ammesso(tg)) or (coin and not p2p_coin_ammesso(tg)):
                 continue
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "onchain",
-                                           p2p_onchain_valuta(o)):
+                                           p2p_onchain_valuta(o), _metodi_libro(metodi)):
                 continue
             if not _avvisi_p2p_accesi(con, tg):
                 continue
             cur = con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
-                "euro, metodi, quando, accodato, mandato) VALUES(?,?,?,?,?,?,?,?,0)",
+                "euro, metodi, quando, accodato, mandato, lato) VALUES(?,?,?,?,?,?,?,?,0,?)",
                 (tg, str(o["ordine"]), tipo, conv, euro_txt, metodi_txt,
-                 int(o["creato"] or adesso), adesso))
+                 int(o["creato"] or adesso), adesso, str(o["lato"] or "")))
             scritte += cur.rowcount
         con.commit()
     finally:
@@ -73639,7 +73975,8 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             tg = int(p["tg_id"])
             if autore and tg == autore:
                 continue                      # mai per i suoi
-            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat):
+            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,
+                                           _metodi_libro(o["metodi"])):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
                 continue
@@ -73649,8 +73986,9 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
                 continue
             cur = con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
-                "euro, metodi, quando, accodato, mandato) VALUES(?,?,?,?,?,?,?,?,0)",
-                (tg, o["id"], tipo, conv, euro_txt, metodi_txt, o["quando"], adesso))
+                "euro, metodi, quando, accodato, mandato, lato) VALUES(?,?,?,?,?,?,?,?,0,?)",
+                (tg, o["id"], tipo, conv, euro_txt, metodi_txt, o["quando"], adesso,
+                 str(o["lato"] or "")))
             scritte += cur.rowcount
     con.commit()
     return scritte
@@ -73712,7 +74050,7 @@ def _scarica_nuovi_p2p(con, adesso: int, vivi, ferme=None) -> list:
         if adesso - int(p["ultimo"] or 0) < finestra:
             continue
         righe = con.execute(
-            "SELECT ordine, tipo, conv, euro, metodi FROM p2p_avvisi_nuovi "
+            "SELECT ordine, tipo, conv, euro, metodi, lato FROM p2p_avvisi_nuovi "
             "WHERE tg_id=? AND mandato=0 ORDER BY quando, ordine", (tg,)).fetchall()
         # gli ordini spariti si consumano; quelli FERMI per la pausa del
         # loro autore restano in coda, e a questo giro non contano
@@ -73873,6 +74211,14 @@ async def orologio_p2p():
                 await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)
             except Exception as e:
                 print(f"⚠️ Fotografia del libro P2P saltata "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
+            # LA VETRINA CHE SI PULISCE (18 nov 2026): dopo la fotografia,
+            # che e' quel che il giro legge; col suo tetto e il suo try
+            try:
+                await asyncio.wait_for(_giro_post_p2p_canale(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Canali: giro dei post P2P saltato "
                       f"({type(e).__name__}: {e})", flush=True)
             _P2P_BATTITO["vivo"] = time.time()
         try:
@@ -74429,6 +74775,8 @@ def _foto_dopo_evento_p2p(ev: dict) -> None:
         _foto_via_p2p(_P2P_FOTO, ev["ordine"], ev["ts"])
     if ev.get("momento") in P2P_MOMENTI_FUORI_FOTO:
         _foto_subito_p2p()
+        # ...e il suo post esce dai canali (LA VETRINA CHE SI PULISCE)
+        _ritira_post_p2p_subito(ev.get("ordine") or "")
     elif ev.get("momento") == "tornato":
         _foto_subito_p2p(ev["ordine"])      # torna vivo: lo si aspetta
 
@@ -85932,6 +86280,36 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
                 (canale_bitcoin_podcast(), _post_podcast(a))]
         if not any(c and m for c, m in dove):
             return
+        # LA VETRINA CHE SI PULISCE (18 nov 2026, cantiere vetrina-pulita):
+        # venduto, il post SPARISCE invece di prendere il ✅ — nei canali
+        # restano solo cose che si comprano. Dove Telegram non lascia
+        # cancellare (oltre le 48 ore) resta la strada di prima, il ✅
+        # Venduto qui sotto. La colonna del post tolto torna a zero: al
+        # ritorno in vendita non c'e' piu' niente da riscrivere, e
+        # l'annuncio vive nella vetrina dell'app come sempre.
+        if venduto and VETRINA_SI_PULISCE:
+            colonne = ("post_canale_id", "post_vetrina_id", "post_bitcoin_podcast_id")
+            tolte = []
+            for (canale, msg), col in zip(dove, colonne):
+                if not (canale and msg):
+                    continue
+                r = await bot_api("deleteMessage",
+                                  {"chat_id": canale, "message_id": msg})
+                if (r and r.get("ok")) or (r and "not found" in str(
+                        r.get("description") or "").lower()):
+                    tolte.append(col)
+            if tolte:
+                con = db()
+                try:
+                    con.execute(f"UPDATE annunci SET {', '.join(c + '=0' for c in tolte)} "
+                                "WHERE id=?", (annuncio_id,))
+                    con.commit()
+                finally:
+                    con.close()
+                dove = [(c, m) for (c, m), col in zip(dove, colonne)
+                        if col not in tolte]
+                if not any(c and m for c, m in dove):
+                    return
         caption = _caption_canale(dict(a), await cambio_btc_eur(),
                                   venduto=venduto, altri=altri)
         # Con la foto il testo vive nella caption, senza nel body — ma
@@ -122122,6 +122500,10 @@ CANCELLA_ANONIMIZZA = (
     # l'assistenza in app (3 nov 2026): le risposte di un admin che se ne
     # va restano nelle conversazioni degli altri, senza il suo nome
     ("assistenza", "autore"),
+    # (18 nov 2026, vetrina-pulita) i post dei suoi ordini nei canali: la
+    # riga resta, perche' il post va tolto quando l'ordine esce dal libro,
+    # il nome no
+    ("post_p2p_canale", "tg_id"),
 )
 # (tabella, colonna): cio' che era SUO e se ne va con lui
 CANCELLA_TOGLI = (

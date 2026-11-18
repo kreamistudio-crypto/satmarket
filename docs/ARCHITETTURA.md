@@ -8208,6 +8208,22 @@
   message_id; in collaudo un finto id negativo da contatore, così
   anche edit e delete si collaudano). Fail-open totale, ganci DOPO i
   commit, coda in memoria (un riavvio la perde, accettato).
+  LA VETRINA CHE SI PULISCE (18 nov 2026, cantiere vetrina-pulita, leva
+  `VETRINA_SI_PULISCE` accesa di serie): venduto, `promo_venduto`
+  CANCELLA i post (colonne a 0) e solo dove Telegram rifiuta (oltre le
+  48 ore) li riscrive col ✅; a leva spenta il ✅ di sempre. I post degli
+  ORDINI P2P (`/api/p2p/canale`) si ricordano in `post_p2p_canale`
+  (canale, message_id, ordine, tg_id, creato; `ordine=''` = annunciato
+  col nome provvisorio, collegato dall'orologio a `p2p_ordini` della
+  stessa persona da maker fra −2 e +15 minuti, `_collega_post_p2p`) e
+  si tolgono con `ritira_post_p2p`: subito alla parola di mostrod
+  (preso/annullato/scaduto, `_foto_dopo_evento_p2p`), o dal giro
+  `_giro_post_p2p_canale` dopo la fotografia, con il giudice PURO
+  `_post_p2p_da_ritirare` che toglie solo su prova in positivo (non
+  `pending`, `expires_at` passato, `via`). Cancellazione rifiutata →
+  edit «⌛ Ordine P2P non più disponibile»; «not found» = tolto;
+  Telegram muto = la riga resta e si riprova. Righe di oltre 7 giorni
+  dimenticate senza toccare il post.
   IL CANALE LO DECIDE IL BOT (ago 2026): `/canale @nome` (o l'id
   numerico) lo cambia da Telegram, `/canale` senza argomenti dice
   quello in uso, `/canale spento` lo spegne. Tabella `impostazioni`
@@ -29516,7 +29532,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per chi e' `p2p_onchain_ammesso`; i loro nomi (`bar-onchain-…`) sono
   «vivi» per `_onchain_vivi_avvisi_p2p`, e il messaggio aggiunge
   «⛓️ On-chain: N» quando ce n'e' almeno uno. Il canale lo sceglie
-  `notifica()`. L'ANTEPRIMA DI QUEL
+  `notifica()`. IL LATO DI CHI LEGGE E IL METODO (18 nov 2026, cantiere
+  vetrina-pulita): il messaggio e' UNA RIGA PER ORDINE (al piu' cinque,
+  poi «…e altri N») che comincia con le parole dei tab del libro —
+  «🟢 Compra BTC» per un `sell`, «🔴 Vendi BTC» per un `buy`, «con
+  Barattozon» sul tabacchino — poi cifra, metodi, «₿ on-chain» e la
+  convenienza; il conto per lato sopra, con piu' ordini. Il lato viaggia
+  nella coda (`p2p_avvisi_nuovi.lato`, '' sulle righe di ieri = dal
+  tipo). Le chip dei tipi dicono «Compra BTC»/«Vendi BTC» (id
+  invariati). `utenti.avvisi_nuovi_metodi` ('|SEPA|Revolut|', '' =
+  tutti), catalogo `METODI_AVVISI_NUOVI_P2P` gemello di
+  `P2P_AVVISI_METODI`: `_passa_avviso_nuovo_p2p(..., metodi)` vuole
+  almeno un metodo scelto fra quelli dell'ordine (`_metodi_libro`),
+  tranne Barattozon, che passa dalla sua chip. L'ANTEPRIMA DI QUEL
   LINK E' IN MINIATURA (9 ott 2026): `_manda_telegram` riconosce il
   messaggio dall'href `LINK_LIBRO_P2P` e chiede `link_preview_options`
   con l'url ESPLICITO (senza, l'API Bot ignora la misura) e

@@ -224,3 +224,4 @@ collaudo_lingua.py
 collaudo_reso_spese_venditore.py
 collaudo_fotografia_annuncio.py
 collaudo_sottocategorie_vetrina.py
+collaudo_vetrina_pulita.py

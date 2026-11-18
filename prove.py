@@ -66734,6 +66734,9 @@ def prove_card_p2p_vetrina():
     SUBITO = []
     amb["_foto_subito_p2p"] = lambda atteso="": SUBITO.append(atteso or "-")
     amb["_p2p_leve"] = lambda: {"attivo": True}
+    # (18 nov 2026, vetrina-pulita) il ritiro dei post dai canali, di cartone:
+    # lo prova prove_vetrina_pulita
+    amb["_ritira_post_p2p_subito"] = lambda ordine: None
     F = {"eventi": list(ev_foto), "via": {}}
     amb["_P2P_FOTO"] = F
     for momento, ordine in (("preso", "ordine-a"), ("garanzia_chiesta", "ordine-b"),
@@ -105063,8 +105066,11 @@ def prove_p2p_avvisi_libro():
     # EMENDATA (13 ott 2026, «il paracadute»): SETTE — il giro del
     # paracadute ha il suo, dopo il libro e prima della fotografia
     # (prove_paracadute_p2p guarda che stia li')
+    # EMENDATA (18 nov 2026, «la vetrina che si pulisce»): OTTO — il giro
+    # dei post P2P nei canali ha il suo, dopo la fotografia
+    # (prove_vetrina_pulita guarda che stia li')
     prova("...e ognuno ha il suo try (un battito storto non ferma gli altri)",
-          7, codice(orologio).count("except Exception as e:"))
+          8, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
           "for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):" in giro)
     prova("...e solo per due ore: un id che il libro non mostra smette di farsi cercare",
@@ -120606,7 +120612,9 @@ def prove_avvisi_nuovi_ordini():
           '                    "avvisi_nuovi_soglia TEXT DEFAULT \'\'",' in src)
     prova("la coda ha la chiave (persona, ordine): e' l'anti-doppione sul database", True,
           "CREATE TABLE IF NOT EXISTS p2p_avvisi_nuovi(" in src
-          and "        mandato INTEGER DEFAULT 0,\n        PRIMARY KEY(tg_id, ordine)\n    );\n"
+          and "        mandato INTEGER DEFAULT 0,\n" in src
+          # (18 nov 2026, vetrina-pulita) il lato in coda, prima della chiave
+          and "        lato TEXT DEFAULT '',\n        PRIMARY KEY(tg_id, ordine)\n    );\n"
           "    CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_nuovi_coda" in src)
     rotta = pezzo("scegli_avvisi_nuovi_p2p")
     prova("la rotta esiste, dietro il cancello del P2P e la leva globale", True,
@@ -120683,7 +120691,7 @@ def prove_avvisi_nuovi_ordini():
     amb = {"html": html, "URL_PUBBLICO": "https://barattolo.store", "time": time}
     gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
     for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = ", "RETI_AVVISI_NUOVI_P2P = ",
-                 "VALUTE_AVVISI_NUOVI_P2P = "):
+                 "VALUTE_AVVISI_NUOVI_P2P = ", "METODI_AVVISI_NUOVI_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("   #")[0], amb)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
@@ -120696,14 +120704,15 @@ def prove_avvisi_nuovi_ordini():
         exec(_senza_prosa(pezzo(f)), amb)
     pref = amb["_pref_avvisi_nuovi_p2p"]
     T3 = ["vendita", "acquisto", "barattozon"]
-    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": "", "valuta": ""}
+    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []}
     prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
           [SPENTO, SPENTO, SPENTO],
           [pref(None), pref({"tg_id": 1}),
            pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
     prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle sei",
-          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": "", "valuta": ""},
-           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": ""}],
+          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": "", "valuta": "",
+            "metodi": []},
+           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []}],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
            pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"})])
     prova("...le tre sotto zero si rileggono, una sconosciuta (−7, −1) torna «tutti»",
@@ -120758,6 +120767,20 @@ def prove_avvisi_nuovi_ordini():
            passa(PV("EUR"), "vendita", None), passa(PV("USDT"), "vendita", None),
            passa(PV("USDT"), "vendita", None, "onchain", "USDT"),
            passa(PV("USDT"), "acquisto", None, "ln", "EUR")])
+    # IL METODO (18 nov 2026, cantiere vetrina-pulita)
+    PM = lambda ms: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": ms}
+    prova("IL METODO: nessuno scelto passa tutto; con dei metodi passa l'ordine che ne accetta "
+          "almeno uno, non gli altri ne' quello senza metodi; Barattozon passa dalla sua chip",
+          [True, True, False, False, True],
+          [passa(PM([]), "vendita", None, "ln", "EUR", ["SEPA"]),
+           passa(PM(["Revolut"]), "vendita", None, "ln", "EUR", ["SEPA", "Revolut"]),
+           passa(PM(["Revolut"]), "vendita", None, "ln", "EUR", ["SEPA"]),
+           passa(PM(["Revolut"]), "acquisto", None, "ln", "EUR", []),
+           passa(PM(["Revolut"]), "barattozon", None, "ln", "EUR", ["Contanti al tabacchino"])])
+    prova("...i metodi si rileggono nell'ordine del catalogo, lo sconosciuto si perde, nessuno = tutti",
+          [["SEPA", "Revolut"], [], []],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_metodi": v})["metodi"]
+           for v in ("|Revolut|x|SEPA|", "|x|", None)])
     prova("spento non passa niente; acceso passa il tipo scelto e non gli altri",
           [False, True, False],
           [passa(P(False, ["vendita"], ""), "vendita", 9), passa(P(True, ["vendita"], ""), "vendita", None),
@@ -120789,18 +120812,36 @@ def prove_avvisi_nuovi_ordini():
     righe = [{"tipo": "vendita", "conv": 3.0, "euro": "50,00 €", "metodi": "SEPA"},
              {"tipo": "vendita", "conv": -1.0, "euro": "20,00 €", "metodi": "Revolut"},
              {"tipo": "barattozon", "conv": None, "euro": "30,00 €", "metodi": "Contanti al tabacchino"}]
-    prova("il messaggio raggruppato: quanti per tipo, il piu' conveniente per lui, il tocco che apre il libro",
-          "🔔 <b>3 nuovi ordini nel libro P2P</b>\nvendita BTC: 2 · Barattozon: 1\n"
-          "Il più conveniente per te: vendita BTC da 50,00 € via SEPA, 3% più conveniente" + LINK,
+    # (18 nov 2026, cantiere vetrina-pulita; un utente: «Non sempre e' segnato
+    # se e' un buy o un sell») UNA RIGA PER ORDINE, col lato di chi LEGGE —
+    # le parole dei tab del libro — davanti a tutto
+    prova("il messaggio raggruppato: quanti per lato (di chi legge), una riga per ordine col "
+          "suo «Compra BTC», la cifra, i metodi e la convenienza, e il tocco che apre il libro",
+          "🔔 <b>3 nuovi ordini nel libro P2P</b>\n🟢 Compra BTC: 3\n\n"
+          "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente\n"
+          "🟢 <b>Compra BTC</b> · 20,00 € · Revolut · 1% meno conveniente\n"
+          "🟢 <b>Compra BTC</b> con Barattozon · 30,00 €" + LINK,
           testo(righe))
-    prova("uno solo: al singolare, «Per te», e a zero «al prezzo di mercato»",
-          "🔔 <b>1 nuovo ordine nel libro P2P</b>\nacquisto BTC: 1\n"
-          "Per te: acquisto BTC da 10,00 € via SEPA, al prezzo di mercato" + LINK,
+    prova("uno solo: al singolare, senza il conto, e a zero «al prezzo di mercato»; l'ordine di chi "
+          "COMPRA e' un «Vendi BTC» per chi legge",
+          "🔔 <b>1 nuovo ordine nel libro P2P</b>\n\n"
+          "🔴 <b>Vendi BTC</b> · 10,00 € · SEPA · al prezzo di mercato" + LINK,
           testo([{"tipo": "acquisto", "conv": 0.0, "euro": "10,00 €", "metodi": "SEPA"}]))
-    prova("senza una convenienza nota la riga manca, e il metodo si scappa",
+    prova("senza una convenienza nota la riga non la dice, e il metodo si scappa",
           (False, True),
-          ("Per te" in testo([{"tipo": "barattozon", "conv": None, "euro": "", "metodi": ""}]),
-           "via &lt;b&gt;" in testo([{"tipo": "vendita", "conv": 1.0, "euro": "", "metodi": "<b>"}])))
+          ("conveniente" in testo([{"tipo": "barattozon", "conv": None, "euro": "", "metodi": ""}])
+           or "mercato" in testo([{"tipo": "barattozon", "conv": None, "euro": "", "metodi": ""}]),
+           "· &lt;b&gt; ·" in testo([{"tipo": "vendita", "conv": 1.0, "euro": "", "metodi": "<b>"}])))
+    prova("IL LATO VINCE SUL TIPO: un Barattozon di chi compra e' un «Vendi BTC», e una riga di "
+          "ieri senza lato lo prende dal tipo; i due lati si contano",
+          ("🔴 <b>Vendi BTC</b> con Barattozon", "🟢 Compra BTC: 1 · 🔴 Vendi BTC: 1"),
+          tuple(testo([{"tipo": "barattozon", "lato": "buy", "conv": None, "euro": "", "metodi": ""},
+                       {"tipo": "vendita", "conv": None, "euro": "", "metodi": ""}]).split("\n")[i]
+                for i in (3, 1)))
+    sette = testo([{"tipo": "vendita", "conv": None, "euro": f"{n},00 €", "metodi": ""} for n in range(1, 8)])
+    prova("oltre cinque righe un «…e altri N»: il messaggio resta un avviso, non il libro",
+          (5, True, False),
+          (sette.count("🟢 <b>Compra BTC</b>"), "\n…e altri 2\n\n<a " in sette, "6,00 €" in sette))
     nuovi_f = amb["_nuovi_dalla_foto_p2p"]
 
     def ev(d, quando, s="pending", k="sell", pm=("SEPA",), amt="0", fa=("50",), premium="0"):
@@ -120861,10 +120902,15 @@ def prove_avvisi_nuovi_ordini():
     vivi = {"o1", "o2", "o3", "o4", "o5"}
     avvisi = scarica(con, T, vivi)
     prova("il primo messaggio parte subito, UNO per persona, con le sue righe",
-          [(111, "🔔 <b>1 nuovo ordine nel libro P2P</b>\nvendita BTC: 1\n"
-                 "Per te: vendita BTC da 50,00 € via SEPA, 3% più conveniente" + LINK),
-           (222, "🔔 <b>5 nuovi ordini nel libro P2P</b>\nvendita BTC: 3 · acquisto BTC: 1 · Barattozon: 1\n"
-                 "Il più conveniente per te: vendita BTC da 50,00 € via SEPA, 3% più conveniente" + LINK)],
+          [(111, "🔔 <b>1 nuovo ordine nel libro P2P</b>\n\n"
+                 "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente" + LINK),
+           (222, "🔔 <b>5 nuovi ordini nel libro P2P</b>\n🟢 Compra BTC: 4 · 🔴 Vendi BTC: 1\n\n"
+                 "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente\n"
+                 "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% meno conveniente\n"
+                 "🔴 <b>Vendi BTC</b> · 50,00 € · SEPA · 1% più conveniente\n"
+                 "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente\n"
+                 # il lato del Barattozon arriva dalla coda (18 nov 2026)
+                 "🟢 <b>Compra BTC</b> con Barattozon · 30,00 € · 3% più conveniente" + LINK)],
           [(tg, t) for tg, t, _ in avvisi])
     prova("...e le righe restano timbrate con l'ora del messaggio", [(T, 1), (T, 5)],
           [tuple(r) for r in con.execute(
@@ -120879,8 +120925,8 @@ def prove_avvisi_nuovi_ordini():
     prova("RAGGRUPPATI: dentro la finestra niente, alla finestra UN messaggio con tutt'e due (e il migliore)",
           ([], [], [(111, 2), (222, 2)], True),
           ([tg for tg, _, _ in presto], [tg for tg, _, _ in meta],
-           [(tg, t.count("via SEPA") and int(t[t.index("<b>") + 3])) for tg, t, _ in tardi],
-           all("Il più conveniente per te: vendita BTC da 50,00 € via SEPA, 5% più conveniente" in t
+           [(tg, t.count("· SEPA ·") and int(t[t.index("<b>") + 3])) for tg, t, _ in tardi],
+           all("🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 5% più conveniente" in t
                for _, t, _ in tardi)))
     prova("...e un ordine gia' visto non si riaccoda nemmeno dopo il messaggio", 0,
           accoda(con, [ev("o1", T + 1000, amt="51500")], CAMBIO, T + 1000))
@@ -120953,13 +120999,35 @@ def prove_avvisi_nuovi_ordini():
             or amb["_accoda_onchain_nuovo_p2p"](dict(oc_riga, ordine="bar-onchain-ef56", stato="preso"),
                                                 CAMBIO, T))))
     msg2 = dict((tg, t) for tg, t, _ in scarica(con2, T, {"m1", "bar-onchain-ab12"}))
-    prova("...il messaggio dice quanti sono on-chain, e il migliore se e' on-chain; "
-          "senza on-chain e' quello di ieri",
+    # (18 nov 2026, vetrina-pulita) l'on-chain lo dice la riga del suo ordine
+    prova("...la riga di un ordine on-chain lo dice («₿ on-chain»), quella del Lightning no; "
+          "senza on-chain non c'e' la parola",
           (True, True, True, False),
-          ("\n₿ On-chain: 1 · ⚡ Lightning: 1\n" in msg2[601],
-           "\n₿ On-chain: 1\nPer te: vendita BTC on-chain da 50,00 € via SEPA, 3% più conveniente" in msg2[602],
-           msg2[603].startswith("🔔 <b>1 nuovo ordine nel libro P2P</b>\nvendita BTC: 1\nPer te: vendita BTC da"),
-           "On-chain" in msg2[603]))
+          ("🟢 <b>Compra BTC</b> · 50,00 € · SEPA · ₿ on-chain · 3% più conveniente" in msg2[601]
+           and "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente" in msg2[601],
+           "\n\n🟢 <b>Compra BTC</b> · 50,00 € · SEPA · ₿ on-chain · 3% più conveniente" in msg2[602],
+           msg2[603].startswith("🔔 <b>1 nuovo ordine nel libro P2P</b>\n\n🟢 <b>Compra BTC</b> · 50,00 €"),
+           "on-chain" in msg2[603]))
+    # IL METODO NELLA CODA (18 nov 2026, vetrina-pulita): un database con la
+    # colonna; 701 vuole solo Revolut, 702 tutti
+    con3 = sqlite3.connect(":memory:")
+    con3.row_factory = sqlite3.Row
+    con3.executescript(schema.replace("avvisi_nuovi_soglia TEXT DEFAULT '');",
+                                      "avvisi_nuovi_soglia TEXT DEFAULT '', "
+                                      "avvisi_nuovi_rete TEXT DEFAULT '', "
+                                      "avvisi_nuovi_valuta TEXT DEFAULT '', "
+                                      "avvisi_nuovi_metodi TEXT DEFAULT '');"))
+    con3.execute("INSERT INTO utenti VALUES(701,1,1,'','','','','|Revolut|')")
+    con3.execute("INSERT INTO utenti VALUES(702,1,1,'','','','','')")
+    con3.commit()
+    accoda(con3, [ev("r1", T, amt="51500"), ev("r2", T, pm=("Revolut",), amt="51500")],
+           CAMBIO, T)
+    prova("IL METODO NELLA CODA: a chi vuole solo Revolut il solo ordine che lo accetta, a chi "
+          "vuole tutti tutt'e due; e la riga porta il lato del libro",
+          ({701: ["r2"], 702: ["r1", "r2"]}, {"sell"}),
+          ({tg: sorted(r[0] for r in con3.execute(
+              "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (701, 702)},
+           {r[0] for r in con3.execute("SELECT lato FROM p2p_avvisi_nuovi")}))
     prova("il prefisso degli on-chain e' lo stesso del nome che nasce alla pubblica", True,
           'P2P_ONCHAIN_PREFISSO = "bar-onchain-"' in src
           and '.startswith("bar-onchain-")' in pezzo("_avviso_onchain_p2p"))
@@ -121062,6 +121130,7 @@ def prove_avvisi_nuovi_ordini():
         + pezzo_js(m, "function scegliSogliaAvvisiNuoviP2P(s){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function scegliReteAvvisiNuoviP2P(r){", "\n}\n") + "\n}\n"
         + pezzo_js(m, "function scegliValutaAvvisiNuoviP2P(v){", "\n}\n") + "\n}\n"
+        + pezzo_js(m, "function scegliMetodoAvvisiNuoviP2P(n){", "\n}\n") + "\n}\n"
         + r"""
 const out = {};
 const attive = h => (h.match(/class="tema-pill active" aria-pressed="true" onclick="([^"]+)"/g) || [])
@@ -121129,6 +121198,21 @@ out.valuta = [senzaUsdt.indexOf('>Valuta<') < 0, conUsdt.indexOf('<div class="se
   attive(conUsdt).filter(a => /Valuta/.test(a)), INVII.slice(),
   normalizzaAvvisiNuoviP2P({valuta: 'btc'}).valuta, normalizzaAvvisiNuoviP2P({valuta: 'usdt'}).valuta];
 delete globalThis.usdtVistoP2P;
+// I METODI (18 nov 2026, cantiere vetrina-pulita): «Tutti» e' la lista
+// vuota, ogni chip si accende da sola, i due svizzeri solo coi franchi
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', metodi: ['Revolut', 'x', 'SEPA']});
+const conMetodi = contenutoAvvisiNuoviP2P();
+INVII = []; scegliMetodoAvvisiNuoviP2P(5); scegliMetodoAvvisiNuoviP2P(1); scegliMetodoAvvisiNuoviP2P('');
+scegliMetodoAvvisiNuoviP2P(99);
+globalThis.chfVistoP2P = () => true;
+const conChf = contenutoAvvisiNuoviP2P();
+delete globalThis.chfVistoP2P;
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: ''});
+out.metodi = [myAvvisiNuoviP2P.metodi, normalizzaAvvisiNuoviP2P({metodi: ['Revolut', 'x', 'SEPA']}).metodi,
+  conMetodi.indexOf('<div class="section-label">Metodo di pagamento</div>') >= 0,
+  attive(conMetodi).filter(a => /Metodo/.test(a)), INVII.slice(),
+  attive(contenutoAvvisiNuoviP2P()).filter(a => /Metodo/.test(a)),
+  [conMetodi.indexOf('>TWINT<') < 0, conChf.indexOf('>TWINT<') >= 0, conChf.indexOf('>Bonifico CH<') >= 0]];
 p2pLeve.avvisiNuovi = false;
 out.fuoriCasa = [campanellaP2P(), rigaAvvisiNuoviP2P()];
 p2pLeve.avvisiNuovi = true; DEMO = true;
@@ -121143,8 +121227,10 @@ console.log(JSON.stringify(out));
         return
     prova("LE DUE PORTE MOSTRANO LE STESSE PREFERENZE: la riga del cassetto e' il corpo del foglio", True,
           out["stessi"])
-    prova("«solo vendita, almeno 2% meglio»: accese la chip Vendita BTC, «Con un limite» e «Almeno 2% meglio»",
-          ["scegliTipoAvvisiNuoviP2P('vendita')", "scegliSogliaAvvisiNuoviP2P('2')", "scegliSogliaAvvisiNuoviP2P('2')"],
+    prova("«solo vendita, almeno 2% meglio»: accese la chip Vendita BTC, «Con un limite» e «Almeno 2% meglio»"
+          " (e dei metodi «Tutti», 18 nov 2026)",
+          ["scegliTipoAvvisiNuoviP2P('vendita')", "scegliMetodoAvvisiNuoviP2P('')",
+           "scegliSogliaAvvisiNuoviP2P('2')", "scegliSogliaAvvisiNuoviP2P('2')"],
           out["attive"])
     prova("...l'interruttore dice «Attivi», la campana e' PIENA e arancio", (True, [True, True, True]),
           (out["interruttore"], out["campana"]))
@@ -121165,15 +121251,18 @@ console.log(JSON.stringify(out));
           (out["accesoTocca"], len(out["invii"])))
     prova("con «tutti»: le tre chip dei tipi e «Tutti» accese, nessuna chip di soglia",
           (["scegliTipoAvvisiNuoviP2P('vendita')", "scegliTipoAvvisiNuoviP2P('acquisto')",
-            "scegliTipoAvvisiNuoviP2P('barattozon')", "scegliSogliaAvvisiNuoviP2P('')"], True),
+            "scegliTipoAvvisiNuoviP2P('barattozon')", "scegliMetodoAvvisiNuoviP2P('')",
+            "scegliSogliaAvvisiNuoviP2P('')"], True),
           (out["tutti"], out["senzaChip"]))
     prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», la campana VUOTA", [True, True, True, True],
           out["spento"])
     # (lo stato di serie ha la soglia «tutti»: le chip visibili sono le tre
     # dei tipi, «Tutti» e «Con un limite» — le sei della soglia
     # compaiono solo con la seconda; dal vivo, a soglia scelta, 8 su 8)
-    prova("...e da spento le scelte NON si toccano: cinque chip, cinque `disabled`, il corpo "
-          "aria-disabled, l'interruttore no", [5, 5, True, True], out["spentoChip"])
+    # (18 nov 2026, vetrina-pulita) ...piu' i metodi: «Tutti» e gli otto in
+    # euro (i due svizzeri solo a chi vede i franchi) = 14
+    prova("...e da spento le scelte NON si toccano: quattordici chip, quattordici `disabled`, il corpo "
+          "aria-disabled, l'interruttore no", [14, 14, True, True], out["spentoChip"])
     prova("...e un gesto che arrivasse lo stesso non chiama il server", 0, out["inviiSpento"])
     prova("FINO A 5% PEGGIO: accese «Con un limite» e «Fino a 5% peggio», e le sei chip in fila dalla piu' larga",
           [["scegliSogliaAvvisiNuoviP2P('-5')", "scegliSogliaAvvisiNuoviP2P('-5')"],
@@ -121182,14 +121271,15 @@ console.log(JSON.stringify(out));
     prova("...e da «Tutti» il tocco su «Con un limite» parte da «A prezzo di mercato o meglio», non dal −10",
           "scegliSogliaAvvisiNuoviP2P('0')", out["limiteParte"])
     prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle sei = «tutti»",
-          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": "", "valuta": ""},
+          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": "", "valuta": "",
+           "metodi": []},
           out["normalizza"])
     prova("LA RETE: la sezione solo a chi l'on-chain lo vede, accesa la scelta salvata, il "
           "gesto manda la rete (una sconosciuta vale «tutte»), e il normalizzatore tiene le due",
           [True, True, ["scegliReteAvvisiNuoviP2P('onchain')"], [{"rete": "ln"}, {"rete": ""}], "", "ln"],
           out["rete"])
     prova("...e il gesto la porta al server, coi nomi del server", True,
-          "rete: voluto.rete || '', valuta: voluto.valuta || ''})});" in m
+          "rete: voluto.rete || '', valuta: voluto.valuta || ''," in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_RETI = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_RETI = ["))])
           == ["", "onchain", "ln"]
@@ -121200,22 +121290,41 @@ console.log(JSON.stringify(out));
            "", "USDT"],
           out["valuta"])
     prova("...e il gesto la porta al server, coi nomi del server, che la salva e la rilegge", True,
-          "valuta: voluto.valuta || ''})});" in m
+          "valuta: voluto.valuta || ''," in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_VALUTE = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_VALUTE = ["))])
           == ["", "EUR", "CHF", "USDT"]  # (16 nov 2026) il franco dopo l'euro
           and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")' in src
           and '"avvisi_nuovi_valuta TEXT DEFAULT \'\'",' in src
-          and "avvisi_nuovi_rete=?, avvisi_nuovi_valuta=? " in src)
+          and "avvisi_nuovi_rete=?, avvisi_nuovi_valuta=?, " in src)
     prova("...e i due giri la passano al giudice: la valuta dell'ordine Lightning, "
           "USDT o EUR per l'on-chain; e a chi gli USDT non li vede la scelta vale «tutte»",
           (True, True, True),
-          ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat)' in src,
+          ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,' in src,
            # (16 nov 2026) USDT, CHF o EUR: il giudice unico della valuta on-chain
-           'p2p_onchain_valuta(o)):' in pezzo("_accoda_onchain_nuovo_p2p"),
+           'p2p_onchain_valuta(o), _metodi_libro(metodi)):' in pezzo("_accoda_onchain_nuovo_p2p"),
            # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» a chi i franchi li vede
            'vista = p2p_usdt_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
            and 'vista = p2p_chf_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")))
+    # I METODI (18 nov 2026, cantiere vetrina-pulita; un utente: «filtrare le
+    # notifiche del bot per buy e per sell oltre che per tipo di pagamento»)
+    prova("I METODI: «Tutti» di serie, il normalizzatore tiene l'ordine del catalogo e perde "
+          "lo sconosciuto, la sezione c'e', accesi i due scelti, i gesti accendono, spengono, "
+          "tornano a «Tutti» e ignorano un numero fuori catalogo; i due svizzeri solo coi franchi",
+          [[], ["SEPA", "Revolut"], True,
+           ["scegliMetodoAvvisiNuoviP2P(1)", "scegliMetodoAvvisiNuoviP2P(3)"],
+           [{"metodi": ["SEPA", "Revolut", "PayPal"]}, {"metodi": ["Revolut"]}, {"metodi": []}],
+           ["scegliMetodoAvvisiNuoviP2P('')"], [True, True, True]],
+          out["metodi"])
+    metodi_cli = re.findall(r"'([^']+)'", m[m.index("const P2P_AVVISI_METODI = ["):
+                                          m.index("];", m.index("const P2P_AVVISI_METODI = ["))])
+    prova("...le chip dei metodi sono le stesse nel server e nel client, nello stesso ordine",
+          list(eval(re.search(r"\nMETODI_AVVISI_NUOVI_P2P = (\([^)]*\))", src).group(1))), metodi_cli)
+    prova("...e il gesto li porta al server, che li salva nella sua colonna e li rilegge", True,
+          "metodi: voluto.metodi || []})});" in m
+          and '"avvisi_nuovi_metodi TEXT DEFAULT \'\'",' in src
+          and "avvisi_nuovi_metodi=? WHERE tg_id=?" in src
+          and '"avvisi_nuovi_valuta": valuta, "avvisi_nuovi_metodi": metodi_txt})}' in src)
     prova("a leva globale spenta, in demo e da anonimi: niente campana e niente riga",
           [["", ""], ["", ""], ["", ""]], [out["fuoriCasa"], out["demo"], out["anonimo"]])
 
@@ -186034,11 +186143,13 @@ def prove_ordine_in_pausa():
     def riga(euro):
         return testo([{"tipo": "vendita", "conv": -8.0, "euro": euro,
                        "metodi": "SEPA Instant, Revolut"}]).split("\n")[2]
-    prova("«DA DA»: l'intervallo porta gia' il suo «da», la cifra sola lo riceve, e senza "
+    # (18 nov 2026, vetrina-pulita) la riga per ordine dice la cifra com'e':
+    # l'intervallo col suo «da», la cifra sola senza, e senza cifra niente
+    prova("«DA DA»: l'intervallo porta gia' il suo «da», la cifra sola non ne prende uno, e senza "
           "cifra non c'e'",
-          ["Per te: vendita BTC da 50,00 a 100,00 € via SEPA Instant, Revolut, 8% meno conveniente",
-           "Per te: vendita BTC da 50,00 € via SEPA Instant, Revolut, 8% meno conveniente",
-           "Per te: vendita BTC via SEPA Instant, Revolut, 8% meno conveniente"],
+          ["🟢 <b>Compra BTC</b> · da 50,00 a 100,00 € · SEPA Instant, Revolut · 8% meno conveniente",
+           "🟢 <b>Compra BTC</b> · 50,00 € · SEPA Instant, Revolut · 8% meno conveniente",
+           "🟢 <b>Compra BTC</b> · SEPA Instant, Revolut · 8% meno conveniente"],
           [riga("da 50,00 a 100,00 €"), riga("50,00 €"), riga("")])
 
     FERMI = {}
@@ -195297,10 +195408,15 @@ def prove_venduto_canale():
 
     cartella = _tfVC.mkdtemp(prefix="venduto-canale-")
 
-    def banco(sorgente_venduto, sorgente_rimuovi, con_podcast=True):
+    def banco(sorgente_venduto, sorgente_rimuovi, con_podcast=True, pulisce=False,
+              esito=None, righe_dopo=None):
         """Un database nuovo, un annuncio coi suoi tre post, e le due
         funzioni eseguite da `sorgente_*`. Torna (chiamate, stampe, riga)
-        dopo promo_venduto e promo_rimuovi."""
+        dopo promo_venduto e promo_rimuovi.
+        (18 nov 2026, vetrina-pulita) `pulisce` e' la leva
+        VETRINA_SI_PULISCE (spenta qui: il mondo di prima), `esito` cosa
+        risponde Telegram a (metodo, canale), e in `righe_dopo` (una lista)
+        finisce la riga com'e' DOPO il venduto."""
         percorso = os.path.join(cartella, f"b{len(os.listdir(cartella))}.db")
         con = _sqVC.connect(percorso)
         colonne = ("id INTEGER PRIMARY KEY, venditore_id INTEGER, titolo TEXT, "
@@ -195334,7 +195450,7 @@ def prove_venduto_canale():
 
         async def bot_api(metodo, dati):
             chiamate.append((metodo, dati["chat_id"], dati["message_id"]))
-            return {"ok": True}
+            return esito(metodo, dati["chat_id"]) if esito else {"ok": True}
 
         async def cambio():
             return 100_000.0
@@ -195351,6 +195467,7 @@ def prove_venduto_canale():
                "canale_bitcoin_podcast": lambda: "@podcast",
                "_NOSTR": ("chiave", "pub"), "_spedisci_ai_relay": relay,
                "firma_evento": lambda kind, tag, testo: (kind, tag[0][1]),
+               "VETRINA_SI_PULISCE": pulisce,
                "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
         for nome in ("_post_vetrina", "_post_podcast"):
             exec(pezzo(nome), amb)
@@ -195358,6 +195475,10 @@ def prove_venduto_canale():
         exec(sorgente_rimuovi, amb)
         _asVC.run(amb["promo_venduto"](1))
         dopo_venduto = list(chiamate)
+        if righe_dopo is not None:
+            c = db()
+            righe_dopo.append(dict(c.execute("SELECT * FROM annunci WHERE id=1").fetchone()))
+            c.close()
         _asVC.run(amb["promo_rimuovi"](1))
         c = db()
         r = dict(c.execute("SELECT * FROM annunci WHERE id=1").fetchone())
@@ -195388,6 +195509,52 @@ def prove_venduto_canale():
     # dei post nella sua SELECT, la vetrina come il podcast, e la
     # migrazione d'avvio le aggiunge prima che giri qualunque cosa)
 
+    # LA VETRINA CHE SI PULISCE (18 nov 2026, cantiere vetrina-pulita; un
+    # utente: «spariscano quando sono scaduti o presi»): a leva accesa il
+    # venduto CANCELLA il post invece di riscriverlo, e la colonna torna a 0
+    POST3 = lambda r: (r["post_canale_id"], r["post_vetrina_id"], r["post_bitcoin_podcast_id"])
+    dopo = []
+    ven, rim, stampe, riga = banco(venduto, rimuovi, pulisce=True, righe_dopo=dopo)
+    prova("LEVA ACCESA: venduto, i tre post si CANCELLANO (niente ✅), le tre colonne a zero, "
+          "e il ritiro dopo manda solo il kind 5 della nota",
+          ([("deleteMessage", "@nostro", 11), ("deleteMessage", "@vetrina", 22),
+            ("deleteMessage", "@podcast", 33)], (0, 0, 0), [("kind5", 5, "abc")], []),
+          (ven, POST3(dopo[0]), rim, stampe))
+    dopo = []
+    ven, rim, stampe, riga = banco(
+        venduto, rimuovi, pulisce=True, righe_dopo=dopo,
+        esito=lambda m, c: {"ok": m != "deleteMessage" or c == "@nostro",
+                            "description": "Bad Request: message can't be deleted"})
+    prova("...oltre le 48 ore Telegram non cancella: quel post prende il ✅ come prima e tiene "
+          "la sua colonna; quello cancellato no",
+          ([("deleteMessage", "@nostro", 11), ("deleteMessage", "@vetrina", 22),
+            ("deleteMessage", "@podcast", 33), ("editMessageText", "@vetrina", 22),
+            ("editMessageText", "@podcast", 33)], (0, 22, 33)),
+          (ven, POST3(dopo[0])))
+    dopo = []
+    ven, rim, stampe, riga = banco(
+        venduto, rimuovi, pulisce=True, righe_dopo=dopo,
+        esito=lambda m, c: {"ok": False, "description": "Bad Request: message to delete not found"})
+    prova("...un post gia' tolto a mano («not found») vale come tolto: niente ✅ da scrivere",
+          ([("deleteMessage", "@nostro", 11), ("deleteMessage", "@vetrina", 22),
+            ("deleteMessage", "@podcast", 33)], (0, 0, 0)),
+          (ven, POST3(dopo[0])))
+    ven, _rim, _st, _r = banco(venduto, rimuovi, pulisce=True,
+                               esito=lambda m, c: None)
+    prova("...e un Telegram muto (None) non perde il post: si tenta il ✅ di prima",
+          ["deleteMessage"] * 3 + ["editMessageText", "editMessageCaption"] * 3,
+          [x[0] for x in ven])
+    _rim_ven = banco(venduto.replace("promo_venduto(annuncio_id: int, venduto: bool = True)",
+                                     "promo_venduto(annuncio_id: int, venduto: bool = False)"),
+                     rimuovi, pulisce=True)[0]
+    prova("...il ritorno in vendita (venduto=False) resta quello di prima: il post si riscrive",
+          [("editMessageText", "@nostro", 11), ("editMessageText", "@vetrina", 22),
+           ("editMessageText", "@podcast", 33)], _rim_ven)
+    prova("la leva: accesa di serie, nel pannello e nel config d'esempio", True,
+          "except ImportError:\n    VETRINA_SI_PULISCE = True\n" in _SORGENTE
+          and '_leva("I canali si puliscono da soli", "VETRINA_SI_PULISCE",' in _SORGENTE
+          and "\nVETRINA_SI_PULISCE = True\n" in open("config_esempio.py", encoding="utf-8").read())
+
     # LA CONTROPROVA: la riga di prima del 17 ott, rimessa al suo posto
     vecchio = lambda s: s.replace("_post_podcast(a)",
                                   'a.get("post_bitcoin_podcast_id")')
@@ -195413,6 +195580,194 @@ def prove_venduto_canale():
         prova(f"{nome}: la riga del «saltato» esce con flush=True", True,
               bool(re.search(r'saltato: \{e\}",\s*flush=True\)',
                              codice(pezzo(nome)))))
+
+
+def prove_vetrina_pulita():
+    """LA VETRINA CHE SI PULISCE DA SOLA (18 nov 2026, cantiere
+    vetrina-pulita; un utente: «Avrebbe senso mettere i messaggi effimeri
+    per gli annunci di Barattolo Vetrina in modo tale che spariscano
+    quando sono scaduti o presi?», Andrea: «Sì, aprila»).
+
+    Il server ricorda dove e' uscito ogni post di un ordine P2P
+    (`post_p2p_canale`) e lo toglie quando l'ordine esce dal libro: per
+    parola di mostrod (preso, annullato, scaduto) o perche' la fotografia
+    del libro lo dice non piu' `pending` o scaduto. SOLO PROVE IN
+    POSITIVO: un ordine che la fotografia non conosce resta. Oltre le 48
+    ore Telegram non cancella, e il post si riscrive. I post nati col
+    nome provvisorio si collegano all'ordine dichiarato da chi li ha
+    pubblicati. Qui le funzioni VERE girano su sqlite, con `bot_api` di
+    cartone."""
+    print("\n[la vetrina che si pulisce: i post P2P tolti dai canali]")
+    import asyncio as _asVP
+    import sqlite3 as _sqVP
+    import tempfile as _tfVP
+    src = _SORGENTE
+
+    def ev(d, s="pending", scade=0):
+        tags = [["d", d], ["s", s]]
+        if scade:
+            tags.append(["expires_at", str(scade)])
+        return {"kind": 38383, "created_at": 1, "tags": tags}
+
+    # --- 1) IL GIUDICE, PURO --------------------------------------------
+    amb = {}
+    for f in ("_tag_evento_p2p", "_post_p2p_da_ritirare"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    giudice = amb["_post_p2p_da_ritirare"]
+    T = 2_000_000_000
+    ultimi = {"preso": ev("preso", "in-progress"), "vivo": ev("vivo"),
+              "scaduto": ev("scaduto", scade=T - 1), "fra-poco": ev("fra-poco", scade=T + 60),
+              "annullato": ev("annullato", "canceled")}
+    prova("IL GIUDICE: via il preso, l'annullato, lo scaduto (anche se ancora «pending») e il "
+          "tolto per parola di mostrod; restano il vivo, quello che scade fra poco e quello che "
+          "la fotografia non conosce",
+          {"preso", "scaduto", "annullato", "detto"},
+          giudice(["preso", "vivo", "scaduto", "fra-poco", "annullato", "ignoto", "detto", ""],
+                  ultimi, {"detto": T - 5}, T))
+    rotto = _senza_prosa(pezzo("_post_p2p_da_ritirare")).replace(
+        "        if not ev:\n            continue\n",
+        "        if not ev:\n            fuori.add(o)\n            continue\n")
+    amb_r = {"_tag_evento_p2p": amb["_tag_evento_p2p"]}
+    exec(rotto, amb_r)
+    prova("controprova: un giudice che toglie anche l'ordine ignoto svuoterebbe i canali al primo "
+          "relay muto — e la prova lo vede", True,
+          "ignoto" in amb_r["_post_p2p_da_ritirare"](["ignoto"], {}, {}, T))
+
+    # --- 2) IL BANCO: sqlite vero, Telegram di cartone -------------------
+    cartella = _tfVP.mkdtemp(prefix="vetrina-pulita-")
+
+    def banco(leva=True, esito=None):
+        percorso = os.path.join(cartella, f"b{len(os.listdir(cartella))}.db")
+        con = _sqVP.connect(percorso)
+        i = src.index("CREATE TABLE IF NOT EXISTS post_p2p_canale(")
+        fine = "ON post_p2p_canale(ordine);"
+        con.executescript(src[i:src.index(fine, i) + len(fine)] +
+                          "\nCREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER, "
+                          "creato INTEGER, maker INTEGER DEFAULT 0);")
+        con.commit()
+        con.close()
+
+        def db():
+            c = _sqVP.connect(percorso)
+            c.row_factory = _sqVP.Row
+            return c
+        chiamate, stampe = [], []
+
+        async def bot_api(metodo, dati):
+            chiamate.append((metodo, dati["chat_id"], dati["message_id"],
+                             dati.get("text", "")))
+            return esito(metodo) if esito else {"ok": True}
+        orologio = {"t": T}
+        a = {"db": db, "bot_api": bot_api, "VETRINA_SI_PULISCE": leva, "asyncio": _asVP,
+             "time": type("t", (), {"time": staticmethod(lambda: orologio["t"])}),
+             "_P2P_FOTO": {"ultimi": {}, "via": {}, "quando": 0},
+             "print": lambda *x, **k: stampe.append(" ".join(map(str, x)))}
+        for riga in ("P2P_POST_CANALE_COLLEGA_S = ", "P2P_POST_CANALE_MEMORIA_S = "):
+            j = src.index("\n" + riga) + 1
+            exec(src[j:src.index("\n", j)].split("   #")[0], a)
+        j = src.index("\nTESTO_POST_P2P_TOLTO = ") + 1
+        exec(src[j:src.index("\n_TASK_POST_P2P", j)], a)
+        a["_tag_evento_p2p"] = amb["_tag_evento_p2p"]
+        a["_post_p2p_da_ritirare"] = giudice
+        for f in ("_segna_post_p2p", "_collega_post_p2p"):
+            exec(_senza_prosa(pezzo(f)), a)
+        for f in ("ritira_post_p2p", "_giro_post_p2p_canale"):
+            exec("async " + _senza_prosa(pezzo(f)), a)
+        return a, chiamate, stampe, orologio, db
+
+    def post(db):
+        c = db()
+        r = sorted(tuple(x) for x in c.execute(
+            "SELECT canale, message_id, ordine FROM post_p2p_canale"))
+        c.close()
+        return r
+
+    a, chiamate, stampe, orologio, db = banco()
+    a["_segna_post_p2p"]([("@casa", 11), ("@subito", 12), ("@podcast", 13)], "aaaa1111", 111, T)
+    a["_segna_post_p2p"]([("@casa", 21)], "", 222, T)            # nome provvisorio
+    a["_segna_post_p2p"]([], "cccc3333", 111, T)                  # niente uscito: niente
+    prova("i post si ricordano uno per canale, e quello col nome provvisorio senza ordine",
+          [("@casa", 11, "aaaa1111"), ("@casa", 21, ""), ("@podcast", 13, "aaaa1111"),
+           ("@subito", 12, "aaaa1111")], post(db))
+    c = db()
+    c.execute("INSERT INTO p2p_ordini VALUES('bbbb2222', 222, ?, 1)", (T + 60,))
+    c.execute("INSERT INTO p2p_ordini VALUES('zzzz9999', 222, ?, 1)", (T + 5000,))  # troppo tardi
+    c.execute("INSERT INTO p2p_ordini VALUES('yyyy8888', 333, ?, 1)", (T + 30,))    # di un altro
+    c.commit()
+    c.close()
+    a["_P2P_FOTO"].update(quando=T, ultimi={"aaaa1111": ev("aaaa1111", "in-progress"),
+                                            "bbbb2222": ev("bbbb2222")})
+    orologio["t"] = T + 100
+    _asVP.run(a["_giro_post_p2p_canale"]())
+    prova("IL GIRO: il provvisorio prende l'ordine dichiarato da chi l'ha pubblicato nei minuti "
+          "attorno (non uno troppo tardi, non di un altro); i tre post dell'ordine preso si "
+          "cancellano, quello dell'ordine vivo resta",
+          ([("deleteMessage", "@casa", 11, ""), ("deleteMessage", "@podcast", 13, ""),
+            ("deleteMessage", "@subito", 12, "")], [("@casa", 21, "bbbb2222")]),
+          (sorted(chiamate), post(db)))
+    prova("...e il journal lo dice in una riga", ["🧹 Canali: 3 post P2P tolti (aaaa1111)"], stampe)
+
+    # LE 48 ORE: Telegram non cancella, il post si riscrive
+    a, chiamate, stampe, orologio, db = banco(
+        esito=lambda m: {"ok": m == "editMessageText",
+                         "description": "Bad Request: message can't be deleted"})
+    a["_segna_post_p2p"]([("@casa", 11)], "aaaa1111", 111, T)
+    tolti = _asVP.run(a["ritira_post_p2p"](["aaaa1111"]))
+    prova("OLTRE LE 48 ORE: la cancellazione non passa, il post si riscrive «non più disponibile», "
+          "e la riga se ne va",
+          (1, ["deleteMessage", "editMessageText"], True, []),
+          (tolti, [x[0] for x in chiamate], "non più disponibile" in chiamate[1][3], post(db)))
+    a, chiamate, stampe, orologio, db = banco(
+        esito=lambda m: {"ok": False, "description": "Bad Request: message to delete not found"})
+    a["_segna_post_p2p"]([("@casa", 11)], "aaaa1111", 111, T)
+    _asVP.run(a["ritira_post_p2p"](["aaaa1111"]))
+    prova("...un post gia' tolto a mano («not found») vale come tolto, senza riscriverlo",
+          (["deleteMessage"], []), ([x[0] for x in chiamate], post(db)))
+    a, chiamate, stampe, orologio, db = banco(esito=lambda m: None)
+    a["_segna_post_p2p"]([("@casa", 11)], "aaaa1111", 111, T)
+    _asVP.run(a["ritira_post_p2p"](["aaaa1111"]))
+    prova("...un Telegram muto non fa perdere il post: la riga resta, il giro dopo ci riprova",
+          [("@casa", 11, "aaaa1111")], post(db))
+    a, chiamate, stampe, orologio, db = banco(leva=False)
+    a["_segna_post_p2p"]([("@casa", 11)], "aaaa1111", 111, T)
+    a["_P2P_FOTO"].update(quando=T, ultimi={"aaaa1111": ev("aaaa1111", "canceled")})
+    _asVP.run(a["_giro_post_p2p_canale"]())
+    _asVP.run(a["ritira_post_p2p"](["aaaa1111"]))
+    prova("LEVA SPENTA: nessun post si tocca, come prima", ([], [("@casa", 11, "aaaa1111")]),
+          (chiamate, post(db)))
+    a, chiamate, stampe, orologio, db = banco()
+    a["_segna_post_p2p"]([("@casa", 11)], "aaaa1111", 111, T)
+    a["_segna_post_p2p"]([("@casa", 12)], "", 222, T)
+    orologio["t"] = T + 8 * 86400
+    _asVP.run(a["_giro_post_p2p_canale"]())
+    prova("una settimana senza che nessuno lo dica finito: il post si dimentica, senza toccarlo",
+          ([], []), (chiamate, post(db)))
+    a, chiamate, stampe, orologio, db = banco()
+    a["_segna_post_p2p"]([("@casa", 11)], "aaaa1111", 111, T)
+    a["_P2P_FOTO"].update(quando=0, ultimi={"aaaa1111": ev("aaaa1111", "canceled")})
+    _asVP.run(a["_giro_post_p2p_canale"]())
+    prova("...e prima della prima fotografia il giro non decide niente", [], chiamate)
+
+    # --- 3) I GANCI, NEL SORGENTE ----------------------------------------
+    rotta = pezzo("annuncia_ordine_p2p_canale")
+    prova("la rotta del canale ricorda i post usciti nei tre canali, con l'id solo se buono",
+          (3, True),
+          (rotta.count("usciti.append(("),
+           '_segna_post_p2p(usciti, ordine if buono else "", user["id"],' in rotta))
+    prova("mostrod dice preso/annullato/scaduto: il post esce subito", True,
+          '_ritira_post_p2p_subito(ev.get("ordine") or "")' in pezzo("_foto_dopo_evento_p2p")
+          and set(eval(re.search(r"\nP2P_MOMENTI_FUORI_FOTO = (\([^)]*\))", src).group(1)))
+          == {"preso", "annullato", "scaduto"})
+    prova("...e l'orologio fa il suo giro DOPO la fotografia, col suo tetto e il suo try", True,
+          "await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)" in src
+          and src.index("await asyncio.wait_for(_giro_post_p2p_canale(), P2P_PASSATA_MAX_S)")
+          > src.index("await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)\n            except"))
+    prova("la tabella ha la chiave (canale, message_id) e l'indice sull'ordine", True,
+          "        PRIMARY KEY(canale, message_id)\n    );\n"
+          "    CREATE INDEX IF NOT EXISTS idx_post_p2p_canale_ordine" in src)
+    prova("il collaudo vero sta nelle due liste della CI", (True, True),
+          ("\ncollaudo_vetrina_pulita\n" in open("ci/collaudi.txt", encoding="utf-8").read(),
+           "\ncollaudo_vetrina_pulita.py\n" in open("ci/compila.txt", encoding="utf-8").read()))
 
 
 def prove_chat_mercatino():
@@ -211787,6 +212142,7 @@ def _esce(f):
 # cambio libero), onchain (il 2-di-3 e RGB).
 CATEGORIE = {
     "p2p": """
+    vetrina_pulita
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
@@ -213047,6 +213403,7 @@ def main():
               prove_importo_copia,
               prove_bundle_bitcoin,
               prove_venduto_canale,
+              prove_vetrina_pulita,
               prove_chat_mercatino,
               prove_chat_dalla_notifica,
               prove_journal_senza_buffer,

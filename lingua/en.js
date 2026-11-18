@@ -3677,6 +3677,7 @@
   "Avvisi sugli scambi spenti: non ti scriviamo più": "Notices on trades off: we no longer write to you",
   "Vendita BTC": "BTC sale",
   "Acquisto BTC": "BTC purchase",
+  "Metodo di pagamento": "Payment method",
   "Fino a 10% peggio": "Up to 10% worse",
   "Fino a 5% peggio": "Up to 5% worse",
   "Fino a 2% peggio": "Up to 2% worse",
