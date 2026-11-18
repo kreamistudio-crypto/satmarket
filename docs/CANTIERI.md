@@ -90535,3 +90535,32 @@ adesso al posto di `chiuso_il`, timbro ignorato, memoria ignorata, regola
 della disputa saltata). DA GUARDARE dopo la promozione: la riga
 «✅ Reputazione P2P on-chain: recuperati N esiti» nel journal, e il
 contatore dei due nel profilo (atteso +2 a testa).
+
+## La Classifica Streak coi numeri: la posizione sempre scritta, la medaglia solo se il posto non è affollato (18 nov 2026, cantiere classifica-posizioni; Andrea, con lo scatto del secondo giorno, tutti con l'oro: «Perché la classifica non ha le posizioni affianco agli utenti? E poi perché vengono mostrati tutti gli utenti?», poi «Fai vedere le prime 20 persone», «Il punto 2 sono d'accordo» e, sulla scheda, «Pari merito (tutti 1°)»)
+LA CAUSA, che non era un difetto del conto: la serie è partita il 17,
+quindi il 18 erano tutti a 2 giorni, tutti 1° a pari merito; e ai primi
+tre posti la medaglia PRENDEVA IL POSTO del numero. Risultato: una
+colonna di ori senza un numero. «Tutti gli utenti» non erano tutti: sono
+quelli con la fila accesa dal secondo giorno, e il secondo giorno erano
+quasi tutti gli attivi.
+LA CORREZIONE (solo client, `serieClassificaRigaHTML(v, pari)`): il
+numero c'è SEMPRE («1°»), la medaglia gli sta accanto solo ai primi tre
+posti e solo se quel posto lo dividono al più tre persone. Il conto dei
+pari lo fa `serieClassificaHTML` sulle righe ricevute: le prime righe ci
+sono tutte, e un pari merito che parte fra i primi tre e va oltre la
+ventesima ne ha comunque più di tre in lista, quindi il conto è esatto.
+La riga «La tua posizione» (oltre la 20a) non ha mai medaglia.
+RESTANO: le prime 20 (Andrea: «Fai vedere le prime 20 persone»; avevo
+proposto 10) e il pari merito (scheda: «Pari merito (tutti 1°)»;
+SCARTATO l'ordine fra pari per ora del primo accesso del giorno:
+premierebbe chi si sveglia presto, non chi è costante, e vorrebbe una
+colonna nuova).
+PROVATO: `prove_serie_classifica` riscritte le righe attese e aggiunti il
+lancio (quattro al 1°: niente medaglie, «1°» a tutti), tre pari che la
+tengono, il conto posto per posto, un `pari` storto; controprove (tolto
+il conto dei pari, tolto il numero accanto alla medaglia, tornato il
+`map` nudo che passava l'indice come `pari`: rosse). Dal vivo sul server
+del worktree in collaudo, 375 px scuro e chiaro: con 6,6,6,4,2,2,2,2
+giorni «🥇 1°» ×3, «4°», «5°» ×4; con tutti a 2, «1°» a tutti e nessuna
+medaglia. Scatti: /mnt/project-files/serie-giorni/classifica-posizioni-oggi.png
+e classifica-posizioni-esempio.png. NON PROVATO: un telefono vero.

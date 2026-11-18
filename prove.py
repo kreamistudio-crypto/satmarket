@@ -143161,7 +143161,7 @@ def prove_volto_unico():
         # senza negozio, quindi senza chiave e senza porta
         "classifica dei giorni di fila": (
             "voltoHTML({nome: v.nome, avatar: v.avatar, ignoto: true}, 'avatar serie-cl-volto'",
-            "function serieClassificaRigaHTML(v){"),
+            "function serieClassificaRigaHTML(v, pari){"),
     }
     prova("il volto si disegna da tredici posti, ognuno col suo nome nel censimento",
           [13, [1] * 13], [fuori.count("voltoHTML("),
@@ -209468,6 +209468,10 @@ out.fuori = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9)], totale: 1, mia: n
 out.nascosto = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9)], totale: 1, mia: null, nascosto: true, minimo: 2}));
 out.vuota = testo(serieClassificaHTML({voci: [], totale: 0, mia: null, nascosto: false, minimo: 2}));
 out.rotta = [testo(serieClassificaHTML(null)), testo(serieClassificaHTML({ok: true}))];
+out.lancio = testo(serieClassificaHTML({voci: [V(1, 'Ada', 2), V(1, 'Bruno', 2), V(1, 'Carla', 2), V(1, 'Dario', 2)], totale: 4, mia: null, nascosto: false, minimo: 2}));
+out.tre_pari = testo(serieClassificaHTML({voci: [V(1, 'Ada', 5), V(1, 'Bruno', 5), V(1, 'Carla', 5), V(4, 'Dario', 2)], totale: 4, mia: null, nascosto: false, minimo: 2}));
+out.misto = testo(serieClassificaHTML({voci: [V(1, 'Ada', 9), V(2, 'Bruno', 5), V(2, 'Carla', 5), V(2, 'Dario', 5), V(2, 'Elena', 5)], totale: 5, mia: null, nascosto: false, minimo: 2}));
+out.pari_storto = [testo(serieClassificaRigaHTML(V(1, 'Ada', 9), '9<img>')), testo(serieClassificaRigaHTML(V(1, 'Ada', 9), 4)), testo(serieClassificaRigaHTML(V(2, 'Ada', 9), 0))];
 out.volto = volti[0];
 console.log(JSON.stringify(out));
 """)
@@ -209477,9 +209481,21 @@ console.log(JSON.stringify(out));
         return
     prova("la porta: niente senza serie, c'e' dal primo giorno, e dice cos'e'",
           ["", True, "🔥 Classifica Streak ›"], o.get("porta"))
-    prova("le righe: medaglia ai primi tre posti, poi il numero; il nome, «tu» "
-          "sulla propria, i giorni con la fiamma",
-          ["🥇 Ada 🔥9", "🥉 Bruno 🔥5", "4° Carla tu 🔥5", "21° — 🔥2"], o.get("righe"))
+    prova("le righe: il numero SEMPRE, la medaglia accanto ai primi tre posti; "
+          "il nome, «tu» sulla propria, i giorni con la fiamma",
+          ["🥇 1° Ada 🔥9", "🥉 3° Bruno 🔥5", "4° Carla tu 🔥5", "21° — 🔥2"], o.get("righe"))
+    prova("al lancio, tutti a pari merito (quattro al 1° posto): niente medaglie, "
+          "«1°» accanto a ognuno (18 nov 2026, dallo scatto di Andrea)",
+          True, o.get("lancio", "").startswith("1° Ada 🔥2 1° Bruno 🔥2 1° Carla 🔥2 1° Dario 🔥2 Si entra"))
+    prova("tre a pari merito la medaglia la tengono; il 4° no",
+          True, o.get("tre_pari", "").startswith(
+              "🥇 1° Ada 🔥5 🥇 1° Bruno 🔥5 🥇 1° Carla 🔥5 4° Dario 🔥2"))
+    prova("la medaglia si conta posto per posto: l'oro da solo la tiene, i "
+          "quattro al 2° no",
+          True, o.get("misto", "").startswith(
+              "🥇 1° Ada 🔥9 2° Bruno 🔥5 2° Carla 🔥5 2° Dario 🔥5 2° Elena 🔥5"))
+    prova("un conto dei pari storto vale «da solo»; quattro tolgono la medaglia",
+          ["🥇 1° Ada 🔥9", "1° Ada 🔥9", "🥈 2° Ada 🔥9"], o.get("pari_storto"))
     prova("la riga di chi guarda e' accesa, le altre no", [True, False], o.get("io"))
     prova("un nome o un numero storto non porta markup nella pagina, e una "
           "riga senza posizione o senza giorni non si disegna",
@@ -209487,12 +209503,12 @@ console.log(JSON.stringify(out));
           ["<img" in o.get("storta", "<img"), "<script" in o.get("storta", "<script"),
            o.get("storta", "").count("serie-cl-riga") == 1])
     prova("la lista piena: le righe e come uscirne",
-          "🥇 Ada 🔥9 🥈 Bruno tu 🔥5 A pari giorni la posizione è la stessa. Se non "
+          "🥇 1° Ada 🔥9 🥈 2° Bruno tu 🔥5 A pari giorni la posizione è la stessa. Se non "
           "vuoi comparire: Profilo, «Livello e titolo», «Non mostrarmi in classifica».",
           o.get("piena"))
     prova("chi sta sotto le prime vede la SUA posizione a parte, e quanti "
           "altri hanno una fila accesa (senza contare se stesso)", True,
-          o.get("sotto", "").startswith("🥇 Ada 🔥9 La tua posizione 30° Io tu 🔥2 "
+          o.get("sotto", "").startswith("🥇 1° Ada 🔥9 La tua posizione 30° Io tu 🔥2 "
                                         "E altre 29 persone hanno una fila accesa."))
     prova("...al singolare", True,
           "E un'altra persona ha una fila accesa." in o.get("uno_in_piu", ""))

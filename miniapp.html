@@ -7524,7 +7524,10 @@
   .serie-cl-riga:last-child{border-bottom:0}
   .serie-cl-riga.io{background:var(--sats-soft);border-radius:12px;
     border-bottom-color:transparent}
-  .serie-cl-riga .cl-pos{min-width:30px}
+  .serie-cl-riga .cl-pos{min-width:52px;display:flex;align-items:center;
+    gap:3px;font-size:15px;line-height:1}
+  .serie-cl-riga .cl-n{font-family:var(--mono);font-weight:800;font-size:13.5px;
+    color:var(--ink-soft)}
   .serie-cl-volto{width:34px;height:34px;font-size:14px}
   .serie-cl-nome{flex:1;min-width:0;font-size:14px;font-weight:800;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -21706,12 +21709,22 @@ function serieClassificaPortaHTML(s){
   if (!serieBusta(s)) return '';
   return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">${SERIE_FIAMMA}<span style="flex:1;min-width:0">Classifica Streak</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
 }
-function serieClassificaRigaHTML(v){
+/* LA POSIZIONE SI LEGGE SEMPRE (18 nov 2026, Andrea, sullo scatto della
+   classifica al secondo giorno: «perché la classifica non ha le posizioni
+   affianco agli utenti?»). Prima la medaglia PRENDEVA IL POSTO del numero
+   ai primi tre posti: al lancio erano tutti 1°, e la lista era una
+   colonna di medaglie d'oro senza un numero. Ora il numero c'e' sempre,
+   e la medaglia gli sta accanto solo se quel posto lo dividono AL PIU'
+   TRE persone (`pari`, contato da chi disegna): un oro a trenta persone
+   non dice niente. */
+function serieClassificaRigaHTML(v, pari){
   const g = Math.floor(Number(v && v.giorni)) || 0;
   const pos = Math.floor(Number(v && v.posizione)) || 0;
   if (g < 1 || pos < 1) return '';
+  const quanti = Math.max(1, Math.floor(Number(pari)) || 1);
+  const medaglia = (pos <= 3 && quanti <= 3) ? ['🥇','🥈','🥉'][pos - 1] : '';
   return `<div class="serie-cl-riga${v.io ? ' io' : ''}">
-      <div class="cl-pos">${pos <= 3 ? ['🥇','🥈','🥉'][pos - 1] : pos + '°'}</div>
+      <div class="cl-pos">${medaglia}<span class="cl-n">${pos}°</span></div>
       ${voltoHTML({nome: v.nome, avatar: v.avatar, ignoto: true}, 'avatar serie-cl-volto', {tag: 'div'})}
       <div class="serie-cl-nome">${esc(v.nome || '—')}${v.io ? '<small>tu</small>' : ''}</div>
       <div class="serie-cl-g" title="${g} giorni di fila">${SERIE_FIAMMA}${g}</div>
@@ -21730,13 +21743,19 @@ function serieClassificaHTML(d){
       minimo === 2 ? 'secondo' : minimo + '°'} giorno di fila. Torna domani.</div>${nascosto}`;
   const totale = Math.floor(Number(d.totale)) || d.voci.length;
   const altri = totale - d.voci.length - (d.mia ? 1 : 0);
+  /* quante persone dividono ogni posto: le prime righe ci sono tutte, e
+     un pari merito che parte fra i primi tre e va oltre la ventesima ne
+     ha comunque piu' di tre in lista */
+  const pari = {};
+  d.voci.forEach(v => { const p = Math.floor(Number(v && v.posizione)) || 0; pari[p] = (pari[p] || 0) + 1; });
+  const quanti = v => pari[Math.floor(Number(v && v.posizione)) || 0] || 1;
   const mia = d.mia ? `<div class="section-label" style="margin-top:14px">La tua posizione</div>${
-    serieClassificaRigaHTML(Object.assign({}, d.mia, {io: true}))}` : '';
+    serieClassificaRigaHTML(Object.assign({}, d.mia, {io: true}), quanti(d.mia))}` : '';
   /* chi guarda e non e' in gara (un giorno solo, o la fila di ieri
      finita) si sente dire come si entra — mai «hai perso» */
   const fuori = (!d.mia && !d.nascosto && !d.voci.some(v => v.io))
     ? `<div class="serie-cl-nota">Si entra dal ${minimo === 2 ? 'secondo' : minimo + '°'} giorno di fila: torna domani e ci sei anche tu.</div>` : '';
-  return d.voci.map(serieClassificaRigaHTML).join('') + mia
+  return d.voci.map(v => serieClassificaRigaHTML(v, quanti(v))).join('') + mia
     + (altri > 0 ? `<div class="serie-cl-nota">E ${altri === 1 ? 'un\'altra persona ha' : 'altre ' + altri + ' persone hanno'} una fila accesa.</div>` : '')
     + fuori + nascosto
     + '<div class="serie-cl-nota">A pari giorni la posizione è la stessa. Se non vuoi comparire: Profilo, «Livello e titolo», «Non mostrarmi in classifica».</div>';
