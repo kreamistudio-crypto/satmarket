@@ -2410,6 +2410,6 @@ pubblico: sì
 ## Novità · 2026-11-18 · sottocategorie-riga
 
 frase: Le sottocategorie ora sono card disegnate come le categorie: tocchi Bitcoin e vedi subito tutti i suoi annunci, e sotto spunta una seconda riga con Hardware wallet, Cappellini, Spille e adesivi, Cover per telefono… ognuna col numero di annunci. Un tocco e filtri.
-dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda riga di card sotto la fila (solo le sottocategorie con annunci, che salgono a molla; le icone disegnate per ora in Bitcoin), le altre categorie in grigio e la ✕ sulla categoria accesa. Ritoccando una sottocategoria torni a tutta la categoria; ritoccando la categoria, a Tutto.
+dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda riga di card sotto la fila (solo le sottocategorie con annunci, che salgono a molla, ognuna con la sua icona disegnata), le altre categorie in grigio e la ✕ sulla categoria accesa. Ritoccando una sottocategoria torni a tutta la categoria; ritoccando la categoria, a Tutto.
 leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì

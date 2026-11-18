@@ -27399,12 +27399,40 @@ const EMOJI_SOTTO = {
   'riparazioni':'🔧', 'casa-manutenzione':'🧰', 'foto-video-servizi':'📷'};
 /* LE ICONE DI FLOW (18 nov 2026, «in stile barattolo», Andrea): chi ha
    il suo disegno in assets/sottocategorie/ sta qui, e solo questi si
-   chiedono al server (prove.py confronta l'elenco coi file); gli altri
-   tengono l'emoji. Come per le categorie, se l'immagine non arriva si
+   chiedono al server (prove.py confronta l'elenco coi file). Oggi ce
+   l'hanno tutte le voci dell'albero; una voce nuova senza disegno resta
+   fuori e tiene l'emoji. Come per le categorie, se l'immagine non arriva si
    toglie da sola e resta l'emoji sotto. */
-const ICONE_SOTTO = new Set(['hardware-wallet', 'nodi-mining', 'poster-stampe',
-  'merch', 'cappellini', 'spille-adesivi', 'cover-telefono', 'tazze-bicchieri',
-  'libri-guide', 'servizi-btc']);
+const ICONE_SOTTO = new Set([
+  'droni-modellismo', 'stampa-3d', 'smart-home', 'componenti-maker',
+  'strumenti-misura', 'computer', 'tablet', 'componenti-periferiche',
+  'software-licenze', 'smartphone', 'cover-accessori', 'sim-ricariche',
+  'cuffie', 'casse-ampli', 'hifi-giradischi', 'tv-proiettori', 'console',
+  'videogiochi', 'controller-accessori', 'retrogaming', 'crediti-digitali',
+  'fotocamere', 'obiettivi', 'binocoli-telescopi', 'treppiedi-accessori',
+  'hardware-wallet', 'nodi-mining', 'poster-stampe', 'merch', 'cappellini',
+  'spille-adesivi', 'cover-telefono', 'tazze-bicchieri', 'libri-guide',
+  'servizi-btc', 'mobili', 'cucina-tavola', 'giardino', 'organizzazione',
+  'grandi-elettrodomestici', 'piccoli-elettrodomestici', 'elettroutensili',
+  'utensili-mano', 'ferramenta', 'olio-condimenti', 'dolci-conserve',
+  'spezie-erbe', 'bevande', 'pasta-riso', 'creme-cosmetici', 'profumi',
+  'integratori', 'apparecchi-estetica', 'donna', 'uomo', 'unisex', 'scarpe',
+  'borse-zaini', 'piccoli-accessori', 'orologi-smartwatch', 'gioielli',
+  'passeggini-attrezzatura', 'giocattoli', 'abbigliamento-bimbi',
+  'attrezzatura-sportiva', 'outdoor', 'mare-piscina', 'giochi-tavolo',
+  'maglie-sportive', 'corsa-gravel', 'mtb', 'ebike', 'citta-pieghevoli',
+  'bici-bimbi', 'componenti-bici', 'veicoli', 'ricambi-motori',
+  'caschi-abbigliamento', 'cani', 'gatti', 'acquari-terrari', 'libri',
+  'fumetti-manga', 'vinili', 'cd-dvd', 'chitarre-bassi', 'tastiere-piano',
+  'batteria-percussioni', 'fiati-archi', 'ampli-studio', 'carte-tcg',
+  'edizioni', 'monete-banconote', 'action-figure', 'francobolli-documenti',
+  'quadri-stampe', 'sculture-ceramiche', 'tessuti-ricami',
+  'materiali-creativi', 'oggetti-decorativi', 'su-misura', 'gift-card',
+  'soggiorni-esperienze', 'lingue', 'ripetizioni', 'musica-lezioni',
+  'informatica-corsi', 'bitcoin-corsi', 'sport-benessere', 'cucina-corsi',
+  'arte-corsi', 'crescita-personale', 'grafica-design', 'siti-e-app',
+  'traduzioni', 'scrittura-testi', 'consulenze', 'riparazioni',
+  'casa-manutenzione', 'foto-video-servizi']);
 function figSotto(sid, c){
   const emoji = `<span class="cat-emoji" aria-hidden="true">${EMOJI_SOTTO[sid] || EMOJI_CAT[c] || '📦'}</span>`;
   if (!ICONE_SOTTO.has(sid)) return emoji;

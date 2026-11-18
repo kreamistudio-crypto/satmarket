@@ -91904,9 +91904,16 @@ stile, due versioni per voce, sfondo scuro uniforme; scelte da me
 (Andrea: «scegli tu, sono tutte belle»); ritagliate in cloud col fondo
 preso dal bordo, riempimento connesso con tolleranza (più i buchi chiusi
 grandi e proprio del colore del fondo: il manico della tazza), orlo
-sfumato, webp 256px in `assets/sottocategorie/<id>.webp`. Per ora le 10
-di Bitcoin; le altre voci tengono la loro emoji (`EMOJI_SOTTO`, tutte
-le 124, una prova vuole ogni id). La rotta `/assets/sottocategorie/{nome}`
+sfumato, webp 256px in `assets/sottocategorie/<id>.webp`. Prima le 10
+di Bitcoin (commit 1e4a43e0), poi le altre 110 nello stesso giro, con
+tre icone di Bitcoin fra i riferimenti per tenere il set uniforme e
+l'arancione solo come DETTAGLIO fuori da Bitcoin (Andrea: «non farmi
+le immagini tutte uguali, arancioni»); quattro rifatte (una richiesta
+bloccata da Flow, una mai partita, un'auto che somigliava a un modello
+vero, scarabocchi che sembravano lettere), le scartate tenute sul PC in
+`_scartate\`. Oggi tutte le 120 voci hanno il disegno (2,2 MB in
+tutto); l'emoji resta come riserva (`EMOJI_SOTTO`, una prova vuole ogni
+id) per una voce nuova senza disegno o un'immagine che non arriva. La rotta `/assets/sottocategorie/{nome}`
 ha la whitelist `ID_SOTTOCATEGORIE` derivata dall'albero (regola 3) e la
 revalidazione delle sorelle; il client chiede solo gli id di
 `ICONE_SOTTO`, e una prova vuole quell'elenco uguale ai file.
@@ -91919,6 +91926,6 @@ che filtra, niente tendina, riga solo a categoria accesa e senza «Tutta
 X», fila spenta, molla, ritocco dello scaffale, icone = file, rotta
 dall'albero) più l'arrivo del reparto; giro dal vivo sul server locale
 coi conteggi di Bitcoin di produzione finti nella risposta (riga di 10,
-scaffale acceso, ritocco, ✕), la rotta: 200 per un'icona, 404 per una
-voce senza disegno e per un nome storto. Da fare: le icone delle altre
-categorie, a gruppi, con lo stesso giro.
+scaffale acceso, ritocco, ✕; poi Casa e giardino, Lezioni e corsi,
+Sport e hobby con tutte le icone), la rotta: 200 per un'icona, 404 per
+un id fuori dall'albero e per un nome storto.
