@@ -6,7 +6,7 @@ libro (assistente/sapere.md), alla Mini App (miniapp.html) o a
 NOVITA.md; prove_conoscenza_tappo è rossa finché non è aggiornato. -->
 
 <!-- pezzo libro-001 | libro | sempre -->
-## Libro · Cos'è Barattolo
+## Libro · Cos'è Barattolo (1/2)
 
 Barattolo è un mercatino fra persone, come un Subito.it, dove si paga solo in bitcoin: in satoshi («sats», la centesima milionesima parte di un bitcoin) sulla rete Lightning, che è veloce e costa quasi niente anche per pochi euro. Il prezzo si può leggere anche in euro con l'interruttore € / ₿, ma quello che viaggia sono sempre sats.
 
@@ -22,11 +22,14 @@ Dove si trova:
 
 Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, tutta l'app compare in inglese da sola — vetrina, schede, acquisto, Ordini, scambio P2P, Vendi, Profilo, aste, raccolte, avvisi e assistenza — coi prezzi scritti all'inglese («1,234.50 €»). Restano in italiano, per ora, i messaggi del bot di Telegram e gli avvisi di errore del server; l'interruttore della lingua nel Profilo arriva in una tappa successiva. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
 
-Le chiavi degli scambi P2P (dal 17 novembre 2026): nascono dalle 12 parole del wallet on-chain, le stesse che hanno la copia nel cloud di Telegram o sui relay Nostr. Ovunque ci siano quelle parole (telefono, Telegram Desktop, browser) gli scambi nuovi si governano da lì. Gli scambi aperti prima continuano dal dispositivo dove sono stati presi: il profilo di prima resta lì «in pensione» solo per finirli. Se su un dispositivo le parole non ci sono, al primo gesto P2P l'app chiede di incollarle da Profilo → «Wallet e incassi». Se lo scambio dice «Le chiavi di questo scambio non sono in questo browser», è di un profilo di prima: si finisce da dove è stato preso, o si scrive a @ilbarattolobot se quella memoria è persa.
+Le chiavi degli scambi P2P (dal 17 novembre 2026): nascono dalle 12 parole del wallet on-chain, le stesse che hanno la copia nel cloud di Telegram o sui relay Nostr. Ovunque ci siano quelle parole (telefono, Telegram Desktop, browser) gli scambi nuovi si governano da lì: uno scambio preso dalla web app si porta avanti anche dalla Mini App o dal browser del computer, e viceversa (dal 18 novembre 2026 ogni dispositivo passa alle chiavi delle parole appena apri il P2P, senza aspettare il primo gesto). Gli scambi aperti prima continuano dal dispositivo dove sono stati presi: il profilo di prima resta lì «in pensione» solo per finirli. Se su un dispositivo le parole non ci sono, al primo gesto P2P l'app chiede di incollarle da Profilo → «Wallet e incassi». Se lo scambio dice «Le chiavi di questo scambio non sono in questo browser», è di un profilo di prima: si finisce da dove è stato preso, o si scrive a @ilbarattolobot se quella memoria è persa.
+
+<!-- pezzo libro-002 | libro | sempre -->
+## Libro · Cos'è Barattolo (2/2)
 
 Il bot di Telegram serve a tre cose: aprire Barattolo, mandarti gli avvisi sui tuoi ordini e scambi, e sfogliare le categorie anche senza aprire la Mini App (scrivi /sfoglia). Gli acquisti, le vendite e le trattative si fanno nella Mini App o sul sito.
 
-<!-- pezzo libro-002 | libro -->
+<!-- pezzo libro-003 | libro -->
 ## Libro · Entrare e il profilo (1/3)
 
 Non servono email, password o numero di telefono. Si entra in due modi:
@@ -40,17 +43,17 @@ Un account nato con Telegram può collegare anche una chiave Nostr dal Profilo, 
 
 Nel Profilo si impostano le cose che servono a vendere e a scambiare: soprattutto l'indirizzo Lightning per incassare (voce «Lightning address»), il wallet collegato con NWC (facoltativo) e gli avvisi. Chi usa anche i bitcoin on-chain trova altre due voci: «📥 Come ricevi» e «₿ On-chain» (vedi «Bitcoin on-chain»).
 
-<!-- pezzo libro-003 | libro -->
+<!-- pezzo libro-004 | libro -->
 ## Libro · Entrare e il profilo (2/3)
 
 La serie dei giorni (se nelle REGOLAZIONI del pannello «Serie dei giorni» è accesa): nel Profilo, sotto le stelle, c'è una fiamma con scritto quanti giorni di fila hai aperto Barattolo e il tuo record, per esempio «5 giorni di fila · record 12»; subito sotto ci sono gli ultimi sette giorni, accesi quelli della serie. Conta aprire Barattolo da dentro il tuo account, almeno una volta al giorno, da Telegram, dal sito o dall'app: contano i giorni, non quante volte. Il giorno è quello italiano, da mezzanotte a mezzanotte. Se salti un giorno la serie riparte da 1 e il record resta. È solo un contatore: non dà XP, livelli, sconti né premi, e sul tuo negozio e sul profilo che vedono gli altri non compare. Sotto i sette giorni c'è il bottone «Classifica Streak» con la fiamma (fino al 17 nov sera si chiamava «Classifica dei giorni di fila»): mostra chi ha la fila più lunga ancora accesa (nome, foto e giorni), la vede solo chi è entrato in Barattolo, ci si entra dal secondo giorno di fila e a pari giorni la posizione è la stessa (per questo all'inizio, quando tutti hanno gli stessi giorni, sono tutti 1°; le posizioni si separano quando le serie diventano diverse); accanto a ognuno c'è sempre il numero della posizione, e la medaglia 🥇🥈🥉 solo ai primi tre posti se quel posto è diviso al più da tre persone; escono le prime 50 righe, e chi sta più giù vede la sua posizione a parte. Chi non vuole comparire accende «🏆 Non mostrarmi in classifica» nel Profilo (dove c'è il livello): esce da questa classifica e da quella del mercatino, e la sua serie continua a vederla lui. Al primo accesso del giorno, dal secondo giorno di fila, compare per un attimo un saluto con il numero. La prima volta del giorno che apri il Profilo, il cerchio di oggi si accende piano come una brace e il numero dei giorni sale da ieri a oggi (per esempio da 4 a 5): succede una volta al giorno, ed è solo un'animazione. Il bot non manda promemoria per non farla scadere.
 
-<!-- pezzo libro-004 | libro -->
+<!-- pezzo libro-005 | libro -->
 ## Libro · Entrare e il profilo (3/3)
 
 Le notifiche sul telefono (se nelle REGOLAZIONI del pannello «Notifiche sul telefono» è accesa): nell'app di Barattolo per Android (quella di Zapstore), nel sito aggiunto alla schermata Home e nel browser del computer, gli avvisi degli ordini, degli scambi P2P e dei messaggi possono arrivare come notifica normale, tipo WhatsApp, anche con l'app chiusa. Si accendono dal Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono» → «Attiva», e il telefono chiede il permesso: va detto sì. Poi «🔔 Mandami una notifica di prova» fa vedere subito se arrivano. Vale per quel telefono (su un altro si accende di nuovo), e arrivano in più rispetto a Telegram o ai messaggi Nostr, che restano come sono. Si spengono dallo stesso tasto; uscendo dall'account smettono di arrivare su quel telefono. Dentro Telegram il tasto non c'è, perché gli avvisi arrivano già dal bot. NON arrivano: sui telefoni senza i servizi Google (per esempio GrapheneOS), con Tor Browser o sul sito .onion; sull'iPhone solo se Barattolo è aggiunto alla schermata Home (Condividi → «Aggiungi alla schermata Home», da iOS 16.4) e aperto da lì. Se le hai bloccate per sbaglio, si riaprono dalle impostazioni del telefono, alla voce Notifiche. Toccando una notifica si apre la pagina di cui parla: l'ordine, lo scambio o l'annuncio (dal 16 nov 2026 anche gli avvisi degli annunci aprono l'annuncio e non la home); lo stesso vale per i link degli avvisi del bot.
 
-<!-- pezzo libro-005 | libro -->
+<!-- pezzo libro-006 | libro -->
 ## Libro · Il wallet Lightning
 
 Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gratuiti, e ne basta uno. Barattolo non ha un wallet suo e non tiene i tuoi sats, tranne il tempo di un affare (vedi il deposito di garanzia).
@@ -61,7 +64,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 - Nel P2P l'indirizzo di Wallet of Satoshi non passa la verifica: lì si incolla una fattura del wallet, che invece funziona. Lo stesso vale per qualunque indirizzo che il servizio di scambio non riesce a verificare.
 - Chi non ha ancora un wallet trova la guida «👛 Il tuo primo wallet»: si apre dalla casella verde «👛 Il tuo primo wallet» nel Profilo, subito sotto la fila dei giorni di fila (c'è solo finché non hai un Lightning address), e dal bottone «👛 Non hai un wallet? Ti spieghiamo come fare» che sta sotto la fattura da pagare, nel riquadro dell'incasso o del rimborso di un ordine e nel Profilo accanto al Lightning address. Sono tre passi: 1) scarica Wallet of Satoshi (gratis, in Europa i sats restano sul telefono di chi lo usa); 2) salva le parole di recupero su carta; 3) dipende da cosa stavi facendo: se devi pagare, metti qualche sats (te li manda un amico o li compri in euro nel P2P) e inquadri il QR dal wallet; se devi incassare, tocchi «Ricevi» nel wallet, copi il tuo indirizzo nome@walletofsatoshi.com e lo incolli nel campo della guida. La prima volta che salvi il tuo Lightning address (dalla guida o dal Profilo) ricevi il distintivo «📥 Pronto a incassare»: non dà punti (i punti si fanno solo con gli affari), è un distintivo. Nella tendina «Hai già un altro wallet?»: va bene qualsiasi wallet che dia un indirizzo con la @ (per esempio Blink, nome@blink.sv, o Coinos, nome@coinos.io), non per forza Wallet of Satoshi; Muun invece non ha un indirizzo con la @, quindi con Muun a ogni vendita si incolla una fattura e la mancia non si può ricevere finché non si aggiunge un indirizzo di un altro wallet; quello di Phoenix Barattolo non lo sa ancora pagare, quindi con Phoenix a ogni vendita si incolla una fattura. Barattolo non ha un wallet suo e non tiene i sats di nessuno: se qualcuno chiede un «conto su Barattolo», la risposta è questa guida.
 
-<!-- pezzo libro-006 | libro -->
+<!-- pezzo libro-007 | libro -->
 ## Libro · Comprare nel mercatino (1/4)
 
 1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Toccando una categoria in «Esplora per categorie» vedi subito tutti i suoi annunci, e sotto la fila compare una seconda riga di card con le sue sottocategorie (per esempio Bitcoin → Hardware wallet e firma, Cappellini, Spille e adesivi…), ognuna col numero di annunci; le altre categorie in alto diventano grigie. Tocchi la sottocategoria che ti interessa; ritoccandola torni a tutta la categoria. Compaiono solo le sottocategorie che hanno annunci. Per uscire: ritocca la categoria accesa (ha una piccola ✕), o la card «Tutto». Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
@@ -71,7 +74,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 5. Il venditore spedisce e segna il corriere col tracciamento, oppure vi accordate per il ritiro, oppure ti consegna il codice dentro l'ordine.
 6. Quando l'oggetto è arrivato ed è come promesso, lo confermi dall'ordine, nella scheda «Ordini». Solo in quel momento i sats passano al venditore.
 
-<!-- pezzo libro-007 | libro -->
+<!-- pezzo libro-008 | libro -->
 ## Libro · Comprare nel mercatino (2/4)
 
 Gli avvisi del barattolo (se nelle REGOLAZIONI del pannello «Avvisi del barattolo» è accesa): quando metti un articolo nel barattolo 🫙 si apre il foglietto «🔔 Avvisami se…» con quattro spunte, tutte accese di serie: «📉 Il prezzo scende», «⚡ Arriva uno sconto lampo», «☝️ Ne resta solo uno» (l'articolo aveva più pezzi e ne è rimasto uno), «🔁 È di nuovo disponibile» (era esaurito e torna, o il negozio rientra dalle ferie). Togli quelle che non vuoi e tocca «Va bene», oppure chiudi il foglietto e restano tutte. Gli avvisi arrivano dal bot, con il tasto «🫙 Apri l'annuncio», al massimo uno al giorno per articolo: se nello stesso giorno succedono più cose arrivano in un messaggio solo, e quello che cade dentro il giorno arriva il giorno dopo se è ancora vero. Se il prezzo sale non arriva niente. Il prezzo si guarda nella valuta dell'annuncio: un annuncio in euro non «scende» perché cambia il valore del bitcoin, e un ritocco sotto l'1% non conta. Le spunte si cambiano quando vuoi dalla 🔔 accanto a ogni articolo, nel Profilo, sezione «Nel tuo barattolo» (🔕 vuol dire nessun avviso). Gli articoli messi nel barattolo prima del 17 novembre 2026 ricevono solo lo sconto lampo, come prima, finché non tocchi la loro 🔔.
@@ -80,21 +83,21 @@ Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la
 
 La mancia al venditore (se nelle REGOLAZIONI del pannello «Mancia al venditore» è accesa): un'offerta può essere solo più bassa del prezzo, ma chi vuole dare di più al venditore può lasciargli una mancia. Nell'ordine già pagato, nella scheda «Ordini», c'è «🎁 Lascia una mancia»: si sceglie la cifra (500, 1.000, 2.100 sats o un'altra) e si paga col proprio wallet. Nello stesso foglio, se vuoi, puoi aggiungere anche uno zap a Barattolo (di serie è «Niente»): sono due fatture, una dopo l'altra. La mancia va DRITTA al Lightning address del venditore: Barattolo non la tocca e non prende commissioni. Per questo è un regalo fuori dal deposito di garanzia e NON si rimborsa, anche se poi l'ordine va male: chi ha dubbi la lascia dopo aver ricevuto l'oggetto. Il bottone c'è solo su un ordine pagato (non su uno annullato, in disputa o rimborsato) e solo se il venditore ha impostato il suo Lightning address nel Profilo. Se non l'ha impostato, il riquadro c'è lo stesso ma senza bottone, con la frase «non ha ancora un indirizzo Lightning nel profilo: per ora la mancia non si può mandare»: è normale, la mancia non avrebbe dove andare (anche se il venditore ha incassato l'ordine, per esempio con una fattura incollata a mano). Al venditore senza indirizzo, nello stesso ordine, compare l'invito «Aggiungilo dal Profilo»: appena lo salva, il bottone compare anche a chi ha comprato. Il venditore riceve un avviso e vede la mancia nell'ordine: «arrivata» se Barattolo ha potuto verificarla, altrimenti «controlla il wallet».
 
-<!-- pezzo libro-008 | libro -->
+<!-- pezzo libro-009 | libro -->
 ## Libro · Comprare nel mercatino (3/4)
 
 Le raccolte fondi in sats (se nelle REGOLAZIONI del pannello «Raccolte in sats» sono accese): chi ha almeno 3 vendite concluse su Barattolo e un indirizzo Lightning nel Profilo può aprire una raccolta da Profilo → «Il tuo negozio» → «🎯 Raccolte fondi» → «🎯 Apri una raccolta»: titolo, racconto, obiettivo in euro (da 10 a 1.000 € in questa prima fase, fissato in sats al cambio del giorno) e durata (da 7 a 60 giorni). Una alla volta. Prima di andare in vetrina la guardano i moderatori: una raccolta è un sostegno, quindi NON può promettere quote, interessi, rendimenti, guadagni o token; l'eventuale ricompensa è un grazie, non un acquisto. Chi la sostiene ha due strade. «⚡ Sostieni con uno zap»: lo zap va DRITTO al wallet di chi raccoglie, Barattolo non lo tocca e non prende commissioni, e per questo NON si rimborsa, nemmeno se l'obiettivo non arriva. «🛡️ Sostieni con garanzia» (c'è solo se chi raccoglie l'ha scelta e se la funzione è accesa): da 50 € in su, si paga on-chain in un deposito di garanzia 2-di-3 (chi sostiene, chi raccoglie, Barattolo) e il deposito va pagato entro 24 ore; a scadenza, se i DEPOSITI hanno raggiunto l'obiettivo (gli zap non contano per questo), i sats vanno a chi raccoglie, altrimenti tornano al wallet di chi li ha messi. In tutti e due i casi Barattolo mette la sua firma e la seconda la mette il telefono di chi riceve, da solo all'apertura dell'app o col bottone «✍️ Firma» nella scheda della raccolta. Un deposito arrivato tardi o incompleto torna indietro. La rete on-chain la paga chi deposita, pochi sats. Se i moderatori fermano una raccolta, i depositi tornano a chi li aveva messi (gli zap no). Chi vede una raccolta sospetta la può segnalare dal fondo della sua scheda («🚩 Segnala questa raccolta»). Le raccolte non danno XP.
 
 Tutti i tuoi acquisti e le tue vendite stanno nella scheda «Ordini», con lo stato di ogni ordine e i bottoni per il passo successivo. In fondo all'elenco c'è «📄 Esporta tutti gli ordini in CSV», che scarica un file con tutti i dettagli dei tuoi ordini (utile a chi vende per tenere i conti).
 
-<!-- pezzo libro-009 | libro -->
+<!-- pezzo libro-010 | libro -->
 ## Libro · Comprare nel mercatino (4/4)
 
 Il feedback: ad affare concluso, dalla pagina dell'ordine, compratore e venditore si lasciano a vicenda un voto da 1 a 5 stelle con un commento breve (chi compra può aggiungere fino a 3 foto). Lo stesso vale per la recensione a fine scambio P2P, che va nella stessa media del profilo. Chi l'ha lasciato può modificarlo una volta sola (stelle e commento; le foto restano) oppure cancellarlo, entro 7 giorni da quando l'ha scritto: sotto il voto ci sono «✏️ Modifica» e «🗑 Cancella», con la data fino a cui valgono. Dopo diventa definitivo. Chi ha ricevuto il feedback viene avvisato del cambio, e sul profilo la riga porta la scritta «modificato». Cancellato è per sempre: su quell'affare non se ne può lasciare un altro. Il feedback lasciato da un altro non si può cambiare: se è offensivo o falso, lo può togliere solo un moderatore (scrivi allo staff). Nessuno può chiederti di cambiare un voto in cambio di qualcosa: se succede, segnalalo allo staff. Le recensioni che hai ricevuto le trovi tutte in un posto: Profilo → «Livello e inviti» → «⭐ Recensioni ricevute» (oppure tocca le stelle sotto il tuo nome in cima al Profilo). Ci sono le ultime 50, del mercatino e degli scambi P2P insieme, come le vedono gli altri nel tuo negozio.
 
 Per un contenuto digitale il venditore può chiederti qualche informazione prima di pagare (per esempio nome, cognome o email, una scelta da un elenco, un sì o un no): rispondi alla cassa. Le risposte viaggiano cifrate dentro l'ordine, le leggete solo tu e il venditore, e si cancellano come l'indirizzo. Il numero di telefono non si può chiedere.
 
-<!-- pezzo libro-010 | libro -->
+<!-- pezzo libro-011 | libro -->
 ## Libro · Il deposito di garanzia
 
 Quando compri, i sats non vanno subito al venditore: si fermano in un deposito di garanzia (in gergo escrow) che custodisce Barattolo, su un nodo Lightning suo. Il venditore spedisce tranquillo perché sa che i soldi ci sono; tu sai che non si muovono finché l'oggetto non è arrivato davvero.
@@ -106,7 +109,7 @@ I tempi (le cifre esatte sono nei NUMERI DI OGGI):
 
 I sats restano in un conto Lightning della piattaforma solo per il tempo dell'affare: non sono un investimento e non vengono messi a rendere. Quando l'affare si chiude escono, al venditore o a te.
 
-<!-- pezzo libro-011 | libro -->
+<!-- pezzo libro-012 | libro -->
 ## Libro · Se qualcosa va storto: la disputa (1/2)
 
 Finché i sats sono nel deposito puoi aprire una disputa dalla pagina del tuo ordine. Il deposito si congela e interviene un moderatore: legge le due versioni, guarda quello che c'è (foto, tracciamento, messaggi nell'ordine) e decide. Le strade sono tre:
@@ -128,12 +131,12 @@ Dove il deposito non può proteggerti, ed è meglio saperlo prima:
 - il deposito garantisce l'oggetto promesso, non i gusti: «non mi piace più» non è un difetto, un oggetto diverso dalla descrizione sì;
 - un indirizzo sbagliato lo paga chi l'ha scritto: se il pacco torna indietro, le spese di spedizione restano a te. Per questo prima di pagare ti chiediamo di ricontrollarlo.
 
-<!-- pezzo libro-012 | libro -->
+<!-- pezzo libro-013 | libro -->
 ## Libro · Se qualcosa va storto: la disputa (2/2)
 
 Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol dire rinunciare al deposito di garanzia: nessuno può più aiutarti a recuperare i soldi.
 
-<!-- pezzo libro-013 | libro -->
+<!-- pezzo libro-014 | libro -->
 ## Libro · Vendere nel mercatino (1/6)
 
 1. Tocca «Vendi» (il tasto ＋ in basso).
@@ -147,7 +150,7 @@ La «Zona» di un annuncio nuovo parte già scritta con quella del tuo ultimo an
 
 Gli annunci esauriti: quando vendi l'ultimo pezzo l'annuncio diventa «Esaurito», resta in fondo al tuo negozio e con «🔄 Rifornisci» torna in vendita appena hai altri pezzi. Se era un pezzo unico che non tornerà (un oggetto usato, per esempio), in «I tuoi annunci» o nella sua pagina tocca «🗑 Elimina»: sparisce dal negozio, da Nostr e dal canale, ma gli ordini e le recensioni restano (dal 16 novembre 2026). Si può fare quando l'ordine di quel pezzo è concluso: con una spedizione, un reso o un rimborso ancora aperti l'app dice di aspettare.
 
-<!-- pezzo libro-014 | libro -->
+<!-- pezzo libro-015 | libro -->
 ## Libro · Vendere nel mercatino (2/6)
 
 Hai un catalogo grande? Nel Profilo, nel gruppo «Annunci», c'è «📥 Carica tanti annunci insieme»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri. Dal 18 novembre 2026 i prodotti di un negozio collegato escono anche su Nostr, come gli altri annunci: un annuncio per prodotto (le varianti, per esempio le taglie, sono un annuncio solo col prezzo «da»), entro qualche ora dall'entrata, e si aggiornano da soli; un prodotto tolto dal negozio sparisce anche da lì. Se il negozio collegato non risponde per cinque ore di fila il collegamento si ferma («⚠️ non risponde») e il bot lo dice al venditore; da lì Barattolo riprova da solo una volta al giorno e, appena il sito risponde, il collegamento riparte e il bot lo avvisa. Se ha cambiato le chiavi del negozio, le riscrive con ✏️; ▶️ lo riaccende subito. Lo stesso negozio non si collega due volte, nemmeno scrivendo l'indirizzo con maiuscole diverse.
@@ -158,7 +161,7 @@ Se spedisci a un locker o a un punto di ritiro, il codice per ritirare il pacco 
 
 Le commissioni del mercatino: Barattolo non prende commissioni, né a chi vende né a chi compra. Si pagano solo le commissioni della rete, che non vanno a Barattolo: su Lightning sono pochi sats o niente, on-chain sono quelle dei miner. Se un giorno cambiasse, la cifra sarebbe nei NUMERI DI OGGI. Negli acquisti on-chain può esserci solo una quota fissa a Barattolo per le spese di rete, scritta nel conto prima di pagare: quanto vale oggi lo dicono i NUMERI DI OGGI.
 
-<!-- pezzo libro-015 | libro -->
+<!-- pezzo libro-016 | libro -->
 ## Libro · Vendere nel mercatino (3/6)
 
 Quando qualcuno chiede delle commissioni, tieni sempre separati il mercatino (zero commissioni di Barattolo, solo quelle della rete) e lo scambio P2P (la commissione del coordinatore, spiegata più sotto). Mescolarli confonde.
@@ -173,33 +176,33 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
 
-<!-- pezzo libro-016 | libro -->
+<!-- pezzo libro-017 | libro -->
 ## Libro · Vendere nel mercatino (4/6)
 
 I numeri del negozio: nel Profilo, gruppo «Il tuo negozio», il cassetto «📊 I numeri del negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Contano gli ordini del mercatino conclusi, non gli scambi P2P. Quanto hai comprato NON si vede nel Profilo, per la privacy (scelta del 17 novembre 2026): né in questo cassetto né nella riga sotto il nome, che dice solo «N vendite concluse». I tuoi acquisti li trovi uno per uno in «Ordini». Chi ha solo comprato e non ha annunci non ha questo cassetto.
 
 I codici sconto: nel Profilo, gruppo «Spedizioni e sconti», alla voce «🎟 Codici sconto», chi vende crea i suoi codici (in percentuale o a cifra fissa, con una durata e un tetto di usi) e li dà a chi vuole; chi compra lo scrive alla cassa. Col tasto «📣» sulla riga di un codice ancora valido può anche mandarlo ai clienti che hanno già comprato da lui: sceglie chi (sono già tutti spuntati) e preme «Invia invito sconto». Il messaggio lo manda Barattolo, sul bot, come DM Nostr o dentro l'app, e chi vende non vede mai i contatti dei clienti. Ogni cliente riceve lo stesso codice una volta sola, e al massimo un invito a settimana dallo stesso negozio. Un codice scaduto, finito o in pausa non si può mandare: si riattiva con ✏️ (scegliendo di nuovo i giorni, che ripartono da oggi). La data «scade il» è scritta all'italiana, giorno/mese/anno. Chi riceve le offerte e non le vuole più le spegne in Profilo → «🔔 Avvisi» → «🎟️ Offerte dei negozi», per tutti i negozi o per uno solo.
 
-<!-- pezzo libro-017 | libro -->
+<!-- pezzo libro-018 | libro -->
 ## Libro · Vendere nel mercatino (5/6)
 
 I premi fedeltà del negozio: nel Profilo, gruppo «Spedizioni e sconti», alla voce «🎀 Premi fedeltà», chi vende scrive fino a quattro gradini in euro, ognuno col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso in quel negozio (solo gli ordini conclusi, in euro al cambio di quel giorno, mai gli altri negozi) e, quando passa una soglia, avvisa tutti e due e mostra il premio sul suo ordine successivo pagato e non ancora spedito: «Nel pacco trovi…» a chi compra, «Nel pacco metti…» a chi vende. Il regalo lo mette nel pacco il venditore: Barattolo non lo compra e non lo spedisce, e non è uno sconto (il prezzo non cambia). Ogni soglia vale una volta per cliente; se l'ordine col premio viene annullato, il premio passa al prossimo. Sulla pagina del negozio chi compra vede i gradini e quanto ha già speso lì. Non sono punti XP né livelli: quelli si fanno con tutti gli affari su Barattolo. Dal 18 novembre: il negozio sceglie se scrivere le soglie in euro o in sats (interruttore «€ euro / ₿ sats» nel cassetto; in sats conta i sats pagati, in euro ogni ordine al cambio del suo giorno); il regalo si può scegliere dalla tendina fra gli articoli in vetrina del proprio negozio, oppure «✏️ Lo scrivo io». Lo sceglie sempre chi vende, mai chi compra. Chi ha un premio da riscuotere lo sa: gli arriva il messaggio del bot «hai un premio da riscuotere» (anche quando il negozio scrive una soglia che aveva già passato), lo legge sulla pagina del negozio («🎁 Hai un premio da riscuotere») e sulla scheda di ogni articolo di quel negozio; quando paga l'ordine, il messaggio «Ordine pagato» gli dice cosa troverà nel pacco e «Hai venduto» dice al negozio cosa metterci. Nello stesso cassetto, «🏆 I tuoi clienti» mostra al negozio la classifica di chi ha comprato da lui, dal più alto per totale speso (solo ordini conclusi), in sats o in euro con un tocco: ognuno vede solo i suoi clienti.
 
 Chi vende contenuti digitali può aggiungere all'annuncio le domande da fare a chi compra (testo breve, elenco a tendina, email, sì/no), obbligatorie o facoltative; nome, cognome ed email si aggiungono con un tocco. Il numero di telefono non si può chiedere.
 
-<!-- pezzo libro-018 | libro -->
+<!-- pezzo libro-019 | libro -->
 ## Libro · Vendere nel mercatino (6/6)
 
 La cassa in negozio (se nelle REGOLAZIONI del pannello «Cassa in negozio» è accesa): chi vende di persona, in un negozio, a un banco del mercato o a un evento, può usare Barattolo come cassa. Nel Profilo, nel gruppo «Il tuo negozio», c'è «🏪 Cassa in negozio»: apre «Barattolo Negozio», la faccia di Barattolo per chi sta al banco, con lo stesso account e senza la barra di Barattolo (si torna con «↩ Barattolo» in alto a destra; dal browser, per esempio sul tablet del banco, ci si arriva anche dall'indirizzo barattolo.store/?app=negozio). Ha due schede: «🧾 Cassa» e «📒 Vendite», cioè le vendite della cassa; a chi tiene un punto di ritiro di Barattolo compare anche «📦 Banco» coi pacchi in arrivo. La Cassa è fatta come il carrello: le card dei propri annunci attivi con almeno un pezzo, ognuna con «Aggiungi» (o un tocco sulla card) e poi i tasti «−» e «+»; in fondo la stessa barra del carrello col totale e i pezzi, e al posto di «Controlla e paga» il bottone «Incassa». Sopra le card si può anche scrivere un importo libero (in euro o in sats, il tasto accanto cambia valuta), e una nota per sé (es. «tavolo 4»). Se non ci sono annunci attivi la Cassa lo dice, e si incassa scrivendo l'importo. Compare un QR grande con due porte, «⚡ Lightning» e «On-chain»: il cliente lo inquadra con qualsiasi wallet, e non gli serve un account su Barattolo né Telegram. I sats vanno DRITTI al wallet di chi vende: in Lightning al suo Lightning address del Profilo, on-chain a un indirizzo nuovo del suo wallet (quello scelto in Profilo → «Incassi on-chain»), mai al deposito di garanzia. Per questo non c'è deposito, né spedizione, né conferma, né disputa, e Barattolo non prende commissioni: è un pagamento di persona, come al banco. Ogni vendita della cassa finisce comunque in «Ordini», insieme agli altri ordini, con il segno «🏪 Cassa in negozio»: il filtro «🏪 Cassa» in cima a «Ordini» mostra solo quelle (stanno anche in «Vendite»), e toccandone una si riapre la sua ricevuta. Il totale di oggi si legge in cima alla cassa. Quando il pagamento arriva la cassa dice «✅ Pagato!». Se il wallet di chi vende non comunica i pagamenti, la cassa dice di guardare il proprio wallet e di toccare «✓ Ricevuto». On-chain, appena il pagamento si vede in rete la cassa dice «in arrivo»: per una cifra piccola si può consegnare subito («✓ Consegna adesso»), per una grande è meglio aspettare la conferma (di solito fra 10 e 60 minuti). On-chain si incassa da 546 sats in su. I pezzi venduti alla cassa escono da soli dalla vetrina, e l'annuncio finito diventa venduto. Per usare la cassa serve almeno uno fra il Lightning address e il wallet on-chain nel Profilo: se mancano, la cassa lo dice e porta al campo giusto.
 
-<!-- pezzo libro-019 | libro -->
+<!-- pezzo libro-020 | libro -->
 ## Libro · Spedizione, indirizzo e ritiro
 
 - Spedizione a un indirizzo: lo scrivi al momento dell'acquisto e resta dentro l'ordine. Lo vede solo il venditore, è cifrato nel database e viene cancellato appena confermi di aver ricevuto. I moderatori non lo leggono, nemmeno in disputa.
 - Punto di ritiro o locker: un tuo indirizzo non serve proprio; al banco basta il nome del destinatario. Puoi lasciare un'email se vuoi che il codice di ritiro te lo mandi il corriere: è facoltativa.
 - Ritiro a mano: vi accordate per vedervi in zona. Controlla l'oggetto prima di confermare.
 
-<!-- pezzo libro-020 | libro -->
+<!-- pezzo libro-021 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (1/20)
 
 Nel P2P non compri da Barattolo: compri da un'altra persona. Vi accordate su un prezzo, gli euro viaggiano fra voi due col metodo scelto, e i sats restano bloccati in garanzia finché gli euro non sono arrivati. Barattolo non tocca i tuoi euro. Si entra dal tasto «P2P» in basso; lì ci sono il «Libro ordini», «I miei scambi», «Pubblica» e «Info P2P», che spiega tutto con calma.
@@ -215,7 +218,7 @@ La garanzia: i sats in garanzia possono prendere due strade sole, andare a chi c
 
 Come si legge una card del libro: in alto a destra due quadratini con una freccia dicono cosa invii e cosa ricevi (le stelle blu dell'Europa per gli euro, la T verde di Tether per gli USDT, il fulmine nero per i sats su Lightning, la ₿ arancio per bitcoin on-chain). Sotto ci sono la cifra da inviare e quella da ricevere, i metodi di pagamento e, nel riquadro in fondo, la faccia di chi ha pubblicato con le sue stelline e quanti scambi P2P ha già fatto («✅ 22 scambi P2P»); toccando la faccia si apre il suo negozio (anche sulle card on-chain; se non ha ancora un negozio, l'app te lo dice e non apre l'ordine). La riga colorata sul bordo di sotto è il tempo che resta all'ordine: si accorcia, diventa arancio negli ultimi tre giorni e rossa, lampeggiante, nell'ultimo.
 
-<!-- pezzo libro-021 | libro -->
+<!-- pezzo libro-022 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (2/20)
 
 Il prezzo di bitcoin nel libro: in cima al libro P2P, sotto i rettangoli «Novità», c'è la card «1 BTC adesso» col prezzo in euro (lo stesso che l'app usa per i conti, aggiornato ogni minuto), quanto è salito o sceso e una piccola linea, verde se sale e rossa se scende. Toccandola si passa dalle ultime 24 ore ai 7 giorni e ai 30 giorni; toccando il simbolo € si passa ai dollari (prezzo, linea e percentuale in dollari) e un altro tocco torna agli euro. La card è grafite lucida, un grigio scuro con un riflesso in alto a sinistra (dal 16 novembre 2026), sia di giorno sia di sera, per staccarsi dagli ordini; in dollari è identica a quella in euro (linea, percentuale e periodo, e il tocco cambia periodo anche lì). Subito dopo un aggiornamento può mostrare solo il prezzo, finché non ha la storia del periodo.
@@ -230,7 +233,7 @@ L'ordine del libro: in cima al libro P2P la pillola con le tre righe (di serie d
 
 Premio e sconto: chi pubblica può chiedere fino al 20% sopra o sotto il prezzo di mercato. Sopra si chiama premio e conviene a chi vende, sotto si chiama sconto e conviene a chi compra. La riga c'è sempre nel conto.
 
-<!-- pezzo libro-022 | libro -->
+<!-- pezzo libro-023 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (3/20)
 
 La commissione del P2P la decide il coordinatore ed è già dentro i sats che passano di mano: chi vende ne blocca un po' di più, chi compra ne riceve un po' di meno. Nell'ottobre 2026, durante la beta, è il 3% in tutto, cioè 1,5% per chi compra e 1,5% per chi vende; finita la beta sarà del 4% (2% per parte). Pionieri e chi è al livello 5 hanno uno sconto dello 0,5% sulla propria parte. La cifra esatta la vedi sempre nel conto, prima di prendere un ordine. Dal 16 novembre 2026 la stessa commissione, con gli stessi sconti, vale anche negli scambi P2P on-chain (a tre chiavi); gli acquisti del mercatino, anche on-chain, restano senza commissioni di Barattolo (on-chain al più la quota fissa per le spese di rete, vedi «Bitcoin on-chain»). Pubblicare o prendere un ordine non costa niente. Il riquadro colorato delle commissioni in cima al libro P2P compare solo la prima volta, alla fine del tutorial: poi non c'è più, e si rivede rifacendo «Come funziona» fino a «Fine 🎉» (toccandolo si apre il dettaglio con lo sconto).
@@ -239,21 +242,21 @@ I metodi di pagamento degli euro sono un elenco chiuso: SEPA (il bonifico), SEPA
 
 I tempi: se il tempo scade prima che i sats siano bloccati non perde niente nessuno, e l'ordine torna nel libro o si chiude. Coi sats in garanzia avete circa quattro giorni: se chi compra non ha detto di aver pagato, allo scadere i sats tornano da soli a chi vende; se l'ha detto, si apre una disputa.
 
-<!-- pezzo libro-023 | libro -->
+<!-- pezzo libro-024 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (4/20)
 
 Il tempo per pagare (dal 18 novembre 2026): chi pubblica un ordine «Vendi BTC» sceglie nel foglio, alla voce «Tempo per pagare», con un cursore e un anello, entro quanto chi lo prende deve mandare i soldi: da 15 minuti a 24 ore (24 di serie). Sotto le 24 ore si scende solo se tutti i metodi dell'ordine sono veloci (SEPA Instant, Revolut, Satispay, PayPal, USDT o cripto): con un bonifico ordinario, Wise o i contanti fra i metodi il cursore resta fermo a 24 ore e l'app dice quale metodo lo blocca. Non c'è col tabacchino, col contanti di persona, col contante per posta e sugli ordini «Compra BTC». Nel libro gli ordini con meno di 24 ore hanno il bollino «⏱ 30 min» (o il tempo scelto): chi vende ha fretta. Chi guarda l'ordine prima di prenderlo legge «Se lo prendi hai 30 minuti per inviare gli euro». Il tempo parte quando i sats sono in garanzia (sull'on-chain quando il deposito è confermato): da lì, nella pagina dello scambio, tutti e due vedono un anello che si svuota e quanto resta, e il bot manda promemoria col tempo che resta. Sugli scambi Lightning, se allo scadere chi compra non ha toccato «Ho inviato gli euro», lo scambio si annulla da solo e i sats tornano a chi vende, anche se gli euro erano partiti: chi li aveva mandati senza toccare il bottone scrive subito all'assistenza, e chi vende, se gli euro arrivano lo stesso, li rimanda. Conta come scambio non completato per chi compra, ma solo se chi vende aveva detto dove ricevere gli euro nella prima metà del tempo. Sugli scambi on-chain allo scadere non si annulla niente (i sats sono nel deposito 2-di-3 e servono due firme): arriva un avviso a tutti e due e chi vende può aprire una disputa.
 
 Annullare uno scambio Lightning appena preso (quelli on-chain, con la ₿ arancio, hanno regole diverse: vedi più sotto): prima che i sats siano in garanzia NON serve aspettare. Chi ha preso l'ordine o chi l'ha pubblicato tocca «✕ Annulla» nella pagina dello scambio e poi «Sì, annulla»: lo scambio si annulla subito, senza il sì dell'altra persona, e nessuno perde niente. Se chi vende aveva già bloccato i sats (succede quando chi vende prende un ordine di acquisto), tornano subito a lui. Se annulla chi aveva preso, l'ordine torna subito nel libro, e chi l'aveva pubblicato riceve «Il tuo ordine è tornato in vetrina: non devi fare niente.». Se annulla chi l'aveva pubblicato, l'ordine si chiude: per rimetterlo nel libro va pubblicato di nuovo. Solo dopo, coi sats in garanzia, annullare da soli non si può più: serve l'annullo d'accordo, uno lo propone con «✕ Annulla» e l'altro accetta con «🤝 Accetta di annullare». Dopo «Ho inviato gli euro» il bottone «✕ Annulla» non c'è più: resta «⚠️ Apri una disputa». Se chi ha preso l'ordine ha toccato «✕ Annulla» ma l'annullo non è arrivato (la rete, la pagina chiusa a metà) e poi il tempo scade, il bot scrive «Non hai proseguito in tempo» con sotto «Avevi chiesto di annullare: questo non conta come scambio non completato.» (dal 17 novembre 2026): nessuna penalità.
 
-<!-- pezzo libro-024 | libro -->
+<!-- pezzo libro-025 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (5/20)
 
 Il paracadute degli ordini P2P: nel foglio «Pubblica», dopo la pausa, la sezione «🪂 Paracadute» ha due righe (dal 17 novembre 2026), «📈 Se BTC sale» e «📉 Se BTC scende», ognuna Nessuna, 5%, 10% o 20%. Se prima che qualcuno prenda l'ordine il prezzo di BTC si muove più di così in quel verso rispetto al momento della pubblicazione, l'ordine esce dal libro da solo, senza penalità, e il bot avvisa col tasto «🔁 Ripubblica al prezzo nuovo». Esempio: «sale: Nessuna» e «scende: 5%» tengono l'ordine se BTC sale e lo tolgono se scende più del 5%. Servono due letture di fila oltre la soglia, a un minuto l'una dall'altra. Di serie le due righe sono su «Nessuna», e il foglio non ricorda la scelta di prima. Sulla card del proprio ordine si legge «🪂 Paracadute ↑10% ↓5%» (freccia in su = salita, in giù = discesa). Gli ordini pubblicati prima del 17 novembre avevano una soglia sola, e vale nei due versi. Uno scambio già preso va avanti come sempre. Non c'è sugli ordini Barattozon in «Vendi BTC». Vale anche per gli ordini on-chain.
 
 La ripubblica (dal 16 novembre 2026): gli ordini nel libro durano un tempo fissato, una settimana, sia quelli Lightning sia quelli on-chain (dal 16 novembre 2026; prima gli on-chain 24 ore), e poi scadono se nessuno li ha presi. Nel foglio «Pubblica», sotto il paracadute, c'è la sezione «🔁 Ripubblica»: scrivi due prezzi di un bitcoin, da X a Y, nella valuta dell'ordine (euro, franchi, o dollari per gli USDT; per gli ordini in ETH, Monero o USDe il prezzo di BTC è in euro). Quando l'ordine scade, se in quel momento BTC è fra quei due prezzi (anche esattamente su uno dei due), l'ordine viene ripubblicato uguale: stessa cifra, a prezzo fisso gli stessi sats, a mercato lo stesso premio o sconto, stessi metodi, zona e paracadute. Succede a ogni scadenza, finché BTC resta dentro. Se lasci i campi vuoti non si ripubblica niente, e il foglio riparte sempre vuoto. Il bot ti avvisa ogni volta, nel messaggio della scadenza: «Lo ripubblico uguale» oppure «Non l'ho ripubblicato», col prezzo di BTC di quel momento. Gli ordini Lightning li ripubblica il tuo telefono appena apri Barattolo (su qualunque pagina, senza fare niente): finché non lo apri l'ordine resta fuori dal libro, e se nel frattempo BTC è uscito dall'intervallo non si ripubblica. Gli ordini on-chain li ripubblica Barattolo subito, anche a telefono spento, per un'altra settimana. Per smettere: nella pagina del tuo ordine tocca «Non ripubblicarlo più». Sulla card del tuo ordine c'è la riga «🔁 Ripubblica da… a…». Non vale per Barattozon in «Vendi BTC» (il PayCode scade da solo); vale invece per Barattozon in «Compra BTC», dove il PayCode lo scrive chi prende l'ordine (dal 16 novembre 2026), e per gli ordini in ETH, Monero o USDe. Barattolo decide solo con un prezzo di BTC aggiornato, mai con uno vecchio.
 
-<!-- pezzo libro-025 | libro -->
+<!-- pezzo libro-026 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (6/20)
 
 La disputa nel P2P: si apre solo coi sats già in garanzia, col bottone «⚠️ Apri una disputa» in fondo alla pagina dello scambio. Ferma lo scambio e chiama un moderatore, che potrà leggere la chat di quello scambio. Se è solo una domanda o un ritardo, prima scrivi all'altra persona nella chat. Chi vende può sempre liberare i sats anche a disputa aperta, e la disputa si chiude.
@@ -269,7 +272,7 @@ Contanti di persona (metodo «Contanti»): ci si incontra, chi compra sats porta
 
 Contante per posta (metodo «Contante per posta», dal 17 novembre 2026, sotto «Altri metodi ▾»): chi compra sats spedisce le banconote a chi li vende, in una busta di carta sigillata dentro una busta di plastica sigillata, nascoste in un pacco con altro dentro; chi vende dà nome e indirizzo dentro lo scambio, cifrati come un IBAN. Le regole, le stesse di Bisq: si spedisce solo a «Sats in garanzia», con un servizio tracciato (meglio quello di Poste Italiane per denaro e valori, da sportello: è l'unico che ammette il denaro e lo rimborsa, fino a 3.000 €; posta ordinaria e corrieri il denaro lo escludono dal rimborso); chi spedisce filma mentre chiude busta e pacco col numero di tracciamento in vista e scrive il numero nella chat dello scambio; chi riceve apre il pacco filmando, col tracciamento in vista, fino alle banconote contate, e poi libera. Chi prende un ordine scegliendo «Contante per posta» blocca la stessa piccola cauzione del contanti di persona. In disputa contano solo le prove: tracciamento consegnato e i due video. Mai scrivere «contanti» sulla busta. Vale anche in franchi svizzeri. Il metodo si accende con una leva: se sotto «Altri metodi ▾» non lo vedi, da voi non è ancora attivo, e non c'è niente da sbloccare.
 
-<!-- pezzo libro-026 | libro -->
+<!-- pezzo libro-027 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (7/20)
 
 Gli avvisi dei nuovi ordini P2P: nel libro P2P, la campanella 🔔 in alto apre «Avvisami dei nuovi ordini P2P». Acceso, il bot ti scrive quando nel libro arrivano ordini nuovi del tipo che scegli: «Compra BTC» (ordini di chi vende, dove compri tu), «Vendi BTC» (ordini di chi compra, dove vendi tu), Barattozon. Nel messaggio ogni ordine ha la sua riga, che comincia con «🟢 Compra BTC» o «🔴 Vendi BTC» dal tuo punto di vista, poi la cifra, i metodi e la convenienza; toccando «🟢 Compra BTC» o «🔴 Vendi BTC» di una riga si apre quell'ordine nel libro, come toccando la sua card, e se l'ordine nuovo è uno solo il tasto in fondo è «🫙 Apri l'ordine» (con più ordini resta «🫙 Apri il libro ordini»; dal 18 novembre 2026, anche per gli ordini on-chain). Sotto «Metodo di pagamento» puoi lasciare «Tutti» o scegliere uno o più metodi (SEPA, Revolut, Satispay, Contanti...): ti arrivano solo gli ordini che ne accettano almeno uno (dal 18 novembre 2026). Sotto «Convenienza» puoi lasciare «Tutti» oppure toccare «Con un limite» e scegliere fin dove ti va bene: «Fino a 10% peggio», «Fino a 5% peggio», «Fino a 2% peggio», «A prezzo di mercato o meglio», «Almeno 2% meglio», «Almeno 5% meglio». «Peggio» e «meglio» sono sempre dal tuo punto di vista, rispetto al prezzo di mercato: con «Fino a 5% peggio» ti avvisa di tutto tranne gli ordini che ti costerebbero più del 5% sopra il mercato (o che, se vendi, pagano più del 5% sotto). Lo stesso blocco sta nel Profilo, nel cassetto «🔔 Avvisi». Non ti avvisa mai dei tuoi ordini.
@@ -278,7 +281,7 @@ I post nei canali Telegram di Barattolo: quando un ordine P2P viene preso, annul
 
 La mappa del contanti: nel libro P2P, in alto accanto alla campanella, il tondo con la mappa colorata 🗺️ apre l'Italia coi pallini delle offerte in contanti di persona. Dal 16 novembre 2026 c'è sempre, sia in «Compra BTC» sia in «Vendi BTC»: se nel tab non ci sono offerte in contanti la mappa si apre vuota e lo dice. In fondo alla mappa c'è l'interruttore «Notifiche nuove offerte in contanti», spento di serie: acceso, sul tondo compare quante offerte in contanti nuove sono arrivate dall'ultima volta che hai aperto la mappa, e aprendola il numero sparisce. La scelta resta su quel telefono; si vede anche mentre scorri le card. Ogni pallino sta sul centro del comune dove la persona propone di vedersi, mai su un indirizzo. Si avvicina con due dita, con la rotellina o con un doppio tocco; toccando un comune l'elenco mostra solo le sue offerte e la pagina scende da sola fino a loro.
 
-<!-- pezzo libro-027 | libro -->
+<!-- pezzo libro-028 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (8/20)
 
 La mappa del ritiro a mano: nel mercatino, in fondo alla barra di ricerca, il tondo 🗺️ apre l'Italia coi pallini degli annunci che si possono ritirare di persona («🤝 Ritiro in zona», anche insieme alla spedizione). Ogni pallino sta sul centro del comune scritto nella «Zona» dell'annuncio, mai sull'indirizzo: il posto esatto si decide in chat. Con la mappa aperta sotto restano solo gli annunci col ritiro a mano; toccando un comune restano solo i suoi (la pagina scende da sola fino a loro), e la pillola «📍 Comune ✕» riporta a tutti. Si muove come quella del P2P: due dita, rotellina, doppio tocco, ＋ − ⟲. In fondo alla mappa l'interruttore «Notifiche nuovi annunci col ritiro a mano», spento di serie: acceso, sul tondo compare quanti annunci col ritiro sono arrivati dall'ultima volta che hai aperto la mappa. Per comparire sulla mappa basta scrivere il nome del comune nella «Zona» quando si vende.
@@ -287,7 +290,7 @@ Revolut: chi riceve gli euro su Revolut sceglie come, con tre bottoni nel modulo
 
 Se chi vende chiede di annullare uno scambio coi sats già in garanzia, chi compra non è obbligato ad accettare: se ha già mandato gli euro o li vuole mandare, ha ancora «Ho inviato gli euro», e può aprire una disputa.
 
-<!-- pezzo libro-028 | libro -->
+<!-- pezzo libro-029 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (9/20)
 
 Barattozon (nel libro «Contanti al tabacchino»): chi vende sats fa un ordine Amazon da pagare in contanti nel punto vendita, e chi compra lo paga alla cassa di un tabacchino abilitato col PayCode. Il PayCode vale almeno 25 € e Amazon lo accetta fino a 999 €. Il PayCode arriva a chi compra solo quando i sats sono in garanzia (prima nella pagina non si vede), quindi si paga solo quando la pagina dice «Sats in garanzia»; si tiene lo scontrino come prova, e poi si tocca «Ho pagato al tabacchino». Chi vende controlla su Amazon che l'ordine risulti pagato e libera i sats. Alla cassa bisogna dire «devo pagare un ordine Amazon in contanti con un PayCode»: non una ricarica e non un buono regalo. Barattozon c'è da tutti e due i lati del libro: anche chi COMPRA sats può pubblicare un ordine «al tabacchino», con una fascia di euro (per esempio da 30 a 80 €, il massimo è obbligatorio); chi vende lo prende scrivendo il PayCode (importo esatto, le nove cifre, la scadenza) e chi compra lo paga al tabacchino. Barattozon in «Vendi BTC» c'è anche on-chain (dal 17 novembre 2026): nel foglio «Pubblica», sopra, si tocca «On-chain» invece di «Lightning». Lì il PayCode deve scadere fra almeno 12 ore (il deposito si conferma in rete e poi bisogna andare al tabacchino), l'ordine esce dal libro da solo 8 ore prima della scadenza, e il PayCode lo custodisce Barattolo: chi prende lo vede solo quando i sats di chi vende sono confermati nel deposito a tre chiavi. La commissione di rete del deposito la paga chi vende. Con meno di 12 ore, meglio Lightning. Anche Barattozon in «Compra BTC» c'è on-chain (dal 17 novembre 2026, sera): chi compra pubblica la fascia a prezzo di mercato; chi prende scrive importo, PayCode e una scadenza fra almeno 8 ore, poi deposita i sats, e chi compra vede il PayCode solo a deposito confermato e lo paga al tabacchino.
@@ -298,7 +301,7 @@ Ordini P2P in USDT (se nei NUMERI DI OGGI «Ordini P2P in USDT» è acceso): al 
 - Nel libro un ordine in USDT si riconosce dalla T verde di Tether nei quadratini in alto a destra della card.
 - Nella home, nella fila «Scambi P2P», la card di un ordine in USDT è verde, con la moneta ₿ accanto alla T di Tether, e la cifra è scritta in USDT. Gli ordini in euro hanno la card di sempre, col ₿ e l'euro.
 
-<!-- pezzo libro-029 | libro -->
+<!-- pezzo libro-030 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (10/20)
 
 - Dal 16 novembre 2026 nella fila della home ci sono anche gli ordini on-chain (anche in USDe, ETH, Monero e franchi), mescolati con quelli Lightning, il più nuovo per primo. In fondo a ogni card, a destra, un piccolo simbolo dice la rete: il fulmine per Lightning, la ₿ arancio per on-chain. Toccando una card on-chain si apre il suo foglio. I propri ordini non compaiono nella propria home (si vedono nel libro e in «I miei scambi»), ma gli altri li vedono.
@@ -311,7 +314,7 @@ Ordini P2P in USDT (se nei NUMERI DI OGGI «Ordini P2P in USDT» è acceso): al 
 
 Ordini P2P in franchi svizzeri (se nei NUMERI DI OGGI «Scambi P2P pagati in franchi svizzeri (CHF)» è disponibile): al posto degli euro l'ordine è in franchi svizzeri, CHF. I sats restano su Lightning con la garanzia di sempre; i franchi passano direttamente da una persona all'altra, e Barattolo non li tocca mai.
 
-<!-- pezzo libro-030 | libro -->
+<!-- pezzo libro-031 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (11/20)
 
 - Nel libro un ordine in franchi si riconosce dalla croce bianca su fondo rosso nei quadratini in alto a destra della card; nella home la sua card è rossa, col ₿ accanto al franco, e la cifra è scritta in CHF.
@@ -323,7 +326,7 @@ Ordini P2P in ETH, Monero o USDe (se nei NUMERI DI OGGI «Scambi P2P pagati in E
 - Per pubblicarne uno: scheda «P2P», nuovo ordine, e in cima al foglio si sceglie la valuta: EUR, USDT, ETH, XMR o USDe. Sotto compare solo la sua lista: con ETH «ETH (Ethereum)», con XMR «XMR (Monero)», con USDe le sue cinque reti, «USDe (Ethereum)», «USDe (Arbitrum)», «USDe (Base)», «USDe (BNB Chain)» e «USDe (Solana)», una o più. Con l'euro restano solo i metodi classici (bonifico, Revolut, contanti…).
 - L'importo si scrive nella moneta (per esempio 0,02 ETH o 50 USDe), ed è uno solo, senza una fascia «da… a…». Dal 16 novembre 2026 funziona come in euro: a prezzo di mercato la cifra in moneta resta quella, e i sats si fanno quando qualcuno prende l'ordine, al cambio di quel momento e col premio o lo sconto scelto. Il cambio della moneta conta al mezzo euro. Se il cambio si sposta di oltre il 5% da quando l'ordine è stato pubblicato, chi l'ha pubblicato lo vede scritto nella pagina dell'ordine; se si sposta troppo (circa il 30%) l'ordine non si può più prendere e conviene rifarlo. Si può anche scrivere un prezzo fisso in sats: allora i sats non cambiano più. Per ordini molto piccoli o vicini al tetto può succedere che il mercato non ci stia: allora i sats si fissano quando si pubblica, come prima.
 
-<!-- pezzo libro-031 | libro -->
+<!-- pezzo libro-032 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (12/20)
 
 - Nel libro ogni valuta ha il suo filtro in cima (EUR, USDT, ETH, XMR, USDe), e la card mostra il logo della moneta nei quadratini in alto a destra e la cifra nella moneta, per esempio «Invia 0,0153 ETH».
@@ -334,7 +337,7 @@ Ordini P2P in ETH, Monero o USDe (se nei NUMERI DI OGGI «Scambi P2P pagati in E
 - Chi vende controlla l'arrivo col tasto «🔎 Controlla su …» (Etherscan, xmrchain, Arbiscan, Basescan, BscScan o Solscan) e libera i sats solo quando ci sono davvero. Se qualcosa non torna si apre una disputa.
 - Dal 16 novembre 2026 ETH, Monero e USDe ci sono anche negli scambi on-chain (a tre chiavi): i bitcoin restano nel deposito, chi compra paga nella moneta. Lì si sceglie una rete sola, e chi paga vede rete, cifra da copiare e QR (l'id della transazione: vedi più sotto).
 
-<!-- pezzo libro-032 | libro -->
+<!-- pezzo libro-033 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (13/20)
 
 - In cima al libro (dal 16 novembre 2026) ci sono tre rettangoli «Novità»: quello arancio «On-Chain», quello verde delle stablecoin «USDT · USDe» (dice solo quel che c'è) e quello blu «ETH · XMR». Ognuno apre il suo breve tutorial: il verde mostra un ordine in USDe col bollino della rete, il foglio e le reti; il blu mostra le due monete, il foglio in ETH e il prezzo di mercato. Si possono rivedere toccandoli di nuovo. Scorrendo il libro verso il basso i tre diventano un rettangolo solo, con le icone di tutte le monete e la scritta «Novità», che resta in alto; scorrendo verso l'alto (o toccandolo) tornano subito i tre.
@@ -346,24 +349,24 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - Il giro, passo per passo: chi prende fa nascere l'indirizzo a tre chiavi. Chi vende ha 6 ore per depositare con «🔒 Blocca i sats»: i sats dello scambio più un piccolo margine per la commissione della rete, più la sua metà della commissione del P2P. Con una conferma della rete (circa dieci minuti) lo scambio va avanti, e tutti e due ricevono l'avviso. Allora chi compra manda gli euro col metodo scritto e tocca «💶 Ho inviato gli euro». Chi vende li controlla sul suo conto e SOLO quando li vede tocca «🔓 Ricevuti: libera i sats»; la seconda firma la mette da solo il telefono di chi compra, e i bitcoin partono.
 - Chi compra deve dire dove ricevere: nello scambio c'è «Dove ricevi i bitcoin?», si incolla un proprio indirizzo e si tocca «✍️ Firma e usa questo indirizzo». Chi ha messo nel Profilo la chiave del conto del suo wallet non deve scriverlo ogni volta: ogni scambio arriva a un indirizzo nuovo.
 
-<!-- pezzo libro-033 | libro -->
+<!-- pezzo libro-034 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (14/20)
 
 - Finché nessun sats è arrivato nel deposito, chi compra può annullare quando vuole con «✕ Annulla» (dal 17 novembre 2026; prima solo a tempo del deposito finito, e allora il tasto si chiama «Rinuncia: il deposito non è arrivato»); chi deve depositare e non ha ancora mandato niente può annullare («Annulla (non deposito)»). Con i sats già nel deposito non si annulla da soli: si esce col rimborso d'accordo o con «⚖️ Apri una disputa». Due eccezioni per un deposito incompleto (dal 18 novembre 2026). Se mancano pochi sats, tipicamente le commissioni di uno swap, lo scambio va avanti lo stesso: li copre il margine per la rete che chi vende ha già messo, fino a metà del margine, e il bot glielo dice («Sono arrivati N sats in meno»). Se ne mancano di più, la pagina dice «ne mancano N perché il deposito valga» e chi ha depositato, dopo la prima conferma, può toccare «↩️ Annulla e riprendi i sats»: lo scambio si chiude, Barattolo firma il rimborso verso il suo wallet e il suo telefono mette la seconda firma. Chi ha depositato può anche chiedere a chi compra di annullare con «🙏 Chiedi a chi compra di annullare» (dal 18 novembre 2026, solo prima che chi compra dica di aver pagato): il bot gli scrive, e se è d'accordo tocca «Rinuncio»: in quel caso a chi rinuncia non si conta nessuno «scambio non completato» e nessuna cauzione si perde, perché fa un favore. Se hai già mandato i soldi non rinunciare: tocca «Ho inviato» o scrivi nella chat. I sats non tornano mai all'indirizzo da cui sono partiti (per esempio la piattaforma di swap): vanno al wallet del Profilo o all'indirizzo scritto nel riquadro «Dove tornano i sats?». Decide un moderatore di Barattolo, Barattolo mette la sua firma e la seconda la mette il telefono di chi ha ragione. Uno scambio on-chain annullato si chiude: a differenza di Lightning non torna nel libro, chi l'aveva pubblicato lo ripubblica.
 - Dove tornano i sats (dal 17 novembre 2026): chi vende bitcoin on-chain e non ha scelto un wallet nel Profilo trova, nel foglio «🔒 Blocca i sats» prima del codice QR, il riquadro «Dove tornano i sats?»: incolla un indirizzo del suo wallet Bitcoin e tocca «✍️ Firma e usa questo indirizzo». Vale per quello scambio: lì tornano i sats se lo scambio si annulla, e il resto quando li libera. Se ha già depositato, lo stesso riquadro è nella pagina dello scambio. Non è il riquadro «Dove vuoi gli euro», che è il recapito per farsi pagare: lì un indirizzo bitcoin non serve. Chi ha scelto il wallet nel Profilo (Profilo, «₿ On-chain», «Dove ricevi i bitcoin») non deve scrivere niente.
 
-<!-- pezzo libro-034 | libro -->
+<!-- pezzo libro-035 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (15/20)
 
 - Quando chi compra non ha ancora scelto dove ricevere (scambi on-chain, dal 17 novembre 2026): chi vende che tocca «Ricevuti: libera i sats» prima che chi compra abbia indicato il suo wallet legge «⏳ Chi compra non ha scelto dove ricevere» e può toccare «🔔 Ricordaglielo» (c'è anche nella pagina dello scambio): il bot scrive a chi compra di incollare un indirizzo nel riquadro «Dove ricevi i bitcoin?». Si può ricordare una volta all'ora. Quando chi compra sceglie dove ricevere, nello scambio o nel Profilo, il bot lo dice a chi vende con «📍 Chi compra ha scelto dove ricevere», e da lì «Ricevuti» manda i sats a quell'indirizzo. Fino ad allora i sats restano al sicuro nel deposito a tre chiavi.
 - Rinunciare coi sats già nel deposito (dal 17 novembre 2026): chi compra tocca «↩️ Rinuncio: rimborsa chi vende». Se chi vende non ha ancora scritto dove riavere i sats, non è un errore: la rinuncia viene registrata, la pagina dice «Hai chiesto di rinunciare» e il bot avvisa chi vende («Chi compra vuole rinunciare») col tasto che apre lo scambio. Appena chi vende scrive l'indirizzo, a chi compra arriva «Ora puoi rinunciare» e tocca di nuovo «Rinuncio». Poi il telefono di chi vende mette la seconda firma quando apre l'app, e i sats tornano a lui meno la commissione di rete. Un moderatore non può saltare questo passaggio: senza l'indirizzo di chi vende il rimborso non ha dove andare, e i sats restano al sicuro nel deposito.
 
-<!-- pezzo libro-035 | libro -->
+<!-- pezzo libro-036 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (16/20)
 
 - Il contanti di persona negli scambi on-chain (dal 17 novembre 2026): come nel Lightning, chi pubblica un ordine on-chain con «Contanti» scrive la zona di scambio (una città o una zona, mai un indirizzo), la card la mostra con «📍», e vale lo stesso tetto in euro per scambio (vedi i NUMERI DI OGGI). Gli ordini on-chain in contanti pubblicati prima non hanno la zona. Lo scambio on-chain in contanti (quando «Contanti» è l'unico metodo dell'ordine) va come quello Lightning: chi vende scrive nello scambio «📍 Dove vedervi» (luogo, giorno e ora; chi compra ha «🧭 Apri nel navigatore» se l'indirizzo è stato riconosciuto), quando i sats sono nel deposito di garanzia ognuno può segnare «📍 Sono qui» dal suo telefono (facoltativo: registra l'ora e, se il telefono la dà, la posizione; l'altra persona vede solo l'ora, mai la posizione), chi compra consegna i contanti e tocca «💵 Ho consegnato i contanti», chi vende li conta e tocca «Ricevuti: libera i sats» lì davanti. In disputa un moderatore guarda le presenze, con la stessa regola del Lightning. Su un ordine on-chain con «Contanti» insieme ad altri metodi, chi prende sceglie il metodo nel foglio dell'ordine prima di toccare «Compra» o «Vendi»: scegliendo «Contanti» lo scambio va in contanti di persona, scegliendo un metodo online va come un bonifico; il metodo scelto resta fissato. La cauzione negli scambi on-chain in contanti non è ancora attiva: è in prova, e quando arriverà si bloccherà in Lightning con un QR e tornerà a fine scambio. Quando sarà attiva, chi vende in un ordine on-chain («Vendi BTC») potrà anche chiederla a chiunque lo prenda, con qualunque metodo (nel foglio «Pubblica», voce «Cauzione di chi prende»; sulla card il bollino «🔐 Cauzione»): serve a chi deposita i bitcoin, che se lo scambio salta paga due volte la commissione di rete, per il deposito e per il ritorno. Questa cauzione chi prende la perde da sola, senza moderatore, se rinuncia dopo che i bitcoin sono nel deposito o se lascia scadere il tempo per pagare senza toccare «Ho inviato» (non se chi vende non aveva scritto dove pagare, e non se l'annullo l'aveva chiesto chi vende); metà va a chi vende, gliela manda un moderatore.
 
-<!-- pezzo libro-036 | libro -->
+<!-- pezzo libro-037 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (17/20)
 
 - Ritirarsi dopo che l'altro ha bloccato i sats (scambi on-chain, dal 17 novembre 2026): non c'è nessuna cauzione e nessuna penale in denaro. Però a chi compra bitcoin e rinuncia a deposito già confermato, quando chi vende aveva già scritto dove pagare, viene contato uno «scambio non completato», come nel Lightning: il primo è tollerato, con un secondo nello stesso mese non si prendono gli ordini con filtro (1+, 3+, 5+) per 30 giorni, e da due in 90 giorni compare sul profilo. Il foglio di «↩️ Rinuncio» lo dice prima della firma. In più chi aveva bloccato i sats può lasciargli una recensione dalla pagina dello scambio (solo lui: chi si è ritirato no). Lo stesso «non completato» vale per chi lascia finire il tempo per pagare senza toccare «Ho inviato» e poi un moderatore, in disputa, rimanda i sats a chi vende. Non conta mai se chi vende non aveva scritto dove pagare, né prima del deposito confermato (lì c'è «✕ Annulla»).
@@ -371,7 +374,7 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - La commissione (dal 16 novembre 2026) è quella degli scambi Lightning, metà a testa e con gli stessi sconti: chi vende deposita la sua metà insieme ai sats, chi compra riceve i sats meno la sua metà. Nel conto dello scambio, e già nel foglio prima di prendere, c'è la riga «Fee P2P» con la percentuale, come negli scambi Lightning. Se lo scambio finisce col rimborso a chi vende, torna tutto, commissione compresa. Sotto i 546 sats di commissione in tutto non si paga niente.
 - Il tempo per pagare (dal 17 novembre 2026): dal deposito confermato chi compra ha 24 ore per pagare, in USDT, ETH, Monero o USDe come in euro e franchi (per euro e franchi all'inizio erano 72 ore: non più). Col PayCode di Barattozon il tempo è la scadenza del PayCode. La card in «I miei scambi» dice quanto resta («Hai ancora 23 h 10 min») e ha la barra del tempo sul bordo di sotto; la pagina dello scambio ha la riga «Tempo per pagare» col conto che scorre. Alla scadenza non si annulla niente, i bitcoin restano nel deposito: il bot avvisa tutti e due, chi compra se ha già pagato tocca «Ho inviato», e chi vende, se i soldi non sono arrivati, può aprire una disputa. La disputa si può aprire anche prima.
 
-<!-- pezzo libro-037 | libro -->
+<!-- pezzo libro-038 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (18/20)
 
 - Il tempo del bonifico (scambi on-chain in euro o franchi): da quando chi compra tocca «Ho inviato», chi vende ha 48 ore per veder arrivare il bonifico e liberare i sats. La pagina dello scambio dice fino a quando. Passate le 48 ore senza che abbia liberato, il bot avvisa tutti e due: chi vende libera se gli euro ci sono, altrimenti apre una disputa; chi compra apre una disputa con «⚖️ Apri una disputa» e tiene pronta la ricevuta. Niente si annulla e niente si libera da solo: i bitcoin restano nel deposito finché una delle due parti non fa il suo gesto o decide un moderatore. Non vale per USDT e monete (arrivano in minuti), per il PayCode e per i contanti di persona.
@@ -381,7 +384,7 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - La chat negli scambi on-chain (dal 17 novembre 2026), come nel Lightning: da quando l'ordine è preso a quando i sats vengono liberati o rimborsati c'è una chat fra voi due, cifrata, con foto e PDF, in fondo alla pagina dello scambio («💬 Chat» in cima porta giù). Quando l'altra persona ti scrive, il bot dice «Hai un nuovo messaggio nello scambio on-chain» (mai il testo) e il bottone «🟠 Apri lo scambio» porta dritto alla chat. Se l'altra persona non ha ancora aperto Barattolo, al posto del campo c'è «🔔 Avvisa». In una disputa il moderatore la legge; a scambio finito si cancella.
 - A fine scambio la pagina dice «Concluso: i sats sono andati al wallet di chi ha comprato» oppure «Rimborsato: i sats sono tornati a chi li aveva depositati». Il messaggio del bot a chi compra dice i sats netti, cioè già tolta la sua metà della commissione, come la card.
 
-<!-- pezzo libro-038 | libro -->
+<!-- pezzo libro-039 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (19/20)
 
 - La recensione (dal 17 novembre 2026): a scambio on-chain concluso, nella pagina dello scambio c'è «⭐ Lascia una recensione», come negli scambi Lightning: stelle e commento vanno sul profilo dell'altra persona, nella stessa media del mercatino, e si possono modificare una volta o cancellare per qualche giorno. C'è anche quando una disputa l'ha decisa un moderatore; non c'è dopo un rimborso d'accordo. Il messaggio del bot «Scambio on-chain concluso!» lo ricorda. Gli scambi on-chain conclusi contano anche nel numero «✅ N scambi P2P» accanto alle stelline (dopo una disputa conta solo per chi ha ricevuto i bitcoin).
@@ -392,14 +395,14 @@ Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete
 - La scelta si fa già nel foglio che si apre toccando l'ordine (dal 16 novembre 2026): sotto «Stai comprando sats» / «Stai vendendo sats» ci sono i due tasti «⚡ Lightning» e «₿ On-chain», già accesi sulla rete dell'ordine. Toccando l'altra rete compare subito quanto costa lo swap di SATS Routing e quanto arriva (o quanto si paga), e nel dettaglio sotto ci sono due righe che il totale conta: «Swap SATS Routing 0,6%» (la commissione del servizio) e «Rete dello swap» (le transazioni sulla rete bitcoin), così si vede che lo swap non è la commissione del P2P anche quando le due cifre si somigliano; la scelta resta, e dopo aver preso il foglio giusto si apre già su quella rete. I tasti ci sono solo dove l'altra rete si può davvero usare.
 - Ordine Lightning, ma vuoi ricevere bitcoin on-chain: nel foglio «Dove ricevere i sats» scegli «₿ On-chain», incolli un tuo indirizzo bitcoin e l'app ti dice quanti sats ti arrivano circa e quanto costa lo swap. Alla liberazione i sats diventano bitcoin al tuo indirizzo. Se il moderatore dà ragione a chi vende, lo swap scade senza costare niente.
 
-<!-- pezzo libro-039 | libro -->
+<!-- pezzo libro-040 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (20/20)
 
 - Scambio on-chain, ma vuoi ricevere in Lightning: nello scambio tocchi «⚡ Ricevi in Lightning» e, quando chi vende ha confermato gli euro, incolli una tua richiesta Lightning (o «⚡ Prendila dal mio Lightning address») e tocchi «✅ Conferma lo swap». Ti arriva il prezzo meno il costo dello swap; se la richiesta non si riesce a pagare, i bitcoin tornano da soli al tuo wallet on-chain di Barattolo. Si torna indietro con «₿ Ricevi on-chain invece».
 - Scambio on-chain che hai preso tu per vendere, ma hai solo sats Lightning: nel foglio «🔒 Blocca i sats» scegli «⚡ Lightning» e tocchi «⚡ Crea la richiesta Lightning»; la paghi col tuo wallet e lo swap mette i bitcoin nel deposito a tre chiavi. Un annullo o un rimborso tornano però on-chain, al tuo wallet di Barattolo.
 - Lo swap ha i suoi limiti di cifra (quelli di SATS Routing): fuori dai limiti l'app lo dice e lo scambio si fa sulla rete dell'ordine.
 
-<!-- pezzo libro-040 | libro -->
+<!-- pezzo libro-041 | libro -->
 ## Libro · Bitcoin on-chain (1/2)
 
 Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla rete principale di Bitcoin: la moneta arancione ₿ le indica in tutta l'app. Quali sono accese, e per chi, lo dicono i NUMERI DI OGGI: una funzione spenta lì non c'è.
@@ -409,7 +412,7 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 - La quota fissa a Barattolo: negli acquisti on-chain del mercatino il conto può avere la riga «Quota fissa a Barattolo (spese di rete)». La paga chi compra, si vede prima di pagare, va a Barattolo quando i sats vengono liberati e col rimborso torna indietro. Quanto vale oggi (o se non c'è) lo dicono i NUMERI DI OGGI.
 - PayJoin negli acquisti on-chain del mercatino (dal 16 novembre 2026, se nei NUMERI DI OGGI è disponibile): il QR e «₿ Apri nel wallet» portano anche un link PayJoin («pj=»), e nel foglio di pagamento compare la riga «🔀 PayJoin». Se il tuo wallet lo sa fare (per esempio Sparrow, BlueWallet, Wasabi, Bull Bitcoin, Cake Wallet), mentre paghi Barattolo aggiunge alla transazione una sua piccola moneta: così chi guarda la blockchain non può più dire che tutti gli ingressi sono tuoi, né leggere a colpo d'occhio quale uscita è il tuo resto. Paghi la stessa cifra, e il deposito a tre chiavi riceve esattamente gli stessi sats. Il tuo wallet può mettere qualche sats in più di commissione di rete per l'ingresso aggiunto (lo decide lui, entro il limite che si dà). Se il wallet non lo sa fare, o se in quel momento Barattolo non ha una moneta pronta, si paga come sempre, senza differenze. La riga non c'è sempre: compare solo quando il PayJoin si può fare. Negli scambi P2P e nello Swap il PayJoin non c'è.
 
-<!-- pezzo libro-041 | libro -->
+<!-- pezzo libro-042 | libro -->
 ## Libro · Bitcoin on-chain (2/2)
 
 - Quando paghi on-chain (un ordine, il deposito di uno scambio P2P, lo Swap) l'app scrive i sats da mandare e, sotto, la riga «In BTC» con la stessa cifra in bitcoin (per esempio 0,00008128 BTC): molti wallet on-chain la chiedono così. Un tocco la copia, col punto (0.00008128), pronta da incollare nel wallet. Se invece inquadri il QR, la cifra il wallet la compila da solo; anche «₿ Apri nel wallet» apre il wallet con indirizzo e cifra già scritti.
@@ -422,7 +425,7 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 - Se non hai ancora scelto dove ricevere, la consegna dei bitcoin a te aspetta: l'app ti manda a Profilo → «₿ On-chain» per sceglierlo.
 - La seconda firma: i sats on-chain escono con due firme su tre. Di solito il tuo telefono mette la sua da solo quando apri Barattolo; nell'ordine c'è anche il tasto «✍️ Metti la seconda firma», che mostra l'anello mentre firma e poi dice com'è andata, o perché non ha firmato (per esempio: la tua chiave sta solo sul telefono con cui hai pagato o venduto). Quando i sats sono partiti l'ordine lo dice, con il link «Vedi la transazione», e il tasto sparisce.
 
-<!-- pezzo libro-042 | libro -->
+<!-- pezzo libro-043 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (1/2)
 
 La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «Cambio») sposta i TUOI sats fra Lightning e un tuo indirizzo bitcoin on-chain, nelle due direzioni, senza un ordine di mezzo. Se è accesa lo dicono i NUMERI DI OGGI.
@@ -436,7 +439,7 @@ La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «C
 
 La privacy dello Swap, cioè chi vede cosa:
 
-<!-- pezzo libro-043 | libro -->
+<!-- pezzo libro-044 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (2/2)
 
 - Barattolo si segna, legati al tuo account, la direzione, la cifra, il numero dello swap e l'indirizzo del servizio dove passano i bitcoin. Non si segna il tuo indirizzo bitcoin né la tua fattura Lightning. Però dal numero dello swap, sulla blockchain pubblica, si può seguire dove sono andati i bitcoin.
@@ -446,7 +449,7 @@ La privacy dello Swap, cioè chi vede cosa:
 - Payjoin: nello Swap non si usa. Da Lightning a bitcoin la transazione verso il tuo indirizzo la prepara il tuo telefono per lo swap, e non sa fare Payjoin: se incolli un link Payjoin («bitcoin:…?pj=…») l'app tiene solo l'indirizzo e i bitcoin arrivano lì con una transazione normale. Da bitcoin a Lightning l'indirizzo del servizio non accetta Payjoin, quindi anche il tuo wallet manda una transazione normale.
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
-<!-- pezzo libro-044 | libro -->
+<!-- pezzo libro-045 | libro -->
 ## Libro · La Caccia a Tappo (il gioco) (1/2)
 
 La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
@@ -461,14 +464,14 @@ Coi bulloni, nella scheda «Bottega», si prendono: attrezzi che si consumano (�
 
 Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il bot te lo dice (senza dire chi è stato). Non devi fare niente: sono visite in più. Nei tuoi annunci, per te, Tappo non si nasconde mai.
 
-<!-- pezzo libro-045 | libro -->
+<!-- pezzo libro-046 | libro -->
 ## Libro · La Caccia a Tappo (il gioco) (2/2)
 
 Il Mondo di Tappo (scheda «Mondo», la prima): Tappo cammina dentro la dispensa, sei zone una sopra l'altra, una per scaffale. Si guida toccando dove andare o trascinando il dito (dal computer anche frecce o WASD). Nel mondo si raccolgono i bulloni sparsi (ognuno si prende una volta), si aprono i barattoli (portano agli annunci di quella categoria), si legge il cartello con la caccia del giorno, si entra in bottega e, nella prima zona, il Banco del cambio porta agli scambi P2P. Le zone più in alto si aprono trovando Tappo più volte. Sul palco di ogni zona ci sono gli annunci in evidenza: chi vende può metterci un suo annuncio in vetrina per un giorno spendendo 40 bulloni (uno al giorno a testa, al massimo 3 annunci per zona). L'evidenza vale solo dentro il gioco, non in Esplora.
 
 Le missioni di Tappo: otto scene brevi a carte, una per zona della «🚀 Rotta per la Luna», il tabellone dei livelli (e tutte in cima alla scheda «Sfide» della Caccia a Tappo), ognuna subito prima della casella che insegna: Tappo ha un problema, Barattolo lo risolve, e alla fine un bottone porta a fare la cosa vera nell'app. Sono «Dal baratto ai sats» (la storia del denaro, prima di «Attiva l'incasso automatico in Lightning»), «Il barattolo col lucchetto» (il deposito di garanzia), «Le dodici parole» (le chiavi sono tue: dove tenere la frase di recupero, e nessuno, nemmeno Barattolo, la chiede mai), «La staffetta del fulmine» (Lightning), «L'oblò scuro» (la privacy: cosa sa Barattolo di te), «Il quaderno di tutti» (Bitcoin è un registro che tengono in tanti, e nessuno lo trucca), «L'antenna di Tappo» (Nostr: gli annunci su tanti relay e un nome che è una chiave tua) e «L'ultimo bullone» (il dimezzamento e i 21 milioni). Ogni missione monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna, all'halving del 2028. Danno da una a tre stelle: la prima volta pagano bulloni, rigiocarle per le tre stelle si può ma non paga di nuovo. Non danno XP. Le parole e i conti dentro le missioni sono finti.
 
-<!-- pezzo libro-046 | libro -->
+<!-- pezzo libro-047 | libro -->
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
@@ -477,7 +480,7 @@ Il nome verificato su Nostr (se nelle REGOLAZIONI del pannello «Nome verificato
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
-<!-- pezzo libro-047 | libro -->
+<!-- pezzo libro-048 | libro -->
 ## Libro · I tuoi dati, in breve
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
@@ -493,12 +496,12 @@ Cancellare l'account: nel Profilo, nel gruppo «Impostazioni» accanto a «🔐 
 
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-048 | libro -->
+<!-- pezzo libro-049 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-049 | libro | sempre -->
+<!-- pezzo libro-050 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -508,7 +511,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-050 | libro | sempre -->
+<!-- pezzo libro-051 | libro | sempre -->
 ## Libro · Parlare con una persona (1/2)
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
@@ -517,7 +520,7 @@ Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla 
 
 I livelli: ogni persona ha un livello che sale con gli XP (li danno solo gli acquisti e le vendite concluse, più una quota per chi inviti) e con il numero di affari conclusi: Nuovo arrivato, Bottega avviata, Mercante pratico, Mercante esperto, Maestro del banco. Lo trovi nel Profilo, nel cassetto «🎖 Livello e titolo». Dal 17 novembre 2026 i livelli si sfogliano come tessere, scorrendo col dito: sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo e quanto manca, i livelli già passati hanno la spunta, quelli davanti il lucchetto; sotto ci sono i vantaggi del livello che stai guardando, ✅ se già tuoi, 🔒 se ancora da sbloccare (sconto sul banner del negozio, link del negozio a scelta, il titolo da mettere sotto il nome, lo sconto sulle commissioni P2P dal livello 5). Il livello si vede anche sul tuo negozio e in classifica, accanto al titolo.
 
-<!-- pezzo libro-051 | libro | sempre -->
+<!-- pezzo libro-052 | libro | sempre -->
 ## Libro · Parlare con una persona (2/2)
 
 Rotta per la Luna (pronta dal 17 novembre 2026, ma PER ORA SPENTA: nel Profilo non c'è ancora, e se qualcuno la chiede si risponde che arriverà presto; nei primi giorni si chiamava «la stradina»). Quando sarà accesa: nel Profilo, nel cassetto «Livello e recensioni», c'è «🚀 Rotta per la Luna», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». All'ingresso di ogni zona Tappo racconta in una frase cosa si impara lì (per esempio al porto: mettere al sicuro i sats con un wallet on-chain e la firma Nostr). La storia è quella del razzo di bulloni, la stessa del gioco di Tappo: Tappo costruisce un razzo per la Luna, un pezzo per zona (piedini, serbatoio, motore, ali, oblò, punta, antenna), il Tarlo e la Gazza dispettosi provano a rubargli i bulloni, e all'halving del 2028 il razzo parte. Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: sta sulla prima casella che manca, quella da fare adesso (quelle fatte più su restano accese), e quando la fai cammina fino alla successiva. La prima volta Tappo si presenta e racconta il razzo (si rivede col tasto «❓ Come funziona» in cima). Toccando la casella da fare, la scheda in basso dice a cosa serve, con «Come funziona?» e i passi (per esempio il primo acquisto spiega il deposito di garanzia); sulle caselle già fatte la scheda non esce. Il bottone «Vai» porta dritto al posto giusto (il cassetto del Profilo, la vetrina, un negozio da seguire, «Vendi») e un riflettore, come nei tutorial dell'app, indica cosa toccare; appena la cosa è fatta l'app torna da sola alla Rotta per la Luna. Quando finisci una zona compare il razzo che prende il pezzo nuovo; toccando il razzo in cima lo si rivede. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». La strada si scopre camminando: si vede la zona dove sei e quella dopo, grigia e spenta, con le caselle ancora misteriose (un cerchio col punto di domanda); quando fai una casella, la prossima si accende e il suo nome compare, con un suono; più su c'è un lucchetto, e il pezzo successivo si apre finendo la zona dove sei. In cima, in fondo alla barra, c'è il razzo di Tappo, che cresce di un pezzo a ogni zona (otto pezzi, dalla pedana ai motori accesi). Il tasto «🗺 Vedi tutta», in alto a destra, mostra il viaggio intero in una schermata (le zone ancora chiuse hanno il lucchetto); toccando una zona si torna lì. Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
@@ -2412,4 +2415,12 @@ pubblico: sì
 frase: Le sottocategorie ora sono card disegnate come le categorie: tocchi Bitcoin e vedi subito tutti i suoi annunci, e sotto spunta una seconda riga con Hardware wallet, Cappellini, Spille e adesivi, Cover per telefono… ognuna col numero di annunci. Un tocco e filtri.
 dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda riga di card sotto la fila (solo le sottocategorie con annunci, che salgono a molla, ognuna con la sua icona disegnata), le altre categorie in grigio e la ✕ sulla categoria accesa. Ritoccando una sottocategoria torni a tutta la categoria; ritoccando la categoria, a Tutto.
 leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-114 | novita -->
+## Novità · 2026-11-18 · chiavi-ovunque
+
+frase: Uno scambio P2P preso dalla web app ora si porta avanti anche dalla Mini App in Telegram o dal browser del computer, e viceversa: appena apri il P2P, ogni dispositivo usa le chiavi delle tue 12 parole. E il tasto «Apri lo scambio» del bot, su un ordine ripreso, apre lo scambio di adesso e non quello annullato prima.
+dove: P2P → «I miei scambi» e il tasto «⚡ Apri lo scambio» degli avvisi del bot.
+leva: nessuna
 pubblico: sì

@@ -716,3 +716,9 @@ frase: Le sottocategorie ora sono card disegnate come le categorie: tocchi Bitco
 dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda riga di card sotto la fila (solo le sottocategorie con annunci, che salgono a molla, ognuna con la sua icona disegnata), le altre categorie in grigio e la ✕ sulla categoria accesa. Ritoccando una sottocategoria torni a tutta la categoria; ritoccando la categoria, a Tutto.
 leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · chiavi-ovunque
+frase: Uno scambio P2P preso dalla web app ora si porta avanti anche dalla Mini App in Telegram o dal browser del computer, e viceversa: appena apri il P2P, ogni dispositivo usa le chiavi delle tue 12 parole. E il tasto «Apri lo scambio» del bot, su un ordine ripreso, apre lo scambio di adesso e non quello annullato prima.
+dove: P2P → «I miei scambi» e il tasto «⚡ Apri lo scambio» degli avvisi del bot.
+leva: nessuna
+pubblico: sì

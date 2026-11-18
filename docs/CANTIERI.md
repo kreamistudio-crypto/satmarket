@@ -91929,3 +91929,53 @@ coi conteggi di Bitcoin di produzione finti nella risposta (riga di 10,
 scaffale acceso, ritocco, ✕; poi Casa e giardino, Lezioni e corsi,
 Sport e hobby con tutte le icone), la rotta: 200 per un'icona, 404 per
 un id fuori dall'albero e per un nome storto.
+
+## Uno scambio preso altrove si porta avanti da qui, e il tasto del bot non apre la presa di ieri (18 nov 2026, cantiere chiavi-ovunque; Andrea: «se io prendo un ordine dalla web app, in automatico lo posso anche portare avanti nella mini app o nel browser del PC»)
+
+DAL CAMPO, in produzione. Andrea prende dalla web app un ordine Lightning
+in USDT già preso (e annullato) ieri sera; il bot dice «Alessandro ti ha
+indicato dove inviare»; «⚡ Apri lo scambio» nella Mini App apre la prima
+volta «Scambio annullato, ieri 20:30», la seconda lo scambio giusto con
+«🔑 Le chiavi di questo scambio non sono in questo browser» e «Ho inviato
+gli USDT» spento. Nella web app tutto a posto. DUE DIFETTI.
+(1) LA RIGA DI IERI DAVANTI. Un ordine ripreso ha lo STESSO id; sul
+telefono c'era la riga del giro di prima, chiusa, e la porta
+(`apriP2PDaUrl`) la apriva subito: quella vera nasceva un attimo dopo
+dall'archivio (`adottaScambiServerP2P` → `giroNuovoP2P` la mette da
+parte), e solo il tocco dopo la trovava. Ora con una riga CHIUSA
+(`rigaChiusaDaAvvisoP2P`) la porta va a «I miei scambi» e chiede PRIMA
+all'archivio (`cercaScambioDaAvvisoP2P`): si apre quel che il server
+racconta, la presa nuova o — se nuova non c'è, o la rete tace — la
+riga che c'era. Il tasto della chat arriva dopo l'apertura.
+(2) LE CHIAVI. Il cantiere chiavi-dalle-parole (17 nov) faceva passare
+un dispositivo al profilo delle 12 parole solo al suo PRIMO GESTO
+(`assicuraMazzo` → `gestoDalleParoleP2P`). La web app, che aveva preso,
+era già passata; la Mini App no: il suo mazzo vivo era quello di prima,
+e l'archivio prova il vivo e i pensionati, mai le parole — riga
+`soloVista`. Ora ci si passa anche GUARDANDO il P2P, una volta per
+sessione (`passaAlleParoleP2P`, chiamata da `renderP2P`), quando le
+parole si TROVANO senza farle nascere (`semeDaParoleP2P` senza gesto:
+qui, cloud di Telegram, relay): stessa regola del gesto — il mazzo di
+prima in pensione (`pensionaPerIlContoP2P`), che finisce i suoi scambi;
+la strada sovrana non si tocca; un mazzo di un altro conto resta al
+gesto, che sa metterlo sulla mensola. Dopo il passaggio il render
+rilegge l'archivio con le chiavi nuove, e la riga `soloVista` prende la
+sua trade key (il ramo già esistente `gia.soloVista && tk`). La restore
+dei miei ordini NON si richiede, come dopo il gesto: una restore a
+indice zero del mazzo nuovo riscriverebbe quella del pensionato.
+SCARTATO: provare le parole come candidato in più in
+`adottaScambiServerP2P` lasciando vivo il mazzo di prima — la riga
+avrebbe la chiave, ma i gesti firmano col mazzo della riga
+(`mazzoRigaP2P`, sincrona, solo vivo e pensionati) e il prossimo
+ordine sarebbe nato ancora dal profilo vecchio: lo stesso buco, un
+passo più in là. IL PREZZO, già detto il 17 nov: la reputazione sul
+coordinatore riparte col profilo delle parole; ora succede guardando,
+non al primo gesto. PROVATO: `prove_chiavi_ovunque` (sentinelle sul
+render e banco node di `passaAlleParoleP2P`: passa, senza parole,
+già delle parole, sovrano, vetrina, senza mazzo, di un altro conto,
+gesto arrivato prima, stesse chiavi, due render insieme),
+`prove_notifica_porta_allo_scambio` estesa (la riga di ieri con la presa
+nuova, a rete giù, senza presa nuova, altrove, il tasto della chat),
+controprova (tolti la pensione e il giudice della riga chiusa: 6
+rosse). NON PROVATO DAL VIVO: la Mini App di Andrea con uno scambio
+preso dalla web app — da guardare dopo la promozione.

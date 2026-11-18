@@ -191410,9 +191410,14 @@ def prove_notifica_porta_allo_scambio():
           [0 < porta_js.index("apriOrdineP2P(P2P_SCAMBIO_URL);")
            < porta_js.index("arrivoP2PFatto();\n  if (pausa) apriPausaP2P();")
            < porta_js.index("cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL)"),
+           # (18 nov 2026, chiavi-ovunque) e dalla riga chiusa, aperta dopo, la chat
            "if (P2P_SCAMBIO_URL && p2pAcceso() && typeof cercaScambioDaAvvisoP2P === "
-           "'function')\n    cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL).catch(() => {});"
+           "'function')\n    cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL).then(esito => {"
            in porta_js])
+    prova("...dalla riga chiusa si va a «I miei scambi» col passo di `apriOrdineP2P`, "
+          "dopo il giudice della porta", [True, True],
+          ["function mieiDaAvvisoP2P(){ go('p2pmiei'); }" in mini,
+           porta_js.index("vaiP2P();") < porta_js.index("mieiDaAvvisoP2P();")])
     cerca = _senza_commenti_js(_fn_js(mini, "async function cercaScambioDaAvvisoP2P(id){"))
     prova("LA RICERCA non manda l'id a nessuno: chiede i PROPRI scambi, senza argomenti, "
           "e dentro non c'e' nessuna fetch",
@@ -191429,6 +191434,12 @@ def prove_notifica_porta_allo_scambio():
         "const ordiniP2P = () => ordini;\n"
         "const vistaAttivaP2P = () => vista;\n"
         "function vaiP2P(){ vista = 'view-p2p'; }\n"
+        # (18 nov 2026, chiavi-ovunque) la porta va a «I miei scambi» da una riga
+        # chiusa (`mieiDaAvvisoP2P`, sotto: e' una riga, la sua sentinella qui)
+        "function go(v){ vista = 'view-' + v; visto.push('go:' + v); }\n"
+        "const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];\n"
+        "let CHAT_DA_AVVISO = false;\n"
+        "function chatDaAvvisoP2P(id){ visto.push('chat:' + id); }\n"
         "function arrivoP2PFatto(){ visto.push('velo'); }\n"
         "function renderP2P(){ visto.push('render'); }\n"
         # la porta di sempre, com'e' in pagina: senza riga porta ai miei scambi
@@ -191436,11 +191447,15 @@ def prove_notifica_porta_allo_scambio():
         "  vista = 'view-p2pordine'; visto.push('apre:' + id); }\n"
         "async function chiediScambiServerP2P(){ chieste++; await new Promise(r => setTimeout(r, 5));\n"
         "  if (vaVia) vista = 'view-esplora'; return rete; }\n"
-        "function adottaScambiServerP2P(loc){ for (const k in server) if (!loc[k]) loc[k] = server[k]; }\n"
+        # una riga del server col segno `nuovo` e' la presa nuova dello stesso ordine:
+        # come `giroNuovoP2P`, prende il posto della riga chiusa
+        "function adottaScambiServerP2P(loc){ for (const k in server) if (!loc[k] || server[k].nuovo) loc[k] = server[k]; }\n"
         "function applicaToltiP2P(){ tolti.forEach(k => { delete ordini[k]; }); }\n"
         # l'azione in vista ha il suo banco, qui sotto: qui lascia un segno
         "function azioneInVistaP2P(id){ visto.push('vista:' + id); }\n"
         + _fn_js(mini, "function scambioSparitoP2P(mostra){")
+        + _fn_js(mini, "function rigaChiusaDaAvvisoP2P(id){")
+        + "function mieiDaAvvisoP2P(){ go('p2pmiei'); }\n"
         + _fn_js(mini, "async function cercaScambioDaAvvisoP2P(id){")
         + porta_js + r"""
 (async () => {
@@ -191467,6 +191482,18 @@ def prove_notifica_porta_allo_scambio():
   R.altroveNato = await giro(() => { vaVia = true; server = {[B]: {id: B}}; });
   R.spenta = await giro(() => { acceso = false; server = {[B]: {id: B}}; });
   R.senza = await giro(() => { P2P_SCAMBIO_URL = ''; server = {[B]: {id: B}}; });
+  /* (18 nov 2026, chiavi-ovunque) LA RIGA DI IERI: lo stesso ordine ripreso */
+  const ieri = {id: B, stato: 'annullato'}, oggi = {id: B, stato: 'attivo', nuovo: true};
+  R.ieri = await giro(() => { ordini = {[B]: ieri}; server = {[B]: oggi}; });
+  R.ieri.stato = ordini[B].stato;
+  R.ieriMuto = await giro(() => { ordini = {[B]: ieri}; server = {[B]: oggi}; rete = false; });
+  R.ieriMuto.stato = ordini[B].stato;
+  R.ieriSolo = await giro(() => { ordini = {[B]: ieri}; server = {[B]: {id: B, stato: 'annullato'}}; });
+  R.ieriAltrove = await giro(() => { ordini = {[B]: ieri}; server = {[B]: oggi}; vaVia = true; });
+  R.ieriChat = await giro(() => { ordini = {[B]: ieri}; server = {[B]: oggi}; CHAT_DA_AVVISO = true; });
+  CHAT_DA_AVVISO = false;
+  R.vivaChat = await giro(() => { ordini = {[B]: {id: B, stato: 'attivo'}}; CHAT_DA_AVVISO = true; });
+  CHAT_DA_AVVISO = false;
   nodi.p2pScambioSparito.hidden = false; scambioSparitoP2P(false);
   R.chiusa = nodi.p2pScambioSparito.hidden;
   delete nodi.p2pScambioSparito; let cade = false;
@@ -191522,6 +191549,23 @@ def prove_notifica_porta_allo_scambio():
     prova("la ✕ chiude la riga; e una pagina senza quel nodo non cade", [True, False],
           [Q.get("chiusa"), Q.get("senzaNodo")])
     prova("le sei parole che la ricerca torna a chi la prova", [True] * 6, Q.get("parole"))
+    # LA RIGA DI IERI NON PASSA DAVANTI (18 nov 2026, cantiere chiavi-ovunque;
+    # Andrea: «la prima volta che lo apro mi dice "scambio annullato"»)
+    prova("UNA RIGA CHIUSA DELLO STESSO ORDINE (ripreso oggi): niente scambio annullato "
+          "davanti — «I miei scambi», l'archivio, e si apre la presa NUOVA",
+          {"visto": ["go:p2pmiei", "velo", "apre:" + B_, "vista:" + B_], "vista": "view-p2pordine",
+           "chieste": 1, "riga": False, "stato": "attivo"}, Q.get("ieri"))
+    prova("...a rete giu' si apre la riga che c'e', senza riga gentile",
+          {"visto": ["go:p2pmiei", "velo", "apre:" + B_], "vista": "view-p2pordine",
+           "chieste": 1, "riga": False, "stato": "annullato"}, Q.get("ieriMuto"))
+    prova("...se l'archivio non ha una presa nuova si apre lei; se si e' andati altrove, niente",
+          [["go:p2pmiei", "velo", "apre:" + B_, "vista:" + B_], ["go:p2pmiei", "velo"]],
+          [(Q.get("ieriSolo") or {}).get("visto"), (Q.get("ieriAltrove") or {}).get("visto")])
+    prova("...e il tasto della chat arriva alla chat della presa nuova, dopo l'apertura; "
+          "su una riga viva resta quello di sempre, subito",
+          [["go:p2pmiei", "velo", "apre:" + B_, "vista:" + B_, "chat:" + B_],
+           ["apre:" + B_, "chat:" + B_, "velo", "vista:" + B_]],
+          [(Q.get("ieriChat") or {}).get("visto"), (Q.get("vivaChat") or {}).get("visto")])
     # --- L'AZIONE IN VISTA, ESEGUITA (dal giro dal vivo a 375 px: il
     # riquadro «tocca a te» restava sotto la barra in basso; e poi la
     # pagina saltava su «Invia» della chat, il primo arancione acceso) ---
@@ -213184,6 +213228,100 @@ const apriOrdineP2P = id => visto.push(['ln', id]);
           [R.get("dalCondiviso"), R.get("lnDalCondiviso")])
 
 
+def prove_chiavi_ovunque():
+    """UNO SCAMBIO PRESO ALTROVE SI GOVERNA DA QUI (18 nov 2026, cantiere
+    chiavi-ovunque; Andrea, con uno scambio preso dalla web app che nella
+    mini app diceva «le chiavi non sono in questo browser»: «se io prendo
+    un ordine dalla web app, in automatico lo posso anche portare avanti
+    nella mini app o nel browser del PC»). Il passaggio al profilo delle
+    12 parole avveniva solo al primo GESTO del dispositivo; adesso anche
+    guardando il P2P, se le parole si TROVANO senza farle nascere
+    (`passaAlleParoleP2P`). Il banco node esegue la funzione vera coi suoi
+    vicini di cartone; le sentinelle guardano il render che la chiama una
+    volta per sessione. (La riga di ieri dello stesso ordine sta in
+    `prove_notifica_porta_allo_scambio`.)"""
+    print("\n[lo scambio preso altrove si governa da qui: le 12 parole senza gesto]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    passa = _fn_js(mini, "function passaAlleParoleP2P(){")
+    corpo = _senza_commenti_js(passa)
+    prova("le parole si cercano SENZA gesto (niente wallet nato guardando il libro), e il "
+          "passaggio e' quello del gesto: la pensione, mai un mazzo cancellato",
+          [True, False, True, False],
+          ["await semeDaParoleP2P();" in corpo, "gesto: true" in corpo,
+           "await pensionaPerIlContoP2P(ora, s);" in corpo, "dimentica" in corpo])
+    i = mini.index("function renderP2P(")
+    rnd = _senza_commenti_js(mini[i:mini.index("\n}\n", i)])
+    prova("il render lo chiama UNA volta per sessione, solo col mazzo giudicato, fuori da "
+          "demo e vetrina, mai sulla strada sovrana; e dopo il passaggio ridisegna",
+          [True, True, True],
+          ["if (mz && !daGiudicare && !p2pVersoParole && myTgId && !DEMO && !VETRINA\n"
+           "      && !mz.parole && mz.origine !== 'mia' && typeof passaAlleParoleP2P === 'function') {\n"
+           "    p2pVersoParole = true;" in rnd,
+           (lambda t: "if (!cambiato) return;" in t and "renderP2P();" in t)(
+               rnd[rnd.index("passaAlleParoleP2P().then(cambiato => {"):][:300]),
+           "p2pMieiChiesto = false" not in rnd[rnd.index("passaAlleParoleP2P().then"):][:400]])
+    prog = ("""
+let visto = [], mazzo, seme, DEMO = false, VETRINA = false, myTgId = 111, p2pMazzoEsito = '';
+let cambiaNelFrattempo = null;
+const mazzoMostro = () => mazzo;
+async function semeDaParoleP2P(opz){ visto.push(['seme', opz === undefined]);
+  if (cambiaNelFrattempo) mazzo = cambiaNelFrattempo; return seme; }
+async function caricaNostrTools(){}
+const mazzoEstraneoP2P = m => !!m.estraneo;
+async function pensionaPerIlContoP2P(m, s){ visto.push(['pensione', m.sk, s.sk]);
+  mazzo = {sk: s.sk, parole: 1}; return mazzo; }
+const console = {log: t => visto.push(['log'])};
+""" + _riga_js(mini, "let versoParoleInCorso = null;") + passa + """
+(async () => {
+  const R = {};
+  const giro = async (prima) => {
+    visto = []; mazzo = {sk: 'VECCHIO'}; seme = {sk: 'PAROLE', parole: 1};
+    DEMO = false; VETRINA = false; myTgId = 111; p2pMazzoEsito = ''; cambiaNelFrattempo = null;
+    prima();
+    const esito = await passaAlleParoleP2P();
+    return [esito, visto.filter(v => v[0] !== 'log'), mazzo ? mazzo.sk : null, p2pMazzoEsito];
+  };
+  R.passa = await giro(() => {});
+  R.senzaParole = await giro(() => { seme = null; });
+  R.giaParole = await giro(() => { mazzo = {sk: 'PAROLE', parole: 1}; });
+  R.sovrano = await giro(() => { mazzo = {sk: 'MIA', origine: 'mia'}; });
+  R.estraneo = await giro(() => { mazzo = {sk: 'ALTRO', estraneo: true}; });
+  R.vetrina = await giro(() => { VETRINA = true; });
+  R.senzaMazzo = await giro(() => { mazzo = null; });
+  R.gestoPrima = await giro(() => { cambiaNelFrattempo = {sk: 'PAROLE', parole: 1}; });
+  R.stessa = await giro(() => { seme = {sk: 'VECCHIO', parole: 1}; });
+  /* due render insieme: una promessa sola */
+  visto = []; mazzo = {sk: 'VECCHIO'}; seme = {sk: 'PAROLE', parole: 1};
+  const a = passaAlleParoleP2P(), b = passaAlleParoleP2P();
+  R.una = [a === b, await a, visto.filter(v => v[0] === 'seme').length];
+  console.log(JSON.stringify(R));
+})().catch(e => { process.stdout.write(String(e)); process.exit(1); });
+""").replace("const console = {log: t => visto.push(['log'])};\n",
+             "const _log = console.log;\nconsole.log = (...a) => (typeof a[0] === 'string' && a[0].startsWith('🔑')) ? visto.push(['log']) : _log(...a);\n")
+    R = _node_banco(prog)
+    if R is None:
+        salta("il passaggio alle 12 parole (banco node)", "node non c'e'")
+        return
+    prova("UN PROFILO DI PRIMA E LE PAROLE TROVATE: il vecchio va in pensione, il vivo e' "
+          "quello delle parole",
+          [True, [["seme", True], ["pensione", "VECCHIO", "PAROLE"]], "PAROLE", "pensione"],
+          R.get("passa"))
+    prova("...senza parole raggiungibili non succede niente", [False, [["seme", True]], "VECCHIO", ""],
+          R.get("senzaParole"))
+    prova("...gia' delle parole, sovrano, in vetrina, o senza mazzo: non si chiede nemmeno il seme",
+          [[False, [], "PAROLE", ""], [False, [], "MIA", ""], [False, [], "VECCHIO", ""],
+           [False, [], None, ""]],
+          [R.get("giaParole"), R.get("sovrano"), R.get("vetrina"), R.get("senzaMazzo")])
+    prova("...un mazzo di un altro conto lo lascia al gesto (la mensola), e se intanto un "
+          "gesto ha gia' fatto il passaggio non si rifa'",
+          [[False, [["seme", True]], "ALTRO", ""], [False, [["seme", True]], "PAROLE", ""]],
+          [R.get("estraneo"), R.get("gestoPrima")])
+    prova("...stesse chiavi (il vecchio ERA gia' delle parole, senza il segno): si timbra e "
+          "l'esito e' «mio»", [True, "mio"],
+          [(R.get("stessa") or [None])[0], (R.get("stessa") or [0, 0, 0, None])[3]])
+    prova("...due render insieme: una promessa sola, un seme solo", [True, True, 1], R.get("una"))
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -213356,7 +213494,7 @@ def _esce(f):
 # cambio libero), onchain (il 2-di-3 e RGB).
 CATEGORIE = {
     "p2p": """
-    vetrina_pulita apri_ordine_notifica
+    vetrina_pulita apri_ordine_notifica chiavi_ovunque
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
@@ -214661,6 +214799,7 @@ def main():
               prove_sentinella_server_fermo,
               prove_caccia_a_tappo,
               prove_apri_ordine_notifica,
+              prove_chiavi_ovunque,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

@@ -82837,6 +82837,23 @@ function renderP2P(){
       if (mazzoMostro()) renderP2P();
     });
   }
+  /* ...e il mazzo che c'e' ma NON e' quello delle 12 parole passa a loro,
+     una volta per sessione, se le parole si trovano (18 nov 2026,
+     chiavi-ovunque: vedi `passaAlleParoleP2P`). Dopo il passaggio il
+     render rilegge l'archivio con le chiavi nuove: le righe «solo da
+     guardare» nate dalle parole altrove prendono la loro trade key */
+  if (mz && !daGiudicare && !p2pVersoParole && myTgId && !DEMO && !VETRINA
+      && !mz.parole && mz.origine !== 'mia' && typeof passaAlleParoleP2P === 'function') {
+    p2pVersoParole = true;
+    passaAlleParoleP2P().then(cambiato => {
+      if (!cambiato) return;
+      /* la restore dei miei ordini NON si richiede: come dopo il gesto,
+         l'archivio basta, e una restore a indice zero del mazzo nuovo
+         riscriverebbe quella del mazzo in pensione */
+      renderP2P();
+      if (p2pOrdineAperto && typeof renderOrdineP2P === 'function') renderOrdineP2P();
+    });
+  }
   /* I MIEI ORDINI si chiedono al coordinatore una volta per sessione, e
      senza far aspettare nessuno: il libro si disegna con quel che si sa
      e si ridisegna quando la risposta arriva — il patto del rientro
@@ -83754,6 +83771,7 @@ const MAZZO_INFO = 'barattolo/mostro/scambio/';
 const FORMA_HEX64 = /^[0-9a-f]{64}$/;
 let p2pRegistrato = false;
 let p2pAdozione = false;
+let p2pVersoParole = false;   // il passaggio alle 12 parole guardando il P2P: una volta per sessione
 let p2pCodiceVisibile = false;
 let p2pCodiceMostrato = '';
 let mazzoInCorso = null;
@@ -85781,6 +85799,40 @@ function gestoDalleParoleP2P(){
     return mazzoMostro();
   })().finally(() => { paroleInCorso = null; });
   return paroleInCorso;
+}
+/* IL PASSAGGIO SENZA GESTO (18 nov 2026, cantiere chiavi-ovunque; Andrea,
+   con uno scambio preso dalla web app che nella mini app diceva «le
+   chiavi non sono in questo browser»: «se io prendo un ordine dalla web
+   app, in automatico lo posso anche portare avanti nella mini app o nel
+   browser del PC»). Fino a ieri un dispositivo passava al profilo delle
+   12 parole solo al suo PRIMO GESTO (`assicuraMazzo` → `gestoDalleParoleP2P`):
+   la web app che aveva preso era gia' passata, la mini app no, e lo
+   scambio nato dalle parole li' non si sapeva firmare. Adesso ci si passa
+   anche GUARDANDO il P2P, quando le parole si TROVANO senza farle nascere
+   (`semeDaParoleP2P` senza gesto: qui, cloud di Telegram, relay) — la
+   stessa regola del gesto: il mazzo di prima va in pensione e finisce i
+   suoi scambi, la strada sovrana (`origine 'mia'`) non si tocca, un mazzo
+   di un altro conto lo lascia al gesto (che sa metterlo sulla mensola).
+   Senza parole raggiungibili non succede niente: nessun wallet nasce
+   guardando il libro. Torna vero se il mazzo vivo e' cambiato. */
+let versoParoleInCorso = null;
+function passaAlleParoleP2P(){
+  if (!versoParoleInCorso) versoParoleInCorso = (async () => {
+    const qui = mazzoMostro();
+    if (!qui || qui.parole || qui.origine === 'mia' || DEMO || VETRINA || !myTgId) return false;
+    const s = await semeDaParoleP2P();
+    if (!s || !s.sk) return false;
+    await caricaNostrTools();
+    /* nel frattempo un gesto puo' aver gia' fatto il passaggio */
+    const ora = mazzoMostro();
+    if (!ora || ora.sk !== qui.sk || ora.parole || ora.origine === 'mia' || mazzoEstraneoP2P(ora))
+      return false;
+    await pensionaPerIlContoP2P(ora, s);
+    p2pMazzoEsito = ora.sk === s.sk ? 'mio' : 'pensione';
+    console.log('🔑 [p2p] profilo: dalle 12 parole on-chain, senza aspettare un gesto');
+    return true;
+  })().catch(() => false).finally(() => { versoParoleInCorso = null; });
+  return versoParoleInCorso;
 }
 let contoInCorso = null;
 function adottaProfiloContoP2P(){
@@ -110660,12 +110712,31 @@ function azioneInVistaP2P(id){
     if (b && v.querySelector('.btn.orange') === b) evidenziaPassoP2P();
   }, 350);
 }
+/* PURA sul dispositivo: la riga di QUESTO id qui c'e' ed e' CHIUSA? (18
+   nov 2026, cantiere chiavi-ovunque) — allora il tasto di un avviso puo'
+   parlare di una presa nuova dello stesso ordine, e prima si chiede */
+function rigaChiusaDaAvvisoP2P(id){
+  const o = ordiniP2P()[id];
+  return !!o && P2P_FINALI.indexOf(o.stato) >= 0;
+}
+/* ...e intanto «I miei scambi»: lo stesso passo che `apriOrdineP2P` fa
+   quando la riga non c'e', DOPO il giudice della porta (`vaiP2P`) */
+function mieiDaAvvisoP2P(){ go('p2pmiei'); }
 async function cercaScambioDaAvvisoP2P(id){
-  if (ordiniP2P()[id]) { azioneInVistaP2P(id); return 'aperto'; }
-  if (DEMO || VETRINA || !myTgId) return 'fuori';
+  /* una riga CHIUSA non risponde da sola (18 nov 2026, chiavi-ovunque):
+     l'avviso e' di adesso, e lei puo' essere il giro di ieri dello stesso
+     ordine. Si chiede all'archivio; se l'archivio tace, si apre lei */
+  const chiusa = rigaChiusaDaAvvisoP2P(id);
+  if (ordiniP2P()[id] && !chiusa) { azioneInVistaP2P(id); return 'aperto'; }
+  const lei = () => {
+    if (vistaAttivaP2P() !== 'view-p2pmiei') return 'altrove';
+    apriOrdineP2P(id);
+    return 'nato';
+  };
+  if (DEMO || VETRINA || !myTgId) return chiusa ? lei() : 'fuori';
   let fresca = false;
   try { fresca = await chiediScambiServerP2P(); } catch(e) {}
-  if (!fresca) return 'muto';
+  if (!fresca) return chiusa ? lei() : 'muto';
   try { adottaScambiServerP2P(ordiniP2P()); applicaToltiP2P(); } catch(e) {}
   /* nel frattempo si e' andati altrove: non si apre niente sopra
      un'altra pagina, e non si lascia un avviso per dopo */
@@ -117264,7 +117335,19 @@ function apriP2PDaUrl(){
       }).catch(() => {});
     return;
   }
-  if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function') {
+  /* LA RIGA DI IERI NON PASSA DAVANTI (18 nov 2026, cantiere
+     chiavi-ovunque; Andrea: «la prima volta che lo apro mi dice
+     "scambio annullato"»): un ordine ripreso ha lo STESSO id, e su
+     questo telefono la riga del giro di prima — chiusa — c'e' ancora.
+     Aprirla subito mostrava lo scambio annullato di ieri; quello vero
+     nasceva un attimo dopo dall'archivio. Con una riga chiusa si va a
+     «I miei scambi» e si chiede PRIMA all'archivio
+     (`cercaScambioDaAvvisoP2P`, qui sotto): si apre quel che il server
+     racconta — la presa nuova, o la stessa riga se nuova non ce n'e'. */
+  const chiusaP2P = P2P_SCAMBIO_URL && typeof rigaChiusaDaAvvisoP2P === 'function'
+    && rigaChiusaDaAvvisoP2P(P2P_SCAMBIO_URL);
+  if (P2P_SCAMBIO_URL && p2pAcceso() && chiusaP2P) mieiDaAvvisoP2P();
+  else if (P2P_SCAMBIO_URL && p2pAcceso() && typeof apriOrdineP2P === 'function') {
     apriOrdineP2P(P2P_SCAMBIO_URL);
     /* il tasto di «Hai un nuovo messaggio» (20 ott 2026): dritti alla chat */
     if (typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO) chatDaAvvisoP2P(P2P_SCAMBIO_URL);
@@ -117294,7 +117377,11 @@ function apriP2PDaUrl(){
      (13 ott 2026): `apriOrdineP2P` ha gia' portato a «I miei scambi», e
      qui lo si chiede all'archivio — si apre, o lo dice la riga gentile */
   if (P2P_SCAMBIO_URL && p2pAcceso() && typeof cercaScambioDaAvvisoP2P === 'function')
-    cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL).catch(() => {});
+    cercaScambioDaAvvisoP2P(P2P_SCAMBIO_URL).then(esito => {
+      /* ...e dalla riga chiusa, aperta adesso, la chat se l'avviso la chiedeva */
+      if (chiusaP2P && esito === 'nato' && typeof CHAT_DA_AVVISO !== 'undefined' && CHAT_DA_AVVISO)
+        chatDaAvvisoP2P(P2P_SCAMBIO_URL);
+    }).catch(() => {});
 }
 
 /* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo
