@@ -2685,6 +2685,39 @@
   invece che vuoto. `prove.py` difende il patto: chiavi ∈ CATEGORIE,
   id unici e kebab, niente «altro», i giudici nei loro casi, il
   dizionario allineato all'albero voce per voce.
+  L'ACCENSIONE (18 nov 2026, cantiere sottocategorie, richiesta di
+  Andrea — la forma l'ha scelta lui, rovesciando la prima proposta di
+  una seconda riga di pillole: «quando clicchi sulla categoria
+  principale si apre una tendina»). Leva `SOTTOCATEGORIE_VETRINA`,
+  ACCESA di serie (solo False la spegne, pannello «🏷️ Vetrina e
+  limiti»). VETRINA: il tocco su una card della striscia
+  (`apriCategoriaDaTocco`) apre la TENDINA (`apriTendinaSotto`, un
+  riquadro appeso al body sotto la card, MAI un foglio) quando la
+  categoria ha almeno uno scaffale pieno — «Tutta la categoria», gli
+  scaffali pieni col numero e, a categoria gia' accesa, «✕ Torna a
+  Tutto», che prende il posto del ritocco-che-esce; senza scaffali
+  pieni il tocco e' quello di sempre. Le pillole appiccicate NON aprono
+  la tendina: sono il comando veloce del reparto. Lo scaffale scelto e'
+  `activeSotto` (lo azzera setCat a ogni cambio di categoria; la
+  tendina lo passa via `sottoChiesto`, consumato una volta), viaggia
+  come `sottocategoria` in /api/listings — il filtro delle card del
+  Lavoro, che adesso vale con una delle due leve — e la card accesa lo
+  scrive sotto il nome (`.cat-sotto`). I numeri sono `sottoconteggi`
+  nella busta di prima pagina: GLOBALI come `conteggi` (soli attivi,
+  capofila, voci valide per la categoria, vuote fuori). Gli annunci
+  senza sottocategoria stanno solo in «Tutta la categoria»: il patto
+  del dato dichiarato. FORM: campo «Sottocategoria (facoltativa)» sotto
+  la categoria (picker `sellSotto`), nascosto a leva spenta, sulle
+  categorie piatte e nella modifica FIRMATA degli importati (quella
+  strada non la porta, patto di agosto); la preselezione e' il giudice
+  del server via `GET /api/sottocategoria` (pura, niente database), e
+  la scelta a mano vince. `sottoPayload` la manda in pubblica e in
+  modifica; in modifica, se la riga non l'ha fatta sapere, NON la manda
+  (l'assenza conserva). La scheda (`/api/listings/{id}`) porta
+  `a.sottocategoria`; CAMPI_VETRINA no, alla card non serve. La copia
+  del catalogo nel client e' `SOTTOCAT`, voce per voce uguale
+  all'albero (`prove_sottocategorie_vetrina`). Il pregresso: lo script
+  `assegna_sottocategorie.py`, gesto di Andrea (DA-FARE, voce 23).
   LA SEZIONE «DA SCOPRIRE» (ago 2026, decisione di Andrea): sotto la
   striscia delle categorie una fila di card RETTANGOLARI (250x115) che
   accendono i filtri dell'occasione — oggi due fisse, le offerte a

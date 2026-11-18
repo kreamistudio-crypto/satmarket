@@ -312,10 +312,16 @@ def main():
            sorted(titoli(cerca(limit=100, sezione="mercato")))))
     prova("...e la busta dice alla pagina che la leva e' spenta", False,
           spenta.get("mercato_lavoro"))
+    # (18 nov 2026, cantiere sottocategorie) lo scaffale ha una leva
+    # sua, SOTTOCATEGORIE_VETRINA, accesa di serie: qui si spegne anche
+    # lei, perche' la prova parla del server di ieri con TUTTE e due le
+    # leve spente (quella accesa la guarda collaudo_sottocategorie_vetrina)
+    SRV.SOTTOCATEGORIE_VETRINA = False
     prova("...e lo scaffale non filtra nemmeno lui",
           sorted(titoli(cerca(limit=100, cat="Lavoro e servizi"))),
           sorted(titoli(cerca(limit=100, cat="Lavoro e servizi",
                               sottocategoria="traduzioni"))))
+    SRV.SOTTOCATEGORIE_VETRINA = True
     SRV.MERCATO_LAVORO = True
     lavoro = titoli(cerca(limit=100, sezione="lavoro"))
     mercato = titoli(cerca(limit=100, sezione="mercato"))

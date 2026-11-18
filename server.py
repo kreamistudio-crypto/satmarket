@@ -24434,6 +24434,9 @@ def numeri_assistente() -> str:
         f"- PayJoin negli acquisti on-chain del mercatino (link pj=, per i "
         f"wallet che lo sanno fare): {si(PAYJOIN_ATTIVO)}.",
         f"- Schede «Mercato» e «Lavoro» in vetrina: {si(MERCATO_LAVORO)}.",
+        f"- Sottocategorie (tocchi una categoria in Esplora e si apre la "
+        f"tendina; nel form Vendi il campo «Sottocategoria»): "
+        f"{si(SOTTOCATEGORIE_VETRINA)}.",
         # (10 nov 2026, cantiere tappo-aggiornato) le funzioni nate dopo il
         # 2 novembre, sempre con gli occhi di chiunque: accese solo per gli
         # admin, per chi chiede sono spente
@@ -29930,6 +29933,24 @@ try:
 except ImportError:
     MERCATO_LAVORO = False
 
+# LE SOTTOCATEGORIE IN VETRINA (18 nov 2026, cantiere sottocategorie,
+# richiesta di Andrea): l'albero dormiente di agosto si accende. Toccando
+# una categoria della striscia si apre la TENDINA con «Tutta X» e le sue
+# sottocategorie piene, col numero; la scelta filtra la vetrina. E nel
+# form Vendi la sottocategoria si sceglie (facoltativa, preselezionata dal
+# giudice silenzioso). ACCESA DI SERIE (la regola delle leve nuove, 14 nov
+# 2026): solo un False scritto nel config la spegne, e spenta il server
+# ignora `sottocategoria` come un server di ieri e la busta non porta i
+# conteggi — niente tendina, niente campo nel form.
+try:
+    from config import SOTTOCATEGORIE_VETRINA
+    if not isinstance(SOTTOCATEGORIE_VETRINA, bool):
+        print("[vetrina] SOTTOCATEGORIE_VETRINA non e' True/False: le "
+              "sottocategorie restano accese")
+    SOTTOCATEGORIE_VETRINA = SOTTOCATEGORIE_VETRINA is not False
+except ImportError:
+    SOTTOCATEGORIE_VETRINA = True
+
 # LA MAPPA DEL RITIRO A MANO, CON UNA LEVA PER SPEGNERLA (14 nov 2026,
 # cantiere mappa-mercatino, richiesta di Andrea): il tondo 🗺️ della
 # vetrina e la mappa dei comuni col ritiro a mano. ACCESA DI SERIE, ed e'
@@ -30016,6 +30037,23 @@ def _mappa_ritiro(con, dove: str, par: list) -> dict:
     return {"comuni": comuni, "senza": senza, "ids": ids}
 
 
+@app.get("/api/sottocategoria")
+async def sottocategoria_proposta(categoria: str = "", titolo: str = "",
+                                  descrizione: str = ""):
+    """La PRESELEZIONE del form Vendi (18 nov 2026, cantiere
+    sottocategorie): mentre si scrive il titolo il campo «Sottocategoria»
+    mostra gia' quel che il giudice silenzioso sceglierebbe — lo stesso
+    `sottocategoria_indovina` di pubblica(), mai una copia nel client.
+    Pura: niente database, niente utente, niente rete; i testi si
+    tagliano a misura di titolo e descrizione. Leva spenta o categoria
+    piatta = '' (il campo resta su «La sceglie Barattolo»)."""
+    if not SOTTOCATEGORIE_VETRINA:
+        return {"sottocategoria": ""}
+    cat = categoria_valida(categoria)
+    return {"sottocategoria": sottocategoria_indovina(
+        cat, (titolo or "")[:200], (descrizione or "")[:2000])}
+
+
 @app.get("/api/listings")
 async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                         cursore: str = "", ordina: str = "",
@@ -30052,11 +30090,14 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         _lavoro = ("(COALESCE(a.consegna,'')='servizio'"
                    " OR COALESCE(a.categoria,'')='Lavoro e servizi')")
         dove += " AND " + ("" if sezione == "lavoro" else "NOT ") + _lavoro
-    if MERCATO_LAVORO and sottocategoria and cat and cat != "Tutto":
+    if ((MERCATO_LAVORO or SOTTOCATEGORIE_VETRINA) and sottocategoria
+            and cat and cat != "Tutto"):
         # le card del Lavoro (23 ott 2026): lo scaffale dentro la
         # categoria, la voce di SOTTOCATEGORIE. Solo con la categoria,
         # perche' lo stesso slug e' un'etichetta di QUELLA categoria;
         # una voce che non esiste da' una vetrina vuota, mai un 400.
+        # Dal 18 nov 2026 la usa anche la TENDINA della striscia, con la
+        # sua leva: basta una delle due accesa.
         dove += " AND a.sottocategoria=?"
         par.append(sottocategoria)
     if solo_spedizione:
@@ -30377,6 +30418,22 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # ...e la leva di Mercato e Lavoro (24 ott 2026), per la stessa
         # ragione: la vetrina la vede anche chi /api/me non ce l'ha
         risposta["mercato_lavoro"] = bool(MERCATO_LAVORO)
+        # ...e le SOTTOCATEGORIE (18 nov 2026): la leva, che decide anche
+        # il campo del form Vendi, e i conteggi della tendina — GLOBALI
+        # come quelli per categoria (una famiglia conta UNO, le righe
+        # senza sottocategoria stanno solo in «Tutta X»). Solo le voci
+        # piene: la tendina non mostra porte su vetrine vuote.
+        risposta["sottocategorie_vetrina"] = bool(SOTTOCATEGORIE_VETRINA)
+        if SOTTOCATEGORIE_VETRINA:
+            _sc = {}
+            for r in con.execute(
+                    "SELECT a.categoria, a.sottocategoria, COUNT(*) AS n "
+                    "FROM annunci a WHERE a.stato='attivo' "
+                    f"AND COALESCE(a.sottocategoria,'')!='' AND {SQL_CAPOFILA} "
+                    "GROUP BY a.categoria, a.sottocategoria"):
+                if sottocategoria_valida(r["categoria"], r["sottocategoria"]):
+                    _sc.setdefault(r["categoria"], {})[r["sottocategoria"]] = r["n"]
+            risposta["sottoconteggi"] = _sc
         # ...e i pallini della mappa del ritiro a mano (14 nov 2026): solo
         # a leva accesa — chiave assente = niente tondo nel client
         if MERCATINO_MAPPA_RITIRO:
@@ -30932,7 +30989,11 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     con = db()
     # le domande a chi compra escono SOLO qui, nella scheda: sono
     # pubbliche (sono testi del venditore), ma alla vetrina non servono
-    r = con.execute(f"SELECT {campi}, a.etichetta, a.stato, a.domande, a.incasso FROM annunci a "
+    # ...e la sottocategoria (18 nov 2026): con l'albero acceso e' un
+    # dato pubblico come la categoria, e serve al form Vendi che
+    # precompila la modifica e il duplicato da questa scheda
+    r = con.execute(f"SELECT {campi}, a.sottocategoria, "
+                    "a.etichetta, a.stato, a.domande, a.incasso FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
                     "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
@@ -37269,6 +37330,15 @@ def _leve_stato():
                          "loro scaffali",
                   spento="la vetrina di sempre: niente schede, i servizi "
                          "in «Tutto» e nella loro categoria"),
+            # LE SOTTOCATEGORIE (18 nov 2026): accese di serie
+            _leva("Sottocategorie in vetrina e nel form",
+                  "SOTTOCATEGORIE_VETRINA", SOTTOCATEGORIE_VETRINA,
+                  acceso="toccando una categoria della striscia si apre "
+                         "la tendina con le sue sottocategorie piene; nel "
+                         "form Vendi la sottocategoria si sceglie",
+                  spento="la categoria filtra subito, come prima; nel "
+                         "form niente sottocategoria (la assegna comunque "
+                         "il giudice dal titolo, senza mostrarla)"),
             # LA MAPPA DEL RITIRO A MANO (14 nov 2026): spenta di serie
             _leva("Mappa del ritiro a mano", "MERCATINO_MAPPA_RITIRO",
                   MERCATINO_MAPPA_RITIRO,

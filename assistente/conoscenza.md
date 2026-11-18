@@ -63,7 +63,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 <!-- pezzo libro-006 | libro -->
 ## Libro · Comprare nel mercatino (1/4)
 
-1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
+1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Toccando una categoria in «Esplora per categorie» si apre una tendina con le sue sottocategorie (per esempio Informatica → Computer e portatili, Tablet ed e-reader…), ognuna col numero di annunci: scegli quella che ti interessa, oppure «Tutta la categoria». Compaiono solo le sottocategorie che hanno annunci; «Altro» e le categorie senza sottocategorie piene filtrano subito. Per uscire: «✕ Torna a Tutto» nella tendina, o la card «Tutto». Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
 2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale. Se il venditore non spedisce ai locker, la riga del locker è spenta e c'è il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso (senza sapere chi ha chiesto) e, se aggiunge InPost, Poste Italiane o SDA nel Profilo, Barattolo ti avvisa. Una richiesta per venditore ogni 7 giorni.
 3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento.
 4. I sats entrano nel deposito di garanzia. Il venditore viene avvisato, sa di essere pagato, ma i sats non sono ancora suoi.
@@ -72,10 +72,10 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 
 Gli avvisi del barattolo (se nelle REGOLAZIONI del pannello «Avvisi del barattolo» è accesa): quando metti un articolo nel barattolo 🫙 si apre il foglietto «🔔 Avvisami se…» con quattro spunte, tutte accese di serie: «📉 Il prezzo scende», «⚡ Arriva uno sconto lampo», «☝️ Ne resta solo uno» (l'articolo aveva più pezzi e ne è rimasto uno), «🔁 È di nuovo disponibile» (era esaurito e torna, o il negozio rientra dalle ferie). Togli quelle che non vuoi e tocca «Va bene», oppure chiudi il foglietto e restano tutte. Gli avvisi arrivano dal bot, con il tasto «🫙 Apri l'annuncio», al massimo uno al giorno per articolo: se nello stesso giorno succedono più cose arrivano in un messaggio solo, e quello che cade dentro il giorno arriva il giorno dopo se è ancora vero. Se il prezzo sale non arriva niente. Il prezzo si guarda nella valuta dell'annuncio: un annuncio in euro non «scende» perché cambia il valore del bitcoin, e un ritocco sotto l'1% non conta. Le spunte si cambiano quando vuoi dalla 🔔 accanto a ogni articolo, nel Profilo, sezione «Nel tuo barattolo» (🔕 vuol dire nessun avviso). Gli articoli messi nel barattolo prima del 17 novembre 2026 ricevono solo lo sconto lampo, come prima, finché non tocchi la loro 🔔.
 
-Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la accetta o la rifiuta, e se la accetta hai un tempo per pagare, scritto nell'ordine. Un'offerta senza risposta scade da sola.
-
 <!-- pezzo libro-007 | libro -->
 ## Libro · Comprare nel mercatino (2/4)
+
+Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la accetta o la rifiuta, e se la accetta hai un tempo per pagare, scritto nell'ordine. Un'offerta senza risposta scade da sola.
 
 La mancia al venditore (se nelle REGOLAZIONI del pannello «Mancia al venditore» è accesa): un'offerta può essere solo più bassa del prezzo, ma chi vuole dare di più al venditore può lasciargli una mancia. Nell'ordine già pagato, nella scheda «Ordini», c'è «🎁 Lascia una mancia»: si sceglie la cifra (500, 1.000, 2.100 sats o un'altra) e si paga col proprio wallet. Nello stesso foglio, se vuoi, puoi aggiungere anche uno zap a Barattolo (di serie è «Niente»): sono due fatture, una dopo l'altra. La mancia va DRITTA al Lightning address del venditore: Barattolo non la tocca e non prende commissioni. Per questo è un regalo fuori dal deposito di garanzia e NON si rimborsa, anche se poi l'ordine va male: chi ha dubbi la lascia dopo aver ricevuto l'oggetto. Il bottone c'è solo su un ordine pagato (non su uno annullato, in disputa o rimborsato) e solo se il venditore ha impostato il suo Lightning address nel Profilo. Se non l'ha impostato, il riquadro c'è lo stesso ma senza bottone, con la frase «non ha ancora un indirizzo Lightning nel profilo: per ora la mancia non si può mandare»: è normale, la mancia non avrebbe dove andare (anche se il venditore ha incassato l'ordine, per esempio con una fattura incollata a mano). Al venditore senza indirizzo, nello stesso ordine, compare l'invito «Aggiungilo dal Profilo»: appena lo salva, il bottone compare anche a chi ha comprato. Il venditore riceve un avviso e vede la mancia nell'ordine: «arrivata» se Barattolo ha potuto verificarla, altrimenti «controlla il wallet».
 
@@ -136,7 +136,7 @@ Pagare fuori da Barattolo (un bonifico, un pagamento diretto al venditore) vuol 
 ## Libro · Vendere nel mercatino (1/5)
 
 1. Tocca «Vendi» (il tasto ＋ in basso).
-2. Aggiungi almeno una foto (senza foto non si pubblica), il titolo, la descrizione, la categoria e il prezzo.
+2. Aggiungi almeno una foto (senza foto non si pubblica), il titolo, la descrizione, la categoria e il prezzo. Sotto la categoria c'è «Sottocategoria (facoltativa)»: Barattolo la propone da solo leggendo il titolo, tu puoi cambiarla o lasciare «La sceglie Barattolo» (se dal titolo non è sicuro, l'annuncio sta solo nella categoria e si trova in «Tutta la categoria»).
 3. Scegli come consegni: spedizione (con i corrieri che usi), punto di ritiro o locker, ritiro a mano in zona, o consegna digitale per codici e buoni.
 4. Pubblica. Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince resta in attesa di un moderatore, e se viene fermato il messaggio spiega perché e come rimediare.
 
@@ -986,6 +986,8 @@ Le foto che carichi sostituiscono tutte quelle attuali. Non toccarle e restano c
 Titolo
 Categoria
  ElettronicaInformaticaTelefoniaAudio e videoConsole e videogiochiFoto e otticaBitcoinCasa e giardinoElettrodomesticiFai da te e utensiliAlimenti e bevandeBellezza e benessereAbbigliamentoScarpe e accessoriOrologi e gioielliBambiniSport e hobbyBicicletteMotoriAnimaliLibri e mediaMusica e filmStrumenti musicaliCollezionismoArte e artigianatoBuoni ed esperienzeLezioni e corsiLavoro e serviziAltro
+▾
+Sottocategoria (facoltativa)
 ▾
 Condizioni dell'oggetto
  Scegli le condizioni…
@@ -2284,4 +2286,12 @@ pubblico: sì
 frase: Negli scambi on-chain un deposito con pochi sats in meno (succede con gli swap) non blocca più lo scambio: li copre il margine per la rete e si va avanti. Se ne mancano di più, chi ha depositato può toccare «↩️ Annulla e riprendi i sats» e riaverli sul suo wallet.
 dove: P2P → «I miei scambi» → uno scambio on-chain preso: la riga «👀 Visti in rete … ne mancano N» e il bottone «↩️ Annulla e riprendi i sats» di chi ha depositato; il messaggio del bot «Sono arrivati N sats in meno».
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-101 | novita -->
+## Novità · 2026-11-18 · sottocategorie
+
+frase: In Esplora le categorie hanno le sottocategorie: tocchi una categoria e si apre una tendina, con il numero di annunci accanto a ogni voce. Per esempio Informatica → Computer e portatili, oppure Tablet ed e-reader. E quando pubblichi Barattolo propone la sottocategoria leggendo il titolo; puoi cambiarla tu.
+dove: Esplora → «Esplora per categorie», tocca una categoria: la tendina sotto la card («Tutta la categoria» e le sottocategorie con annunci); la card accesa scrive la scelta sotto il nome. Vendi → il campo «Sottocategoria (facoltativa)» sotto la categoria.
+leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì

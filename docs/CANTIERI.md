@@ -91030,3 +91030,82 @@ PROVATO: `prove_serie_classifica` (la misura nel server, il taglio a 50
 con 60 in gara e la riga a parte del 60°), le sezioni che leggono i
 documenti, `collaudo_serie_giorni`. NON PROVATO: un telefono vero con 50
 righe vere (in produzione oggi sono meno).
+
+## Le sottocategorie in vetrina: la tendina sotto la card (18 nov 2026, cantiere sottocategorie; Andrea: «Dovremmo mettere le sottocategorie, cliccando una categoria, si apre una seconda riga con le sottocategorie in basso», poi sull'anteprima: «No, … quando clicchi sulla categoria principale si apre una tendina e tu scegli in quella tendina quali annunci mostrare», e sulla seconda: «Si così va bene»)
+
+**COSA.** L'albero di agosto (102 sottocategorie su 27 categorie, «Altro»
+piatta), dormiente fino a oggi, si accende. In Esplora il tocco su una card
+della striscia apre una TENDINA sotto la card: «Tutta la categoria», gli
+scaffali che hanno annunci col loro numero e, se la categoria è già accesa,
+«✕ Torna a Tutto». La scelta filtra la vetrina e resta scritta, piccola,
+sotto il nome della card. Nel form Vendi, sotto la categoria, «Sottocategoria
+(facoltativa)», già proposta dal giudice del server mentre si scrive il
+titolo. Leva `SOTTOCATEGORIE_VETRINA`, ACCESA di serie (regola delle leve
+nuove), nel pannello delle leve e nei numeri di Tappo.
+
+**LE DECISIONI.** 1) La forma è di Andrea: la prima proposta (una seconda
+riga di pillole sotto la striscia) l'ha bocciata, la tendina l'ha approvata
+sull'anteprima. 2) Solo gli scaffali PIENI: una porta su una vetrina vuota
+è un muro (la regola delle card «Da scoprire»); una categoria senza scaffali
+pieni, «Altro» compresa, filtra subito come prima. 3) Il ritocco della card
+accesa, che riportava a «Tutto», adesso riapre la tendina (con la scelta
+segnata): l'uscita è la sua ultima voce, e la card «Tutto» resta l'altra
+maniglia. Il tocco sulla card con la tendina aperta la chiude e basta. 4) Le
+pillole appiccicate non aprono la tendina: sono il comando veloce, e lo
+scaffale lo azzerano. 5) I numeri sono GLOBALI come quelli per categoria
+(`sottoconteggi` nella busta di prima pagina): soli attivi, una famiglia
+conta uno, voci valide per la categoria. 6) Gli annunci senza
+sottocategoria stanno solo in «Tutta la categoria», mai indovinati dal
+client: il pregresso lo riempie lo script di agosto, gesto di Andrea sul
+VPS (DA-FARE, voce 23). 7) La preselezione del form è il giudice del
+SERVER (`GET /api/sottocategoria`, pura, niente database), non una copia del
+dizionario nel client: la lezione del prompt in due copie. La scelta a mano
+vince e non la sovrascrive più. 8) In modifica, se la riga non ha fatto
+sapere la sua sottocategoria, il form non la manda: sul server l'assenza
+CONSERVA. 9) Mai nella modifica firmata degli importati (patto di agosto).
+10) «Tutta la categoria» e non «Tutta Informatica» come nell'anteprima:
+«Tutta Motori» o «Tutta Libri e media» non si dicono.
+
+**LE STRADE SCARTATE.** La riga di pillole (bocciata da Andrea). Un foglio
+dal basso (il picker): copre la vetrina e stacca la scelta dalla card che
+l'ha aperta. Le firme `setCat(c, sotto)` e `apriCategoria(c, sotto)`: sette
+prove di forma leggono quelle due funzioni per testo, e lo scaffale viaggia
+meglio in una variabile consumata una volta (`sottoChiesto`). La
+sottocategoria in CAMPI_VETRINA: alla card non serve, basta la scheda.
+
+**PROVATO.** `prove_sottocategorie_vetrina` nuova (la copia `SOTTOCAT` del
+client uguale all'albero voce per voce, la leva accesa di serie, il filtro
+con una delle due leve, busta e conteggi, la proposta che è il giudice del
+server, la tendina sul tocco, lo scaffale nella richiesta, il campo nei due
+payload e mai in quello firmato, l'assenza che conserva). Collaudo nuovo
+`collaudo_sottocategorie_vetrina` sulla rotta vera (17: leva accesa senza
+riga nel config, conteggi con famiglia/venduto/rimosso/vuote/storte, filtro
+e totale, scaffale senza categoria, voce inventata, la scheda, la proposta,
+la leva spenta come ieri), nell'elenco della CI. Controprove: un'etichetta
+storta nella copia del client e i conteggi senza capofila fanno rosse le
+due prove. Ritoccati `collaudo_ricerca` (lo scaffale «non filtra» solo con
+TUTTE e due le leve spente), `prove_leva_mercato_lavoro` (la riga del
+filtro) e il banco dei Consigliati (le due variabili nuove della striscia).
+Dal vivo con Playwright su un server usa-e-getta col database seminato, a
+390 e 320 px, chiaro e scuro: tendina con i numeri giusti, scelta che
+filtra (3 annunci), card che scrive lo scaffale, riapertura con la scelta
+segnata e «✕ Torna a Tutto», chiusura col ritocco e col tocco fuori,
+categoria senza scaffali che filtra subito; nel form la proposta dal titolo
+(«Computer e portatili»), la scelta a mano che resta, il cambio categoria
+che azzera. Nessun errore della pagina.
+Suite severa intera sul primo commit, nel venv senza coincurve: 30058/5;
+le cinque rosse erano prove di forma che leggevano i pezzi toccati — la
+firma della fila (`prove_raccolte`: lo scaffale entra con un suo `#S`, il
+pezzo vecchio resta intero), il banco dell'assistente (la leva nuova nei
+numeri di Tappo) e la sezione nuova senza categoria nella mappa
+(«mercatino») — e un'esplosione di `prove_indirizzo_ordine_onchain` dovuta
+a due suite lanciate insieme nella stessa cartella (il file del banco è
+uno solo): da sola è verde. Dopo le correzioni, le sezioni rosse più quelle
+toccate di nuovo verdi, con nostr-tools (`IDENTITA_NODE_MODULES`): zero
+saltate. Collaudi della CI 156/0 nel venv senza coincurve. Dopo i due
+rebase su develop (db190994 ammanco-p2p-onchain e b91a2a5e classifica-50,
+nessun simbolo in comune) il giro mirato: le sezioni toccate, quelle che
+leggono i documenti e i collaudi vicini (p2p_onchain, serie_giorni,
+ricerca, semina_collaudo), tutto verde.
+NON PROVATO: un telefono vero dentro Telegram; il pregresso di produzione
+(quanti annunci restano senza sottocategoria lo dice lo script, DA-FARE 23).

@@ -388,6 +388,13 @@ MODIFICA_MASSIVA_ATTIVA = False
 # accende.
 MERCATO_LAVORO = False
 
+# LE SOTTOCATEGORIE (18 nov 2026, decisione di Andrea): toccando una
+# categoria della striscia in Esplora si apre la tendina con «Tutta X» e
+# le sue sottocategorie piene, e nel form Vendi la sottocategoria si
+# sceglie (facoltativa). ACCESA DI SERIE: e' l'interruttore d'emergenza,
+# solo False la spegne (la categoria torna a filtrare subito).
+SOTTOCATEGORIE_VETRINA = True
+
 # LA MAPPA DEL RITIRO A MANO (14 nov 2026, decisione di Andrea): in fondo
 # alla barra di ricerca un tondo 🗺️ apre la mappa dell'Italia coi comuni
 # degli annunci col ritiro a mano (il centro del comune della «Zona», mai
