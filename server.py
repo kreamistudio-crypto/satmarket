@@ -112171,6 +112171,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "indirizzo": indirizzo, "proposta": proposta,
         "txid_uscita": o["txid_uscita"] or "",
         "scade": int(o["scade"]), "preso_il": int(o["preso_il"] or 0),
+        # (18 nov 2026, mercato-onchain) il cambio della presa, metro fermo
+        # di «Rispetto al mercato della presa» negli ordini a prezzo fisso
+        "cambio_presa": float(_p2p_onchain_campo(o, "cambio_presa", 0) or 0),
         "deposito_entro": int(o["deposito_entro"] or 0),
         "depositato_il": int(o["depositato_il"] or 0),
         # (17 nov 2026) il tempo per pagare: la card e la pagina lo contano
@@ -113993,6 +113996,16 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             if perche:
                 raise HTTPException(400, perche)
         prezzo, cambio_presa = int(o["prezzo_sats"]), 0.0
+        if not _p2p_onchain_mercato(o):
+            # A PREZZO FISSO IL CAMBIO DELLA PRESA SI TIMBRA LO STESSO (18 nov
+            # 2026, cantiere mercato-onchain): e' il metro fermo di «Rispetto
+            # al mercato della presa» nel conto, come su Lightning. Solo
+            # lettura della cache, e un cambio che manca non ferma niente:
+            # 0, e la riga tace
+            try:
+                cambio_presa = float(cambio_noto_ora(_p2p_onchain_metro(o)) or 0)
+            except Exception:
+                cambio_presa = 0.0
         if _p2p_onchain_mercato(o):
             # in USDT il metro e' il dollaro (1 USDT = 1 $), in franchi il
             # franco, in moneta l'euro con la cifra al cambio di ADESSO

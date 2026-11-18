@@ -77281,7 +77281,32 @@ function contoOnchainP2P(o){
         ? conNotaPremioP2P(rigaPremio, notaPremioP2P(o.mio, affare, prem)) : rigaPremio)
       + r('Subtotale', sats(o.sats), 'sub')
     : r('Sats dello scambio', sats(o.sats));
+  /* «RISPETTO AL MERCATO» A PREZZO FISSO, COME SU LIGHTNING (18 nov 2026,
+     cantiere mercato-onchain, Andrea: «Direi di sì»). I sats fissi sono
+     fermi dalla pubblicazione e il bitcoin no: la riga di `contoDettP2P`
+     (`rigaConvenienzaFissaP2P`) dice quanto il prezzo fisso e' sopra o
+     sotto il mercato. Stessi giudici: il metro e' il cambio di ADESSO
+     finche' nessuno prende e quello DELLA PRESA dopo (`cambio_presa`, che
+     il server timbra anche agli ordini fissi), e senza metro la riga tace
+     (`metroFissoP2P`, che in USDT, franchi e monete dopo la presa tace
+     gia'); la percentuale al decimo dalle due cifre, come la' (cantiere
+     sconto-fisso-decimale). Il lato «del libro» e' quello di chi sta di
+     fronte a chi legge, come per il premio qui sopra. Col typeof, come i
+     fratelli. */
+  const fissoOc = !o.mercato && Number(o.sats) > 0 && Number(o.euro) > 0
+    && typeof rigaConvenienzaFissaP2P === 'function' && typeof metroFissoP2P === 'function'
+    && typeof convenienzaFissaP2P === 'function';
+  let rigaConv = '';
+  if (fissoOc) {
+    const oc = Object.assign({}, o, {lato: compro ? 'sell' : 'buy', sats: Number(o.sats),
+      preso: Number(o.preso_il) > 0, cambioPresa: Number(o.cambio_presa) || 0});
+    const metro = metroFissoP2P(oc);
+    const conv = convenienzaFissaP2P(oc, metro);
+    const ctrlFisso = (conv && metro > 0) ? Math.round(Number(o.euro) / metro) : 0;
+    rigaConv = rigaConvenienzaFissaP2P(oc, ctrlFisso > 0 ? (1 - oc.sats / ctrlFisso) * 100 : conv);
+  }
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
+    + rigaConv
     + righeBase
     + (deposito && o.margine_sats ? r('Margine per la rete', sats(o.margine_sats)) : '')
     + rigaComm

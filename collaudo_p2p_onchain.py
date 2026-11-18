@@ -390,8 +390,17 @@ def main():
     prova("chi non e' ammesso: 404", 404,
           c.post(f"/api/p2p/onchain/{oid}/prendi", json={}).status_code)
     banco.DETTO.clear()
+    # (18 nov 2026, mercato-onchain) un cambio noto alla presa: a prezzo
+    # fisso si timbra lo stesso, metro di «Rispetto al mercato della presa»
+    cambio_prima = (dict(SRV._cambio_cache["valori"]), SRV._cambio_cache["quando"])
+    SRV._cambio_cache["valori"]["eur"] = 95000.0
+    SRV._cambio_cache["quando"] = time.time()
     r = gesto(888, oid, "prendi")
+    SRV._cambio_cache["valori"], SRV._cambio_cache["quando"] = cambio_prima
     o = r.json()
+    prova("a prezzo fisso il cambio della presa si timbra lo stesso, e chi "
+          "ha preso lo legge (il metro di «Rispetto al mercato della presa»)",
+          95000.0, o.get("cambio_presa"))
     prova("Alan compra: preso, lui e' il «venditore» del 2-di-3 (riceve), "
           "il margine di rete e' 3 x 2 x 180 = 1080",
           (200, "preso", "venditore", "compro", 1080, 101080),

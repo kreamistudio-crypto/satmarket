@@ -92121,3 +92121,29 @@ DECISO: a ogni giro dell'ora, dopo il ciclo dei collegamenti letti, `_nostr_dei_
 SCARTATO: aspettare che SWAG torni (il riprova giornaliero di connettori-ripartono c'è già, ma Andrea li vuole su Nostrology adesso e la vetrina li vende già); pubblicare dentro `_un_connettore` anche sul ramo dell'errore (lì si conta il fallimento di lettura, e un negozio in pausa non ci passa mai).
 PROVATO: `collaudo_negozi_su_nostr` esteso (31: un collegamento in errore riprovato da poco, due annunci vivi e uno tolto → il giro dell'ora manda in piazza i due vivi col tag Barattolo, e il giro dopo niente); controprove rosse senza il passo dei fermi e con tutti i collegamenti contati come «già allineati». `prove_negozi_su_nostr` estesa (il passo dopo il ciclo, niente `return` sul vuoto, i due salti). Rigirate le sezioni dei connettori (interrompibile, negozi grandi, varianti, categoria, cassetto) e quelle che leggono i documenti.
 RESTA DA GUARDARE: dopo la promozione, al primo giro dell'ora, «🟣 Negozio #3 su Nostr: 100 pubblicati, N al prossimo giro» e il #1 con i suoi 4 (probabili doppioni del #3 in piazza, come in vetrina); Nostrology il giorno dopo.
+
+## «Rispetto al mercato» nel conto on-chain a prezzo fisso (18 nov 2026, cantiere mercato-onchain; Andrea, sul «fuori dal chiesto» di premio-conto-onchain: «Direi di sì»)
+
+Gli ordini P2P on-chain a sats fissi non dicevano, come quelli di
+Lightning, quanto il prezzo fisso sta sopra o sotto il mercato. Ora in
+cima al conto di `contoOnchainP2P` c'e' la stessa riga
+(`rigaConvenienzaFissaP2P`), coi giudici di Lightning: metro di ADESSO
+finche' nessuno prende, quello DELLA PRESA dopo (`metroFissoP2P`), la
+percentuale al decimo dalle due cifre (sconto-fisso-decimale), la tinta
+dal giudice dell'affare visto da chi legge (il lato di chi gli sta di
+fronte, come la riga del premio). Il cambio della presa agli ordini
+fissi on-chain NON c'era: la presa lo timbrava solo a mercato. Ora
+`p2p_onchain_prendi` lo timbra anche a prezzo fisso (solo lettura della
+cache, `cambio_noto_ora` nella valuta del metro; se manca, 0 e la riga
+tace: la presa non si ferma mai per questo) e la riga di «I miei
+scambi» lo porta (`cambio_presa`). In USDT, franchi e monete dopo la
+presa la riga tace, come su Lightning. A mercato non c'e' (li' c'e' il
+premio).
+Provato: `prove_mercato_conto_onchain` coi pezzi veri (libro −10% in
+verde per chi compra, pari 0% senza tinta, mio preso «della presa»
++0,6% al decimo, preso senza cambio e USDT preso muti, USDT nel libro
+col dollaro, mercato muto); `collaudo_p2p_onchain` guarda il cambio
+timbrato alla presa di un ordine fisso. Controprove: senza la riga, o
+con `preso` spento, la sezione diventa rossa; senza il timbro il
+collaudo diventa rosso. Non provato dal vivo sul telefono: da guardare
+dopo il cherry-pick su un ordine on-chain a prezzo fisso.
