@@ -91334,3 +91334,20 @@ secondo tasto avrebbe detto la stessa cosa con una tabella in più.
 PROVATO. `collaudo_p2p_onchain` (6 prove: senza deposito 409, 403 a chi
 compra, l'avviso con l'avvertenza, la pagina, uno all'ora, 409 dopo «Ho
 inviato»). NON PROVATO: un telefono vero.
+
+## «No altcoin» toglie solo ETH e XMR, e le pillole in fondo alle «Valute» (18 nov 2026, correzione dopo la promozione; Andrea: «Nel filtro no al coin, quando lo selezionano, scompare anche USDT e USDE. Invece quando schiaccio no stablecoin è giusto perché vedo ancora Ethereum e Monero. Inoltre no al coin e no stablecoin, mettimele non alle prime posizioni ma alle ultime posizioni di quel paragrafo di valute.»)
+Le altcoin sono le monete che NON sono stablecoin: «No altcoin» ora
+toglie solo ETH e XMR, USDT e USDe li toglie solo «No stablecoin».
+`metodoMonetaP2P`/`valutaMonetaP2P` escludono le stablecoin, e un solo
+giudice, `fuoriPerMoneteP2P`, decide per tutte e due le pillole: fuori
+l'ordine la cui valuta è nascosta, o i cui metodi lo sono TUTTI. Così con
+le due accese esce anche l'euro che accetta solo ETH o USDT (con una sola
+resta: si paga con l'altra). Il banner BTC-euro resta legato a «No
+altcoin», come aveva deciso Andrea; la Novità degli USDT tace solo con «No
+stablecoin». Le due pillole passano in FONDO alla riga delle valute.
+Ritoccati i testi (Tappo, NOVITA, pannello, config d'esempio).
+PROVATO: `prove_bitcoin_only_p2p` coi casi nuovi (l'euro ETH-o-USDT, i
+giudici puri, la fila della home, l'ordine delle pillole nel foglio; la
+controprova rompe `fuoriPerMoneteP2P`), suite severa e collaudi nel venv
+senza coincurve.
+NON PROVATO: un telefono vero dentro Telegram.

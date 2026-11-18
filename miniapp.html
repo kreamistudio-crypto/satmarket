@@ -73037,8 +73037,8 @@ function facciaStableP2P(usdt, usde){
 let tutorialUsdtLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
 let p2pUsdtTutorialTimer = null;
 function novitaUsdtLibroP2P(){
-  /* con «No altcoin» o «No stablecoin» le stablecoin non si annunciano (18 nov 2026) */
-  if (typeof soloBtcVivoP2P === 'function' && (soloBtcVivoP2P(p2pFiltro) || noStableVivoP2P(p2pFiltro))) return '';
+  /* con «No stablecoin» le stablecoin non si annunciano (18 nov 2026) */
+  if (typeof noStableVivoP2P === 'function' && noStableVivoP2P(p2pFiltro)) return '';
   const usdt = novitaUsdtVistaP2P(), usde = novitaUsdeVistaP2P();
   if (!usdt && !usde) return '';
   const appeso = novitaUsdtAppesaP2P();
@@ -80574,37 +80574,46 @@ function valutaStableP2P(cod){
   return c === 'USDT' || c === 'USDE';
 }
 /* PURA: un ordine che si paga SOLO in stablecoin, con la regola di
-   `pagatoInMonetaP2P` qui sotto */
+   `fuoriPerMoneteP2P` qui sotto */
 function pagatoInStableP2P(o){
-  if (!o) return false;
-  if (valutaStableP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat)) return true;
-  const m = Array.isArray(o.metodi) ? o.metodi : [];
-  return m.length > 0 && m.every(metodoStableP2P);
+  return fuoriPerMoneteP2P(o, null, false, true);
 }
-/* PURA sul filtro: l'ordine esce per una delle due pillole */
-function fuoriPerMoneteP2P(o, f){
-  return (soloBtcVivoP2P(f) && pagatoInMonetaP2P(o)) || (noStableVivoP2P(f) && pagatoInStableP2P(o));
-}
-/* PURA: un METODO che e' una moneta (una rete di USDT, ETH, XMR, USDe) */
+/* «NO ALTCOIN» TOGLIE SOLO ETH E XMR (18 nov 2026, Andrea dopo la
+   promozione: «quando lo selezionano scompare anche USDT e USDE»): le
+   altcoin sono le monete che NON sono stablecoin. USDT e USDe le toglie
+   solo «No stablecoin». */
+/* PURA: un METODO che e' un'altcoin (una rete di ETH o XMR) */
 function metodoMonetaP2P(m){
-  return !!((typeof reteUsdtDaMetodoP2P === 'function' && reteUsdtDaMetodoP2P(m))
-    || (typeof reteCoinDaMetodoP2P === 'function' && reteCoinDaMetodoP2P(m)));
+  if (metodoStableP2P(m)) return false;
+  return !!(typeof reteCoinDaMetodoP2P === 'function' && reteCoinDaMetodoP2P(m));
 }
-/* PURA: una VALUTA che e' una moneta (USDT, USDe, ETH, XMR) */
+/* PURA: una VALUTA che e' un'altcoin (ETH, XMR) */
 function valutaMonetaP2P(cod){
   const c = String(cod || '').toUpperCase();
-  return c === 'USDT' || !!(typeof valutaCoinP2P === 'function' && valutaCoinP2P(c));
+  if (valutaStableP2P(c)) return false;
+  return !!(typeof valutaCoinP2P === 'function' && valutaCoinP2P(c));
 }
 /* PURA: un ordine — del libro o una card on-chain — che si paga SOLO in
-   moneta: in USDT, ETH, XMR o USDe, o in euro coi metodi tutti in moneta
-   (gli ordini del 13-16 nov 2026, quando ETH e XMR erano metodi
-   dell'euro). Un ordine in euro che accetta SEPA *o* ETH resta: si puo'
-   pagare in euro. */
+   altcoin, con la regola di `fuoriPerMoneteP2P` qui sotto */
 function pagatoInMonetaP2P(o){
+  return fuoriPerMoneteP2P(o, null, true, false);
+}
+/* PURA sul filtro: l'ordine esce se la sua VALUTA e' nascosta da una
+   pillola accesa, o se TUTTI i suoi metodi lo sono (gli ordini del 13-16
+   nov 2026, quando ETH e XMR erano metodi dell'euro). Un ordine in euro
+   che accetta SEPA *o* ETH resta: si puo' pagare in euro. Con le due
+   pillole accese esce anche l'euro che accetta solo ETH o USDT.
+   `alt`/`stab` forzano le pillole (per i giudici puri qui sopra). */
+function fuoriPerMoneteP2P(o, f, alt, stab){
   if (!o) return false;
-  if (valutaMonetaP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat)) return true;
+  const a = alt === undefined ? soloBtcVivoP2P(f) : !!alt;
+  const s = stab === undefined ? noStableVivoP2P(f) : !!stab;
+  if (!a && !s) return false;
+  const via = (isV, isM) => x => (a && isV(x)) || (s && isM(x));
+  const val = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat;
+  if (via(valutaMonetaP2P, valutaStableP2P)(val)) return true;
   const m = Array.isArray(o.metodi) ? o.metodi : [];
-  return m.length > 0 && m.every(metodoMonetaP2P);
+  return m.length > 0 && m.every(via(metodoMonetaP2P, metodoStableP2P));
 }
 /* fuori dalla fila della home per le pillole di adesso */
 function nascostoBitcoinOnlyP2P(o){
@@ -83111,7 +83120,7 @@ function renderFiltroP2P(){
   const b = p2pFiltroBozza;
   if (!box || !b) return;
   /* «NO ALTCOIN» E «NO STABLECOIN» (18 nov 2026, cantiere bitcoin-only):
-     due pillole normali in testa alle «Valute», solo a chi le ha */
+     due pillole normali in fondo alle «Valute», solo a chi le ha */
   const offerto = typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P();
   const soloBtc = offerto && !!b.soloBtc;
   const noStable = offerto && !!b.noStable;
@@ -83143,8 +83152,7 @@ function renderFiltroP2P(){
     '</div>';
   box.innerHTML = rete +
     '<div class="section-label">Valute</div>' +
-    '<div class="p2p-metodi">' + (offerto ? P2P_PILLOLE_NO.map(p =>
-      pill(p[0], !!b[p[1]], 'scegliNoMoneteFiltroP2P')).join('') : '') +
+    '<div class="p2p-metodi">' +
     (typeof valuteVisibiliP2P === 'function' ? valuteVisibiliP2P() : P2P_VALUTE)
       .filter(v => !nascosta(v.cod)).map(v =>
       /* le monete col loro nome, «USDe» (16 nov 2026, p2p-monete-valute),
@@ -83153,6 +83161,10 @@ function renderFiltroP2P(){
          filtro»): la bandierina, la T di Tether, il logo della moneta */
       pill(v.cod, b.valute.indexOf(v.cod) >= 0, 'scegliValutaFiltroP2P',
            iconaValutaFiltroP2P(v))).join('') +
+    /* in FONDO alle valute (18 nov 2026, Andrea: «non alle prime
+       posizioni ma alle ultime») */
+    (offerto ? P2P_PILLOLE_NO.map(p =>
+      pill(p[0], !!b[p[1]], 'scegliNoMoneteFiltroP2P')).join('') : '') +
     '</div>' +
     '<div class="section-label">Metodi di pagamento</div>' +
     '<div class="p2p-metodi">' + metodiFiltroP2P().filter(m => !nascostoM(m)).map(m =>

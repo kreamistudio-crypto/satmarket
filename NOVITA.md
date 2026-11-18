@@ -628,8 +628,8 @@ leva: ETICHETTA_OBBLIGATORIA (accesa di serie)
 pubblico: sì
 
 ## 2026-11-18 · bitcoin-only
-frase: Nel filtro del P2P ci sono due pillole nuove: «No altcoin» ti lascia solo gli scambi in euro e franchi, senza USDT, USDe, ETH e XMR; «No stablecoin» toglie solo USDT e USDe. Il telefono si ricorda la scelta. E ricorda: quelle monete servono solo a pagare, da noi si compra e si vende sempre bitcoin.
-dove: P2P → «Filtro» → «Valute», le prime due pillole «No altcoin» e «No stablecoin», poi «Applica». Spente di serie.
+frase: Nel filtro del P2P ci sono due pillole nuove: «No altcoin» toglie ETH e XMR, «No stablecoin» toglie USDT e USDe; accese tutte e due restano solo euro e franchi. Il telefono si ricorda la scelta. E ricorda: quelle monete servono solo a pagare, da noi si compra e si vende sempre bitcoin.
+dove: P2P → «Filtro» → «Valute», le ultime due pillole «No altcoin» e «No stablecoin», poi «Applica». Spente di serie.
 leva: P2P_BITCOIN_ONLY_ATTIVO (accesa di serie)
 pubblico: sì
 

@@ -38112,7 +38112,7 @@ def _leve_stato():
             _leva("No altcoin e No stablecoin nel Filtro P2P", "P2P_BITCOIN_ONLY_ATTIVO",
                   bool(P2P_BITCOIN_ONLY_ATTIVO),
                   acceso="nelle Valute del Filtro P2P ci sono le pillole «No "
-                         "altcoin» (via USDT, USDe, ETH e XMR) e «No "
+                         "altcoin» (via ETH e XMR) e «No "
                          "stablecoin» (via USDT e USDe); spente di serie, il "
                          "telefono ricorda la scelta",
                   spento="le due pillole non ci sono e il libro mostra tutte "
@@ -60840,8 +60840,8 @@ if not isinstance(P2P_COIN_ATTIVO, bool):
     P2P_COIN_ATTIVO = False
 # «₿ BITCOIN ONLY» NEL LIBRO P2P (18 nov 2026, cantiere bitcoin-only, dal
 # gruppo Telegram: «per quelli come me ai quali interessa solo bitcoin»).
-# L'interruttore nel Filtro del libro che nasconde in un colpo gli
-# scambi pagati in USDT, USDe, ETH e XMR; SPENTO di serie per chi guarda
+# Due pillole nelle Valute del Filtro: «No altcoin» nasconde gli scambi
+# pagati in ETH e XMR, «No stablecoin» quelli in USDT e USDe; SPENTE di serie per chi guarda
 # (Andrea: «non di default altrimenti uno manco sa che ci sono altri
 # scambi»), e il telefono si ricorda la scelta. Tutto vive nel browser:
 # qui c'e' solo la leva che lo OFFRE, accesa di serie (regola del 14 nov

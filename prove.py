@@ -209935,7 +209935,8 @@ def prove_bitcoin_only_p2p():
     cantiere bitcoin-only, dal gruppo Telegram: «per quelli come me ai
     quali interessa solo bitcoin»; Andrea: spente di serie, «altrimenti uno
     manco sa che ci sono altri scambi», due pillole normali in «Valute», e
-    il telefono se le ricorda). Il banco gira i giudici puri — chi si paga
+    il telefono se le ricorda; dopo la promozione: «No altcoin» toglie
+    solo ETH e XMR, e le pillole stanno in fondo alle valute). Il banco gira i giudici puri — chi si paga
     solo in moneta o in stablecoin, il libro di Lightning, le card
     on-chain, la fila della home, la memoria, il banner degli scambi — poi
     i fili della pagina e la leva del server. La controprova spegne i
@@ -209976,7 +209977,7 @@ const f = x => Object.assign(filtroVuotoP2P(), x);
 const o = (id, fiat, metodi, creato) => ({id, fiat, metodi, creato: creato || id, stato: 'pending', lato: 'sell'});
 const libro = [o('a', 'EUR', ['SEPA']), o('b', 'USDT', ['USDT (Tron)']), o('c', 'ETH', ['ETH (Ethereum)']),
   o('d', 'EUR', ['ETH (Ethereum)']), o('e', 'EUR', ['SEPA', 'XMR (Monero)']), o('g', 'CHF', ['TWINT']),
-  o('h', 'EUR', ['USDT (Tron)']), o('i', 'USDE', ['USDe (Base)'])];
+  o('h', 'EUR', ['USDT (Tron)']), o('i', 'USDE', ['USDe (Base)']), o('j', 'EUR', ['ETH (Ethereum)', 'USDT (Tron)'])];
 const passa = filtro => libro.filter(x => passaFiltroP2P(x, filtro)).map(x => x.id).join('');
 const passaOc = filtro => libro.filter(x => passaFiltroOcP2P(x, filtro)).map(x => x.id).join('');
 const out = {};
@@ -210005,6 +210006,9 @@ out.bannerStable = bannerScambiP2P().src;
 p2pFiltro = null;
 out.filaSpenta = ordiniVetrinaP2P(vlib, 1).map(x => x.id).join('');
 out.bannerMonete = bannerScambiP2P().src;
+out.puri = [pagatoInMonetaP2P(o('x', 'ETH', [])), pagatoInMonetaP2P(o('x', 'USDT', [])),
+  pagatoInMonetaP2P(o('x', 'USDE', [])), pagatoInMonetaP2P(o('x', 'EUR', ['XMR (Monero)'])),
+  pagatoInStableP2P(o('x', 'USDE', [])), pagatoInStableP2P(o('x', 'XMR', []))];
 out.memoria = [noMoneteRicordateP2P()];
 ricordaNoMoneteP2P(f({soloBtc: true})); out.memoria.push(noMoneteRicordateP2P());
 ricordaNoMoneteP2P(f({noStable: true})); out.memoria.push(noMoneteRicordateP2P());
@@ -210019,25 +210023,28 @@ console.log(JSON.stringify(out));
         prova("il banco di No altcoin e No stablecoin gira", True, False)
         return
     prova("LEVA SPENTA: le pillole ricordate non fermano niente, non accendono il Filtro "
-          "e non si offrono", ["abcdeghi", False, False], o["levaSpenta"])
+          "e non si offrono", ["abcdeghij", False, False], o["levaSpenta"])
     prova("...e senza niente da nascondere (ne' USDT ne' monete per chi guarda) non si offrono",
-          [False, "abcdeghi"], o["niente"])
+          [False, "abcdeghij"], o["niente"])
     prova("leva accesa e monete visibili: si offrono", True, o["offerto"])
-    prova("NO ALTCOIN: restano euro e franchi; fuori USDT, ETH, USDe e gli ordini in euro "
-          "pagabili solo in moneta. Chi accetta SEPA *o* XMR resta (si paga in euro)",
-          "aeg", o["acceso"])
+    prova("NO ALTCOIN: fuori solo ETH e XMR e gli ordini in euro pagabili solo in ETH o XMR; "
+          "USDT e USDe RESTANO (Andrea, dopo la promozione). Chi accetta SEPA *o* XMR resta, "
+          "e anche l'euro che accetta ETH *o* USDT", "abeghij", o["acceso"])
+    prova("i giudici puri: altcoin sono ETH e XMR, non USDT ne' USDe; stablecoin USDT e USDe",
+          [True, False, False, True, True, False], o["puri"])
     prova("NO STABLECOIN: fuori solo USDT e USDe (anche l'euro pagabile solo in USDT); "
-          "ETH e XMR restano", "acdeg", o["stable"])
-    prova("...tutte e due insieme valgono «No altcoin»", "aeg", o["tutte"])
-    prova("spente, o senza filtro, il libro e' intero come ieri", ["abcdeghi", "abcdeghi"],
+          "ETH e XMR restano", "acdegj", o["stable"])
+    prova("...tutte e due insieme: restano euro e franchi, e esce anche l'euro pagabile solo "
+          "in ETH o USDT", "aeg", o["tutte"])
+    prova("spente, o senza filtro, il libro e' intero come ieri", ["abcdeghij", "abcdeghij"],
           [o["spento"], o["nullo"]])
-    prova("le card on-chain seguono gli stessi giudici", ["aeg", "acdeg", "abcdeghi"], o["oc"])
+    prova("le card on-chain seguono gli stessi giudici", ["abeghij", "acdegj", "abcdeghij"], o["oc"])
     prova("la pillola Filtro si accende con una delle due", [True, True, False], o["accesoPill"])
     prova("IL VUOTO E' QUELLO DI SEMPRE (pillole normali): «Togli il filtro»", [True, None],
           [o["vuoto"].get("togli"), o["vuoto"].get("monete")])
-    prova("LA FILA DELLA HOME: le monete escono PRIMA del taglio, e i posti vanno agli euro "
+    prova("LA FILA DELLA HOME: ETH esce PRIMA del taglio, e i posti vanno a USDT ed euro "
           "(quella on-chain non ordina: la mescola renderVetrinaP2P)",
-          ["v1", "v1"], [o["fila"], o["filaOc"]])
+          ["v3v1", "v1v3"], [o["fila"], o["filaOc"]])
     prova("...con «No stablecoin» via solo l'USDT", "v4v2", o["filaStable"])
     prova("...e spente la fila e' quella di ieri", "v4v3", o["filaSpenta"])
     prova("IL BANNER DEGLI SCAMBI: con «No altcoin» torna la coppia BTC-euro; con «No "
@@ -210047,12 +210054,12 @@ console.log(JSON.stringify(out));
     prova("la memoria del telefono: nascono spente, una chiave per pillola, «Azzera» le dimentica",
           [{"soloBtc": False, "noStable": False}, {"soloBtc": True, "noStable": False},
            {"soloBtc": False, "noStable": True}, {"soloBtc": False, "noStable": False}], o["memoria"])
-    rotto = (fns.replace("function pagatoInMonetaP2P(o){\n", "function pagatoInMonetaP2P(o){\n  return false;\n", 1)
-             .replace("function pagatoInStableP2P(o){\n", "function pagatoInStableP2P(o){\n  return false;\n", 1))
-    prova("controprova: il banco rotto si e' davvero rotto", True, rotto.count("return false;\n") > fns.count("return false;\n") + 1)
+    rotto = fns.replace("function fuoriPerMoneteP2P(o, f, alt, stab){\n",
+                        "function fuoriPerMoneteP2P(o, f, alt, stab){\n  return false;\n", 1)
+    prova("controprova: il banco rotto si e' davvero rotto", True, rotto.count("return false;\n") > fns.count("return false;\n"))
     x = _node_banco(banco(rotto)) or {}
     prova("controprova: coi giudici spenti gli USDT e le monete tornano nel libro",
-          ["abcdeghi", "abcdeghi"], [x.get("acceso"), x.get("stable")])
+          ["abcdeghij", "abcdeghij"], [x.get("acceso"), x.get("stable")])
     # --- i fili della pagina ---
     me = mini[mini.index("    myP2PCoin = !!me.p2p_coin;\n"):]
     me = me[:me.index("renderVetrinaP2P, 0)")]
@@ -210067,15 +210074,17 @@ console.log(JSON.stringify(out));
            "vestiBannerScambiP2P()" in azz and "renderVetrinaP2P()" in azz,
            "vestiBannerScambiP2P()" in app and "renderVetrinaP2P()" in app])
     rf = _fn_js(mini, "function renderFiltroP2P(){")
-    prova("il foglio: le due pillole in testa alle «Valute», solo a chi le ha, e le monete "
-          "che nascondono via dalle valute e dai metodi", [True, True, True, True],
+    prova("il foglio: le due pillole in FONDO alle «Valute» (dopo le valute), solo a chi le "
+          "ha, e le monete che nascondono via dalle valute e dai metodi", [True, True, True, True, True],
           ["const P2P_PILLOLE_NO = [['No altcoin', 'soloBtc'], ['No stablecoin', 'noStable']];" in mini,
            "(offerto ? P2P_PILLOLE_NO.map(p =>\n      pill(p[0], !!b[p[1]], 'scegliNoMoneteFiltroP2P')).join('') : '')" in rf,
-           ".filter(v => !nascosta(v.cod))" in rf, ".filter(m => !nascostoM(m))" in rf])
+           ".filter(v => !nascosta(v.cod))" in rf, ".filter(m => !nascostoM(m))" in rf,
+           rf.find(".filter(v => !nascosta(v.cod))") < rf.find("(offerto ? P2P_PILLOLE_NO.map(")
+           < rf.find("Metodi di pagamento")])
     prova("niente piu' riga in cima al foglio", False, "p2p-btc-only" in mini)
-    prova("i due «Novità»: quello delle stablecoin tace con l'una o l'altra, quello di ETH e "
-          "XMR solo con «No altcoin»", [True, True],
-          ["(soloBtcVivoP2P(p2pFiltro) || noStableVivoP2P(p2pFiltro))) return '';"
+    prova("i due «Novità»: quello delle stablecoin tace con «No stablecoin», quello di ETH e "
+          "XMR con «No altcoin»", [True, True],
+          ["if (typeof noStableVivoP2P === 'function' && noStableVivoP2P(p2pFiltro)) return '';"
            in _fn_js(mini, "function novitaUsdtLibroP2P(){"),
            "if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(p2pFiltro)) return '';"
            in _fn_js(mini, "function novitaCoinLibroP2P(){")])

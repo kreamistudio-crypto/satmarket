@@ -1560,10 +1560,10 @@ P2P_CHF_SOLO_ADMIN = True
 # ACCESA di serie (regola del 14 nov 2026): False la spegne in emergenza.
 P2P_COIN_ATTIVO = True
 # «₿ BITCOIN ONLY» NEL FILTRO DEL LIBRO P2P (18 nov 2026, cantiere
-# bitcoin-only): l'interruttore che nasconde in un colpo gli scambi in
-# USDT, USDe, ETH e XMR. Per chi guarda nasce SPENTO e il telefono si
-# ricorda la scelta; questa leva lo OFFRE. ACCESA di serie (regola del 14
-# nov 2026): False toglie l'interruttore in emergenza.
+# bitcoin-only): le pillole «No altcoin» (via ETH e XMR) e «No
+# stablecoin» (via USDT e USDe). Per chi guarda nascono SPENTE e il
+# telefono ricorda la scelta; questa leva le OFFRE. ACCESA di serie
+# (regola del 14 nov 2026): False le toglie in emergenza.
 P2P_BITCOIN_ONLY_ATTIVO = True
 # La fase chiusa, come per il P2P: i tg_id che vedono le cose RGB
 # mentre gli altri non vedono niente. Vuota = aperta a chiunque appena
