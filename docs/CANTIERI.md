@@ -91263,3 +91263,43 @@ il passo «Le prove» della CI (senza httpx né coincurve, nostr-tools con
 IDENTITA_NODE_MODULES), e collaudi della CI 156/0 senza coincurve e
 senza variabili del proxy. `collaudo_avvisi_mercatino` cercava i titoli
 nudi: ora li cerca coi loro link (rosso al primo giro, verde dopo).
+
+## Le sottocategorie agli annunci di produzione, a mano (18 nov 2026, cantiere sottocategorie-nuove; Andrea: «mettermi tutti gli annunci nelle sottocategorie giuste», poi «Controlla quegli annunci, guarda le foto e crea tu delle sottocategorie apposite», e sulla scheda «Sì, spostali»)
+Richiesta di Andrea: «mettimi tutti gli annunci nelle sottocategorie
+giuste», senza crediti Anthropic per la ricategorizzazione AI. Lo script
+automatico (`assegna_sottocategorie.py --scrivi`) ne ha assegnate 4 e si è
+astenuto su 2652; tolti gli «Altro» (piatta per forza) ne restavano 226,
+esportati in sola lettura (`id|categoria|titolo|descrizione[:150]`) e letti
+uno per uno. Le foto NO: né la sessione cloud né il PC raggiungono
+barattolo.store dalla rete del lavoro, si è deciso su titolo e descrizione.
+DECISO: 93 su sottocategorie già esistenti (script con elenco esplicito,
+scrive solo i vuoti nella stessa categoria); 81 erano nella categoria
+SBAGLIATA (abbonamenti software in Elettronica, Pixel in Elettronica,
+occhiali in Bellezza, vestiti da bimbo in Abbigliamento, statue in
+Collezionismo...): Andrea sulla scheda «Sì, spostali», contro la strada di
+~40 sottocategorie doppione (ids eterni: un «Software» in due categorie
+sarebbe restato per sempre). Spostati in categoria + sottocategoria con le
+regole di confine già scritte sopra l'albero. Per i 38 rimasti 14 voci
+nuove, una sola parola nuova per volta e nessun doppione: Unisex; Pasta,
+riso e cereali; Su misura e personalizzazioni; Oggetti decorativi; Apparecchi
+per estetica; Libri e guide e Servizi e consulenze (Bitcoin, che è una
+categoria a TEMA come merch e poster); Contenitori e organizzazione; Action
+figure e modellini; Francobolli e documenti storici; Crediti e contenuti
+digitali; Crescita personale; Maglie e divise; SIM e ricariche. Ognuna ha le
+sue parole nel giudice silenzioso (la prova lo esige), scelte strette:
+«supporto», «statuetta», «certificato», «scatola» e «decorativo» tolte
+perché rubavano annunci ad altre voci («in scatola originale», «certificato
+di autenticità»).
+ERRORE PAGATO: lo script copiato in /root e lanciato da `sudo -u barattolo`
+non si apre (barattolo non legge /root): si passa da stdin,
+`sudo -u barattolo python3 - < /root/x.py`.
+PROVATO: le tre liste contro l'albero (asserzioni nello script), ognuna su
+una copia finta delle 226 righe (riscrittura idempotente: secondo giro 0),
+il blocco dello script nuovo senza la promozione; `prove_sottocategorie`,
+`prove_sottocategorie_vetrina`, collaudo della vetrina, suite severa.
+I 38 li ha scritti Andrea SUBITO («i 38 rimasti risolvili adesso»), prima
+della promozione: il codice in produzione non conosce le 14 voci, ma non
+mostra ancora nessuna sottocategoria, quindi non cambia niente finché la
+promozione non porta tendina e albero insieme.
+RESTA: i 14 annunci di prova in Elettronica e Casa restano vuoti
+(cancellarli è un'altra scelta).

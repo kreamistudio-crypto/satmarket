@@ -940,3 +940,11 @@ cd /srv/barattolo && sudo -u barattolo python3 assegna_sottocategorie.py --scriv
 ```
 Nessun riavvio: la tendina conta le righe a ogni apertura della vetrina.
 Si rilancia quando vuoi, tocca solo i vuoti.
+
+## 24. Le 14 sottocategorie nuove: niente da fare (18 nov 2026, cantiere sottocategorie-nuove)
+
+I 38 annunci delle 14 voci nuove li ha già scritti Andrea il 18 nov
+(`sottocategorie_nuove.py`, subito, su sua richiesta: «i 38 rimasti
+risolvili adesso»). Si vedono nella tendina con la promozione che porta
+l'albero nuovo. Restano senza sottocategoria solo 14 annunci di prova
+(«Prova», «Test», «Balu», «Tastiera»).

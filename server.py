@@ -27567,6 +27567,7 @@ SOTTOCATEGORIE = {
     "Telefonia": (
         ("smartphone", "Smartphone e cellulari"),
         ("cover-accessori", "Cover e accessori"),
+        ("sim-ricariche", "SIM e ricariche"),
     ),
     "Audio e video": (
         ("cuffie", "Cuffie e auricolari"),
@@ -27579,6 +27580,7 @@ SOTTOCATEGORIE = {
         ("videogiochi", "Videogiochi"),
         ("controller-accessori", "Controller e accessori"),
         ("retrogaming", "Retrogaming"),
+        ("crediti-digitali", "Crediti e contenuti digitali"),
     ),
     "Foto e ottica": (
         ("fotocamere", "Fotocamere"),
@@ -27592,11 +27594,14 @@ SOTTOCATEGORIE = {
         ("nodi-mining", "Nodi e mining"),
         ("poster-stampe", "Poster e stampe"),
         ("merch", "Abbigliamento e gadget"),
+        ("libri-guide", "Libri e guide"),
+        ("servizi-btc", "Servizi e consulenze"),
     ),
     "Casa e giardino": (
         ("mobili", "Mobili e arredamento"),
         ("cucina-tavola", "Cucina e tavola"),
         ("giardino", "Giardinaggio"),
+        ("organizzazione", "Contenitori e organizzazione"),
     ),
     "Elettrodomestici": (
         ("grandi-elettrodomestici", "Grandi elettrodomestici"),
@@ -27612,16 +27617,19 @@ SOTTOCATEGORIE = {
         ("dolci-conserve", "Dolci, creme e conserve"),
         ("spezie-erbe", "Spezie ed erbe"),
         ("bevande", "Vino, birra e bevande"),
+        ("pasta-riso", "Pasta, riso e cereali"),
     ),
     "Bellezza e benessere": (
         ("creme-cosmetici", "Creme e cosmetici"),
         ("profumi", "Profumi"),
         ("integratori", "Integratori"),
+        ("apparecchi-estetica", "Apparecchi per estetica"),
     ),
     # adulti e basta: la roba da bimbi ha la sua casa, vedi Bambini
     "Abbigliamento": (
         ("donna", "Donna"),
         ("uomo", "Uomo"),
+        ("unisex", "Unisex"),
     ),
     "Scarpe e accessori": (
         ("scarpe", "Scarpe"),
@@ -27645,6 +27653,7 @@ SOTTOCATEGORIE = {
         # asteneva su una categoria giusta
         ("mare-piscina", "Mare e piscina"),
         ("giochi-tavolo", "Giochi da tavolo e puzzle"),
+        ("maglie-sportive", "Maglie e divise"),
     ),
     "Biciclette": (
         ("corsa-gravel", "Da corsa e gravel"),
@@ -27683,12 +27692,16 @@ SOTTOCATEGORIE = {
         ("carte-tcg", "Carte e giochi collezionabili"),
         ("edizioni", "Libri ed edizioni da collezione"),
         ("monete-banconote", "Monete e banconote"),
+        ("action-figure", "Action figure e modellini"),
+        ("francobolli-documenti", "Francobolli e documenti storici"),
     ),
     "Arte e artigianato": (
         ("quadri-stampe", "Quadri e stampe"),
         ("sculture-ceramiche", "Sculture e ceramiche"),
         ("tessuti-ricami", "Tessuti e ricami"),
         ("materiali-creativi", "Materiali creativi"),
+        ("oggetti-decorativi", "Oggetti decorativi"),
+        ("su-misura", "Su misura e personalizzazioni"),
     ),
     "Buoni ed esperienze": (
         ("gift-card", "Gift card e buoni acquisto"),
@@ -27711,6 +27724,7 @@ SOTTOCATEGORIE = {
         ("sport-benessere", "Sport e benessere"),
         ("cucina-corsi", "Cucina"),
         ("arte-corsi", "Arte e creativita"),
+        ("crescita-personale", "Crescita personale"),
     ),
     "Lavoro e servizi": (
         ("grafica-design", "Grafica e design"),
@@ -27801,6 +27815,7 @@ SINONIMI_SOTTOCATEGORIA = {
                        "xiaomi", "redmi"),
         "cover-accessori": ("cover", "custodia", "pellicola", "caricatore",
                             "caricabatterie", "auricolari", "cuffiette"),
+        "sim-ricariche": ("sim", "esim", "ricarica telefonica"),
     },
     "Audio e video": {
         "cuffie": ("cuffie", "auricolari", "cuffia"),
@@ -27819,6 +27834,7 @@ SINONIMI_SOTTOCATEGORIA = {
                                  "volante"),
         "retrogaming": ("retro", "retrogaming", "game boy", "amiga",
                         "commodore", "sega"),
+        "crediti-digitali": ("crediti", "coins", "vbucks", "v bucks"),
     },
     "Foto e ottica": {
         "fotocamere": ("fotocamera", "reflex", "mirrorless", "polaroid",
@@ -27841,6 +27857,8 @@ SINONIMI_SOTTOCATEGORIA = {
         "merch": ("maglietta", "tshirt", "t shirt", "felpa", "cappello",
                   "sacca", "borsa", "tazza", "adesiv", "portachiavi",
                   "gadget", "sticker"),
+        "libri-guide": ("libro", "libri", "ebook", "guida", "manuale"),
+        "servizi-btc": ("consulenza", "assistenza", "sostenitori"),
     },
     "Casa e giardino": {
         "mobili": ("divano", "tavolo", "sedia", "sgabello", "armadio",
@@ -27851,6 +27869,8 @@ SINONIMI_SOTTOCATEGORIA = {
                           "posate", "tagliere", "macchina per la pasta"),
         "giardino": ("pianta", "vaso", "semi", "rastrello", "tosaerba",
                      "irrigazione", "barbecue"),
+        "organizzazione": ("organizzatori", "organizer", "contenitori",
+                           "contenitore", "scatole portaoggetti"),
     },
     "Elettrodomestici": {
         "grandi-elettrodomestici": ("frigo", "frigorifero", "lavatrice",
@@ -27878,6 +27898,7 @@ SINONIMI_SOTTOCATEGORIA = {
                         "origano", "erbe", "curcuma"),
         "bevande": ("vino", "birra", "caffe", "liquore", "amaro", "succo",
                     "bevanda", "sidro", "kombucha"),
+        "pasta-riso": ("riso", "pasta", "farina", "cereali", "legumi"),
     },
     "Bellezza e benessere": {
         "creme-cosmetici": ("crema", "sapone", "shampoo", "balsamo",
@@ -27886,10 +27907,13 @@ SINONIMI_SOTTOCATEGORIA = {
         "profumi": ("profumo", "profumi", "fragranza", "colonia"),
         "integratori": ("integratore", "vitamine", "proteine", "creatina",
                         "omega"),
+        "apparecchi-estetica": ("lampada", "estetica", "estetista",
+                                "epilatore", "tatuatori"),
     },
     "Abbigliamento": {
         "donna": ("donna", "femminile", "gonna", "camicetta", "tailleur"),
         "uomo": ("uomo", "maschile", "cravatta", "completo uomo"),
+        "unisex": ("unisex",),
     },
     "Scarpe e accessori": {
         "scarpe": ("scarpe", "sneakers", "stivali", "sandali", "mocassini",
@@ -27929,6 +27953,7 @@ SINONIMI_SOTTOCATEGORIA = {
                          "surf", "bodyboard", "muta", "costume"),
         "giochi-tavolo": ("gioco", "giochi", "puzzle", "tavolo",
                           "strategia", "scacchi", "dadi"),
+        "maglie-sportive": ("maglia", "jersey", "divisa", "calzettoni"),
     },
     "Biciclette": {
         "corsa-gravel": ("corsa", "gravel", "bdc"),
@@ -27981,6 +28006,9 @@ SINONIMI_SOTTOCATEGORIA = {
                      "cofanetto", "prima edizione"),
         "monete-banconote": ("moneta", "monete", "banconota", "banconote",
                              "numismatica", "lire", "conio"),
+        "action-figure": ("funko", "action figure", "modellini", "modellino"),
+        "francobolli-documenti": ("francobollo", "francobolli", "stamps",
+                                  "stamp", "lettera antica"),
     },
     "Arte e artigianato": {
         "quadri-stampe": ("quadro", "dipinto", "tela", "acquerello",
@@ -27991,6 +28019,9 @@ SINONIMI_SOTTOCATEGORIA = {
                            "uncinetto", "tessitura"),
         "materiali-creativi": ("colori", "tele", "pennelli", "lana",
                                "filati", "perline"),
+        "oggetti-decorativi": ("feng shui", "soprammobile", "biotensor"),
+        "su-misura": ("personalizzazione", "personalizzato", "su misura",
+                      "incisione"),
     },
     "Lezioni e corsi": {
         "lingue": ("inglese", "spagnolo", "francese", "tedesco", "cinese",
@@ -28018,6 +28049,8 @@ SINONIMI_SOTTOCATEGORIA = {
         "arte-corsi": ("disegno", "pittura", "ceramica", "fotografia",
                        "teatro", "danza", "cucito", "acquerello",
                        "recitazione"),
+        "crescita-personale": ("crescita personale", "consapevolezza",
+                               "chakra", "chakras", "sovranita"),
     },
     "Lavoro e servizi": {
         "grafica-design": ("logo", "loghi", "grafica", "design",
