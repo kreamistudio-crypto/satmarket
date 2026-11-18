@@ -82928,11 +82928,18 @@ function renderP2P(){
      divisorio di cadere a meta' — sotto il logo (vedi il CSS della
      pillola). Senza wrapper l'icona e «Filtro» sono due fratelli
      del `em`, e un flex non sa che vanno pesati insieme. */
+  /* IL NUMERO CONTA ANCHE LE CARD ON-CHAIN (18 nov 2026, Andrea: «non
+     ho filtri attivi … in Vendi ci sono più di 4 card»): contava solo il
+     libro di Lightning, mentre a schermo le card on-chain dello stesso
+     lato stanno mescolate alle altre. Le righe sono quelle che si
+     disegnano, col filtro gia' passato (`righeOnchainLibroP2P`). */
+  const contoPillola = elenco.length
+    + (typeof righeOnchainLibroP2P === 'function' ? righeOnchainLibroP2P(k).length : 0);
   const pillola = `<button type="button" class="p2p-filtro${
       filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''}" onclick="apriFiltroP2P()">`
     + `<span class="p2p-filtro-sx">` + icoFiltroP2P() + `<b>Filtro</b></span>`
-    + `<s></s><em>${elenco.length}<span class="p2p-filtro-parola"> `
-    + `offert${elenco.length === 1 ? 'a' : 'e'}</span></em></button>`;
+    + `<s></s><em>${contoPillola}<span class="p2p-filtro-parola"> `
+    + `offert${contoPillola === 1 ? 'a' : 'e'}</span></em></button>`;
   /* GLI AVVISI RESTANO COL LIBRO e non salgono nella testata
      attaccata: la pillola e' un COMANDO e vale sempre, questi
      raccontano com'e' andata la lettura di adesso — appesi in alto

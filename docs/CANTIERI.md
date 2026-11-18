@@ -91698,3 +91698,15 @@ solo, avviso senza intent; su Android come prima.
 NON PROVATO DAL VIVO: un iPhone vero con Clave. Da guardare: che Safari
 lasci partire il lancio da solo dopo l'attesa dei relay (se no resta il
 bottone), e che dopo l'ok in Clave, tornati su Barattolo, si entri.
+
+## Il numero accanto a «Filtro» conta anche le card on-chain (18 nov 2026, cantiere conto-filtro; Andrea: «io non ho filtri attivi, quindi non capisco che quel 4 cosa vuol dire, perché in Vendi ci sono più di 4 card»)
+Il numero della pillola contava solo il libro di Lightning (`elenco`),
+mentre le card on-chain dello stesso lato sono mescolate alle altre: con
+due on-chain a schermo il numero diceva due di meno. Adesso è
+`contoPillola` = `elenco` + `righeOnchainLibroP2P(k)`, le stesse righe
+che si disegnano col filtro già passato. Il 17 nov (filtro-barattozon)
+contarle era stato scartato solo perché non chiesto. La parola
+«offerte» accanto al numero resta nascosta sul telefono per lo spazio.
+PROVATO: le prove di forma di `prove_p2p_libro` sul conto nuovo, suite
+severa e collaudi nel venv senza coincurve.
+NON PROVATO: un telefono vero.

@@ -69427,7 +69427,7 @@ def prove_p2p_libro():
           and "onclick=\"apriFiltroP2P()\"" in _rp
           and "<b>Filtro</b>" in _rp)
     prova("...col singolare quando ne resta una",
-          True, "elenco.length === 1 ? 'a' : 'e'" in _rp)
+          True, "contoPillola === 1 ? 'a' : 'e'" in _rp)
     # ⚠️ E IL NUMERO E' QUELLO FILTRATO, sempre: un conteggio sul libro
     # intero mentre a schermo se ne vedono tre sarebbe la bugia piu'
     # facile da scrivere e la piu' difficile da notare.
@@ -69442,7 +69442,12 @@ def prove_p2p_libro():
           # (31 ott 2026, mappa-contanti) il comune scelto sulla mappa
           # restringe ancora: si conta e si disegna l'`elenco`, che senza
           # comune scelto E' `mostrati`
-          and '<em>${elenco.length}<span class="p2p-filtro-parola"> ' in _rp
+          # (18 nov 2026, Andrea: «in Vendi ci sono più di 4 card») e
+          # ci si aggiungono le card on-chain dello stesso lato, quelle
+          # che si disegnano mescolate alle altre
+          and '<em>${contoPillola}<span class="p2p-filtro-parola"> ' in _rp
+          and "const contoPillola = elenco.length\n    + (typeof righeOnchainLibroP2P === 'function' ? righeOnchainLibroP2P(k).length : 0);" in _rp
+          and "elenco.concat(righeOnchainLibroP2P(k)" in _rp
           and "elenco.map(rigaOrdineP2P)" in _rp
           and "const elenco = conMappa ? elencoMappaP2P(mostrati) : mostrati;" in _rp)
     prova("...e i volti si chiedono PRIMA della reputazione, o non si chiedono mai",
