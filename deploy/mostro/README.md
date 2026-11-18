@@ -1,5 +1,14 @@
 # IL FORK DI MOSTRO — le undici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
+**Dal 18 novembre 2026 c'è la 0013, PREPARATA E NON ANCORA SUL NODO**: il
+tempo per pagare scelto da chi pubblica (cantiere `tempo-pagamento`,
+sotto, «LA 0013»). Sta sopra la 0012, ha il suo patcher e il suo modulo
+(`barattolo_finestra.rs`), ed è stata COMPILATA E PROVATA nel cloud: `git
+am` delle dodici `.patch` su un clone pulito della `v0.20.2` dà l'albero
+`bdad9c34`, e `cargo test` dice 2001 verdi, 0 rosse. Il nodo gira ancora
+la `-bar9` (undici patch) finché Andrea non fa la voce di
+`docs/DA-FARE-ANDREA.md`; l'immagine nuova sarà la `-bar10`.
+
 **Dal 29 ottobre 2026 il fork sta sulla `v0.20.2`** (`fe2a905`, uscita il
 28 ott; cantiere `mostro-0202`, decisione di Andrea: il fork intero,
 non la sola cura). Le undici patch sono le stesse della `-bar8`: tre
@@ -615,6 +624,61 @@ rinasce, quindi lì l'evento arriva e non avvisa. E NON SI PROVA IN
 FRETTA: servono ~92 ore da una garanzia pagata, col pagamento segnato e
 mai liberato.
 
+## LA 0013: IL TEMPO PER PAGARE, SCELTO DA CHI PUBBLICA (18 nov 2026)
+
+Preparata il 18 nov 2026 (cantiere `tempo-pagamento`; Andrea, da un
+venditore che scambia tanto: «nel momento in cui lo prendi hai un'ora di
+tempo», poi «Tutto insieme, nodo compreso»). Sopra la 0012.
+
+IL PROBLEMA. Uno scambio `active` (garanzia bloccata, niente «pagato»)
+finisce solo per mano del guardiano della garanzia, a ~92 ore
+(`hold_invoice_cltv_delta` 576 meno il margine): chi prende e sparisce
+tiene fermi i sats di chi vende per quattro giorni, e l'annullo d'accordo
+lui non lo manda. Il «24 ore» che si legge in giro non lo fa rispettare
+nessuno.
+
+COSA FA. Chi pubblica una vendita su Barattolo sceglie il tempo su un
+orologio, da 15 minuti a 24 ore (sotto le 24 solo coi metodi veloci: lo
+decide il server). Il
+nodo lo CHIEDE al server, come la 0005 chiede lo sconto: il filo di Mostro
+(`SmallOrder`) non ha un campo per lui, e cambiarlo romperebbe gli altri
+client. Un job suo, ogni 60 secondi, FUORI dal ciclo seriale dei messaggi:
+timbra in una tabella sua (`barattolo_payment_windows`) il primo minuto in
+cui vede uno scambio `active`, chiede `POST {"ordini": [...]}` a
+`BARATTOLO_FINESTRA_URL` col bearer `BARATTOLO_FINESTRA_SEGRETO` e scrive
+`{"finestre": {id: secondi}}` una volta sola per ordine (valgono SOLO i
+minuti interi da 900 a 86400 secondi; il resto è «nessun tempo»). Quando il tempo finisce e
+l'ordine è ancora `active`, annulla la hold invoice COME il ramo `Active`
+del guardiano (`cancel_hold_invoice`, stato `canceled`, gli avvisi alle
+parti, la cauzione di chi pubblica risolta), e lo racconta con la 0007:
+`expired` / `payment-window`. Il 38385 annuncia l'intervallo
+(`barattolo_payment_windows` = `900-86400`): la pagina offre la scelta
+SOLO se lo vede intero.
+
+L'OROLOGIO AL POSTO DELLE TRE FINESTRE (18 nov 2026, lo stesso giorno,
+prima che toccasse il nodo; Andrea: «non a soglie che decidiamo noi
+mentre tipo un orologio con un timer che decidi tu»). La prima versione
+accettava solo 3600, 14400 e 86400 (albero `d893a2f3`): rifatta prima
+del deploy, il nodo non l'ha mai vista.
+
+QUEL CHE UN SERVER BUGIARDO PUÒ FARE: annullare uno scambio attivo dopo
+almeno un quarto d'ora, coi sats che tornano a chi vende. Mai spostarli altrove,
+mai toccare un `fiat-sent` o una disputa. Senza le due variabili il job è
+INERTE (nessuna richiesta, nessuna tabella, nessun tag), e un server che
+non risponde vale «nessun tempo» (fail-open: il comportamento di oggi).
+
+GLI AGGANCI: il modulo in `main.rs`; il job in `start_scheduler` accanto
+al guardiano; il giro (`barattolo_payment_window_pass`) prima del
+guardiano, che rilegge l'ordine e lo vuole ancora `Active` prima di
+annullare; tre prove del giro accanto a quelle del guardiano (col suo
+`StubEscrow`); la riga del vocabolario e la prova del corpo in
+`barattolo_eventi.rs`; il tag nel 38385 accanto a quelli della 0011. Sei
+prove pure nel modulo.
+
+PRIMA IL SERVER, POI IL NODO, come per la 0011 e la 0012: il server di
+ieri non ha la rotta (404, e il nodo si comporta come oggi) e leggerebbe
+`payment-window` come un annullo qualunque.
+
 ## GLI OTTO PATCHER (più il decimo)
 
 Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
@@ -638,6 +702,7 @@ fermano («porta gia' questa modifica»).
 | 0010 | `patch-0010-cauzione-metodo-dichiarato.py` | 8 agganci in 5 file (`util.rs`, `bond/flow.rs`, `bond/mod.rs`, `take_buy.rs`, `take_sell.rs`), più i test in coda a `flow.rs` (10 ott 2026); pretende la 0008 |
 | 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` | 13 agganci in 7 file (`main.rs`, `config/types.rs`, `settings.tpl.toml`, `db.rs`, `scheduler.rs`, `barattolo_eventi.rs`, `nip33.rs`), coi test dentro il modulo (12 ott 2026); pretende la 0007; uno riagganciato sulla 0.20.2 il 29 ott 2026 (`nip33.rs`) |
 | 0012 | `patch-0012-disputa-automatica.py` | 3 agganci in 2 file (`scheduler.rs`: l'evento nel ramo `fiat-sent` del guardiano; `barattolo_eventi.rs`: la riga del vocabolario e una prova pura) (12 ott 2026); pretende la 0011 |
+| 0013 | `patch-0013-tempo-per-pagare.py` + `barattolo_finestra.rs` | 7 agganci in 4 file (`main.rs`, `scheduler.rs`: il job, il giro e tre prove; `barattolo_eventi.rs`: la riga del vocabolario e una prova; `nip33.rs`: il tag nel 38385) (18 nov 2026); pretende la 0011 e la 0012 |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha

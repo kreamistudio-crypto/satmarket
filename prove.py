@@ -36803,6 +36803,8 @@ _SEGRETI_FINTI = {
     "P2P_SCONTO_SEGRETO": "SEGRETO-porta-dello-sconto-p2p",
     # la porta da cui il coordinatore racconta gli scambi (patch 0007)
     "P2P_EVENTI_SEGRETO": "SEGRETO-porta-degli-eventi-p2p",
+    # la porta da cui il coordinatore chiede il tempo per pagare (patch 0013)
+    "P2P_FINESTRA_SEGRETO": "SEGRETO-porta-del-tempo-per-pagare",
     # la porta da cui la ronda del nodo chiede i payout (28 set 2026)
     "RONDA_NODO_SEGRETO": "SEGRETO-porta-della-ronda-del-nodo",
     # le quattro chiavi dell'app su X (9 ott 2026, la cassa di
@@ -37044,6 +37046,7 @@ def _censimento(acceso, dopo=None):
         amb["CHIAVE_CONTENUTI_DIGITALI"] = ""
         amb["RELAY_CHIAVI_TOKEN"] = ""
         amb["P2P_EVENTI_SEGRETO"] = ""
+        amb["P2P_FINESTRA_SEGRETO"] = ""
         for nome in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN",
                      "X_ACCESS_SECRET"):
             amb[nome] = ""
@@ -37070,6 +37073,11 @@ def _censimento(acceso, dopo=None):
     # `swap_rete()`, che cerca la parola in SWAP_RETI — da `__missing__`
     # sarebbe un 7, e `in 7` esplode
     amb["SWAP_RETI"] = ("bitcoin", "testnet", "regtest")
+    # ...e l'orologio del tempo per pagare (18 nov 2026): `_p2p_leve` fa una
+    # lista dei metodi veloci, e da `__missing__` un 7 non si scorre
+    amb.update({"P2P_MINUTI_PAGARE_MIN": 15, "P2P_MINUTI_PAGARE_MAX": 1440,
+                "P2P_MINUTI_PAGARE_PASSO": 15, "P2P_MINUTI_PAGARE_DI_SERIE": 1440,
+                "P2P_METODI_VELOCI": ("SEPA Instant", "Revolut", "Satispay", "PayPal")})
     # ...e i fornitori (20 ott 2026, l'instradatore): il pannello CHIAMA
     # `swap_fornitori()`, che scorre SWAP_FORNITORI_IN_PIU — da
     # `__missing__` un 7, e un 7 non si scorre
@@ -37108,6 +37116,9 @@ def _censimento(acceso, dopo=None):
     amb["URL_PUBBLICO"] = "https://barattolo.store"
     for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
               "eventi_p2p_attivi", "ronda_nodo_attiva", "_leva", "_elenco",
+              # il tempo per pagare (18 nov 2026): la riga della porta CHIAMA
+              # il suo giudice, la trappola del 7 ancora una volta
+              "finestra_p2p_attiva",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
               "_nodo_configurato", "cassaforte_nuova",
               # il guardiano del ponte (set 2026): la sua riga CHIAMA
@@ -66289,8 +66300,11 @@ def prove_ritocchi_prova_alan():
                      "_pause_p2p", "_pause_foto_p2p",
                      # (13 ott 2026, paracadute) ...e gli ordini col paracadute aperto
                      "_paracadute_p2p", "_paracadute_foto_p2p",
+                     # (18 nov 2026, tempo-pagamento) ...e il tempo per pagare
+                     "_minuti_pagare_foto_p2p",
                      "_rinfresca_volti_foto_p2p", "_intesta_dal_canale_p2p"):
             exec(pezzo(nome), amb)
+        tempo_pagare_nel_banco(amb)
         amb["P2P_TEMPO_DI_CHI_PUBBLICA"] = False
         amb["P2P_PARACADUTE"] = False
         amb["P2P_RIPUBBLICA"] = True
@@ -83131,8 +83145,10 @@ def prove_p2p_pubblica():
           # «chi puo' prendere» e prima dei limiti
           # (13 ott 2026, paracadute) e il paracadute, dopo la pausa
           # (16 nov 2026, ripubblica) e la ripubblica, dopo il paracadute
+          # (18 nov 2026, tempo-pagamento) e il tempo per pagare, subito dopo
+          # «chi puo' prendere»: tutt'e due dicono a chi prende a cosa si impegna
           "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio"
-          " + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
+          " + accesso + tempoPagare + pausa + paracadute + ripubblica + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
     prova("la scatola e' quella delle altre, senza icona", True,
@@ -88306,6 +88322,11 @@ def prove_p2p_server():
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
+             # (18 nov 2026) ...e il tempo per pagare, acceso col suo orologio
+             "P2P_TEMPO_PER_PAGARE": True, "P2P_MINUTI_PAGARE_MIN": 15,
+             "P2P_MINUTI_PAGARE_MAX": 1440, "P2P_MINUTI_PAGARE_PASSO": 15,
+             "P2P_MINUTI_PAGARE_DI_SERIE": 1440,
+             "P2P_METODI_VELOCI": ("SEPA Instant", "Revolut", "Satispay", "PayPal"),
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
@@ -88342,11 +88363,12 @@ def prove_p2p_server():
     # (20 ott 2026) DICIOTTO: il tetto del collaudo, 0 in produzione
     # (16 nov 2026) DICIANNOVE: la ripubblica degli ordini scaduti
     # (17 nov 2026) VENTI: il contante per posta, spento di serie (Andrea)
-    prova("le chiavi sono venti e sono sempre quelle",
+    # (18 nov 2026) VENTITRE: il tempo per pagare, la leva e il suo orologio
+    prova("le chiavi sono ventitre e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
-           "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz", "mostro",
-           "paracadute", "posta",
-           "relay", "ripubblica", "specchio", "tempoPubblica"],
+           "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz",
+           "minutiPagareDiSerie", "minutiPagareLimiti", "mostro", "paracadute", "posta",
+           "relay", "ripubblica", "specchio", "tempoPagare", "tempoPubblica"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
     # client lo usa solo per dire quando la fee viva e' una promo.
@@ -93907,8 +93929,10 @@ def prove_premio_barattozon():
           # (12 ott 2026, tempo-di-chi-pubblica) ...e in coda le pause
           # (13 ott 2026, paracadute) ...e gli ordini col paracadute aperto
           # (31 ott 2026, mappa-contanti) ...e accanto alle zone i punti
+          # (18 nov 2026, tempo-pagamento) ...e in coda il tempo per pagare
           ['return {"facce": facce, "cambi": cambi, "zone": zone, "posti": _posti_p2p(zone),\n'
-           '            "filtri": filtri, "pause": pause, "paracadute": paracadute}'
+           '            "filtri": filtri, "pause": pause, "paracadute": paracadute,\n'
+           '            "minuti_pagare": minuti_pagare}'
            in pezzo("facce_ordini_p2p"),
            'if fuori["eventi"] and F.get("cambi"):\n        fuori["cambi"] = F["cambi"]'
            in pezzo("libro_fotografato_p2p")
@@ -99686,7 +99710,54 @@ def _banco_eventi_p2p(eventi_attivi=True):
               "_risposta_pubblica_p2p", "_veloce_p2p", "_veloci_p2p",
               "_piano_promemoria_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    tempo_pagare_nel_banco(amb)
     return con, amb
+
+
+def tempo_pagare_nel_banco(amb, acceso=True):
+    """IL TEMPO PER PAGARE NEI BANCHI (18 nov 2026, cantiere tempo-
+    pagamento): le costanti e i giudici veri, da infilare in ogni banco che
+    esegue un pezzo che li nomina — la registrazione degli ordini, i volti,
+    l'archivio degli scambi, gli avvisi, i solleciti, gli esiti. Un posto
+    solo, come `giudice_nascosto`: la leva sta ACCESA come di serie (chi la
+    vuole spenta passa `acceso=False`), e le dipendenze che il banco non ha
+    si prendono dal sorgente. Le righe vere, mai una copia: una costante
+    ricopiata resterebbe verde il giorno che quella vera cambia."""
+    import json as _json
+    import sqlite3 as _sq
+    src = _SORGENTE
+    amb.setdefault("json", _json)
+    amb.setdefault("sqlite3", _sq)
+    amb.setdefault("re", re)
+    amb["P2P_TEMPO_PER_PAGARE"] = bool(acceso)
+    for riga in ("P2P_MINUTI_PAGARE_MIN = ", "P2P_MINUTI_PAGARE_MAX = ",
+                 "P2P_MINUTI_PAGARE_PASSO = ", "P2P_MINUTI_PAGARE_DI_SERIE = ",
+                 "P2P_METODI_VELOCI = ", "P2P_FINESTRA_RITARDO_MAX_S = ",
+                 "P2P_MINUTI_RECAPITO_CORTO = ",
+                 "SOLLECITI_RECAPITO_CORTO_S = ", "FORMA_ORDINE_P2P = ",
+                 "MAX_ORDINI_P2P = "):
+        if riga.split(" ")[0] in amb and riga.startswith(("FORMA_", "MAX_")):
+            continue
+        i = src.index("\n" + riga) + 1
+        exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    for blocco, fine in (("SOLLECITO_TEMPO_PAGARE_PRIMI = (", ")\n"),
+                         ("SOLLECITO_TEMPO_PAGARE_ULTIMO = (", ")\n"),
+                         ("SOLLECITO_RECAPITO_CORTO_TESTO = (", ")\n")):
+        i = src.index("\n" + blocco) + 1
+        exec(src[i:src.index(fine, i) + len(fine)], amb)
+    for f in ("_euro_tabacchino", "_metodi_libro", "_tabacchino_libro",
+              "_ordini_puliti_p2p"):
+        if f not in amb:
+            exec(_senza_prosa(pezzo(f)), amb)
+    for f in ("_minuti_pagare_scelta_p2p", "_metodo_veloce_p2p",
+              "_metodi_veloci_p2p", "_minuti_coi_metodi_p2p", "_ordine_col_tempo_p2p",
+              "_dichiara_minuti_pagare_p2p", "_minuti_pagare_righe_p2p", "_minuti_pagare_p2p",
+              "_finestre_per_nodo_p2p", "_attivo_dal_p2p", "_paga_entro_p2p",
+              "_recapito_tardi_p2p", "_durata_detta_p2p", "_intervalli_tempo_pagare_p2p",
+              "_recapito_corto_s_p2p", "_testi_tempo_pagare_p2p",
+              "_minuti_pagare_ordine_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    return amb
 
 
 def prove_p2p_eventi():
@@ -103371,6 +103442,7 @@ def prove_scambi_ovunque():
               # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
               "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
+    tempo_pagare_nel_banco(amb)       # (18 nov 2026) l'archivio dice il tempo per pagare
     euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
     stato = amb["_stato_scambio_p2p"]
     prova("la cifra del libro torna numero: «10,00 €», «23,47 €», «1.500,00 €», storta, vuota",
@@ -104280,6 +104352,7 @@ def prove_tolti_ovunque():
               "_conto_scambio_p2p",
               "_tolti_p2p", "_tolto_vale_p2p", "_togli_scambio_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
+    tempo_pagare_nel_banco(amb)       # (18 nov 2026) l'archivio dice il tempo per pagare
     togli, tolti, vale = amb["_togli_scambio_p2p"], amb["_tolti_p2p"], amb["_tolto_vale_p2p"]
     ORA = 1_800_000_000
     CONC, ANN, APERTO = "a1-conc-0001", "b2-ann-00002", "c3-aperto-03"
@@ -120792,6 +120865,11 @@ def prove_avvisi_nuovi_ordini():
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
+             # (18 nov 2026) ...e il tempo per pagare, acceso col suo orologio
+             "P2P_TEMPO_PER_PAGARE": True, "P2P_MINUTI_PAGARE_MIN": 15,
+             "P2P_MINUTI_PAGARE_MAX": 1440, "P2P_MINUTI_PAGARE_PASSO": 15,
+             "P2P_MINUTI_PAGARE_DI_SERIE": 1440,
+             "P2P_METODI_VELOCI": ("SEPA Instant", "Revolut", "Satispay", "PayPal"),
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": {},
@@ -143434,6 +143512,7 @@ def prove_ritocchi_flusso_p2p():
               # (10 ott 2026) la riga del conto dell'archivio: qui tace (fail-open)
               "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
+    tempo_pagare_nel_banco(amb)       # (18 nov 2026) l'archivio dice il tempo per pagare
     tocca = amb["_tocca_a_me_p2p"]
     prova("il giudice del server: chi compra tocca su fattura, fattura nuova, e attivo col recapito detto",
           [True, True, False, True, False, False],
@@ -146925,6 +147004,11 @@ def prove_contanti_a_mano():
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
+             # (18 nov 2026) ...e il tempo per pagare, acceso col suo orologio
+             "P2P_TEMPO_PER_PAGARE": True, "P2P_MINUTI_PAGARE_MIN": 15,
+             "P2P_MINUTI_PAGARE_MAX": 1440, "P2P_MINUTI_PAGARE_PASSO": 15,
+             "P2P_MINUTI_PAGARE_DI_SERIE": 1440,
+             "P2P_METODI_VELOCI": ("SEPA Instant", "Revolut", "Satispay", "PayPal"),
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              # gli avvisi dei nuovi ordini (9 ott 2026), entrati in busta
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
@@ -158062,6 +158146,11 @@ def prove_indirizzo_non_verificato():
              "P2P_TEMPO_DI_CHI_PUBBLICA": False,   # (12 ott 2026) la leva in busta
              "P2P_PARACADUTE": False,              # (13 ott 2026) ...e quella del paracadute
              "P2P_RIPUBBLICA": True,               # (16 nov 2026) ...e quella della ripubblica
+             # (18 nov 2026) ...e il tempo per pagare, acceso col suo orologio
+             "P2P_TEMPO_PER_PAGARE": True, "P2P_MINUTI_PAGARE_MIN": 15,
+             "P2P_MINUTI_PAGARE_MAX": 1440, "P2P_MINUTI_PAGARE_PASSO": 15,
+             "P2P_MINUTI_PAGARE_DI_SERIE": 1440,
+             "P2P_METODI_VELOCI": ("SEPA Instant", "Revolut", "Satispay", "PayPal"),
              "P2P_CHAT_SCAMBIO": True,             # (12 ott 2026) e quella della chat
              "P2P_AVVISI_NUOVI_ORDINI": True, "P2P_AVVISI_NUOVI_MINUTI": 15,
              "P2P_INDIRIZZI_NON_PASSANO": elenco,
@@ -165002,8 +165091,9 @@ def prove_p2p_onchain_valute():
            # (17 nov 2026 sera, onchain-contanti) ...e dopo il PayCode la zona
            # (17 nov 2026 sera, paracadute-su-giu) ...e dopo la zona le due soglie
            # (17 nov 2026 sera, barattozon-oc-compra) ...e dopo le soglie la fascia
+           # (18 nov 2026, tempo-pagamento) ...e dopo la fascia il tempo per pagare
            '"CHF" if chf else "",\n             json.dumps(tab) if tab else "", zona, para_su, '
-           'para_giu,\n             fascia[0] if fascia else 0))' in pub
+           'para_giu,\n             fascia[0] if fascia else 0, minuti_pagare))' in pub
            and '("fiat", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
            'if coin_o and not p2p_coin_ammesso(user["id"]):' in pre
            and 'if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):' in pre,
@@ -167899,7 +167989,8 @@ console.log(JSON.stringify(out));
           (True, True),
           # le scatole sono quelle di Lightning, nello stesso ordine e con le
           # stesse parole: la rete cambia solo l'ultima, dentro `riquadroLimitiP2P`
-          ("+ quanti + premio + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() +"
+          # (18 nov 2026) col tempo per pagare, che a rete on-chain tace da se'
+          ("+ quanti + premio + accesso + tempoPagare + pausa + paracadute + ripubblica + riquadroLimitiP2P() +"
            in nuovo,
            "const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';"
            in nuovo))
@@ -173165,8 +173256,10 @@ def prove_contanti_zona():
           'zone = _zone_p2p(con, (d or {}).get("ordini"))' in fac
           # (13 ott 2026, paracadute) ...e in coda gli ordini col paracadute aperto;
           # (31 ott 2026, mappa-contanti) e accanto alle zone i loro punti
+          # (18 nov 2026, tempo-pagamento) ...e in coda il tempo per pagare
           and 'return {"facce": facce, "cambi": cambi, "zone": zone, "posti": _posti_p2p(zone),\n'
-              '            "filtri": filtri, "pause": pause, "paracadute": paracadute}' in fac)
+              '            "filtri": filtri, "pause": pause, "paracadute": paracadute,\n'
+              '            "minuti_pagare": minuti_pagare}' in fac)
     lib = pezzo("libro_fotografato_p2p")
     prova("la fotografia le da' a TUTTI, prima di chiedere chi guarda (non sono un volto)", True,
           'if fuori["eventi"] and F.get("zone"):\n        fuori["zone"] = F["zone"]' in lib
@@ -173214,7 +173307,8 @@ def prove_contanti_zona():
            # (10 ott 2026, reputazione-p2p) ...e i filtri, in coda alle zone;
            # (12 ott 2026, tempo-di-chi-pubblica) e in coda ai filtri le pause
            # (13 ott 2026, paracadute) e in coda alle pause il paracadute
-           and "> 0 || cambi || zone || filtri || pause || paracadute || onchain;" in fn("async function chiediFotoLibroP2P(){"),
+           # (18 nov 2026, tempo-pagamento) e accanto ai filtri il tempo per pagare
+           and "> 0 || cambi || zone || filtri || minutiPagare || pause || paracadute || onchain;" in fn("async function chiediFotoLibroP2P(){"),
            mini.count("\n  prendiZoneP2P(d && d.zone);\n") == 1])
     riga = fn("function rigaOrdineP2P(o){")
     prova("la card del libro mette la zona sotto la scatola dei metodi; la card d'esempio no",
@@ -187863,7 +187957,8 @@ def prove_paracadute_p2p():
           ['_dichiara_paracadute_p2p(con, user["id"], (d or {}).get("paracadute"),\n'
            '                                 int(time.time()), cambio_noto_ora())'
            in pezzo("registra_ordini_p2p"),
-           '"paracadute": paracadute}' in pezzo("facce_ordini_p2p"),
+           # (18 nov 2026) col tempo per pagare in coda
+           '"paracadute": paracadute,\n            "minuti_pagare": minuti_pagare}' in pezzo("facce_ordini_p2p"),
            'fuori["paracadute"] = F["paracadute"]' in src])
     prova("la fotografia lo rifa' nei suoi due posti, col giudice unico", [2, True],
           [src.count('F["paracadute"] = _paracadute_foto_p2p(F["eventi"])'),
@@ -188986,7 +189081,8 @@ def prove_paracadute_app():
     prova("nel foglio che pubblica la sezione sta DOPO la pausa e prima dei limiti",
           [True, True],
           ["sezioneParacaduteNuovoP2P(tabMetodo) : '';" in foglio,
-           "+ quanti + premio + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() +" in foglio])
+           # (18 nov 2026) col tempo per pagare dopo «chi puo' prendere»
+           "+ quanti + premio + accesso + tempoPagare + pausa + paracadute + ripubblica + riquadroLimitiP2P() +" in foglio])
     # (13 ott 2026, sera, EMENDA dalla prova di Andrea sul telefono: il foglio
     # ripartiva dal 5% dell'ordine di prima, e un paracadute che nessuno ha
     # scelto ANNULLA un ordine. La scelta ricordata — decisa la mattina — e'
@@ -189091,7 +189187,8 @@ def prove_paracadute_app():
           < annulla.find("chiamataOrdineP2P(o, 'cancel')"))
     foto = fn("async function chiediFotoLibroP2P(){")
     prova("la fotografia dice «e' cambiato qualcosa» anche per il solo paracadute", True,
-          "|| cambi || zone || filtri || pause || paracadute || onchain;" in foto)
+          # (18 nov 2026) col tempo per pagare accanto ai filtri
+          "|| cambi || zone || filtri || minutiPagare || pause || paracadute || onchain;" in foto)
     prova("CHI HA IL LIBRO DAVANTI LO VEDE USCIRE: la fotografia si richiede dall'interval "
           "unico (una volta al minuto) e dalla tirata (subito)", [True, True],
           ["try { if (typeof rinfrescaFuoriLibroP2P === 'function') rinfrescaFuoriLibroP2P(); } "
@@ -193925,7 +194022,8 @@ def prove_barattozon_onchain():
            "_p2p_onchain_quanto": lambda o, netti=False: "100.000 sats per 39,99 €"}
     for n in ("_p2p_onchain_campo", "_importo_paycode_valido", "_paycode_sopra_minimo",
               "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "p2p_onchain_giudica_tabacchino",
-              "p2p_onchain_scade_libro", "p2p_onchain_ore_pagamento", "p2p_onchain_paga_entro",
+              "p2p_onchain_scade_libro", "p2p_onchain_ore_pagamento", "_p2p_onchain_minuti",
+              "p2p_onchain_paga_entro",
               "_p2p_onchain_testi_deposito_tab", "_p2p_onchain_tab_codice",
               "p2p_onchain_giudica_tab_compra", "p2p_onchain_tab_compra",
               "p2p_onchain_giudica_tab_presa", "_p2p_onchain_euro_testo"):
@@ -194066,7 +194164,8 @@ def prove_barattozon_onchain():
            # (17 nov 2026 sera, onchain-contanti) dopo il PayCode viene la zona,
            # e dopo la zona le due soglie del paracadute (paracadute-su-giu)
            # (17 nov 2026 sera, barattozon-oc-compra) e in coda la fascia di «Compra BTC»
-           'json.dumps(tab) if tab else "", zona, para_su, para_giu,\n             fascia[0] if fascia else 0))' in pub,
+           # (18 nov 2026, tempo-pagamento) ...e dopo la fascia il tempo per pagare
+           'json.dumps(tab) if tab else "", zona, para_su, para_giu,\n             fascia[0] if fascia else 0, minuti_pagare))' in pub,
            '("paycode", "TEXT DEFAULT \'\'")' in src])
     prova("il recapito di un Barattozon non si scrive, e un Barattozon in pausa si prende lo stesso",
           [True, True, True],
@@ -206654,6 +206753,7 @@ def prove_onchain_come_lightning():
     for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
               "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
               "p2p_onchain_chf", "p2p_onchain_valuta", "p2p_onchain_ore_pagamento",
+              "_p2p_onchain_minuti", "_durata_detta_p2p",
               "p2p_onchain_paga_entro", "_p2p_onchain_quanto", "_recensibile_onchain_p2p",
               "_riga_recensione_p2p", "_p2p_onchain_esiti", "_p2p_onchain_testi_tempo_scaduto",
               "_p2p_onchain_passata_tempo_pagare"):
@@ -206761,7 +206861,8 @@ def prove_onchain_come_lightning():
            and '_riga_recensione_p2p(con, ordine, user["id"])' in rec_scrivi
            and "FROM p2p_ordini" not in rec_si and "FROM p2p_ordini" not in rec_scrivi,
            "_p2p_onchain_passata_tempo_pagare(con, adesso)" in ronda,
-           "Hai {ore} ore</b>, poi chi vende può aprire una disputa" in controlla,
+           # (18 nov 2026, tempo-pagamento) il tempo scelto da chi pubblica, detto
+           "Hai {tempo_detto}</b>, poi chi vende può aprire una disputa" in controlla,
            '"paga_entro": p2p_onchain_paga_entro(o)' in pezzo("_p2p_onchain_per"),
            '("pagamento_scaduto_il", "INTEGER DEFAULT 0")' in pezzo("_p2p_onchain_prepara")])
     # --- 2) il telefono ---
@@ -206962,7 +207063,8 @@ def prove_onchain_promemoria():
     amb["_metodi_libro"] = lambda m: [str(x).strip() for x in m or []]
     for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_metodi_usdt",
               "p2p_onchain_usdt", "_coin_pm_libro", "_coin_ordine_libro", "p2p_onchain_coin",
-              "p2p_onchain_ore_pagamento", "_p2p_onchain_intervalli_pagare",
+              "p2p_onchain_ore_pagamento", "_p2p_onchain_minuti",
+              "_p2p_onchain_intervalli_pagare",
               "_p2p_onchain_testi_pagare", "_p2p_onchain_solo_contanti",
               "_p2p_onchain_contanti",
               "p2p_onchain_tab_dati", "p2p_onchain_tab_scade", "_p2p_onchain_promemoria_tab",
@@ -207704,7 +207806,8 @@ def prove_onchain_contanti():
            # (17 nov 2026 sera, paracadute-su-giu) dopo la zona le due soglie
            # (17 nov 2026 sera, barattozon-oc-compra) e in coda la fascia di «Compra BTC»
            "\" rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,\"" in rotta
-           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu,\n             fascia[0] if fascia else 0))" in rotta,
+           # (18 nov 2026, tempo-pagamento) e in coda il tempo per pagare
+           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu,\n             fascia[0] if fascia else 0, minuti_pagare))" in rotta,
            "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
     prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
           (True, True, True),
@@ -212262,6 +212365,452 @@ console.log(JSON.stringify({
           (ae.get("saldi"), ae.get("finita"), ae.get("chiusa"), ae.get("errori")))
 
 
+def prove_tempo_pagare_p2p():
+    """IL TEMPO PER PAGARE NEL P2P (18 nov 2026, cantiere tempo-pagamento;
+    Andrea, da JJ che scambia tanto: «nel momento in cui lo prendi hai
+    un'ora di tempo»; e sul come, «Tutto insieme, nodo compreso»). Chi
+    pubblica una vendita sceglie il tempo su un OROLOGIO, da 15 minuti a 24
+    ore, e sotto le 24 ore solo coi metodi veloci; chi prende lo legge
+    prima; l'anello lo vedono tutt'e due; allo scadere senza «Ho inviato»
+    il NODO annulla (patch 0013, che chiede il tempo a `/api/p2p/finestre`);
+    sull'on-chain arrivano l'avviso e la disputa.
+
+    Quel che qui si rompe in silenzio: l'orologio del server, della pagina
+    e del nodo che si separano (un quarto d'ora qui, un numero che il nodo
+    scarta la'); un tempo corto su un bonifico ordinario; la pagina che offre la scelta a un nodo che non annulla; un tempo
+    sul PayCode, sul contanti o su un acquisto; il termine contato da
+    un'ora diversa da quella del nodo; il «non completato» a chi compra
+    quando il recapito e' arrivato tardi; il segreto che esce dal
+    pannello. Le rotte vere girano in `collaudo_tempo_pagare`."""
+    print("\n[il tempo per pagare: l'orologio da 15 minuti a 24 ore, e il nodo che annulla]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    rs = open("deploy/mostro/barattolo_finestra.rs", encoding="utf-8").read()
+    patch = open("deploy/mostro/patch-0013-tempo-per-pagare.py", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) LE SENTINELLE --------------------------------------------------
+    prova("la leva e' ACCESA di serie, e una storta resta accesa",
+          [True, True],
+          ["except ImportError:\n    P2P_TEMPO_PER_PAGARE = True\n" in src,
+           "        P2P_TEMPO_PER_PAGARE = True\nexcept ImportError:" in src])
+    prova("...L'OROLOGIO e' lo stesso nel server, nella pagina e nel NODO (15 minuti - 24 "
+          "ore; il nodo in secondi, a minuti interi)",
+          [True, True, True, True, True, True],
+          ["\nP2P_MINUTI_PAGARE_MIN = 15\nP2P_MINUTI_PAGARE_MAX = 24 * 60\n"
+           "P2P_MINUTI_PAGARE_PASSO = 15\nP2P_MINUTI_PAGARE_DI_SERIE = 24 * 60\n" in src,
+           "\nconst P2P_MINUTI_PAGARE_MIN = 15;\nconst P2P_MINUTI_PAGARE_MAX = 1440;\n"
+           "const P2P_MINUTI_PAGARE_PASSO = 15;\nconst P2P_MINUTI_PAGARE_DI_SERIE = 1440;\n" in mini,
+           "pub const MIN_WINDOW: i64 = 900;" in rs, "pub const MAX_WINDOW: i64 = 86_400;" in rs,
+           "pub const WINDOW_STEP: i64 = 60;" in rs, "WINDOWS" not in rs])
+    prova("...i metodi veloci sono gli stessi nel server e nel ripiego della pagina",
+          [True, True],
+          ['\nP2P_METODI_VELOCI = ("SEPA Instant", "Revolut", "Satispay", "PayPal")\n' in src,
+           "\nconst P2P_METODI_VELOCI = ['SEPA Instant', 'Revolut', 'Satispay', 'PayPal'];\n" in mini])
+    prova("...e il nome del tag del 38385 e' lo stesso per il nodo e per la pagina",
+          [True, True], ['("barattolo_payment_windows", format!("{MIN_WINDOW}-{MAX_WINDOW}"))' in rs,
+                         "finestrePagareDaTagP2P(tagValore(ev, 'barattolo_payment_windows'))" in mini])
+    prova("la porta ha un segreto SUO (la M6 dell'audit), e il config d'esempio ha "
+          "il segnaposto che la tiene chiusa", [True, True, True],
+          ['"Bearer " + P2P_FINESTRA_SEGRETO' in pezzo("_porta_finestra_p2p"),
+           '\nP2P_FINESTRA_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"\n' in esempio,
+           "\nP2P_TEMPO_PER_PAGARE = True\n" in esempio])
+    prova("...il segreto non si scrive dal pannello, e nel pannello esce il FATTO",
+          [True, True], ['"P2P_FINESTRA_SEGRETO"' in src[src.index("LEVE_MAI_DAL_PANNELLO = "):
+                                                        src.index("})", src.index("LEVE_MAI_DAL_PANNELLO = "))],
+                         '"P2P_FINESTRA_SEGRETO", finestra_p2p_attiva(),' in pezzo("_leve_stato")])
+    prova("...e il nodo legge le due variabili coi nomi che DA-FARE gli scrive",
+          [True, True], ['const ENV_URL: &str = "BARATTOLO_FINESTRA_URL";' in rs,
+                         'const ENV_SECRET: &str = "BARATTOLO_FINESTRA_SEGRETO";' in rs])
+    prova("A LEVA SPENTA LA PORTA TACE: l'interruttore d'emergenza vale anche per il nodo",
+          True, "and P2P_TEMPO_PER_PAGARE)" in pezzo("finestra_p2p_attiva"))
+    prova("l'intestazione lo dichiara dalla porta della zona e del filtro; i volti, la "
+          "fotografia (nei due posti) e il libro lo servono",
+          [True, True, 2, True],
+          ['_dichiara_minuti_pagare_p2p(con, user["id"], (d or {}).get("minuti_pagare"))'
+           in pezzo("registra_ordini_p2p"),
+           '"minuti_pagare": minuti_pagare}' in pezzo("facce_ordini_p2p"),
+           src.count('F["minuti_pagare"] = _minuti_pagare_foto_p2p(F["eventi"])'),
+           'fuori["minuti_pagare"] = F["minuti_pagare"]' in src])
+    prova("l'archivio dei due da' i minuti e il TERMINE", [True, True],
+          ['"minuti_pagare": minuti_pagare.get(ordine, 0),' in pezzo("_scambi_p2p"),
+           '"paga_entro": _paga_entro_p2p(momenti, minuti_pagare.get(ordine, 0)),'
+           in pezzo("_scambi_p2p")])
+    prova("il motivo dell'annullo ha il suo nome, e nel registro vale «a garanzia bloccata»",
+          [True, True, True],
+          ['if dettaglio == "payment-window":\n        return "tempo_pagare_scaduto"'
+           in pezzo("_motivo_annullo_p2p"),
+           '"tempo_pagare_scaduto"))' in pezzo("_garanzia_dal_registro_p2p"),
+           "tempo_pagare_scaduto: 'tempo per pagare finito'"
+           in open("admin.html", encoding="utf-8").read()])
+    prova("il nodo racconta l'annullo con la parola che il server aspetta", [True, True],
+          ['AZIONE, ATTORE, DETTAGLIO = "expired", "mostro", "payment-window"' in patch,
+           'scadenza in ("escrow-deadline", "payment-window")' in pezzo("_esiti_dopo_garanzia_p2p")])
+    prova("il collaudo delle rotte vere gira in CI, nella gabbia", [True, True],
+          ["collaudo_tempo_pagare" in _collaudi_della_ci(),
+           "collaudo_tempo_pagare.py" in _compilati_dalla_ci()])
+    cartella = os.path.join("deploy", "mostro")
+    pp = [f for f in os.listdir(cartella) if f.startswith("0013-") and f.endswith(".patch")]
+    testo_pp = open(os.path.join(cartella, pp[0]), "rb").read() if len(pp) == 1 else b""
+    prova("LA .patch DEL NODO: una sola, LF (il nodo la prende con `git am`), col modulo "
+          "intero dentro, e il README del fork la mette in tabella",
+          [1, False, True, True],
+          [len(pp), b"\r" in testo_pp, b"+++ b/src/barattolo_finestra.rs" in testo_pp,
+           "| 0013 | `patch-0013-tempo-per-pagare.py` + `barattolo_finestra.rs` |"
+           in open(os.path.join(cartella, "README.md"), encoding="utf-8").read()])
+    prova("...e DA-FARE-ANDREA ha i comandi, con l'albero e i numeri del cloud", [True, True],
+          ["bdad9c3479602556e2db1ddbeefc8cc2dd809d7d" in open("docs/DA-FARE-ANDREA.md", encoding="utf-8").read(),
+           "740 passed; 0 failed; 1 ignored" in open("docs/DA-FARE-ANDREA.md", encoding="utf-8").read()])
+
+    # --- 2) I GIUDICI PURI DEL SERVER --------------------------------------
+    import sqlite3
+    amb = tempo_pagare_nel_banco({})
+    scelta, col = amb["_minuti_pagare_scelta_p2p"], amb["_ordine_col_tempo_p2p"]
+    prova("l'orologio: da 15 a 1440 minuti, a quarti d'ora; fuori, storti, un booleano, un "
+          "testo valgono 0",
+          [15, 45, 60, 1440, 0, 0, 0, 0, 0, 0, 0],
+          [scelta(15), scelta(45), scelta(60), scelta(1440), scelta(10), scelta(1455),
+           scelta(20), scelta(True), scelta("60"), scelta(None), scelta(0)])
+    veloce, coi = amb["_metodo_veloce_p2p"], amb["_minuti_coi_metodi_p2p"]
+    amb["P2P_COIN_METODI"] = {"ETH (Ethereum)": "ETH", "XMR (Monero)": "XMR"}
+    prova("i metodi veloci: SEPA Instant, Revolut, Satispay, PayPal, gli USDT, le monete (col "
+          "nome nudo o con la cifra); lenti il bonifico ordinario, Wise, i contanti, l'ignoto",
+          [True, True, True, True, True, True, True, False, False, False, False, False],
+          [veloce("SEPA Instant"), veloce("Revolut"), veloce("Satispay"), veloce("PayPal"),
+           veloce("USDT (Tron)"), veloce("ETH (Ethereum)"), veloce("XMR (Monero) 0.25"),
+           veloce("SEPA"), veloce("Wise"), veloce("Contanti"), veloce("Bonifico lampo"),
+           veloce("")])
+    prova("SOTTO LE 24 ORE SOLO COI METODI TUTTI VELOCI: con un lento resta un giorno; senza "
+          "scelta niente", [60, 1440, 1440, 15, 0, 1440],
+          [coi(60, ["SEPA Instant", "Revolut"]), coi(60, ["SEPA Instant", "SEPA"]),
+           coi(60, []), coi(15, ["USDT (Tron)"]), coi(0, ["Revolut"]),
+           coi(1440, ["SEPA"])])
+    prova("un tempo solo sulle VENDITE, e mai col PayCode, col contanti di persona o per posta",
+          [True, True, False, False, False, False, False],
+          [col("sell", ["SEPA"]), col("sell", ["SEPA Instant", "Revolut"]),
+           col("buy", ["SEPA"]), col("sell", ["Contanti al tabacchino 23.47"]),
+           col("sell", ["SEPA", "Contanti"]), col("sell", ["Contante per posta"]),
+           col("sell", ["Contanti al tabacchino"])])
+    dal, entro = amb["_attivo_dal_p2p"], amb["_paga_entro_p2p"]
+    m = lambda mom, q, det="", giro=1: {"momento": mom, "quando": q, "dettaglio": det, "giro": giro}
+    prova("ATTIVO DAL: la garanzia pagata per seconda, o la fattura data per seconda; senza "
+          "dettaglio vale la garanzia; prima dell'attivo, 0",
+          [100, 200, 300, 0],
+          [dal([m("preso", 50), m("garanzia_pagata", 100, "active")]),
+           dal([m("garanzia_pagata", 150, "waiting-buyer-invoice"), m("fattura_data", 200, "active")]),
+           dal([m("garanzia_pagata", 300)]),
+           dal([m("preso", 50), m("garanzia_pagata", 90, "waiting-buyer-invoice")])])
+    prova("...e conta il giro chiesto (l'ultimo, se non detto)", [500, 100],
+          [dal([m("garanzia_pagata", 100, "active", 1), m("garanzia_pagata", 500, "active", 2)]),
+           dal([m("garanzia_pagata", 100, "active", 1), m("garanzia_pagata", 500, "active", 2)], 1)])
+    prova("IL TERMINE: attivo + minuti; fuori dall'orologio, o non attivo, 0",
+          [100 + 900, 100 + 3600, 100 + 86400, 0, 0],
+          [entro([m("garanzia_pagata", 100, "active")], 15),
+           entro([m("garanzia_pagata", 100, "active")], 60),
+           entro([m("garanzia_pagata", 100, "active")], 1440),
+           entro([m("garanzia_pagata", 100, "active")], 7), entro([m("preso", 50)], 240)])
+    detta = amb["_durata_detta_p2p"]
+    prova("la durata detta", ["45 minuti", "1 ora", "3 ore", "2 ore e 30 minuti", "1 minuto",
+                              "0 minuti"],
+          [detta(2700), detta(3600), detta(10800), detta(9000), detta(60), detta(0)])
+    testi, punti = amb["_testi_tempo_pagare_p2p"], amb["_intervalli_tempo_pagare_p2p"]
+    prova("i momenti dei promemoria dall'orologio: un giorno come i tre di sempre, un'ora a 20 "
+          "e 45 minuti, quattro ore a una e a tre, un quarto d'ora uno solo a 10 minuti",
+          [(3600, 43200, 72000), (1200, 2700), (3600, 10800), (600,), ()],
+          [punti(1440), punti(60), punti(240), punti(15), punti(7)])
+    i1, t1 = testi(60)
+    i24, t24 = testi(1440)
+    i15, t15 = testi(15)
+    prova("i promemoria: il primo dice il tempo che RESTA, l'ultimo che si annulla anche se "
+          "si e' pagato; un quarto d'ora ne ha uno, che e' l'ultimo",
+          [2, 3, 1, True, True, True, True, ((), {})],
+          [len(i1), len(i24), len(i15), "Hai ancora 40 minuti" in t1[1],
+           t1[2].startswith("⏰ Mancano 15 minuti") and "anche se hai già pagato" in t1[2],
+           t24[3].startswith("⏰ Mancano 4 ore"),
+           t15[1].startswith("⏰ Mancano 5 minuti"), testi(2)])
+    prova("...e su TUTTO l'orologio i promemoria crescono e cadono prima della fine", True,
+          all(punti(k) and all(0 < a < b for a, b in zip(punti(k), punti(k)[1:] + (k * 60,)))
+              for k in range(15, 1441, 15)))
+    corto = amb["_recapito_corto_s_p2p"]
+    prova("a chi vende, col tempo fino a 4 ore, il promemoria del recapito a dieci minuti (a "
+          "un quarto del tempo, se prima); oltre, i soliti",
+          [(180,), (420,), (600,), (600,), ()],
+          [corto(15), corto(30), corto(60), corto(240), corto(300)])
+
+    # --- 3) IL DATABASE: la dichiarazione, i volti, la risposta al nodo ----
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    con.executescript(src[i:src.index("ON p2p_ordini(tg_id);", i)] + "ON p2p_ordini(tg_id);")
+    con.execute("ALTER TABLE p2p_ordini ADD COLUMN minuti_pagare INTEGER DEFAULT 0")
+    O = ["7e3a0000-0000-4a2b-9c3d-00000000000%d" % n for n in range(7)]
+    # O[0] col bonifico ordinario (lento), O[1] col SEPA Instant (veloce)
+    for o, chi, lato, maker, metodi in ((O[0], 1, "sell", 1, ["SEPA"]),
+                                        (O[1], 1, "sell", 1, ["SEPA Instant"]),
+                                        (O[2], 1, "buy", 1, ["SEPA"]),
+                                        (O[3], 1, "sell", 1, ["Contanti al tabacchino 9.99"]),
+                                        (O[4], 2, "sell", 1, ["SEPA"]),
+                                        (O[5], 1, "sell", 0, ["SEPA"])):
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, metodi) "
+                    "VALUES(?,?,0,'pending',?,?,?)", (o, chi, lato, maker, json.dumps(metodi)))
+    dich = amb["_dichiara_minuti_pagare_p2p"]
+    scritti = dich(con, 1, {O[0]: 60, O[1]: 240, O[2]: 60, O[3]: 60, O[4]: 60, O[5]: 60,
+                            O[6]: 60, "storto": 60})
+    righe = {r[0]: r[1] for r in con.execute("SELECT ordine, minuti_pagare FROM p2p_ordini")}
+    prova("si scrive SOLO sulle righe di chi l'ha pubblicato (maker): non su quella di un "
+          "altro, ne' su quella di chi l'ha preso", [4, 0, 0],
+          [scritti, righe[O[4]], righe[O[5]]])
+    dich(con, 1, {O[0]: 1440})
+    prova("LA PRIMA RESTA", 60, con.execute("SELECT minuti_pagare FROM p2p_ordini WHERE ordine=?",
+                                           (O[0],)).fetchone()[0])
+    prova("i volti: solo dove un tempo ha senso (la dichiarazione dell'acquisto e del "
+          "PayCode c'e', ma non esce), e l'ora chiesta sul bonifico ordinario esce come 24 ore",
+          {O[0]: 1440, O[1]: 240}, amb["_minuti_pagare_p2p"](con, O[:6]))
+    prova("al nodo: gli stessi, in secondi", {O[0]: 86400, O[1]: 14400},
+          amb["_finestre_per_nodo_p2p"](con, O[:6]))
+    try:
+        amb["_finestre_per_nodo_p2p"](con, "tutti")
+        alzato = ""
+    except ValueError:
+        alzato = "ValueError"
+    prova("una lista storta alza ValueError (la rotta ne fa un 400)", "ValueError", alzato)
+    amb["P2P_TEMPO_PER_PAGARE"] = False
+    prova("A LEVA SPENTA: niente si scrive, niente esce, il nodo non ha tempi",
+          [0, {}, {}], [dich(con, 1, {O[1]: 60}), amb["_minuti_pagare_p2p"](con, O[:6]),
+                        amb["_finestre_per_nodo_p2p"](con, O[:6])])
+    amb["P2P_TEMPO_PER_PAGARE"] = True
+    nudo = sqlite3.connect(":memory:")
+    nudo.row_factory = sqlite3.Row
+    nudo.execute("CREATE TABLE p2p_ordini(ordine TEXT, lato TEXT, metodi TEXT)")
+    prova("un database senza la colonna vale «nessun tempo», mai un errore", [{}, 0],
+          [amb["_minuti_pagare_p2p"](nudo, O[:2]), amb["_minuti_pagare_ordine_p2p"](nudo, O[0])])
+
+    # --- 4) IL RECAPITO TARDI ---------------------------------------------
+    for tabella, fine in (("p2p_momenti", "\n    );"), ("p2p_avvisi", "ON p2p_avvisi(tg_id);")):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        con.executescript(src[i:src.index(fine, i) + len(fine)])
+    tardi = amb["_recapito_tardi_p2p"]
+
+    def momento(o, mom, q, det="", fonte="mostrod"):
+        con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, attore, dettaglio, giro, "
+                    "fonte) VALUES(?,?,?,?,?,1,?)", (o, mom, q, "x", det, fonte))
+    momento(O[0], "garanzia_pagata", 1000, "active")
+    # dopo la meta' dell'ora chiesta, ma il bonifico ordinario vale 24 ore
+    momento(O[0], "recapito", 1000 + 1801, fonte="telefono")
+    momento(O[1], "garanzia_pagata", 1000, "active")
+    momento(O[1], "recapito", 1000 + 4 * 1800 + 1, fonte="telefono")
+    con.execute("UPDATE p2p_ordini SET minuti_pagare=240, metodi='[\"Revolut\"]' "
+                "WHERE ordine=?", (O[4],))
+    momento(O[4], "garanzia_pagata", 1000, "active")
+    con.execute("INSERT INTO p2p_avvisi(tg_id, ordine, momento, giro, quando) "
+                "VALUES(2,?,'recapito',1,?)", (O[4], 1000 + 4 * 1800 + 60))
+    amb["print"] = lambda *a, **k: None
+    fin = amb["_finestre_per_nodo_p2p"]
+    prova("LA DOMANDA TARDIVA NON HA TEMPO: attivo da 15 minuti si', da 16 no; senza "
+          "l'attivo in cronaca il tempo vale (il nodo conta dal suo minuto)",
+          [{O[1]: 14400}, {}, {O[1]: 14400}],
+          [fin(con, [O[1]], 1000 + 900), fin(con, [O[1]], 1000 + 960),
+           (con.execute("DELETE FROM p2p_momenti WHERE ordine=? AND momento='garanzia_pagata'",
+                        (O[1],)), fin(con, [O[1]], 99999))[1]])
+    momento(O[1], "garanzia_pagata", 1000, "active")
+    prova("IL RECAPITO TARDI: nella prima meta' no, nella seconda si'; senza la riga del "
+          "telefono vale l'ora dell'avviso; senza garanzia, senza tempo o senza recapito, "
+          "no; e sul bonifico ordinario la meta' e' quella delle 24 ore, non dell'ora chiesta",
+          [False, True, True, False, False],
+          [tardi(con, O[0], 1), tardi(con, O[1], 1), tardi(con, O[4], 1),
+           tardi(con, O[5], 1), tardi(con, O[2], 1)])
+
+    # --- 5) LA PAGINA, in node ---------------------------------------------
+    fns = ("".join(_riga_js(mini, r) for r in (
+                "const P2P_MINUTI_PAGARE_MIN = ", "const P2P_MINUTI_PAGARE_MAX = ",
+                "const P2P_MINUTI_PAGARE_PASSO = ", "const P2P_MINUTI_PAGARE_DI_SERIE = ",
+                "const P2P_METODI_VELOCI = ",
+                "let p2pMinutiPagare = ", "let p2pNuovoMinutiPagare = ",
+                "const P2P_TABACCHINO = ", "const P2P_CONTANTI = ", "const P2P_POSTA = "))
+           + pezzo_js(mini, "const P2P_MINUTI_PAGARE_FERMI = ", "\n})();\n") + "\n})();\n"
+           + "".join(_fn_js(mini, f) for f in (
+               "function idMostroVero(id){", "function traQuantoP2P(sec){",
+               "function minutiPagareSceltaP2P(v){", "function minutiPagareDetteP2P(min){",
+               "function minutiPagareCortiP2P(min){", "function metodiVelociP2P(coord){",
+               "function metodoVeloceP2P(m, veloci){",
+               "function metodiVelociTuttiP2P(metodi, veloci){",
+               "function metodiLentiP2P(metodi, veloci){",
+               "function minutiCoiMetodiP2P(min, metodi, veloci){",
+               "function finestrePagareDaTagP2P(v){",
+               "function tempoPagareAttivoP2P(coord, info, oc){",
+               "function tempoPagarePossibileP2P(lato, metodi, oc){",
+               "function minutiPagareFoglioP2P(scelta, lato, metodi, oc, attivo, veloci){",
+               "function fermoDaMinutiP2P(min){", "function quotaTempoP2P(min){",
+               "function anelloTempoP2P(quota, id){",
+               "function prendiMinutiPagareP2P(m){", "function minutiPagareOrdineP2P(o){",
+               "function bollinoTempoPagareP2P(min){",
+               "function rigaTempoPagareDettP2P(o, tuo){",
+               "function rigaTempoPagareScambioP2P(o, adesso){")))
+
+    def banco(js):
+        return (r"""
+const esc = s => String(s), tabacchinoP2P = m => (m || []).some(x => /^Contanti al tabacchino/.test(x));
+var MIE = {};
+const ordiniP2P = () => MIE;
+const p2pCoord = () => null;
+""" + js + r"""
+const T = finestrePagareDaTagP2P('900-86400');
+const ID = '7e3a0000-0000-4a2b-9c3d-000000000001', ID2 = '7e3a0000-0000-4a2b-9c3d-000000000002';
+const out = {};
+out.tag = [JSON.stringify(T), finestrePagareDaTagP2P('3600,14400,86400'), finestrePagareDaTagP2P(''),
+  finestrePagareDaTagP2P('900-60')];
+out.attivo = [tempoPagareAttivoP2P({tempoPagare: true}, {finestrePagare: T}),
+  tempoPagareAttivoP2P({tempoPagare: true}, {finestrePagare: []}),
+  tempoPagareAttivoP2P({tempoPagare: true}, {finestrePagare: [3600, 86400]}),
+  tempoPagareAttivoP2P({tempoPagare: false}, {finestrePagare: T}),
+  tempoPagareAttivoP2P(null, {finestrePagare: T}), tempoPagareAttivoP2P({tempoPagare: true}, null),
+  tempoPagareAttivoP2P({tempoPagare: true}, null, true), tempoPagareAttivoP2P({tempoPagare: false}, null, true)];
+out.scelta = [15, 45, 1440, 10, 1455, 20, true, '60'].map(minutiPagareSceltaP2P);
+out.dette = [15, 60, 90, 1440, 61].map(minutiPagareDetteP2P);
+out.corti = [15, 90, 240].map(minutiPagareCortiP2P);
+out.fermi = [P2P_MINUTI_PAGARE_FERMI.length, P2P_MINUTI_PAGARE_FERMI[0], P2P_MINUTI_PAGARE_FERMI[P2P_MINUTI_PAGARE_FERMI.length - 1],
+  P2P_MINUTI_PAGARE_FERMI.every(m => minutiPagareSceltaP2P(m) === m),
+  P2P_MINUTI_PAGARE_FERMI.every((m, i, a) => !i || a[i - 1] < m), fermoDaMinutiP2P(1440), fermoDaMinutiP2P(65)];
+out.veloci = [metodoVeloceP2P('SEPA Instant'), metodoVeloceP2P('USDT (Tron)'), metodoVeloceP2P('ETH (Ethereum) 0.01'),
+  metodoVeloceP2P('USDe (Base)'), metodoVeloceP2P('SEPA'), metodoVeloceP2P('Wise'), metodoVeloceP2P('Revolut', ['Satispay'])];
+out.coi = [minutiCoiMetodiP2P(60, ['SEPA Instant', 'Satispay']), minutiCoiMetodiP2P(60, ['SEPA Instant', 'SEPA']),
+  minutiCoiMetodiP2P(0, ['Revolut']), JSON.stringify(metodiLentiP2P(['SEPA', 'Revolut', 'Wise']))];
+out.possibile = [tempoPagarePossibileP2P('vendo', ['SEPA'], false),
+  tempoPagarePossibileP2P('compro', ['SEPA'], false), tempoPagarePossibileP2P('vendo', ['SEPA'], true),
+  tempoPagarePossibileP2P('vendo', ['SEPA', 'Contanti'], false),
+  tempoPagarePossibileP2P('vendo', ['Contanti al tabacchino'], false),
+  tempoPagarePossibileP2P('vendo', ['Contante per posta'], false),
+  tempoPagarePossibileP2P('vendo', [], false)];
+out.foglio = [minutiPagareFoglioP2P(0, 'vendo', ['SEPA'], false, true),
+  minutiPagareFoglioP2P(0, 'vendo', ['SEPA Instant'], false, true),
+  minutiPagareFoglioP2P(30, 'vendo', ['SEPA Instant'], false, true),
+  minutiPagareFoglioP2P(30, 'vendo', ['SEPA Instant', 'SEPA'], false, true),
+  minutiPagareFoglioP2P(30, 'vendo', ['SEPA'], false, false),
+  minutiPagareFoglioP2P(30, 'compro', ['SEPA'], false, true),
+  minutiPagareFoglioP2P(7, 'vendo', ['Revolut'], false, true),
+  minutiPagareFoglioP2P(45, 'vendo', ['USDT (Tron)'], true, true)];
+out.prendi = [prendiMinutiPagareP2P({[ID]: 240, 'storto': 60, [ID2]: 7}), JSON.stringify(p2pMinutiPagare),
+  prendiMinutiPagareP2P({[ID]: 240}), prendiMinutiPagareP2P(null)];
+MIE = {[ID2]: {mio: true, minutiPagare: 30, metodi: ['Revolut']}};
+out.ordine = [minutiPagareOrdineP2P({id: ID}), minutiPagareOrdineP2P({id: ID2}),
+  minutiPagareOrdineP2P({id: ID2, metodi: ['Revolut', 'SEPA']}), minutiPagareOrdineP2P({})];
+out.bollino = [bollinoTempoPagareP2P(30), bollinoTempoPagareP2P(90), bollinoTempoPagareP2P(1440), bollinoTempoPagareP2P(0)];
+out.dett = [rigaTempoPagareDettP2P({id: ID}, false), rigaTempoPagareDettP2P({id: ID2}, true),
+  rigaTempoPagareDettP2P({id: 'x'}, false)];
+const s = (stato, lato, entro, min) => rigaTempoPagareScambioP2P({stato, lato, pagaEntro: entro, minutiPagare: min}, 1000);
+out.scambio = [s('attivo', 'compro', 1000 + 3000, 60), s('attivo', 'vendo', 1000 + 600, 60),
+  s('attivo', 'compro', 999, 60), s('euro_inviati', 'compro', 5000, 60), s('attivo', 'compro', 0, 60)];
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco(fns))
+    if o is None:
+        salta("il banco della pagina del tempo per pagare", "node assente")
+        return
+    if "attivo" not in o:
+        prova("il banco della pagina del tempo per pagare gira", True, False)
+        return
+    prova("il tag del nodo: «900-86400» e' l'intervallo; la lista di ieri, vuoto o rovescio, no",
+          ["[900,86400]", None, None, None], o["tag"])
+    prova("LA SCELTA SI OFFRE SOLO SE IL NODO LA FA RISPETTARE: leva accesa E l'intervallo "
+          "intero nel 38385; un pezzo, niente, o la leva spenta: no. SULL'ON-CHAIN basta la leva",
+          [True, False, False, False, False, False, True, False], o["attivo"])
+    prova("l'orologio della pagina: come il server", [15, 45, 1440, 0, 0, 0, 0, 0], o["scelta"])
+    prova("la durata detta e quella corta della card",
+          [["15 minuti", "1 ora", "1 ora e 30 minuti", "24 ore", "1 ora e 1 minuto"],
+           ["15 min", "1 h 30", "4 h"]], [o["dette"], o["corti"]])
+    prova("I FERMI DEL CURSORE: 34, da 15 minuti a 24 ore, tutti nell'orologio e in salita; "
+          "l'ultimo e' il giorno, e fra due fermi si va per difetto",
+          [34, 15, 1440, True, True, 33, 3], o["fermi"])
+    prova("i metodi veloci della pagina, coi ripieghi e con la lista del server",
+          [True, True, True, True, False, False, False], o["veloci"])
+    prova("con un metodo lento il tempo resta 24 ore, e la nota li nomina",
+          [60, 1440, 0, '["SEPA","Wise"]'], o["coi"])
+    prova("solo «Vendi BTC» (Lightning E on-chain), e mai coi metodi che non stanno in un giorno",
+          [True, False, True, False, False, False, False], o["possibile"])
+    prova("i minuti che partono con l'ordine: 24 ore se il dito non ha scelto, la scelta coi "
+          "metodi veloci, 24 ore con un lento, 0 dove non si puo'; una scelta storta vale 24 "
+          "ore; sull'on-chain lo stesso", [1440, 1440, 30, 1440, 0, 0, 1440, 45], o["foglio"])
+    prova("dal server: solo id veri e scelte vere; il secondo giro uguale non e' «nuovo»",
+          [True, '{"7e3a0000-0000-4a2b-9c3d-000000000001":240}', False, False], o["prendi"])
+    prova("il tempo di un ordine: dal server, o dalla mia riga coi suoi metodi",
+          [240, 30, 1440, 0], o["ordine"])
+    prova("IL BOLLINO DEL LIBRO solo sotto le 24 ore",
+          [True, True, "", ""],
+          ["⏱ 30 min" in o["bollino"][0], "⏱ 1 h 30" in o["bollino"][1],
+           o["bollino"][2], o["bollino"][3]])
+    prova("la riga del dettaglio: a chi prende «Se lo prendi hai 4 ore», a chi ha pubblicato "
+          "«Chi lo prende ha 30 minuti», con l'anello; senza tempo niente",
+          [True, True, True, ""],
+          ["Se lo prendi hai <b>4 ore</b> per inviare gli euro" in o["dett"][0],
+           "Chi lo prende ha <b>30 minuti</b> per inviarti gli euro" in o["dett"][1],
+           'class="p2p-anello"' in o["dett"][0], o["dett"][2]])
+    sc = o["scambio"]
+    prova("IL TIMER: a chi compra il tempo che resta, a chi vende lo stesso (vicino alla "
+          "fine si scalda); l'ANELLO porta la parte che resta; finito dice che si annulla; "
+          "senza attivo o senza termine niente",
+          [True, True, True, True, True, "", ""],
+          ["Hai ancora <b>50 min</b>" in sc[0] and 'data-entro="4000"' in sc[0],
+           "Chi compra ha ancora <b>10 min</b>" in sc[1] and " vicino" in sc[1],
+           'data-tot="3600"' in sc[0] and 'class="p2p-anello"' in sc[0],
+           "scaduto" in sc[2] and "si sta annullando" in sc[2],
+           "vicino" not in sc[0], sc[3], sc[4]])
+    rotto = fns.replace("  return metodiVelociTuttiP2P(metodi, veloci) ? m : P2P_MINUTI_PAGARE_MAX;",
+                        "  return m;", 1)
+    prova("controprova: il banco rotto si e' davvero rotto", True, rotto != fns)
+    x = _node_banco(banco(rotto)) or {}
+    prova("controprova: senza il giudice dei metodi un'ora si prometterebbe sul bonifico "
+          "ordinario", 60, (x.get("coi") or [0, 0])[1])
+    # --- i fili della pagina ---
+    prova("I FILI: la scelta nel foglio, la riga del dettaglio e il timer nella pagina dello "
+          "scambio, e il battito nell'unico interval", [1, 1, 1, 1],
+          [mini.count("const tempoPagare = typeof sezioneTempoPagareNuovoP2P === 'function' "
+                      "? sezioneTempoPagareNuovoP2P() : '';"),
+           mini.count("(typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '')"),
+           mini.count("(typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')"),
+           mini.count("if (typeof battitoTempoPagareP2P === 'function') battitoTempoPagareP2P();")])
+    prova("...e le tre risposte del server che portano i tempi li prendono", 3,
+          mini.count("prendiMinutiPagareP2P(d && d.minuti_pagare)"))
+    prova("IL BOLLINO sta sulle due card del libro (Lightning e on-chain), e l'on-chain "
+          "manda la scelta quando pubblica", [2, True, True],
+          [mini.count("typeof bollinoTempoPagareP2P"),
+           "if (minOc) corpo.minuti_pagare = minOc;" in mini,
+           '"minuti_pagamento": _p2p_onchain_minuti(o),' in pezzo("_p2p_onchain_per")])
+
+    # --- 6) L'ON-CHAIN: il tempo scelto, coi metodi, e i promemoria --------
+    amb_oc = tempo_pagare_nel_banco({})
+    amb_oc.update({"p2p_onchain_ore_pagamento": lambda o: 24,
+                   "p2p_onchain_tab_scade": lambda o: int(o.get("tab") or 0),
+                   "P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S": 4 * 3600,
+                   "P2P_ONCHAIN_SEGNO": "🟠", "P2P_COIN_METODI": {}})
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_metodi", "p2p_onchain_minuti_pagamento",
+              "_p2p_onchain_minuti", "p2p_onchain_paga_entro", "_p2p_onchain_intervalli_pagare",
+              "_p2p_onchain_testi_pagare"):
+        exec(_senza_prosa(pezzo(f)), amb_oc)
+    mp = amb_oc["p2p_onchain_minuti_pagamento"]
+    oc = lambda minuti, metodi, lato="sell", **k: dict(
+        {"minuti_pagare": minuti, "metodi": json.dumps(metodi), "lato": lato}, **k)
+    prova("ON-CHAIN: il tempo scelto coi metodi veloci; con un lento, senza scelta, su un "
+          "acquisto, col contanti, 24 ore; col PayCode vince la sua scadenza",
+          [30, 1440, 1440, 1440, 1440, 1440],
+          [mp(oc(30, ["USDT (Tron)"])), mp(oc(30, ["SEPA"])), mp(oc(0, ["Revolut"])),
+           mp(oc(30, ["Revolut"], lato="buy")), mp(oc(30, ["Revolut", "Contanti"])),
+           mp(oc(30, ["Revolut"], tab=99999))])
+    amb_oc["P2P_TEMPO_PER_PAGARE"] = False
+    prova("...a leva spenta, le 24 ore di sempre", 1440, mp(oc(30, ["USDT (Tron)"])))
+    amb_oc["P2P_TEMPO_PER_PAGARE"] = True
+    prova("...il termine conta i minuti dal deposito confermato", [1000 + 1800, 0],
+          [amb_oc["p2p_onchain_paga_entro"](oc(30, ["Revolut"], depositato_il=1000)),
+           amb_oc["p2p_onchain_paga_entro"](oc(30, ["Revolut"], depositato_il=0))])
+    ip, tp = amb_oc["_p2p_onchain_intervalli_pagare"], amb_oc["_p2p_onchain_testi_pagare"]
+    t30 = tp(oc(30, ["Revolut"]))
+    prova("...i promemoria: col tempo corto quelli dell'orologio, col giorno i tre di sempre; "
+          "l'ultimo corto dice la DISPUTA, non l'annullo",
+          [(1200,), (3600, 21600, 72000), 1, True, False, 3],
+          [ip(oc(30, ["Revolut"])), ip(oc(0, ["SEPA"])), len(t30),
+           "Mancano 10 minuti" in t30[1] and "disputa" in t30[1],
+           "annulla" in t30[1], len(tp(oc(0, ["SEPA"])))])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -212486,6 +213035,7 @@ CATEGORIE = {
     ripubblica_p2p
     filtro_onchain_tutto
     bitcoin_only_p2p
+    tempo_pagare_p2p
     """.split(),
     "mercatino": """
     guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio
@@ -213730,6 +214280,7 @@ def main():
               prove_negozi_su_nostr,
               prove_filtro_onchain_tutto,
               prove_bitcoin_only_p2p,
+              prove_tempo_pagare_p2p,
               prove_avvisi_barattolo,
               prove_serie_giorni,
               prove_serie_classifica,

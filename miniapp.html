@@ -3597,6 +3597,34 @@
     font-size:13px;font-weight:700;line-height:1.35}
   .p2p-gesto-tempo .mono{font-weight:800;font-variant-numeric:tabular-nums}
   .p2p-gesto-tempo.finito{background:var(--chip-bg);color:var(--ink-soft)}
+  /* IL TEMPO PER PAGARE (18 nov 2026, tempo-pagamento): la stessa
+     scadenza gentile del gesto, cifre fisse; negli ultimi 15 minuti si
+     scalda, a tempo finito si spegne */
+  .p2p-box.p2p-tempo-pagare{background:var(--sats-soft);color:var(--sats-text);font-weight:700}
+  .p2p-box.p2p-tempo-pagare .mono{font-weight:800;font-variant-numeric:tabular-nums}
+  .p2p-box.p2p-tempo-pagare.vicino{box-shadow:inset 3px 0 0 var(--sats)}
+  .p2p-box.p2p-tempo-pagare.scaduto{background:var(--chip-bg);color:var(--ink-soft)}
+  /* L'OROLOGIO DEL TEMPO PER PAGARE (18 nov 2026, «un orologio con un
+     timer che decidi tu»): un anello arancio di casa che dice quanto del
+     giorno e' concesso — pieno a 24 ore, uno spicchio a un quarto d'ora —
+     e nella pagina dello scambio si svuota col tempo che passa. */
+  .p2p-anello{flex:0 0 auto;width:30px;height:30px;transform:rotate(-90deg)}
+  .p2p-anello circle{fill:none;stroke-width:5}
+  .p2p-anello .fondo{stroke:currentColor;opacity:.16}
+  .p2p-anello .pieno{stroke:var(--sats);stroke-linecap:round;transition:stroke-dashoffset .35s}
+  .p2p-box.p2p-tempo-pagare,.p2p-box.p2p-tempo-dett{display:flex;align-items:center;gap:10px}
+  .p2p-box.p2p-tempo-pagare.scaduto .p2p-anello .pieno{stroke:var(--ink-soft)}
+  .p2p-orologio{display:flex;align-items:center;gap:12px}
+  .p2p-orologio .p2p-anello{width:44px;height:44px}
+  .p2p-orologio-val{flex:0 0 auto;min-width:92px;font-weight:800;font-size:15px;
+    color:var(--sats-text);font-variant-numeric:tabular-nums}
+  .p2p-orologio input[type=range]{flex:1 1 auto;min-width:0;margin:0;accent-color:var(--sats)}
+  .p2p-orologio.fermo input[type=range]{opacity:.45}
+  .p2p-orologio.fermo .p2p-orologio-val{color:var(--ink-soft)}
+  /* il bollino della card nel libro: solo coi tempi sotto le 24 ore */
+  .p2p-bollino-tempo{display:inline-block;font-size:11px;font-weight:800;line-height:1;
+    padding:4px 7px;border-radius:999px;background:var(--sats-soft);color:var(--sats-text);
+    white-space:nowrap;font-variant-numeric:tabular-nums}
   /* ⚠️ LA MANINA E' L'UNICA COSA CHE SI MUOVE in questa card, ed e'
      una chiamata e non un racconto: si sposta di tre pixel verso le
      parole che indica, avanti e indietro. `inline-block` perche' su
@@ -29949,6 +29977,8 @@ setInterval(() => {
   /* ...e le scritte «⏸ Puoi prenderlo tra…» delle carte in pausa nel
      libro (13 ott 2026): i minuti, e il ritorno alla fine */
   if (typeof battitoPausaLibroP2P === 'function') battitoPausaLibroP2P();
+  /* ...e il tempo per pagare nella pagina dello scambio (18 nov 2026) */
+  if (typeof battitoTempoPagareP2P === 'function') battitoTempoPagareP2P();
   battitoTabacchinoP2P();
   battitoControlloTabP2P();
   battitoPagamentiP2P();
@@ -73722,6 +73752,10 @@ function rigaOnchainP2P(o){
   const affarone = badge && typeof affaroneP2P === 'function'
     ? affaroneP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0}) : '';
   const filtro = Number(o.filtro) > 0 ? '<div class="p2p-box p2p-accesso">🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</div>' : '';
+  /* il bollino del tempo per pagare, come sulla card di Lightning (18 nov
+     2026, cantiere tempo-pagamento): solo sotto le 24 ore */
+  const tempoB = !paghiEuro || typeof bollinoTempoPagareP2P !== 'function' ? ''
+    : bollinoTempoPagareP2P(Number(o.minuti_pagamento) || 0);
   const metodi = Array.isArray(o.metodi) ? o.metodi : [];
   /* LA SCATOLA DIVENTA L'INSEGNA quando dentro c'e' solo un marchio, il
      banner pieno di Barattozon della card di Lightning (18 nov 2026): lo
@@ -73746,7 +73780,7 @@ function rigaOnchainP2P(o){
     ${fermo}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
-    ${badge ? '<div class="p2p-badge-riga">' + badge + affarone + '</div>' : ''}
+    ${badge || tempoB ? '<div class="p2p-badge-riga">' + badge + affarone + tempoB + '</div>' : ''}
     ${paga}
     ${zona}
     ${filtro}
@@ -76064,6 +76098,10 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
   /* la ripubblica (16 nov 2026): qui la rifa' la ronda del server */
   const ripOc = typeof ripubblicaDaCampiP2P === 'function' ? ripubblicaDaCampiP2P(campi) : null;
   if (ripOc) corpo.ripubblica = ripOc;
+  /* il tempo per pagare (18 nov 2026, cantiere tempo-pagamento): come su
+     Lightning, solo chi vende; il server lo rigiudica coi metodi */
+  const minOc = vendo && typeof minutiPagareDaCampiP2P === 'function' ? minutiPagareDaCampiP2P(campi) : 0;
+  if (minOc) corpo.minuti_pagare = minOc;
   if (campi.fisso) corpo.sats = interoP2P(campi.sats).n;
   else corpo.premio = Number(campi.premio) || 0;
   /* IL PAYCODE (17 nov 2026): l'importo coi centesimi, il metodo con
@@ -80948,6 +80986,13 @@ function infoDaEvento(ev){
        giudici sono `finestraDiP2P` e `tornaNelLibroP2P`. */
     scadenzaPubblicaSec: Math.floor(num('maker_expiration_seconds')),
     limitePubblica: Math.floor(num('maker_timeout_limit')),
+    /* IL TEMPO PER PAGARE (18 nov 2026, patch 0013 del fork): l'intervallo
+       che il nodo FA RISPETTARE, in secondi («900-86400»: da 15 minuti a 24
+       ore, a minuti interi). Senza il tag il nodo non annulla niente allo
+       scadere, e la pagina la scelta non la offre (`tempoPagareAttivoP2P`):
+       mai promettere un annullo che nessuno fa. */
+    finestrePagare: (typeof finestrePagareDaTagP2P === 'function'
+      ? finestrePagareDaTagP2P(tagValore(ev, 'barattolo_payment_windows')) : null) || [],
     /* quanto vive un ordine NEL LIBRO, in ore (168 sul nostro nodo):
        la legge la pagina «Info P2P», e come le altre si LEGGE —
        il numero cablato in P2P_ORIZZONTE_S resta il ripiego di chi
@@ -82439,6 +82484,12 @@ function rigaOrdineP2P(o){
   /* dal 26 set 2026 il cartellino lo scrive `affaroneP2P`: lo mostra
      anche la card P2P della vetrina, e una frase in due posti diverge */
   const affarone = affaroneP2P(o);
+  /* IL BOLLINO DEL TEMPO PER PAGARE (18 nov 2026, cantiere
+     tempo-pagamento): «⏱ 30 min» nella riga del premio, solo coi tempi
+     sotto le 24 ore — chi guarda il libro sa prima di toccare che chi vende
+     ha fretta */
+  const tempoB = typeof bollinoTempoPagareP2P === 'function'
+    ? bollinoTempoPagareP2P(minutiPagareOrdineP2P(o)) : '';
   /* il metodo VESTITO (16 set 2026): il marchio per chi ce l'ha nel
      catalogo, il testo per tutti gli altri — vedi P2P_VESTE_METODI. Il
      `title` resta il testo, che e' quel che viaggia nel tag `pm`. */
@@ -82511,7 +82562,7 @@ function rigaOrdineP2P(o){
     ${fermo}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
-    ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
+    ${badge || tempoB ? `<div class="p2p-badge-riga">${badge}${affarone}${tempoB}</div>` : ''}
     ${paga}
     ${zona}
     ${typeof segnoFiltroP2P === 'function' ? segnoFiltroP2P(o) : ''}
@@ -91499,6 +91550,8 @@ function renderDettaglioP2P(){
     repRiquadroP2P(p2pFacce[o.id], o.id) +
     /* il filtro di chi ha pubblicato, a chi guarda (10 ott 2026) */
     (tuo || typeof rigaFiltroDettP2P !== 'function' ? '' : rigaFiltroDettP2P(o.id)) +
+    /* il tempo per pagare, a chi prende PRIMA di premere e sul mio (18 nov 2026) */
+    (typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '') +
     /* la mia pausa, sul MIO ordine (12 ott 2026, tempo-di-chi-pubblica) */
     (tuo && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : '') +
     /* ...e il mio paracadute (13 ott 2026) */
@@ -93295,6 +93348,9 @@ function renderOrdineP2P(){
        pubblica): quanto tempo ha l'altro per rispondere, il conto alla
        rovescia, e che si puo' annullare senza penalita' */
     (typeof rigaAttesaPubblicaP2P === 'function' ? rigaAttesaPubblicaP2P(o) : '') +
+    /* IL TEMPO PER PAGARE (18 nov 2026): quanto resta a chi compra, detto
+       a tutt'e due, a scambio attivo */
+    (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '') +
     /* LA RIGA SOLO DA GUARDARE (24 set 2026, l'archivio del server):
        lo scambio c'e' e si segue, ma le chiavi cifrate con cui si
        fanno i gesti stanno sul dispositivo dove e' stato aperto */
@@ -97268,6 +97324,331 @@ function rigaFiltroDettP2P(id){
     + ', nessuno scambio non completato negli ultimi 30 giorni '
     + 'e nessuna disputa persa negli ultimi 90</div>' : '';
 }
+/* ============ IL TEMPO PER PAGARE (18 nov 2026, cantiere tempo-pagamento) ============
+   Andrea, da JJ che scambia tanto: «se uno ha fretta dice io metto
+   l'ordine però nel momento in cui lo prendi hai un'ora di tempo per
+   scambiare». Chi pubblica un ordine di VENDITA sceglie entro quanto chi
+   prende manda gli euro, da quando lo scambio e' attivo.
+   UN OROLOGIO, NON TRE SOGLIE (stesso giorno, Andrea: «non a soglie che
+   decidiamo noi mentre tipo un orologio con un timer che decidi tu quanto
+   farlo scorrere»): un cursore da 15 minuti a 24 ore (24 di serie), fitto
+   dove conta — un quarto d'ora alla volta fino a due ore, mezz'ora fino a
+   sei, poi un'ora — e un anello che dice quanto e' corto.
+   SOTTO LE 24 ORE SOLO COI METODI VELOCI («se tu paghi con bonifico sepa
+   [...] devo attendere [...] per tempi bancari, se invece fai con sepa
+   instant allora lì sì»): con anche un solo metodo lento il cursore sta
+   fermo a 24 ore e la nota dice perche'. Il server fa lo stesso conto
+   (`_minuti_coi_metodi_p2p`), e i metodi veloci li dice lui
+   (`minutiPagareLimiti.veloci`).
+   Chi prende lo legge nel libro e nel dettaglio PRIMA di prendere; nella
+   pagina dello scambio tutt'e due vedono l'anello che si svuota; allo
+   scadere senza «Ho inviato» il NODO annulla da solo (patch 0013) e i
+   sats tornano a chi vende.
+   LA SCELTA SI OFFRE SOLO SE C'E' DAVVERO CHI LA FA RISPETTARE: la leva
+   del server (`tempoPagare`) E il nodo che annuncia l'intervallo nel
+   38385 (`finestrePagare`). Mai col PayCode, col contanti di persona o
+   per posta, mai in «Compra BTC» (li' chi paga e' chi pubblica). La
+   scelta parte all'intestazione come il filtro (la prima resta), e torna
+   dal server per chi guarda. */
+const P2P_MINUTI_PAGARE_MIN = 15;
+const P2P_MINUTI_PAGARE_MAX = 1440;
+const P2P_MINUTI_PAGARE_PASSO = 15;
+const P2P_MINUTI_PAGARE_DI_SERIE = 1440;
+/* i fermi del cursore, in minuti: tutti multipli del passo */
+const P2P_MINUTI_PAGARE_FERMI = (function(){
+  const f = [];
+  for (let m = 15; m <= 120; m += 15) f.push(m);
+  for (let m = 150; m <= 360; m += 30) f.push(m);
+  for (let m = 420; m <= 1440; m += 60) f.push(m);
+  return f;
+})();
+/* il ripiego, se il server non li dice: gli stessi di P2P_METODI_VELOCI */
+const P2P_METODI_VELOCI = ['SEPA Instant', 'Revolut', 'Satispay', 'PayPal'];
+let p2pMinutiPagare = {};          // ordine -> minuti, come li dice il server
+let p2pNuovoMinutiPagare = 0;      // la scelta del dito nel foglio: 0 = non scelta, vale 24 ore
+/* PURA: i minuti, se stanno nell'orologio (15..1440, a quarti d'ora); 0.
+   Solo un NUMERO, come il server: un testo o un booleano non e' un tempo */
+function minutiPagareSceltaP2P(v){
+  const n = typeof v === 'number' ? v : NaN;
+  if (!Number.isInteger(n) || n < P2P_MINUTI_PAGARE_MIN || n > P2P_MINUTI_PAGARE_MAX) return 0;
+  return n % P2P_MINUTI_PAGARE_PASSO === 0 ? n : 0;
+}
+/* PURA: «15 minuti», «1 ora», «1 ora e 30 minuti», «24 ore» */
+function minutiPagareDetteP2P(min){
+  const n = Math.max(0, Math.floor(Number(min) || 0));
+  const h = Math.floor(n / 60), r = n % 60;
+  const parti = [];
+  if (h) parti.push(h === 1 ? '1 ora' : h + ' ore');
+  if (r || !h) parti.push(r === 1 ? '1 minuto' : r + ' minuti');
+  return parti.join(' e ');
+}
+/* PURA: la forma corta, per la card del libro: «15 min», «1 h 30», «4 h» */
+function minutiPagareCortiP2P(min){
+  const n = Math.max(0, Math.floor(Number(min) || 0));
+  const h = Math.floor(n / 60), r = n % 60;
+  return h ? h + ' h' + (r ? ' ' + r : '') : r + ' min';
+}
+/* i metodi veloci: quelli del server, o il ripiego */
+function metodiVelociP2P(coord){
+  const c = coord === undefined ? (typeof p2pCoord === 'function' ? p2pCoord() : null) : coord;
+  const l = c && c.minutiPagareLimiti && Array.isArray(c.minutiPagareLimiti.veloci)
+    ? c.minutiPagareLimiti.veloci : null;
+  return l && l.length ? l : P2P_METODI_VELOCI;
+}
+/* PURA: un metodo che arriva in minuti a qualunque ora? I veloci, gli
+   USDT e le monete (col nome nudo o con la cifra dentro) */
+function metodoVeloceP2P(m, veloci){
+  const t = String(m || '').trim();
+  if (!t) return false;
+  if ((veloci || P2P_METODI_VELOCI).indexOf(t) >= 0 || /^usdt/i.test(t)) return true;
+  return /^(ETH \(Ethereum\)|XMR \(Monero\)|USDe \([^)]+\))(\s|$)/.test(t);
+}
+/* PURA: tutti veloci, e almeno uno */
+function metodiVelociTuttiP2P(metodi, veloci){
+  const l = (metodi || []).map(x => String(x || '').trim()).filter(Boolean);
+  return l.length > 0 && l.every(m => metodoVeloceP2P(m, veloci));
+}
+/* PURA: i lenti fra i metodi, per dirli nella nota */
+function metodiLentiP2P(metodi, veloci){
+  return (metodi || []).map(x => String(x || '').trim()).filter(m => m && !metodoVeloceP2P(m, veloci));
+}
+/* PURA: il tempo che VALE coi metodi: lo scelto coi metodi tutti veloci,
+   24 ore con anche un solo lento, 0 senza scelta */
+function minutiCoiMetodiP2P(min, metodi, veloci){
+  const m = minutiPagareSceltaP2P(min);
+  if (!m) return 0;
+  return metodiVelociTuttiP2P(metodi, veloci) ? m : P2P_MINUTI_PAGARE_MAX;
+}
+/* PURA: l'intervallo che il nodo annuncia, «900-86400», in secondi; null
+   se il tag manca o e' storto */
+function finestrePagareDaTagP2P(v){
+  const m = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(String(v || ''));
+  if (!m) return null;
+  const a = Number(m[1]), b = Number(m[2]);
+  return a > 0 && b >= a ? [a, b] : null;
+}
+/* PURA sulle due fonti: la leva del server e l'intervallo che il nodo
+   annuncia. L'intervallo deve coprire TUTTO l'orologio: il nodo che ne
+   accetta solo un pezzo non e' il nostro, e una scelta che lui non
+   conosce non si offre. Sull'on-chain il nodo non c'entra: basta la leva. */
+function tempoPagareAttivoP2P(coord, info, oc){
+  const c = coord === undefined ? (typeof p2pCoord === 'function' ? p2pCoord() : null) : coord;
+  const i = info === undefined ? (typeof p2pInfo !== 'undefined' ? p2pInfo : null) : info;
+  if (!(c && c.tempoPagare === true)) return false;
+  if (oc) return true;
+  const f = i && Array.isArray(i.finestrePagare) && i.finestrePagare.length === 2 ? i.finestrePagare : null;
+  return !!f && f[0] <= P2P_MINUTI_PAGARE_MIN * 60 && f[1] >= P2P_MINUTI_PAGARE_MAX * 60;
+}
+/* PURA: questo foglio puo' avere un tempo per pagare? Solo «Vendi BTC»
+   (Lightning o on-chain), e mai coi metodi che non stanno in un giorno */
+function tempoPagarePossibileP2P(lato, metodi, oc){
+  if (lato === 'compro') return false;
+  const m = (metodi || []).map(x => String(x || '').trim());
+  return m.length > 0 && m.indexOf(P2P_TABACCHINO) < 0 && m.indexOf(P2P_CONTANTI) < 0
+    && m.indexOf(P2P_POSTA) < 0 && !(typeof tabacchinoP2P === 'function' && tabacchinoP2P(metodi));
+}
+/* PURA: i minuti che partono con l'ordine: la scelta del dito (24 ore se
+   non ha scelto), coi metodi; 0 se il foglio un tempo non lo puo' avere */
+function minutiPagareFoglioP2P(scelta, lato, metodi, oc, attivo, veloci){
+  if (!attivo || !tempoPagarePossibileP2P(lato, metodi, oc)) return 0;
+  return minutiCoiMetodiP2P(minutiPagareSceltaP2P(scelta) || P2P_MINUTI_PAGARE_DI_SERIE, metodi, veloci);
+}
+/* PURA: l'indice del fermo piu' vicino (per difetto) ai minuti */
+function fermoDaMinutiP2P(min){
+  let k = 0;
+  P2P_MINUTI_PAGARE_FERMI.forEach((m, i) => { if (m <= min) k = i; });
+  return k;
+}
+/* PURA: quanto e' pieno l'anello di un tempo SCELTO, sulla scala del
+   cursore (un quarto d'ora e' uno spicchio, 24 ore il giro intero): sulla
+   scala dei minuti due ore sarebbero un puntino */
+function quotaTempoP2P(min){
+  const n = P2P_MINUTI_PAGARE_FERMI.length - 1;
+  return n > 0 ? Math.max(1, fermoDaMinutiP2P(min)) / n : 1;
+}
+/* PURA: l'anello, un SVG. `quota` da 0 a 1 = la parte piena; `id` per il
+   battito che lo svuota in place */
+function anelloTempoP2P(quota, id){
+  const r = 15, giro = 2 * Math.PI * r;
+  const q = Math.max(0, Math.min(1, Number(quota) || 0));
+  return '<svg class="p2p-anello" viewBox="0 0 36 36" aria-hidden="true"' + (id ? ' id="' + id + '"' : '') + '>'
+    + '<circle class="fondo" cx="18" cy="18" r="' + r + '"></circle>'
+    + '<circle class="pieno" cx="18" cy="18" r="' + r + '" stroke-dasharray="' + giro.toFixed(2)
+    + '" stroke-dashoffset="' + (giro * (1 - q)).toFixed(2) + '"></circle></svg>';
+}
+/* l'anello gia' disegnato, a una quota nuova */
+function quotaAnelloP2P(svg, quota){
+  const c = svg && svg.querySelector ? svg.querySelector('.pieno') : null;
+  if (!c) return;
+  const giro = 2 * Math.PI * 15, q = Math.max(0, Math.min(1, Number(quota) || 0));
+  c.setAttribute('stroke-dashoffset', (giro * (1 - q)).toFixed(2));
+}
+/* PURA: la nota sotto l'orologio */
+function notaTempoPagareP2P(min, lenti){
+  const base = 'Chi prende il tuo ordine ha <b>' + minutiPagareDetteP2P(min)
+    + '</b> per inviarti i soldi e toccare «Ho inviato», da quando i sats sono in garanzia. ';
+  const fine = typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
+    ? 'Se non lo fa in tempo, potrai aprire una disputa.'
+    : 'Se non lo fa in tempo, lo scambio si annulla da solo e i sats tornano a te.';
+  const lento = lenti && lenti.length
+    ? ' <br>Per scendere sotto le 24 ore servono solo metodi veloci (SEPA Instant, Revolut, '
+      + 'Satispay, PayPal, USDT o cripto): ' + esc(lenti.join(', '))
+      + (lenti.length === 1 ? ' non lo è.' : ' non lo sono.')
+    : '';
+  return base + fine + lento;
+}
+/* la sezione del foglio «Pubblica», dopo «Chi puo' prendere l'ordine» */
+function sezioneTempoPagareNuovoP2P(){
+  const oc = typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc;
+  const veloci = metodiVelociP2P();
+  const min = minutiPagareFoglioP2P(p2pNuovoMinutiPagare, p2pLato, p2pNuovoMetodi, oc,
+                                    tempoPagareAttivoP2P(undefined, undefined, oc), veloci);
+  if (!min) return '';
+  const lenti = metodiLentiP2P(p2pNuovoMetodi, veloci);
+  const fermo = lenti.length ? '' : ' oninput="scegliTempoPagareNuovoP2P(this.value)"';
+  return sezioneNuovoP2P({
+    titolo: 'Tempo per pagare',
+    corpo: '<div class="p2p-orologio' + (lenti.length ? ' fermo' : '') + '" id="p2pTempoPagareOrologio">'
+      + anelloTempoP2P(quotaTempoP2P(min), 'p2pTempoPagareAnello')
+      + '<div class="p2p-orologio-val" id="p2pTempoPagareVal">' + minutiPagareDetteP2P(min) + '</div>'
+      + '<input type="range" id="p2pTempoPagareCursore" min="0" max="' + (P2P_MINUTI_PAGARE_FERMI.length - 1)
+      + '" step="1" value="' + fermoDaMinutiP2P(min) + '"' + (lenti.length ? ' disabled' : '') + fermo
+      + ' aria-label="Tempo per pagare" aria-valuetext="' + minutiPagareDetteP2P(min) + '">'
+      + '</div>',
+    sotto: '<div class="hint" id="p2pTempoPagareNota">' + notaTempoPagareP2P(min, lenti) + '</div>'
+  });
+}
+/* il dito sul cursore: tutto IN PLACE, mai il foglio rifatto (il cursore
+   perderebbe la presa a meta' gesto) */
+function scegliTempoPagareNuovoP2P(i){
+  const k = Math.max(0, Math.min(P2P_MINUTI_PAGARE_FERMI.length - 1, Math.floor(Number(i) || 0)));
+  const min = P2P_MINUTI_PAGARE_FERMI[k];
+  if (min === p2pNuovoMinutiPagare) return;
+  p2pNuovoMinutiPagare = min;
+  if (typeof haptic === 'function' && min % 60 === 0) haptic();
+  const val = el('p2pTempoPagareVal');
+  if (val) val.textContent = minutiPagareDetteP2P(min);
+  const cur = el('p2pTempoPagareCursore');
+  if (cur) cur.setAttribute('aria-valuetext', minutiPagareDetteP2P(min));
+  quotaAnelloP2P(el('p2pTempoPagareAnello'), quotaTempoP2P(min));
+  const nota = el('p2pTempoPagareNota');
+  if (nota) nota.innerHTML = notaTempoPagareP2P(min, []);
+}
+/* il tempo che parte con l'ordine: dai campi (`campiNuovoP2P`) */
+function minutiPagareDaCampiP2P(campi){
+  return campi ? minutiPagareSceltaP2P(campi.minutiPagare) : 0;
+}
+/* quel che si DICHIARA al server all'intestazione: dalle righe dei MIEI
+   ordini in questa lista (il calco dei filtri) */
+function minutiPagareDaDichiarareP2P(ids){
+  const fuori = {}, mie = typeof ordiniP2P === 'function' ? ordiniP2P() : {};
+  for (const id of ids || []) {
+    const riga = mie[id];
+    const o = (riga && riga.mio) ? minutiPagareSceltaP2P(riga.minutiPagare) : 0;
+    if (o) { fuori[id] = o; p2pMinutiPagare[id] = o; }
+  }
+  return fuori;
+}
+/* dalla risposta del server (facce e fotografia): torna vero se e'
+   cambiato qualcosa */
+function prendiMinutiPagareP2P(m){
+  if (!m || typeof m !== 'object') return false;
+  let nuovi = false;
+  for (const id of Object.keys(m)) {
+    const o = idMostroVero(id) ? minutiPagareSceltaP2P(m[id]) : 0;
+    if (o && p2pMinutiPagare[id] !== o) { p2pMinutiPagare[id] = o; nuovi = true; }
+  }
+  return nuovi;
+}
+/* il tempo di UN ordine: dalla mia riga se l'ho pubblicato io, se no da
+   quel che ha detto il server (che ha gia' fatto il conto coi metodi) */
+function minutiPagareOrdineP2P(o){
+  if (!o || !o.id) return 0;
+  const mia = typeof ordiniP2P === 'function' ? ordiniP2P()[o.id] : null;
+  if (mia && mia.mio && mia.minutiPagare)
+    return minutiCoiMetodiP2P(mia.minutiPagare, o.metodi || mia.metodi || [], metodiVelociP2P());
+  return minutiPagareSceltaP2P(p2pMinutiPagare[o.id] || 0);
+}
+/* PURA: il bollino della card nel libro, solo per i tempi CORTI (sotto le
+   24 ore): chi guarda sa subito che chi vende ha fretta (Andrea: «quando
+   vedi l'ordine e lo prendi, sai già che questo è un utente che ha un po'
+   più di fretta degli altri») */
+function bollinoTempoPagareP2P(min){
+  const m = minutiPagareSceltaP2P(min);
+  if (!m || m >= P2P_MINUTI_PAGARE_MAX) return '';
+  return '<span class="p2p-bollino-tempo" title="Tempo per pagare">⏱ '
+    + minutiPagareCortiP2P(m) + '</span>';
+}
+/* la riga del dettaglio, PRIMA della presa (e sul mio ordine): chi prende
+   sa a cosa si impegna */
+function rigaTempoPagareDettP2P(o, tuo){
+  const min = minutiPagareOrdineP2P(o);
+  if (!min) return '';
+  return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">'
+    + anelloTempoP2P(quotaTempoP2P(min)) + '<span>'
+    + (tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro'
+           : 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro')
+    + ', da quando i sats sono in garanzia: poi lo scambio si annulla da solo.</span></div>';
+}
+/* PURA: la riga del tempo che resta nella pagina dello scambio, per chi
+   compra e per chi vende. Solo a scambio attivo (garanzia bloccata, niente
+   «pagato») e con un termine detto dal server; '' altrimenti. */
+function rigaTempoPagareScambioP2P(o, adesso){
+  if (!o || o.stato !== 'attivo') return '';
+  const entro = Number(o.pagaEntro) || 0;
+  if (!(entro > 0)) return '';
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const resta = entro - ora;
+  const compro = o.lato === 'compro';
+  if (resta <= 0)
+    return '<div class="p2p-box p2p-tempo-pagare scaduto" id="p2pTempoPagare">⏱ '
+      + (compro ? 'Il tempo per pagare è finito: lo scambio si sta annullando.'
+                : 'Il tempo per pagare è finito: lo scambio si sta annullando e i sats tornano a te.')
+      + '</div>';
+  const quanto = traQuantoP2P(resta);
+  /* L'ANELLO CHE SI SVUOTA (Andrea: «graficamente si veda che scorre
+     attivamente all'indietro»): pieno all'attivo, vuoto allo scadere */
+  const tot = (minutiPagareSceltaP2P(o.minutiPagare) || 0) * 60;
+  return '<div class="p2p-box p2p-tempo-pagare' + (resta <= 900 ? ' vicino' : '') + '" id="p2pTempoPagare" data-entro="'
+    + entro + '" data-tot="' + tot + '">' + anelloTempoP2P(tot ? resta / tot : 1) + '<span>' + (compro
+      ? 'Hai ancora <b>' + esc(quanto) + '</b> per inviare gli euro e toccare «Ho inviato gli euro»: poi lo scambio si annulla da solo.'
+      : 'Chi compra ha ancora <b>' + esc(quanto) + '</b> per inviarti gli euro: poi lo scambio si annulla da solo e i sats tornano a te.')
+    + '</span></div>';
+}
+/* il termine dello scambio, dall'archivio del server: e' lui a sapere da
+   quando lo scambio e' attivo (l'ora di mostrod, uguale per i due) */
+function pagaEntroP2P(o){
+  const s = o && typeof p2pScambiServer !== 'undefined' && p2pScambiServer ? p2pScambiServer[o.id] : null;
+  return s ? Math.max(0, Math.floor(Number(s.paga_entro) || 0)) : 0;
+}
+/* ...e il tempo intero, per l'anello: dallo stesso archivio */
+function minutiPagareScambioP2P(o){
+  const s = o && typeof p2pScambiServer !== 'undefined' && p2pScambiServer ? p2pScambiServer[o.id] : null;
+  return s ? minutiPagareSceltaP2P(Math.floor(Number(s.minuti_pagare) || 0)) : 0;
+}
+/* la riga nella pagina, col termine letto qui */
+function rigaTempoPagareP2P(o){
+  if (!o || o.soloVista) return '';
+  return rigaTempoPagareScambioP2P(Object.assign({}, o, {pagaEntro: pagaEntroP2P(o),
+                                                         minutiPagare: minutiPagareScambioP2P(o)}));
+}
+/* IL BATTITO, nell'unico interval dell'app: i minuti in place, e allo
+   zero la pagina si ridisegna UNA volta (la frase cambia) */
+function battitoTempoPagareP2P(){
+  if (typeof document === 'undefined' || !document.querySelector) return;
+  const box = document.querySelector('.view.active #p2pTempoPagare[data-entro]');
+  if (!box) return;
+  const resta = (Number(box.dataset.entro) || 0) - Date.now() / 1000;
+  if (resta <= 0) {
+    if (typeof renderOrdineP2P === 'function') renderOrdineP2P();
+    return;
+  }
+  const b = box.querySelector('b'), q = traQuantoP2P(resta);
+  if (b && b.textContent !== q) b.textContent = q;
+  box.classList.toggle('vicino', resta <= 900);
+  const tot = Number(box.dataset.tot) || 0;
+  if (tot) quotaAnelloP2P(box.querySelector('.p2p-anello'), resta / tot);
+}
 /* PURA: la frase del «no» del server, dal suo codice. `rep` sono i
    numeri di chi chiede, se li ha gia' detti. */
 function fraseVetoP2P(v, rep){
@@ -98138,6 +98519,8 @@ function ripubblicaParacaduteP2P(){
   p2pNuovoFisso = c.fisso; p2pNuovoSats = c.sats; p2pNuovoPremio = c.premio;
   p2pNuovoZona = c.zona;
   if (typeof sogliaFiltroP2P === 'function') p2pNuovoFiltro = sogliaFiltroP2P(c.filtro);
+  /* ...e il tempo per pagare dell'ordine vecchio (18 nov 2026) */
+  if (typeof minutiPagareOrdineP2P === 'function') p2pNuovoMinutiPagare = minutiPagareOrdineP2P(o);
   /* QUI LA SOGLIA DELL'ORDINE VECCHIO TORNA (13 ott 2026, sera, parola di
      Andrea): e' una scelta gia' fatta su quest'ordine, e nel foglio si
      vede accesa prima di pubblicare. «Sempre da Spento» vale per gli
@@ -98347,6 +98730,8 @@ function campiRipubblicaUgualeP2P(o, adesso){
   const r = miaRipubblicaP2P(o);
   return {euro: c.euro, euroMax: c.euroMax, sats: c.fisso ? c.sats : '', fisso: c.fisso,
     metodi: c.metodi, zona: c.zona, filtro: c.filtro, paracadute: c.paracadute,
+    /* il tempo per pagare torna uguale (18 nov 2026) */
+    minutiPagare: typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P(o) : 0,
     premio: c.premio, premioTab: '', valuta: valuta,
     /* in moneta il cambio di adesso (16 nov 2026, ricevi-mercato) */
     cambioCoin: typeof eurPerValutaCoinP2P === 'function' ? eurPerValutaCoinP2P(valuta) : 0,
@@ -100033,6 +100418,8 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoZona = '';
   /* ...e il filtro di chi puo' prendere riparte da «tutti» (10 ott 2026) */
   p2pNuovoFiltro = 0;
+  /* ...e il tempo per pagare dalla proposta (18 nov 2026) */
+  p2pNuovoMinutiPagare = 0;
   /* ...e il paracadute riparte SEMPRE DA «SPENTO» (13 ott 2026, sera,
      dalla prova di Andrea sul telefono): la scelta di prima non si
      ricorda — un paracadute che nessuno ha scelto annulla un ordine.
@@ -100763,6 +101150,13 @@ function campiNuovoP2P(){
     zona: typeof p2pNuovoZona === 'string' ? p2pNuovoZona : '',
     /* chi puo' prendere l'ordine (10 ott 2026, reputazione-p2p): 0 = tutti */
     filtro: typeof p2pNuovoFiltro === 'number' ? p2pNuovoFiltro : 0,
+    /* il tempo per pagare (18 nov 2026): la scelta o la proposta, 0 dove
+       il foglio non lo puo' avere */
+    minutiPagare: typeof minutiPagareFoglioP2P === 'function'
+      ? minutiPagareFoglioP2P(p2pNuovoMinutiPagare, p2pLato, p2pNuovoMetodi,
+                           typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc,
+                           tempoPagareAttivoP2P(undefined, undefined, typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc),
+                           metodiVelociP2P()) : 0,
     /* il paracadute (13 ott 2026): dal 17 nov `{su, giu}`, 0 = in quel verso niente */
     paracadute: typeof versiParacaduteP2P === 'function' ? versiParacaduteP2P(p2pNuovoParacadute) : {su: 0, giu: 0},
     /* la ripubblica (16 nov 2026): i due prezzi di BTC come li scrive il dito */
@@ -101419,6 +101813,9 @@ function renderNuovoOrdineP2P(){
   /* CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p): la sua
      sezione, dopo il premio e prima dei limiti — vedi `sezioneAccessoNuovoP2P` */
   const accesso = typeof sezioneAccessoNuovoP2P === 'function' ? sezioneAccessoNuovoP2P() : '';
+  /* IL TEMPO PER PAGARE (18 nov 2026): subito dopo «chi puo' prendere»,
+     solo in «Vendi BTC» su Lightning — vedi `sezioneTempoPagareNuovoP2P` */
+  const tempoPagare = typeof sezioneTempoPagareNuovoP2P === 'function' ? sezioneTempoPagareNuovoP2P() : '';
   /* LA PAUSA IN VISTA (cantiere pausa-in-vista): lo stato di adesso e
      il bottone che apre il foglio della pausa SOPRA questo, dopo «chi
      puo' prendere» e prima dei limiti — vedi `sezionePausaNuovoP2P` */
@@ -101561,7 +101958,7 @@ function renderNuovoOrdineP2P(){
        PRIMA del percorso (30 set 2026): il passo 4 e il riepilogo
        cambiano parole con lei, quindi si sceglie prima di arrivarci. */
     valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)
-    + quanti + premio + accesso + pausa + paracadute + ripubblica + riquadroLimitiP2P() +
+    + quanti + premio + accesso + tempoPagare + pausa + paracadute + ripubblica + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
@@ -103490,6 +103887,9 @@ async function inviaNuovoOrdineP2P(confermato){
      mia card mostra il segno */
   const filtroOrd = typeof filtroDaCampiP2P === 'function' ? filtroDaCampiP2P(campi) : 0;
   if (filtroOrd) ord.filtro = filtroOrd;
+  /* ...e IL TEMPO PER PAGARE (18 nov 2026), con la stessa strada */
+  const oreOrd = typeof minutiPagareDaCampiP2P === 'function' ? minutiPagareDaCampiP2P(campi) : 0;
+  if (oreOrd) ord.minutiPagare = oreOrd;
   /* IL PARACADUTE STA SULLA RIGA (13 ott 2026): parte all'intestazione
      come la zona e il filtro, e intanto la mia card mostra il segno. La
      scelta vale per QUESTO ordine e non si ricorda per il prossimo */
@@ -108595,6 +108995,8 @@ async function chiediFotoLibroP2P(){
   if (typeof prendiPostiP2P === 'function') prendiPostiP2P(d && d.posti);
   /* ...e i filtri di chi pubblica (10 ott 2026, reputazione-p2p) */
   const filtri = typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri);
+  /* ...e il tempo per pagare scelto da chi pubblica (18 nov 2026, tempo-pagamento) */
+  const minutiPagare = typeof prendiMinutiPagareP2P === 'function' && prendiMinutiPagareP2P(d && d.minuti_pagare);
   /* ...e gli ordini in pausa adesso (12 ott 2026): la fotografia intera */
   const pause = typeof prendiPauseP2P === 'function' && prendiPauseP2P(d && d.pause);
   /* ...e quelli col paracadute aperto (13 ott 2026): la fotografia intera */
@@ -108609,7 +109011,7 @@ async function chiediFotoLibroP2P(){
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
-      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri || pause || paracadute || onchain;
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi || zone || filtri || minutiPagare || pause || paracadute || onchain;
   libroDaCopiaP2P(eventi, quando, 'server');
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
@@ -109464,6 +109866,7 @@ async function chiediFotoVetrinaP2P(){
   /* ...col punto sulla mappa del contanti (31 ott 2026, mappa-contanti) */
   if (typeof prendiPostiP2P === 'function') prendiPostiP2P(d && d.posti);
   if (typeof prendiFiltriP2P === 'function') prendiFiltriP2P(d && d.filtri);
+  if (typeof prendiMinutiPagareP2P === 'function') prendiMinutiPagareP2P(d && d.minuti_pagare);   /* il tempo per pagare (18 nov 2026) */
   if (typeof prendiPauseP2P === 'function') prendiPauseP2P(d && d.pause);
   if (typeof prendiParacaduteP2P === 'function') prendiParacaduteP2P(d && d.paracadute);
   if (typeof accogliLibroOnchainP2P === 'function') accogliLibroOnchainP2P(d && d.onchain);   /* il libro on-chain (30 ott 2026) */
@@ -110130,6 +110533,8 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
   const paracadute = typeof paracaduteDaDichiarareP2P === 'function' ? paracaduteDaDichiarareP2P(lista) : {};
   /* ...e LA RIPUBBLICA (16 nov 2026): stessa porta, la prima resta */
   const ripubblica = typeof ripubblicaDaDichiarareP2P === 'function' ? ripubblicaDaDichiarareP2P(lista) : {};
+  /* ...e IL TEMPO PER PAGARE (18 nov 2026): stessa porta, la prima resta */
+  const minutiPagare = typeof minutiPagareDaDichiarareP2P === 'function' ? minutiPagareDaDichiarareP2P(lista) : {};
   try {
     const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -110148,6 +110553,7 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
                             filtri: filtri,
                             paracadute: paracadute,
                             ripubblica: ripubblica,
+                            minuti_pagare: minutiPagare,
                             cambi: cambi})});
     return r.ok;
   } catch(e){ return false; }
@@ -110393,6 +110799,8 @@ async function chiediFacceP2P(ids){
       if (typeof prendiPostiP2P === 'function' && prendiPostiP2P(d && d.posti)) nuove++;
       /* ...e il filtro di chi pubblica (10 ott 2026, reputazione-p2p) */
       if (typeof prendiFiltriP2P === 'function' && prendiFiltriP2P(d && d.filtri)) nuove++;
+      /* ...e il tempo per pagare che ha scelto (18 nov 2026, tempo-pagamento) */
+      if (typeof prendiMinutiPagareP2P === 'function' && prendiMinutiPagareP2P(d && d.minuti_pagare)) nuove++;
       /* ...e la pausa di chi li ha pubblicati (12 ott 2026): solo per gli id chiesti */
       if (typeof prendiPauseP2P === 'function' && prendiPauseP2P(d && d.pause, lista)) nuove++;
       /* ...e il paracadute aperto (13 ott 2026): solo per gli id chiesti */

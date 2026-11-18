@@ -340,7 +340,8 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     # 🔁 il coordinator e i suoi segreti
     "MOSTRO_NPUB", "P2P_PROVA_IDS", "P2P_STATISTICHE_IDS", "MOSTRO_RELAY",
     "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
-    "P2P_EVENTI_SEGRETO", "SEGRETI_PROFILO_P2P", "SEGRETO_PROFILO_P2P_VIVA",
+    "P2P_EVENTI_SEGRETO", "P2P_FINESTRA_SEGRETO", "SEGRETI_PROFILO_P2P",
+    "SEGRETO_PROFILO_P2P_VIVA",
     "MOSTRO_RELAY_SPECCHIO", "MOSTRO_RELAY_CONFERMA",
     # ⛓️ 🪙 🔔 chiavi e liste di persone. ONCHAIN_RETE ne e' uscita il
     # 30 ott 2026 (cantiere onchain-rete-pannello, Andrea: «signet e
@@ -10155,7 +10156,11 @@ def init_db():
                     "min_completati INTEGER DEFAULT 0",
                     # la valuta dell'ordine, il `f` del 38383 (14 nov 2026,
                     # p2p-chf): '' = mai letta, cioe' l'euro di sempre
-                    "fiat TEXT DEFAULT ''"):
+                    "fiat TEXT DEFAULT ''",
+                    # il tempo per pagare scelto da chi pubblica, in minuti
+                    # (18 nov 2026, tempo-pagamento): 0 = non scelto, cioe'
+                    # il solo tempo della garanzia, come gli ordini di prima
+                    "minuti_pagare INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -37973,6 +37978,15 @@ def _leve_stato():
                          "apertura, on-chain dal server); mai Barattozon",
                   spento="nessun paragrafo «Ripubblica» nel foglio, e gli "
                          "ordini scaduti non si rifanno più"),
+            # IL TEMPO PER PAGARE (18 nov 2026): acceso di serie
+            _leva("Tempo per pagare nel P2P (da 15 minuti a 24 ore)",
+                  "P2P_TEMPO_PER_PAGARE", P2P_TEMPO_PER_PAGARE,
+                  acceso="chi vende sceglie entro quanto chi prende manda gli "
+                         "euro; allo scadere senza «Ho inviato» il nodo annulla "
+                         "da solo (patch 0013) e i sats tornano a chi vende",
+                  spento="nessuna scelta nel foglio e nessuna risposta al "
+                         "nodo: gli scambi hanno il solo tempo della garanzia "
+                         "(~92 ore)"),
             # LA CHAT NELLO SCAMBIO (12 ott 2026): accesa di serie
             _leva("Chat nello scambio P2P", "P2P_CHAT_SCAMBIO",
                   P2P_CHAT_SCAMBIO,
@@ -38034,6 +38048,13 @@ def _leve_stato():
                          "restano i soli avvisi del libro (presa, "
                          "concluso, annullato, scaduto), e garanzia, "
                          "euro inviati e disputa NON avvisano nessuno"),
+            # IL TEMPO PER PAGARE (patch 0013): esce il FATTO, mai il segreto
+            _leva("Tempo per pagare — porta del coordinatore",
+                  "P2P_FINESTRA_SEGRETO", finestra_p2p_attiva(),
+                  acceso="il nodo chiede qui quanto tempo ha chi compra, e "
+                         "allo scadere annulla da solo",
+                  spento="il nodo non può chiedere: nessuno scambio si annulla "
+                         "da solo allo scadere del tempo per pagare"),
             # IL SEGRETO NON ESCE MAI, esce il FATTO: la regola di
             # CHIAVE_CONTENUTI_DIGITALI, applicata al segreto piu'
             # pesante che questo server abbia — chi lo ruba, col sale
@@ -61133,6 +61154,55 @@ try:
         P2P_RIPUBBLICA = True
 except ImportError:
     P2P_RIPUBBLICA = True
+# IL TEMPO PER PAGARE, SCELTO DA CHI PUBBLICA (18 nov 2026, cantiere
+# tempo-pagamento; Andrea, da JJ che scambia tanto: «se uno ha fretta dice
+# io metto l'ordine però nel momento in cui lo prendi hai un'ora di tempo
+# per scambiare», e «Tutto insieme, nodo compreso»). Chi pubblica un
+# ordine di VENDITA sceglie entro quanto chi prende manda gli euro: con un
+# timer libero, da 15 minuti a 24 ore (24 di serie), e sotto le 24 ore
+# SOLO coi metodi veloci (vedi `P2P_METODI_VELOCI`). Chi prende
+# lo legge prima di prendere, il timer lo vedono tutt'e due, e allo
+# scadere senza «Ho inviato» il NODO annulla da solo (patch 0013: chiede
+# a /api/p2p/finestre) e i sats tornano a chi vende. ACCESA DI SERIE
+# (regola del 14 nov); `P2P_TEMPO_PER_PAGARE = False` nel config spegne
+# la scelta nella pagina E la risposta al nodo: gli scambi tornano ad
+# avere il solo tempo della garanzia (~92 ore). Finche' il nodo non
+# annuncia la patch (`barattolo_payment_windows` nel 38385) la pagina la
+# scelta non la offre: non si promette un annullo che nessuno fa.
+try:
+    from config import P2P_TEMPO_PER_PAGARE
+    if not isinstance(P2P_TEMPO_PER_PAGARE, bool):
+        print("[p2p] P2P_TEMPO_PER_PAGARE non e' True/False: il tempo per "
+              "pagare resta ACCESO come di serie")
+        P2P_TEMPO_PER_PAGARE = True
+except ImportError:
+    P2P_TEMPO_PER_PAGARE = True
+# UN OROLOGIO, NON TRE SOGLIE (18 nov 2026, stesso cantiere, Andrea: «non
+# a soglie che decidiamo noi mentre tipo un orologio con un timer che
+# decidi tu quanto farlo scorrere»). In MINUTI, a passi di un quarto
+# d'ora, da 15 minuti a 24 ore: lo stesso intervallo del nodo
+# (MIN_WINDOW/MAX_WINDOW di barattolo_finestra.rs, in secondi), che un
+# numero fuori lo tratta da «nessun tempo». Sotto i 15 minuti chi compra
+# non fa in tempo ad aprire l'app della banca; sopra le 24 ore decide la
+# garanzia comunque.
+P2P_MINUTI_PAGARE_MIN = 15
+P2P_MINUTI_PAGARE_MAX = 24 * 60
+P2P_MINUTI_PAGARE_PASSO = 15
+P2P_MINUTI_PAGARE_DI_SERIE = 24 * 60
+# SOTTO LE 24 ORE, SOLO COI METODI VELOCI (Andrea, stesso giorno: «se tu
+# paghi con bonifico sepa [...] devo attendere [...] per tempi bancari,
+# se invece fai con sepa instant allora lì sì che ti posso chiedere anche
+# di meno»). Un tempo corto si tiene solo se TUTTI i metodi dell'ordine
+# arrivano in minuti a qualunque ora: questi, piu' gli USDT e le monete
+# (`_metodo_veloce_p2p`). Con anche un solo metodo lento (il bonifico
+# ordinario, Wise, i contanti) il tempo resta 24 ore: chi prende potrebbe
+# scegliere proprio quello. Wise e' fuori perche' verso una banca puo'
+# metterci un giorno.
+P2P_METODI_VELOCI = ("SEPA Instant", "Revolut", "Satispay", "PayPal")
+# quanto puo' tardare la domanda del nodo dall'attivo (vedi
+# `_finestre_per_nodo_p2p`): lui chiede ogni minuto, quindi un quarto d'ora
+# vuol dire che la porta era chiusa
+P2P_FINESTRA_RITARDO_MAX_S = 15 * 60
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
 # chi lo chiede riceve un messaggio quando nel libro P2P compaiono
 # ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
@@ -61221,6 +61291,19 @@ try:
     from config import P2P_EVENTI_SEGRETO
 except ImportError:
     P2P_EVENTI_SEGRETO = ""
+# LA PORTA DA CUI IL COORDINATORE CHIEDE IL TEMPO PER PAGARE (18 nov
+# 2026, patch 0013 del fork): ogni minuto mostrod chiede a
+# /api/p2p/finestre quanto tempo hanno i compratori degli scambi appena
+# attivi. UN SEGRETO SUO, come gli altri due (la M6 dell'audit): chi lo
+# ruba impara il tempo per pagare di un ordine — che e' gia' scritto
+# sulla card — e niente altro. Vuoto o segnaposto = la rotta NON ESISTE
+# (404) e il nodo non annulla niente: gli scambi hanno il solo tempo
+# della garanzia. Lo stesso valore va nel compose del nodo
+# (`BARATTOLO_FINESTRA_SEGRETO`).
+try:
+    from config import P2P_FINESTRA_SEGRETO
+except ImportError:
+    P2P_FINESTRA_SEGRETO = ""
 # quante chiavi in una domanda: le due parti di uno scambio, e un po'
 # d'aria. Un elenco lungo non e' una domanda, e' una raccolta.
 MAX_PUBKEY_SCONTO_P2P = 4
@@ -61483,6 +61566,17 @@ def _p2p_leve() -> dict:
             # la ripubblica (16 nov 2026): il paragrafo nel foglio che
             # pubblica e il battito che rifa' gli ordini scaduti
             "ripubblica": bool(P2P_RIPUBBLICA),
+            # il tempo per pagare (18 nov 2026): la scelta nel foglio che
+            # pubblica, la riga prima della presa e il timer nello scambio;
+            # la pagina la offre solo se ANCHE il nodo la annuncia (38385)
+            "tempoPagare": bool(P2P_TEMPO_PER_PAGARE),
+            # l'orologio: i limiti, il passo e i metodi veloci (sotto le
+            # 24 ore solo con quelli), cosi' la pagina non li ripete
+            "minutiPagareLimiti": {"min": int(P2P_MINUTI_PAGARE_MIN),
+                                   "max": int(P2P_MINUTI_PAGARE_MAX),
+                                   "passo": int(P2P_MINUTI_PAGARE_PASSO),
+                                   "veloci": list(P2P_METODI_VELOCI)},
+            "minutiPagareDiSerie": int(P2P_MINUTI_PAGARE_DI_SERIE),
             # la chat nello scambio (12 ott 2026): accesa di serie; a
             # leva spenta il client non mostra il riquadro
             "chat": bool(P2P_CHAT_SCAMBIO),
@@ -62168,6 +62262,51 @@ async def sconto_p2p(req: Request):
     return JSONResponse({"ok": True, "sconti": sconti},
                         headers={"Cache-Control": "no-store"})
 
+
+
+def finestra_p2p_attiva() -> bool:
+    """La porta del tempo per pagare (patch 0013) ESISTE? Segreto scritto
+    E leva accesa: a leva spenta la rotta tace (404) e il nodo non annulla
+    niente — l'interruttore d'emergenza vale anche per lui."""
+    return bool(P2P_FINESTRA_SEGRETO
+                and not P2P_FINESTRA_SEGRETO.startswith("INCOLLA")
+                and P2P_TEMPO_PER_PAGARE)
+
+
+def _porta_finestra_p2p(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato: il calco di
+    `_porta_sconto_p2p`, a byte e a tempo costante."""
+    if not finestra_p2p_attiva():
+        raise HTTPException(404, "Non trovato")
+    atteso = ("Bearer " + P2P_FINESTRA_SEGRETO).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+@app.post("/api/p2p/finestre")
+async def finestre_p2p(req: Request):
+    """Il coordinatore chiede, per gli scambi appena attivi, quanto tempo
+    ha chi compra per mandare gli euro (18 nov 2026, patch 0013). Risponde
+    `{finestre: {ordine: secondi}}` coi soli ordini che un tempo ce
+    l'hanno: per il nodo uno che manca e' «nessun tempo», e allora vale la
+    sola scadenza della garanzia. NIENT'ALTRO ESCE: ne' chi ha pubblicato
+    ne' chi ha preso. POST perche' gli id non finiscano nei log."""
+    _porta_finestra_p2p(req.headers.get("authorization", ""))
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        finestre = _finestre_per_nodo_p2p(con, (d or {}).get("ordini"),
+                                          int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse({"ok": True, "finestre": finestre},
+                        headers={"Cache-Control": "no-store"})
 
 
 # IL PROFILO DI SCAMBIO CHE SI RICAVA DALL'ACCOUNT (set 2026): tutto il
@@ -64505,6 +64644,42 @@ def _colpa_disputa_p2p(con, ordine: str, giro: int, esito: str) -> bool:
         return False
 
 
+def _recapito_tardi_p2p(con, ordine: str, giro: int) -> bool:
+    """IL RECAPITO ARRIVATO NELLA SECONDA META' DEL TEMPO PER PAGARE (18
+    nov 2026, tempo-pagamento)? Pura sulla connessione. L'ora del recapito
+    e' la prima dichiarazione del telefono di chi vende nel giro, o, senza,
+    il primo avviso del recapito partito; il tempo parte quando lo scambio
+    e' diventato attivo (`_attivo_dal_p2p`), coi minuti scelti da chi ha
+    pubblicato (24 ore se fra i metodi ce n'e' uno lento). Quel che non si
+    sa NON e' tardi: senza tempo, senza l'ora d'inizio o senza l'ora del
+    recapito vale la regola di sempre."""
+    try:
+        r = con.execute("SELECT minuti_pagare, metodi FROM p2p_ordini "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    try:
+        metodi = json.loads(r[1] or "[]") if r else []
+    except ValueError:
+        metodi = []
+    minuti = _minuti_coi_metodi_p2p(int(r[0] or 0), metodi
+                                    if isinstance(metodi, list) else []) if r else 0
+    momenti = [dict(m) for m in con.execute(
+        "SELECT momento, quando, dettaglio, giro FROM p2p_momenti WHERE ordine=?",
+        (ordine,))]
+    dal = _attivo_dal_p2p(momenti, giro)
+    ore_rec = [int(m["quando"] or 0) for m in momenti
+               if m["momento"] == "recapito" and int(m["giro"] or 0) == int(giro)
+               and int(m["quando"] or 0) > 0]
+    if not ore_rec:
+        ore_rec = [int(x[0] or 0) for x in con.execute(
+            "SELECT quando FROM p2p_avvisi WHERE ordine=? AND giro=? AND momento "
+            "LIKE 'recapito%' AND quando > 0", (ordine, int(giro)))]
+    if not (minuti and dal and ore_rec):
+        return False
+    return min(ore_rec) > dal + minuti * 30
+
+
 def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
     """GLI ESITI CHE NASCONO DOPO LA GARANZIA BLOCCATA (10 ott 2026, «I
     MALUS DOPO LA GARANZIA», a e b). Pura sulla connessione; torna le
@@ -64521,7 +64696,13 @@ def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
       cronaca, o l'avviso del recapito gia' partito: lo stesso doppio
       sguardo di `_dati_frase_p2p`) e non c'e' ne' un «pagato» ne' una
       disputa. In ogni altro caso non si conta a nessuno, e il journal
-      dice perche'."""
+      dice perche'.
+    • IL TEMPO PER PAGARE FINITO (`payment-window`, 18 nov 2026, patch
+      0013): la stessa regola, piu' una. Il recapito deve essere arrivato
+      nella PRIMA META' del tempo: chi vende che lo dice al cinquantanovesimo
+      minuto di un'ora non puo' far contare a chi compra un pagamento che
+      non aveva dove mandare. Senza l'ora del recapito (lo sa solo
+      l'anti-doppione dell'avviso) vale la sua ora d'invio."""
     righe = []
     ordine, giro = ev["ordine"], int(fatto.get("giro") or 0)
     momento, ts = str(fatto.get("momento") or ""), int(ev["ts"])
@@ -64542,7 +64723,8 @@ def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
                 (tg, ordine, giro, ruolo, ts)).rowcount:
             righe.append(f"⚖️ Reputazione P2P: a {tg} si segna una disputa persa "
                          f"({corto}, giro {giro}: lo ha deciso il moderatore, a registro)")
-    if momento == "annullato" and ev.get("dettaglio") == "escrow-deadline":
+    scadenza = str(ev.get("dettaglio") or "")
+    if momento == "annullato" and scadenza in ("escrow-deadline", "payment-window"):
         nomi = {r[0] for r in con.execute(
             "SELECT DISTINCT momento FROM p2p_momenti WHERE ordine=? AND giro=?",
             (ordine, giro))}
@@ -64557,18 +64739,23 @@ def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
             perche = "c'era un «pagato» o una disputa"
         elif not detto:
             perche = "chi vende non aveva detto dove ricevere gli euro"
+        elif scadenza == "payment-window" and _recapito_tardi_p2p(con, ordine, giro):
+            perche = ("chi vende ha detto dove ricevere gli euro quando era "
+                      "passata piu' di meta' del tempo per pagare")
         else:
             perche = ""
+        fatto_q = ("tempo per pagare finito" if scadenza == "payment-window"
+                   else "garanzia arrivata a scadenza")
         if perche:
-            righe.append(f"· Reputazione P2P: {corto} garanzia arrivata a scadenza, "
+            righe.append(f"· Reputazione P2P: {corto} {fatto_q}, "
                          f"ma {perche}: non si conta a nessuno")
         elif con.execute(
                 "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, ruolo, "
-                "quando, dettaglio) VALUES(?,?,?,'mancato','compra',?,'escrow-deadline')",
-                (compra, ordine, giro, ts)).rowcount:
+                "quando, dettaglio) VALUES(?,?,?,'mancato','compra',?,?)",
+                (compra, ordine, giro, ts, scadenza)).rowcount:
             righe.append(f"⚠️ Reputazione P2P: a {compra} si conta uno scambio non "
-                         f"completato ({corto}, giro {giro}: garanzia arrivata a "
-                         "scadenza senza gli euro segnati, col recapito detto)")
+                         f"completato ({corto}, giro {giro}: {fatto_q} "
+                         "senza gli euro segnati, col recapito detto)")
     return righe
 
 
@@ -64901,6 +65088,201 @@ def _filtri_p2p(con, ordini) -> dict:
         # un database senza la colonna — i banchi di ieri — vale «nessun
         # filtro», mai un errore che lasci indietro i volti
         return {}
+
+
+# ═══ IL TEMPO PER PAGARE (18 nov 2026, cantiere tempo-pagamento) ═══
+# Chi pubblica un ordine di VENDITA sceglie entro quanto chi lo prende
+# manda gli euro: un timer da 15 minuti a 24 ore, in MINUTI, da quando lo
+# scambio e' attivo (garanzia bloccata e recapito pronto). Sotto le 24 ore
+# solo se tutti i metodi sono veloci (`_metodi_veloci_p2p`), se no 24. La scelta entra dalla porta della zona e del
+# filtro (`/api/p2p/ordini`, solo da maker, la prima resta), esce sulla
+# card prima della presa (`/api/p2p/facce` e la fotografia), nell'archivio
+# di tutt'e due le parti col suo termine (`paga_entro`), e va al NODO che
+# la chiede (`/api/p2p/finestre`, patch 0013): allo scadere senza «Ho
+# inviato» e' lui ad annullare, e racconta `expired` / `payment-window`.
+# NIENTE TEMPO dove non ha senso: col PayCode (la sua scadenza e' quella di
+# Amazon), col contanti di persona fra i metodi (un appuntamento non sta
+# in un'ora) e col contante per posta (una busta viaggia giorni). E
+# nessun tempo sugli ordini di ACQUISTO: li' chi paga e' chi ha
+# pubblicato, e il tempo lo sceglierebbe per se'.
+
+
+def _minuti_pagare_scelta_p2p(v) -> int:
+    """PURA: i minuti scelti, se stanno nell'orologio (da
+    `P2P_MINUTI_PAGARE_MIN` a `P2P_MINUTI_PAGARE_MAX`, a passi di
+    `P2P_MINUTI_PAGARE_PASSO`), o 0. I booleani e le stringhe non valgono:
+    un `true` non e' «un minuto»."""
+    if isinstance(v, bool) or not isinstance(v, int):
+        return 0
+    if not P2P_MINUTI_PAGARE_MIN <= v <= P2P_MINUTI_PAGARE_MAX:
+        return 0
+    return v if v % P2P_MINUTI_PAGARE_PASSO == 0 else 0
+
+
+def _metodo_veloce_p2p(metodo) -> bool:
+    """PURA: un metodo che arriva in minuti a qualunque ora? Quelli di
+    `P2P_METODI_VELOCI`, gli USDT su ogni rete e le monete (ETH, Monero,
+    USDe: `P2P_COIN_METODI`). Il resto e' lento, anche un nome che non si
+    conosce: un tempo corto non si promette su un metodo ignoto."""
+    m = str(metodo or "").strip()
+    if not m:
+        return False
+    if m in P2P_METODI_VELOCI or m.upper().startswith("USDT"):
+        return True
+    # una moneta, col suo nome nudo («ETH (Ethereum)») o con la cifra dentro
+    return any(m == k or m.startswith(k + " ")
+               for k in globals().get("P2P_COIN_METODI", {}))
+
+
+def _metodi_veloci_p2p(metodi) -> bool:
+    """PURA: TUTTI i metodi dell'ordine sono veloci (e ce n'e' almeno uno)?
+    E' la condizione per un tempo sotto le 24 ore."""
+    lista = [m for m in (metodi or []) if isinstance(m, str) and m.strip()]
+    return bool(lista) and all(_metodo_veloce_p2p(m) for m in lista)
+
+
+def _minuti_coi_metodi_p2p(minuti: int, metodi) -> int:
+    """PURA: il tempo che VALE coi metodi dell'ordine: quello scelto coi
+    metodi tutti veloci, 24 ore (`P2P_MINUTI_PAGARE_MAX`) con anche un solo
+    metodo lento, 0 senza un tempo scelto."""
+    minuti = _minuti_pagare_scelta_p2p(minuti)
+    if not minuti:
+        return 0
+    return minuti if _metodi_veloci_p2p(metodi) else P2P_MINUTI_PAGARE_MAX
+
+
+def _ordine_col_tempo_p2p(lato: str, metodi) -> bool:
+    """PURA: un ordine con questi lato e metodi puo' avere un tempo per
+    pagare? Solo la VENDITA, e mai col PayCode o col contanti di persona
+    fra i metodi (vedi qui sopra)."""
+    lista = [m for m in (metodi or []) if isinstance(m, str)]
+    detti = _metodi_libro(lista)
+    # ...e mai col contante per posta (17 nov 2026): una busta viaggia giorni
+    return (lato == "sell" and not _tabacchino_libro(lista)
+            and "Contanti" not in detti and "Contante per posta" not in detti)
+
+
+def _dichiara_minuti_pagare_p2p(con, tg_id: int, mappa) -> int:
+    """Scrive i tempi per pagare dichiarati, `{ordine: minuti}`, e torna
+    quanti ne ha scritti. La porta della zona e del filtro: SOLO sulla
+    riga di chi l'ordine l'ha PUBBLICATO (`maker` acceso), e LA PRIMA
+    RESTA — un tempo che chi prende ha gia' letto non si accorcia sotto i
+    suoi occhi. Una scelta fuori dall'orologio non entra. A leva spenta non
+    si scrive niente."""
+    if not P2P_TEMPO_PER_PAGARE or not isinstance(mappa, dict):
+        return 0
+    scritti = 0
+    for ordine, v in list(mappa.items())[:MAX_ORDINI_P2P]:
+        if not isinstance(ordine, str) or not FORMA_ORDINE_P2P.fullmatch(ordine):
+            continue
+        minuti = _minuti_pagare_scelta_p2p(v)
+        if not minuti:
+            continue
+        scritti += con.execute(
+            "UPDATE p2p_ordini SET minuti_pagare=? WHERE ordine=? AND tg_id=? "
+            "AND maker=1 AND (minuti_pagare IS NULL OR minuti_pagare=0)",
+            (minuti, ordine, int(tg_id))).rowcount
+    if scritti:
+        con.commit()
+    return scritti
+
+
+def _minuti_pagare_righe_p2p(con, ordini) -> dict:
+    """`{ordine: minuti}` degli ordini chiesti che HANNO un tempo per
+    pagare valido adesso: scelto, nell'orologio, e su un ordine che puo'
+    averlo (`_ordine_col_tempo_p2p`: il lato e i metodi del libro si
+    guardano qui, quando li sa). Un tempo corto con anche un solo metodo
+    lento vale 24 ore (`_minuti_coi_metodi_p2p`). A leva spenta, `{}`. Un
+    database senza la colonna vale «nessun tempo»."""
+    if not P2P_TEMPO_PER_PAGARE:
+        return {}
+    pulite = _ordini_puliti_p2p(ordini)
+    segni = ",".join("?" * len(pulite))
+    try:
+        righe = con.execute(
+            f"SELECT ordine, minuti_pagare, lato, metodi FROM p2p_ordini "
+            f"WHERE ordine IN ({segni}) AND minuti_pagare > 0", pulite).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    fuori = {}
+    for r in righe:
+        try:
+            metodi = json.loads(r["metodi"] or "[]")
+        except ValueError:
+            metodi = []
+        metodi = metodi if isinstance(metodi, list) else []
+        minuti = _minuti_coi_metodi_p2p(int(r["minuti_pagare"] or 0), metodi)
+        if minuti and _ordine_col_tempo_p2p(str(r["lato"] or ""), metodi):
+            fuori[r["ordine"]] = minuti
+    return fuori
+
+
+def _minuti_pagare_p2p(con, ordini) -> dict:
+    """Per la card e per la fotografia: lo stesso giudice, che alza
+    ValueError sulla lista storta come le sorelle (`_filtri_p2p`)."""
+    return _minuti_pagare_righe_p2p(con, ordini)
+
+
+def _finestre_per_nodo_p2p(con, ordini, adesso: int = 0) -> dict:
+    """LA RISPOSTA AL NODO (patch 0013): `{ordine: secondi}` per gli
+    ordini chiesti che hanno un tempo per pagare — gli altri non ci sono,
+    e per il nodo «non c'e'» vuol dire «nessun tempo», per sempre. Sono gli
+    stessi minuti della card, in secondi: il nodo accetta solo i minuti
+    interi da 900 a 86400.
+    LA DOMANDA TARDIVA NON HA TEMPO (`adesso`): il nodo chiede nel minuto
+    in cui vede lo scambio attivo, e conta da li'. Se chiede molto dopo
+    che lo scambio e' diventato attivo per la cronaca — la porta era
+    chiusa (leva spenta, server giu') e si riapre — il tempo sarebbe gia'
+    finito o quasi, e lo scambio si annullerebbe sotto gli occhi di chi
+    non aveva visto nessun timer. Allora niente tempo: vale la garanzia."""
+    fuori = {}
+    for o, minuti in _minuti_pagare_righe_p2p(con, ordini).items():
+        if adesso:
+            try:
+                dal = _attivo_dal_p2p([dict(m) for m in con.execute(
+                    "SELECT momento, quando, dettaglio, giro FROM p2p_momenti "
+                    "WHERE ordine=?", (o,))])
+            except sqlite3.OperationalError:
+                dal = 0
+            if dal and int(adesso) - dal > P2P_FINESTRA_RITARDO_MAX_S:
+                print(f"· Tempo per pagare: {o[:8]} chiesto dal nodo "
+                      f"{(int(adesso) - dal) // 60} minuti dopo l'attivo: "
+                      "nessun tempo, vale la garanzia", flush=True)
+                continue
+        fuori[o] = minuti * 60
+    return fuori
+
+
+def _attivo_dal_p2p(momenti, giro=None) -> int:
+    """PURA: QUANDO E' DIVENTATO ATTIVO lo scambio del giro (dell'ultimo,
+    se non detto): e' da li' che parte il tempo per pagare, come sul nodo.
+    Attivo vuol dire garanzia bloccata E fattura di chi compra in mano, e
+    l'evento che lo dice porta il dettaglio `active` — la garanzia pagata
+    per seconda o la fattura data per seconda. Un evento senza dettaglio
+    (i giri di prima della 0007 nuova) vale la garanzia pagata. 0 = non
+    ancora attivo, o non si sa."""
+    noti = [m for m in (momenti or []) if isinstance(m, dict)]
+    if giro is None:
+        giro = max([int(m.get("giro") or 0) for m in noti] or [0])
+    del_giro = [m for m in noti if int(m.get("giro") or 0) == int(giro or 0)]
+    ore = [int(m.get("quando") or 0) for m in del_giro
+           if int(m.get("quando") or 0) > 0 and (
+               (str(m.get("momento") or "") in ("garanzia_pagata", "fattura_data")
+                and str(m.get("dettaglio") or "") == "active")
+               or (str(m.get("momento") or "") == "garanzia_pagata"
+                   and not str(m.get("dettaglio") or "")))]
+    return min(ore) if ore else 0
+
+
+def _paga_entro_p2p(momenti, minuti: int, giro=None) -> int:
+    """PURA: l'epoch entro cui chi compra manda gli euro, o 0 (nessun
+    tempo scelto, o lo scambio non e' ancora attivo). Il nodo conta dal
+    minuto in cui LUI vede lo scambio attivo, quindi annulla un poco DOPO
+    quest'ora, mai prima: chi compra non perde un secondo di quel che
+    legge."""
+    minuti = _minuti_pagare_scelta_p2p(minuti)
+    dal = _attivo_dal_p2p(momenti, giro)
+    return dal + minuti * 60 if minuti and dal else 0
 
 
 def _posso_prendere_p2p(con, io, ordini, adesso: int) -> dict:
@@ -65576,6 +65958,9 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         # ...e CHI PUO' PRENDERE L'ORDINE (10 ott 2026, reputazione-p2p):
         # stessa porta, stessa regola (solo da maker, la prima resta)
         _dichiara_filtri_p2p(con, user["id"], (d or {}).get("filtri"))
+        # ...e IL TEMPO PER PAGARE (18 nov 2026, tempo-pagamento): stessa
+        # porta, stessa regola (solo da maker, la prima resta)
+        _dichiara_minuti_pagare_p2p(con, user["id"], (d or {}).get("minuti_pagare"))
         # ...e IL PARACADUTE (13 ott 2026): stessa porta, e la partenza e'
         # il cambio che il server ha in mano adesso
         _dichiara_paracadute_p2p(con, user["id"], (d or {}).get("paracadute"),
@@ -65648,13 +66033,16 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         pause = _pause_p2p(con, (d or {}).get("ordini"), int(time.time()))
         # e quelli col paracadute aperto (13 ott 2026, cantiere paracadute)
         paracadute = _paracadute_p2p(con, (d or {}).get("ordini"))
+        # e il tempo per pagare scelto da chi pubblica (18 nov 2026)
+        minuti_pagare = _minuti_pagare_p2p(con, (d or {}).get("ordini"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
     # e il punto sulla mappa del contanti (31 ott 2026, mappa-contanti)
     return {"facce": facce, "cambi": cambi, "zone": zone, "posti": _posti_p2p(zone),
-            "filtri": filtri, "pause": pause, "paracadute": paracadute}
+            "filtri": filtri, "pause": pause, "paracadute": paracadute,
+            "minuti_pagare": minuti_pagare}
 
 
 @app.get("/api/p2p/zona")
@@ -65738,6 +66126,10 @@ def libro_fotografato_p2p(req: Request, x_tg_init_data: str = Header(""),
     # senza dire di chi — il client li toglie dal libro degli altri
     if fuori["eventi"] and F.get("paracadute"):
         fuori["paracadute"] = F["paracadute"]
+    # ...e il tempo per pagare (18 nov 2026): `{ordine: ore}`, scritto da
+    # chi pubblica perche' chi prende lo legga — esce a tutti, come il filtro
+    if fuori["eventi"] and F.get("minuti_pagare"):
+        fuori["minuti_pagare"] = F["minuti_pagare"]
     onchain = p2p_onchain_leva()
     chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
         if (fuori["eventi"] or onchain) else 0
@@ -71202,6 +71594,107 @@ SOLLECITO_EURO_TESTI = {
        "oppure tocca «✕ Annulla» nella pagina dello scambio. Chi vende può "
        "aprire una disputa: a decidere sarà un moderatore.",
 }
+# COL TEMPO PER PAGARE (18 nov 2026, cantiere tempo-pagamento) i tre
+# promemoria di sopra non bastano e in parte mentono: «è passato un
+# giorno» a chi aveva un'ora, «chi vende può aprire una disputa» quando lo
+# scambio si annulla da solo. Al loro posto questi, contati da quando lo
+# scambio e' diventato attivo, col tempo che RESTA scritto dentro: l'ultimo
+# dice chiaro che senza «Ho inviato» si annulla anche se si e' pagato.
+# I minuti sono quelli che chi vende ha scelto sull'orologio, e i momenti
+# dei promemoria si contano da loro (`_intervalli_tempo_pagare_p2p`): con
+# 24 ore come i tre di sempre (un'ora, dodici, venti), con un'ora a 20 e a
+# 45 minuti, con un quarto d'ora uno solo, a 10 minuti.
+SOLLECITO_TEMPO_PAGARE_PRIMI = (
+    "💶 Promemoria: i sats sono in garanzia e aspettano i tuoi euro. Hai "
+    "ancora {resto} per inviarli al recapito che trovi nella pagina dello "
+    "scambio e toccare «Ho inviato gli euro»: allo scadere lo scambio si "
+    "annulla da solo.")
+SOLLECITO_TEMPO_PAGARE_ULTIMO = (
+    "⏰ Mancano {resto}: invia gli euro e tocca subito «Ho inviato gli "
+    "euro». Se allo scadere non l'hai toccato, lo scambio si annulla da solo "
+    "e i sats tornano a chi vende, anche se hai già pagato.")
+# ...e a chi VENDE, se chi compra ha poco tempo (fino a 4 ore) e il
+# recapito non e' ancora partito: un promemoria a dieci minuti, al posto di
+# quello a un'ora, che con un'ora sarebbe gia' la fine — e prima, a un
+# quarto del tempo, quando il tempo e' sotto i 40 minuti
+# (`_recapito_corto_s_p2p`)
+P2P_MINUTI_RECAPITO_CORTO = 4 * 60
+SOLLECITI_RECAPITO_CORTO_S = (10 * 60,)
+SOLLECITO_RECAPITO_CORTO_TESTO = (
+    "📍 Chi compra ha {ore} per pagarti e non sa ancora dove mandarti gli "
+    "euro: il suo tempo sta già correndo. Apri la pagina dello scambio e "
+    "tocca «💶 Indica dove ricevere gli euro».")
+
+
+def _durata_detta_p2p(secondi: int) -> str:
+    """PURA: «45 minuti», «1 ora», «3 ore», «2 ore e 30 minuti»."""
+    s = max(0, int(secondi or 0))
+    ore, minuti = s // 3600, (s % 3600) // 60
+    parti = []
+    if ore:
+        parti.append("1 ora" if ore == 1 else f"{ore} ore")
+    if minuti or not ore:
+        parti.append("1 minuto" if minuti == 1 else f"{minuti} minuti")
+    return " e ".join(parti)
+
+
+def _intervalli_tempo_pagare_p2p(minuti: int) -> tuple:
+    """PURA: i secondi dall'attivo a cui partono i promemoria a chi
+    compra, per un tempo di `minuti`; `()` senza un tempo. L'ultimo e'
+    sempre quello che dice «si annulla anche se hai pagato».
+    • da 12 ore in su: un'ora, a meta', e quattro ore prima della fine;
+    • da 4 a 12 ore: un'ora, e a tre quarti;
+    • da un'ora a 4: a un terzo e a tre quarti (un'ora: 20 e 45 minuti);
+    • sotto l'ora: uno solo, a due terzi (un quarto d'ora: a 10 minuti).
+    A minuti interi, arrotondati per difetto."""
+    m = _minuti_pagare_scelta_p2p(minuti)
+    if not m:
+        return ()
+    if m >= 12 * 60:
+        punti = (60, m // 2, m - 4 * 60)
+    elif m >= 4 * 60:
+        punti = (60, m * 3 // 4)
+    elif m >= 60:
+        punti = (m // 3, m * 3 // 4)
+    else:
+        punti = (m * 2 // 3,)
+    return tuple(p * 60 for p in punti)
+
+
+def _recapito_corto_s_p2p(minuti: int) -> tuple:
+    """PURA: quando parte il promemoria del recapito a chi vende, coi
+    tempi corti (fino a `P2P_MINUTI_RECAPITO_CORTO`): a dieci minuti, o a
+    un quarto del tempo se e' prima (un quarto d'ora: a 3 minuti). `()`
+    oltre: valgono i promemoria di sempre, a un'ora e a sei."""
+    m = _minuti_pagare_scelta_p2p(minuti)
+    if not m or m > P2P_MINUTI_RECAPITO_CORTO:
+        return ()
+    return (min(SOLLECITI_RECAPITO_CORTO_S[0], max(60, (m // 4) * 60)),)
+
+
+def _testi_tempo_pagare_p2p(minuti: int) -> tuple:
+    """PURA: `(intervalli, testi)` dei promemoria col tempo per pagare di
+    `minuti`, col tempo che resta gia' scritto; `((), {})` senza un tempo."""
+    m = _minuti_pagare_scelta_p2p(minuti)
+    intervalli = _intervalli_tempo_pagare_p2p(m)
+    testi = {}
+    for i, fra in enumerate(intervalli, 1):
+        modello = (SOLLECITO_TEMPO_PAGARE_ULTIMO if i == len(intervalli)
+                   else SOLLECITO_TEMPO_PAGARE_PRIMI)
+        testi[i] = modello.format(resto=_durata_detta_p2p(m * 60 - fra))
+    return intervalli, testi
+
+
+def _minuti_pagare_ordine_p2p(con, ordine: str) -> int:
+    """Il tempo per pagare di UN ordine, in minuti (0 = nessuno), col giudice
+    della card. Fail-open: un intoppo vale «nessun tempo», cioe' i
+    promemoria di sempre."""
+    try:
+        return int(_minuti_pagare_righe_p2p(con, [ordine]).get(ordine, 0))
+    except (ValueError, sqlite3.Error):
+        return 0
+
+
 # IL BUONO REGALO, IN CODA A TUTT'E TRE (10 ott 2026, cantiere
 # guida-paycode, col si' di Andrea): una cassiera ha emesso un Buono
 # Regalo Amazon al posto del pagamento del PayCode, e ognuno di questi
@@ -71627,14 +72120,38 @@ def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # garanzia bloccata, a un'ora e a sei, se chi compra e' dei nostri. Se
     # il recapito c'e' gia' (il PayCode parte alla presa) o arriva dopo,
     # non parte: lo decide il giudice alla scadenza
+    # IL TEMPO PER PAGARE (18 nov 2026): i minuti scelti da chi ha pubblicato
+    # (0 = nessuna, e tutto resta com'era), e se QUESTO evento e' quello
+    # che rende lo scambio attivo — e' da li' che il tempo corre
+    minuti_tempo = _minuti_pagare_ordine_p2p(con, ordine) if compra else 0
+    det = str(ev.get("dettaglio") or "")
+    diventa_attivo = ((momento == "garanzia_pagata" and det in ("", "active"))
+                      or (momento == "fattura_data" and det == "active"))
     if momento == "garanzia_pagata" and vende and compra:
         dati_v = _dati_frase_p2p(con, ordine)
-        in_attesa("sollecito_recapito", vende,
-                  SOLLECITO_RECAPITO_PAYCODE_TESTI if dati_v["tabacchino"]
-                  else SOLLECITO_RECAPITO_CONTANTI_TESTI if dati_v["contanti"]
-                  else SOLLECITO_RECAPITO_TESTI,
-                  SOLLECITI_RECAPITO_S, "sollecito_recapito")
-    if momento == "garanzia_pagata" and compra:
+        if _recapito_corto_s_p2p(minuti_tempo):
+            in_attesa("sollecito_recapito", vende,
+                      {1: SOLLECITO_RECAPITO_CORTO_TESTO.format(
+                          ore=_durata_detta_p2p(minuti_tempo * 60))},
+                      _recapito_corto_s_p2p(minuti_tempo), "sollecito_recapito")
+        else:
+            in_attesa("sollecito_recapito", vende,
+                      SOLLECITO_RECAPITO_PAYCODE_TESTI if dati_v["tabacchino"]
+                      else SOLLECITO_RECAPITO_CONTANTI_TESTI if dati_v["contanti"]
+                      else SOLLECITO_RECAPITO_TESTI,
+                      SOLLECITI_RECAPITO_S, "sollecito_recapito")
+    if minuti_tempo and diventa_attivo:
+        # al posto dei tre di sempre, i promemoria col tempo che resta: il
+        # giudice alla scadenza e' lo stesso (`_sollecito_euro_p2p_fermo`)
+        intervalli, testi = _testi_tempo_pagare_p2p(minuti_tempo)
+        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND giro=? AND "
+                    "tg_id=? AND fonte='sollecito_euro'", (ordine, giro, compra))
+        in_attesa("euro_tempo", compra, testi, intervalli, "sollecito_euro")
+    elif momento == "garanzia_pagata" and compra and minuti_tempo:
+        righe.append(f"· Solleciti P2P: {corto} ha un tempo per pagare di "
+                     f"{_durata_detta_p2p(minuti_tempo * 60)}: i promemoria "
+                     "partono quando e' attivo")
+    if momento == "garanzia_pagata" and compra and not minuti_tempo:
         dati = _dati_frase_p2p(con, ordine)
         # (10 ott 2026, riquadro-contanti-sepa) le attese NASCONO salvo il
         # contanti saputo — il solo «Contanti», o l'appuntamento gia'
@@ -72021,6 +72538,8 @@ def _motivo_annullo_p2p(attore: str, dettaglio: str, visti) -> str:
         return "garanzia_non_pagata"
     if dettaglio == "escrow-deadline":
         return "garanzia_scaduta"
+    if dettaglio == "payment-window":
+        return "tempo_pagare_scaduto"
     if "fattura_chiesta" in visti and "fattura_data" not in visti:
         return "fattura_non_data"
     return "tempo_scaduto"
@@ -72943,7 +73462,10 @@ def _garanzia_dal_registro_p2p(esito: str, motivo: str, lato: str) -> bool:
     if motivo == "fattura_non_data" and lato == "buy":
         return True
     return (esito == "annullato"
-            and motivo in ("moderatore", "concordato", "garanzia_scaduta"))
+            and motivo in ("moderatore", "concordato", "garanzia_scaduta",
+                           # il tempo per pagare finito (18 nov 2026): si
+                           # arriva li' solo a garanzia bloccata
+                           "tempo_pagare_scaduto"))
 
 
 def dati_dispute_p2p(con, adesso: int):
@@ -74764,6 +75286,8 @@ async def _fotografa_libro_p2p():
     F["pause"] = _pause_foto_p2p(F["eventi"], adesso)
     # ...e quelli col paracadute aperto (13 ott 2026)
     F["paracadute"] = _paracadute_foto_p2p(F["eventi"])
+    # ...e il tempo per pagare scelto da chi pubblica (18 nov 2026)
+    F["minuti_pagare"] = _minuti_pagare_foto_p2p(F["eventi"])
     if intera:
         F["intera"] = adesso
 
@@ -74935,6 +75459,7 @@ def _rinfresca_volti_foto_p2p(ordini=None) -> bool:
         F["autori"] = _autori_foto_p2p(F["eventi"])
         F["pause"] = _pause_foto_p2p(F["eventi"], int(time.time()))
         F["paracadute"] = _paracadute_foto_p2p(F["eventi"])
+        F["minuti_pagare"] = _minuti_pagare_foto_p2p(F["eventi"])
     except Exception as e:
         print(f"⚠️ Fotografia del libro, volti non rifatti: {e}", flush=True)
         return False
@@ -75016,6 +75541,24 @@ def _paracadute_foto_p2p(eventi) -> list:
         return _paracadute_p2p(con, ids)
     except ValueError:
         return []
+    finally:
+        con.close()
+
+
+def _minuti_pagare_foto_p2p(eventi) -> dict:
+    """Il tempo per pagare degli ordini della fotografia (18 nov 2026,
+    tempo-pagamento), una volta per giro come i filtri: il giudice e'
+    `_minuti_pagare_p2p`, sugli stessi id che la rotta serve."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        return _minuti_pagare_p2p(con, ids)
+    except ValueError:
+        return {}
     finally:
         con.close()
 
@@ -76313,12 +76856,20 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         if dettaglio == "active" and paycode:
             return (f"🔒 <b>{altro} ha bloccato i sats in garanzia.</b> Appena "
                     "ti manda il PayCode, tocca a te.")
+        # IL TEMPO PER PAGARE (18 nov 2026): se chi vende l'ha scelto, la
+        # frase lo dice subito, con la conseguenza
+        min_t = _minuti_pagare_scelta_p2p(int(dati.get("minuti_pagare") or 0))
+        coda_t = (f"\n\n⏱ Hai <b>{_durata_detta_p2p(min_t * 60)}</b> per inviarli "
+                  "e toccare «Ho inviato gli euro»: poi lo scambio si annulla "
+                  "da solo e i sats tornano a chi vende." if min_t else "")
         if dettaglio == "active" and detto:
             return (f"🔒 <b>{altro} ha bloccato i sats in garanzia e ti ha già "
-                    f"indicato dove inviare {cifra or 'gli euro'}:</b> tocca a te.")
+                    f"indicato dove inviare {cifra or 'gli euro'}:</b> tocca a te."
+                    + coda_t)
         if dettaglio == "active":
             return (f"🔒 <b>{altro} ha bloccato i sats in garanzia.</b> Appena "
-                    f"ti indica dove inviare {cifra or 'gli euro'}, tocca a te.")
+                    f"ti indica dove inviare {cifra or 'gli euro'}, tocca a te."
+                    + coda_t)
         return (f"🔒 <b>{altro} ha bloccato i sats in garanzia:</b> indica "
                 "dove ricevere i sats.") + tempo
     if momento == "fattura_data":
@@ -76424,6 +76975,24 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             conto = "" if vende else str(dati.get("conto_compra") or "")
             return ("⏰ <b>La garanzia è arrivata a scadenza: lo scambio è "
                     "annullato.</b>" + (tornati or " I sats tornano a chi vende.")
+                    + ("\n\n" + conto if conto else ""))
+        if dettaglio == "payment-window":
+            # IL TEMPO PER PAGARE FINITO (18 nov 2026, patch 0013): l'ha
+            # annullato il nodo, allo scadere del tempo che chi vende aveva
+            # scelto, senza «Ho inviato». A chi compra la strada se gli
+            # euro erano partiti davvero, e la riga del conto se c'e'
+            if vende:
+                return ("⏰ <b>Il tempo per pagare è finito senza gli euro "
+                        "segnati: lo scambio è annullato.</b>"
+                        + (tornati or " I sats tornano a te.")
+                        + " Se gli euro ti arrivano lo stesso, rimandali a "
+                        "chi li ha inviati.")
+            conto = str(dati.get("conto_compra") or "")
+            return ("⏰ <b>Il tempo per pagare è finito: lo scambio è "
+                    "annullato.</b> Gli euro non risultano inviati e i sats "
+                    "tornano a chi vende. Se li avevi già mandati senza "
+                    "toccare «Ho inviato gli euro», scrivi subito "
+                    "all'assistenza dall'app."
                     + ("\n\n" + conto if conto else ""))
         return f"❌ <b>{altro} ha annullato lo scambio.</b>{coda}"
     if momento == "tornato" and dettaglio == "maker-republished":
@@ -76728,12 +77297,18 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # LA GARANZIA ARRIVATA A SCADENZA, A CHI COMPRA (10 ott 2026, malus-
     # p2p): se questo giro gli e' stato contato, la stessa riga del conto
     # — con davanti il fatto. Nei banchi di ieri il giudice non c'e', e tace
-    if (momento == "annullato" and ev.get("dettaglio") == "escrow-deadline"
+    # il tempo per pagare (18 nov 2026), per la frase della garanzia
+    if momento == "garanzia_pagata":
+        dati["minuti_pagare"] = _minuti_pagare_ordine_p2p(con, ordine)
+    if (momento == "annullato"
+            and ev.get("dettaglio") in ("escrow-deadline", "payment-window")
             and fatto["compratore"]):
         try:
             c = _conto_esito_p2p(con, fatto["compratore"], ordine, giro, adesso)
-            dati["conto_compra"] = ("Gli euro non risultano inviati. " + c["riga"]
-                                    if c["contato"] else "")
+            # (col tempo per pagare la frase lo dice gia' da sola)
+            davanti = ("" if ev.get("dettaglio") == "payment-window"
+                       else "Gli euro non risultano inviati. ")
+            dati["conto_compra"] = (davanti + c["riga"] if c["contato"] else "")
         except Exception:
             dati["conto_compra"] = ""
     lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
@@ -79334,6 +79909,13 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             ids.append(r["ordine"])
     soglia = int(adesso) - P2P_STORICO_GIORNI * 86400
     fuori = {}
+    # il tempo per pagare degli ordini in elenco, in una query (18 nov 2026)
+    minuti_pagare = {}
+    for i in range(0, len(ids), MAX_ORDINI_P2P):
+        try:
+            minuti_pagare.update(_minuti_pagare_righe_p2p(con, ids[i:i + MAX_ORDINI_P2P]))
+        except ValueError:
+            pass
     for ordine in ids:
         o = con.execute(
             "SELECT tg_id, lato, maker, stato, euro, sats, metodi, creato, "
@@ -79425,6 +80007,11 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             # sotto ogni passo fatto
             "orari": _orari_passi_p2p(momenti, int(o["creato"] or 0) if o else 0,
                                       bool(mio)),
+            # IL TEMPO PER PAGARE (18 nov 2026, tempo-pagamento): le ore
+            # scelte da chi ha pubblicato e il termine, uguale per i due —
+            # la pagina dello scambio ci disegna il timer. 0 = nessun tempo
+            "minuti_pagare": minuti_pagare.get(ordine, 0),
+            "paga_entro": _paga_entro_p2p(momenti, minuti_pagare.get(ordine, 0)),
             # LA RIGA DEL CONTO NELL'APP (10 ott 2026, l'avviso del blocco):
             # se QUESTO giro mi e' stato contato come non completato, la
             # stessa frase del Telegram — la pagina dello scambio tornato
@@ -110324,6 +110911,37 @@ def p2p_onchain_ore_pagamento(o) -> int:
     return P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI
 
 
+def p2p_onchain_minuti_pagamento(o) -> int:
+    """PURA: i MINUTI che chi compra bitcoin ha per pagare, dal deposito
+    confermato. IL TEMPO SCELTO DA CHI PUBBLICA (18 nov 2026, cantiere
+    tempo-pagamento, Andrea: uguale «sia per Lightning che on-chain»), coi
+    metodi che lo permettono (`_minuti_coi_metodi_p2p`: sotto le 24 ore
+    solo coi metodi veloci) e a leva accesa; senza, le ore di sempre
+    (`p2p_onchain_ore_pagamento`). Col PayCode vince sempre la sua
+    scadenza. Alla fine non si annulla niente: i sats restano nel 2-di-3,
+    e chi vende puo' aprire la disputa."""
+    if not globals().get("p2p_onchain_tab_scade", lambda x: 0)(o) and \
+            globals().get("P2P_TEMPO_PER_PAGARE", False):
+        try:
+            scelti = int(_p2p_onchain_campo(o, "minuti_pagare", 0) or 0)
+        except (TypeError, ValueError):
+            scelti = 0
+        m = _minuti_coi_metodi_p2p(scelti, _p2p_onchain_metodi(o)) \
+            if _ordine_col_tempo_p2p(str(_p2p_onchain_campo(o, "lato", "") or ""),
+                                     _p2p_onchain_metodi(o)) else 0
+        if m:
+            return m
+    return p2p_onchain_ore_pagamento(o) * 60
+
+
+def _p2p_onchain_minuti(o) -> int:
+    """I minuti per pagare di uno scambio on-chain, col giudice qui sopra;
+    i banchi che non lo hanno (e le righe di ieri) valgono le ore di
+    sempre."""
+    g = globals().get("p2p_onchain_minuti_pagamento")
+    return int(g(o)) if g else p2p_onchain_ore_pagamento(o) * 60
+
+
 def p2p_onchain_paga_entro(o) -> int:
     """PURA: l'epoch entro cui chi compra paga (0 = il deposito non e'
     ancora confermato, e il tempo non e' partito). Col PayCode mai oltre
@@ -110331,7 +110949,7 @@ def p2p_onchain_paga_entro(o) -> int:
     dal = int(_p2p_onchain_campo(o, "depositato_il", 0) or 0)
     if dal <= 0:
         return 0
-    entro = dal + p2p_onchain_ore_pagamento(o) * 3600
+    entro = dal + _p2p_onchain_minuti(o) * 60
     tab_scade = globals().get("p2p_onchain_tab_scade", lambda x: 0)(o)
     return min(entro, tab_scade) if tab_scade else entro
 
@@ -110776,7 +111394,11 @@ def _p2p_onchain_prepara(con):
                       # `p2p_paracadute`); -1 = ordine di prima, la soglia
                       # unica `paracadute` vale nei due versi
                       ("para_su", "INTEGER DEFAULT -1"),
-                      ("para_giu", "INTEGER DEFAULT -1")):
+                      ("para_giu", "INTEGER DEFAULT -1"),
+                      # 18 nov 2026, cantiere tempo-pagamento: il tempo per
+                      # pagare scelto da chi pubblica, in minuti, come nel
+                      # Lightning (0 = non scelto: le ore di sempre)
+                      ("minuti_pagare", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
     # LE CAUZIONI DEL CONTANTI ON-CHAIN (17 nov 2026 sera): una riga per
@@ -111393,6 +112015,11 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         # (17 nov 2026) il tempo per pagare: la card e la pagina lo contano
         "paga_entro": p2p_onchain_paga_entro(o),
         "ore_pagamento": p2p_onchain_ore_pagamento(o),
+        # (18 nov 2026) ...e quello scelto da chi pubblica, in minuti: il
+        # bollino del libro e l'anello della pagina lo leggono da qui
+        "minuti_pagamento": _p2p_onchain_minuti(o),
+        "minuti_scelti": _minuti_pagare_scelta_p2p(
+            int(_p2p_onchain_campo(o, "minuti_pagare", 0) or 0)),
         "euro_inviati_il": int(o["euro_inviati_il"] or 0),
         # (17 nov 2026 sera) il tempo del bonifico, da «Ho inviato»
         "bonifico_entro": p2p_onchain_bonifico_entro(o),
@@ -111942,6 +112569,15 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     # LA RIPUBBLICA (16 nov 2026): l'intervallo, se c'e'; qui il nuovo
     # ordine lo rifa' la ronda, il libro e' del server
     rip = _intervallo_ripubblica_p2p(d.get("ripubblica")) if P2P_RIPUBBLICA else None
+    # IL TEMPO PER PAGARE (18 nov 2026, cantiere tempo-pagamento): come nel
+    # Lightning, solo chi VENDE e solo dove ha senso (`_ordine_col_tempo_p2p`:
+    # mai col PayCode, col contanti di persona, per posta). Si scrive la
+    # scelta; i metodi la contano a ogni lettura (`_minuti_coi_metodi_p2p`)
+    minuti_pagare = _minuti_pagare_scelta_p2p(d.get("minuti_pagare")) \
+        if P2P_TEMPO_PER_PAGARE else 0
+    if minuti_pagare and not _ordine_col_tempo_p2p(
+            lato, metodi if isinstance(metodi, list) else []):
+        minuti_pagare = 0
     if tab or fascia:
         # col PayCode niente ripubblica (rimetterebbe nel libro un codice
         # che sta per scadere), niente paracadute (come su Lightning:
@@ -111950,6 +112586,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
         rip, recapito = None, ""
         para, para_da, para_letto = 0, 0.0, 0
         para_su = para_giu = 0
+        minuti_pagare = 0
     try:
         onchain_xpub_barattolo()
     except ValueError as e:
@@ -111970,8 +112607,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
             " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
-            " tab_min_cent)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " tab_min_cent, minuti_pagare)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -111980,7 +112617,7 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              para, para_da, para_letto,
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
              json.dumps(tab) if tab else "", zona, para_su, para_giu,
-             fascia[0] if fascia else 0))
+             fascia[0] if fascia else 0, minuti_pagare))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -113234,6 +113871,8 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                 stato = "depositato"
                 euro = _fmt_eur(int(o["euro_cent"]) / 100)
                 ore = p2p_onchain_ore_pagamento(o)
+                # (18 nov 2026) il tempo scelto da chi pubblica, detto
+                tempo_detto = _durata_detta_p2p(_p2p_onchain_minuti(o) * 60)
                 avvisi = _p2p_onchain_testi_deposito_tab(o, euro) or (
                     _p2p_onchain_testi_deposito_contanti(o, euro, ore)
                     if _p2p_onchain_contanti(o) else None) or [
@@ -113241,7 +113880,7 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                      f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
                      f"Apri Barattolo: ora manda <b>{euro} €</b> a chi vende, poi tocca "
                      "«Ho inviato gli euro». Il recapito è nello scambio."
-                     f"\n\n⏳ <b>Hai {ore} ore</b>, poi chi vende può aprire una disputa."),
+                     f"\n\n⏳ <b>Hai {tempo_detto}</b>, poi chi vende può aprire una disputa."),
                     (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> aspetta gli euro. "
                      f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
                      f"Chi compra sta per mandarti {euro} €: quando li vedi sul tuo "
@@ -115473,7 +116112,7 @@ def _p2p_onchain_testi_tempo_scaduto(o) -> dict:
     return {
         int(o["depositante_id"]): (
             f"{S} ⏰ <b>Il tempo per pagare è finito.</b> Chi compra non ha segnato "
-            f"«Ho inviato gli euro» entro {ore} ore. Vendi {_p2p_onchain_quanto(o)}.\n\n"
+            f"«Ho inviato gli euro» entro {_durata_detta_p2p(_p2p_onchain_minuti(o) * 60)}. Vendi {_p2p_onchain_quanto(o)}.\n\n"
             "Se gli euro sono arrivati, apri lo scambio e libera i sats. Se non sono "
             "arrivati, apri una disputa: decide un moderatore. I sats restano al "
             "sicuro nel 2-di-3."),
@@ -115556,9 +116195,15 @@ def _p2p_onchain_passata_tempo_bonifico(con, adesso: int) -> list:
 
 def _p2p_onchain_intervalli_pagare(o) -> tuple:
     """PURA: i tre promemoria a chi paga, in secondi dal deposito: un'ora,
-    sei, e quattro ore prima della fine del suo tempo."""
+    sei, e quattro ore prima della fine del suo tempo. COL TEMPO CORTO
+    scelto da chi pubblica (18 nov 2026, sotto le 24 ore) i momenti del
+    Lightning (`_intervalli_tempo_pagare_p2p`): un'ora e sei sarebbero gia'
+    oltre la fine."""
+    minuti = _p2p_onchain_minuti(o)
+    if minuti < 24 * 60:
+        return _intervalli_tempo_pagare_p2p(minuti)
     return (3600, 6 * 3600,
-            p2p_onchain_ore_pagamento(o) * 3600 - P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S)
+            minuti * 60 - P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S)
 
 
 def _p2p_onchain_testi_pagare(o) -> dict:
@@ -115566,7 +116211,23 @@ def _p2p_onchain_testi_pagare(o) -> dict:
     della valuta le mette `_notifica_p2p_onchain`). Le etichette fra «»
     sono quelle dei bottoni dello scambio on-chain."""
     S = P2P_ONCHAIN_SEGNO
-    ore = p2p_onchain_ore_pagamento(o)
+    minuti = _p2p_onchain_minuti(o)
+    if minuti < 24 * 60:
+        # (18 nov 2026) il tempo corto: col tempo che RESTA scritto dentro,
+        # come nel Lightning, e l'ultimo dice la disputa
+        punti = _intervalli_tempo_pagare_p2p(minuti)
+        fuori = {}
+        for i, fra in enumerate(punti, 1):
+            resto = _durata_detta_p2p(minuti * 60 - fra)
+            fuori[i] = (
+                f"{S} ⏰ Mancano {resto}: invia gli euro e tocca subito «Ho "
+                "inviato gli euro». Dopo, chi vende può aprire una disputa e a "
+                "decidere sarà un moderatore." if i == len(punti) else
+                f"{S} 💶 Promemoria: i sats sono nel 2-di-3 e aspettano i tuoi "
+                f"euro. Hai ancora {resto} per inviarli al recapito che trovi "
+                "nella pagina dello scambio e toccare «Ho inviato gli euro».")
+        return fuori
+    ore = minuti // 60
     return {
         1: (f"{S} 💶 Promemoria: i sats sono nel 2-di-3 da un'ora e aspettano i "
             "tuoi euro. Inviali al recapito che trovi nella pagina dello scambio, "
@@ -115759,7 +116420,8 @@ async def _p2p_onchain_ronda() -> None:
                 print(f"⚠️ P2P on-chain: avviso del tempo per pagare {o['id']} "
                       f"saltato: {e}", flush=True)
         print(f"⏰ P2P on-chain: scambio {o['id']}, tempo per pagare finito "
-              f"({p2p_onchain_ore_pagamento(o)} ore): avvisate le due parti", flush=True)
+              f"({_durata_detta_p2p(_p2p_onchain_minuti(o) * 60)}): "
+              "avvisate le due parti", flush=True)
     for o in senza_rilascio:
         for chi, testo in _p2p_onchain_testi_bonifico_scaduto(o).items():
             if not chi:
