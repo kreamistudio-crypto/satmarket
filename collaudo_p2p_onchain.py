@@ -2242,6 +2242,10 @@ def main():
     prova("...e la pagina lo dice a tutt'e due", (True, True),
           (uno(999, o4["id"])["annullo_chiesto_il"] > 0,
            uno(888, o4["id"])["annullo_chiesto_il"] > 0))
+    # (18 nov 2026, Andrea: «Sì, toglilo») ...e a chi compra la rinuncia non
+    # conta piu': il foglio di «Rinuncio» non lo minaccia
+    prova("...e chiesto l'annullo, la rinuncia di chi compra non gli conta piu'",
+          False, uno(888, o4["id"])["rinuncia_conta"])
     banco.DETTO.clear()
     r = gesto(999, o4["id"], "chiedi-annullo")
     prova("una seconda volta subito: nessun avviso nuovo (uno all'ora)",

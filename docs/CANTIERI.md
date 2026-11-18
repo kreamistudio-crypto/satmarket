@@ -91710,3 +91710,22 @@ contarle era stato scartato solo perché non chiesto. La parola
 PROVATO: le prove di forma di `prove_p2p_libro` sul conto nuovo, suite
 severa e collaudi nel venv senza coincurve.
 NON PROVATO: un telefono vero.
+
+## La rinuncia chiesta da chi vende non conta più come «non completato» (18 nov 2026, cantiere annullo-chiesto; Andrea, sull'esempio di Mario che chiede di annullare e Luca che rinuncia: «Sì, toglilo»)
+
+Notato chiudendo la cauzione a scelta: col «🙏 Chiedi a chi compra di
+annullare» del cantiere chiedi-annullo, chi compra che accetta e tocca
+«Rinuncio» si vedeva contare uno «scambio non completato»
+(`onchain-rinuncia`), come se fosse colpa sua, e chi vende poteva pure
+recensirlo. DECISO: se `annullo_chiesto_il` c'è, la rinuncia non conta
+(`_p2p_onchain_annullo_chiesto`, dentro `_p2p_onchain_mancato`), il
+preavviso del foglio tace (`_p2p_onchain_rinuncia_conta`), e senza
+`mancato_perche` non nasce nemmeno la recensione a senso unico; la
+cauzione chiesta torna (lo diceva già `p2p_onchain_cauzione_persa_da_sola`).
+Il perché: punire chi fa un favore vuol dire che la volta dopo non
+rinuncia, e lo scambio resta fermo fino alla disputa. Il trucco non c'è:
+la richiesta la può fare solo chi ha depositato, e solo prima di «Ho
+inviato». SCARTATO: contare comunque ma «tollerato» (il marchio resta e
+spiega male). PROVATO: `prove_onchain_ritiro` (giudice e preavviso con
+la richiesta), `collaudo_p2p_onchain` (dopo la richiesta, a chi compra
+`rinuncia_conta` falso). NON PROVATO: un telefono vero.

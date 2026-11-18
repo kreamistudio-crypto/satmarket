@@ -114940,7 +114940,17 @@ def _p2p_onchain_rinuncia_conta(o) -> bool:
     scambio ancora fra le due parti, e chi vende ha detto dove pagare."""
     return (str(_p2p_onchain_campo(o, "stato", "") or "") in ("depositato", "euro_inviati")
             and int(_p2p_onchain_campo(o, "depositato_il", 0) or 0) > 0
-            and _p2p_onchain_ha_dove_pagare(o))
+            and _p2p_onchain_ha_dove_pagare(o)
+            and not _p2p_onchain_annullo_chiesto(o))
+
+
+def _p2p_onchain_annullo_chiesto(o) -> bool:
+    """PURA: l'annullo l'ha CHIESTO chi vende («🙏 Chiedi a chi compra di
+    annullare»)? Allora chi rinuncia fa un favore, e non gli si conta niente
+    (18 nov 2026, Andrea: «Sì, toglilo»): punirlo vorrebbe dire che la volta
+    dopo non rinuncia piu' e lo scambio resta fermo. Il trucco non c'e': la
+    richiesta la puo' fare solo chi ha depositato."""
+    return int(_p2p_onchain_campo(o, "annullo_chiesto_il", 0) or 0) > 0
 
 
 def _p2p_onchain_mancato(o, stato) -> tuple:
@@ -114964,7 +114974,8 @@ def _p2p_onchain_mancato(o, stato) -> tuple:
             return ric, "onchain-non-pagato"
         return 0, ""
     if (prima in ("depositato", "euro_inviati")
-            and int(_p2p_onchain_campo(o, "proposta_da", 0) or 0) == ric):
+            and int(_p2p_onchain_campo(o, "proposta_da", 0) or 0) == ric
+            and not _p2p_onchain_annullo_chiesto(o)):
         return ric, "onchain-rinuncia"
     return 0, ""
 

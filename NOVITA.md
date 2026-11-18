@@ -692,3 +692,9 @@ frase: Negli scambi P2P on-chain chi vende può chiedere una cauzione a chi pren
 dove: P2P → «Pubblica» → «Vendi BTC» a rete on-chain, la sezione «Cauzione di chi prende» («No» / «🔐 Chiedila») dopo «Tempo per pagare»; sulla card del libro il bollino «🔐 Cauzione»; nel foglio di chi prende la riga «Chi vende chiede una cauzione» e il foglio «🔐 Blocca la cauzione»; il foglio di «↩️ Rinuncio» lo ricorda.
 leva: P2P_ONCHAIN_CAUZIONE_A_SCELTA (accesa di serie), ma vive sopra P2P_ONCHAIN_CAUZIONE e il suo macaroon (DA-FARE-ANDREA voce 20) e, a porticina chiusa, solo per i moderatori: «pubblico» diventa sì quando la cauzione on-chain si apre a tutti
 pubblico: no
+
+## 2026-11-18 · annullo-chiesto
+frase: Negli scambi on-chain, se chi vende chiede di annullare e chi compra accetta toccando «Rinuncio», a chi compra non si conta più nessuno «scambio non completato»: sta facendo un favore.
+dove: P2P → uno scambio on-chain dopo «🙏 Chiedi a chi compra di annullare»: il foglio di «↩️ Rinuncio» non avvisa più del «non completato».
+leva: nessuna
+pubblico: sì

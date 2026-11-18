@@ -207661,7 +207661,8 @@ def prove_onchain_ritiro():
     j = src.index("\nP2P_ONCHAIN_PREFISSO = ") + 1
     exec(src[j:src.index("\n", j)].split("  #")[0], amb)
     for f in ("_p2p_onchain_campo", "p2p_onchain_tab_dati", "p2p_onchain_tab_scade",
-              "_p2p_onchain_ha_dove_pagare", "_p2p_onchain_rinuncia_conta",
+              "_p2p_onchain_ha_dove_pagare", "_p2p_onchain_annullo_chiesto",
+              "_p2p_onchain_rinuncia_conta",
               "_p2p_onchain_mancato", "_recensibile_onchain_p2p", "_riga_recensione_p2p"):
         exec(pezzo(f), amb)
     M, C = amb["_p2p_onchain_mancato"], amb["_p2p_onchain_rinuncia_conta"]
@@ -207696,6 +207697,13 @@ def prove_onchain_ritiro():
           [M(dict(disp, pagamento_scaduto_il=4000), "rimborsato"), M(disp, "rimborsato"),
            M(dict(disp, pagamento_scaduto_il=4000, euro_inviati_il=4500), "rimborsato"),
            M(dict(disp, pagamento_scaduto_il=4000, recapito=""), "rimborsato")])
+    # (18 nov 2026, Andrea: «Sì, toglilo») la rinuncia CHIESTA da chi vende
+    chiesta = dict(base, annullo_chiesto_il=900)
+    prova("...e MAI se l'annullo l'aveva chiesto chi vende («🙏 Chiedi a chi compra di "
+          "annullare»): chi rinuncia fa un favore, e anche il preavviso tace",
+          [(0, ""), (0, ""), False],
+          [M(chiesta, "rimborsato"), M(dict(chiesta, stato="euro_inviati", euro_inviati_il=2000),
+                                       "rimborsato"), C(chiesta)])
     prova("IL PREAVVISO: il server dice se una rinuncia ADESSO conterebbe (depositato o euro "
           "inviati, col recapito); non prima del deposito, non senza recapito, non in disputa",
           [True, True, False, False, False],

@@ -36872,7 +36872,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_p2p_onchain_ha_dove_pagare(o)` (recapito scritto o PayCode),
   `_p2p_onchain_mancato(o, stato)` sulla riga PRIMA della chiusura →
   `(tg_id, dettaglio)`: `onchain-rinuncia` (rimborso proposto da chi
-  compra da `depositato`/`euro_inviati`) o `onchain-non-pagato` (disputa
+  compra da `depositato`/`euro_inviati`, MAI se `annullo_chiesto_il`:
+  dal 18 nov 2026 l'annullo chiesto da chi vende, `_p2p_onchain_annullo_chiesto`,
+  toglie anche il preavviso) o `onchain-non-pagato` (disputa
   decisa verso chi ha depositato, con `pagamento_scaduto_il` e senza
   `euro_inviati_il`); `_p2p_onchain_rinuncia_conta(o)` e' il preavviso.
   `p2p_onchain_firma` scrive `mancato_a`/`mancato_perche` sullo scambio,
