@@ -17106,7 +17106,9 @@ MSG_LNBITS_MUTO = ("Non riusciamo a verificarla in questo momento: "
 CONSIGLIO_LNURL = (
     "Per gli incassi automatici serve un Lightning address LNURL: il "
     "più semplice è Wallet of Satoshi — installi l'app e in «Receive» "
-    "trovi già pronto il tuo nome@walletofsatoshi.com. Oppure lascia "
+    "trovi già pronto il tuo nome@walletofsatoshi.com. Va bene anche "
+    "qualsiasi altro wallet che ti dia un indirizzo con la @, come Blink "
+    "o Coinos (Muun non ne ha uno). Oppure lascia "
     "vuoto questo campo: a ogni vendita ti avvisiamo noi quando tocca a "
     "te, e in quel momento incolli una fattura."
 )

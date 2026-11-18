@@ -91440,3 +91440,29 @@ NON PROVATO DAL VIVO: un Android vero con Amber, né dentro Telegram
 con questo) né nell'app installata. Da guardare sul collaudo: che Amber
 si apra da solo, che dopo l'ok si torni e si entri, e dentro Telegram
 che il lancio da solo non sia fermato (allora resta il bottone).
+
+## Il suggerimento del Lightning address non nomina più solo Wallet of Satoshi (18 nov 2026, cantiere suggerimento-ln-address; Andrea: «sul suggerimento sotto il campo sono d'accordo»)
+COSA C'ERA. Un venditore (Luca, negozio «Un tempo per te») ha visto la
+mancia ma ha Muun e non voleva installare Wallet of Satoshi: i testi
+accanto al campo dicevano solo «tipo nome@walletofsatoshi.com» e
+sembrava obbligatorio. Il codice invece accetta già qualsiasi indirizzo
+LUD-16 (`FORMA_LN_NOME`/`FORMA_LN_DOMINIO` e la prova dal vivo in
+`invoice_da_ln_address`): non c'era niente da correggere nella logica.
+DECISO: solo testi. Il campo del Profilo (dove porta il link della
+mancia «Aggiungilo dal Profilo»), i due riquadri d'incasso, la tendina
+«Hai già un altro wallet?» e `CONSIGLIO_LNURL` ora dicono che va bene
+qualsiasi indirizzo con la @, con Blink e Coinos come esempi, e che Muun
+non ne ha uno. Ritoccato `assistente/sapere.md` per Tappo.
+SCARTATO: cambiare i placeholder (`nome@walletofsatoshi.com` resta: un
+esempio concreto aiuta chi parte da zero, e la guida «👛 Il tuo primo
+wallet» consiglia quello); la mancia su un indirizzo on-chain per chi ha
+solo Muun (cosa nuova, non chiesta).
+PROVATO: suite severa 30.061 verdi (le 6 rosse erano 5 moduli
+mancanti nell'ambiente, rigirate verdi dopo l'installazione, e
+`conoscenza.md` da rigenerare: fatto), 157 collaudi della CI verdi,
+`collaudo_mancia` e `collaudo_cassa_negozio` anche senza coincurve.
+Dal vivo, dal browser: untempoperte@sbpc.ch risponde al LNURL e dà la
+fattura da 100 sats della prova di salvataggio; Andrea conferma che
+Luca l'ha salvato. Due fatture Muun vere lette col giudice unico: da
+1000 sats e 24 ore passa, senza importo prende il messaggio giusto.
+NON PROVATO: i testi nuovi su un telefono vero.

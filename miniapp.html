@@ -18727,7 +18727,7 @@ document.getElementById('cartello')?.remove();</script>
     </ol>
     <details class="pw-altri">
       <summary>Hai già un altro wallet?</summary>
-      <div class="pw-riga">Va bene qualsiasi wallet con un indirizzo Lightning (<span class="mono">nome@dominio</span>). Quello di <b>Phoenix</b> Barattolo non lo sa ancora pagare: con Phoenix, a ogni vendita incolli una fattura.</div>
+      <div class="pw-riga">Va bene qualsiasi wallet con un indirizzo Lightning (<span class="mono">nome@dominio</span>), per esempio Blink o Coinos. <b>Muun</b> non ne ha uno. Quello di <b>Phoenix</b> Barattolo non lo sa ancora pagare: con Phoenix, a ogni vendita incolli una fattura.</div>
       <div class="pw-nota">Wallet of Satoshi è un'app di altri, non di Barattolo: non ci dà niente per consigliarla.</div>
     </details>
     <button class="btn primary" id="walletGuidaChiudi" style="margin-top:14px" onclick="navIndietro()">Ho capito</button>
@@ -43767,7 +43767,8 @@ function payoutPanel(o){
       ${vecchia}
       <div class="hint">Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)}<span class="unit">sats</span></b>.
         <br><br><b>⚡ Imposta il tuo Lightning address</b> (lo trovi nel tuo wallet,
-        tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
+        tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>,
+        <span class="mono" style="font-size:11px">nome@blink.sv</span> o <span class="mono" style="font-size:11px">nome@coinos.io</span>: va bene qualsiasi wallet che te ne dia uno):
         <b>non scade mai</b>, lo usiamo al momento del pagamento, e lo fai <b>una volta sola</b> per tutte le vendite.</div>
       ${rigaGuidaWallet()}
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
@@ -43821,7 +43822,8 @@ function payoutPanel(o){
         ? 'Il pagamento di prima è rimasto <b>bloccato per un guasto nostro</b>, non tuo, e te li mandiamo da un\'altra strada: ci serve una fattura <b>nuova</b>. Ti aspettano'
         : 'L\'acquirente ha <b>già confermato la ricezione</b>: ti aspettano'} <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
-        tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
+        tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>,
+        <span class="mono" style="font-size:11px">nome@blink.sv</span> o <span class="mono" style="font-size:11px">nome@coinos.io</span>: va bene qualsiasi wallet che te ne dia uno):
         <b>non scade mai</b>, lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
       ${rigaGuidaWallet()}
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
@@ -43935,6 +43937,9 @@ function renderLnAddress(){
       <input id="lnAddrProfilo" placeholder="nome@walletofsatoshi.com" value="${esc(myLnAddress)}"></div>
     <button class="btn ghost" style="margin-top:0" onclick="salvaLnAddressProfilo(this)">⚡ Attiva incassi automatici</button>
     <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
+      Va bene <b>qualsiasi indirizzo con la @</b>, non solo Wallet of
+      Satoshi: per esempio Blink (nome@blink.sv) o Coinos
+      (nome@coinos.io). Muun e Phoenix non ne danno uno che funzioni qui.
       Lo trovi nella app del tuo wallet: <b>non scade mai</b>, lo usiamo
       al momento del pagamento, e lo imposti una volta sola per tutte
       le vendite. È l'unico metodo che si salva qui: senza, a ogni
