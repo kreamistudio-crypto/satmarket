@@ -72521,8 +72521,8 @@ function valutaPassaOcP2P(o){
    meta' (i banchi, una bozza vecchia). */
 function passaFiltroOcP2P(o, f){
   if (!o || !f) return true;
-  /* «₿ Bitcoin only» (18 nov 2026): anche qui, come su Lightning */
-  if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(f) && pagatoInMonetaP2P(o)) return false;
+  /* «No altcoin» e «No stablecoin» (18 nov 2026): anche qui, come su Lightning */
+  if (typeof fuoriPerMoneteP2P === 'function' && fuoriPerMoneteP2P(o, f)) return false;
   const scelti = Array.isArray(f.metodi) ? f.metodi : [];
   if (scelti.length) {
     const suoi = (Array.isArray(o.metodi) ? o.metodi : []).map(m => String(m).toLowerCase());
@@ -72830,8 +72830,8 @@ function facciaStableP2P(usdt, usde){
 let tutorialUsdtLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
 let p2pUsdtTutorialTimer = null;
 function novitaUsdtLibroP2P(){
-  /* col «₿ Bitcoin only» acceso le monete non si annunciano (18 nov 2026) */
-  if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(p2pFiltro)) return '';
+  /* con «No altcoin» o «No stablecoin» le stablecoin non si annunciano (18 nov 2026) */
+  if (typeof soloBtcVivoP2P === 'function' && (soloBtcVivoP2P(p2pFiltro) || noStableVivoP2P(p2pFiltro))) return '';
   const usdt = novitaUsdtVistaP2P(), usde = novitaUsdeVistaP2P();
   if (!usdt && !usde) return '';
   const appeso = novitaUsdtAppesaP2P();
@@ -73021,7 +73021,7 @@ let tutorialCoinLato = null;   // il lato da rimettere alla fine; null = nessun 
 let p2pCoinTutorialTimer = null;
 function novitaCoinLibroP2P(){
   if (!novitaCoinVistaP2P()) return '';
-  /* col «₿ Bitcoin only» acceso le monete non si annunciano (18 nov 2026) */
+  /* con «No altcoin» le monete non si annunciano (18 nov 2026) */
   if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(p2pFiltro)) return '';
   if (typeof testaAltaP2P === 'function') testaAltaP2P();
   return '<div class="p2p-oc-novita p2p-coin-novita appeso'
@@ -80092,19 +80092,23 @@ function ordineRicordatoP2P(){
   try { v = localStorage.getItem(P2P_ORDINE_CHIAVE); } catch(e){}
   return P2P_ORDINI_LIBRO.indexOf(v) >= 0 ? v : P2P_ORDINE_CASA;
 }
-/* ...e la memoria del «₿ Bitcoin only» (18 nov 2026, cantiere
-   bitcoin-only), qui fuori per la stessa ragione: il blocco della
-   lettura non nomina `localStorage`. L'interruttore vive nel filtro
-   (vedi «₿ BITCOIN ONLY» piu' giu'); qui si ricorda e si rilegge. */
+/* ...e la memoria delle pillole «No altcoin» e «No stablecoin» (18 nov
+   2026, cantiere bitcoin-only), qui fuori per la stessa ragione: il
+   blocco della lettura non nomina `localStorage`. Le pillole vivono nel
+   filtro (vedi «₿ BITCOIN ONLY» piu' giu'); qui si ricordano e si
+   rileggono, una chiave per pillola. */
 const P2P_BTC_ONLY_CHIAVE = 'barattolo_p2p_bitcoin_only';
-function ricordaBitcoinOnlyP2P(si){
+const P2P_NO_STABLE_CHIAVE = 'barattolo_p2p_no_stable';
+function ricordaNoMoneteP2P(f){
+  const scrivi = (k, si) => { if (si) localStorage.setItem(k, '1'); else localStorage.removeItem(k); };
   try {
-    if (si) localStorage.setItem(P2P_BTC_ONLY_CHIAVE, '1');
-    else localStorage.removeItem(P2P_BTC_ONLY_CHIAVE);
+    scrivi(P2P_BTC_ONLY_CHIAVE, !!(f && f.soloBtc));
+    scrivi(P2P_NO_STABLE_CHIAVE, !!(f && f.noStable));
   } catch(e){}
 }
-function bitcoinOnlyRicordatoP2P(){
-  try { return localStorage.getItem(P2P_BTC_ONLY_CHIAVE) === '1'; } catch(e){ return false; }
+function noMoneteRicordateP2P(){
+  const letto = k => { try { return localStorage.getItem(k) === '1'; } catch(e){ return false; } };
+  return {soloBtc: letto(P2P_BTC_ONLY_CHIAVE), noStable: letto(P2P_NO_STABLE_CHIAVE)};
 }
 
 
@@ -80299,25 +80303,23 @@ function ordineDaEvento(ev, adesso){
    peer-to-peer, è già Bitcoin only»); nel codice resta `soloBtc` —
    Telegram: «per quelli come me ai quali interessa solo bitcoin, ogni
    volta dover andare a scegliere di escludere le shitcoin mi sembra un
-   po' esagerato»). Un interruttore in cima al Filtro del libro che
-   nasconde in un colpo gli scambi pagati in USDT, USDe, ETH e XMR — e i
-   loro «Novità», e le loro card nella fila della home. SPENTO DI SERIE
-   (Andrea: «non di default altrimenti uno manco sa che ci sono altri
-   scambi»), e il telefono SE LO RICORDA (localStorage, per dispositivo,
-   come l'ordinamento): chi l'accende una volta non lo riaccende piu'.
-   VIVE DENTRO IL FILTRO (`soloBtc`), cosi' la pillola si accende, il
-   vuoto dice quale vuoto e' e «Applica» resta il momento in cui il libro
-   si muove. Ma «Azzera» NON lo spegne: e' una preferenza, come
-   l'ordinamento, e chi azzera il metodo non sta chiedendo le altre
-   monete. Si spegne dal suo interruttore, o dal vuoto («Mostra anche le
-   altre monete»).
+   po' esagerato»). DUE PILLOLE in testa alle «Valute» del Filtro (Andrea,
+   lo stesso giorno: «mettilo nella sezione valute come una pillola
+   normalissima e dai due scelte»): «No altcoin» (`soloBtc`) nasconde gli
+   scambi pagati in USDT, USDe, ETH e XMR, e con loro i due «Novità», le
+   card nella fila della home e il grappolo del banner degli scambi;
+   «No stablecoin» (`noStable`) nasconde i soli USDT e USDe, e il loro
+   «Novità». SPENTE DI SERIE (Andrea: «non di default altrimenti uno manco
+   sa che ci sono altri scambi»), e il telefono SE LE RICORDA
+   (localStorage, per dispositivo, come l'ordinamento). Pillole normali:
+   si applicano con «Applica» e «Azzera» le spegne, come le altre.
    ⚠️ LE MONETE SERVONO A PAGARE, non si comprano (Andrea, 18 nov 2026):
-   ogni scambio del P2P e' bitcoin contro qualcos'altro. Lo dice il
-   foglio sotto l'interruttore, e lo dicono i giri dei due «Novità».
-   LA LEVA `p2p_bitcoin_only` di /api/me (P2P_BITCOIN_ONLY_ATTIVO) lo
-   OFFRE: spenta, un `soloBtc` ricordato non conta piu' e il libro torna
+   ogni scambio del P2P e' bitcoin contro qualcos'altro. Lo dicono i giri
+   dei due «Novità» e il sapere di Tappo.
+   LA LEVA `p2p_bitcoin_only` di /api/me (P2P_BITCOIN_ONLY_ATTIVO) le
+   OFFRE: spenta, una scelta ricordata non conta piu' e il libro torna
    intero. E senza niente da nascondere — ne' USDT ne' monete per chi
-   guarda — l'interruttore non si offre. */
+   guarda — le pillole non si offrono. */
 let myP2PBitcoinOnly = false;
 function bitcoinOnlyOffertoP2P(){
   return typeof myP2PBitcoinOnly !== 'undefined' && !!myP2PBitcoinOnly
@@ -80327,6 +80329,33 @@ function bitcoinOnlyOffertoP2P(){
 /* PURA sul filtro (e sulla leva): il «Bitcoin only» conta, adesso? */
 function soloBtcVivoP2P(f){
   return !!(f && f.soloBtc) && bitcoinOnlyOffertoP2P();
+}
+/* ...e il «No stablecoin» */
+function noStableVivoP2P(f){
+  return !!(f && f.noStable) && bitcoinOnlyOffertoP2P();
+}
+/* PURA: un METODO che e' una stablecoin (una rete di USDT o di USDe) */
+function metodoStableP2P(m){
+  if (typeof reteUsdtDaMetodoP2P === 'function' && reteUsdtDaMetodoP2P(m)) return true;
+  const r = typeof reteCoinDaMetodoP2P === 'function' ? reteCoinDaMetodoP2P(m) : null;
+  return !!r && String(r.coin).toUpperCase() === 'USDE';
+}
+/* PURA: una VALUTA stablecoin (USDT, USDe) */
+function valutaStableP2P(cod){
+  const c = String(cod || '').toUpperCase();
+  return c === 'USDT' || c === 'USDE';
+}
+/* PURA: un ordine che si paga SOLO in stablecoin, con la regola di
+   `pagatoInMonetaP2P` qui sotto */
+function pagatoInStableP2P(o){
+  if (!o) return false;
+  if (valutaStableP2P(typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : o.fiat)) return true;
+  const m = Array.isArray(o.metodi) ? o.metodi : [];
+  return m.length > 0 && m.every(metodoStableP2P);
+}
+/* PURA sul filtro: l'ordine esce per una delle due pillole */
+function fuoriPerMoneteP2P(o, f){
+  return (soloBtcVivoP2P(f) && pagatoInMonetaP2P(o)) || (noStableVivoP2P(f) && pagatoInStableP2P(o));
 }
 /* PURA: un METODO che e' una moneta (una rete di USDT, ETH, XMR, USDe) */
 function metodoMonetaP2P(m){
@@ -80349,9 +80378,9 @@ function pagatoInMonetaP2P(o){
   const m = Array.isArray(o.metodi) ? o.metodi : [];
   return m.length > 0 && m.every(metodoMonetaP2P);
 }
-/* fuori dal libro e dalla fila della home per il «Bitcoin only» di adesso */
+/* fuori dalla fila della home per le pillole di adesso */
 function nascostoBitcoinOnlyP2P(o){
-  return soloBtcVivoP2P(typeof p2pFiltro !== 'undefined' ? p2pFiltro : null) && pagatoInMonetaP2P(o);
+  return fuoriPerMoneteP2P(o, typeof p2pFiltro !== 'undefined' ? p2pFiltro : null);
 }
 /* IL BANNER DEGLI SCAMBI TORNA BTC-EURO (18 nov 2026, Andrea: «chi
    seleziona btc only nella sezione i miei scambi mostra il banner vecchio
@@ -80387,7 +80416,7 @@ function vestiBannerScambiP2P(){
 }
 function filtroVuotoP2P(){
   return {valute: [], metodi: [], premioDa: -P2P_PREMIO_MAX,
-          premioA: P2P_PREMIO_MAX, repDa: 0, repA: 5, rete: '', soloBtc: false};
+          premioA: P2P_PREMIO_MAX, repDa: 0, repA: 5, rete: '', soloBtc: false, noStable: false};
 }
 /* IL FILTRO SPENTO E' `null` e non un oggetto pieno di valori neutri:
    cosi' «non c'e' filtro» e' una cosa sola da controllare, e il
@@ -80405,7 +80434,7 @@ function filtroAccesoP2P(f){
   return !!(f.valute.length || f.metodi.length
     || f.premioDa > v.premioDa || f.premioA < v.premioA
     || f.repDa > v.repDa || f.repA < v.repA || f.rete
-    || (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(f)));
+    || (typeof soloBtcVivoP2P === 'function' && (soloBtcVivoP2P(f) || noStableVivoP2P(f))));
 }
 /* PURO: un ordine passa o no. Si prova senza browser e senza libro, ed
    e' l'unico posto dove le quattro regole vivono.
@@ -80433,8 +80462,8 @@ function passaFiltroP2P(o, f){
      scritto. */
   if (typeof nascostoPerParacaduteP2P === 'function' && nascostoPerParacaduteP2P(o)) return false;
   if (!o || !f) return true;
-  /* «₿ Bitcoin only» (18 nov 2026): fuori chi si paga solo in moneta */
-  if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(f) && pagatoInMonetaP2P(o)) return false;
+  /* «No altcoin» e «No stablecoin» (18 nov 2026): fuori chi si paga solo in quelle */
+  if (typeof fuoriPerMoneteP2P === 'function' && fuoriPerMoneteP2P(o, f)) return false;
   /* gli ordini di qui sono quelli di Mostro, cioe' Lightning: «solo
      on-chain» li lascia fuori tutti (quelli on-chain li filtra
      `carteOnchainLibroP2P`) */
@@ -80506,14 +80535,6 @@ function passaRepP2P(f, faccia){
    • «C'e' 1 offerta» / «Ci sono N offerte»: il numero decide il verbo. */
 function vuotoLibroP2P(vivi, filtro, lato){
   const n = Array.isArray(vivi) ? vivi.length : 0;
-  /* SOLO IL «BITCOIN ONLY» ACCESO, e non passa niente (18 nov 2026): le
-     offerte ci sono, e si pagano tutte in moneta. Lo si dice, e l'uscita
-     e' spegnerlo — «Togli il filtro» non lo spegne (vedi `azzeraFiltroP2P`) */
-  if (n > 0 && filtro && typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(filtro)
-      && !filtroAccesoP2P(Object.assign({}, filtro, {soloBtc: false})))
-    return {logo: true, togli: false, monete: true, titolo: 'Nessuno scambio in euro o franchi',
-            frase: n === 1 ? 'C\'è 1 offerta pagata in USDT, USDe, ETH o XMR.'
-                           : 'Ci sono ' + n + ' offerte pagate in USDT, USDe, ETH o XMR.'};
   if (n > 0 && filtro)
     return {logo: true, togli: true, titolo: 'Nessun ordine col tuo filtro',
             frase: n === 1 ? 'C\'è 1 offerta, ma non passa il filtro.'
@@ -82603,9 +82624,7 @@ function renderP2P(){
          }<span class="empty-title">${esc(vuoto.titolo)}</span>${esc(vuoto.frase)}${
            /* «Togli il filtro» SOLO SE UN FILTRO C'E': a filtro spento
               azzerava il niente, e il libro restava com'era */
-           vuoto.monete
-             ? ' <button type="button" class="scopri-link" onclick="spegniBitcoinOnlyP2P()">Mostra anche le altre monete</button>'
-             : vuoto.togli
+           vuoto.togli
              ? ' <button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
              : ''}</div>`)
     + comeFunziona;
@@ -82839,17 +82858,23 @@ function iconaValutaFiltroP2P(v){
   const sep = !ico || ico.indexOf('p2p-coin-ico') >= 0 ? '' : ' ';
   return ico + sep + esc(coin ? v.segno : v.cod);
 }
-/* l'interruttore del foglio lavora sulla BOZZA, come il resto: si
-   applica con «Applica». Acceso, toglie dalla bozza le valute e i metodi
-   in moneta: resterebbero scelti e invisibili, e il libro si svuoterebbe
-   senza che si capisca perche' */
-function scegliBitcoinOnlyFiltroP2P(){
+/* le due pillole lavorano sulla BOZZA, come le altre. Accese, tolgono
+   dalla bozza le valute e i metodi che nascondono: resterebbero scelti e
+   invisibili, e il libro si svuoterebbe senza che si capisca perche' */
+const P2P_PILLOLE_NO = [['No altcoin', 'soloBtc'], ['No stablecoin', 'noStable']];
+function scegliNoMoneteFiltroP2P(v){
   const b = p2pFiltroBozza; if (!b) return;
+  const p = P2P_PILLOLE_NO.find(x => x[0] === v);
+  if (!p) return;
   haptic();
-  b.soloBtc = !b.soloBtc;
+  b[p[1]] = !b[p[1]];
   if (b.soloBtc) {
     b.valute = b.valute.filter(c => !valutaMonetaP2P(c));
     b.metodi = b.metodi.filter(m => !metodoMonetaP2P(m));
+  }
+  if (b.noStable) {
+    b.valute = b.valute.filter(c => !valutaStableP2P(c));
+    b.metodi = b.metodi.filter(m => !metodoStableP2P(m));
   }
   renderFiltroP2P();
 }
@@ -82857,26 +82882,13 @@ function renderFiltroP2P(){
   const box = el('p2pFiltroCorpo');
   const b = p2pFiltroBozza;
   if (!box || !b) return;
-  /* «₿ BITCOIN ONLY» IN CIMA (18 nov 2026, cantiere bitcoin-only): la riga
-     delle impostazioni (titolo, frase, Attivo/Spento), con la frase che
-     dice a cosa servono le monete */
+  /* «NO ALTCOIN» E «NO STABLECOIN» (18 nov 2026, cantiere bitcoin-only):
+     due pillole normali in testa alle «Valute», solo a chi le ha */
   const offerto = typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P();
   const soloBtc = offerto && !!b.soloBtc;
-  const interruttore = !offerto ? '' :
-    '<div class="p2p-btc-only" style="display:flex;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:4px;border-bottom:1px solid var(--line)">' +
-      '<div style="min-width:0;flex:1">' +
-        '<div style="font-size:13.5px;font-weight:800">No altcoin</div>' +
-        '<div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">' +
-          'Nasconde gli scambi pagati in USDT, USDe, ETH e XMR. Quelle monete servono solo a ' +
-          '<b style="color:var(--ink)">pagare</b>: nel P2P compri e vendi sempre bitcoin. ' +
-          'Il telefono si ricorda la scelta.</div>' +
-      '</div>' +
-      '<button type="button" onclick="scegliBitcoinOnlyFiltroP2P()" role="switch" aria-checked="' + (soloBtc ? 'true' : 'false') +
-        '" aria-label="No altcoin" style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ' +
-        (soloBtc ? 'var(--sats)' : 'var(--line)') + ';background:' + (soloBtc ? 'var(--sats)' : 'transparent') +
-        ';color:' + (soloBtc ? '#fff' : 'var(--ink)') + ';border-radius:999px;padding:8px 14px;cursor:pointer">' +
-        (soloBtc ? 'Attivo' : 'Spento') + '</button>' +
-    '</div>';
+  const noStable = offerto && !!b.noStable;
+  const nascosta = v => (soloBtc && valutaMonetaP2P(v)) || (noStable && valutaStableP2P(v));
+  const nascostoM = m => (soloBtc && metodoMonetaP2P(m)) || (noStable && metodoStableP2P(m));
   /* `dentro` e' quel che si vede nella pillola quando non e' il testo:
      il marchio del metodo vestito (16 set 2026). Il `data-v` resta il
      testo, che e' la chiave che il filtro confronta col tag `pm`. */
@@ -82901,10 +82913,12 @@ function renderFiltroP2P(){
       (r[0] === 'onchain' ? P2P_OC_MONETA : r[0] === 'ln' ? P2P_LN_MONETA : '') +
       esc(r[1]) + '</button>').join('') +
     '</div>';
-  box.innerHTML = interruttore + rete +
+  box.innerHTML = rete +
     '<div class="section-label">Valute</div>' +
-    '<div class="p2p-metodi">' + (typeof valuteVisibiliP2P === 'function' ? valuteVisibiliP2P() : P2P_VALUTE)
-      .filter(v => !soloBtc || !valutaMonetaP2P(v.cod)).map(v =>
+    '<div class="p2p-metodi">' + (offerto ? P2P_PILLOLE_NO.map(p =>
+      pill(p[0], !!b[p[1]], 'scegliNoMoneteFiltroP2P')).join('') : '') +
+    (typeof valuteVisibiliP2P === 'function' ? valuteVisibiliP2P() : P2P_VALUTE)
+      .filter(v => !nascosta(v.cod)).map(v =>
       /* le monete col loro nome, «USDe» (16 nov 2026, p2p-monete-valute),
          e OGNI valuta con la sua icona davanti, come nella scelta della
          valuta del foglio (16 nov 2026, Andrea: «manca l'icona … anche nel
@@ -82913,7 +82927,7 @@ function renderFiltroP2P(){
            iconaValutaFiltroP2P(v))).join('') +
     '</div>' +
     '<div class="section-label">Metodi di pagamento</div>' +
-    '<div class="p2p-metodi">' + metodiFiltroP2P().filter(m => !soloBtc || !metodoMonetaP2P(m)).map(m =>
+    '<div class="p2p-metodi">' + metodiFiltroP2P().filter(m => !nascostoM(m)).map(m =>
       pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P',
            marchioMetodoP2P(m), !!vesteMetodoP2P(m))).join('') +
     '</div>' +
@@ -82951,14 +82965,11 @@ function renderFiltroP2P(){
    stato vuoto, che da li' e' l'unica strada d'uscita. */
 function azzeraFiltroP2P(){
   haptic();
-  /* ...TRANNE IL «₿ BITCOIN ONLY» (18 nov 2026): e' una preferenza, non
-     un filtro di passaggio — resta dov'e' l'interruttore, anche quello
-     appena toccato nel foglio */
-  const tieni = (p2pFiltroBozza ? !!p2pFiltroBozza.soloBtc : !!(p2pFiltro && p2pFiltro.soloBtc))
-    && typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P();
-  if (typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P()) ricordaBitcoinOnlyP2P(tieni);
-  p2pFiltro = tieni ? Object.assign(filtroVuotoP2P(), {soloBtc: true}) : null;
+  p2pFiltro = null;
   p2pFiltroBozza = null;
+  /* ...anche «No altcoin» e «No stablecoin», che il telefono dimentica
+     (18 nov 2026: pillole normali) */
+  if (typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P()) ricordaNoMoneteP2P(null);
   if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();
   vestiBannerScambiP2P();
   if (el('p2pFiltroSheet').classList.contains('open'))
@@ -82970,29 +82981,16 @@ function applicaFiltroP2P(){
   if (p2pFiltroBozza) {
     p2pFiltro = Object.assign({}, p2pFiltroBozza,
       {valute: p2pFiltroBozza.valute.slice(), metodi: p2pFiltroBozza.metodi.slice()});
-    /* il «₿ Bitcoin only» si ricorda al momento di Applica (18 nov 2026),
-       e la fila della home lo segue subito */
+    /* «No altcoin» e «No stablecoin» si ricordano al momento di Applica
+       (18 nov 2026), e la fila della home li segue subito */
     if (typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P())
-      ricordaBitcoinOnlyP2P(!!p2pFiltro.soloBtc);
+      ricordaNoMoneteP2P(p2pFiltro);
     if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();
     vestiBannerScambiP2P();
   }
   p2pFiltroBozza = null;
   chiudiFoglioP2P('p2pFiltroSheet');
   renderP2P();
-}
-/* l'uscita del vuoto «Nessuno scambio con Bitcoin only» (18 nov 2026):
-   spegne l'interruttore, se lo dimentica, e il resto del filtro resta */
-function spegniBitcoinOnlyP2P(){
-  haptic();
-  ricordaBitcoinOnlyP2P(false);
-  if (p2pFiltro) {
-    p2pFiltro = Object.assign({}, p2pFiltro, {soloBtc: false});
-    if (!filtroAccesoP2P(p2pFiltro)) p2pFiltro = null;
-  }
-  renderP2P();
-  if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();
-  vestiBannerScambiP2P();
 }
 
 /* ---- IL FOGLIO DEL FILTRO DEI PROPRI SCAMBI ----
@@ -116808,12 +116806,13 @@ async function avvia(){
     myP2PChf = !!me.p2p_chf;
     myP2POnchainUsdt = !!me.p2p_onchain_usdt;
     myP2PCoin = !!me.p2p_coin;
-    /* ...e l'interruttore «₿ Bitcoin only» (18 nov 2026): la leva lo offre,
-       e quello ricordato su questo telefono rientra nel filtro */
+    /* ...e le pillole «No altcoin» e «No stablecoin» (18 nov 2026): la leva
+       le offre, e quelle ricordate su questo telefono rientrano nel filtro */
     myP2PBitcoinOnly = !!me.p2p_bitcoin_only;
-    if (!p2pFiltro && typeof bitcoinOnlyRicordatoP2P === 'function'
-        && bitcoinOnlyOffertoP2P() && bitcoinOnlyRicordatoP2P())
-      p2pFiltro = Object.assign(filtroVuotoP2P(), {soloBtc: true});
+    if (!p2pFiltro && typeof noMoneteRicordateP2P === 'function' && bitcoinOnlyOffertoP2P()) {
+      const ric = noMoneteRicordateP2P();
+      if (ric.soloBtc || ric.noStable) p2pFiltro = Object.assign(filtroVuotoP2P(), ric);
+    }
     if (typeof vestiBannerScambiP2P === 'function') vestiBannerScambiP2P();
     /* ...e la fila della home si ridisegna coi cancelli appena letti (16 nov
        2026, Andrea: «i nuovi annunci tipo USDE, Ethereum, XMR non si vedono

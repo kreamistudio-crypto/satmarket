@@ -24451,7 +24451,7 @@ def numeri_assistente() -> str:
         # (16 nov 2026, cantiere p2p-monete) ETH, Monero e USDe come metodi
         f"- Scambi P2P pagati in ETH, Monero (XMR) o USDe: {si(p2p_coin_ammesso(0))}.",
         # (18 nov 2026, cantiere bitcoin-only) l'interruttore del Filtro
-        f"- Interruttore «No altcoin» nel Filtro del P2P: "
+        f"- Pillole «No altcoin» e «No stablecoin» nel Filtro del P2P: "
         f"{si(bool(P2P_BITCOIN_ONLY_ATTIVO))}.",
         f"- Scambi P2P in bitcoin on-chain: {si(p2p_onchain_ammesso(0))}.",
         # (12 nov 2026, cantiere sapere-onchain) le due leve del P2P che
@@ -37938,12 +37938,13 @@ def _leve_stato():
                   spento="i tre metodi non compaiono, e il libro nasconde "
                          "gli ordini che li portano"),
             # «₿ BITCOIN ONLY» (18 nov 2026, cantiere bitcoin-only)
-            _leva("No altcoin nel Filtro P2P", "P2P_BITCOIN_ONLY_ATTIVO",
+            _leva("No altcoin e No stablecoin nel Filtro P2P", "P2P_BITCOIN_ONLY_ATTIVO",
                   bool(P2P_BITCOIN_ONLY_ATTIVO),
-                  acceso="nel Filtro del libro P2P c'è l'interruttore che "
-                         "nasconde gli scambi in USDT, USDe, ETH e XMR "
-                         "(spento di serie, il telefono ricorda la scelta)",
-                  spento="l'interruttore non c'è e il libro mostra tutte "
+                  acceso="nelle Valute del Filtro P2P ci sono le pillole «No "
+                         "altcoin» (via USDT, USDe, ETH e XMR) e «No "
+                         "stablecoin» (via USDT e USDe); spente di serie, il "
+                         "telefono ricorda la scelta",
+                  spento="le due pillole non ci sono e il libro mostra tutte "
                          "le monete, come ieri"),
             _leva("USDT solo agli admin", "P2P_USDT_SOLO_ADMIN",
                   bool(P2P_USDT_SOLO_ADMIN),
@@ -60317,8 +60318,8 @@ try:
 except ImportError:
     P2P_BITCOIN_ONLY_ATTIVO = True
 if not isinstance(P2P_BITCOIN_ONLY_ATTIVO, bool):
-    print("[p2p] P2P_BITCOIN_ONLY_ATTIVO non e' True/False: l'interruttore "
-          "«No altcoin» resta spento", flush=True)
+    print("[p2p] P2P_BITCOIN_ONLY_ATTIVO non e' True/False: le pillole "
+          "«No altcoin» e «No stablecoin» restano spente", flush=True)
     P2P_BITCOIN_ONLY_ATTIVO = False
 # IL TETTO DEL COLLAUDO (20 ott 2026, decisione di Andrea con Alan): sul
 # collaudo il P2P parla col coordinatore VERO, quindi ordini e sats sono
