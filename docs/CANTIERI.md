@@ -91361,3 +91361,26 @@ SCARTATE: la linea arancio tenue rientrata e quella tratteggiata (le altre
 due anteprime). PROVATO: giro dal vivo in collaudo (tendina chiusa e con
 una voce scelta, tema scuro), `prove_sottocategorie_vetrina`, suite severa
 e collaudi della CI.
+
+## Il venduto del mercatino resta col ✅ nei canali: la sua cancellazione dietro una leva spenta (18 nov 2026, cantiere venduto-resta; Andrea, sulla scheda due volte: «No, lì resta il ✅ Venduto», poi «Tieni il ✅ Venduto»)
+
+COSA C'ERA. Due sessioni hanno fatto in parallelo la vetrina che si pulisce.
+Quella arrivata prima su develop (vetrina-pulita, c2532723, qui sopra) mette
+sotto la stessa leva `VETRINA_SI_PULISCE`, accesa, sia i post P2P sia gli
+annunci venduti (che sparivano invece di prendere il ✅, pause ed esauriti
+compresi). Nell'altra Andrea aveva risposto due volte che il venduto del
+mercatino resta col ✅. La seconda sessione non ha pushato il suo P2P
+(doppione, e meno completo: niente nome provvisorio, niente riscrittura
+oltre le 48 ore).
+DECISO: leva nuova `VETRINA_VENDUTI_SI_CANCELLANO`, SPENTA di serie (codice,
+config d'esempio, pannello «Anche gli annunci venduti spariscono dai
+canali»); `promo_venduto` cancella solo con TUTTE E DUE accese. Il P2P non
+cambia. Testi utente (NOVITA, sapere, conoscenza rigenerata) corretti: il
+venduto resta, con «✅ Venduto».
+SCARTATO: togliere il codice della cancellazione del venduto — è provato,
+e la leva costa una riga se un giorno Andrea cambia idea.
+PROVATO: `prove_venduto_canale` (banco nuovo: vetrina accesa e leva del
+venduto spenta → tre ✅, niente cancellato; sentinella della leva nei tre
+posti; i banchi della cancellazione la accendono), `collaudo_vetrina_pulita`
+(di serie il ✅, accesa la cancellazione) e `collaudo_modifica_massiva` (la
+pausa in blocco torna al ✅); suite severa e collaudi della CI.

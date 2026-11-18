@@ -728,13 +728,15 @@ def main():
               (200, {pausa_id: "sold"}),
               (r.status_code, DOPO[-1][1] if DOPO else {}))
         asyncio.run(SRV._mm_fuori(VENDE, DOPO[-1][1] if DOPO else {}))
-        # (18 nov 2026, vetrina-pulita) a leva VETRINA_SI_PULISCE accesa,
-        # di serie, il post di un annuncio che non si compra piu' si
-        # CANCELLA invece di prendere il ✅ (quello resta a leva spenta,
-        # o dove Telegram non lascia cancellare: prove_venduto_canale)
-        prova("...il post nel canale si cancella (la vetrina si pulisce)",
-              True, any(m == "deleteMessage" and ch == "@nostro" and mid == 501
-                        for m, ch, mid in TELEGRAM))
+        # (18 nov 2026, venduto-resta; Andrea: «Tieni il ✅ Venduto») di
+        # serie il post di un annuncio che non si compra piu' prende il ✅
+        # e NON si cancella: la cancellazione vive dietro la leva
+        # VETRINA_VENDUTI_SI_CANCELLANO, spenta (prove_venduto_canale)
+        prova("...il post nel canale prende il ✅, e non si cancella",
+              (True, False),
+              (any(m.startswith("editMessage") and ch == "@nostro" and mid == 501
+                   for m, ch, mid in TELEGRAM),
+               any(m == "deleteMessage" and mid == 501 for m, ch, mid in TELEGRAM)))
         TELEGRAM.clear()
         DOPO.clear()
         r = c.post("/api/me/modifica-massiva/applica", json={

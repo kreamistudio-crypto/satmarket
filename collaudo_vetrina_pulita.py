@@ -181,10 +181,18 @@ def main():
     prova("leva spenta: il venduto riscrive i tre post col ✅, come prima",
           (["editMessageText"] * 3, (71, 72, 73)),
           ([m for m, _, _ in telegram], post_annuncio()))
+    # (venduto-resta, 18 nov 2026; Andrea: «Tieni il ✅ Venduto») di serie
+    # la vetrina si pulisce ma il venduto del mercatino resta col ✅
     S.VETRINA_SI_PULISCE = True
     telegram.clear()
     asyncio.run(S.promo_venduto(aid))
-    prova("leva accesa: i tre post si cancellano, e le colonne tornano a zero",
+    prova("di serie (leva del venduto spenta): il ✅ anche con la vetrina che si pulisce",
+          (False, ["editMessageText"] * 3, (71, 72, 73)),
+          (S.VETRINA_VENDUTI_SI_CANCELLANO, [m for m, _, _ in telegram], post_annuncio()))
+    S.VETRINA_VENDUTI_SI_CANCELLANO = True
+    telegram.clear()
+    asyncio.run(S.promo_venduto(aid))
+    prova("leva del venduto accesa: i tre post si cancellano, e le colonne tornano a zero",
           ([("deleteMessage", "@casa", 71), ("deleteMessage", "@subito", 72),
             ("deleteMessage", "@podcast", 73)], (0, 0, 0)),
           (telegram, post_annuncio()))

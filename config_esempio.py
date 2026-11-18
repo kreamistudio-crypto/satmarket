@@ -1953,11 +1953,14 @@ MAX_TARIFFA_CONNETTORE_SATS = 1_000_000
 # post nel canale Telegram. Attivo di default; False per spegnere tutto.
 POST_AUTOMATICI = True
 # La vetrina che si pulisce da sola (18 nov 2026): il post di un ordine
-# P2P sparisce dai canali quando l'ordine e' preso, annullato o scaduto,
-# e quello di un annuncio quando e' venduto (oltre le 48 ore Telegram non
-# lascia cancellare: il post si riscrive). False = com'era: i post P2P
-# restano, l'annuncio venduto prende il «✅ Venduto».
+# P2P sparisce dai canali quando l'ordine e' preso, annullato o scaduto
+# (oltre le 48 ore Telegram non lascia cancellare: il post si riscrive).
+# False = com'era: i post P2P restano.
 VETRINA_SI_PULISCE = True
+# ...e l'annuncio venduto del mercatino: di serie resta nei canali col
+# «✅ Venduto» (scelta di Andrea). True = anche il suo post sparisce
+# (vale solo con VETRINA_SI_PULISCE accesa).
+VETRINA_VENDUTI_SI_CANCELLANO = False
 # Il canale Telegram di Barattolo: "@nomecanale" oppure l'id numerico
 # (-100...). Il bot deve esserne AMMINISTRATORE. Vuoto = niente post
 # sul canale (la nota Nostr vive comunque).

@@ -658,7 +658,7 @@ leva: nessuna
 pubblico: sì
 
 ## 2026-11-18 · vetrina-pulita
-frase: I canali di Barattolo si puliscono da soli: quando un ordine P2P viene preso, annullato o scade, il suo post sparisce, e lo stesso succede all'annuncio venduto. Così lì trovi solo cose che puoi ancora prendere. E gli avvisi dei nuovi ordini P2P adesso dicono ordine per ordine se per te è un «🟢 Compra BTC» o un «🔴 Vendi BTC», e puoi sceglierli anche per metodo di pagamento.
+frase: I canali di Barattolo si puliscono da soli: quando un ordine P2P viene preso, annullato o scade, il suo post sparisce, così lì trovi solo ordini che puoi ancora prendere (l'annuncio venduto del mercatino resta, con «✅ Venduto»). E gli avvisi dei nuovi ordini P2P adesso dicono ordine per ordine se per te è un «🟢 Compra BTC» o un «🔴 Vendi BTC», e puoi sceglierli anche per metodo di pagamento.
 dove: i canali Telegram di Barattolo; nel P2P la campanella 🔔 in alto (o Profilo → «🔔 Avvisi») → «Avvisami dei nuovi ordini P2P»: le chip «Compra BTC» e «Vendi BTC» e la sezione nuova «Metodo di pagamento»; il messaggio del bot «🔔 N nuovi ordini nel libro P2P».
 leva: VETRINA_SI_PULISCE (accesa di serie)
 pubblico: sì

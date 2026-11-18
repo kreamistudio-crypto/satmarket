@@ -195412,7 +195412,7 @@ def prove_venduto_canale():
     cartella = _tfVC.mkdtemp(prefix="venduto-canale-")
 
     def banco(sorgente_venduto, sorgente_rimuovi, con_podcast=True, pulisce=False,
-              esito=None, righe_dopo=None):
+              esito=None, righe_dopo=None, venduti=None):
         """Un database nuovo, un annuncio coi suoi tre post, e le due
         funzioni eseguite da `sorgente_*`. Torna (chiamate, stampe, riga)
         dopo promo_venduto e promo_rimuovi.
@@ -195471,6 +195471,9 @@ def prove_venduto_canale():
                "_NOSTR": ("chiave", "pub"), "_spedisci_ai_relay": relay,
                "firma_evento": lambda kind, tag, testo: (kind, tag[0][1]),
                "VETRINA_SI_PULISCE": pulisce,
+               # (venduto-resta) la leva del venduto segue `pulisce` se non
+               # detta: i banchi della cancellazione la vogliono accesa
+               "VETRINA_VENDUTI_SI_CANCELLANO": pulisce if venduti is None else venduti,
                "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
         for nome in ("_post_vetrina", "_post_podcast"):
             exec(pezzo(nome), amb)
@@ -195557,6 +195560,22 @@ def prove_venduto_canale():
           "except ImportError:\n    VETRINA_SI_PULISCE = True\n" in _SORGENTE
           and '_leva("I canali si puliscono da soli", "VETRINA_SI_PULISCE",' in _SORGENTE
           and "\nVETRINA_SI_PULISCE = True\n" in open("config_esempio.py", encoding="utf-8").read())
+    # IL VENDUTO RESTA COL ✅ (18 nov 2026, cantiere venduto-resta; Andrea:
+    # «Tieni il ✅ Venduto»): la vetrina che si pulisce accesa, la leva del
+    # venduto SPENTA di serie — il post si riscrive come prima
+    ven = banco(venduto, rimuovi, pulisce=True, venduti=False)[0]
+    prova("VENDUTO-RESTA: vetrina che si pulisce accesa ma leva del venduto spenta, "
+          "il post prende il ✅ nei tre canali, niente cancellato",
+          [("editMessageText", "@nostro", 11), ("editMessageText", "@vetrina", 22),
+           ("editMessageText", "@podcast", 33)], ven)
+    prova("...la leva del venduto: SPENTA di serie, nel pannello e nel config d'esempio",
+          True,
+          "except ImportError:\n    VETRINA_VENDUTI_SI_CANCELLANO = False\n" in _SORGENTE
+          and '"VETRINA_VENDUTI_SI_CANCELLANO",' in _SORGENTE
+          and "if venduto and VETRINA_SI_PULISCE and VETRINA_VENDUTI_SI_CANCELLANO:"
+          in pezzo("promo_venduto")
+          and "\nVETRINA_VENDUTI_SI_CANCELLANO = False\n"
+          in open("config_esempio.py", encoding="utf-8").read())
 
     # LA CONTROPROVA: la riga di prima del 17 ott, rimessa al suo posto
     vecchio = lambda s: s.replace("_post_podcast(a)",

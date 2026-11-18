@@ -1137,13 +1137,24 @@ except ImportError:
 # un utente: «messaggi effimeri per gli annunci di Barattolo Vetrina in
 # modo tale che spariscano quando sono scaduti o presi», Andrea: «Sì,
 # aprila»). Accesa: il post di un ordine P2P sparisce dai canali quando
-# l'ordine e' preso, annullato o scaduto, e quello di un annuncio quando
-# e' venduto. Spenta: com'era — i post P2P restano, l'annuncio venduto
-# prende il «✅ Venduto». E' l'interruttore d'emergenza: False e riavvia.
+# l'ordine e' preso, annullato o scaduto. Spenta: com'era — i post P2P
+# restano. E' l'interruttore d'emergenza: False e riavvia.
 try:
     from config import VETRINA_SI_PULISCE
 except ImportError:
     VETRINA_SI_PULISCE = True
+# ...E IL VENDUTO DEL MERCATINO RESTA COL ✅ (18 nov 2026, cantiere
+# venduto-resta; Andrea sulla scheda, due volte: «No, lì resta il ✅
+# Venduto», poi «Tieni il ✅ Venduto»). La cancellazione del post di un
+# annuncio venduto (o in pausa, o esaurito) vive dietro questa leva
+# SPENTA: accesa, e insieme a VETRINA_SI_PULISCE, il post sparisce
+# invece di prendere il ✅. Il perche' del no: l'annuncio venduto puo'
+# tornare in vendita (rimborso, fine pausa, rifornimento) e il ✅ e' la
+# vetrina che dice «qui si vende davvero».
+try:
+    from config import VETRINA_VENDUTI_SI_CANCELLANO
+except ImportError:
+    VETRINA_VENDUTI_SI_CANCELLANO = False
 try:
     from config import TELEGRAM_CANALE_ID
 except ImportError:
@@ -37403,12 +37414,19 @@ def _leve_stato():
             _leva("I canali si puliscono da soli", "VETRINA_SI_PULISCE",
                   bool(VETRINA_SI_PULISCE),
                   acceso="il post di un ordine P2P sparisce dai canali "
-                         "quando l'ordine è preso, annullato o scaduto, e "
-                         "quello di un annuncio quando è venduto; oltre le "
-                         "48 ore Telegram non lascia cancellare, e il post "
-                         "si riscrive («non più disponibile», «✅ Venduto»)",
-                  spento="come prima: i post P2P restano nei canali, e "
-                         "l'annuncio venduto prende il «✅ Venduto»"),
+                         "quando l'ordine è preso, annullato o scaduto; "
+                         "oltre le 48 ore Telegram non lascia cancellare, "
+                         "e il post si riscrive («non più disponibile»)",
+                  spento="come prima: i post P2P restano nei canali"),
+            # ...e il venduto del mercatino: SPENTA di serie (venduto-resta)
+            _leva("Anche gli annunci venduti spariscono dai canali",
+                  "VETRINA_VENDUTI_SI_CANCELLANO",
+                  bool(VETRINA_VENDUTI_SI_CANCELLANO and VETRINA_SI_PULISCE),
+                  acceso="il post di un annuncio venduto, in pausa o "
+                         "esaurito sparisce dai canali (dove Telegram non "
+                         "lascia cancellare prende il «✅ Venduto»)",
+                  spento="l'annuncio venduto resta nei canali col "
+                         "«✅ Venduto» (scelta di Andrea, 18 nov 2026)"),
             # il FATTO e non il valore, la regola dei segreti: qui
             # basta sapere se il bot ha un canale dove parlare. E si
             # chiede al giudice, non alla costante: dall'ago 2026 il
@@ -86287,7 +86305,9 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
         # Venduto qui sotto. La colonna del post tolto torna a zero: al
         # ritorno in vendita non c'e' piu' niente da riscrivere, e
         # l'annuncio vive nella vetrina dell'app come sempre.
-        if venduto and VETRINA_SI_PULISCE:
+        # (cantiere venduto-resta, 18 nov 2026: solo con la leva sua accesa,
+        # che di serie e' SPENTA — Andrea tiene il ✅ Venduto)
+        if venduto and VETRINA_SI_PULISCE and VETRINA_VENDUTI_SI_CANCELLANO:
             colonne = ("post_canale_id", "post_vetrina_id", "post_bitcoin_podcast_id")
             tolte = []
             for (canale, msg), col in zip(dove, colonne):
