@@ -91312,3 +91312,25 @@ LA LEVA: `VETRINA_SI_PULISCE`, accesa di serie (codice, config d'esempio, pannel
 SCARTATO: i messaggi «effimeri» di Telegram (l'autodistruzione a tempo) — un post che sparisce dopo N ore toglie anche gli ordini ancora vivi, e lascia quelli presi un minuto dopo; ripubblicare il post quando un ordine torna nel libro (chi l'aveva preso non ha proseguito) — sarebbe un secondo post dello stesso ordine, la cosa che il freno del canale esiste per non fare; togliere un ordine che la fotografia non porta (vedi sopra); mandare al server l'id provvisorio e poi il vero con una seconda chiamata del telefono — il collegamento dal lato server usa una dichiarazione che il telefono fa già (`/api/p2p/ordini`), e non tocca il flusso di pubblicazione.
 PROVATO: `prove_vetrina_pulita` (nuova, 16: il giudice coi cinque casi e la controprova dell'ordine ignoto; su sqlite vero il segno dei post, il collegamento del provvisorio — non quello troppo tardi, non quello di un altro —, i tre post dell'ordine preso cancellati, le 48 ore, il «not found», il Telegram muto, la leva spenta, la settimana, il giro prima della prima fotografia; i ganci nel sorgente e le due liste della CI); `prove_venduto_canale` estesa (leva accesa: cancellati e colonne a zero, 48 ore → ✅, not found, Telegram muto, ritorno in vendita com'era, la leva nei tre posti; i banchi di prima girano a leva spenta); `prove_avvisi_nuovi_ordini` riscritta sulle frasi nuove (il lato che vince sul tipo, il conto per lato, il «…e altri N», il metodo nel giudice e nella coda su sqlite, il normalizzatore, le chip in node con l'accendi/spegni/«Tutti», i due svizzeri solo coi franchi, le gemelle server/client) e `prove_gesti_ordine` (il «da da» nella riga nuova); `collaudo_vetrina_pulita` (nuovo, sul server vero: la rotta che ricorda i tre post, il provvisorio, il giro che collega e cancella, l'evento «preso», lo scaduto oltre le 48 ore, la leva spenta, l'annuncio venduto nei due versi della leva); ritoccati `collaudo_ordine_in_pausa` (la riga nuova dell'avviso) e `collaudo_modifica_massiva` (la pausa in blocco ora cancella il post). Suite severa e collaudi della CI nel venv senza coincurve.
 RESTA DA GUARDARE: dal vivo sul collaudo, che il bot sia amministratore coi permessi di cancellare in tutti e tre i canali (senza, Telegram rifiuta la cancellazione e il post si riscrive: il danno è nullo, ma il post resta); quanti post P2P vecchi, di prima di oggi, restano nei canali — il server non li conosce e non li tocca; gli avvisi di scambio «annullato» e «tornato in vetrina» non dicono il lato (gli altri sì).
+
+## Chiedi a chi compra di annullare, negli scambi P2P on-chain (18 nov 2026, cantiere chiedi-annullo; Andrea: «deve anche poter chiedere l'annullamento alla controparte comunque», sullo scambio del deposito corto di 59 sats dove chi comprava non rispondeva)
+
+DECISO. Il rimborso a due firme lo propone solo chi compra («↩️ Rinuncio:
+rimborsa chi vende»); chi ha depositato ora può CHIEDERLO: `POST
+/api/p2p/onchain/{oid}/chiedi-annullo` scrive a chi compra col bottone
+dello scambio («🙏 Chi vende ti chiede di annullare … Se hai già mandato
+i soldi, non rinunciare»). Non firma niente: è un avviso. Uno all'ora
+(`P2P_ONCHAIN_RINUNCIA_RIAVVISO`, colonna `annullo_chiesto_il`, scritta
+PRIMA dell'invio). La pagina lo dice a tutt'e due. Chi ha depositato
+viene già avvisato quando chi compra rinuncia («Rimborso proposto»).
+SOLO DA 'preso' CON SATS VISTI E DA 'depositato' (`p2p_onchain_chiedi_annullo_perche`,
+pura): dopo «Ho inviato gli euro» la richiesta sarebbe un trucco — chi
+ha già incassato chiede di «annullare» e chi compra, ingenuo, regala il
+rimborso; da lì si esce col rilascio o con la disputa. Senza sats visti
+si annulla da soli col tasto di sempre.
+STRADE SCARTATE. L'annullo d'accordo con «Accetta» come nel Lightning:
+qui la seconda firma del rimborso è già il gesto di chi compra, un
+secondo tasto avrebbe detto la stessa cosa con una tabella in più.
+PROVATO. `collaudo_p2p_onchain` (6 prove: senza deposito 409, 403 a chi
+compra, l'avviso con l'avvertenza, la pagina, uno all'ora, 409 dopo «Ho
+inviato»). NON PROVATO: un telefono vero.

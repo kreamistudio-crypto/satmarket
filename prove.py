@@ -47561,7 +47561,9 @@ def prove_fogli_di_casa():
     # aperto da «🧾 Il tuo PayCode» come su Lightning.
     # CENTOVENTOTTO (18 nov 2026, cantiere ammanco-p2p-onchain): «↩️ Annulli
     # e riprendi i sats?» di chi ha depositato meno del dovuto.
-    prova("i gesti che passano dalla domanda unica sono centoventotto (dal 30 ott "
+    # CENTOVENTINOVE (18 nov 2026, cantiere chiedi-annullo): «🙏 Chiedi di
+    # annullare?» di chi ha depositato, a chi compra.
+    prova("i gesti che passano dalla domanda unica sono centoventinove (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47579,8 +47581,9 @@ def prove_fogli_di_casa():
           "moderatore sulla cauzione on-chain; «Chi compra non ha scelto dove "
           "ricevere» davanti a «Ricevuti» on-chain; dal 18 nov il foglio «🧾 Il "
           "tuo PayCode Amazon» di Barattozon on-chain in «Compra BTC»; «Annulli "
-          "e riprendi i sats?» del deposito on-chain incompleto)",
-          128, solo_codice(mini).count("chiediConferma({"))
+          "e riprendi i sats?» del deposito on-chain incompleto; «Chiedi di "
+          "annullare?» a chi compra on-chain)",
+          129, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.

@@ -662,3 +662,9 @@ frase: I canali di Barattolo si puliscono da soli: quando un ordine P2P viene pr
 dove: i canali Telegram di Barattolo; nel P2P la campanella 🔔 in alto (o Profilo → «🔔 Avvisi») → «Avvisami dei nuovi ordini P2P»: le chip «Compra BTC» e «Vendi BTC» e la sezione nuova «Metodo di pagamento»; il messaggio del bot «🔔 N nuovi ordini nel libro P2P».
 leva: VETRINA_SI_PULISCE (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · chiedi-annullo
+frase: Negli scambi on-chain chi ha messo i sats nel deposito può chiedere a chi compra di annullare: il bot glielo scrive, e se è d'accordo tocca «Rinuncio» e i sats tornano indietro. Si chiede prima che chi compra dica di aver pagato.
+dove: P2P → «I miei scambi» → uno scambio on-chain col deposito fatto: il bottone «🙏 Chiedi a chi compra di annullare».
+leva: nessuna
+pubblico: sì

@@ -76310,6 +76310,19 @@ function schedaOnchainP2P(o){
   } else if (o.proposta && o.proposta.mia && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') {
     testo += '<br>Hai firmato: si aspetta la seconda firma dell\'altra parte (il suo telefono la mette quando apre l\'app).';
   }
+  /* (18 nov 2026, chiedi-annullo) CHIEDI DI ANNULLARE: chi ha depositato
+     lo chiede a chi compra, che decide con «Rinuncio». Solo prima di «Ho
+     inviato» (dopo sarebbe un trucco: vedi il server) */
+  const annChiesto = Number(o.annullo_chiesto_il) > 0;
+  if (!mod && !o.proposta && (o.stato === 'depositato' || (o.stato === 'preso' && Number(o.visti_sats) > 0))) {
+    if (deposito) {
+      gesti += g('chiedi-annullo', '🙏 Chiedi a chi compra di annullare');
+      if (annChiesto) testo += '<br>🙏 Hai chiesto a chi compra di annullare (' + quando(o.annullo_chiesto_il) + '): se è d\'accordo tocca «Rinuncio» e i sats tornano a te.';
+    } else if (ricevo && annChiesto) {
+      testo += '<br>🙏 <b>Chi vende ti chiede di annullare.</b> Se sei d\'accordo tocca «↩️ Rinuncio: rimborsa chi vende». '
+        + 'Se hai già mandato i soldi, non rinunciare: tocca «Ho inviato» o scrivigli nella chat.';
+    }
+  }
   /* (17 nov 2026, onchain-rimborso-liscio) la rinuncia che aspetta
      l'indirizzo di chi ha depositato: chi compra lo legge qui */
   if (ricevo && Number(o.rinuncia_chiesta_il) > 0 && !o.rimborso && !o.proposta
@@ -77497,6 +77510,12 @@ function gestoOnchainP2P(btn, id, cosa){
       corpo: 'Nessun sats si è mosso: lo scambio si chiude qui e l\'altra parte lo sa subito.',
       poi: () => eseguiGestoOnchainP2P(id, 'annulla', {})});
   }
+  if (cosa === 'chiedi-annullo') {
+    return chiediConferma({titolo: '🙏 Chiedi di annullare?', etichetta: 'Chiedi di annullare',
+      corpo: 'Il bot scrive a chi compra. Se è d\'accordo tocca «Rinuncio» e i sats tornano al tuo wallet, '
+        + 'meno la commissione di rete. Se non risponde, puoi chiederlo di nuovo fra un\'ora.',
+      poi: () => eseguiGestoOnchainP2P(id, 'chiedi-annullo', {})});
+  }
   if (cosa === 'riprendi') {
     return chiediConferma({titolo: '↩️ Annulli e riprendi i sats?', etichetta: 'Annulla e riprendi',
       vestito: 'allarme',
@@ -77531,6 +77550,8 @@ async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
       : corpo && corpo.contanti ? '💵 Detto a chi vende: conta i contanti e libera i sats'
       : '💶 Detto a chi vende: controlla il conto e libera i sats', 5000);
     else if (cosa === 'disputa') toast('⚖️ Disputa aperta: un moderatore guarderà', 5000);
+    else if (cosa === 'chiedi-annullo') toast(d.avvisato ? '🙏 Chiesto a chi compra: ti avvisiamo quando risponde'
+      : '🙏 L\'hai già chiesto da poco: si può di nuovo fra un\'ora', 6000);
     else if (cosa === 'riprendi') toast('↩️ Annullato: Barattolo ha firmato il rimborso. Tocca «✍️ Metti la seconda firma»', 7000);
     else toast('₿ Fatto', 3000);
   } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }

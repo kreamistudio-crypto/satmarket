@@ -2131,6 +2131,38 @@ def main():
           "rimette la reputazione", (200, "rimborsato", ""),
           (r.status_code, r.json()["stato"],
            uno(999, o3["id"]).get("non_completato") or ""))
+
+    print("\n[chiedi di annullare: chi ha depositato lo chiede, chi compra decide]")
+    o4 = pubblica(999).json()
+    gesto(888, o4["id"], "prendi")
+    r = gesto(999, o4["id"], "chiedi-annullo")
+    prova("niente depositato: si annulla da soli, 409", (409, True),
+          (r.status_code, "usa «Annulla»" in r.json()["detail"]))
+    o4 = uno(999, o4["id"])
+    paga(o4)
+    gesto(999, o4["id"], "controlla")
+    prova("lo chiede solo chi ha depositato: 403", 403,
+          gesto(888, o4["id"], "chiedi-annullo").status_code)
+    banco.DETTO.clear()
+    r = gesto(999, o4["id"], "chiedi-annullo")
+    prova("deposito valido: chiesto, e chi compra lo sa col bottone, con "
+          "l'avvertenza di non rinunciare se ha gia' pagato",
+          (200, True, True, True),
+          (r.status_code, r.json()["avvisato"], detto_a(888, "ti chiede di annullare"),
+           detto_a(888, "non rinunciare")))
+    prova("...e la pagina lo dice a tutt'e due", (True, True),
+          (uno(999, o4["id"])["annullo_chiesto_il"] > 0,
+           uno(888, o4["id"])["annullo_chiesto_il"] > 0))
+    banco.DETTO.clear()
+    r = gesto(999, o4["id"], "chiedi-annullo")
+    prova("una seconda volta subito: nessun avviso nuovo (uno all'ora)",
+          (200, False, False), (r.status_code, r.json()["avvisato"],
+                                detto_a(888, "ti chiede di annullare")))
+    gesto(888, o4["id"], "euro-inviati")
+    r = gesto(999, o4["id"], "chiedi-annullo")
+    prova("dopo «Ho inviato gli euro» non si chiede piu': 409 (sarebbe un "
+          "trucco per farsi regalare il rimborso)", (409, True),
+          (r.status_code, "già pagato" in r.json()["detail"]))
     SRV.P2P_ONCHAIN_APERTI_MAX = tetto
 
     # ---- 12) gli avvisi, tutti ----------------------------------------------

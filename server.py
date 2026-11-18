@@ -110415,6 +110415,10 @@ def _p2p_onchain_prepara(con):
                       # l'ultimo avviso e' partito (0 = nessuna rinuncia
                       # che aspetta): si azzera appena l'indirizzo c'e'
                       ("rinuncia_chiesta_il", "INTEGER DEFAULT 0"),
+                      # 18 nov 2026, cantiere chiedi-annullo: quando chi ha
+                      # depositato ha chiesto a chi compra di annullare
+                      # (0 = mai): un avviso all'ora, al massimo
+                      ("annullo_chiesto_il", "INTEGER DEFAULT 0"),
                       # 17 nov 2026, cantiere avviso-indirizzo: quando chi
                       # ha depositato ha ricordato a chi compra di scegliere
                       # dove ricevere (0 = mai): uno all'ora, al massimo
@@ -111087,6 +111091,8 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         # (17 nov 2026, onchain-rimborso-liscio) chi compra vuole
         # rinunciare e il rimborso aspetta l'indirizzo di chi ha depositato
         "rinuncia_chiesta_il": int(_p2p_onchain_campo(o, "rinuncia_chiesta_il", 0) or 0),
+        # (18 nov 2026, chiedi-annullo) chi ha depositato chiede di annullare
+        "annullo_chiesto_il": int(_p2p_onchain_campo(o, "annullo_chiesto_il", 0) or 0),
         # (17 nov 2026, avviso-indirizzo) «🔔 Ricordaglielo» davanti a
         # «Ricevuti» senza l'indirizzo di chi compra, e l'ultimo sollecito
         "sollecito_incasso": bool(P2P_ONCHAIN_AVVISO_INCASSO and ruolo == "compratore"),
@@ -113584,6 +113590,70 @@ async def p2p_onchain_rinuncia_chiesta(oid: int, x_tg_init_data: str = Header(""
             "restano al sicuro nel 2-di-3.",
             _p2p_onchain_bottone(o))
     return {"ok": True, "pronto": False, "avvisato": avvisa}
+
+
+# ---- CHIEDI DI ANNULLARE (18 nov 2026, cantiere chiedi-annullo; Andrea:
+# «deve anche poter chiedere l'annullamento alla controparte comunque»;
+# il caso: chi vendeva voleva chiudere, chi comprava non rispondeva) ----
+# Il rimborso a due firme lo propone chi compra («Rinuncio»): chi ha
+# depositato non puo' firmarselo da solo, ma adesso puo' CHIEDERLO. Il
+# bot scrive a chi compra col bottone dello scambio; se e' d'accordo
+# tocca «Rinuncio» e il rimborso parte come sempre. NIENTE si firma da
+# questa rotta: e' solo un avviso.
+# SOLO PRIMA DI «HO INVIATO GLI EURO»: dopo, la richiesta diventerebbe
+# un trucco (chi ha gia' incassato gli euro chiede a chi compra di
+# «annullare», e chi compra regala il rimborso). Da li' in poi si esce
+# col rilascio o con la disputa. E un deposito senza sats visti si
+# annulla da soli col tasto di sempre.
+def p2p_onchain_chiedi_annullo_perche(o) -> str:
+    """PURA: '' se chi ha depositato puo' chiedere di annullare adesso."""
+    if o["stato"] == "euro_inviati":
+        return ("Chi compra dice di aver già pagato: controlla e libera i "
+                "sats, o apri una disputa")
+    if o["stato"] not in ("preso", "depositato"):
+        return "Questo scambio non si annulla più"
+    if o["stato"] == "preso" and not int(o["visti_sats"] or 0):
+        return "Non hai ancora depositato niente: usa «Annulla»"
+    if o["proposta_psbt"] or o["decisione_da"]:
+        return "Su questo scambio c'è già una firma: manca solo la seconda"
+    return ""
+
+
+@app.post("/api/p2p/onchain/{oid}/chiedi-annullo")
+async def p2p_onchain_chiedi_annullo(oid: int, x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _p2p_onchain_serve(user)
+    _frena("onchain_firma", user["id"])
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        o = _p2p_onchain_carica(con, oid)
+        if _p2p_onchain_ruolo(o, user["id"]) != "compratore":
+            raise HTTPException(403, "L'annullo lo chiede chi ha depositato i sats")
+        perche = p2p_onchain_chiedi_annullo_perche(o)
+        if perche:
+            raise HTTPException(409, perche)
+        ultimo = int(_p2p_onchain_campo(o, "annullo_chiesto_il", 0) or 0)
+        avvisa = not ultimo or adesso - ultimo >= P2P_ONCHAIN_RINUNCIA_RIAVVISO
+        if avvisa:
+            # scritto PRIMA dell'invio, come ogni avviso
+            con.execute("UPDATE p2p_onchain_ordini SET annullo_chiesto_il=?,"
+                        " aggiornato=? WHERE id=?", (adesso, adesso, oid))
+            con.commit()
+    finally:
+        con.close()
+    if avvisa:
+        await _notifica_p2p_onchain(o, o["ricevente_id"],
+            "🙏 <b>Chi vende ti chiede di annullare</b> lo scambio di "
+            f"{_p2p_onchain_quanto(o)}.\n\n"
+            "Se sei d'accordo, apri lo scambio e tocca «↩️ Rinuncio: rimborsa "
+            "chi vende»: i sats tornano a lui e lo scambio si chiude. "
+            "<b>Se hai già mandato i soldi, non rinunciare</b>: tocca «Ho "
+            "inviato» o scrivigli nella chat.",
+            _p2p_onchain_bottone(o))
+    return {"ok": True, "avvisato": avvisa,
+            "prossimo": (adesso if avvisa else ultimo) + P2P_ONCHAIN_RINUNCIA_RIAVVISO}
 
 
 @app.post("/api/p2p/onchain/{oid}/proposta")
