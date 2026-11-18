@@ -91109,3 +91109,24 @@ leggono i documenti e i collaudi vicini (p2p_onchain, serie_giorni,
 ricerca, semina_collaudo), tutto verde.
 NON PROVATO: un telefono vero dentro Telegram; il pregresso di produzione
 (quanti annunci restano senza sottocategoria lo dice lo script, DA-FARE 23).
+
+## «No altcoin» e «No stablecoin», due pillole in «Valute» (18 nov 2026, seguito del cantiere bitcoin-only; Andrea: «il filtro no al coin, non metterlo lì, ma mettilo nella sezione valute come una pillola normalissima e dai due scelte. La prima è no al coin e la seconda è no stablecoin. Stop.»)
+La riga-interruttore in cima al Filtro se ne va: in «Valute» le prime due
+pillole sono «No altcoin» (fuori USDT, USDe, ETH, XMR) e «No stablecoin»
+(fuori solo USDT e USDe). Toccarne una toglie dalla bozza le valute e i
+metodi che nasconde, e la pillola nascosta sparisce dalle scelte. Il campo
+nuovo `noStable` vive accanto a `soloBtc` in `filtroVuotoP2P`; un solo
+giudice, `fuoriPerMoneteP2P`, li somma per libro, on-chain e fila della
+home. Spente di serie, ricordate per dispositivo come prima (seconda chiave
+`barattolo_p2p_no_stable`). La stessa leva P2P_BITCOIN_ONLY_ATTIVO le offre
+tutte e due. Il banner BTC-euro di «I miei scambi» torna solo con «No
+altcoin» (con le monete ci sono ancora ETH e XMR). «No stablecoin» spegne
+anche la Novità degli USDT, non quella delle monete.
+CAMBIATO RISPETTO AL PRIMO GIRO: essendo pillole come le altre, «Azzera» le
+spegne e le dimentica; il libro vuoto torna quello normale (via il bottone
+«Mostra anche le altre monete»), e le prove di forma di «Azzera» e del
+foglio tornano quelle di prima.
+PROVATO: `prove_bitcoin_only_p2p` riscritta (giudici in node per le due
+pillole, memoria, banner, Novità, scelta che pulisce la bozza; controprova),
+suite severa e collaudi della CI nel venv senza coincurve.
+NON PROVATO: un telefono vero dentro Telegram.

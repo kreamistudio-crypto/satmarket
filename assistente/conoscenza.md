@@ -318,7 +318,7 @@ Ordini P2P in ETH, Monero o USDe (se nei NUMERI DI OGGI «Scambi P2P pagati in E
 
 - Nel libro ogni valuta ha il suo filtro in cima (EUR, USDT, ETH, XMR, USDe), e la card mostra il logo della moneta nei quadratini in alto a destra e la cifra nella moneta, per esempio «Invia 0,0153 ETH».
 - Le monete del P2P servono solo a PAGARE: ogni scambio ha sempre bitcoin da una parte, e da Barattolo non si comprano USDT, ETH, XMR o USDe con gli euro. Chi ha ETH e vuole bitcoin prende un ordine di chi vende sats e paga in ETH, come pagherebbe con un bonifico; chi riceve USDT li riceve in cambio dei suoi bitcoin.
-- «No altcoin» (se nei NUMERI DI OGGI «Interruttore «No altcoin» nel Filtro del P2P» è acceso, dal 18 novembre 2026): in cima al Filtro del libro P2P c'è l'interruttore «No altcoin». Acceso (con «Applica»), il libro mostra solo gli scambi in euro e franchi: spariscono quelli pagati in USDT, USDe, ETH e XMR, i loro rettangoli «Novità» e le loro card nella fila della home, e il banner di «I miei scambi» torna quello con le sole monete bitcoin ed euro. Di serie è spento, e il telefono si ricorda la scelta (vale su quel dispositivo). «Azzera» non lo spegne: si spegne dal suo interruttore, o dal tasto «Mostra anche le altre monete» quando il libro resta vuoto.
+- «No altcoin» e «No stablecoin» (se nei NUMERI DI OGGI «Pillole «No altcoin» e «No stablecoin» nel Filtro del P2P» è acceso, dal 18 novembre 2026): nel Filtro del libro P2P, in testa alle «Valute», ci sono due pillole. «No altcoin» lascia solo gli scambi in euro e franchi: spariscono quelli pagati in USDT, USDe, ETH e XMR, i loro rettangoli «Novità» e le loro card nella fila della home, e il banner di «I miei scambi» torna quello con le sole monete bitcoin ed euro. «No stablecoin» toglie solo gli scambi in USDT e USDe (e il loro «Novità»): ETH e XMR restano. Si applicano con «Applica»; di serie sono spente, il telefono si ricorda la scelta (vale su quel dispositivo) e «Azzera» le spegne come le altre.
 - Chi riceve scrive nello scambio il suo indirizzo, copiato dal wallet. L'app controlla che sia della moneta e della rete giusta e ferma un indirizzo sbagliato o con un refuso. Un limite da sapere: Ethereum, Arbitrum, Base e BNB Chain hanno indirizzi uguali (0x…), quindi chi paga deve mandare proprio sulla rete scritta nello scambio. Per USDe lo scambio mostra anche il contratto del vero USDe, contro i token falsi con lo stesso nome.
 - Chi paga vede l'indirizzo col QR e la cifra esatta da mandare, che è quella dell'ordine. Manda, incolla l'id della transazione e tocca «Ho inviato». Con Monero serve anche la chiave della transazione (tx key), che il wallet di chi manda conserva: Monero è privato, e solo con id, chiave e indirizzo si vede quanto è arrivato.
 - Chi vende controlla l'arrivo col tasto «🔎 Controlla su …» (Etherscan, xmrchain, Arbiscan, Basescan, BscScan o Solscan) e libera i sats solo quando ci sono davvero. Se qualcosa non torna si apre una disputa.
@@ -2275,8 +2275,8 @@ pubblico: sì
 <!-- pezzo novita-099 | novita -->
 ## Novità · 2026-11-18 · bitcoin-only
 
-frase: Nel P2P c'è l'interruttore «No altcoin»: lo accendi una volta e vedi solo gli scambi in euro e franchi, senza USDT, USDe, ETH e XMR. Il telefono se lo ricorda. E ricorda: quelle monete servono solo a pagare, da noi si compra e si vende sempre bitcoin.
-dove: P2P → «Filtro», la prima riga «No altcoin», poi «Applica». Spento di serie.
+frase: Nel filtro del P2P ci sono due pillole nuove: «No altcoin» ti lascia solo gli scambi in euro e franchi, senza USDT, USDe, ETH e XMR; «No stablecoin» toglie solo USDT e USDe. Il telefono si ricorda la scelta. E ricorda: quelle monete servono solo a pagare, da noi si compra e si vende sempre bitcoin.
+dove: P2P → «Filtro» → «Valute», le prime due pillole «No altcoin» e «No stablecoin», poi «Applica». Spente di serie.
 leva: P2P_BITCOIN_ONLY_ATTIVO (accesa di serie)
 pubblico: sì
 

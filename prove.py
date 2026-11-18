@@ -69918,9 +69918,7 @@ def prove_p2p_libro():
     # parole del gesto, «Azzera» e «Applica».
     _az = pezzo_js(mini, "function azzeraFiltroP2P(){", "\n}\n")
     prova("«Azzera» riporta a zero, chiude e ridisegna", True,
-          # (18 nov 2026, bitcoin-only) a zero TRANNE il «₿ Bitcoin only»
-          "p2pFiltro = tieni ? Object.assign(filtroVuotoP2P(), {soloBtc: true}) : null;" in _az
-          and "chiudiFoglioP2P('p2pFiltroSheet');" in _az
+          "p2pFiltro = null;" in _az and "chiudiFoglioP2P('p2pFiltroSheet');" in _az
           and "renderP2P();" in _az)
     # (si guarda DENTRO il renderer del filtro e non il `.foglio-piede`
     # nudo: quella classe veste il piede di mezza app, e la sentinella
@@ -167242,7 +167240,7 @@ console.log(JSON.stringify(out));
     rf = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
     prova("il foglio del filtro chiede la rete in cima, solo a chi vede l'on-chain, con "
           "moneta e fulmine", (True, True, True, True),
-          ("const rete = !myP2POnchain ? '' :" in rf and "box.innerHTML = interruttore + rete +" in rf,
+          ("const rete = !myP2POnchain ? '' :" in rf and "box.innerHTML = rete +" in rf,
            "(r[0] === 'onchain' ? P2P_OC_MONETA : r[0] === 'ln' ? P2P_LN_MONETA : '')" in rf,
            "const P2P_FILTRO_RETI = [['', 'Tutte'], ['onchain', 'On-chain'], ['ln', 'Lightning']];" in mini,
            "b.rete = r === 'onchain' || r === 'ln' ? r : '';" in pezzo_js(mini, "function scegliReteFiltroP2P(r){", "\n}\n")))
@@ -209368,22 +209366,24 @@ console.log(JSON.stringify(out));
 
 
 def prove_bitcoin_only_p2p():
-    """«₿ BITCOIN ONLY» NEL FILTRO DEL LIBRO P2P (18 nov 2026, cantiere
-    bitcoin-only, dal gruppo Telegram: «per quelli come me ai quali
-    interessa solo bitcoin»; Andrea: spento di serie, «altrimenti uno manco
-    sa che ci sono altri scambi», e il telefono se lo ricorda). Il banco
-    gira i giudici puri — chi si paga solo in moneta, il libro di
-    Lightning, le card on-chain, il vuoto, la fila della home, la memoria,
-    il banner degli scambi — poi i fili della pagina e la leva del server.
-    La controprova spegne il giudice e guarda tornare gli USDT."""
-    print("\n[₿ Bitcoin only: le monete fuori dal libro in un colpo]")
+    """«NO ALTCOIN» E «NO STABLECOIN» NEL FILTRO DEL LIBRO P2P (18 nov 2026,
+    cantiere bitcoin-only, dal gruppo Telegram: «per quelli come me ai
+    quali interessa solo bitcoin»; Andrea: spente di serie, «altrimenti uno
+    manco sa che ci sono altri scambi», due pillole normali in «Valute», e
+    il telefono se le ricorda). Il banco gira i giudici puri — chi si paga
+    solo in moneta o in stablecoin, il libro di Lightning, le card
+    on-chain, la fila della home, la memoria, il banner degli scambi — poi
+    i fili della pagina e la leva del server. La controprova spegne i
+    giudici e guarda tornare gli USDT."""
+    print("\n[No altcoin e No stablecoin: le monete fuori dal libro in un colpo]")
     src = _SORGENTE
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     blocco = pezzo_js(mini, "let myP2PBitcoinOnly = false;", "function filtroVuotoP2P(){")
     fns = (_riga_js(mini, "const P2P_PREMIO_MAX = ") + _riga_js(mini, "const P2P_VALUTA = ")
            + _riga_js(mini, "const P2P_BTC_ONLY_CHIAVE = ")
-           + _fn_js(mini, "function ricordaBitcoinOnlyP2P(si){")
-           + _fn_js(mini, "function bitcoinOnlyRicordatoP2P(){")
+           + _riga_js(mini, "const P2P_NO_STABLE_CHIAVE = ")
+           + _fn_js(mini, "function ricordaNoMoneteP2P(f){")
+           + _fn_js(mini, "function noMoneteRicordateP2P(){")
            + blocco
            + "".join(_fn_js(mini, f) for f in (
                "function filtroVuotoP2P(){", "function filtroAccesoP2P(f){",
@@ -209416,100 +209416,104 @@ const passa = filtro => libro.filter(x => passaFiltroP2P(x, filtro)).map(x => x.
 const passaOc = filtro => libro.filter(x => passaFiltroOcP2P(x, filtro)).map(x => x.id).join('');
 const out = {};
 myP2PBitcoinOnly = false;
-out.levaSpenta = [passa(f({soloBtc: true})), filtroAccesoP2P(f({soloBtc: true})), bitcoinOnlyOffertoP2P()];
+out.levaSpenta = [passa(f({soloBtc: true, noStable: true})), filtroAccesoP2P(f({soloBtc: true, noStable: true})), bitcoinOnlyOffertoP2P()];
 myP2PBitcoinOnly = true; USDT = false; COIN = false;
 out.niente = [bitcoinOnlyOffertoP2P(), passa(f({soloBtc: true}))];
 USDT = true; COIN = true;
 out.offerto = bitcoinOnlyOffertoP2P();
 out.acceso = passa(f({soloBtc: true}));
-out.spento = passa(f({soloBtc: false}));
+out.stable = passa(f({noStable: true}));
+out.tutte = passa(f({soloBtc: true, noStable: true}));
+out.spento = passa(f({}));
 out.nullo = passa(null);
-out.oc = passaOc(f({soloBtc: true}));
-out.ocSpento = passaOc(f({}));
-out.accesoPill = [filtroAccesoP2P(f({soloBtc: true})), filtroAccesoP2P(f({}))];
-out.vuotoMonete = vuotoLibroP2P([1, 2], f({soloBtc: true}), 'compro');
-out.vuotoAltro = vuotoLibroP2P([1, 2], f({soloBtc: true, metodi: ['SEPA']}), 'compro');
-out.vuotoUno = vuotoLibroP2P([1], f({soloBtc: true}), 'compro').frase;
-const vlib = {ordini: [o('v1', 'EUR', ['SEPA'], 1), o('v2', 'EUR', ['SEPA'], 2), o('v3', 'USDT', ['USDT (Tron)'], 3), o('v4', 'ETH', ['ETH (Ethereum)'], 4)]};
+out.oc = [passaOc(f({soloBtc: true})), passaOc(f({noStable: true})), passaOc(f({}))];
+out.accesoPill = [filtroAccesoP2P(f({soloBtc: true})), filtroAccesoP2P(f({noStable: true})), filtroAccesoP2P(f({}))];
+out.vuoto = vuotoLibroP2P([1, 2], f({soloBtc: true}), 'compro');
+const vlib = {ordini: [o('v1', 'EUR', ['SEPA'], 1), o('v2', 'ETH', ['ETH (Ethereum)'], 2), o('v3', 'USDT', ['USDT (Tron)'], 3), o('v4', 'ETH', ['ETH (Ethereum)'], 4)]};
 p2pFiltro = f({soloBtc: true});
 out.fila = ordiniVetrinaP2P(vlib, 1).map(x => x.id).join('');
 out.filaOc = ordiniOnchainVetrinaP2P({eventi: vlib.ordini.map(x => Object.assign({}, x, {ordine: x.id}))}, 1).map(x => x.id).join('');
 out.bannerBtc = bannerScambiP2P().src;
+p2pFiltro = f({noStable: true});
+out.filaStable = ordiniVetrinaP2P(vlib, 1).map(x => x.id).join('');
+out.bannerStable = bannerScambiP2P().src;
 p2pFiltro = null;
 out.filaSpenta = ordiniVetrinaP2P(vlib, 1).map(x => x.id).join('');
 out.bannerMonete = bannerScambiP2P().src;
-out.memoria = [bitcoinOnlyRicordatoP2P()];
-ricordaBitcoinOnlyP2P(true); out.memoria.push(bitcoinOnlyRicordatoP2P());
-ricordaBitcoinOnlyP2P(false); out.memoria.push(bitcoinOnlyRicordatoP2P());
+out.memoria = [noMoneteRicordateP2P()];
+ricordaNoMoneteP2P(f({soloBtc: true})); out.memoria.push(noMoneteRicordateP2P());
+ricordaNoMoneteP2P(f({noStable: true})); out.memoria.push(noMoneteRicordateP2P());
+ricordaNoMoneteP2P(null); out.memoria.push(noMoneteRicordateP2P());
 console.log(JSON.stringify(out));
 """)
     o = _node_banco(banco(fns))
     if o is None:
-        salta("il banco del Bitcoin only", "node assente")
+        salta("il banco di No altcoin e No stablecoin", "node assente")
         return
     if "acceso" not in o:
-        prova("il banco del Bitcoin only gira", True, False)
+        prova("il banco di No altcoin e No stablecoin gira", True, False)
         return
-    prova("LEVA SPENTA: un «Bitcoin only» ricordato non ferma niente, non accende la "
-          "pillola e l'interruttore non si offre", ["abcdeghi", False, False], o["levaSpenta"])
-    prova("...e senza niente da nascondere (ne' USDT ne' monete per chi guarda) non si offre",
+    prova("LEVA SPENTA: le pillole ricordate non fermano niente, non accendono il Filtro "
+          "e non si offrono", ["abcdeghi", False, False], o["levaSpenta"])
+    prova("...e senza niente da nascondere (ne' USDT ne' monete per chi guarda) non si offrono",
           [False, "abcdeghi"], o["niente"])
-    prova("leva accesa e monete visibili: si offre", True, o["offerto"])
-    prova("ACCESO: restano euro e franchi; fuori USDT, ETH, USDe e gli ordini in euro "
+    prova("leva accesa e monete visibili: si offrono", True, o["offerto"])
+    prova("NO ALTCOIN: restano euro e franchi; fuori USDT, ETH, USDe e gli ordini in euro "
           "pagabili solo in moneta. Chi accetta SEPA *o* XMR resta (si paga in euro)",
           "aeg", o["acceso"])
-    prova("spento, o senza filtro, il libro e' intero come ieri", ["abcdeghi", "abcdeghi"],
+    prova("NO STABLECOIN: fuori solo USDT e USDe (anche l'euro pagabile solo in USDT); "
+          "ETH e XMR restano", "acdeg", o["stable"])
+    prova("...tutte e due insieme valgono «No altcoin»", "aeg", o["tutte"])
+    prova("spente, o senza filtro, il libro e' intero come ieri", ["abcdeghi", "abcdeghi"],
           [o["spento"], o["nullo"]])
-    prova("le card on-chain seguono lo stesso giudice", ["aeg", "abcdeghi"], [o["oc"], o["ocSpento"]])
-    prova("la pillola Filtro si accende col solo «Bitcoin only»", [True, False], o["accesoPill"])
-    vm = o["vuotoMonete"]
-    prova("IL VUOTO DICE QUALE VUOTO E': solo il «Bitcoin only» e niente passa → «Mostra "
-          "anche le altre monete», non «Togli il filtro»",
-          [True, False, "Nessuno scambio in euro o franchi", "Ci sono 2 offerte pagate in USDT, USDe, ETH o XMR."],
-          [vm.get("monete"), vm.get("togli"), vm.get("titolo"), vm.get("frase")])
-    prova("...col resto del filtro acceso torna il vuoto di sempre", [None, True],
-          [o["vuotoAltro"].get("monete"), o["vuotoAltro"].get("togli")])
-    prova("...e al singolare", "C'è 1 offerta pagata in USDT, USDe, ETH o XMR.", o["vuotoUno"])
+    prova("le card on-chain seguono gli stessi giudici", ["aeg", "acdeg", "abcdeghi"], o["oc"])
+    prova("la pillola Filtro si accende con una delle due", [True, True, False], o["accesoPill"])
+    prova("IL VUOTO E' QUELLO DI SEMPRE (pillole normali): «Togli il filtro»", [True, None],
+          [o["vuoto"].get("togli"), o["vuoto"].get("monete")])
     prova("LA FILA DELLA HOME: le monete escono PRIMA del taglio, e i posti vanno agli euro "
           "(quella on-chain non ordina: la mescola renderVetrinaP2P)",
-          ["v2v1", "v1v2"], [o["fila"], o["filaOc"]])
-    prova("...e spento la fila e' quella di ieri", "v4v3", o["filaSpenta"])
-    prova("IL BANNER DEGLI SCAMBI: acceso torna la coppia BTC-euro, spento il grappolo",
-          ["/assets/scambi-intestazione.webp", "/assets/scambi-monete.webp"],
-          [o["bannerBtc"], o["bannerMonete"]])
-    prova("la memoria del telefono: nasce spenta, si accende, si spegne",
-          [False, True, False], o["memoria"])
-    rotto = fns.replace("function pagatoInMonetaP2P(o){\n", "function pagatoInMonetaP2P(o){\n  return false;\n", 1)
-    prova("controprova: il banco rotto si e' davvero rotto", True, rotto != fns)
+          ["v1", "v1"], [o["fila"], o["filaOc"]])
+    prova("...con «No stablecoin» via solo l'USDT", "v4v2", o["filaStable"])
+    prova("...e spente la fila e' quella di ieri", "v4v3", o["filaSpenta"])
+    prova("IL BANNER DEGLI SCAMBI: con «No altcoin» torna la coppia BTC-euro; con «No "
+          "stablecoin» o spente il grappolo",
+          ["/assets/scambi-intestazione.webp", "/assets/scambi-monete.webp", "/assets/scambi-monete.webp"],
+          [o["bannerBtc"], o["bannerStable"], o["bannerMonete"]])
+    prova("la memoria del telefono: nascono spente, una chiave per pillola, «Azzera» le dimentica",
+          [{"soloBtc": False, "noStable": False}, {"soloBtc": True, "noStable": False},
+           {"soloBtc": False, "noStable": True}, {"soloBtc": False, "noStable": False}], o["memoria"])
+    rotto = (fns.replace("function pagatoInMonetaP2P(o){\n", "function pagatoInMonetaP2P(o){\n  return false;\n", 1)
+             .replace("function pagatoInStableP2P(o){\n", "function pagatoInStableP2P(o){\n  return false;\n", 1))
+    prova("controprova: il banco rotto si e' davvero rotto", True, rotto.count("return false;\n") > fns.count("return false;\n") + 1)
     x = _node_banco(banco(rotto)) or {}
-    prova("controprova: col giudice spento gli USDT e le monete tornano nel libro",
-          "abcdeghi", x.get("acceso"))
+    prova("controprova: coi giudici spenti gli USDT e le monete tornano nel libro",
+          ["abcdeghi", "abcdeghi"], [x.get("acceso"), x.get("stable")])
     # --- i fili della pagina ---
     me = mini[mini.index("    myP2PCoin = !!me.p2p_coin;\n"):]
     me = me[:me.index("renderVetrinaP2P, 0)")]
-    prova("I FILI: /api/me legge la leva e rimette nel filtro il «Bitcoin only» ricordato",
+    prova("I FILI: /api/me legge la leva e rimette nel filtro le pillole ricordate",
           [True, True], ["myP2PBitcoinOnly = !!me.p2p_bitcoin_only;" in me,
-                         "Object.assign(filtroVuotoP2P(), {soloBtc: true})" in me])
+                         "p2pFiltro = Object.assign(filtroVuotoP2P(), ric);" in me])
     azz = _fn_js(mini, "function azzeraFiltroP2P(){")
     app = _fn_js(mini, "function applicaFiltroP2P(){")
-    prova("«Azzera» NON spegne il «Bitcoin only», «Applica» se lo ricorda, e tutti e due "
+    prova("«Azzera» le spegne e le dimentica, «Applica» le ricorda, e tutti e due "
           "ridisegnano la fila della home e il banner", [True, True, True, True],
-          ["{soloBtc: true}" in azz, "ricordaBitcoinOnlyP2P(!!p2pFiltro.soloBtc)" in app,
+          ["ricordaNoMoneteP2P(null)" in azz, "ricordaNoMoneteP2P(p2pFiltro)" in app,
            "vestiBannerScambiP2P()" in azz and "renderVetrinaP2P()" in azz,
            "vestiBannerScambiP2P()" in app and "renderVetrinaP2P()" in app])
     rf = _fn_js(mini, "function renderFiltroP2P(){")
-    prova("il foglio: l'interruttore in cima con la frase delle monete che servono a pagare, "
-          "e le pillole delle monete via quand'e' acceso", [True, True, True, True],
-          ["box.innerHTML = interruttore + rete" in rf,
-           "servono solo a ' +\n          '<b style=\"color:var(--ink)\">pagare</b>" in rf,
-           ".filter(v => !soloBtc || !valutaMonetaP2P(v.cod))" in rf,
-           ".filter(m => !soloBtc || !metodoMonetaP2P(m))" in rf])
-    guardia = "if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(p2pFiltro)) return '';"
-    prova("i due «Novità» delle monete tacciono col «Bitcoin only» acceso", [True, True],
-          [guardia in _fn_js(mini, "function novitaUsdtLibroP2P(){"),
-           guardia in _fn_js(mini, "function novitaCoinLibroP2P(){")])
-    prova("il vuoto del libro offre l'uscita giusta", 1,
-          mini.count('onclick="spegniBitcoinOnlyP2P()">Mostra anche le altre monete</button>'))
+    prova("il foglio: le due pillole in testa alle «Valute», solo a chi le ha, e le monete "
+          "che nascondono via dalle valute e dai metodi", [True, True, True, True],
+          ["const P2P_PILLOLE_NO = [['No altcoin', 'soloBtc'], ['No stablecoin', 'noStable']];" in mini,
+           "(offerto ? P2P_PILLOLE_NO.map(p =>\n      pill(p[0], !!b[p[1]], 'scegliNoMoneteFiltroP2P')).join('') : '')" in rf,
+           ".filter(v => !nascosta(v.cod))" in rf, ".filter(m => !nascostoM(m))" in rf])
+    prova("niente piu' riga in cima al foglio", False, "p2p-btc-only" in mini)
+    prova("i due «Novità»: quello delle stablecoin tace con l'una o l'altra, quello di ETH e "
+          "XMR solo con «No altcoin»", [True, True],
+          ["(soloBtcVivoP2P(p2pFiltro) || noStableVivoP2P(p2pFiltro))) return '';"
+           in _fn_js(mini, "function novitaUsdtLibroP2P(){"),
+           "if (typeof soloBtcVivoP2P === 'function' && soloBtcVivoP2P(p2pFiltro)) return '';"
+           in _fn_js(mini, "function novitaCoinLibroP2P(){")])
     prova("il banner degli scambi nei quattro posti (la testa e i tre vuoti)", [1, 3],
           [mini.count('id="p2pMieiBanner"'), mini.count("attrBannerScambiP2P() : ")])
     prova("i giri dei «Novità» dicono che le monete servono a pagare", 2,
@@ -209542,8 +209546,8 @@ console.log(JSON.stringify(out));
               spazio["P2P_BITCOIN_ONLY_ATTIVO"])
     prova("la leva sta nel pannello, nei numeri di Tappo, in /api/me e nel config "
           "d'esempio (accesa)", (1, 1, 1, 1),
-          (src.count('_leva("No altcoin nel Filtro P2P", "P2P_BITCOIN_ONLY_ATTIVO",'),
-           src.count('f"- Interruttore «No altcoin» nel Filtro del P2P: "'),
+          (src.count('_leva("No altcoin e No stablecoin nel Filtro P2P", "P2P_BITCOIN_ONLY_ATTIVO",'),
+           src.count('f"- Pillole «No altcoin» e «No stablecoin» nel Filtro del P2P: "'),
            src.count('profilo["p2p_bitcoin_only"] = bool(P2P_BITCOIN_ONLY_ATTIVO)'),
            len(re.findall(r"(?m)^P2P_BITCOIN_ONLY_ATTIVO = True$",
                           open("config_esempio.py", encoding="utf-8").read()))))
