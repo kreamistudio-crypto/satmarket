@@ -74369,6 +74369,11 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
         pezzi = [nomi.get(lato(r), "🔁 <b>Ordine</b>")]
         if r.get("tipo") == "barattozon":
             pezzi[0] += f" con {NOMI_TIPI_AVVISI_NUOVI_P2P['barattozon']}"
+        # (18 nov 2026, cantiere apri-ordine-notifica) il lato e' il LINK
+        # del suo ordine: il tocco apre quella card, non il libro a caso
+        link = _link_ordine_avviso_p2p(r)
+        if link:
+            pezzi[0] = f"<a href=\"{link}\">{pezzi[0]}</a>"
         if r.get("euro"):
             pezzi.append(html.escape(str(r["euro"])))
         # i metodi di Barattozon sono il tabacchino, gia' detto nel nome
@@ -74387,9 +74392,31 @@ def _testo_avviso_nuovi_p2p(righe: list) -> str:
     # link di testo esiste solo su Telegram: l'altro canale degli avvisi
     # passa da `spoglia_html`, che dei tag non lascia niente — nemmeno
     # l'indirizzo.
+    # L'ORDINE, NON IL LIBRO (18 nov 2026, cantiere apri-ordine-notifica;
+    # Andrea: «quando schiaccio apri il libro ordini deve portare
+    # direttamente dentro la card»): con UN ordine solo il tocco in fondo
+    # e' «🫙 Apri l'ordine» e apre quella card, come il tocco sulla card
+    # nel libro. Con piu' d'uno resta il libro, e ogni riga apre il suo.
+    link = _link_ordine_avviso_p2p(righe[0]) if n == 1 else ""
+    if link:
+        testo += f"\n\n<a href=\"{link}\">🫙 Apri l'ordine</a>"
+        return testo
     testo += (f"\n\n<a href=\"{_link_dentro_telegram(URL_PUBBLICO + '/p2p')}\">"
               "🫙 Apri il libro ordini</a>")
     return testo
+
+
+def _link_ordine_avviso_p2p(riga) -> str:
+    """PURA: il link che apre l'ordine di una riga dell'avviso dei nuovi
+    ordini, o '' se la riga non ne porta un id nella forma pubblica
+    (`FORMA_ORDINE_P2P`: Mostro o «bar-onchain-…»). E' il link del
+    «Condividi», `/p2p?ordine=<id>`, che la pagina apre come il tocco
+    sulla card (`apriOrdineCondivisoP2P`); dentro Telegram, a leva
+    accesa, diventa `startapp=ordine_<id>` (`_link_dentro_telegram`)."""
+    oid = str((riga or {}).get("ordine") or "")
+    if not FORMA_ORDINE_P2P.fullmatch(oid):
+        return ""
+    return _link_dentro_telegram(f"{URL_PUBBLICO}/p2p?ordine={oid}")
 
 
 def _avviso_onchain_p2p(riga) -> bool:

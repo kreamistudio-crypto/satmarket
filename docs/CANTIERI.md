@@ -91811,3 +91811,48 @@ più uno scrittore che insiste fermano le letture annidate per tutto il
 timeout; con `fetchall` zero.
 NON PROVATO: il blocco del 17 nov 08:07 (senza pila) può avere avuto
 la stessa causa o un'altra; se torna, le righe «🧊 Sentinella».
+
+## «Apri il libro ordini» apriva il libro a caso: la notifica apre l'ordine (18 nov 2026, cantiere apri-ordine-notifica; Andrea: «deve portare direttamente dentro la card»)
+
+Andrea, con lo screenshot di due 🔔 «1 nuovo ordine nel libro P2P» (uno
+on-chain da 1.096 USDT, uno Lightning da 100 USDT): «quando schiaccio
+apri il libro ordini deve portare direttamente dentro la card». Il link
+in fondo era `/p2p` (a leva `startapp=p2p`): il libro, nel tab di
+sempre, senza dire quale ordine. DECISO: ogni riga del messaggio apre il
+SUO ordine — il lato («🟢 Compra BTC», «🔴 Vendi BTC», con Barattozon
+anche «con Barattozon») e' il link di `_link_ordine_avviso_p2p` — e con
+UN ordine solo il tocco in fondo e' «🫙 Apri l'ordine», lo stesso link.
+Con piu' ordini il tocco in fondo resta «🫙 Apri il libro ordini»: non
+si sceglie per chi legge quale dei cinque contava. Lo stesso disegno di
+«Apri Esplora» → annuncio della mattina (apri-esplora-annuncio). IL LINK
+non e' nuovo: e' quello del «Condividi» di un ordine (10 ott),
+`/p2p?ordine=<id>`, che dentro Telegram diventa `startapp=ordine_<id>`
+(`_link_dentro_telegram`, gia' nel vocabolario chiuso) e che la pagina
+apre come il tocco sulla card (`apriOrdineCondivisoP2P` →
+`prendiOrdineP2P`, con le sue guardie: il proprio ordine, la pausa, chi
+guarda da fuori). La notifica del telefono (`push_carico`) prende il
+primo link del testo: il primo ordine. Un id fuori dalla forma pubblica
+(`FORMA_ORDINE_P2P`) resta testo, e il tocco resta il libro.
+IL BUCO DELL'ON-CHAIN: «bar-onchain-…» vive nel secondo libro
+(`p2pOnchainLibro`, card per numero), non in quello di Mostro, e la
+strada del «Condividi» avrebbe detto «non c'e' piu'» proprio
+sull'ordine dello screenshot. Ora `apriOrdineCondivisoP2P` lo manda ad
+`apriOrdineOnchainDaLinkP2P`: cerca il nome pubblico nel libro on-chain
+(se non c'e' ancora aspetta il cancello di /api/me, come
+`apriScambioOnchainDaAvvisoP2P`, e lo rilegge), mette il tab della card
+e fa quel che fa il tocco su di lei (`apriOnchainP2P`). Vale anche per
+un link condiviso a mano con un nome on-chain. SCARTATO: aprire il libro
+e far lampeggiare la card (la seconda strada proposta da Andrea): il
+tocco diretto e' quello che ha chiesto per primo, e una card fuori dal
+filtro attivo o dal tab non si sarebbe vista lampeggiare; e una parola
+nuova nel vocabolario `startapp` quando `ordine_` c'era gia'. PROVATO:
+`prove_apri_ordine_notifica` (il messaggio coi pezzi veri a leva accesa
+e spenta, uno/piu' ordini, on-chain, Barattozon, id storto; la parola
+avanti e indietro in node; la pagina con l'ordine on-chain in un banco
+node: subito, dopo la rilettura, sparito, altrove, da fuori Telegram, e
+il Lightning che fa la strada di sempre), controprova fatta (tolto il
+ramo «un ordine» e il ramo on-chain: 9 rosse); ritoccati
+`prove_link_dentro_telegram` (SEI chiamanti della traduzione),
+`prove_avvisi_nuovi_ordini` e `collaudo_ordine_in_pausa` (la riga col
+link, «Apri l'ordine»). NON PROVATO: il tocco su un Telegram vero —
+da guardare sul collaudo con un ordine nuovo nel libro.

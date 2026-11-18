@@ -704,3 +704,9 @@ frase: Chi ha collegato un negozio Shopify o WooCommerce non deve più riaccende
 dove: Profilo → «📥 Carica tanti annunci insieme» → «Catalogo esterno»: la riga del negozio fermo dice «⚠️ non risponde · riprovo da solo ogni giorno»; i messaggi del bot «Il collegamento col tuo negozio non risponde» e «Il tuo negozio risponde di nuovo».
 leva: nessuna
 pubblico: no
+
+## 2026-11-18 · apri-ordine-notifica
+frase: Negli avvisi dei nuovi ordini P2P ogni riga adesso apre il suo ordine: tocca «🟢 Compra BTC» o «🔴 Vendi BTC» e si apre proprio quella card, anche se è on-chain. Se l'ordine nuovo è uno solo, il tasto in fondo diventa «🫙 Apri l'ordine»; con più ordini resta «🫙 Apri il libro ordini».
+dove: il bot, l'avviso «🔔 N nuovi ordini nel libro P2P»; lo stesso tocco sulla notifica del telefono apre il primo ordine.
+leva: nessuna
+pubblico: sì

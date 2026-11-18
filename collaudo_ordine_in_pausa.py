@@ -415,9 +415,11 @@ async def prove():
           ["<b>1 nuovo ordine nel libro P2P</b>" in testo,
            # (18 nov 2026, vetrina-pulita) una riga per ordine, dal lato di
            # chi legge: chi ha pubblicato vende, chi legge «Compra BTC»
-           "🟢 <b>Compra BTC</b> · da 50,00 a 100,00 € · SEPA Instant, Revolut · "
+           # (stesso giorno, apri-ordine-notifica) e il lato apre l'ordine
+           "🟢 <b>Compra BTC</b></a> · da 50,00 a 100,00 € · SEPA Instant, Revolut · "
            "8% meno conveniente" in testo,
-           "da da" in testo, "Apri il libro ordini" in testo])
+           # ...e con un ordine solo il tocco in fondo e' «Apri l'ordine»
+           "da da" in testo, f"?ordine={ORD}\">🫙 Apri l'ordine</a>" in testo])
     prova("...la riga e' timbrata, e al giro dopo non riparte", (True, []),
           (in_coda(ORD)[0] > 1, await giro()))
     scena = pagina([{"adesso": OROLOGIO.ora, "libro": [riga_libro(ORD)], "pause": {},

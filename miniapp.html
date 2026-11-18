@@ -74656,6 +74656,37 @@ async function apriScambioOnchainDaAvvisoP2P(ordine){
   return 'aperto';
 }
 
+/* UN ORDINE ON-CHAIN DEL LIBRO DA UN LINK (18 nov 2026, cantiere
+   apri-ordine-notifica; Andrea: «deve portare direttamente dentro la
+   card»): la riga dell'avviso dei nuovi ordini, o «🫙 Apri l'ordine», porta
+   `/p2p?ordine=bar-onchain-…`. Si cerca nel libro on-chain per il nome
+   pubblico (`ordine`) e si fa quel che fa il tocco sulla sua card,
+   `apriOnchainP2P` — con le sue guardie: il proprio ordine, la pausa,
+   chi l'on-chain non lo ha. Il libro on-chain puo' non esserci ancora:
+   il cancello arriva con /api/me (si aspetta un poco, come la sorella
+   qui sopra) e poi lo si rilegge. Il tab e' quello della card, cosi'
+   chiuso il foglio si resta accanto a lei. */
+async function apriOrdineOnchainDaLinkP2P(ordine){
+  const cerca = () => (p2pOnchainLibro.eventi || []).find(x => String(x.ordine) === String(ordine));
+  if (!cerca()) {
+    for (let i = 0; i < 20 && !myP2POnchain && !(p2pOnchainLibro.quando > 0); i++)
+      await new Promise(r => setTimeout(r, 250));
+    await rinfrescaOnchainP2P(true);
+  }
+  const o = cerca();
+  /* nel frattempo si e' andati altrove: niente fogli sopra un'altra pagina */
+  if (vistaAttivaP2P() !== 'view-p2p') return 'altrove';
+  if (!o) {
+    toast('₿ Quest\'ordine non è più nel libro', 4000);
+    renderP2P();
+    return 'sparito';
+  }
+  setLatoP2P(o.lato === 'sell' ? 'compro' : 'vendo', true);
+  renderP2P();
+  if (!VETRINA && myTgId) apriOnchainP2P(o.id);
+  return 'aperto';
+}
+
 /* IL DEPOSITO SI VEDE DA SOLO (30 ott 2026, Andrea alla prima prova:
    «quando pago lui dovrebbe capire in automatico che ho pagato come
    avviene nel lightning e deve dire fatto e poi chiudersi la pagina
@@ -110412,6 +110443,15 @@ function ordineSparitoP2P(mostra){
 async function apriOrdineCondivisoP2P(id){
   p2pCondivisoInVolo = true;
   try {
+    /* UN ORDINE ON-CHAIN (18 nov 2026, cantiere apri-ordine-notifica):
+       l'avviso dei nuovi ordini porta anche «bar-onchain-…», che vive
+       nel secondo libro e non in quello di Mostro — la strada qui sotto
+       direbbe «non c'e' piu'». Va alla sua card (`apriOrdineOnchainDaLinkP2P`) */
+    if (typeof P2P_ONCHAIN_PREFISSO === 'string' && String(id).startsWith(P2P_ONCHAIN_PREFISSO)
+        && typeof apriOrdineOnchainDaLinkP2P === 'function') {
+      await apriOrdineOnchainDaLinkP2P(id);
+      return;
+    }
     if (ordiniP2P()[id]) { apriOrdineP2P(id); return; }
     const veroLibro = () => !!p2pLibro && !p2pLibro.copia;
     if (!rigaLibroP2P(id) && !veroLibro()) {

@@ -216,6 +216,11 @@ def gemelli_link_telegram(amb, leva=""):
     exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef _startapp_esplora(", i)], amb)
     for f in ("_startapp_esplora", "_link_esplora_telegram"):
         exec(pezzo(f), amb)
+    # ...e l'ordine dell'avviso dei nuovi ordini P2P (18 nov 2026, cantiere
+    # apri-ordine-notifica): la forma pubblica dell'id e il suo link
+    i = _SORGENTE.index("\nFORMA_ORDINE_P2P = re.compile(") + 1
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec(pezzo("_link_ordine_avviso_p2p"), amb)
     return amb
 
 
@@ -60560,12 +60565,16 @@ def prove_link_dentro_telegram():
     # dell'avviso «qualcuno vorrebbe un locker», che traduce /?corrieri=1
     # (17 nov 2026, assistenza-screenshot) il quinto: il bottone sotto lo
     # screenshot che arriva agli admin nel bot (`_foto_al_bot`)
-    prova("la traduzione ha CINQUE chiamanti: il bottone del ramo Telegram, lo "
+    # (18 nov 2026, apri-ordine-notifica) il sesto: il link di OGNI ordine
+    # dell'avviso dei nuovi ordini, e «🫙 Apri l'ordine» quando e' uno solo
+    prova("la traduzione ha SEI chiamanti: il bottone del ramo Telegram, lo "
           "stesso bottone nel gruppo degli admin (12 ott 2026), il link di testo "
-          "dell'avviso dei nuovi ordini, il bottone di «chiedi al venditore» e "
-          "quello sotto lo screenshot dell'assistenza",
-          [5, True, True, True, True],
+          "dell'avviso dei nuovi ordini, il link di ogni suo ordine, il bottone di "
+          "«chiedi al venditore» e quello sotto lo screenshot dell'assistenza",
+          [6, True, True, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
+           'return _link_dentro_telegram(f"{URL_PUBBLICO}/p2p?ordine={oid}")'
+           in pezzo("_link_ordine_avviso_p2p"),
            '"url": _link_dentro_telegram(bottone[1])' in pezzo("_foto_al_bot"),
            '"url": str(_link_dentro_telegram(bottone[1]))' in pezzo("_al_gruppo_admin"),
            # (13 ott 2026) uno o piu' bottoni: ognuno passa dalla traduzione
@@ -121210,12 +121219,15 @@ def prove_avvisi_nuovi_ordini():
                                                 CAMBIO, T))))
     msg2 = dict((tg, t) for tg, t, _ in scarica(con2, T, {"m1", "bar-onchain-ab12"}))
     # (18 nov 2026, vetrina-pulita) l'on-chain lo dice la riga del suo ordine
+    # (stesso giorno, apri-ordine-notifica) e il lato e' il link del suo
+    # ordine — «m1», troppo corto per la forma pubblica, resta testo
+    OCL = '<a href="https://barattolo.store/p2p?ordine=bar-onchain-ab12">🟢 <b>Compra BTC</b></a>'
     prova("...la riga di un ordine on-chain lo dice («₿ on-chain»), quella del Lightning no; "
           "senza on-chain non c'e' la parola",
           (True, True, True, False),
-          ("🟢 <b>Compra BTC</b> · 50,00 € · SEPA · ₿ on-chain · 3% più conveniente" in msg2[601]
-           and "🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente" in msg2[601],
-           "\n\n🟢 <b>Compra BTC</b> · 50,00 € · SEPA · ₿ on-chain · 3% più conveniente" in msg2[602],
+          (OCL + " · 50,00 € · SEPA · ₿ on-chain · 3% più conveniente" in msg2[601]
+           and "\n🟢 <b>Compra BTC</b> · 50,00 € · SEPA · 3% più conveniente" in msg2[601],
+           "\n\n" + OCL + " · 50,00 € · SEPA · ₿ on-chain · 3% più conveniente" in msg2[602],
            msg2[603].startswith("🔔 <b>1 nuovo ordine nel libro P2P</b>\n\n🟢 <b>Compra BTC</b> · 50,00 €"),
            "on-chain" in msg2[603]))
     # IL METODO NELLA CODA (18 nov 2026, vetrina-pulita): un database con la
@@ -212965,6 +212977,155 @@ console.log(JSON.stringify(out));
            "annulla" in t30[1], len(tp(oc(0, ["SEPA"])))])
 
 
+def prove_apri_ordine_notifica():
+    """«APRI IL LIBRO ORDINI» APRIVA IL LIBRO A CASO (18 nov 2026, cantiere
+    apri-ordine-notifica; Andrea, con lo screenshot di due 🔔 «1 nuovo
+    ordine nel libro P2P»: «deve portare direttamente dentro la card»).
+    Tre pezzi, tutti eseguiti veri:
+    • IL MESSAGGIO (`_testo_avviso_nuovi_p2p`): ogni riga apre il suo
+      ordine — il lato e' il link di `_link_ordine_avviso_p2p`, il link
+      del «Condividi» `/p2p?ordine=<id>`, a leva accesa `startapp=
+      ordine_<id>` — e con un ordine solo il tocco in fondo e' «🫙 Apri
+      l'ordine». Con piu' d'uno resta il libro.
+    • LA PAROLA, avanti e indietro: anche il nome on-chain
+      («bar-onchain-…») sta nei 64 caratteri e la pagina lo rilegge.
+    • LA PAGINA: l'ordine on-chain non vive nel libro di Mostro, e la
+      strada del «Condividi» avrebbe detto «non c'e' piu'» —
+      `apriOrdineCondivisoP2P` lo manda ad `apriOrdineOnchainDaLinkP2P`,
+      che fa quel che fa il tocco sulla sua card."""
+    print("\n[la notifica dei nuovi ordini P2P apre l'ordine giusto]")
+    import html as _html
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    BOT = "https://t.me/ilbarattolobot"
+    ID = "0f3c9a2e-5b7d-4e11-9c3a-8d2f6b1a7e40"
+    OC = "bar-onchain-0123456789abcdef"
+
+    # --- 1) IL MESSAGGIO, coi pezzi veri ------------------------------------
+    def testo(leva):
+        amb = gemelli_link_telegram({"URL_PUBBLICO": "https://barattolo.store",
+                                     "html": _html, "time": time}, leva)
+        i = src.index("\nTIPI_AVVISI_NUOVI_P2P = ") + 1
+        exec(src[i:src.index("\n", i)].split("   #")[0], amb)
+        i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
+        exec(src[i:src.index("}\n", i) + 2], amb)
+        for f in ("_frase_convenienza_p2p", "_avviso_onchain_p2p", "_testo_avviso_nuovi_p2p"):
+            exec(_senza_prosa(pezzo(f)), amb)
+        return amb["_testo_avviso_nuovi_p2p"], amb["_link_ordine_avviso_p2p"]
+    t_acc, link_acc = testo(BOT)
+    t_sp, link_sp = testo("")
+    LN = {"ordine": ID, "tipo": "vendita", "lato": "sell", "conv": -5.0,
+          "euro": "100,00 USDT", "metodi": "USDT (Ethereum)"}
+    ONC = {"ordine": OC, "tipo": "acquisto", "lato": "buy", "conv": -5.0,
+           "euro": "1.096,00 USDT", "metodi": "USDT (Ethereum)"}
+    prova("il link dell'ordine: a leva accesa la Mini App sull'ordine (anche on-chain), "
+          "a leva spenta il link del «Condividi»; senza id, o storto, niente link",
+          [f"{BOT}?startapp=ordine_{ID}", f"{BOT}?startapp=ordine_{OC}",
+           f"https://barattolo.store/p2p?ordine={ID}", "", "", ""],
+          [link_acc(LN), link_acc(ONC), link_sp(LN), link_acc({}),
+           link_acc({"ordine": "a\"><b>x"}), link_acc(None)])
+    uno = t_acc([LN])
+    prova("UN ORDINE: la riga e' il link della card e il tocco in fondo e' «🫙 Apri "
+          "l'ordine» — niente piu' «Apri il libro ordini»",
+          ["🔔 <b>1 nuovo ordine nel libro P2P</b>\n\n"
+           f"<a href=\"{BOT}?startapp=ordine_{ID}\">🟢 <b>Compra BTC</b></a> · 100,00 USDT · "
+           "USDT (Ethereum) · 5% meno conveniente\n\n"
+           f"<a href=\"{BOT}?startapp=ordine_{ID}\">🫙 Apri l'ordine</a>", False],
+          [uno, "Apri il libro ordini" in uno])
+    prova("...anche on-chain: la riga del lato «Vendi BTC» e il tocco aprono «bar-onchain-…»",
+          [True, True],
+          (lambda t: [t.endswith(f"<a href=\"{BOT}?startapp=ordine_{OC}\">🫙 Apri l'ordine</a>"),
+                      f"<a href=\"{BOT}?startapp=ordine_{OC}\">🔴 <b>Vendi BTC</b></a> · " in t])(t_acc([ONC])))
+    prova("...e Barattozon: il link prende anche «con Barattozon»", True,
+          f"<a href=\"{BOT}?startapp=ordine_{ID}\">🟢 <b>Compra BTC</b> con Barattozon</a>"
+          in t_acc([dict(LN, tipo="barattozon")]))
+    due = t_acc([LN, ONC])
+    prova("PIU' ORDINI: ogni riga apre il suo, il primo link del messaggio e' il primo "
+          "ordine (lo prende il tocco sulla notifica del telefono, `push_carico`), e in "
+          "fondo resta il libro",
+          [[f"{BOT}?startapp=ordine_{ID}", f"{BOT}?startapp=ordine_{OC}", f"{BOT}?startapp=p2p"],
+           True, False],
+          [re.findall(r'href="([^"]+)"', due), due.endswith("🫙 Apri il libro ordini</a>"),
+           "Apri l'ordine" in due])
+    prova("una riga senza id (la coda di ieri) resta testo, e il tocco resta il libro", 
+          [False, True],
+          (lambda t: ["startapp=ordine_" in t, t.endswith(f"<a href=\"{BOT}?startapp=p2p\">🫙 Apri il libro ordini</a>")])(
+              t_acc([dict(LN, ordine="")])))
+    prova("...a leva spenta i link sono quelli del sito", True,
+          t_sp([LN]).endswith(f"<a href=\"https://barattolo.store/p2p?ordine={ID}\">🫙 Apri l'ordine</a>"))
+    prova("l'id che arriva in coda e' quello del libro (`o[\"id\"]`, il `d` del 38383)", True,
+          '"INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "' in src
+          and "(tg, o[\"id\"], tipo, conv, euro_txt, metodi_txt," in src)
+
+    # --- 2) LA PAROLA, avanti e indietro ------------------------------------
+    per = pezzo_js(mini, "function percorsoDaStartapp(p){", "\n}\n") + "\n}\n"
+    R = _node_banco(per + "console.log(JSON.stringify([percorsoDaStartapp('ordine_" + ID
+                    + "'), percorsoDaStartapp('ordine_" + OC + "')]));")
+    if R is None:
+        salta("la parola si rilegge nella pagina", "node non c'e'")
+    else:
+        prova("la parola si rilegge nell'indirizzo del «Condividi», anche on-chain",
+              [f"/p2p?ordine={ID}", f"/p2p?ordine={OC}"], R)
+
+    # --- 3) LA PAGINA: l'ordine on-chain va alla sua card -------------------
+    oc_fn = pezzo_js(mini, "async function apriOrdineOnchainDaLinkP2P(ordine){", "\n}\n") + "\n}\n"
+    cond = pezzo_js(mini, "async function apriOrdineCondivisoP2P(id){", "\n}\n") + "\n}\n"
+    prog = ("""
+let visto = [], p2pOnchainLibro, myP2POnchain, vista, VETRINA, myTgId, rilettura;
+const P2P_ONCHAIN_PREFISSO = 'bar-onchain-';
+const toast = t => visto.push(['toast', t]);
+const renderP2P = () => visto.push(['render']);
+const setLatoP2P = (l, s) => visto.push(['lato', l]);
+const apriOnchainP2P = id => visto.push(['apri', id]);
+const vistaAttivaP2P = () => vista;
+async function rinfrescaOnchainP2P(subito){ visto.push(['rilegge', subito]); if (rilettura) p2pOnchainLibro = rilettura; }
+""" + oc_fn + """
+let p2pCondivisoInVolo = false;
+const ordiniP2P = () => ({'LN-AAAA-1': {id: 'LN-AAAA-1'}});
+const apriOrdineP2P = id => visto.push(['ln', id]);
+""" + cond + """
+(async () => {
+  const R = {};
+  const giro = async (prima, id) => {
+    visto = []; myP2POnchain = true; vista = 'view-p2p'; VETRINA = false; myTgId = 111; rilettura = null;
+    p2pOnchainLibro = {quando: 5, eventi: [{id: 7, ordine: 'OC', lato: 'buy'}, {id: 9, ordine: 'bar-onchain-0123456789abcdef', lato: 'sell'}]};
+    prima();
+    const esito = await (id ? apriOrdineCondivisoP2P(id) : apriOrdineOnchainDaLinkP2P('bar-onchain-0123456789abcdef'));
+    return [esito, visto];
+  };
+  R.subito = await giro(() => {});
+  R.dopoRilettura = await giro(() => { rilettura = p2pOnchainLibro; p2pOnchainLibro = {quando: 0, eventi: []}; });
+  R.sparito = await giro(() => { p2pOnchainLibro = {quando: 5, eventi: []}; });
+  R.altrove = await giro(() => { vista = 'view-esplora'; });
+  R.vetrina = await giro(() => { VETRINA = true; });
+  R.dalCondiviso = (await giro(() => {}, 'bar-onchain-0123456789abcdef'))[1];
+  R.lnDalCondiviso = (await giro(() => {}, 'LN-AAAA-1'))[1];
+  console.log(JSON.stringify(R));
+})().catch(e => { console.error(e); process.exit(1); });
+""")
+    R = _node_banco(prog)
+    if R is None:
+        salta("la pagina apre la card on-chain", "node non c'e'")
+        return
+    prova("on-chain nel libro: il tab della card (chi ha pubblicato vende → «compro»), "
+          "il ridisegno, e il tocco sulla card (`apriOnchainP2P` col suo numero)",
+          ["aperto", [["lato", "compro"], ["render"], ["apri", 9]]], R.get("subito"))
+    prova("...non ancora nel libro in pagina: lo si rilegge, poi si apre", 
+          ["aperto", [["rilegge", True], ["lato", "compro"], ["render"], ["apri", 9]]],
+          R.get("dopoRilettura"))
+    prova("...non c'e' piu': lo dice, ridisegna il libro e non apre niente",
+          ["sparito", [["rilegge", True], ["toast", "₿ Quest'ordine non è più nel libro"], ["render"]]],
+          R.get("sparito"))
+    prova("...si e' andati altrove nel frattempo: niente fogli sopra un'altra pagina",
+          ["altrove", []], R.get("altrove"))
+    prova("...chi guarda da fuori Telegram vede la card nel suo tab, senza la presa",
+          ["aperto", [["lato", "compro"], ["render"]]], R.get("vetrina"))
+    prova("il link del «Condividi» con un nome on-chain va alla card on-chain; uno di "
+          "Mostro fa la strada di sempre",
+          [[["lato", "compro"], ["render"], ["apri", 9]], [["ln", "LN-AAAA-1"]]],
+          [R.get("dalCondiviso"), R.get("lnDalCondiviso")])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -213137,7 +213298,7 @@ def _esce(f):
 # cambio libero), onchain (il 2-di-3 e RGB).
 CATEGORIE = {
     "p2p": """
-    vetrina_pulita
+    vetrina_pulita apri_ordine_notifica
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
@@ -214441,6 +214602,7 @@ def main():
               prove_serie_brace,
               prove_sentinella_server_fermo,
               prove_caccia_a_tappo,
+              prove_apri_ordine_notifica,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)
