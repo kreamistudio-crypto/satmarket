@@ -90564,3 +90564,47 @@ del worktree in collaudo, 375 px scuro e chiaro: con 6,6,6,4,2,2,2,2
 giorni «🥇 1°» ×3, «4°», «5°» ×4; con tutti a 2, «1°» a tutti e nessuna
 medaglia. Scatti: /mnt/project-files/serie-giorni/classifica-posizioni-oggi.png
 e classifica-posizioni-esempio.png. NON PROVATO: un telefono vero.
+
+## La carta di Barattozon on-chain in «Compra BTC» uguale a quella di Lightning (18 nov 2026, cantiere barattozon-oc-carta; Andrea con quattro scatti dalla produzione: «l'annuncio viene visualizzato male. Deve vedersi come nel lighting», poi «Sì, sistemano tutto, deve essere uguale al lighting»)
+L'ordine con la fascia pubblicato da Andrea dopo la promozione del 17 sera
+si leggeva peggio del gemello Lightning. Sette differenze, tutte chiuse:
+1) la card diceva «Ricevi 25,00–250,00 €» e «≈ 408 018 sats» (solo il
+capo alto): ora «Ricevi da 25,00 a 250,00 €, scegli tu» e «≈ da X a Y
+sats»; il server manda `stima_min` accanto a `stima` (sul capo basso,
+stesso premio, stesso cambio) e `cifraOcP2P` scrive la fascia a parole
+con `da … a …` e gli spazi duri, come `capiP2P`; 2) il cartellino
+«⚡ Ottimo affare» mancava: `affaroneP2P`, stesso giudice e soglie;
+3) il logo piccolo dentro la scatola: ora l'insegna blu notte
+(`p2p-paga-marchio` quando `soloMarchiP2P`); 4) al posto del nome le
+stelline (`stellineP2P`): il server legge per persona lo stesso volto
+pubblico di `_facce_ordini_p2p` (media, voti, foto con la sua scelta,
+completati, marchi, «risponde in fretta») e lo manda come `rep`, SOLO
+con la sessione come il nome; `ordineVoltoOnchainP2P` lo copia chiave
+per chiave, mai una in più. Vale per tutte le card on-chain. 5) Chi
+prende trovava i campi del PayCode nel foglio della presa col tasto
+«Vendi»: ora il foglio mostra il riquadro della fascia di Lightning
+(`contoAttesaP2P`, «Scrivi i dati del tuo PayCode Amazon per vedere il
+dettaglio») e il tasto arancio «🧾 Il tuo PayCode», che apre il foglio
+«🧾 Il tuo PayCode Amazon» (`apriPayCodeBzOcP2P`) con le parole e le
+etichette di quello di Lightning; un no del telefono o del server riapre
+quel foglio coi dati scritti. Il seguito parte con `setTimeout` perché
+`eseguiConferma` rimette l'etichetta del bottone dopo il `poi`. 6) «Pubblicato
+da» è diventato il riquadro «Chi ha pubblicato quest'ordine» di Lightning
+(`repRiquadroP2P`), senza la porta del negozio: `apriNegozioDettP2P`
+chiude il foglio di Lightning, non questo. 7) Nel mio dettaglio, con la
+fascia ancora nel libro, il riquadro «da … a …» e la frase di Lightning
+(`FRASE_INTERVALLO_DOPO_PRESA`) al posto di un conto sul solo massimo; la
+card di «I miei scambi» dice «≈ da X a Y sats» al netto. TROVATI STRADA
+FACENDO E SISTEMATI perché stavano nelle stesse schermate: la frase sotto
+il foglio di chi prende diceva «Chi compra ti manda 250,00 €» (ora: paga
+il tuo PayCode al tabacchino) e il terzo passo del mio dettaglio prima
+della presa diceva «Euro inviati» (ora «PayCode pagato»). PROVATO:
+`prove_barattozon_onchain` (banco node: i due capi dei sats e degli euro,
+il volto senza chiavi in più; forme della carta, del foglio, del
+dettaglio; controprova: rotta la fascia e tolto il cartellino, due
+rosse); `collaudo_p2p_onchain_barattozon` sezione 7 (stima ai due capi,
+stelline con la sessione e senza niente; controprova sul `rep`, rossa)
+nel venv senza coincurve; scatti in Chromium della carta, del foglio di
+chi prende, del foglio del PayCode e del mio dettaglio. NON PROVATO: un
+telefono vero (il logo di Barattozon negli scatti non c'è perché la
+pagina girava da file).

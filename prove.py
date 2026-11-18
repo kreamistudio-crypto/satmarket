@@ -47202,7 +47202,10 @@ def prove_fogli_di_casa():
     # (`pubblicaOnchainDalFoglioP2P`), gemello di quello di Lightning.
     # CENTOVENTI (17 nov 2026, cantiere stradina): «Esci da Barattolo?»
     # sulla casella che porta al partner dell'educazione (`vaiTappa`).
-    prova("i gesti che passano dalla domanda unica sono centoventisei (dal 30 ott "
+    # CENTOVENTISETTE (18 nov 2026, cantiere barattozon-oc-carta): «🧾 Il tuo
+    # PayCode Amazon» on-chain (`apriPayCodeBzOcP2P`), il foglio dei dati
+    # aperto da «🧾 Il tuo PayCode» come su Lightning.
+    prova("i gesti che passano dalla domanda unica sono centoventisette (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47218,8 +47221,9 @@ def prove_fogli_di_casa():
           "raccolta?» delle raccolte; «Hai consegnato i contanti?» del "
           "contanti on-chain; «Brucia la cauzione» e «Metà mandata» del "
           "moderatore sulla cauzione on-chain; «Chi compra non ha scelto dove "
-          "ricevere» davanti a «Ricevuti» on-chain)",
-          126, solo_codice(mini).count("chiediConferma({"))
+          "ricevere» davanti a «Ricevuti» on-chain; dal 18 nov il foglio «🧾 Il "
+          "tuo PayCode Amazon» di Barattozon on-chain in «Compra BTC»)",
+          127, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -166835,7 +166839,10 @@ console.log(JSON.stringify(out));
     prova("la presa dice la rete: fulmine a Lightning, moneta e Compra/Vendi on-chain",
           (True, True, True, True, False),
           ("(daScegliere ? (bz ? '🧾 Il tuo PayCode' : 'Scegli') : '<span class=\"p2p-invia-ico\">⚡</span>' + (compro ? 'Compra' : 'Vendi'))" in mini,
-           "etichetta: vendeLui ? 'Compra' : 'Vendi',\n    vestito: vendeLui ? 'compro-oc' : 'vendo-oc'," in _oc_presa,
+           # (18 nov 2026, barattozon-oc-carta) col Barattozon in «Compra
+           # BTC» il primo tocco e' «🧾 Il tuo PayCode» arancio, come la'
+           "etichetta: bzC ? '🧾 Il tuo PayCode' : vendeLui ? 'Compra' : 'Vendi',\n"
+           "    vestito: bzC ? '' : vendeLui ? 'compro-oc' : 'vendo-oc'," in _oc_presa,
            "ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-ico-3d';" in _conf,
            # dal 16 nov (cantiere ricevi-mercato) l'icona la sceglie
            # iconaPresaOcP2P, che col tasto «⚡ Lightning» mette il fulmine
@@ -173057,8 +173064,10 @@ def prove_dati_reputazione_p2p():
            '"completati": rep["completati"]' in pezzo("_posso_prendere_p2p")))
     volti = [src[m.start():m.start() + 3000] for m in re.finditer(
         r"marchi = _marchi_mancati_p2p\(", src)]
-    prova("...e i due costruttori dei volti portano il conto dei completati dal suo "
-          "giudice (una query per tutti), mai i numeri grezzi della reputazione", (2, 2, []),
+    # (18 nov 2026, barattozon-oc-carta) il terzo: le stelline delle card
+    # on-chain, nella fotografia del libro (`_p2p_onchain_rifai_foto`)
+    prova("...e i tre costruttori dei volti portano il conto dei completati dal suo "
+          "giudice (una query per tutti), mai i numeri grezzi della reputazione", (3, 3, []),
           (len(volti), sum(1 for v in volti if "fatti = _completati_p2p(con, " in v
                            and '["completati"] = fatti[' in v),
            [v[:80] for v in volti if "_reputazione_p2p(" in v]))
@@ -192996,6 +193005,61 @@ console.log(JSON.stringify(r));
     prova("chi l'ha scritto rivede il suo PayCode, e un ordine senza tabacchino non ha riquadro",
           [True, True, ""],
           ["212-802-988" in out["chiVende"], "Il tuo PayCode" in out["chiVende"], out["senzaTab"]])
+
+    # LA CARTA E IL FOGLIO COME QUELLI DI LIGHTNING (18 nov 2026, cantiere
+    # barattozon-oc-carta, Andrea: «deve essere uguale al lighting»)
+    banco = (_fn_js(mini, "function satsCardOnchainP2P(o){") + _fn_js(mini, "function cifraOcP2P(o){")
+             + _fn_js(mini, "function ordineVoltoOnchainP2P(o){") + r"""
+const fmt = n => Number(n).toLocaleString('it-IT'), fmtSoldiP2P = e => Number(e).toFixed(2).replace('.', ',');
+const segnoValutaP2P = c => '€', valutaOrdineP2P = o => 'EUR', usdtOcP2P = o => false;
+const fascia = {mercato: true, sats: 0, euro: 250, euro_min: 25, stima: 408018, stima_min: 40802};
+const r = {};
+r.sats = [satsCardOnchainP2P(fascia), satsCardOnchainP2P({mercato: true, sats: 0, stima: 98000}),
+          satsCardOnchainP2P(Object.assign({}, fascia, {stima_min: 0}))];
+r.euro = [cifraOcP2P(fascia), cifraOcP2P({euro: 50})];
+r.volto = [ordineVoltoOnchainP2P({id: 3, nome: 'A', rep: {media: 5, voti: 4, completati: 4, avatar: 'x.webp',
+             mancati: 2, dispute: 1, veloce: true, tg_id: 7}}).faccia,
+           ordineVoltoOnchainP2P({id: 4, nome: 'B', rep: {media: 0, voti: 0}}).faccia];
+console.log(JSON.stringify(r));
+""")
+    out = _node_banco(banco)
+    if out is None:
+        salta("il banco della carta Barattozon on-chain", "serve node")
+        return
+    prova("la carta: i sats ai due capi della fascia («≈ da X a Y»), senza il capo basso il "
+          "solo massimo come prima; gli euro a parole, «da 25,00 a 250,00 €»",
+          [["≈ da\u00a040.802 a\u00a0408.018 sats", "≈ 98.000 sats", "≈ 408.018 sats"],
+           ["da\u00a025,00 a\u00a0250,00 €", "50,00 €"]], [out["sats"], out["euro"]])
+    prova("il volto della card on-chain prende stelline, foto, scambi e marchi come quello di "
+          "Lightning, mai una chiave in piu' (niente tg_id); senza voti niente stelle",
+          [{"nome": "A", "avatar": "x.webp", "voti": 4, "media": 5, "completati": 4, "mancati": 2,
+            "dispute": 1, "veloce": True}, {"nome": "B"}], out["volto"])
+    roc = _fn_js(mini, "function rigaOnchainP2P(o){")
+    prova("...e la carta del libro: «, scegli tu» sulla fascia, il cartellino dell'affare, "
+          "l'insegna di Barattozon e le stelline al posto del nome",
+          [True, True, True, True, False],
+          ["(Number(o.euro_min) > 0 ? ', scegli\\u00a0tu' : '')" in roc,
+           "badge + affarone" in roc and "affaroneP2P({lato: o.lato" in roc,
+           "${insegna ? ' p2p-paga-marchio' : ''}" in roc,
+           "stellineP2P(ov.faccia)" in roc, "esc(o.nome)" in roc])
+    aoc = _fn_js(mini, "function apriOnchainP2P(id, modo){")
+    prova("il foglio di chi prende: il riquadro di chi ha pubblicato, la fascia in attesa e «🧾 Il "
+          "tuo PayCode», che apre il foglio dei dati a parte",
+          [True, True, True, True],
+          ["repRiquadroP2P(Object.assign({}, ordineVoltoOnchainP2P(o).faccia, {negozio: ''})" in aoc,
+           "'Scrivi i dati del tuo PayCode Amazon per vedere il dettaglio')" in aoc,
+           "etichetta: bzC ? '🧾 Il tuo PayCode'" in aoc,
+           "setTimeout(() => apriPayCodeBzOcP2P(Number(o.id)), 350)" in aoc])
+    prova("...e un PayCode rifiutato (dal telefono o dal server) riapre il foglio dei dati",
+          [True, True],
+          ["setTimeout(() => apriPayCodeBzOcP2P(id), 350);\n    return;" in _fn_js(mini, "async function prendiBzOcP2P(id){"),
+           "if (extra && extra.tabacchino) setTimeout(() => apriPayCodeBzOcP2P(id), 350);" in mini])
+    prova("il mio dettaglio con la fascia nel libro: il riquadro «da … a …» di Lightning, e il "
+          "terzo passo e' gia' il tabacchino",
+          [True, True],
+          ["contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),\n"
+           "                       FRASE_INTERVALLO_DOPO_PRESA)" in _fn_js(mini, "function schedaOnchainP2P(o){"),
+           "if ((o.tabacchino || Number(o.euro_min) > 0) && typeof tabacchinoP2P" in mini])
 
 
 def prove_estensione_barattozon():

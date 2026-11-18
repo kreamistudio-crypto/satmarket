@@ -109289,6 +109289,12 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
     if mercato and not int(o["prezzo_sats"] or 0):
         d["stima"] = p2p_onchain_sats_mercato(p2p_onchain_cent_mercato(o), d["premio"],
                                               _p2p_onchain_cambio(o))
+        # ...e il primo capo della fascia, per «≈ da X a Y sats» come la
+        # card di Lightning (18 nov 2026, cantiere barattozon-oc-carta)
+        if "euro_min" in d:
+            d["stima_min"] = p2p_onchain_sats_mercato(
+                int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0), d["premio"],
+                _p2p_onchain_cambio(o))
     if not pubblico:
         d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
         # ...e le sue due soglie, una per verso (17 nov 2026)
@@ -109344,6 +109350,39 @@ def _p2p_onchain_rifai_foto() -> None:
                     except Exception:
                         negozi[maker] = ""
                 o["_negozio"] = negozi[maker]
+            # LE STELLINE DI CHI PUBBLICA, come sulla card di Lightning (18
+            # nov 2026, cantiere barattozon-oc-carta, Andrea: «deve essere
+            # uguale al lighting»): lo stesso volto pubblico di
+            # `_facce_ordini_p2p` — media, voti, foto (con la sua scelta),
+            # scambi completati e i marchi —, letto per persona
+            rep = {}
+            try:
+                makers = sorted({m for _, m, _ in foto})
+                marchi = _marchi_mancati_p2p(con, makers, adesso)
+                perse = _marchi_dispute_p2p(con, makers, adesso)
+                fatti = _completati_p2p(con, makers)
+                veloci = _veloci_p2p(con, makers, adesso)
+                for m in makers:
+                    u = con.execute(
+                        "SELECT rating, n_feedback, (CASE WHEN avatar_scelta='nessuna' "
+                        "THEN '' ELSE avatar END) AS avatar FROM utenti WHERE tg_id=?",
+                        (m,)).fetchone()
+                    voti = int(u["n_feedback"] or 0) if u else 0
+                    v = {"media": round(float(u["rating"] or 0), 1) if voti else 0,
+                         "voti": voti, "avatar": (u["avatar"] or "") if u else ""}
+                    if marchi.get(m):
+                        v["mancati"] = marchi[m]
+                    if perse.get(m):
+                        v["dispute"] = perse[m]
+                    if fatti.get(m):
+                        v["completati"] = fatti[m]
+                    if m in veloci:
+                        v["veloce"] = True
+                    rep[m] = v
+            except Exception:
+                rep = {}
+            for o, maker, _ in foto:
+                o["_rep"] = rep.get(maker) or {}
         finally:
             con.close()
     except Exception as e:
@@ -109375,6 +109414,9 @@ def _p2p_onchain_libro(chi: int) -> dict:
         # la porta del volto, con la sessione come il nome (12 nov 2026)
         if chi and o.get("_negozio"):
             riga["negozio"] = o["_negozio"]
+        # ...e le stelline, con la sessione come il nome (18 nov 2026)
+        if chi and o.get("_rep"):
+            riga["rep"] = dict(o["_rep"])
         # lo scudo 🛡️ Staff all'angolo del volto, come sulla card di
         # Lightning (16 nov 2026, Andrea: «non ho più il badge da
         # moderatore» sul suo ordine USDe on-chain): il si', mai il tg_id,

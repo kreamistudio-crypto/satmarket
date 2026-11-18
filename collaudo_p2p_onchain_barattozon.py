@@ -386,6 +386,23 @@ def main():
           [25.0, 250.0, ["fa", "25", "250"], ""],
           [ev[0].get("euro_min") if ev else None, ev[0].get("euro") if ev else None,
            [t for t in SRV.p2p_onchain_tags(rc) if t[0] == "fa"][0], rc["paycode"]])
+    # LA CARTA COME QUELLA DI LIGHTNING (18 nov 2026, cantiere
+    # barattozon-oc-carta): i due capi della stima, «≈ da X a Y sats», e le
+    # stelline di chi pubblica, solo con la sessione
+    con = SRV.db()
+    con.execute("UPDATE utenti SET rating=4.5, n_feedback=3 WHERE tg_id=888")
+    con.commit()
+    con.close()
+    SRV._p2p_onchain_rifai_foto()
+    ev = [e for e in libro(999)["onchain"]["eventi"] if int(e["id"]) == oc]
+    muto = [e for e in SRV._p2p_onchain_libro(0)["eventi"] if int(e["id"]) == oc]
+    prova("la stima ai due capi della fascia (50.000 e 500.000 sats a 50.000 €), le stelline "
+          "con la sessione e senza la sessione niente",
+          [50000, 500000, 4.5, 3, False, False],
+          [ev[0].get("stima_min") if ev else None, ev[0].get("stima") if ev else None,
+           (ev[0].get("rep") or {}).get("media") if ev else None,
+           (ev[0].get("rep") or {}).get("voti") if ev else None,
+           "rep" in (muto[0] if muto else {"rep": 1}), "nome" in (muto[0] if muto else {"nome": 1})])
     adesso = int(time.time())
     no_pc = gesto(999, oc, "prendi")
     no_fuori = gesto(999, oc, "prendi", tabacchino={"paycode": PC, "scade": adesso + 24 * 3600,

@@ -72821,6 +72821,15 @@ function ordineVoltoOnchainP2P(o){
   /* ...e lo scudo 🛡️ Staff (16 nov 2026, Andrea: «non ho più il badge da
      moderatore»): lo dice il server, come per il volto di Lightning */
   if (o.staff === true) faccia.staff = true;
+  /* ...e le stelline, la foto e gli scambi, come il volto di Lightning (18
+     nov 2026, cantiere barattozon-oc-carta, Andrea: «deve essere uguale al
+     lighting»): li manda il server con la sessione (`rep`), chiave per
+     chiave, mai un campo che il volto di Lightning non ha */
+  const rep = o.rep && typeof o.rep === 'object' ? o.rep : {};
+  if (rep.avatar) faccia.avatar = String(rep.avatar);
+  if (Number(rep.voti) > 0 && Number(rep.media) > 0) { faccia.voti = Number(rep.voti); faccia.media = Number(rep.media); }
+  ['completati', 'mancati', 'dispute'].forEach(k => { if (Number(rep[k]) > 0) faccia[k] = Number(rep[k]); });
+  if (rep.veloce === true) faccia.veloce = true;
   return {id: 'oc-' + Number(o.id), scade: Number(o.scade) || 0,
           creato: Number(o.creato) || 0, faccia};
 }
@@ -72830,6 +72839,10 @@ function ordineVoltoOnchainP2P(o){
    cantiere oc-identico), o la frase se il cambio non c'e' */
 function satsCardOnchainP2P(o){
   if (!o.mercato || Number(o.sats) > 0) return fmt(Number(o.sats) || 0) + ' sats';
+  /* la fascia di Barattozon in «Compra BTC» coi suoi due capi, «≈ da X a Y
+     sats» come la card di Lightning (18 nov 2026, barattozon-oc-carta) */
+  if (Number(o.euro_min) > 0 && Number(o.stima_min) > 0 && Number(o.stima) > 0)
+    return '≈ da\u00a0' + fmt(Number(o.stima_min)) + ' a\u00a0' + fmt(Number(o.stima)) + ' sats';
   return Number(o.stima) > 0 ? '≈ ' + fmt(Number(o.stima)) + ' sats' : 'sats contati quando lo prendi';
 }
 /* PURA: fino a quando l'ordine di un ALTRO e' fermo per la sua pausa
@@ -72849,8 +72862,12 @@ function rigaOnchainP2P(o){
   /* LA COPPIA IN ALTO A DESTRA, come la card di Mostro (12 nov 2026,
      cantiere card-coppia): la valuta e la ₿ arancio con la freccia del
      gesto; davanti ai verbi non c'e' piu' nessuna icona */
+  /* LA FASCIA DI BARATTOZON COME LA CARD DI LIGHTNING (18 nov 2026,
+     cantiere barattozon-oc-carta, Andrea: «deve essere uguale al
+     lighting»): «Ricevi da 25,00 a 250,00 €, scegli tu», il «tu» a capo
+     intero con lo spazio duro */
   const rigaEuro = '<span class="p2p-grande p2p-euro">' + (paghiEuro ? 'Invia ' : 'Ricevi ')
-    + esc(cifraOc(o)) + '</span>';
+    + esc(cifraOc(o)) + (Number(o.euro_min) > 0 ? ', scegli\u00a0tu' : '') + '</span>';
   const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">'
     + (paghiEuro ? 'Ricevi ' : 'Invia ') + '</span>' + esc(satsCardOnchainP2P(o)) + '</span>';
   const coppia = typeof coppiaCardP2P === 'function'
@@ -72869,10 +72886,18 @@ function rigaOnchainP2P(o){
     + esc(traQuantoP2P(pausa - adesso)) + '</b></div>' : '';
   const badge = o.mercato && typeof badgePremioP2P === 'function'
     ? badgePremioP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0}) : '';
+  /* ...col cartellino dell'affare accanto, lo stesso giudice e le stesse
+     soglie di Lightning (18 nov 2026) */
+  const affarone = badge && typeof affaroneP2P === 'function'
+    ? affaroneP2P({lato: o.lato, premium: Number(o.premio) || 0, sats: 0}) : '';
   const filtro = Number(o.filtro) > 0 ? '<div class="p2p-box p2p-accesso">🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</div>' : '';
   const metodi = Array.isArray(o.metodi) ? o.metodi : [];
+  /* LA SCATOLA DIVENTA L'INSEGNA quando dentro c'e' solo un marchio, il
+     banner pieno di Barattozon della card di Lightning (18 nov 2026): lo
+     stesso giudice, `soloMarchiP2P` */
+  const insegna = typeof soloMarchiP2P === 'function' && soloMarchiP2P(metodi);
   const paga = metodi.length
-    ? `<div class="p2p-box p2p-paga" title="${esc(metodi.join(', '))}">`
+    ? `<div class="p2p-box p2p-paga${insegna ? ' p2p-paga-marchio' : ''}" title="${esc(metodi.join(', '))}">`
       + metodi.map(m => typeof marchioMetodoP2P === 'function' ? marchioMetodoP2P(m) : esc(m)).join(', ')
       + '</div>' : '';
   /* LA ZONA DI SCAMBIO DEL CONTANTI, come sulla card di Lightning (17 nov
@@ -72881,16 +72906,20 @@ function rigaOnchainP2P(o){
      «📍 Milano centro» sotto i metodi. La porta la riga del server; gli
      ordini pubblicati prima di oggi non ce l'hanno e non mostrano niente */
   const zona = typeof rigaZonaP2P === 'function' ? rigaZonaP2P({metodi: metodi, zona: o.zona}) : '';
+  /* LE STELLINE AL POSTO DEL NOME, come la card di Lightning (18 nov
+     2026): «⭐ 5,0 · 4 · ✅ 4 scambi P2P» dal volto che il server manda
+     con la sessione; senza voti ne' scambi, come la', il solo volto */
+  const rep = typeof stellineP2P === 'function' ? stellineP2P(ov.faccia) : '';
   return `<div class="p2p-ord p2p-onchain${paghiEuro ? ' lato-compro' : ' lato-vendo'}${barra ? ' con-barra' : ''}${mio ? ' p2p-mio' : ''}${fermo ? ' p2p-in-pausa' : ''}" data-id="${Number(o.id)}" role="button" tabindex="0"${fermo ? ' aria-disabled="true"' : ''}
     onclick="apriOnchainP2P(Number(this.dataset.id))">
     ${fermo}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${coppia}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
-    ${badge ? '<div class="p2p-badge-riga">' + badge + '</div>' : ''}
+    ${badge ? '<div class="p2p-badge-riga">' + badge + affarone + '</div>' : ''}
     ${paga}
     ${zona}
     ${filtro}
-    <div class="p2p-box p2p-rep">${volto}${o.nome ? '<span class="p2p-rep-testo">' + esc(o.nome) + '</span>' : ''}</div>
+    <div class="p2p-box p2p-rep">${volto}${rep ? '<span class="p2p-rep-testo">' + rep + '</span>' : ''}</div>
     ${mio && pausa ? '<div class="p2p-box p2p-pausa">⏸ In pausa fino ' + esc(quandoPausaP2P(pausa)) + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
     ${barra}
@@ -72959,6 +72988,7 @@ function apriOnchainP2P(id, modo){
      non si prende; scritte e controllate, la presa riparte da qui */
   if (typeof backupOnchainPrima === 'function' && !backupOnchainPrima(() => apriOnchainP2P(id, modo))) return;
   const conTasti = typeof reteOcPresaPossibileP2P === 'function' && reteOcPresaPossibileP2P(vendeLui);
+  const bzC = typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o);
   chiediConferma({
     /* lo stesso cappello del dettaglio Lightning, con la rete sotto
        (20:24, Andrea): era «⛓️ Compri bitcoin on-chain» */
@@ -72968,13 +72998,28 @@ function apriOnchainP2P(id, modo){
     via: conTasti ? '' : 'via on-chain',
     testata: (conTasti ? '<div id="p2pOcPresaRete" style="margin-bottom:12px">'
         + reteOcPresaHtmlP2P(o, vendeLui) + '</div>' : '')
-      + '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
-      + esc(cifraOc(o)) + '</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : '')
+      /* BARATTOZON IN «COMPRA BTC» COME IL DETTAGLIO DI LIGHTNING (18 nov
+         2026, cantiere barattozon-oc-carta, Andrea: «deve essere uguale al
+         lighting»): in cima l'insegna del metodo, la cifra la dice il
+         riquadro della fascia piu' sotto (`contoAttesaP2P`) */
+      + (bzC ? '<div class="p2p-onchain-riass"><div class="p2p-box p2p-paga p2p-paga-marchio" title="'
+          + esc(metodi) + '">' + (o.metodi || []).map(m => typeof marchioMetodoP2P === 'function'
+            ? marchioMetodoP2P(m) : esc(m)).join(', ') + '</div>'
+          + '<small>Chi ha pubblicato paga in contanti al tabacchino il PayCode Amazon che scrivi tu.</small>'
+        : '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
+          + esc(cifraOc(o)) + '</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : ''))
       /* «quando prendi L'ORDINE» (16 nov 2026, mappa-recenti): la frase
          finiva su «prendi» e la riga sotto, «di Jj», la continuava */
       + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi l\'ordine.</small>' : '')
       + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
-      + (o.nome ? '<br><small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
+      /* «Pubblicato da» e' diventato il riquadro di Lightning, qui sotto
+         (18 nov 2026); senza il riquadro resta la riga di prima */
+      + (o.nome && typeof repRiquadroP2P !== 'function' ? '<br><small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
+      /* «CHI HA PUBBLICATO QUEST'ORDINE», con stelle, recensioni, volto e
+         scambi, il riquadro del dettaglio di Lightning (18 nov 2026): senza
+         la porta del negozio, che chiuderebbe il foglio di Lightning */
+      + (typeof repRiquadroP2P === 'function'
+        ? repRiquadroP2P(Object.assign({}, ordineVoltoOnchainP2P(o).faccia, {negozio: ''}), 'oc-' + Number(o.id)) : '')
       /* IL LUOGO E LA REGOLA DEL CONTANTI, come nel dettaglio Lightning
          (17 nov 2026, cantiere onchain-contanti): la zona se «Contanti» e'
          fra i metodi; la regola col tetto quando e' l'UNICO metodo (con
@@ -72998,7 +73043,11 @@ function apriOnchainP2P(id, modo){
          i sats, la MIA meta' della fee e il totale, dal mio verso.
          Barattozon in «Compra BTC» (17 nov 2026 sera): al suo posto i dati
          del PayCode, che fanno la cifra */
-      + (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o) ? corpoPresaBzOcP2P(o)
+      /* ...e dal 18 nov 2026 il riquadro della fascia di Lightning, «da 25,00
+         a 250,00 €» con la sua frase: i dati del PayCode li chiede il foglio
+         «🧾 Il tuo PayCode», come la' */
+      + (bzC ? contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),
+                              'Scrivi i dati del tuo PayCode Amazon per vedere il dettaglio')
         : typeof contoOnchainP2P === 'function'
         ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '" id="p2pOcPresaConto">'
           + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo',
@@ -73011,12 +73060,14 @@ function apriOnchainP2P(id, modo){
        lo prende sa se e' onchain o lightning»): era «Prendi lo scambio»
        arancio; adesso il verde o il rosso del lato, con la moneta
        a sinistra (`vestito: 'compro-oc'` / `'vendo-oc'`, vedi chiediConferma) */
-    etichetta: vendeLui ? 'Compra' : 'Vendi',
-    vestito: vendeLui ? 'compro-oc' : 'vendo-oc',
+    /* Barattozon in «Compra BTC»: «🧾 Il tuo PayCode» arancio, che apre il
+       foglio dei dati come su Lightning (18 nov 2026). Il seguito parte a
+       foglio chiuso e col bottone gia' rimesso (`eseguiConferma`) */
+    etichetta: bzC ? '🧾 Il tuo PayCode' : vendeLui ? 'Compra' : 'Vendi',
+    vestito: bzC ? '' : vendeLui ? 'compro-oc' : 'vendo-oc',
     reteLn: conTasti && (p2pOcPresaRete[o.id] || {}).rete === 'ln',
-    poi: () => (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o))
-      ? prendiBzOcP2P(Number(o.id)) : prendiOnchainP2P(Number(o.id))});
-  if (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o)) riempiPresaBzOcP2P(o.id);
+    poi: () => bzC ? void setTimeout(() => apriPayCodeBzOcP2P(Number(o.id)), 350)
+      : prendiOnchainP2P(Number(o.id))});
 }
 
 /* ══ BARATTOZON IN «COMPRA BTC», LA PRESA ON-CHAIN (17 nov 2026 sera,
@@ -73032,20 +73083,37 @@ let p2pOcBzPresa = {};
 function bzOcInCompraP2P(o){
   return !!o && o.lato === 'buy' && tabacchinoP2P(o.metodi) && Number(o.euro_min) > 0;
 }
+/* IL FOGLIO «🧾 IL TUO PAYCODE AMAZON» (18 nov 2026, cantiere
+   barattozon-oc-carta, Andrea: «deve essere uguale al lighting»): i campi
+   stavano nel foglio della presa; adesso hanno il loro, aperto da «🧾 Il
+   tuo PayCode», con le parole e le etichette di quello di Lightning
+   (`corpoPresaBzP2P`). Gli id restano i suoi. */
 function corpoPresaBzOcP2P(o){
   return '<div class="p2p-box p2p-bz-presa">'
-    + '<div class="hint">🧾 Fai l\'ordine su Amazon con «Paga in contanti» (da <b>'
-    + esc(fmtEur(o.euro_min)) + '</b> a <b>' + esc(fmtEur(o.euro)) + ' €</b>) e scrivi qui il PayCode. '
-    + 'Chi compra lo vede solo coi tuoi sats confermati.</div>'
-    + '<div class="field"><label for="p2pOcBzEuro">Importo, in euro</label>'
-    + '<input id="p2pOcBzEuro" type="text" inputmode="decimal" placeholder="47,30" autocomplete="off"></div>'
+    + '<div class="hint">Chi ha pubblicato compra sats e li paga <b>in contanti al tabacchino</b>, '
+    + 'con un PayCode Amazon da <b>' + esc(fmtEur(o.euro_min)) + ' €</b> a <b>' + esc(fmtEur(o.euro)) + ' €</b>. '
+    + 'Fai l\'ordine su Amazon scegliendo «Paga in contanti», poi scrivi qui i dati della mail: '
+    + 'chi compra li vede solo quando i tuoi sats sono confermati.</div>'
+    + '<div class="field"><label for="p2pOcBzEuro">Importo del PayCode, in euro</label>'
+    + '<div class="campo-pre"><span class="pre">€</span>'
+    + '<input id="p2pOcBzEuro" type="text" inputmode="decimal" placeholder="47,30" autocomplete="off"></div></div>'
     + '<div class="field"><label for="p2pOcBzOrdine">PayCode (9 cifre)</label>'
     + '<input id="p2pOcBzOrdine" type="text" inputmode="numeric" placeholder="479-868-518" autocomplete="off"></div>'
-    + '<div class="field"><label for="p2pOcBzScade">Scade il</label>'
+    + '<div class="field"><label for="p2pOcBzScade">Scade il (data e ora, dalla mail di Amazon)</label>'
     + '<input id="p2pOcBzScade" type="text" placeholder="17/09/2026 alle 14:30" autocomplete="off"></div>'
-    + '<div class="field"><label for="p2pOcBzBarre">Codice a barre (facoltativo)</label>'
-    + '<input id="p2pOcBzBarre" type="text" placeholder="link del PDF o 0100…" maxlength="800" autocomplete="off"></div>'
+    + '<div class="field"><label for="p2pOcBzBarre">Codice a barre (facoltativo): link del PDF di Amazon o numero lungo</label>'
+    + '<input id="p2pOcBzBarre" type="text" placeholder="https://… oppure 0100…" maxlength="800" autocomplete="off"></div>'
     + '</div>';
+}
+function apriPayCodeBzOcP2P(id){
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  if (!o) return toast('₿ Quest\'ordine non è più nel libro', 4000);
+  chiediConferma({titolo: '🧾 Il tuo PayCode Amazon', via: 'via on-chain',
+    testata: corpoPresaBzOcP2P(o),
+    etichetta: 'Vendi', vestito: 'vendo-oc',
+    reteLn: (p2pOcPresaRete[o.id] || {}).rete === 'ln',
+    poi: () => prendiBzOcP2P(Number(o.id))});
+  riempiPresaBzOcP2P(o.id);
 }
 function valoriPresaBzOcP2P(){
   const v = id => { const i = el(id); return i ? String(i.value || '') : ''; };
@@ -73071,7 +73139,8 @@ async function prendiBzOcP2P(id){
   const g = valePresaBzOcP2P(o, val);
   if (!g.ok) {
     toast(g.manca, 6000);
-    setTimeout(() => apriOnchainP2P(id), 350);
+    /* si torna al foglio del PayCode, coi dati gia' scritti (18 nov 2026) */
+    setTimeout(() => apriPayCodeBzOcP2P(id), 350);
     return;
   }
   return prendiOnchainP2P(id, {tabacchino: {paycode: String(g.tab.ordine).replace(/-/g, ''),
@@ -73307,7 +73376,12 @@ function corpoPresaOcP2P(o, vendeLui){
       : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
         + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore'
         + (ln ? ', pagando da Lightning con lo swap' : '') + '. '
-        + (cont ? 'Poi scrivi nello scambio dove vedervi: chi compra ti consegna ' + esc(fmtSoldiP2P(o.euro, o))
+        /* Barattozon in «Compra BTC» (18 nov 2026, barattozon-oc-carta): chi
+           compra non manda euro, paga il TUO PayCode al tabacchino */
+        + (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o)
+           ? 'Chi compra paga in contanti al tabacchino il tuo PayCode Amazon, e tu liberi i sats SOLO quando '
+             + 'Amazon ti conferma il pagamento. Se non arriva, apri una disputa: decide un moderatore.'
+           : cont ? 'Poi scrivi nello scambio dove vedervi: chi compra ti consegna ' + esc(fmtSoldiP2P(o.euro, o))
                   + ' € in contanti e tu liberi i sats SOLO dopo averli contati, lì davanti a lui. '
                   + 'Se non te li dà, apri una disputa: decide un moderatore.'
            : 'Chi compra ti manda ' + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
@@ -73659,7 +73733,7 @@ async function prendiOnchainP2P(id, extra){
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       /* il PayCode rifiutato dal server: il foglio torna coi dati scritti */
-      if (extra && extra.tabacchino) setTimeout(() => apriOnchainP2P(id), 350);
+      if (extra && extra.tabacchino) setTimeout(() => apriPayCodeBzOcP2P(id), 350);
       throw new Error(d.detail || 'non si è potuto prendere');
     }
     if (extra && extra.tabacchino) delete p2pOcBzPresa[id];
@@ -74445,7 +74519,12 @@ function rigaScambioOnchainP2P(o){
      «Deposita»), come la card di Lightning — vedi `satsNettiOnchainP2P`.
      Senza una base (a mercato senza stima) resta la frase di prima. */
   const netto = typeof satsNettiOnchainP2P === 'function' ? satsNettiOnchainP2P(o) : null;
-  const sats = netto ? (netto.circa ? '≈ ' : '') + fmt(netto.sats) + ' sats'
+  /* la fascia di Barattozon ancora nel libro coi suoi due capi, al netto
+     come l'altro (18 nov 2026, barattozon-oc-carta) */
+  const capoBasso = netto && Number(o.euro_min) > 0 && Number(o.stima_min) > 0
+    ? satsNettiOnchainP2P(Object.assign({}, o, {stima: Number(o.stima_min)})) : null;
+  const sats = netto && capoBasso ? '≈ da\u00a0' + fmt(capoBasso.sats) + ' a\u00a0' + fmt(netto.sats) + ' sats'
+    : netto ? (netto.circa ? '≈ ' : '') + fmt(netto.sats) + ' sats'
     : typeof satsCardOnchainP2P === 'function' ? satsCardOnchainP2P(o)
     : fmt(Number(o.sats) || 0) + ' sats';
   const cifraSats = '<span class="p2p-sats ' + (ricevoSats ? 'riceve' : 'invia') + '">' + esc(sats) + '</span>';
@@ -74773,7 +74852,9 @@ function usdtOcP2P(o){ return typeof usdtP2P === 'function' && usdtP2P(o); }
 function cifraOcP2P(o){
   const cod = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(o) : (usdtOcP2P(o) ? 'USDT' : 'EUR');
   /* la fascia di Barattozon in «Compra BTC», finche' nessuno l'ha presa */
-  return (Number(o.euro_min) > 0 ? fmtSoldiP2P(o.euro_min, o) + '–' : '') + fmtSoldiP2P(o.euro, o) + ' '
+  /* ...«da 25,00 a 250,00 €», a parole come la card di Lightning (18 nov
+     2026, barattozon-oc-carta: «25,00–250,00 €» non si leggeva) */
+  return (Number(o.euro_min) > 0 ? 'da\u00a0' + fmtSoldiP2P(o.euro_min, o) + ' a\u00a0' : '') + fmtSoldiP2P(o.euro, o) + ' '
     + (typeof segnoValutaP2P === 'function' ? segnoValutaP2P(cod) : usdtOcP2P(o) ? 'USDT' : '€');
 }
 /* PURA: una FRASE scritta per gli euro, detta nella valuta dello
@@ -75487,7 +75568,14 @@ function schedaOnchainP2P(o){
      funzione da sola; al moderatore la chat delle parti in lettura */
   return (typeof chatOcRichiamoHTML === 'function' ? chatOcRichiamoHTML(o) : '')
     + parti
-    + '<div class="p2p-ord lato-' + (vendo ? 'vendo' : 'compro') + '">' + contoOnchainP2P(o) + '</div>'
+    /* LA FASCIA DI BARATTOZON ANCORA NEL LIBRO, come il dettaglio di
+       Lightning sul proprio intervallo (18 nov 2026, cantiere
+       barattozon-oc-carta): «da 25,00 a 250,00 €» e la frase, al posto di
+       un conto che sapeva solo il capo alto; preso, il conto vero */
+    + (Number(o.euro_min) > 0 && o.stato === 'pending' && typeof contoAttesaP2P === 'function'
+      ? contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),
+                       FRASE_INTERVALLO_DOPO_PRESA)
+      : '<div class="p2p-ord lato-' + (vendo ? 'vendo' : 'compro') + '">' + contoOnchainP2P(o) + '</div>')
     + '<div class="p2p-passi"><div class="steps">'
     + ps.passi.map((p, i) => {
         const cl = ps.fermo >= 0 ? (i < ps.fermo ? 'done' : i === ps.fermo ? 'stop' : 'todo')
@@ -76093,7 +76181,8 @@ function passiOnchainP2P(o){
   if (o.stato === 'pending') passi[0] = {t: 'Ordine pubblicato',
     d: vendo ? 'Aspetta chi ti compra i sats' : 'Aspetta chi ti vende i sats'};
   /* Barattozon on-chain (17 nov 2026): il terzo passo e' il tabacchino */
-  if (o.tabacchino && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
+  /* ...anche con la fascia ancora nel libro, prima del PayCode (18 nov 2026) */
+  if ((o.tabacchino || Number(o.euro_min) > 0) && typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi))
     passi[2] = {t: 'PayCode pagato', d: vendo ? 'Al tabacchino, da chi compra' : 'Al tabacchino, in contanti'};
   /* in contanti di persona il terzo passo e' la consegna (17 nov 2026) */
   if (typeof contantiOcP2P === 'function' && contantiOcP2P(o))

@@ -605,7 +605,7 @@ pubblico: sì
 
 ## 2026-11-17 · barattozon-oc-compra
 frase: Barattozon on-chain adesso c'è anche in «Compra BTC»: scegli il tabacchino, tocca «On-chain» e scrivi da quanto a quanto. Chi prende l'ordine scrive il suo PayCode; tu lo vedi quando i suoi sats sono nel deposito di garanzia e lo paghi al tabacchino.
-dove: Il P2P, «Compra BTC» → metodo «Contanti al tabacchino», il tasto «On-chain» in cima al foglio; chi prende scrive importo, PayCode e scadenza nel foglio della presa.
+dove: Il P2P, «Compra BTC» → metodo «Contanti al tabacchino», il tasto «On-chain» in cima al foglio; chi prende tocca «🧾 Il tuo PayCode» e scrive importo, PayCode e scadenza.
 leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
 pubblico: sì
 
