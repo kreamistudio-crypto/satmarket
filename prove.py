@@ -205159,6 +205159,85 @@ console.log(JSON.stringify(out));
            "statoAnelloP2P(manca * (Number(box.dataset.scala) || 1))" in battito])
 
 
+def prove_onchain_esiti_recuperati():
+    """GLI SCAMBI ON-CHAIN DI PRIMA DEL CONTO (18 nov 2026, cantiere
+    contatore-onchain; un utente via Tappo: «gli ultimi 2 scambi P2P che
+    ho fatto non mi sono stati aggiunti al totale nel profilo. Sono stati
+    on-chain entrambi»). Si erano chiusi la mattina del 17 nov, prima che
+    `_p2p_onchain_segna_esiti` arrivasse in produzione: il recupero li
+    scrive UNA volta, con la regola di oggi e l'ora della chiusura, e
+    lascia stare rimborsi, scambi aperti e chi era gia' contato."""
+    print("\n[gli scambi on-chain chiusi prima del conto]")
+    import sqlite3
+    src = _SORGENTE
+    amb = {"sqlite3": sqlite3, "time": time, "print": lambda *a, **k: None}
+    for riga in ("P2P_ESITI_MEMORIA_S = ", "MIGRAZIONE_ESITI_P2P_ONCHAIN = "):
+        j = src.index("\n" + riga) + 1
+        exec(src[j:src.index("\n", j)], amb)
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_esiti", "_p2p_onchain_recupera_esiti"):
+        exec(pezzo(f), amb)
+    R = amb["_p2p_onchain_recupera_esiti"]
+    adesso = 1_800_000_000
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    prova("un database senza le tabelle vale zero, mai un errore", 0, R(con, adesso))
+    con.execute("CREATE TABLE impostazioni(chiave TEXT PRIMARY KEY, valore TEXT)")
+    con.execute("CREATE TABLE p2p_esiti(tg_id INTEGER NOT NULL, ordine TEXT NOT NULL, "
+                "giro INTEGER NOT NULL DEFAULT 0, esito TEXT NOT NULL, ruolo TEXT DEFAULT '', "
+                "quando INTEGER NOT NULL, dettaglio TEXT DEFAULT '', "
+                "PRIMARY KEY(tg_id, ordine, giro, esito))")
+    con.execute("CREATE TABLE p2p_onchain_ordini(id INTEGER PRIMARY KEY, ordine TEXT, "
+                "stato TEXT, depositante_id INT, ricevente_id INT, decisione_da INT DEFAULT 0, "
+                "chiuso_il INT DEFAULT 0)")
+    vecchio = adesso - 500 * 86400
+    con.executemany("INSERT INTO p2p_onchain_ordini(id, ordine, stato, depositante_id, "
+                    "ricevente_id, decisione_da, chiuso_il) VALUES(?,?,?,?,?,?,?)", [
+        (5, "bar-onchain-5", "rilasciato", 222, 111, 0, adesso - 3600),     # i due dell'utente
+        (8, "bar-onchain-8", "rilasciato", 222, 111, 0, adesso - 7200),
+        (9, "bar-onchain-9", "rilasciato", 333, 444, 999, adesso - 60),     # dopo una disputa
+        (10, "bar-onchain-10", "rimborsato", 222, 111, 0, adesso - 60),     # rimborso: niente
+        (11, "bar-onchain-11", "depositato", 222, 111, 0, 0),               # aperto: niente
+        (12, "bar-onchain-12", "rilasciato", 222, 111, 0, vecchio),         # oltre la memoria
+        (13, "bar-onchain-13", "rilasciato", 555, 666, 0, adesso - 60)])    # gia' contato
+    con.executemany("INSERT INTO p2p_esiti VALUES(?,?,0,'completato',?,?,'onchain')", [
+        (555, "bar-onchain-13", "vende", adesso - 60), (666, "bar-onchain-13", "compra", adesso - 60)])
+    prova("IL RECUPERO: i due scambi conclusi contano a tutte e due le parti, dopo una "
+          "disputa solo a chi ha ricevuto; niente ai rimborsi, agli aperti, ai piu' vecchi "
+          "della memoria, ne' doppioni a chi era gia' contato",
+          5, R(con, adesso))
+    righe = [tuple(r) for r in con.execute(
+        "SELECT tg_id, ordine, ruolo, quando, dettaglio FROM p2p_esiti "
+        "WHERE esito='completato' ORDER BY ordine, tg_id")]
+    prova("...con l'ora VERA della chiusura e il dettaglio di sempre (le finestre di 30 e "
+          "90 giorni contano da li')",
+          sorted([(555, "bar-onchain-13", "vende", adesso - 60, "onchain"),
+                  (666, "bar-onchain-13", "compra", adesso - 60, "onchain"),
+                  (111, "bar-onchain-5", "compra", adesso - 3600, "onchain"),
+                  (222, "bar-onchain-5", "vende", adesso - 3600, "onchain"),
+                  (111, "bar-onchain-8", "compra", adesso - 7200, "onchain"),
+                  (222, "bar-onchain-8", "vende", adesso - 7200, "onchain"),
+                  (444, "bar-onchain-9", "compra", adesso - 60, "onchain")],
+                 key=lambda r: (r[1], r[0])),
+          righe)
+    conti = {int(r[0]): int(r[1]) for r in con.execute(
+        "SELECT tg_id, COUNT(*) FROM p2p_esiti WHERE esito='completato' GROUP BY tg_id")}
+    prova("il contatore «✅ N scambi P2P» di chi ha fatto i due scambi passa a 2, "
+          "per lui e per l'altra parte", [2, 2], [conti.get(111), conti.get(222)])
+    prova("...e mai a chi ha perso la disputa", None, conti.get(333))
+    con.execute("DELETE FROM p2p_esiti WHERE ordine='bar-onchain-5'")
+    prova("UNA VOLTA SOLA: col timbro in `impostazioni` il secondo avvio non riscrive "
+          "niente (le righe tolte dopo i 400 giorni non tornerebbero)",
+          [0, 0], [R(con, adesso + 60),
+                   con.execute("SELECT COUNT(*) FROM p2p_esiti WHERE ordine='bar-onchain-5'"
+                               ).fetchone()[0]])
+    prova("cucitura: il recupero gira all'avvio, dentro la sua rete di sicurezza, sulla "
+          "connessione del libro on-chain",
+          [True, True], ["_p2p_onchain_recupera_esiti(con, int(time.time()))"
+                         in pezzo("recupera_esiti_p2p_onchain"),
+                         '@app.on_event("startup")\nasync def recupera_esiti_p2p_onchain():'
+                         in src])
+
+
 def prove_onchain_promemoria():
     """I PROMEMORIA DELLO SCAMBIO ON-CHAIN (17 nov 2026, cantiere
     onchain-chat-sollecito, «tutto deve essere come la parte Lightning»):
@@ -210492,7 +210571,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -211506,6 +211585,7 @@ def main():
     prove_usdt_cifra_copia,
     prove_convenienza_monete,
     prove_onchain_come_lightning,
+    prove_onchain_esiti_recuperati,
     prove_onchain_promemoria,
     prove_onchain_txid_moneta,
     prove_chat_onchain,

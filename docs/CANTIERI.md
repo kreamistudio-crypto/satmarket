@@ -90504,3 +90504,34 @@ pagina. Video: /mnt/project-files/serie-giorni/brace-del-giorno.mp4.
 NON PROVATO: un telefono vero.
 DA FARE (aspetta l'ok di Andrea, stesso thread): la Classifica Streak
 con le posizioni scritte e le medaglie solo se non condivise da più di 3.
+
+## Gli scambi on-chain chiusi prima del conto, recuperati (18 nov 2026, cantiere contatore-onchain; segnalazione di un utente raccolta da Tappo: «Gli ultimi 2 scambi P2P che ho fatto non mi sono stati aggiunti al totale nel profilo. Sono stati on-chain entrambi»; ok di Andrea: «Ok, perfetto.»)
+CAUSA, provata in produzione con due letture `sqlite3 -readonly` che
+stampano numeri: i due scambi (righe 5 e 8 di `p2p_onchain_ordini`, con
+Andrea dall'altra parte) si erano chiusi `rilasciato` il 17 nov alle
+08:12 e alle 09:03 UTC, senza disputa, e avevano ZERO righe in
+`p2p_esiti`. Il conto degli scambi on-chain nella reputazione
+(`_p2p_onchain_segna_esiti`, cantiere convenienza-monete) è arrivato su
+main solo il pomeriggio del 17 nov, e scrive l'esito nel momento della
+chiusura, che c'è una volta sola: chi aveva chiuso prima non sarebbe
+stato contato mai. Il contatore (`_completati_p2p`) era giusto, mancava
+la riga. CURA: `_p2p_onchain_recupera_esiti`, al primo avvio
+(`recupera_esiti_p2p_onchain`), scrive i «completato» degli scambi
+rilasciati che non li hanno, con la regola di oggi (`_p2p_onchain_esiti`:
+tutte e due le parti, dopo una disputa solo chi ha ricevuto) e l'ora vera
+della chiusura (`chiuso_il`), così le finestre di 30 e 90 giorni e i 400
+della memoria contano da lì. DECISO: UNA VOLTA SOLA, col timbro
+`migrazione:esiti_p2p_onchain` in `impostazioni` come le quote
+accantonate: ripassando a ogni avvio tornerebbero le righe tolte dopo
+400 giorni. SOLO i completati: il «non completato» di chi si ritira è
+nato la sera del 17 nov, e contarlo a chi si era ritirato prima, senza
+il foglio che lo avvisava, sarebbe una penalità retroattiva. SCARTATO:
+inserire le righe a mano sul VPS (il codice le fa uguali per tutti e
+resta scritto). PROVATO: `prove_onchain_esiti_recuperati` (il caso
+dell'utente, la disputa, rimborsi e aperti esclusi, oltre la memoria,
+chi era già contato senza doppioni, il timbro, il database senza
+tabelle, la cucitura all'avvio) con quattro controprove rosse (ora di
+adesso al posto di `chiuso_il`, timbro ignorato, memoria ignorata, regola
+della disputa saltata). DA GUARDARE dopo la promozione: la riga
+«✅ Reputazione P2P on-chain: recuperati N esiti» nel journal, e il
+contatore dei due nel profilo (atteso +2 a testa).

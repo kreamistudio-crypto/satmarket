@@ -112133,6 +112133,72 @@ def _p2p_onchain_segna_esiti(o, stato, adesso: int):
         print(f"⚠️ Reputazione P2P on-chain: {o['ordine'][:20]} non scritta ({e})", flush=True)
 
 
+# GLI SCAMBI ON-CHAIN DI PRIMA DEL CONTO (18 nov 2026, cantiere contatore-
+# onchain; segnalazione di un utente raccolta da Tappo: «gli ultimi 2
+# scambi P2P che ho fatto non mi sono stati aggiunti al totale nel
+# profilo. Sono stati on-chain entrambi»). `_p2p_onchain_segna_esiti`
+# scrive l'esito nel momento della chiusura, e quel momento c'e' una
+# volta sola: gli scambi on-chain chiusi PRIMA che il conto esistesse
+# (in produzione dal pomeriggio del 17 nov; i due dell'utente si erano
+# chiusi la mattina, alle 08:12 e alle 09:03 UTC) non avevano la riga, e
+# non l'avrebbero avuta mai. Si recuperano qui, con la regola di oggi e
+# l'ora VERA della chiusura (`chiuso_il`: le finestre di 30 e 90 giorni e
+# i 400 della memoria contano da li'). SOLO i completati: il «non
+# completato» di chi si ritira e' nato la sera del 17 nov, e contarlo a
+# chi si e' ritirato prima, senza il foglio che glielo diceva, sarebbe
+# una penalita' retroattiva.
+# UNA VOLTA SOLA, col timbro in `impostazioni` come le quote accantonate:
+# a ogni avvio ripasserebbe sugli scambi piu' vecchi della memoria (le
+# righe tolte dopo 400 giorni tornerebbero) e su account che nel
+# frattempo si sono fusi.
+MIGRAZIONE_ESITI_P2P_ONCHAIN = "migrazione:esiti_p2p_onchain"
+
+
+def _p2p_onchain_recupera_esiti(con, adesso: int) -> int:
+    """Pura sulla connessione, COMMITTA: scrive gli esiti «completato»
+    degli scambi on-chain rilasciati che non li hanno, e torna quante
+    righe ha scritto. La PK fa l'idempotenza: chi era gia' contato resta
+    com'e'. Un database senza le tabelle vale zero, mai un errore."""
+    try:
+        if con.execute("SELECT 1 FROM impostazioni WHERE chiave=?",
+                       (MIGRAZIONE_ESITI_P2P_ONCHAIN,)).fetchone():
+            return 0
+        righe = con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE stato='rilasciato' "
+            "AND chiuso_il>=?", (int(adesso) - P2P_ESITI_MEMORIA_S,)).fetchall()
+    except sqlite3.OperationalError:
+        return 0
+    scritte = 0
+    for o in righe:
+        quando = int(_p2p_onchain_campo(o, "chiuso_il", 0) or 0) or int(adesso)
+        for tg, ruolo in _p2p_onchain_esiti(o, "rilasciato"):
+            scritte += con.execute(
+                "INSERT OR IGNORE INTO p2p_esiti(tg_id, ordine, giro, esito, "
+                "ruolo, quando, dettaglio) VALUES(?,?,0,'completato',?,?,'onchain')",
+                (tg, o["ordine"], ruolo, quando)).rowcount
+    con.execute("INSERT OR IGNORE INTO impostazioni(chiave, valore) VALUES(?,?)",
+                (MIGRAZIONE_ESITI_P2P_ONCHAIN, str(int(adesso))))
+    con.commit()
+    if scritte:
+        print(f"✅ Reputazione P2P on-chain: recuperati {scritte} esiti "
+              f"«completato» di scambi chiusi prima del conto", flush=True)
+    return scritte
+
+
+@app.on_event("startup")
+async def recupera_esiti_p2p_onchain():
+    """Il giro di `_p2p_onchain_recupera_esiti`, al primo avvio. Un
+    errore qui non ferma niente: e' un conto."""
+    try:
+        con = _p2p_onchain_db()
+        try:
+            _p2p_onchain_recupera_esiti(con, int(time.time()))
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Reputazione P2P on-chain: recupero saltato ({e})", flush=True)
+
+
 @app.post("/api/p2p/onchain/{oid}/firma")
 async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header(""),
                             barattolo_sessione: str = Cookie("")):
