@@ -106979,12 +106979,21 @@ async def onchain_prova(x_tg_init_data: str = Header(""),
         d = con.execute("SELECT tipo, valore, firma FROM onchain_incasso "
                         "WHERE tg_id=?", (user["id"],)).fetchone()
         incasso = dict(d) if d else None
+        # IL LUCCHETTO TENUTO MENTRE SI CHIEDE (18 nov 2026, produzione
+        # ferma 14:46-14:49 UTC, pila della sentinella): la lista si legge
+        # TUTTA prima di chiedere `onchain_ammesso` riga per riga. Un
+        # cursore lasciato aperto tiene il lucchetto di lettura (journal
+        # «delete»); uno scrittore di un altro filo prende il PENDING e
+        # aspetta lui, e ogni connessione nuova di `leva_scrivibile`
+        # aspetta lo scrittore fino a DB_BUSY_TIMEOUT — 15 s per riga,
+        # 120 righe, il ciclo principale fermo. Con fetchall il lucchetto
+        # si lascia prima della prima domanda.
+        altri = con.execute("SELECT tg_id FROM onchain_xpub "
+                            "WHERE tg_id != ? ORDER BY aggiornato DESC",
+                            (user["id"],)).fetchall()
         controparti = [
             {"id": x["tg_id"], "nome": _onchain_nome(con, x["tg_id"])}
-            for x in con.execute("SELECT tg_id FROM onchain_xpub "
-                                 "WHERE tg_id != ? ORDER BY aggiornato DESC",
-                                 (user["id"],))
-            if onchain_ammesso(x["tg_id"])]
+            for x in altri if onchain_ammesso(x["tg_id"])]
         indirizzi = []
         for x in con.execute(
                 "SELECT * FROM onchain_indirizzi WHERE compratore_id=? "
