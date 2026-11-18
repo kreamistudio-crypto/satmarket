@@ -91130,3 +91130,85 @@ PROVATO: `prove_bitcoin_only_p2p` riscritta (giudici in node per le due
 pillole, memoria, banner, Novità, scelta che pulisce la bozza; controprova),
 suite severa e collaudi della CI nel venv senza coincurve.
 NON PROVATO: un telefono vero dentro Telegram.
+
+## I premi fedeltà, secondo giro: soglie in sats, il regalo fra gli articoli, l'avviso del premio da riscuotere, la classifica dei clienti (18 nov 2026, cantiere premi-fedelta-2; Andrea, guardando il cassetto: «Soglie in sats al posto dei merdosi fiat», poi «Le soglie mettele sia in sats che in euro, uno può scegliere»; «avvisi automatici quando un utente ha un premio da riscuotere al prossimo ordine»; «scegliere il premio tra gli articoli pubblicati nel proprio negozio (scelta del negoziante nelle impostazioni dei premi mica di chi compra!)»; «la classifica degli utenti che hanno comprato nel proprio negozio ordinata decrescente per somma degli acquisti (in sats anche se uno vuole)»)
+
+LE DECISIONI.
+- EURO O SATS, UNA VALUTA PER NEGOZIO (`premi_fedelta_valuta`). Il primo
+  giro aveva scelto «in euro e basta» perché i sats di mesi diversi non
+  valgono uguale: resta vero, e infatti l'euro c'è ancora, ma la scelta
+  è del negozio (Andrea). In sats il conto è la somma dei sats pagati,
+  senza cambi (gli ordini senza cambio, che in euro contano zero, in
+  sats contano). Quattro gradini in due unità non avrebbero un ordine:
+  una valuta per tutta la scala. Il cambio di valuta nel cassetto
+  traduce la bozza al cambio del giorno, tondo, come punto di partenza.
+  Misure in sats: da 10.000 a 100.000.000.
+- IL REGALO-ARTICOLO lo sceglie il negozio dalla tendina dei SUOI
+  annunci in vetrina (`annuncio_id` nel gradino); il server controlla
+  che sia suo e attivo e ci scrive lui il titolo (il client non può
+  far dire a un premio un testo diverso dall'articolo). Resta «✏️ Lo
+  scrivo io». Chi compra non sceglie niente. Lo stock NON scala: il
+  regalo lo mette il negozio, e se l'articolo esce di vetrina la
+  promessa scritta resta, senza link.
+- GLI AVVISI. Il bot avvisava già al momento della maturazione (allo
+  sblocco dei sats); mancavano tre momenti, ora coperti: (1) QUANDO IL
+  NEGOZIO SALVA le soglie, chi le ha già passate matura subito e
+  riceve «hai un premio da riscuotere» (prima maturava in silenzio al
+  primo ordine nuovo), col FRENO delle 24 ore — un negozio che sposta
+  le soglie dieci volte non manda dieci messaggi ai suoi clienti; al
+  negozio lo dice il toast («N clienti hanno già un premio da
+  riscuotere, li ho avvisati»), nessun messaggio del bot; (2) NEL
+  MOMENTO DI COMPRARE: la pagina del negozio («🎁 Hai un premio da
+  riscuotere») e la scheda di ogni articolo di quel negozio; (3) AL
+  PAGAMENTO: `_incassa_ordine` aggancia subito e aggiunge la riga a
+  «Hai venduto» (cosa mettere nel pacco, prima di spedire) e a «Ordine
+  pagato» (cosa troverà). Più soglie passate insieme fanno UN
+  messaggio per parte, coi premi in fila («poi …»), non uno per soglia.
+- LA CLASSIFICA DEI CLIENTI sta nello stesso cassetto, «🏆 I tuoi
+  clienti», a richiesta (un tocco, non a ogni /api/me). Il negozio
+  vede solo i suoi, letti dal tg_id di chi bussa; contano gli stessi
+  ordini dei premi (conclusi, non prova, non da se stessi), così la
+  cifra in classifica e quella della soglia non litigano. Escono le due
+  somme e il client rifà la fila in € o sats senza chiedere. I primi
+  50. Nomi e cifre che il negozio ha già nei suoi ordini: nessun dato
+  nuovo esce, e i totali restano fuori dai profili pubblici (la
+  decisione del 17 nov sugli acquisti non si tocca). Leva
+  `CLASSIFICA_CLIENTI_ATTIVA` accesa di serie.
+
+LE STRADE SCARTATE: la valuta per gradino (la scala non avrebbe
+ordine); il regalo scelto da chi compra (detto no da Andrea); lo stock
+che scala col regalo (il regalo non è una vendita, e un pezzo che
+sparisce senza ordine confonderebbe magazzino e negozi collegati);
+l'aggancio immediato su tutte le porte di pagamento (on-chain, asta,
+set restano sull'aggancio pigro di `/api/orders`, che le copre già:
+cambia solo che lì il premio non è nel primo messaggio); un
+promemoria periodico «hai ancora un premio» (non chiesto).
+
+IMPERFEZIONI DICHIARATE. La UNIQUE di `premi_fedelta_maturati` è sul
+numero e non sulla valuta: un negozio che passa da «10.000 €» a
+«10.000 sats» non fa rimaturare chi aveva il primo (rifare la tabella
+costerebbe più del caso). Le soglie salvate PRIMA di questo cantiere:
+chi le aveva già passate matura al suo prossimo ordine come prima,
+oppure subito se il negozio risalva il cassetto. `premi_da_riscuotere`
+in `/api/me` è la fotografia dell'apertura dell'app: un premio appena
+agganciato a un ordine può restare scritto sulla scheda fino al
+prossimo /api/me.
+
+PROVATO. `prove_premi_fedelta` (77: le misure in sats, la valuta, il
+regalo-articolo nel giudice, il conto in sats con le prove escluse e i
+cambi ignoti contati, due soglie in un messaggio, la fotografia di
+articolo e valuta, la maturazione al salvataggio col freno, il premio
+al pagamento e le sue righe scappate, il più vecchio per primo, il
+premio da riscuotere e la scheda in node, le sentinelle su incasso,
+rotta e classifica); `collaudo_premi_fedelta` (44, sulle rotte vere:
+valuta storta, minimo in sats, l'articolo altrui e quello venduto
+rifiutati, il titolo scritto dal server, chi matura al salvataggio e
+l'avviso solo a lui, il risalvataggio muto, /api/me al negozio e al
+cliente, la vetrina in sats col premio da riscuotere, il link tolto
+all'articolo uscito, la classifica in fila con le prove escluse, la
+classifica vuota, la leva spenta).
+
+DA GUARDARE DAL VIVO: il cassetto a 375 px con l'interruttore e la
+tendina, la classifica di «Un tempo per te» coi clienti veri, e un
+ordine vero che passa la soglia (il messaggio «Hai venduto» con la
+riga del regalo).

@@ -644,3 +644,9 @@ frase: In Esplora le categorie hanno le sottocategorie: tocchi una categoria e s
 dove: Esplora → «Esplora per categorie», tocca una categoria: la tendina sotto la card («Tutta la categoria» e le sottocategorie con annunci); la card accesa scrive la scelta sotto il nome. Vendi → il campo «Sottocategoria (facoltativa)» sotto la categoria.
 leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · premi-fedelta-2
+frase: Premi fedeltà dei negozi: le soglie ora si scrivono in euro o in sats, e il regalo si sceglie fra gli articoli del proprio negozio. Chi ha un premio da riscuotere lo sa subito: glielo dicono il bot, la pagina del negozio e la scheda degli articoli. E ogni negozio vede la classifica dei suoi clienti per totale speso, in sats o in euro.
+dove: Profilo → «🎀 Premi fedeltà»: l'interruttore «€ euro / ₿ sats», la tendina del regalo («✏️ Lo scrivo io» o un articolo 🎁), e sotto «🏆 I tuoi clienti» → «Guarda chi ha speso di più da te»; la pagina di un negozio, riga «🎁 Hai un premio da riscuotere»; la scheda di un articolo di quel negozio; i messaggi del bot «Premio fedeltà!», «Ordine pagato» e «Hai venduto».
+leva: PREMI_FEDELTA_ATTIVI e CLASSIFICA_CLIENTI_ATTIVA (accese di serie)
+pubblico: sì

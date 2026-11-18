@@ -37236,6 +37236,37 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `setPremiFedelta`), la riga `premiNegozioRiga` dopo le due promesse
   sorelle in `#negozioPromesse`, e `notaPremioFedelta(o)` nel dettaglio
   dell'ordine. Prove: `prove_premi_fedelta` e `collaudo_premi_fedelta`.
+  IL SECONDO GIRO (18 nov 2026, cantiere premi-fedelta-2, Andrea). (1) LA
+  VALUTA: `utenti.premi_fedelta_valuta` ('eur'|'sats', una per negozio,
+  `valuta_premi` la pulisce, `_misure_premi` dà le misure: in sats da
+  `PREMI_FEDELTA_MIN_SATS` a `PREMI_FEDELTA_MAX_SATS`); il conto in sats
+  è la somma dei `prezzo_sats` conclusi, senza cambi. `soglie_del_negozio`
+  legge lista e valuta insieme; `premi_fedelta_maturati` ha `valuta` e
+  `annuncio_id` (migrazioni additive). La UNIQUE resta sul numero
+  (imperfezione dichiarata in `matura_premi_fedelta`). (2) IL REGALO-
+  ARTICOLO: `annuncio_id` nel gradino, la rotta accetta solo un annuncio
+  SUO `attivo` e scrive lei il titolo come testo; `/api/me` manda
+  `premi_fedelta_articoli`; la vetrina toglie il link se l'articolo non
+  è più attivo. (3) GLI AVVISI: la rotta, dopo il salvataggio, chiama
+  `matura_clienti_del_negozio` (tutti i clienti con affari conclusi) e
+  avvisa chi matura col freno di `PREMI_AVVISO_FRENO_S` (un premio dallo
+  stesso negozio nelle ultime 24 ore = nessun secondo messaggio); gli
+  avvisi sono uno per parte anche con più soglie insieme
+  (`_avvisa_premi_maturati`). `premi_da_riscuotere` (maturati senza
+  ordine) esce in `/api/me` e in `/api/negozio` a chi guarda da cliente;
+  il client li mostra sulla pagina del negozio e sulla scheda
+  (`notaPremioScheda`, per codice del negozio). `_incassa_ordine`, dopo
+  il commit, chiama `premio_al_pagamento` (aggancio subito, fail-open)
+  e `riga_premio_pagato` aggiunge la riga a «Hai venduto» e «Ordine
+  pagato»; le altre porte di pagamento restano sull'aggancio pigro.
+  L'ordine degli agganci è per `maturato_il`, poi soglia. (4) LA
+  CLASSIFICA: `GET /api/me/negozio/clienti` (`classifica_clienti_negozio`),
+  il negozio si legge da chi bussa; righe released, non prova, non da se
+  stessi, raggruppate per cliente, fila per sats, al più
+  `CLASSIFICA_CLIENTI_MAX`, con sats, euro, ordini, premi, il totale e la
+  valuta del negozio. Leva `CLASSIFICA_CLIENTI_ATTIVA` (accesa, stesso
+  gruppo del pannello). Nel telefono: `renderClassificaClienti`,
+  interruttore € / sats senza richiedere al server.
 
 
 ## I NOMI NIP-05 DEGLI UTENTI (17 nov 2026, cantiere nip05-utenti)

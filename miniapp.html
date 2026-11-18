@@ -28772,19 +28772,34 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
      speso qui e quanto manca al prossimo */
   const premiNegozioRiga = w => {
     const premi = (w.premi_fedelta || []).filter(p => p && p.premio);
-    if (!premi.length) return '';
+    const daRisc = (w.premi_da_riscuotere || []).filter(p => p && p.premio);
+    if (!premi.length && !daRisc.length) return '';
+    /* (18 nov 2026) la valuta delle soglie e il regalo-articolo con
+       il suo link: un tocco apre l'annuncio del regalo */
+    const val = w.premi_fedelta_valuta === 'sats' ? 'sats' : 'eur';
+    const regalo = p => p.annuncio_id
+      ? `<a href="#" style="color:inherit" onclick="event.preventDefault();apriAnnuncioPuntata(${parseInt(p.annuncio_id,10)||0})"><b>${esc(p.premio)}</b></a>`
+      : `<b>${esc(p.premio)}</b>`;
     const gradini = premi.map(p =>
-      `da ${fmt(p.soglia)} € <b>${esc(p.premio)}</b>`).join(' · ');
+      `da ${sogliaPremio(p.soglia, val)} ${regalo(p)}`).join(' · ');
     let mio = '';
-    if (typeof w.speso_qui_eur === 'number') {
-      const speso = w.speso_qui_eur;
+    const speso = typeof w.speso_qui === 'number' ? w.speso_qui
+                : (val === 'eur' && typeof w.speso_qui_eur === 'number' ? w.speso_qui_eur : null);
+    if (speso !== null && premi.length) {
       const prossimo = premi.find(p => p.soglia > speso);
-      mio = `<br>Hai speso qui <b>${fmtEur(speso)} €</b>${prossimo
-        ? `: ti mancano ${fmtEur(prossimo.soglia - speso)} € per ${esc(prossimo.premio)}.`
+      const quanto = x => val === 'sats' ? `${fmt(x)} sats` : `${fmtEur(x)} €`;
+      mio = `<br>Hai speso qui <b>${quanto(speso)}</b>${prossimo
+        ? `: ti mancano ${quanto(prossimo.soglia - speso)} per ${esc(prossimo.premio)}.`
         : '.'}`;
     }
-    return `<div class="trust-note nota-promessa" style="margin-top:12px">🎀
-      <span>Premi fedeltà, nel pacco dopo: ${gradini}.${mio}</span></div>`;
+    /* IL PREMIO DA RISCUOTERE, sopra a tutto: e' la notizia per chi guarda */
+    const risc = daRisc.length
+      ? `<div class="trust-note nota-promessa" style="margin-top:12px">🎁
+          <span><b>Hai un premio da riscuotere:</b> nel pacco del tuo prossimo ordine qui trovi ${regalo(daRisc[0])}${
+          daRisc.length === 2 ? ' (e poi un altro, al seguente)'
+          : daRisc.length > 2 ? ` (e poi altri ${daRisc.length - 1}, uno per ordine)` : ''}.</span></div>` : '';
+    return risc + (premi.length ? `<div class="trust-note nota-promessa" style="margin-top:12px">🎀
+      <span>Premi fedeltà, nel pacco dopo: ${gradini}.${mio}</span></div>` : '');
   };
   const chi = (v.nome||'').split(' ')[0];
   /* I PONTI E IL LINK SONO TONDI DENTRO IL RIQUADRO (24 set 2026): i due
@@ -36485,6 +36500,7 @@ function openDetail(id){
                   con loro, che la prima spiegazione lunga ora vive li'. -->
              <div class="trust-note"><span>I tuoi sats restano nel <b>deposito di garanzia</b> finché non confermi di aver ricevuto <span class="fine-frase">l'oggetto. <button type="button" class="scopri-link" onclick="apriSicurezza()">Scopri di più</button></span></span></div>
              ${offAcc ? `<div class="trust-note">🤝 <span><b>Offerta accettata:</b> l'articolo per te costa <b>${cifraAccordo(offAcc)}</b>${offAcc.quantita > 1 ? ` — l'accordo è per ${fmt(offAcc.quantita)} pezzi` : ''} — completa il pagamento prima che l'accordo scada.</span></div>` : ''}
+             ${notaPremioScheda(l)}
              ${stradeConsegna(l).includes('servizio') ? `<div class="trust-note" id="notaServizio">📅 <span><b>Prestazione:</b> dopo il pagamento il venditore propone giorno e ora, e tu confermi — finché non confermi non parte nessun conto alla rovescia. I sats restano nel deposito di garanzia e <b>non si muovono da soli</b>: si sbloccano quando confermi tu che la prestazione c'è stata. ⚠️ Barattolo non può sapere se c'è stata davvero: se finite in disputa, un moderatore guarda se le <b>condizioni</b> c'erano — appuntamento concordato, collegamento lasciato in tempo.</span></div>` : ''}
              ${/* L'AVVISO DEL RECUPERO WALLET (ago 2026, decisione di
                    Andrea): un AVVISO a chi COMPRA, mai un blocco a chi
@@ -49935,11 +49951,27 @@ function scollegaConnettore(id){
 
 /* «🎀 PREMI FEDELTA'» (17 nov 2026): la proposta di un negozio vero —
    «chi compra da me sale di punteggio: a 100 € il pacco dopo ha la
-   borsa, a 200 la tazza». Fino a `max` gradini in euro, ognuno col suo
-   regalo scritto a parole. I campi scrivono nella bozza SENZA
-   ridisegnare (il fuoco resterebbe a meta' parola); aggiungere e
-   togliere una riga invece ridisegna. */
+   borsa, a 200 la tazza». Fino a `max` gradini, ognuno col suo regalo.
+   I campi scrivono nella bozza SENZA ridisegnare (il fuoco resterebbe
+   a meta' parola); aggiungere e togliere una riga, cambiare valuta o
+   scegliere un articolo invece ridisegna.
+   (18 nov 2026, Andrea) LE SOGLIE ANCHE IN SATS, a scelta: una valuta
+   per tutto il negozio, e il cambio di valuta traduce le cifre della
+   bozza al cambio del giorno (arrotondate), che il negoziante ritocca.
+   IL REGALO SI SCEGLIE FRA GLI ARTICOLI DEL NEGOZIO («scelta del
+   negoziante nelle impostazioni dei premi, mica di chi compra!») o si
+   scrive a mano come prima. E sotto, LA CLASSIFICA DEI SUOI CLIENTI. */
 let myPremiFedelta = [], premiFedeltaLeve = null, premiFedeltaBozza = null;
+let myPremiValuta = 'eur', premiFedeltaArticoli = [], mieiPremiDaRiscuotere = [];
+function premiMisure(valuta){
+  const L = premiFedeltaLeve || {};
+  return valuta === 'sats' ? [L.min_sats || 10000, L.max_sats || 100000000]
+                           : [L.min_eur || 10, L.max_eur || 100000];
+}
+/* «100 €» / «150.000 sats»: una soglia detta nella sua valuta */
+function sogliaPremio(soglia, valuta){
+  return valuta === 'sats' ? `${fmt(soglia)} sats` : `${fmt(soglia)} €`;
+}
 function renderPremiFedelta(){
   const box = el('premiFedeltaBlocco');
   if (!box) return;
@@ -49953,54 +49985,118 @@ function renderPremiFedelta(){
   const n = myPremiFedelta.length;
   el('premiFedeltaConta').textContent = n ? (n === 1 ? '1 premio' : `${n} premi`) : '';
   if (!premiFedeltaBozza)
-    premiFedeltaBozza = n ? myPremiFedelta.map(p => ({soglia: p.soglia, premio: p.premio}))
-                          : [{soglia: 100, premio: ''}];
-  const b = premiFedeltaBozza;
+    premiFedeltaBozza = {
+      valuta: myPremiValuta || 'eur',
+      righe: n ? myPremiFedelta.map(p => ({soglia: p.soglia, premio: p.premio,
+                                           annuncio_id: p.annuncio_id || 0}))
+               : [{soglia: myPremiValuta === 'sats' ? 100000 : 100, premio: '', annuncio_id: 0}]};
+  const b = premiFedeltaBozza, inSats = b.valuta === 'sats';
+  const [mn, mx] = premiMisure(b.valuta);
+  const stile = 'font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)';
+  const articoli = premiFedeltaArticoli || [];
+  const scelta = (p, i) => {
+    const aid = p.annuncio_id || 0;
+    /* un articolo scelto e poi uscito di vetrina resta nella tendina col
+       suo nome: il server lo rifiuta al salvataggio, e lo dice */
+    const fuori = aid && !articoli.some(a => a.id === aid)
+      ? `<option value="${aid}" selected>${esc(p.premio || 'Articolo')} (non più in vetrina)</option>` : '';
+    return `<select onchange="premiFedeltaArticolo(${i}, this.value)" aria-label="Il regalo"
+        style="${stile};width:100%;margin-top:6px">
+        <option value="0"${aid ? '' : ' selected'}>✏️ Lo scrivo io</option>
+        ${articoli.map(a => `<option value="${a.id}"${a.id === aid ? ' selected' : ''}>🎁 ${esc(a.titolo)}</option>`).join('')}
+        ${fuori}
+      </select>
+      ${aid ? '' : `<input type="text" maxlength="${L.testo_max}" value="${esc(p.premio||'')}" placeholder="es. la borsa di tela"
+        oninput="premiFedeltaCampo(${i},'premio',this.value)" aria-label="Il regalo scritto a mano"
+        style="${stile};width:100%;box-sizing:border-box;margin-top:6px">`}`;
+  };
   const riga = (p, i) => `
-    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
-      <span style="font-size:12.5px;font-weight:700;color:var(--muted)">da</span>
-      <input type="number" inputmode="numeric" min="${L.min_eur}" max="${L.max_eur}" value="${esc(String(p.soglia||''))}"
-        oninput="premiFedeltaCampo(${i},'soglia',this.value)" aria-label="Soglia in euro"
-        style="width:78px;font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)">
-      <span style="font-size:12.5px;font-weight:700;color:var(--muted)">€</span>
-      <input type="text" maxlength="${L.testo_max}" value="${esc(p.premio||'')}" placeholder="es. la borsa di tela"
-        oninput="premiFedeltaCampo(${i},'premio',this.value)" aria-label="Il regalo"
-        style="flex:1;min-width:0;font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--ink)">
-      <button type="button" onclick="premiFedeltaTogli(${i})" aria-label="Togli questo premio"
-        style="font:inherit;border:0;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;padding:4px">✕</button>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:12.5px;font-weight:700;color:var(--muted)">da</span>
+        <input type="number" inputmode="numeric" min="${mn}" max="${mx}" value="${esc(String(p.soglia||''))}"
+          oninput="premiFedeltaCampo(${i},'soglia',this.value)" aria-label="Soglia in ${inSats ? 'sats' : 'euro'}"
+          style="${stile};width:${inSats ? 120 : 84}px">
+        <span style="font-size:12.5px;font-weight:700;color:var(--muted)">${inSats ? 'sats' : '€'}</span>
+        <span style="flex:1"></span>
+        <button type="button" onclick="premiFedeltaTogli(${i})" aria-label="Togli questo premio"
+          style="font:inherit;border:0;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;padding:4px">✕</button>
+      </div>
+      ${scelta(p, i)}
     </div>`;
+  const valute = (L.valute || ['eur']).length > 1 ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+      ${(L.valute || []).map(v => `<button type="button" data-v="${esc(v)}" onclick="premiFedeltaValuta(this.dataset.v)"
+        style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b.valuta===v?'var(--sats)':'var(--line)'};background:${b.valuta===v?'var(--sats)':'transparent'};color:${b.valuta===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${v==='sats'?'₿ sats':'€ euro'}</button>`).join('')}
+    </div>` : '';
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
       Barattolo conta quanto ogni cliente ha speso da te (ordini conclusi,
-      in euro). Quando passa una soglia, il premio compare sul suo ordine
-      successivo: tu lo metti nel pacco.</div>
+      in ${inSats ? 'sats' : 'euro'}). Quando passa una soglia gli arriva
+      l'avviso, e il premio compare sul suo ordine successivo: tu lo metti
+      nel pacco.</div>
+    ${valute}
     <div id="premiFedeltaErrore"></div>
-    ${b.map(riga).join('')}
-    ${b.length < L.max ? `<button type="button" class="scopri-link" style="margin-top:10px" onclick="premiFedeltaAggiungi()">＋ Aggiungi un premio</button>` : ''}
+    ${b.righe.map(riga).join('')}
+    ${b.righe.length < L.max ? `<button type="button" class="scopri-link" style="margin-top:10px" onclick="premiFedeltaAggiungi()">＋ Aggiungi un premio</button>` : ''}
     <button class="btn orange" onclick="setPremiFedelta()">🎀 Salva i premi</button>
-    ${n ? `<button class="btn ghost" onclick="setPremiFedelta(true)">Togli tutti i premi</button>` : ''}`;
+    ${n ? `<button class="btn ghost" onclick="setPremiFedelta(true)">Togli tutti i premi</button>` : ''}
+    ${L.classifica ? `
+      <div class="section-label" style="margin-top:16px">🏆 I tuoi clienti</div>
+      <div id="classificaClienti"><button type="button" class="scopri-link" style="margin-top:6px"
+        onclick="caricaClassificaClienti()">Guarda chi ha speso di più da te</button></div>` : ''}`;
 }
 function premiFedeltaCampo(i, campo, valore){
-  if (!premiFedeltaBozza || !premiFedeltaBozza[i]) return;
-  premiFedeltaBozza[i][campo] = campo === 'soglia' ? parseInt(valore, 10) || 0 : valore;
+  const b = premiFedeltaBozza;
+  if (!b || !b.righe[i]) return;
+  b.righe[i][campo] = campo === 'soglia' ? parseInt(valore, 10) || 0 : valore;
+}
+/* il cambio di valuta traduce le soglie della bozza al cambio del
+   giorno, tonde (1.000 sats, 5 €): sono un punto di partenza */
+function premiFedeltaValuta(v){
+  const b = premiFedeltaBozza;
+  if (!b || b.valuta === v || !(v === 'eur' || v === 'sats')) return;
+  haptic();
+  const cambio = eurPerSat > 0 ? eurPerSat : 0.00092;
+  b.righe.forEach(r => {
+    if (!r.soglia) return;
+    r.soglia = v === 'sats'
+      ? Math.max(1000, Math.round(r.soglia / cambio / 1000) * 1000)
+      : Math.max(5, Math.round(r.soglia * cambio / 5) * 5);
+  });
+  b.valuta = v;
+  renderPremiFedelta();
+}
+function premiFedeltaArticolo(i, valore){
+  const b = premiFedeltaBozza;
+  if (!b || !b.righe[i]) return;
+  const aid = parseInt(valore, 10) || 0;
+  const a = (premiFedeltaArticoli || []).find(x => x.id === aid);
+  b.righe[i].annuncio_id = aid;
+  /* il titolo e' solo l'anteprima: il server lo riscrive dall'annuncio */
+  b.righe[i].premio = aid ? (a ? a.titolo : b.righe[i].premio) : '';
+  renderPremiFedelta();
 }
 function premiFedeltaAggiungi(){
   haptic();
-  const b = premiFedeltaBozza || [];
-  const ultima = b.length ? (b[b.length-1].soglia || 0) : 0;
-  b.push({soglia: ultima ? ultima * 2 : 100, premio: ''});
-  premiFedeltaBozza = b;
+  const b = premiFedeltaBozza;
+  if (!b) return;
+  const ultima = b.righe.length ? (b.righe[b.righe.length-1].soglia || 0) : 0;
+  b.righe.push({soglia: ultima ? ultima * 2 : (b.valuta === 'sats' ? 100000 : 100),
+                premio: '', annuncio_id: 0});
   renderPremiFedelta();
 }
 function premiFedeltaTogli(i){
   haptic();
-  (premiFedeltaBozza || []).splice(i, 1);
+  if (premiFedeltaBozza) premiFedeltaBozza.righe.splice(i, 1);
   renderPremiFedelta();
 }
 async function setPremiFedelta(togliTutti){
   haptic();
   if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
-  const L = premiFedeltaLeve || {};
+  const b = premiFedeltaBozza || {valuta: 'eur', righe: []};
+  const valuta = b.valuta === 'sats' ? 'sats' : 'eur';
+  const [mn, mx] = premiMisure(valuta);
   const errore = t => {
     const dove = el('premiFedeltaErrore');
     if (dove) dove.innerHTML =
@@ -50009,29 +50105,90 @@ async function setPremiFedelta(togliTutti){
   };
   /* le righe lasciate del tutto vuote si ignorano; quelle a meta' no:
      un regalo senza soglia (o il contrario) e' quasi sempre un errore */
-  const premi = togliTutti ? [] : (premiFedeltaBozza || [])
-    .map(p => ({soglia: parseInt(p.soglia, 10) || 0, premio: String(p.premio||'').trim()}))
-    .filter(p => p.soglia || p.premio);
+  const premi = togliTutti ? [] : b.righe
+    .map(p => ({soglia: parseInt(p.soglia, 10) || 0, premio: String(p.premio||'').trim(),
+                annuncio_id: p.annuncio_id || 0}))
+    .filter(p => p.soglia || p.premio || p.annuncio_id);
   for (const p of premi) {
-    if (p.soglia < L.min_eur || p.soglia > L.max_eur)
-      return errore(`Ogni soglia va da ${fmt(L.min_eur)} a ${fmt(L.max_eur)} € di acquisti.`);
-    if (!p.premio) return errore(`Scrivi il regalo per la soglia di ${fmt(p.soglia)} €.`);
+    if (p.soglia < mn || p.soglia > mx)
+      return errore(`Ogni soglia va da ${sogliaPremio(mn, valuta)} a ${sogliaPremio(mx, valuta)} di acquisti.`);
+    if (!p.premio && !p.annuncio_id)
+      return errore(`Scegli o scrivi il regalo per la soglia di ${sogliaPremio(p.soglia, valuta)}.`);
   }
   if (new Set(premi.map(p => p.soglia)).size !== premi.length)
     return errore('Due premi hanno la stessa soglia.');
   const box = el('premiFedeltaErrore');
   if (box) box.innerHTML = '';
+  let d = {};
   try {
     const r = await fetch(`${API_BASE}/me/premi-fedelta`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({premi})});
-    const d = await r.json().catch(()=>({}));
+       body: JSON.stringify({premi, valuta})});
+    d = await r.json().catch(()=>({}));
     if (!r.ok) return errore(d.detail || 'Non ci sono riuscito, riprova');
     myPremiFedelta = d.premi || [];
+    myPremiValuta = d.valuta || 'eur';
   } catch(e) { toast('Rete assente: riprova'); return; }
   premiFedeltaBozza = null;
   renderPremiFedelta();
-  toast(myPremiFedelta.length ? '🎀 Premi fedeltà salvati' : 'Premi fedeltà tolti');
+  const premiati = d.clienti_premiati || 0;
+  toast(!myPremiFedelta.length ? 'Premi fedeltà tolti'
+        : premiati ? `🎀 Premi salvati: ${premiati === 1 ? 'un cliente ha' : `${premiati} clienti hanno`} già un premio da riscuotere, li ho avvisati`
+        : '🎀 Premi fedeltà salvati', premiati ? 6000 : undefined);
+}
+/* LA CLASSIFICA DEI CLIENTI (18 nov 2026): chi ha comprato dal negozio,
+   in fila per quanto ha speso. Arriva con le due somme, e l'interruttore
+   € / sats rifa' la fila senza richiedere niente al server. */
+let classificaClienti = null, classificaValuta = '';
+async function caricaClassificaClienti(){
+  haptic();
+  const box = el('classificaClienti');
+  if (!box) return;
+  box.innerHTML = '<div style="font-size:13px;color:var(--muted);margin-top:6px">Un attimo…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/me/negozio/clienti`, {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { box.innerHTML = `<div class="trust-note" style="margin-top:6px">⚠️ <span>${esc(d.detail || 'Non ci sono riuscito, riprova')}</span></div>`; return; }
+    classificaClienti = d;
+    if (!classificaValuta) classificaValuta = d.valuta === 'sats' ? 'sats' : 'eur';
+  } catch(e) { box.innerHTML = ''; toast('Rete assente: riprova'); return; }
+  renderClassificaClienti();
+}
+function classificaClientiValuta(v){
+  if (v !== 'eur' && v !== 'sats') return;
+  haptic();
+  classificaValuta = v;
+  renderClassificaClienti();
+}
+function renderClassificaClienti(){
+  const box = el('classificaClienti'), d = classificaClienti;
+  if (!box || !d) return;
+  const inSats = classificaValuta === 'sats';
+  const righe = (d.clienti || []).slice()
+    .sort((a, b) => inSats ? (b.sats - a.sats) : (b.eur - a.eur || b.sats - a.sats));
+  if (!righe.length) {
+    box.innerHTML = `<div style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.45">
+      Ancora nessun ordine concluso nel tuo negozio: la classifica si riempie da sola.</div>`;
+    return;
+  }
+  const medaglia = i => ['🥇','🥈','🥉'][i] || `${i + 1}.`;
+  const pill = v => `<button type="button" data-v="${v}" onclick="classificaClientiValuta(this.dataset.v)"
+    style="font:inherit;font-size:12px;font-weight:700;border:1px solid ${classificaValuta===v?'var(--sats)':'var(--line)'};background:${classificaValuta===v?'var(--sats)':'transparent'};color:${classificaValuta===v?'#fff':'var(--muted)'};border-radius:99px;padding:4px 10px;cursor:pointer">${v==='sats'?'₿ sats':'€ euro'}</button>`;
+  box.innerHTML = `
+    <div style="display:flex;gap:6px;margin-top:6px">${pill('sats')}${pill('eur')}</div>
+    <div style="margin-top:8px">
+      ${righe.map((c, i) => `
+        <div style="display:flex;gap:8px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px">
+          <span style="width:26px;flex:none;font-weight:800;color:var(--muted)">${medaglia(i)}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700">${esc(c.nome)}</span>
+          <span style="flex:none;text-align:right">
+            <b>${inSats ? `${fmt(c.sats)} sats` : `${fmtEur(c.eur)} €`}</b>
+            <span style="display:block;font-size:11.5px;color:var(--muted)">${c.ordini === 1 ? '1 ordine' : `${fmt(c.ordini)} ordini`}${c.premi ? ` · 🎀 ${c.premi}` : ''}</span>
+          </span>
+        </div>`).join('')}
+    </div>
+    ${d.totale > righe.length ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">I primi ${righe.length} di ${fmt(d.totale)} clienti.</div>` : ''}
+    <div style="font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4">Solo ordini conclusi. In euro, ogni ordine al cambio del giorno in cui l'hai incassato.</div>`;
 }
 function renderSpedGratis(){
   const box = el('spedGratisBlocco');
@@ -55950,10 +56107,21 @@ function notaChiusoDalTimer(o, s){
    nel pacco, a chi compra cosa ci trovera'. Il server lo attacca solo
    agli ordini pagati e non ancora spediti; una volta attaccato resta
    scritto, anche dopo la consegna, come ricevuta. */
+/* IL PREMIO DA RISCUOTERE SULLA SCHEDA (18 nov 2026; Andrea: «avvisi
+   automatici quando un utente ha un premio da riscuotere al prossimo
+   ordine»): chi ha un premio maturato in questo negozio lo legge qui,
+   nel momento in cui decide di comprare. La lista arriva da /api/me,
+   per codice del negozio (il tg_id del venditore in vetrina non c'e'). */
+function notaPremioScheda(l){
+  if (!l || !l.negozio) return '';
+  const qui = (mieiPremiDaRiscuotere || []).filter(p => p && p.premio && p.negozio === l.negozio);
+  if (!qui.length) return '';
+  return `<div class="trust-note nota-promessa">🎁 <span><b>Hai un premio da riscuotere</b> in questo negozio: nel pacco del tuo prossimo ordine trovi anche <b>${esc(qui[0].premio)}</b>.</span></div>`;
+}
 function notaPremioFedelta(o){
   const p = o && o.premioFedelta;
   if (!p || !p.premio) return '';
-  const quanto = `${fmt(p.soglia)} €`;
+  const quanto = sogliaPremio(p.soglia, p.valuta === 'sats' ? 'sats' : 'eur');
   return o.role === 'seller'
     ? `<div class="trust-note nota-promessa">🎀 <span><b>Premio fedeltà:</b> questo cliente ha superato ${quanto} di acquisti da te. Nel pacco metti <b>${esc(p.premio)}</b>.</span></div>`
     : `<div class="trust-note nota-promessa">🎀 <span><b>Premio fedeltà:</b> hai superato ${quanto} di acquisti in questo negozio. Nel pacco trovi <b>${esc(p.premio)}</b>.</span></div>`;
@@ -116936,6 +117104,9 @@ async function avvia(){
     /* i premi fedelta' (17 nov 2026): la lista pulita dal server, le
        misure, e la bozza buttata per la stessa ragione delle sorelle */
     myPremiFedelta = me.premi_fedelta || [];
+    myPremiValuta = me.premi_fedelta_valuta === 'sats' ? 'sats' : 'eur';
+    premiFedeltaArticoli = me.premi_fedelta_articoli || [];
+    mieiPremiDaRiscuotere = me.premi_da_riscuotere || [];
     premiFedeltaLeve = me.premi_fedelta_leve || null;
     premiFedeltaBozza = null;
     /* il negozio collegato: la leva decide se il cassetto esiste, e

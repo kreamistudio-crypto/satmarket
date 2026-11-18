@@ -709,6 +709,10 @@ SPED_GRATIS_MIN_SATS = 1        # idem, in sats
 # quanto ha speso ogni cliente in quel negozio (affari conclusi, in euro)
 # e attacca il premio al suo ordine successivo. Nessun sat si muove.
 PREMI_FEDELTA_ATTIVI = True     # interruttore generale (False = spento)
+# Dal 18 nov 2026 le soglie si scrivono anche in sats (scelta del
+# negozio), il regalo puo' essere un articolo del negozio, e il negozio
+# vede la classifica dei suoi clienti per totale speso:
+CLASSIFICA_CLIENTI_ATTIVA = True  # False = la classifica sparisce
 
 # --- Codici sconto del venditore -------------------------------------
 # «SATOSHI10» scritto alla cassa vale -X% sugli articoli. E' la TERZA

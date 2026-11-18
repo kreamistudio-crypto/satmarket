@@ -20253,6 +20253,10 @@ def prove_notifica_fail_open():
               # (18 nov 2026, fotografia-annuncio) la fotografia
               # dell'annuncio ha la sua prova e il suo collaudo: qui tace
               "ORDINE_FOTOGRAFIA_ATTIVA": False,
+              # (18 nov 2026, premi-fedelta-2) il premio al pagamento ha
+              # la sua prova in `prove_premi_fedelta`: qui tace
+              "premio_al_pagamento": lambda con, o: None,
+              "riga_premio_pagato": lambda p, chi: "",
               "WEB_PUSH_ATTIVO": False,
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
@@ -40787,6 +40791,10 @@ def prove_ricevuta_compratore():
                # (18 nov 2026) la fotografia dell'annuncio ha la sua
                # prova in `prove_fotografia_annuncio`: qui tace
                "ORDINE_FOTOGRAFIA_ATTIVA": False,
+               # (18 nov 2026) il premio fedelta' al pagamento ha la sua
+               # prova in `prove_premi_fedelta`: qui tace
+               "premio_al_pagamento": lambda con, o: None,
+               "riga_premio_pagato": lambda p, chi: "",
                # il registro dei negozi collegati (tappa 4) passa dal
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
@@ -53926,8 +53934,9 @@ def prove_sponsor():
     # la lezione gia' pagata dal padding della sezione del Profilo:
     # una sentinella si ancora al FATTO, non alla forma di ieri.
     _reg = [r for r in mini.split("}") if "{background:var(--chip-bg)" in r]
-    # (17 nov 2026) la terza, i premi fedelta', con la stessa veste
-    prova("le tre righe non sono piu' verdi", (3, True),
+    # (17 nov 2026) la terza, i premi fedelta', con la stessa veste;
+    # (18 nov 2026) la quarta, il premio da riscuotere di chi guarda
+    prova("le quattro righe non sono piu' verdi", (4, True),
           (_neg.count('class="trust-note nota-promessa"'),
            any(".trust-note.nota-promessa" in r.split("{")[0] for r in _reg)))
     # ...E SONO CORTE: via il prefisso, che ripeteva a ogni riga una
@@ -107147,6 +107156,7 @@ def prove_introduzioni_leggibili():
         "<input id=\"codUsi\"",        # la riga di un campo
         "da</span> <input type=\"number\"",   # la riga di un premio
         "€</span> <input type=\"text\"",      # fedelta' (17 nov 2026)
+        "${inSats ? 'sats' : '€'}</span>",   # ...la valuta della soglia (18 nov 2026)
         "— ${da}",                     # il mittente: un dato
         "${esaurito(l)",               # uno stato dell'annuncio
         "Nessun codice, per ora.",     # righe vuote
@@ -139728,6 +139738,13 @@ def prove_cambio_converte():
         # € a sats e la cifra scritta si CONVERTE — e' lo stesso conto,
         # detto nell'altra valuta, non un'altra cifra
         "cassaCambiaValuta": "converte",
+        # i premi fedelta' (18 nov 2026): la scala del negozio passa da €
+        # a sats e le soglie della BOZZA si traducono al cambio del
+        # giorno, TONDE (1.000 sats, 5 €): sono un punto di partenza che
+        # il negoziante ritocca, non un conto da tenere al centesimo
+        "premiFedeltaValuta": "converte",
+        # la classifica dei clienti: la stessa fila letta in € o in sats
+        "classificaClientiValuta": "vista",
     }
     prova("il censimento dei bottoni di valuta e' completo (uno nuovo "
           "decide qui cosa fa ai numeri gia' scritti)", set(CENSIMENTO),
@@ -199445,14 +199462,23 @@ def prove_premi_fedelta():
            "PREMI_FEDELTA_ATTIVI": True, "PREMI_FEDELTA_MAX": 4,
            "PREMI_FEDELTA_MIN_EUR": 10, "PREMI_FEDELTA_MAX_EUR": 100_000,
            "PREMIO_TESTO_MAX": 60,
+           "PREMI_FEDELTA_MIN_SATS": 10_000,
+           "PREMI_FEDELTA_MAX_SATS": 100_000_000,
+           "PREMI_AVVISO_FRENO_S": 86_400,
            "PREMI_STATI_AGGANCIO": ("locked",),
            "PREMI_STATI_MORTI": ("annullato", "refunded")}
     prova("le costanti degli stati sono quelle del server", True,
           'PREMI_STATI_AGGANCIO = ("locked",)' in srv
           and 'PREMI_STATI_MORTI = ("annullato", "refunded")' in srv)
-    for nome in ("premi_fedelta_leggi", "speso_nel_negozio",
+    prova("le misure in sats sono quelle del server", True,
+          "PREMI_FEDELTA_MIN_SATS = 10_000\n" in srv
+          and "PREMI_FEDELTA_MAX_SATS = 100_000_000\n" in srv)
+    for nome in ("valuta_premi", "_misure_premi", "premi_fedelta_leggi",
+                 "soglie_del_negozio", "speso_nel_negozio",
                  "matura_premi_fedelta", "aggancia_premi_fedelta",
-                 "premi_di_ordini"):
+                 "_premio_da_riga", "premi_di_ordini", "premi_da_riscuotere",
+                 "premio_dell_ordine", "premio_al_pagamento",
+                 "matura_clienti_del_negozio"):
         exec(pezzo(nome), amb)
     leggi = amb["premi_fedelta_leggi"]
 
@@ -199477,6 +199503,25 @@ def prove_premi_fedelta():
         [{"soglia": 10 * (i + 1), "premio": f"p{i}"} for i in range(6)])))
     prova("il regalo si tronca a PREMIO_TESTO_MAX", 60,
           len(leggi([{"soglia": 10, "premio": "a" * 99}])[0]["premio"]))
+    # (18 nov 2026) le soglie in sats e il regalo-articolo
+    prova("la valuta: 'sats' solo se lo dice, il resto e' euro",
+          ["sats", "eur", "eur", "eur"],
+          [amb["valuta_premi"](x) for x in (" SATS", "", None, "usd")])
+    prova("in sats le misure sono altre: 5.000 cade, 150.000 resta", [
+        {"soglia": 150_000, "premio": "la borsa"}],
+        leggi([{"soglia": 5_000, "premio": "poco"},
+               {"soglia": 150_000, "premio": "la borsa"},
+               {"soglia": 200_000_000, "premio": "troppo"}], "sats"))
+    prova("...e 100 € in sats sono troppo pochi", [],
+          leggi([{"soglia": 100, "premio": "x"}], "sats"))
+    prova("l'articolo scelto resta in lista, il vuoto non compare", [
+        {"soglia": 100, "premio": "la candela", "annuncio_id": 7},
+        {"soglia": 200, "premio": "la tazza"}],
+        leggi([{"soglia": 100, "premio": "la candela", "annuncio_id": "7"},
+               {"soglia": 200, "premio": "la tazza", "annuncio_id": 0}]))
+    prova("un articolo storto non rompe il gradino", [
+        {"soglia": 100, "premio": "x"}],
+        leggi([{"soglia": 100, "premio": "x", "annuncio_id": "abc"}]))
 
     # --- il database di cartone, con lo schema VERO della tabella ---
     i = srv.index("CREATE TABLE IF NOT EXISTS premi_fedelta_maturati(")
@@ -199485,16 +199530,18 @@ def prove_premi_fedelta():
     con.row_factory = sqlite3.Row
     con.executescript(
         "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, "
-        "premi_fedelta TEXT DEFAULT '');"
+        "premi_fedelta TEXT DEFAULT '', negozio TEXT DEFAULT '', "
+        "premi_fedelta_valuta TEXT DEFAULT 'eur');"
         "CREATE TABLE ordini(id INTEGER PRIMARY KEY AUTOINCREMENT, "
         "compratore_id INTEGER, venditore_id INTEGER, prezzo_sats INTEGER, "
         "stato TEXT, cambio_eur REAL DEFAULT 0, prova INTEGER DEFAULT 0);"
         + schema)
     premi = [{"soglia": 100, "premio": "la borsa"},
              {"soglia": 200, "premio": "la tazza"}]
-    con.execute("INSERT INTO utenti VALUES(222,'Un tempo per te',?)",
+    con.execute("INSERT INTO utenti(tg_id, nome, premi_fedelta, negozio) "
+                "VALUES(222,'Un tempo per te',?,'neg222')",
                 (json.dumps(premi),))
-    con.execute("INSERT INTO utenti VALUES(111,'Compratore','')")
+    con.execute("INSERT INTO utenti(tg_id, nome) VALUES(111,'Compratore')")
 
     def ordine(stato, euro, cambio=50_000.0, prova_=0, c=111, v=222):
         sats = int(euro / cambio * 100_000_000) if cambio else 1000
@@ -199516,8 +199563,8 @@ def prove_premi_fedelta():
     prova("sotto la prima soglia non matura niente", [],
           matura(con, 111, 222))
     ordine("released", 50)
-    prova("a 110 € matura la borsa, e lo restituisce", [premi[0]],
-          matura(con, 111, 222))
+    prova("a 110 € matura la borsa, e lo restituisce", [
+        dict(premi[0], valuta="eur")], matura(con, 111, 222))
     prova("...una volta sola", [], matura(con, 111, 222))
     prova("a se stessi niente", [], matura(con, 222, 222))
     con.execute("UPDATE utenti SET premi_fedelta=? WHERE tg_id=222",
@@ -199534,11 +199581,19 @@ def prove_premi_fedelta():
         r = con.execute("SELECT premio FROM premi_fedelta_maturati WHERE "
                         "ordine_id=?", (oid,)).fetchone()
         return r[0] if r else None
+    prova("da riscuotere: la borsa, col negozio per la scheda", [
+        {"soglia": 100, "premio": "la borsa", "valuta": "eur",
+         "negozio": "neg222", "nome": "Un tempo per te"}],
+        amb["premi_da_riscuotere"](con, 111))
+    prova("...di quel negozio e di nessun altro", [],
+          amb["premi_da_riscuotere"](con, 111, 444))
     aggancia(con, 111, 222)
     locked = con.execute("SELECT id FROM ordini WHERE stato='locked' AND "
                          "compratore_id=111").fetchone()[0]
     prova("la borsa va sul primo ordine pagato e non spedito", "la borsa",
           premio_di(locked))
+    prova("attaccato, non e' piu' da riscuotere", [],
+          amb["premi_da_riscuotere"](con, 111))
     nuovo = ordine("locked", 30)
     aggancia(con, 111, 222)
     prova("un premio per ordine: il secondo resta senza", None,
@@ -199565,7 +199620,8 @@ def prove_premi_fedelta():
     righe = [{"id": terzo, "compratore_id": 111, "venditore_id": 222,
               "stato": "locked"}]
     amb["premi_di_ordini"](con, righe, 111)
-    prova("chi compra lo vede", {"soglia": 200, "premio": "la tazza"},
+    prova("chi compra lo vede", {"soglia": 200, "premio": "la tazza",
+                                 "valuta": "eur"},
           righe[0].get("premio_fedelta"))
     righe = [{"id": terzo, "compratore_id": 111, "venditore_id": 222,
               "stato": "locked"}]
@@ -199598,12 +199654,14 @@ def prove_premi_fedelta():
     con2.row_factory = sqlite3.Row
     con2.executescript(
         "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, "
-        "premi_fedelta TEXT DEFAULT '');"
+        "premi_fedelta TEXT DEFAULT '', negozio TEXT DEFAULT '', "
+        "premi_fedelta_valuta TEXT DEFAULT 'eur');"
         "CREATE TABLE ordini(id INTEGER PRIMARY KEY AUTOINCREMENT, "
         "compratore_id INTEGER, venditore_id INTEGER, prezzo_sats INTEGER, "
         "stato TEXT, cambio_eur REAL DEFAULT 0, prova INTEGER DEFAULT 0);"
         + schema)
-    con2.execute("INSERT INTO utenti VALUES(222,'Bottega <b>',?)",
+    con2.execute("INSERT INTO utenti(tg_id, nome, premi_fedelta) "
+                 "VALUES(222,'Bottega <b>',?)",
                  (json.dumps([{"soglia": 1000, "premio": "la <tazza>"}]),))
     con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
                  "prezzo_sats, stato, cambio_eur) VALUES(111,222,"
@@ -199617,6 +199675,9 @@ def prove_premi_fedelta():
             pass
     amb.update(db=lambda: _Con(), notifica=notifica, html=html,
                _fmt_sats=lambda n: f"{n:,}".replace(",", "."))
+    for nome in ("soglia_premio_testo", "riga_premio_pagato"):
+        exec(pezzo(nome), amb)
+    exec("async " + pezzo("_avvisa_premi_maturati"), amb)
     exec("async " + pezzo("premia_fedelta_negozio"), amb)
     _aio.run(amb["premia_fedelta_negozio"](111, 222))
     prova("dopo lo sblocco l'avviso arriva a tutti e due", [111, 222],
@@ -199627,6 +199688,81 @@ def prove_premi_fedelta():
     detti.clear()
     _aio.run(amb["premia_fedelta_negozio"](111, 222))
     prova("...e una volta sola", [], detti)
+
+    # --- (18 nov 2026) le soglie in SATS: il conto senza cambi ---
+    con2.execute("UPDATE utenti SET premi_fedelta=?, premi_fedelta_valuta="
+                 "'sats' WHERE tg_id=222", (json.dumps(
+                     [{"soglia": 1_500_000, "premio": "la borsa"},
+                      {"soglia": 2_500_000, "premio": "la candela",
+                       "annuncio_id": 9}]),))
+    con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
+                 "prezzo_sats, stato, cambio_eur) VALUES(111,222,"
+                 "1000000,'released',0)")       # cambio ignoto: in sats conta
+    con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
+                 "prezzo_sats, stato, cambio_eur, prova) VALUES(111,222,"
+                 "9000000,'released',60000,1)")  # la prova no
+    prova("il conto in sats: tutti i sats conclusi, prove escluse", 3_000_000,
+          amb["speso_nel_negozio"](con2, 111, 222, "sats"))
+    prova("...e in euro resta al cambio di ognuno", 1200.0,
+          amb["speso_nel_negozio"](con2, 111, 222, "eur"))
+    detti.clear()
+    _aio.run(amb["premia_fedelta_negozio"](111, 222))
+    prova("due soglie insieme: UN messaggio per parte", [111, 222],
+          [t for t, _ in detti])
+    prova("...con la cifra in sats e i due premi in fila", True,
+          all("2.500.000 sats" in t and "la borsa" in t
+              and "poi <b>la candela</b>" in t for _, t in detti))
+    prova("il premio-articolo si fotografa con l'annuncio", (9, "sats"),
+          tuple(con2.execute("SELECT annuncio_id, valuta FROM "
+                             "premi_fedelta_maturati WHERE soglia_eur="
+                             "2500000").fetchone()))
+
+    # --- al salvataggio matura chi ha GIA' passato la soglia ---
+    con2.execute("INSERT INTO utenti(tg_id, nome) VALUES(333,'Altra')")
+    con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
+                 "prezzo_sats, stato) VALUES(333,222,1600000,'released')")
+    con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
+                 "prezzo_sats, stato) VALUES(444,222,9000000,'locked')")
+    con2.execute("INSERT INTO ordini(compratore_id, venditore_id, "
+                 "prezzo_sats, stato) VALUES(222,222,9000000,'released')")
+    fatti = amb["matura_clienti_del_negozio"](con2, 222)
+    prova("al salvataggio: solo chi ha concluso abbastanza, mai se stesso",
+          [(333, ["la borsa"], True)],
+          [(c, [n["premio"] for n in nuovi], av) for c, nuovi, av in fatti])
+    con2.execute("UPDATE utenti SET premi_fedelta=? WHERE tg_id=222",
+                 (json.dumps([{"soglia": 1_000_000, "premio": "il segnalibro"},
+                              {"soglia": 1_500_000, "premio": "la borsa"}]),))
+    fatti = amb["matura_clienti_del_negozio"](con2, 222)
+    prova("il freno delle 24 ore: matura, ma nessun secondo messaggio",
+          sorted([(111, False), (333, False)]),
+          sorted((c, av) for c, _, av in fatti))
+
+    # --- il premio al momento del pagamento: il piu' VECCHIO per primo
+    # (con due valute in fila le soglie non si confrontano, l'eta' si') ---
+    con2.execute("UPDATE premi_fedelta_maturati SET maturato_il="
+                 "maturato_il-100 WHERE compratore_id=333 AND "
+                 "premio='la borsa'")
+    pagato = con2.execute(
+        "INSERT INTO ordini(compratore_id, venditore_id, prezzo_sats, stato) "
+        "VALUES(333,222,1000,'locked')").lastrowid
+    p = amb["premio_al_pagamento"](con2, {"id": pagato, "compratore_id": 333,
+                                          "venditore_id": 222})
+    prova("pagato l'ordine, il premio si aggancia SUBITO", "la borsa",
+          (p or {}).get("premio"))
+    prova("a chi vende: cosa mettere nel pacco, scappato", True,
+          "Nel pacco metti <b>la borsa</b>" in amb["riga_premio_pagato"](
+              p, "venditore") and "1.500.000 sats" in amb[
+              "riga_premio_pagato"](p, "venditore"))
+    prova("a chi compra: cosa trova", True,
+          "trovi anche <b>la borsa</b>" in amb["riga_premio_pagato"](
+              p, "compratore"))
+    prova("il regalo con l'HTML dentro esce scappato", True,
+          "&lt;b&gt;" in amb["riga_premio_pagato"](
+              {"soglia": 10, "premio": "<b>", "valuta": "eur"}, "compratore"))
+    prova("senza premio nessuna riga", "", amb["riga_premio_pagato"](
+        None, "venditore"))
+    prova("a se stessi niente", None, amb["premio_al_pagamento"](
+        con2, {"id": 1, "compratore_id": 222, "venditore_id": 222}))
 
     # --- le sentinelle sul server ---
     prova("la leva nasce ACCESA (regola di Andrea del 14 nov)", True,
@@ -199641,7 +199777,7 @@ def prove_premi_fedelta():
           < mo.index("con.close()", mo.index("premi_di_ordini(")))
     neg = codice(pezzo("negozio"))
     prova("la vetrina passa dal giudice, mai il JSON grezzo", True,
-          'premi_fedelta_leggi(v["premi_fedelta"])' in neg
+          'premi_fedelta_leggi(v["premi_fedelta"], valuta_premi_neg)' in neg
           and 'venditore["premi_fedelta"] = ' in neg)
     me = codice(pezzo("mio_profilo"))
     prova("/api/me: lista pulita e misure del cassetto", True,
@@ -199659,7 +199795,31 @@ def prove_premi_fedelta():
     prova("nessun sat si muove: niente fatture ne' escrow nei premi", True,
           all(p not in codice(pezzo(n)) for n in (
               "matura_premi_fedelta", "aggancia_premi_fedelta",
-              "premia_fedelta_negozio") for p in ("invoice", "paga_", "sats=")))
+              "premia_fedelta_negozio", "premio_al_pagamento",
+              "matura_clienti_del_negozio", "classifica_clienti_negozio")
+              for p in ("invoice", "paga_", "sats=")))
+    prova("la rotta: l'articolo dev'essere SUO e in vetrina", True,
+          "AND venditore_id=? \"\n                    \"AND stato='attivo'\"" in rot
+          or ("venditore_id=?" in rot and "stato='attivo'" in rot
+              and 'user["id"]' in rot))
+    prova("la rotta matura i clienti dopo il salvataggio", True,
+          rot.index("UPDATE utenti SET premi_fedelta=?")
+          < rot.index("matura_clienti_del_negozio(con"))
+    inc = codice(pezzo("_incassa_ordine"))
+    prova("l'incasso aggancia il premio DOPO il commit e lo dice a tutti e due",
+          True, inc.index('"AND venditore_id=?", (o["compratore_id"]')
+          < inc.index("premio_pagato = premio_al_pagamento(con, o)")
+          < inc.index('riga_premio_pagato(premio_pagato, "venditore")')
+          < inc.index("await notifica(o[\"venditore_id\"], msg")
+          and 'riga_premio_pagato(premio_pagato, "compratore")' in inc)
+    cl = codice(pezzo("classifica_clienti_negozio"))
+    prova("la classifica: solo i MIEI clienti, conclusi, niente prove", True,
+          "WHERE o.venditore_id=? AND o.stato='released'" in cl
+          and "COALESCE(o.prova,0)=0" in cl
+          and "o.compratore_id<>o.venditore_id" in cl
+          and "if not CLASSIFICA_CLIENTI_ATTIVA:" in cl)
+    prova("la leva della classifica nasce ACCESA", True,
+          "    CLASSIFICA_CLIENTI_ATTIVA = True\n" in srv)
 
     # --- il client ---
     prova("il cassetto sta nel Profilo, con le altre promesse", True,
@@ -199670,13 +199830,21 @@ def prove_premi_fedelta():
           "${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}"
           "${premiNegozioRiga(v)}" in mini)
     nota = pezzo_js(mini, "function notaPremioFedelta(o){", "\n}\n") + "\n}\n"
+    soglia_js = pezzo_js(mini, "function sogliaPremio(soglia, valuta){", "\n}\n") + "\n}\n"
+    scheda = pezzo_js(mini, "function notaPremioScheda(l){", "\n}\n") + "\n}\n"
     js = ("const fmt = n => String(n);\n"
           "const esc = s => String(s).replace(/</g,'&lt;');\n"
-          + nota +
+          + soglia_js + nota + scheda +
+          "let mieiPremiDaRiscuotere = [{negozio:'neg222', premio:'la <tazza>'}];\n"
           "const p = {soglia:100, premio:'la <borsa>'};\n"
+          "const ps = {soglia:150000, premio:'la borsa', valuta:'sats'};\n"
           "console.log(JSON.stringify({"
           "vende: notaPremioFedelta({role:'seller', premioFedelta:p}),"
           "compra: notaPremioFedelta({role:'buyer', premioFedelta:p}),"
+          "sats: notaPremioFedelta({role:'buyer', premioFedelta:ps}),"
+          "scheda: notaPremioScheda({negozio:'neg222'}),"
+          "altrove: notaPremioScheda({negozio:'neg999'}),"
+          "senza: notaPremioScheda({negozio:''}),"
           "niente: notaPremioFedelta({role:'buyer', premioFedelta:null})}));\n")
     r = _node_banco(js)
     if r is None:
@@ -199688,6 +199856,21 @@ def prove_premi_fedelta():
     prova("chi compra: «nel pacco trovi»", True,
           "Nel pacco trovi" in r.get("compra", ""))
     prova("senza premio niente riga", "", r.get("niente"))
+    prova("in sats la soglia si dice in sats", True,
+          "150000 sats" in r.get("sats", "") and "€" not in r.get("sats", ""))
+    prova("la scheda di quel negozio: «hai un premio da riscuotere»", True,
+          "premio da riscuotere" in r.get("scheda", "")
+          and "la &lt;tazza>" in r.get("scheda", ""))
+    prova("...un altro negozio, o nessun codice: niente", ["", ""],
+          [r.get("altrove"), r.get("senza")])
+    prova("il cassetto: valuta, articoli e classifica", True,
+          "premiFedeltaValuta(this.dataset.v)" in mini
+          and "premiFedeltaArticolo(${i}, this.value)" in mini
+          and "caricaClassificaClienti()" in mini
+          and "body: JSON.stringify({premi, valuta})" in mini)
+    prova("la scheda dell'annuncio dice il premio da riscuotere", True,
+          "${notaPremioScheda(l)}" in mini
+          and "mieiPremiDaRiscuotere = me.premi_da_riscuotere || [];" in mini)
 
 
 def prove_notifiche_telefono():

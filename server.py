@@ -760,6 +760,28 @@ except ImportError:
 PREMI_FEDELTA_MAX = 4          # quattro gradini bastano a qualunque negozio
 PREMI_FEDELTA_MIN_EUR = 10     # sotto, il premio e' di fatto a ogni ordine
 PREMI_FEDELTA_MAX_EUR = 100_000
+# ...E ANCHE IN SATS, a scelta del negozio (18 nov 2026, cantiere
+# premi-fedelta-2; Andrea: «Le soglie mettele sia in sats che in euro,
+# uno può scegliere»). Il «in euro e basta» del 17 nov resta vero per
+# chi lo sceglie; chi conta in sats somma i sats pagati, senza cambi. Una
+# valuta sola per negozio (`premi_fedelta_valuta`): quattro gradini in
+# due unita' non avrebbero un ordine. Le misure sono le stesse in
+# grandezza: ~10 € da una parte, 1 BTC dall'altra.
+PREMI_FEDELTA_MIN_SATS = 10_000
+PREMI_FEDELTA_MAX_SATS = 100_000_000
+VALUTE_PREMI = ("eur", "sats")
+# LA CLASSIFICA DEI CLIENTI DEL NEGOZIO (18 nov 2026, stesso cantiere;
+# Andrea: «la classifica degli utenti che hanno comprato nel proprio
+# negozio ordinata decrescente per somma degli acquisti, in sats anche
+# se uno vuole»). La vede SOLO il negozio, dei SUOI clienti: nomi e
+# cifre che ha gia' nei suoi ordini, messi in fila. Leva accesa di serie
+# (regola del 14 nov): spenta, la rotta risponde 400 e il cassetto la
+# nasconde.
+try:
+    from config import CLASSIFICA_CLIENTI_ATTIVA
+except ImportError:
+    CLASSIFICA_CLIENTI_ATTIVA = True
+CLASSIFICA_CLIENTI_MAX = 50    # i primi cinquanta: oltre e' un elenco, non una classifica
 PREMIO_TESTO_MAX = 60          # «la borsa di tela», non una descrizione
 try:
     from config import SPED_GRATIS_SOGLIE_EUR
@@ -7311,6 +7333,11 @@ def init_db():
         premio TEXT NOT NULL,
         maturato_il INTEGER NOT NULL,
         ordine_id INTEGER,
+        -- (18 nov 2026) la valuta della soglia ('eur' o 'sats': il
+        -- nome `soglia_eur` e' rimasto di quando c'era solo l'euro) e
+        -- l'articolo del negozio scelto come regalo, 0 = scritto a mano
+        valuta TEXT DEFAULT 'eur',
+        annuncio_id INTEGER DEFAULT 0,
         UNIQUE(compratore_id, venditore_id, soglia_eur)
     );
     CREATE INDEX IF NOT EXISTS idx_premi_ordine
@@ -9817,6 +9844,10 @@ def init_db():
                     # '' = nessun premio. La legge e la ripulisce
                     # SEMPRE `premi_fedelta_leggi`, mai il JSON nudo.
                     "premi_fedelta TEXT DEFAULT ''",
+                    # ...e la loro valuta (18 nov 2026): 'eur' o 'sats',
+                    # una per negozio. Il default e' la migrazione: le
+                    # liste di ieri erano tutte in euro.
+                    "premi_fedelta_valuta TEXT DEFAULT 'eur'",
                     # IL BANNER DEL NEGOZIO (ago 2026): l'insegna che
                     # il venditore appende sopra il suo catalogo — una
                     # foto e un link al suo sito. Il default '' E' la
@@ -10814,6 +10845,18 @@ def init_db():
                     # i codici gia' in giro restano CUMULABILI (ott 2026)
                     "codici_sconto ADD COLUMN cumulabile INTEGER "
                     "NOT NULL DEFAULT 1"):
+        try:
+            con.execute(f"ALTER TABLE {tab_col}")
+        except sqlite3.OperationalError:
+            pass
+    # I PREMI FEDELTA' IN SATS E SCELTI FRA GLI ARTICOLI (18 nov 2026):
+    # la prima migrazione su `premi_fedelta_maturati`. Additiva, coi
+    # default ripetuti (SQLite scrive quello della CREATE solo sui DB
+    # nuovi): le righe di ieri sono in euro e scritte a mano, ed e' vero.
+    for tab_col in ("premi_fedelta_maturati ADD COLUMN valuta TEXT "
+                    "DEFAULT 'eur'",
+                    "premi_fedelta_maturati ADD COLUMN annuncio_id "
+                    "INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE {tab_col}")
         except sqlite3.OperationalError:
@@ -32207,6 +32250,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
                      "sconto_pacco_valore_valuta, sconto_pacco_percento, "
                      "sped_gratis_soglia, sped_gratis_soglia_eur, "
                      "sped_gratis_valuta, premi_fedelta, "
+                     "premi_fedelta_valuta, "
                      "banner_stato, banner_foto, banner_link, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
@@ -32403,10 +32447,29 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     seguito = bool(user and int(user["id"]) != int(v["tg_id"]) and con.execute(
         "SELECT 1 FROM venditori_seguiti WHERE tg_id=? AND venditore_id=?",
         (user["id"], v["tg_id"])).fetchone())
-    # ...e quanto ha speso qui chi guarda (premi fedelta', 17 nov 2026)
-    speso_qui = (round(speso_nel_negozio(con, user["id"], v["tg_id"]), 2)
-                 if user and int(user["id"]) != int(v["tg_id"])
-                 and PREMI_FEDELTA_ATTIVI and v["premi_fedelta"] else None)
+    # ...e quanto ha speso qui chi guarda (premi fedelta', 17 nov 2026),
+    # nella valuta delle soglie del negozio (18 nov 2026), e i premi che
+    # ha GIA' da riscuotere qui: la riga «al tuo prossimo ordine trovi»
+    valuta_premi_neg = valuta_premi(v["premi_fedelta_valuta"])
+    da_cliente = bool(user and int(user["id"]) != int(v["tg_id"])
+                      and PREMI_FEDELTA_ATTIVI)
+    speso_qui = (speso_nel_negozio(con, user["id"], v["tg_id"],
+                                   valuta_premi_neg)
+                 if da_cliente and v["premi_fedelta"] else None)
+    if speso_qui is not None and valuta_premi_neg == "eur":
+        speso_qui = round(speso_qui, 2)
+    da_riscuotere = (premi_da_riscuotere(con, user["id"], v["tg_id"])
+                     if da_cliente else [])
+    # il regalo-articolo che non e' piu' in vetrina resta una promessa
+    # scritta, ma senza link: un tocco su un annuncio sparito e' un errore
+    in_vetrina_premi = set()
+    _aid_premi = [int(p.get("annuncio_id") or 0) for p in
+                  premi_fedelta_leggi(v["premi_fedelta"], valuta_premi_neg)
+                  + da_riscuotere if p.get("annuncio_id")]
+    if _aid_premi:
+        in_vetrina_premi = {int(r["id"]) for r in con.execute(
+            "SELECT id FROM annunci WHERE stato='attivo' AND id IN "
+            f"({','.join('?' * len(_aid_premi))})", _aid_premi)}
     con.close()
     venditore = dict(v)
     venditore["seguito"] = seguito
@@ -32455,10 +32518,21 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # I PREMI FEDELTA' (17 nov 2026), dal loro giudice e mai il JSON
     # grezzo; a leva spenta la vetrina non promette niente. A chi guarda
     # da cliente, quanto ha gia' speso li' (solo a lui: e' roba sua)
-    venditore["premi_fedelta"] = (premi_fedelta_leggi(v["premi_fedelta"])
-                                  if PREMI_FEDELTA_ATTIVI else [])
+    venditore["premi_fedelta"] = (
+        premi_fedelta_leggi(v["premi_fedelta"], valuta_premi_neg)
+        if PREMI_FEDELTA_ATTIVI else [])
+    venditore["premi_fedelta_valuta"] = valuta_premi_neg
     if venditore["premi_fedelta"] and speso_qui is not None:
-        venditore["speso_qui_eur"] = speso_qui
+        # `speso_qui` nella valuta delle soglie; la chiave vecchia in
+        # euro resta per i client in cache, solo quando e' davvero euro
+        venditore["speso_qui"] = speso_qui
+        if valuta_premi_neg == "eur":
+            venditore["speso_qui_eur"] = speso_qui
+    if da_riscuotere:
+        venditore["premi_da_riscuotere"] = da_riscuotere
+    for p in venditore["premi_fedelta"] + da_riscuotere:
+        if p.get("annuncio_id") and int(p["annuncio_id"]) not in in_vetrina_premi:
+            p.pop("annuncio_id", None)
     # Il pezzo leggibile dell'indirizzo del negozio: lo calcola il
     # server, come per gli annunci, cosi' il client non ha un secondo
     # `_slug` da tenere in pari.
@@ -37038,6 +37112,10 @@ def _leve_stato():
                   spento="nessun negozio mostra premi, nessuno ne matura "
                          "e nessun ordine ne riceve di nuovi; quelli già "
                          "attaccati agli ordini restano scritti"),
+            _leva("Classifica dei clienti", "CLASSIFICA_CLIENTI_ATTIVA",
+                  bool(CLASSIFICA_CLIENTI_ATTIVA),
+                  spento="il negozio non vede più la fila dei suoi "
+                         "clienti per totale speso; niente si cancella"),
         ]},
         {"gruppo": "🎟 Codici sconto del venditore", "voci": [
             _leva("Codici sconto", "CODICI_SCONTO_ATTIVI",
@@ -48839,6 +48917,10 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     con.execute("DELETE FROM carrello_salvato WHERE tg_id=? "
                 "AND venditore_id=?", (o["compratore_id"], o["venditore_id"]))
     con.commit()
+    # IL PREMIO FEDELTA' DI QUEST'ORDINE (18 nov 2026), agganciato
+    # adesso e non alla prossima lettura degli ordini: va detto in
+    # «Hai venduto», prima che il pacco parta. Fail-open, dopo il commit.
+    premio_pagato = premio_al_pagamento(con, o)
     for e in esauriti:
         # Anche la piazza Nostr deve sapere che l'oggetto e' andato
         asyncio.create_task(annuncio_su_nostr(e["annuncio_id"], "sold",
@@ -48956,6 +49038,9 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # ...e in fondo la riga operativa di chi ha un negozio collegato:
     # e' l'ULTIMA cosa che legge perche' e' l'unica che gli chiede di
     # uscire da Barattolo. Vuota per tutti gli altri.
+    # il regalo del premio fedelta', prima della riga del magazzino
+    # (quella resta l'ultima: e' l'unica che fa uscire da Barattolo)
+    msg += riga_premio_pagato(premio_pagato, "venditore")
     if magazzino:
         msg += "\n\n" + _coda_magazzino(magazzino)
     # ...e sotto, il tasto che apre l'ordine (dove stanno la data e la
@@ -48981,7 +49066,8 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                                     o["indirizzo_atteso"],
                                     bool(o["indirizzo_il"]),
                                     o["zona_sped"], o["paese_sped"],
-                                    o["domestico_sped"]))
+                                    o["domestico_sped"])
+                   + riga_premio_pagato(premio_pagato, "compratore"))
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
         f"🛒 <b>Nuovo ordine:</b> «{titolo}» — "
@@ -53223,14 +53309,35 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # I PREMI FEDELTA' (17 nov 2026), per il cassetto «🎁»: la lista
     # pulita dal giudice al posto del JSON in colonna, e le misure per
     # i messaggi del 400; `attivo` nasconde il cassetto a leva spenta
+    profilo["premi_fedelta_valuta"] = valuta_premi(
+        profilo.get("premi_fedelta_valuta"))
     profilo["premi_fedelta"] = premi_fedelta_leggi(
-        profilo.get("premi_fedelta"))
+        profilo.get("premi_fedelta"), profilo["premi_fedelta_valuta"])
     profilo["premi_fedelta_leve"] = {
         "attivo": bool(PREMI_FEDELTA_ATTIVI),
         "max": PREMI_FEDELTA_MAX,
         "min_eur": PREMI_FEDELTA_MIN_EUR,
         "max_eur": PREMI_FEDELTA_MAX_EUR,
-        "testo_max": PREMIO_TESTO_MAX}
+        "min_sats": PREMI_FEDELTA_MIN_SATS,
+        "max_sats": PREMI_FEDELTA_MAX_SATS,
+        "valute": list(VALUTE_PREMI),
+        "testo_max": PREMIO_TESTO_MAX,
+        "classifica": bool(CLASSIFICA_CLIENTI_ATTIVA)}
+    # (18 nov 2026) gli articoli in vetrina fra cui il negozio sceglie
+    # il regalo, e i premi che chi guarda ha da riscuotere come CLIENTE
+    # altrove (la riga sulla scheda dell'annuncio di quel negozio)
+    _con_premi = db()
+    try:
+        profilo["premi_fedelta_articoli"] = [
+            {"id": int(r["id"]), "titolo": r["titolo"] or ""}
+            for r in _con_premi.execute(
+                "SELECT id, titolo FROM annunci WHERE venditore_id=? AND "
+                "stato='attivo' ORDER BY id DESC LIMIT 200",
+                (user["id"],))] if PREMI_FEDELTA_ATTIVI else []
+        profilo["premi_da_riscuotere"] = premi_da_riscuotere(
+            _con_premi, user["id"])
+    finally:
+        _con_premi.close()
     profilo["sped_gratis_leve"] = {
         "attivo": bool(SPED_GRATIS_ATTIVO),
         "valute": list(VALUTE_SOGLIA),
@@ -56199,18 +56306,40 @@ PREMI_STATI_AGGANCIO = ("locked",)          # pagato, non ancora spedito
 PREMI_STATI_MORTI = ("annullato", "refunded")
 
 
-def premi_fedelta_leggi(grezzo) -> list:
+def valuta_premi(grezza) -> str:
+    """La valuta delle soglie di un negozio: 'sats' solo se lo dice,
+    tutto il resto (vuoto, NULL, sporco) e' l'euro di ieri."""
+    return "sats" if str(grezza or "").strip().lower() == "sats" else "eur"
+
+
+def _misure_premi(valuta: str) -> tuple:
+    """(minimo, massimo) di una soglia nella sua valuta."""
+    if valuta == "sats":
+        return PREMI_FEDELTA_MIN_SATS, PREMI_FEDELTA_MAX_SATS
+    return PREMI_FEDELTA_MIN_EUR, PREMI_FEDELTA_MAX_EUR
+
+
+def soglia_premio_testo(soglia, valuta: str) -> str:
+    """«100 €» o «150.000 sats»: la soglia detta nella sua valuta, per
+    gli avvisi del bot e i messaggi del 400."""
+    return (f"{_fmt_sats(int(soglia))} sats" if valuta_premi(valuta) == "sats"
+            else f"{_fmt_sats(int(soglia))} €")
+
+
+def premi_fedelta_leggi(grezzo, valuta: str = "eur") -> list:
     """Il giudice unico delle soglie di un negozio: dal JSON in colonna
-    alla lista pulita [{soglia, premio}] in ordine di soglia. Tutto cio'
-    che non torna (JSON rotto, soglie fuori misura, premi vuoti,
-    doppioni) cade in silenzio: una colonna sporca non deve mai far
-    cadere la pagina di un negozio."""
+    alla lista pulita [{soglia, premio}] in ordine di soglia, con
+    `annuncio_id` solo dove il regalo e' un articolo del negozio
+    (18 nov 2026). Tutto cio' che non torna (JSON rotto, soglie fuori
+    misura per la valuta, premi vuoti, doppioni) cade in silenzio: una
+    colonna sporca non deve mai far cadere la pagina di un negozio."""
     try:
         dati = json.loads(grezzo) if isinstance(grezzo, str) else grezzo
     except (TypeError, ValueError):
         return []
     if not isinstance(dati, list):
         return []
+    minimo, massimo = _misure_premi(valuta_premi(valuta))
     visti, fuori = set(), []
     for voce in dati:
         if not isinstance(voce, dict):
@@ -56223,21 +56352,45 @@ def premi_fedelta_leggi(grezzo) -> list:
                         str(voce.get("premio") or ""))
         premio = " ".join(premio.split())[:PREMIO_TESTO_MAX]
         if (not premio or soglia in visti
-                or not PREMI_FEDELTA_MIN_EUR <= soglia
-                <= PREMI_FEDELTA_MAX_EUR):
+                or not minimo <= soglia <= massimo):
             continue
         visti.add(soglia)
-        fuori.append({"soglia": soglia, "premio": premio})
+        pulita = {"soglia": soglia, "premio": premio}
+        try:
+            aid = int(voce.get("annuncio_id") or 0)
+        except (TypeError, ValueError):
+            aid = 0
+        if aid > 0:
+            pulita["annuncio_id"] = aid
+        fuori.append(pulita)
     fuori.sort(key=lambda x: x["soglia"])
     return fuori[:PREMI_FEDELTA_MAX]
 
 
-def speso_nel_negozio(con, compratore_id: int, venditore_id: int) -> float:
-    """Gli euro spesi da un cliente in un negozio: solo affari conclusi,
-    al cambio di ognuno. Un ordine senza cambio (storico, CoinGecko
-    muto) conta zero, la regola di xp_ordine: meglio un conto corto che
-    un numero inventato. Gli ordini di PROVA non contano, come in
-    classifica."""
+def soglie_del_negozio(con, venditore_id: int) -> tuple:
+    """(lista pulita, valuta) dei premi di un negozio, dalla sua riga."""
+    r = con.execute("SELECT premi_fedelta, premi_fedelta_valuta FROM utenti "
+                    "WHERE tg_id=?", (venditore_id,)).fetchone()
+    if not r:
+        return [], "eur"
+    valuta = valuta_premi(r["premi_fedelta_valuta"])
+    return premi_fedelta_leggi(r["premi_fedelta"], valuta), valuta
+
+
+def speso_nel_negozio(con, compratore_id: int, venditore_id: int,
+                      valuta: str = "eur") -> float:
+    """Quanto ha speso un cliente in un negozio: solo affari conclusi.
+    In EURO al cambio di ognuno — un ordine senza cambio (storico,
+    CoinGecko muto) conta zero, la regola di xp_ordine: meglio un conto
+    corto che un numero inventato. In SATS (18 nov 2026) la somma dei
+    sats pagati, e li' il cambio non serve. Gli ordini di PROVA non
+    contano, come in classifica."""
+    if valuta_premi(valuta) == "sats":
+        r = con.execute(
+            "SELECT COALESCE(SUM(prezzo_sats), 0) AS s FROM ordini "
+            "WHERE compratore_id=? AND venditore_id=? AND stato='released' "
+            "AND COALESCE(prova,0)=0", (compratore_id, venditore_id)).fetchone()
+        return int(r["s"] if r else 0)
     r = con.execute(
         "SELECT COALESCE(SUM(prezzo_sats * cambio_eur), 0) AS s FROM ordini "
         "WHERE compratore_id=? AND venditore_id=? AND stato='released' "
@@ -56247,21 +56400,26 @@ def speso_nel_negozio(con, compratore_id: int, venditore_id: int) -> float:
 
 
 def matura_premi_fedelta(con, compratore_id: int, venditore_id: int,
-                         soglie: list = None) -> list:
-    """Scrive i premi appena maturati e li RESTITUISCE (per gli avvisi):
-    ogni soglia passata una volta sola, grazie alla UNIQUE. Il premio si
-    fotografa in riga, cosi' un venditore che poi cambia regalo non
-    toglie niente a chi l'aveva gia' guadagnato. Leva spenta, o chi
-    compra da se stesso: niente."""
+                         soglie: list = None, valuta: str = None) -> list:
+    """Scrive i premi appena maturati e li RESTITUISCE (per gli avvisi),
+    ognuno con la sua `valuta`: ogni soglia passata una volta sola,
+    grazie alla UNIQUE. Il premio si fotografa in riga (testo e
+    articolo), cosi' un venditore che poi cambia regalo non toglie
+    niente a chi l'aveva gia' guadagnato. Leva spenta, o chi compra da
+    se stesso: niente.
+    IMPERFEZIONE DICHIARATA: la UNIQUE e' su (cliente, negozio, numero)
+    e non sulla valuta — un negozio che passa da «10.000 €» a «10.000
+    sats» non fa maturare di nuovo chi aveva gia' il primo. Coincidenza
+    di cifre fra due scale lontane mille volte: rifare la tabella per
+    lei costerebbe piu' del caso."""
     if not PREMI_FEDELTA_ATTIVI or compratore_id == venditore_id:
         return []
     if soglie is None:
-        r = con.execute("SELECT premi_fedelta FROM utenti WHERE tg_id=?",
-                        (venditore_id,)).fetchone()
-        soglie = premi_fedelta_leggi(r["premi_fedelta"] if r else "")
+        soglie, valuta = soglie_del_negozio(con, venditore_id)
+    valuta = valuta_premi(valuta)
     if not soglie:
         return []
-    speso = speso_nel_negozio(con, compratore_id, venditore_id)
+    speso = speso_nel_negozio(con, compratore_id, venditore_id, valuta)
     adesso = int(time.time())
     nuovi = []
     for s in soglie:
@@ -56269,11 +56427,12 @@ def matura_premi_fedelta(con, compratore_id: int, venditore_id: int,
             break
         cur = con.execute(
             "INSERT OR IGNORE INTO premi_fedelta_maturati(compratore_id, "
-            "venditore_id, soglia_eur, premio, maturato_il) "
-            "VALUES(?,?,?,?,?)",
-            (compratore_id, venditore_id, s["soglia"], s["premio"], adesso))
+            "venditore_id, soglia_eur, premio, maturato_il, valuta, "
+            "annuncio_id) VALUES(?,?,?,?,?,?,?)",
+            (compratore_id, venditore_id, s["soglia"], s["premio"], adesso,
+             valuta, int(s.get("annuncio_id") or 0)))
         if cur.rowcount:
-            nuovi.append(s)
+            nuovi.append(dict(s, valuta=valuta))
     return nuovi
 
 
@@ -56295,8 +56454,8 @@ def aggancia_premi_fedelta(con, compratore_id: int,
     matura_premi_fedelta(con, compratore_id, venditore_id)
     liberi = con.execute(
         "SELECT id FROM premi_fedelta_maturati WHERE compratore_id=? AND "
-        "venditore_id=? AND ordine_id IS NULL ORDER BY soglia_eur, id",
-        (compratore_id, venditore_id)).fetchall()
+        "venditore_id=? AND ordine_id IS NULL ORDER BY maturato_il, "
+        "soglia_eur, id", (compratore_id, venditore_id)).fetchall()
     if not liberi:
         return
     ordini = con.execute(
@@ -56312,10 +56471,21 @@ def aggancia_premi_fedelta(con, compratore_id: int,
                     (ordine["id"], premio["id"]))
 
 
+def _premio_da_riga(p) -> dict:
+    """La forma che esce verso il client di un premio maturato:
+    {soglia, premio, valuta} e `annuncio_id` solo se c'e'."""
+    fuori = {"soglia": p["soglia_eur"], "premio": p["premio"],
+             "valuta": valuta_premi(p["valuta"])}
+    if int(p["annuncio_id"] or 0) > 0:
+        fuori["annuncio_id"] = int(p["annuncio_id"])
+    return fuori
+
+
 def premi_di_ordini(con, righe: list, user_id: int) -> None:
     """Attacca a ogni riga della lista ordini la chiave `premio_fedelta`
-    ({soglia, premio}), SOLO alle due parti e solo dove un premio c'e':
-    chi vende sa cosa mettere nel pacco, chi compra cosa trovarci.
+    ({soglia, premio, valuta[, annuncio_id]}), SOLO alle due parti e
+    solo dove un premio c'e': chi vende sa cosa mettere nel pacco, chi
+    compra cosa trovarci.
     Prima rifa' gli agganci delle coppie in lista (vedi
     aggancia_premi_fedelta): e' una scrittura su una GET, idempotente,
     il precedente di /api/me coi distintivi."""
@@ -56338,14 +56508,124 @@ def premi_di_ordini(con, righe: list, user_id: int) -> None:
     for i in range(0, len(ids), 500):
         pezzo = ids[i:i + 500]
         for p in con.execute(
-                "SELECT ordine_id, soglia_eur, premio FROM "
-                "premi_fedelta_maturati WHERE ordine_id IN "
+                "SELECT ordine_id, soglia_eur, premio, valuta, annuncio_id "
+                "FROM premi_fedelta_maturati WHERE ordine_id IN "
                 f"({','.join('?' * len(pezzo))})", pezzo):
-            premi[p["ordine_id"]] = {"soglia": p["soglia_eur"],
-                                     "premio": p["premio"]}
+            premi[p["ordine_id"]] = _premio_da_riga(p)
     for r in mie:
         if r["id"] in premi:
             r["premio_fedelta"] = premi[r["id"]]
+
+
+def premi_da_riscuotere(con, compratore_id: int,
+                        venditore_id: int = None) -> list:
+    """I PREMI DA RISCUOTERE (18 nov 2026; Andrea: «avvisi automatici
+    quando un utente ha un premio da riscuotere al prossimo ordine»):
+    quelli maturati e non ancora attaccati a un ordine vivo, cioe' i
+    regali che il cliente trovera' nel pacco del suo PROSSIMO ordine in
+    quel negozio. Solo i suoi; con `venditore_id`, solo di quel negozio.
+    Ognuno porta il codice e il nome del negozio, per la riga sulla
+    scheda dell'annuncio e sulla pagina del negozio. Leva spenta: niente
+    (nessun ordine nuovo ne riceverebbe, la promessa non si fa)."""
+    if not PREMI_FEDELTA_ATTIVI:
+        return []
+    sql = ("SELECT p.soglia_eur, p.premio, p.valuta, p.annuncio_id, "
+           "p.venditore_id, u.negozio, u.nome FROM premi_fedelta_maturati p "
+           "JOIN utenti u ON u.tg_id=p.venditore_id "
+           "WHERE p.compratore_id=? AND p.ordine_id IS NULL "
+           "AND p.venditore_id<>p.compratore_id")
+    arg = [compratore_id]
+    if venditore_id is not None:
+        sql += " AND p.venditore_id=?"
+        arg.append(venditore_id)
+    fuori = []
+    for p in con.execute(sql + " ORDER BY p.maturato_il, p.soglia_eur "
+                         "LIMIT 50", arg):
+        voce = _premio_da_riga(p)
+        voce["negozio"] = p["negozio"] or ""
+        voce["nome"] = p["nome"] or ""
+        fuori.append(voce)
+    return fuori
+
+
+def premio_dell_ordine(con, ordine_id: int):
+    """Il premio attaccato a un ordine (o None): la riga per gli avvisi
+    del pagamento."""
+    p = con.execute(
+        "SELECT soglia_eur, premio, valuta, annuncio_id FROM "
+        "premi_fedelta_maturati WHERE ordine_id=?", (ordine_id,)).fetchone()
+    return _premio_da_riga(p) if p else None
+
+
+def premio_al_pagamento(con, o):
+    """IL PREMIO NEL MOMENTO DEL PAGAMENTO (18 nov 2026): l'aggancio era
+    solo pigro, alla lettura degli ordini, e chi vende lo scopriva
+    aprendo l'app. Qui, appena i sats di un ordine sono in cassaforte,
+    si aggancia SUBITO e si restituisce il premio di QUELL'ordine, cosi'
+    «🔒 Hai venduto» e «Ordine pagato» lo dicono nello stesso messaggio
+    (il regalo va messo nel pacco PRIMA di spedire). Fail-open: un
+    premio non deve mai fermare un incasso. Le altre porte (on-chain,
+    asta, set) restano coperte dall'aggancio pigro come prima."""
+    if not PREMI_FEDELTA_ATTIVI:
+        return None
+    try:
+        c, v = int(o["compratore_id"]), int(o["venditore_id"])
+        if c == v:
+            return None
+        aggancia_premi_fedelta(con, c, v)
+        con.commit()
+        return premio_dell_ordine(con, int(o["id"]))
+    except Exception as e:
+        print(f"⚠️ Premi fedeltà: aggancio al pagamento non riuscito ({e})",
+              flush=True)
+        return None
+
+
+def riga_premio_pagato(p, chi: str) -> str:
+    """La coda HTML degli avvisi del pagamento: a chi vende cosa mettere
+    nel pacco, a chi compra cosa ci trovera'. Il regalo e' testo del
+    venditore: si escapa SEMPRE."""
+    if not p:
+        return ""
+    premio = html.escape(p["premio"])
+    if chi == "venditore":
+        return (f"\n\n🎀 <b>Premio fedeltà:</b> questo cliente ha superato "
+                f"{soglia_premio_testo(p['soglia'], p['valuta'])} di acquisti "
+                f"da te. Nel pacco metti <b>{premio}</b>.")
+    return (f"\n\n🎀 <b>Premio fedeltà:</b> in questo pacco trovi anche "
+            f"<b>{premio}</b>.")
+
+
+async def _avvisa_premi_maturati(compratore_id: int, venditore_id: int,
+                                 negozio: str, nuovi: list,
+                                 al_venditore: bool = True) -> None:
+    """Gli avvisi di premi appena maturati, UN messaggio per parte anche
+    quando un ordine grosso (o il salvataggio delle soglie) ne fa
+    maturare piu' d'uno: al cliente cosa lo aspetta e dove, al negozio
+    cosa mettere nel pacco. Piu' premi vanno uno per ordine, nell'ordine
+    delle soglie (lo fa aggancia_premi_fedelta), e il testo lo dice."""
+    if not nuovi:
+        return
+    soglia = soglia_premio_testo(nuovi[-1]["soglia"], nuovi[-1].get("valuta"))
+    nomi = [f"<b>{html.escape(s['premio'])}</b>" for s in nuovi]
+    if len(nomi) == 1:
+        cosa_c = f"Nel pacco del tuo prossimo ordine lì trovi {nomi[0]}."
+        cosa_v = f"nel pacco del suo prossimo ordine metti {nomi[0]}."
+    else:
+        elenco = ", poi ".join(nomi)
+        cosa_c = (f"Ne hai {len(nomi)}, uno per ordine: al prossimo trovi "
+                  f"{elenco}.")
+        cosa_v = (f"ha {len(nomi)} premi, uno per ordine: al prossimo "
+                  f"metti {elenco}.")
+    await notifica(compratore_id,
+                   f"🎀 <b>Premio fedeltà!</b> Hai superato {soglia} di "
+                   f"acquisti da <b>{html.escape(negozio)}</b>: hai un "
+                   f"premio da riscuotere. {cosa_c}")
+    if al_venditore:
+        await notifica(venditore_id,
+                       f"🎀 <b>Un tuo cliente ha superato {soglia} di "
+                       f"acquisti:</b> {cosa_v} Te lo ricordo anche "
+                       f"sull'ordine.")
 
 
 async def premia_fedelta_negozio(compratore_id: int,
@@ -56368,18 +56648,42 @@ async def premia_fedelta_negozio(compratore_id: int,
     except Exception as e:
         print(f"⚠️ Premi fedeltà: maturazione non riuscita ({e})", flush=True)
         return
-    for s in nuovi:
-        premio = html.escape(s["premio"])
-        await notifica(compratore_id,
-                       f"🎀 <b>Premio fedeltà!</b> Hai superato "
-                       f"{_fmt_sats(s['soglia'])} € di acquisti da "
-                       f"<b>{html.escape(negozio)}</b>: nel pacco del tuo "
-                       f"prossimo ordine lì trovi <b>{premio}</b>.")
-        await notifica(venditore_id,
-                       f"🎀 <b>Un tuo cliente ha superato {_fmt_sats(s['soglia'])} € "
-                       f"di acquisti:</b> nel pacco del suo prossimo "
-                       f"ordine metti <b>{premio}</b>. Te lo ricordo "
-                       f"anche sull'ordine.")
+    await _avvisa_premi_maturati(compratore_id, venditore_id, negozio, nuovi)
+
+
+# Il freno degli avvisi al salvataggio: un cliente che ha avuto un
+# premio maturato da quel negozio nelle ultime 24 ore non riceve un
+# altro messaggio (il premio matura lo stesso, e la riga c'e'). Senza,
+# un negozio che sposta le soglie dieci volte manderebbe dieci messaggi
+# del bot a tutti i suoi clienti.
+PREMI_AVVISO_FRENO_S = 86_400
+PREMI_AVVISI_SALVA_MAX = 200
+
+
+def matura_clienti_del_negozio(con, venditore_id: int) -> list:
+    """Al SALVATAGGIO delle soglie (18 nov 2026): matura subito per
+    tutti i clienti che le hanno GIA' passate, invece di aspettare il
+    loro prossimo ordine in silenzio. Restituisce [(cliente, nuovi,
+    da_avvisare)]: `da_avvisare` e' falso per chi ha gia' avuto un
+    premio da quel negozio nelle ultime 24 ore (il freno)."""
+    soglie, valuta = soglie_del_negozio(con, venditore_id)
+    if not PREMI_FEDELTA_ATTIVI or not soglie:
+        return []
+    adesso = int(time.time())
+    fuori = []
+    for r in con.execute(
+            "SELECT DISTINCT compratore_id FROM ordini WHERE venditore_id=? "
+            "AND stato='released' AND compratore_id<>venditore_id "
+            "AND COALESCE(prova,0)=0", (venditore_id,)).fetchall():
+        c = int(r["compratore_id"])
+        recente = con.execute(
+            "SELECT 1 FROM premi_fedelta_maturati WHERE compratore_id=? "
+            "AND venditore_id=? AND maturato_il>=?",
+            (c, venditore_id, adesso - PREMI_AVVISO_FRENO_S)).fetchone()
+        nuovi = matura_premi_fedelta(con, c, venditore_id, soglie, valuta)
+        if nuovi:
+            fuori.append((c, nuovi, not recente))
+    return fuori
 
 
 @app.post("/api/me/premi-fedelta")
@@ -56387,12 +56691,19 @@ async def imposta_premi_fedelta(req: Request,
                                 x_tg_init_data: str = Header(""),
                                 barattolo_sessione: str = Cookie("")):
     """«🎁 Premi fedeltà»: il venditore scrive fino a PREMI_FEDELTA_MAX
-    gradini «da N € spesi da me, nel pacco dopo metto X». Body
-    {premi: [{soglia, premio}]}; la lista VUOTA spegne tutto, senza
-    guardie (togliere una promessa non e' mai un problema; i premi gia'
-    maturati restano a chi li ha guadagnati). La chiave `premi` deve
-    esserci: assente = 400 (il patto di MSG_CLIENT_VECCHIO, mai
-    un'assenza letta come spegnimento)."""
+    gradini «da N € (o sats) spesi da me, nel pacco dopo metto X». Body
+    {premi: [{soglia, premio[, annuncio_id]}], valuta}; la lista VUOTA
+    spegne tutto, senza guardie (togliere una promessa non e' mai un
+    problema; i premi gia' maturati restano a chi li ha guadagnati). La
+    chiave `premi` deve esserci: assente = 400 (il patto di
+    MSG_CLIENT_VECCHIO, mai un'assenza letta come spegnimento).
+    `valuta` assente = euro: il client di ieri conosceva solo quella.
+    IL REGALO PUO' ESSERE UN ARTICOLO DEL NEGOZIO (18 nov 2026; Andrea:
+    «scelta del negoziante nelle impostazioni dei premi, mica di chi
+    compra!»): con `annuncio_id` l'annuncio dev'essere SUO e in vetrina,
+    e il testo del premio diventa il suo titolo, scritto dal server.
+    Dopo il salvataggio matura SUBITO chi ha gia' passato una soglia, e
+    lo avvisa (col freno delle 24 ore)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     if not PREMI_FEDELTA_ATTIVI:
@@ -56400,32 +56711,140 @@ async def imposta_premi_fedelta(req: Request,
     grezzi = d.get("premi")
     if not isinstance(grezzi, list):
         raise HTTPException(400, MSG_CLIENT_VECCHIO)
+    valuta = str(d.get("valuta") or "eur").strip().lower()
+    if valuta not in VALUTE_PREMI:
+        raise HTTPException(400, "Le soglie si scrivono in euro o in sats.")
+    minimo, massimo = _misure_premi(valuta)
     if len(grezzi) > PREMI_FEDELTA_MAX:
         raise HTTPException(400, f"Al massimo {PREMI_FEDELTA_MAX} premi.")
-    for g in grezzi:
-        if not isinstance(g, dict):
-            raise HTTPException(400, "Premio non leggibile")
-        try:
-            soglia = int(g.get("soglia") or 0)
-        except (TypeError, ValueError):
-            raise HTTPException(400, "Soglia non leggibile")
-        if not PREMI_FEDELTA_MIN_EUR <= soglia <= PREMI_FEDELTA_MAX_EUR:
-            raise HTTPException(400,
-                f"Ogni soglia va da {PREMI_FEDELTA_MIN_EUR} a "
-                f"{_fmt_sats(PREMI_FEDELTA_MAX_EUR)} € di acquisti.")
-        if not str(g.get("premio") or "").strip():
-            raise HTTPException(400, f"Scrivi il regalo per la soglia "
-                                     f"di {soglia} €.")
-    premi = premi_fedelta_leggi(grezzi)
-    if len(premi) != len(grezzi):
-        raise HTTPException(400, "Due premi hanno la stessa soglia.")
     con = db()
-    con.execute("UPDATE utenti SET premi_fedelta=? WHERE tg_id=?",
-                (json.dumps(premi, ensure_ascii=False) if premi else "",
-                 user["id"]))
-    con.commit()
-    con.close()
-    return {"ok": True, "premi": premi}
+    try:
+        puliti = []
+        for g in grezzi:
+            if not isinstance(g, dict):
+                raise HTTPException(400, "Premio non leggibile")
+            try:
+                soglia = int(g.get("soglia") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "Soglia non leggibile")
+            if not minimo <= soglia <= massimo:
+                raise HTTPException(400,
+                    f"Ogni soglia va da {soglia_premio_testo(minimo, valuta)} "
+                    f"a {soglia_premio_testo(massimo, valuta)} di acquisti.")
+            try:
+                aid = int(g.get("annuncio_id") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(400, "Articolo non leggibile")
+            voce = {"soglia": soglia, "premio": str(g.get("premio") or "")}
+            if aid > 0:
+                a = con.execute(
+                    "SELECT titolo FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'", (aid, user["id"])).fetchone()
+                if not a:
+                    raise HTTPException(400,
+                        f"L'articolo scelto per la soglia di "
+                        f"{soglia_premio_testo(soglia, valuta)} non è fra "
+                        f"i tuoi annunci in vetrina.")
+                titolo = " ".join(str(a["titolo"] or "").split())
+                if len(titolo) > PREMIO_TESTO_MAX:
+                    titolo = titolo[:PREMIO_TESTO_MAX - 1].rstrip() + "…"
+                voce = {"soglia": soglia, "premio": titolo,
+                        "annuncio_id": aid}
+            elif not voce["premio"].strip():
+                raise HTTPException(400, f"Scrivi il regalo per la soglia "
+                                         f"di {soglia_premio_testo(soglia, valuta)}.")
+            puliti.append(voce)
+        premi = premi_fedelta_leggi(puliti, valuta)
+        if len(premi) != len(puliti):
+            raise HTTPException(400, "Due premi hanno la stessa soglia.")
+        con.execute("UPDATE utenti SET premi_fedelta=?, "
+                    "premi_fedelta_valuta=? WHERE tg_id=?",
+                    (json.dumps(premi, ensure_ascii=False) if premi else "",
+                     valuta if premi else "eur", user["id"]))
+        con.commit()
+        maturati = []
+        try:
+            maturati = matura_clienti_del_negozio(con, user["id"])
+            con.commit()
+        except Exception as e:  # il salvataggio e' fatto: l'avviso no
+            print(f"⚠️ Premi fedeltà: maturazione al salvataggio non "
+                  f"riuscita ({e})", flush=True)
+        r = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        negozio = (r["nome"] if r else "") or "il negozio"
+    finally:
+        con.close()
+    # gli avvisi DOPO aver chiuso il database: il bot puo' essere lento.
+    # Al negozio nessun messaggio: e' davanti allo schermo, glielo dice
+    # la risposta (`clienti_premiati`)
+    avvisati = 0
+    for c, nuovi, avvisa in maturati:
+        if avvisa and avvisati < PREMI_AVVISI_SALVA_MAX:
+            avvisati += 1
+            await _avvisa_premi_maturati(c, user["id"], negozio, nuovi,
+                                         al_venditore=False)
+    return {"ok": True, "premi": premi,
+            "valuta": valuta if premi else "eur",
+            "clienti_premiati": len(maturati)}
+
+
+@app.get("/api/me/negozio/clienti")
+def classifica_clienti_negozio(x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """LA CLASSIFICA DEI CLIENTI DEL MIO NEGOZIO (18 nov 2026): chi ha
+    comprato da me, in fila per quanto ha speso, dal primo. Il negozio
+    si legge dal tg_id di chi bussa, mai da un parametro: ognuno vede
+    i SUOI clienti e basta. Contano gli affari CONCLUSI (released),
+    non le prove, non gli acquisti da se stessi — lo stesso conto dei
+    premi fedelta', cosi' la classifica e la soglia dicono la stessa
+    cifra. Escono le due somme: i SATS pagati e gli EURO al cambio di
+    ognuno (un ordine senza cambio conta zero euro, la regola di
+    speso_nel_negozio); la fila e' per sats, e il client la riordina
+    per euro se il negozio guarda in euro. Per ognuno anche quanti
+    ordini e quanti premi ha maturato da me."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not CLASSIFICA_CLIENTI_ATTIVA:
+        raise HTTPException(400, "La classifica dei clienti non è attiva")
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT o.compratore_id AS c, COUNT(*) AS n, "
+            "SUM(o.prezzo_sats) AS sats, "
+            "SUM(CASE WHEN o.cambio_eur > 0 THEN o.prezzo_sats * o.cambio_eur "
+            "ELSE 0 END) AS eur100m, u.nome AS nome FROM ordini o "
+            "LEFT JOIN utenti u ON u.tg_id=o.compratore_id "
+            "WHERE o.venditore_id=? AND o.stato='released' "
+            "AND o.compratore_id<>o.venditore_id AND COALESCE(o.prova,0)=0 "
+            "GROUP BY o.compratore_id ORDER BY sats DESC, n DESC, c "
+            "LIMIT ?", (user["id"], CLASSIFICA_CLIENTI_MAX)).fetchall()
+        premi = {}
+        if righe:
+            ids = [int(r["c"]) for r in righe]
+            for p in con.execute(
+                    "SELECT compratore_id AS c, COUNT(*) AS n FROM "
+                    "premi_fedelta_maturati WHERE venditore_id=? AND "
+                    f"compratore_id IN ({','.join('?' * len(ids))}) "
+                    "GROUP BY compratore_id", [user["id"]] + ids):
+                premi[int(p["c"])] = int(p["n"])
+        totale = con.execute(
+            "SELECT COUNT(DISTINCT compratore_id) AS n FROM ordini "
+            "WHERE venditore_id=? AND stato='released' "
+            "AND compratore_id<>venditore_id AND COALESCE(prova,0)=0",
+            (user["id"],)).fetchone()["n"]
+        _, valuta = soglie_del_negozio(con, user["id"])
+    finally:
+        con.close()
+    return {
+        "clienti": [{
+            "nome": (r["nome"] or "").strip() or "Cliente",
+            "sats": int(r["sats"] or 0),
+            "eur": round(float(r["eur100m"] or 0) / 100_000_000, 2),
+            "ordini": int(r["n"] or 0),
+            "premi": premi.get(int(r["c"]), 0),
+        } for r in righe],
+        "totale": int(totale or 0),
+        "valuta": valuta,
+    }
 
 
 @app.post("/api/me/ferie")
