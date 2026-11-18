@@ -710,3 +710,9 @@ frase: Negli avvisi dei nuovi ordini P2P ogni riga adesso apre il suo ordine: to
 dove: il bot, l'avviso «🔔 N nuovi ordini nel libro P2P»; lo stesso tocco sulla notifica del telefono apre il primo ordine.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-18 · sottocategorie-riga
+frase: Le sottocategorie ora sono card disegnate come le categorie: tocchi Bitcoin e vedi subito tutti i suoi annunci, e sotto spunta una seconda riga con Hardware wallet, Cappellini, Spille e adesivi, Cover per telefono… ognuna col numero di annunci. Un tocco e filtri.
+dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda riga di card sotto la fila (solo le sottocategorie con annunci, che salgono a molla; le icone disegnate per ora in Bitcoin), le altre categorie in grigio e la ✕ sulla categoria accesa. Ritoccando una sottocategoria torni a tutta la categoria; ritoccando la categoria, a Tutto.
+leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
+pubblico: sì

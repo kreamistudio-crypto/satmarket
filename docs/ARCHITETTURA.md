@@ -32003,7 +32003,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    Google — vedi «I FONT VENGONO IN CASA»),
    `/assets/categorie/{slug}.webp` (le 27 illustrazioni di Sfoglia:
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
-   calcolata dal catalogo), `/assets/scoprire/{nome}` (i due banner
+   calcolata dal catalogo), `/assets/sottocategorie/{id}.webp` (le
+   icone della seconda riga, 18 nov 2026: whitelist `ID_SOTTOCATEGORIE`
+   derivata dall'albero, il file che manca è un 404 e il client chiede
+   solo quelle di `ICONE_SOTTO`), `/assets/scoprire/{nome}` (i due banner
    della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
    ago 2026; da set 2026 anche il banner della card dei Consigliati di
    una pagina del server, solo pubblicata col `banner` vero — vedi «I

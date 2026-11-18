@@ -117987,6 +117987,28 @@ def asset_categoria(nome: str, if_none_match: str = Header("")):
                           if_none_match)
 
 
+# LE ICONE DEGLI SCAFFALI (18 nov 2026, seconda riga delle
+# sottocategorie): disegni di Flow nello stile delle categorie, uno per
+# sottocategoria, in assets/sottocategorie/<id>.webp. La whitelist e'
+# CHIUSA e derivata dall'albero (regola 3: nessun mount, nessun nome che
+# non sia un id dell'albero esce di qui); le voci senza disegno danno
+# 404 e il client non le chiede nemmeno (ICONE_SOTTO in miniapp.html,
+# che prove.py confronta coi file). Stessa revalidazione delle sorelle.
+ID_SOTTOCATEGORIE = {v[0] for voci in SOTTOCATEGORIE.values() for v in voci}
+
+
+@app.get("/assets/sottocategorie/{nome}")
+def asset_sottocategoria(nome: str, if_none_match: str = Header("")):
+    sid = nome[:-5] if nome.endswith(".webp") else ""
+    if sid not in ID_SOTTOCATEGORIE:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "sottocategorie", sid + ".webp")
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
+                          if_none_match)
+
+
 # I banner della sezione «Da scoprire» in home (ago 2026): le due card
 # delle occasioni — le offerte a tempo e gli sconti dei negozi — piu'
 # quella del P2P, che invece di accendere un filtro porta al suo

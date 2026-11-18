@@ -64,17 +64,17 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 <!-- pezzo libro-006 | libro -->
 ## Libro · Comprare nel mercatino (1/4)
 
-1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Toccando una categoria in «Esplora per categorie» si apre una tendina con le sue sottocategorie (per esempio Informatica → Computer e portatili, Tablet ed e-reader…), ognuna col numero di annunci: scegli quella che ti interessa, oppure «Tutta la categoria». Compaiono solo le sottocategorie che hanno annunci; «Altro» e le categorie senza sottocategorie piene filtrano subito. Per uscire: «✕ Torna a Tutto» nella tendina, o la card «Tutto». Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
+1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Toccando una categoria in «Esplora per categorie» vedi subito tutti i suoi annunci, e sotto la fila compare una seconda riga di card con le sue sottocategorie (per esempio Bitcoin → Hardware wallet e firma, Cappellini, Spille e adesivi…), ognuna col numero di annunci; le altre categorie in alto diventano grigie. Tocchi la sottocategoria che ti interessa; ritoccandola torni a tutta la categoria. Compaiono solo le sottocategorie che hanno annunci. Per uscire: ritocca la categoria accesa (ha una piccola ✕), o la card «Tutto». Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
 2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale. Se il venditore non spedisce ai locker, la riga del locker è spenta e c'è il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso (senza sapere chi ha chiesto) e, se aggiunge InPost, Poste Italiane o SDA nel Profilo, Barattolo ti avvisa. Una richiesta per venditore ogni 7 giorni.
 3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento.
 4. I sats entrano nel deposito di garanzia. Il venditore viene avvisato, sa di essere pagato, ma i sats non sono ancora suoi.
 5. Il venditore spedisce e segna il corriere col tracciamento, oppure vi accordate per il ritiro, oppure ti consegna il codice dentro l'ordine.
 6. Quando l'oggetto è arrivato ed è come promesso, lo confermi dall'ordine, nella scheda «Ordini». Solo in quel momento i sats passano al venditore.
 
-Gli avvisi del barattolo (se nelle REGOLAZIONI del pannello «Avvisi del barattolo» è accesa): quando metti un articolo nel barattolo 🫙 si apre il foglietto «🔔 Avvisami se…» con quattro spunte, tutte accese di serie: «📉 Il prezzo scende», «⚡ Arriva uno sconto lampo», «☝️ Ne resta solo uno» (l'articolo aveva più pezzi e ne è rimasto uno), «🔁 È di nuovo disponibile» (era esaurito e torna, o il negozio rientra dalle ferie). Togli quelle che non vuoi e tocca «Va bene», oppure chiudi il foglietto e restano tutte. Gli avvisi arrivano dal bot, con il tasto «🫙 Apri l'annuncio», al massimo uno al giorno per articolo: se nello stesso giorno succedono più cose arrivano in un messaggio solo, e quello che cade dentro il giorno arriva il giorno dopo se è ancora vero. Se il prezzo sale non arriva niente. Il prezzo si guarda nella valuta dell'annuncio: un annuncio in euro non «scende» perché cambia il valore del bitcoin, e un ritocco sotto l'1% non conta. Le spunte si cambiano quando vuoi dalla 🔔 accanto a ogni articolo, nel Profilo, sezione «Nel tuo barattolo» (🔕 vuol dire nessun avviso). Gli articoli messi nel barattolo prima del 17 novembre 2026 ricevono solo lo sconto lampo, come prima, finché non tocchi la loro 🔔.
-
 <!-- pezzo libro-007 | libro -->
 ## Libro · Comprare nel mercatino (2/4)
+
+Gli avvisi del barattolo (se nelle REGOLAZIONI del pannello «Avvisi del barattolo» è accesa): quando metti un articolo nel barattolo 🫙 si apre il foglietto «🔔 Avvisami se…» con quattro spunte, tutte accese di serie: «📉 Il prezzo scende», «⚡ Arriva uno sconto lampo», «☝️ Ne resta solo uno» (l'articolo aveva più pezzi e ne è rimasto uno), «🔁 È di nuovo disponibile» (era esaurito e torna, o il negozio rientra dalle ferie). Togli quelle che non vuoi e tocca «Va bene», oppure chiudi il foglietto e restano tutte. Gli avvisi arrivano dal bot, con il tasto «🫙 Apri l'annuncio», al massimo uno al giorno per articolo: se nello stesso giorno succedono più cose arrivano in un messaggio solo, e quello che cade dentro il giorno arriva il giorno dopo se è ancora vero. Se il prezzo sale non arriva niente. Il prezzo si guarda nella valuta dell'annuncio: un annuncio in euro non «scende» perché cambia il valore del bitcoin, e un ritocco sotto l'1% non conta. Le spunte si cambiano quando vuoi dalla 🔔 accanto a ogni articolo, nel Profilo, sezione «Nel tuo barattolo» (🔕 vuol dire nessun avviso). Gli articoli messi nel barattolo prima del 17 novembre 2026 ricevono solo lo sconto lampo, come prima, finché non tocchi la loro 🔔.
 
 Si può anche fare un'offerta più bassa con «Fai un'offerta»: il venditore la accetta o la rifiuta, e se la accetta hai un tempo per pagare, scritto nell'ordine. Un'offerta senza risposta scade da sola.
 
@@ -2404,4 +2404,12 @@ pubblico: no
 frase: Negli avvisi dei nuovi ordini P2P ogni riga adesso apre il suo ordine: tocca «🟢 Compra BTC» o «🔴 Vendi BTC» e si apre proprio quella card, anche se è on-chain. Se l'ordine nuovo è uno solo, il tasto in fondo diventa «🫙 Apri l'ordine»; con più ordini resta «🫙 Apri il libro ordini».
 dove: il bot, l'avviso «🔔 N nuovi ordini nel libro P2P»; lo stesso tocco sulla notifica del telefono apre il primo ordine.
 leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-113 | novita -->
+## Novità · 2026-11-18 · sottocategorie-riga
+
+frase: Le sottocategorie ora sono card disegnate come le categorie: tocchi Bitcoin e vedi subito tutti i suoi annunci, e sotto spunta una seconda riga con Hardware wallet, Cappellini, Spille e adesivi, Cover per telefono… ognuna col numero di annunci. Un tocco e filtri.
+dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda riga di card sotto la fila (solo le sottocategorie con annunci, che salgono a molla; le icone disegnate per ora in Bitcoin), le altre categorie in grigio e la ✕ sulla categoria accesa. Ritoccando una sottocategoria torni a tutta la categoria; ritoccando la categoria, a Tutto.
+leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì

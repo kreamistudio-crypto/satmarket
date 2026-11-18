@@ -1525,9 +1525,9 @@ def prove_sottocategorie_vetrina():
     richiesta di Andrea): l'albero dormiente si accende. La rotta vera la
     fa girare collaudo_sottocategorie_vetrina; qui si tengono i fili —
     la leva accesa di serie, la copia del catalogo nel client voce per
-    voce, la tendina sul tocco della card, lo scaffale nella richiesta,
+    voce, la seconda riga sotto la fila, lo scaffale nella richiesta,
     il campo del form nei due payload giusti e MAI in quello firmato."""
-    print("\n[sottocategorie in vetrina: leva, tendina, form]")
+    print("\n[sottocategorie in vetrina: leva, seconda riga, form]")
     import json as _json
     import re as _re
     src = _SORGENTE
@@ -1573,18 +1573,69 @@ def prove_sottocategorie_vetrina():
                          "if not SOTTOCATEGORIE_VETRINA:" in prop))
 
     tocco = pezzo_js(mini, "function apriCategoriaDaTocco(e, c){", "\n}\n")
-    prova("il tocco della card apre la tendina quando ci sono scaffali "
-          "pieni, sennò filtra come sempre", (True, True),
-          ("if (vociTendinaSotto(c).length) { apriTendinaSotto(e.currentTarget, c); return; }"
-           in tocco, tocco.rstrip().endswith("apriCategoria(c);")))
-    voci = pezzo_js(mini, "function vociTendinaSotto(c){", "\n}\n")
-    prova("...la tendina mostra solo gli scaffali pieni, e niente a leva "
-          "spenta", (True, True),
+    prova("il tocco della card filtra SUBITO, niente tendina in mezzo "
+          "(seconda riga, 18 nov 2026)", (True, False),
+          (tocco.rstrip().endswith("apriCategoria(c);"),
+           "Tendina" in tocco or "tendina(" in tocco))
+    prova("...e della tendina non resta niente nel client", 0,
+          mini.count("TendinaSotto"))
+    voci = pezzo_js(mini, "function vociSottoRiga(c){", "\n}\n")
+    prova("la seconda riga mostra solo gli scaffali pieni, e niente a "
+          "leva spenta", (True, True),
           ("if (!sottoLeva || !SOTTOCAT[c]) return [];" in voci,
            "(Number(n[id]) || 0) > 0" in voci))
+    rr = pezzo_js(mini, "function renderSottoRiga(){", "\n}\n")
+    prova("...compare solo con una categoria accesa (mai su «Tutto» ne' "
+          "nel barattolo), e solo coi suoi scaffali: niente «Tutta X» che "
+          "ripete la categoria accesa sopra (Andrea)", (True, False, True),
+          ("const voci = (c !== 'Tutto' && !vistaBarattolo) ? vociSottoRiga(c) : [];"
+           in rr, "'Tutta ' + c" in rr,
+           "riga.innerHTML = voci.map(v => card(v.id, v.nome, v.n, figSotto(v.id, c))).join('');"
+           in rr))
+    prova("...accende e spegne la fila sopra (le altre categorie in grigio)",
+          (True, True, True),
+          ("sez.classList.add('con-sotto')" in rr,
+           "sez.classList.remove('con-sotto')" in rr,
+           "#catSez.con-sotto #catStrip .cat-cella:not(.attiva) .cat-quad{filter:grayscale(1);opacity:.5}"
+           in mini))
+    prova("...ed entra a molla solo quando compare o cambia reparto, mai "
+          "con gli effetti ridotti", (True, True, True),
+          ("const entra = c !== sottoRigaCat;" in rr,
+           "if (effettiRidotti()) return;" in pezzo_js(
+               mini, "function entraSottoRiga(wrap, riga){", "\n}\n"),
+           ".sotto-entra .cat-cella{animation:sottoMolla" in mini))
+    prova("...e la disegna la striscia a ogni giro (con la sua firma)", 1,
+          pezzo_js(mini, "function renderStriscia(){", "\n}\n")
+          .count("renderSottoRiga();"))
+    ch = pezzo_js(mini, "function scegliSottoRiga(sid){", "\n}\n")
+    prova("...la card di uno scaffale passa da setCat, giudice unico, e "
+          "il suo ritocco torna a tutta la categoria", (True, True, True),
+          ("sottoChiesto = sid;" in ch, "setCat(c);" in ch,
+           "if (sid === activeSotto) sid = '';" in ch))
+    # LE ICONE DI FLOW: l'elenco del client e i file sono la stessa cosa,
+    # e la rotta li serve solo dall'albero (regola 3)
+    ids = {v[0] for voci_ in albero.values() for v in voci_}
+    i = mini.index("const ICONE_SOTTO = new Set([")
+    ic = set(_re.findall(r"'([a-z0-9-]+)'", mini[i:mini.index("]);", i)]))
+    cart = os.path.join(QUI, "assets", "sottocategorie")
+    fil = {f[:-5] for f in os.listdir(cart) if f.endswith(".webp")}
+    prova("le icone chieste dal client sono i file della cartella, e "
+          "ognuna e' un id dell'albero", (ic, set()), (fil, ic - ids))
+    rt = pezzo("asset_sottocategoria")
+    prova("...e la rotta le serve solo dalla whitelist dell'albero",
+          (True, True),
+          ("if sid not in ID_SOTTOCATEGORIE:" in rt,
+           "ID_SOTTOCATEGORIE = {v[0] for voci in SOTTOCATEGORIE.values() for v in voci}"
+           in src))
+    i = mini.index("const EMOJI_SOTTO = {")
+    em = set(_re.findall(r"'([a-z0-9-]+)':",
+                         mini[i:mini.index("};", i)]))
+    ids = {v[0] for voci_ in albero.values() for v in voci_}
+    prova("ogni scaffale dell'albero ha la sua figura nella riga (e "
+          "nessuna figura orfana)", (set(), set()), (ids - em, em - ids))
     sc = pezzo_js(mini, "function setCat(c){", "\n}\n")
     prova("ogni cambio di categoria riparte da «Tutta la categoria», "
-          "tranne lo scaffale chiesto dalla tendina (consumato una volta)",
+          "tranne lo scaffale chiesto dalla seconda riga (consumato una volta)",
           (True, True),
           ("activeSotto = (c !== 'Tutto' && sottoChiesto) ? sottoChiesto : '';"
            in sc, "sottoChiesto = '';" in sc))
@@ -52107,11 +52158,16 @@ def prove_scoprire():
     # l'accensione del barattolo): scritto due volte, e' quello che
     # diverge.
     _sr = pezzo_js(mini, "function scorriAlReparto(){", "\n}")
-    prova("l'arrivo del reparto e' la riga «N oggetti»", True,
-          "scorriSottoHeader(document.querySelector('.strumenti'))"
-          in _sr)
+    # (18 nov 2026, seconda riga delle sottocategorie) l'arrivo SALE
+    # sulla riga degli scaffali quando c'e': su «N oggetti» finiva
+    # sotto l'header, proprio la cosa appena aperta. Senza riga (o col
+    # barattolo, che la tiene spenta) resta «N oggetti».
+    prova("l'arrivo del reparto e' la seconda riga se c'e', sennò la "
+          "riga «N oggetti»", (True, True),
+          ("riga && riga.style.display !== 'none'" in _sr,
+           "? riga : document.querySelector('.strumenti'));" in _sr))
     prova("...scritto in un posto solo", 1,
-          mini.count("scorriSottoHeader(document.querySelector"))
+          mini.count("riga : document.querySelector('.strumenti')"))
     # apriCategoria ARMA dopo go() (che chiude col suo scrollTo della
     # vista: prima, lo scroll verrebbe riportato in cima un rigo
     # dopo); il RITOCCO che spegne passa da tornaATutto, che non
@@ -58033,7 +58089,8 @@ def prove_strisce_web():
     # tenerle via e' `.off`, che il render poi toglie se c'e' davvero
     # da scorrere. Nate accese, la prima cosa che si vedrebbe
     # all'apertura sono due frecce inerti.
-    prova("le otto frecce nascono spente", 8,
+    # (18 nov 2026) la quinta fila e' la seconda riga delle sottocategorie
+    prova("le dieci frecce nascono spente", 10,
           mini.count('class="strip-frec sx off"')
           + mini.count('class="strip-frec dx off"'))
     # ...e sul telefono non esistono affatto: `display:none` nella base
@@ -58057,7 +58114,7 @@ def prove_strisce_web():
     # «semplifica» rimetterebbe un trattino al posto di una freccia.
     _bott = [_r for _r in mini.split(chr(10))
              if "onclick" in _r and "scorriFila(" in _r]
-    prova("...e la freccia e' un disegno, mai un carattere", (8, 8),
+    prova("...e la freccia e' un disegno, mai un carattere", (10, 10),
           (len(_bott), sum(1 for _r in _bott if "<svg" in _r)))
     # LA ROTELLINA SI ARMA SOLO FUORI DA TELEGRAM, e col giudice GIA'
     # deciso: `FUORI_TG` LEGGE la classe che l'anti-flash ha messo, mai
@@ -142044,6 +142101,7 @@ let myTgId = 111, activeCat = 'Tutto', vistaBarattolo = false;
 // lo scaffale della tendina (18 nov 2026): la striscia lo scrive sotto la card accesa
 let activeSotto = '';
 const etichettaSotto = () => '';
+function renderSottoRiga(){}   /* la seconda riga (18 nov 2026) non e' di questo banco */
 let sponsorizzati = [], consigliatiServer = [];
 let ridotti = false, premutaFatta = false;
 const effettiRidotti = () => ridotti;

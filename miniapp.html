@@ -1195,35 +1195,47 @@
   .cat-eti{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;margin-top:5px;font-size:11px;font-weight:700;
     line-height:1.2;color:var(--ink);text-align:center}
-  /* LO SCAFFALE SCELTO NELLA TENDINA (18 nov 2026): una riga sola sotto
+  /* LO SCAFFALE SCELTO NELLA SECONDA RIGA (18 nov 2026): una riga sola sotto
      il nome della card accesa, piccola e arancio come il nome acceso */
   .cat-sotto{display:block;margin-top:1px;font-size:10px;font-weight:800;
     line-height:1.2;color:var(--sats-text);text-align:center;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* LA TENDINA DELLE SOTTOCATEGORIE (18 nov 2026): appesa al body sotto
-     la card toccata, sopra la pagina ma sotto l'header (20 e' suo) */
-  .tendina-sotto{position:absolute;z-index:18;width:min(264px,calc(100vw - 24px));
-    background:var(--card);border:1.5px solid var(--line);border-radius:16px;
-    box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
-  /* niente overflow sul riquadro: taglierebbe la punta, che sta fuori
-     di 8px; le voci sono al piu' dieci (Lavoro e servizi), ci stanno */
-  .tendina-sotto .ts-punta{position:absolute;top:-8px;width:14px;height:14px;
-    background:var(--card);border-left:1.5px solid var(--line);
-    border-top:1.5px solid var(--line);transform:rotate(45deg)}
-  .ts-voce{display:flex;width:100%;justify-content:space-between;align-items:center;
-    gap:10px;padding:11px 12px;border:0;border-radius:10px;background:none;
-    font:700 15px/1.25 Nunito,sans-serif;color:var(--ink);text-align:left;cursor:pointer}
-  .ts-voce:active{background:var(--line)}
-  /* la linea sottile fra una voce e l'altra (18 nov 2026, Andrea fra tre
-     anteprime: «A: grigia piena»), da bordo a bordo; la «✕ Torna a
-     Tutto» ha gia' il suo bordo e resta fuori */
-  .ts-voce{position:relative}
-  .ts-voce:not(.ts-esci) + .ts-voce:not(.ts-esci)::before{content:'';
-    position:absolute;left:0;right:0;top:0;height:1px;background:var(--line)}
-  .ts-voce.sel{background:var(--sats);color:#fff}
-  .ts-voce .ts-n{opacity:.6;font-weight:800;font-variant-numeric:tabular-nums}
-  .ts-voce.ts-esci{color:var(--muted);font-size:14px;border-top:1px solid var(--line);
-    border-radius:0 0 10px 10px;margin-top:4px}
+  /* LA SECONDA RIGA DELLE SOTTOCATEGORIE (18 nov 2026, al posto della
+     tendina): card un po' piu' piccole di quelle delle categorie, cosi'
+     si legge a colpo d'occhio che stanno UN LIVELLO SOTTO; l'emoji fa da
+     figura (come nelle card del Lavoro), la prima card porta il disegno
+     della categoria. Una riga sottile la separa dalla fila sopra. */
+  #sottoRigaWrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+  .sotto-riga .cat-cella{width:72px}
+  .sotto-riga .cat-quad .cat-emoji{font-size:28px}
+  /* i nomi degli scaffali sono lunghi («Abbigliamento e gadget»): a
+     72px la parola lunga si va a capo con il trattino, non a meta' */
+  .sotto-riga .cat-eti{font-size:11px;-webkit-hyphens:auto;hyphens:auto}
+  .sotto-riga .sotto-n{display:block;font-size:10px;font-weight:800;opacity:.6;
+    text-align:center;font-variant-numeric:tabular-nums}
+  /* L'ENTRATA A MOLLA (18 nov 2026, la «D» scelta da Andrea fra cinque
+     prove girate): le card salgono dal basso una dopo l'altra e si
+     assestano con un piccolo rimbalzo. Solo quando la riga compare o
+     cambia reparto (entraSottoRiga), mai coi effetti ridotti. */
+  @keyframes sottoMolla{from{opacity:0;transform:translateY(34px) scale(.6)}
+    to{opacity:1;transform:none}}
+  .sotto-entra .cat-cella{animation:sottoMolla .45s cubic-bezier(.34,1.56,.64,1) both;
+    animation-delay:calc(var(--i) * 55ms)}
+  /* LA FILA SOPRA SI SPEGNE (18 nov 2026, Andrea: «spente, non
+     scure»): con la seconda riga aperta le altre categorie passano in
+     grigio e meno piene, cosi' si capisce di chi sono gli scaffali
+     sotto; restano toccabili (aprono le loro). La card accesa porta
+     una ✕ in BASSO a destra (l'arrivo del reparto lascia in vista solo
+     la coda della fila, e in alto finirebbe sotto l'header):
+     ritoccarla chiude e torna a «Tutto». */
+  #catStrip .cat-quad,#catStrip .cat-eti{transition:filter .25s,opacity .25s}
+  #catSez.con-sotto #catStrip .cat-cella:not(.attiva) .cat-quad{filter:grayscale(1);opacity:.5}
+  #catSez.con-sotto #catStrip .cat-cella:not(.attiva) .cat-eti{opacity:.5}
+  #catSez.con-sotto #catStrip .cat-cella.attiva .cat-quad::after{content:'✕';
+    position:absolute;bottom:5px;right:5px;width:20px;height:20px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-size:11px;
+    font-weight:900;line-height:1;background:var(--sats-text);color:#1a1208;
+    box-shadow:0 1px 4px rgba(0,0,0,.35)}
   /* LA CARD DELLO SCAMBIO: una riga sola, il logo piu' grosso (set
      2026, ritocco di Andrea — vedi Architettura, «LA CARD DELLO
      SCAMBIO NELLA STRISCIA»).
@@ -14345,6 +14357,17 @@ document.getElementById('cartello')?.remove();</script>
         <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
           onclick="scorriFila('catStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
+      <!-- LA SECONDA RIGA DELLE SOTTOCATEGORIE (18 nov 2026, Andrea: «una
+           seconda riga come se fosse la categoria, però con le icone
+           relative alla sottocategoria»): la disegna renderSottoRiga(),
+           e c'e' solo con una categoria accesa che ha scaffali pieni -->
+      <div class="strip-wrap" id="sottoRigaWrap" style="display:none">
+        <div class="cat-strip sotto-riga" id="sottoRiga"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('sottoRiga',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('sottoRiga',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
     </div>
     <!-- LE CARD DEL LAVORO (23 ott 2026): al posto delle categorie del
          mercato, che in Lavoro si spengono, gli scaffali dei servizi.
@@ -19670,7 +19693,7 @@ const EMOJI_CAT = {'Elettronica':'🔌', 'Informatica':'💻', 'Telefonia':'📱
 /* LE SOTTOCATEGORIE (18 nov 2026, cantiere sottocategorie, richiesta di
    Andrea): la copia ESATTA di SOTTOCATEGORIE in server.py — id e
    etichetta, nello stesso ordine — e prove.py le confronta voce per
-   voce (`prove_sottocategorie_vetrina`). Servono alla tendina della
+   voce (`prove_sottocategorie_vetrina`). Servono alla seconda riga della
    striscia (le etichette accanto ai conteggi del server) e al campo
    «Sottocategoria» del form Vendi. Il giudice della validita' resta il
    server: il client propone, `sottocategoria_valida` decide. */
@@ -20808,7 +20831,7 @@ let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
 let conteggiServer = null, ultimaRicercaAI = false;
 /* LE SOTTOCATEGORIE (18 nov 2026): la leva e i conteggi arrivano nella
    busta di prima pagina. Chiave assente = server di ieri o leva spenta =
-   niente tendina e niente campo nel form. `activeSotto` e' lo scaffale
+   niente seconda riga e niente campo nel form. `activeSotto` e' lo scaffale
    scelto dentro `activeCat` ('' = «Tutta X»): lo azzera setCat a ogni
    cambio di categoria, e vale solo con una categoria. */
 let sottoLeva = false, sottoConteggi = {}, activeSotto = '', sottoChiesto = '';
@@ -20945,7 +20968,7 @@ function paramsVetrina(){
     p.set('cat', sc.cat);
     if (sc.sotto) p.set('sottocategoria', sc.sotto);
   } else if (sottoLeva && activeSotto && activeCat !== 'Tutto') {
-    /* lo scaffale scelto nella tendina della striscia (18 nov 2026) */
+    /* lo scaffale scelto nella seconda riga sotto la striscia (18 nov 2026) */
     p.set('sottocategoria', activeSotto);
   }
   /* LA RICERCA E' DI TUTTI (ago 2026): vive qui dentro, quindi vale
@@ -23337,7 +23360,6 @@ function libroDaPiuP2P(){
 }
 
 function go(view){
-  chiudiTendinaSotto();   /* la tendina della striscia non segue una vista che cambia */
   haptic();
   /* In vetrina Vendi, Ordini e Profilo non esistono: si fanno su Telegram */
   if (VETRINA && (view==='vendi' || view==='affari' || view==='profilo')) {
@@ -25477,8 +25499,8 @@ function renderChips(){
   centraNellaFila(el('chips'), el('chips').querySelector('.chip.active'));
 }
 function setCat(c){
-  /* LO SCAFFALE DELLA TENDINA (18 nov 2026): ogni cambio di categoria
-     riparte da «Tutta X», tranne quando a chiederlo e' la tendina, che
+  /* LO SCAFFALE DELLA SECONDA RIGA (18 nov 2026): ogni cambio di categoria
+     riparte da «Tutta X», tranne quando a chiederlo e' la seconda riga, che
      lascia la sua scelta in `sottoChiesto` (si consuma qui, una volta).
      Con «Tutto» uno scaffale non esiste. */
   activeSotto = (c !== 'Tutto' && sottoChiesto) ? sottoChiesto : '';
@@ -25698,10 +25720,11 @@ function renderStriscia(){
   /* ...e LA TESSERA DELLE RACCOLTE (17 nov 2026): c'e' o non c'e' */
   const racc = typeof raccolteSullaFila === 'function' && raccolteSullaFila();
   const firma = voci.join('|') + '#' + activeCat + (racc ? '#R' : '')
-    + '#S' + activeSotto   /* lo scaffale della tendina (18 nov 2026) */
+    + '#S' + activeSotto   /* lo scaffale scelto (18 nov 2026) */
     + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '')
     + '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu)).join(',')
     + '#' + (carr ? `C${carr.pezzi}${carr.cambiato ? '!' : ''}:${carr.nome}` : '');
+  renderSottoRiga();   /* la seconda riga ha la sua firma (18 nov 2026) */
   if (firma === strisciaFirma) return;
   strisciaFirma = firma;
   /* La card accesa si porta in vista, che illuminata fuori schermo
@@ -25835,7 +25858,7 @@ function renderStriscia(){
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span></span>
       <span class="cat-eti">${esc(c)}</span>${
-      /* lo scaffale scelto nella tendina (18 nov 2026) resta scritto
+      /* lo scaffale scelto nella seconda riga (18 nov 2026) resta scritto
          sotto il nome, piccolo: la card accesa dice il reparto E lo
          scaffale, cioe' cosa sta filtrando la vetrina qui sotto */
       c === activeCat && activeSotto && !vistaBarattolo
@@ -26849,7 +26872,13 @@ if (window.IntersectionObserver) {
    giorno diverge. */
 let scrollRepartoInAttesa = false;
 function scorriAlReparto(){
-  scorriSottoHeader(document.querySelector('.strumenti'));
+  /* CON LA SECONDA RIGA L'ARRIVO SALE (18 nov 2026): la riga degli
+     scaffali e' la cosa da vedere appena toccata la categoria («mi si
+     apre una seconda riga», Andrea), e arrivando su «N oggetti» finiva
+     sotto l'header. Si arriva su di lei: sotto c'e' gia' la merce. */
+  const riga = el('sottoRigaWrap');
+  scorriSottoHeader(riga && riga.style.display !== 'none'
+    ? riga : document.querySelector('.strumenti'));
 }
 function armaScrollReparto(){
   if (DEMO) { scorriAlReparto(); return; }
@@ -27322,108 +27351,145 @@ function apriCard(e, id){
   openDetail(id);
 }
 
-/* ---------- LA TENDINA DELLE SOTTOCATEGORIE (18 nov 2026) ----------
-   Cantiere sottocategorie, richiesta di Andrea che ha scelto lui la
-   forma: NON una seconda riga di pillole, ma una tendina che si apre
-   sotto la card toccata. In cima «Tutta la categoria», poi gli scaffali
-   PIENI col loro numero (una porta su una vetrina vuota e' un muro), e
-   a categoria gia' accesa in fondo «✕ Torna a Tutto», che e' il ritocco
-   di sempre (prima il ritocco della card accesa riportava a «Tutto»: con
-   la tendina il ritocco la riapre, e l'uscita sta dentro).
-   Non e' un foglio: vive appesa al body in coordinate di pagina, quindi
-   scorre con la pagina, e si chiude con un tocco fuori, Esc, il cambio
-   di vista o lo scorrimento della fila. I conteggi sono quelli GLOBALI
-   del server (sottoconteggi, come conteggi per categoria): le righe
-   senza sottocategoria stanno solo in «Tutta la categoria». */
-function vociTendinaSotto(c){
+/* ---------- LA SECONDA RIGA DELLE SOTTOCATEGORIE (18 nov 2026) ----------
+   Cantiere sottocategorie, terzo giro deciso da Andrea: la prima forma
+   (una riga di pillole) bocciata, la seconda (la tendina sotto la card)
+   provata e sostituita da questa — «tocco Bitcoin, vedo gia' tutti gli
+   annunci di Bitcoin, e mi si apre una seconda riga con le sottocategorie,
+   come se fosse la categoria, ma con le icone della sottocategoria».
+   Il tocco sulla card della categoria torna quello di sempre (filtra
+   subito; il ritocco della card accesa riporta a «Tutto»). Sotto la
+   fila, solo con una categoria accesa che ha scaffali PIENI (una porta
+   su una vetrina vuota e' un muro), la riga: in testa «Tutta X» col
+   disegno della categoria, poi gli scaffali col loro numero. I conteggi
+   sono quelli GLOBALI del server (sottoconteggi): le righe senza
+   sottocategoria stanno solo in «Tutta X». */
+const EMOJI_SOTTO = {
+  'droni-modellismo':'🚁', 'stampa-3d':'🖨️', 'smart-home':'📡', 'componenti-maker':'🔧', 'strumenti-misura':'📏',
+  'computer':'💻', 'tablet':'📲', 'componenti-periferiche':'🖱️', 'software-licenze':'💿',
+  'smartphone':'📱', 'cover-accessori':'🔌', 'sim-ricariche':'📶',
+  'cuffie':'🎧', 'casse-ampli':'🔊', 'hifi-giradischi':'📻', 'tv-proiettori':'📺',
+  'console':'🎮', 'videogiochi':'👾', 'controller-accessori':'🕹️', 'retrogaming':'👾', 'crediti-digitali':'🪙',
+  'fotocamere':'📷', 'obiettivi':'🔭', 'binocoli-telescopi':'🔭', 'treppiedi-accessori':'📸',
+  'hardware-wallet':'🔐', 'nodi-mining':'⛏️', 'poster-stampe':'🖼️', 'merch':'👕', 'cappellini':'🧢',
+  'spille-adesivi':'📌', 'cover-telefono':'📱', 'tazze-bicchieri':'☕', 'libri-guide':'📚', 'servizi-btc':'🤝',
+  'mobili':'🛋️', 'cucina-tavola':'🍽️', 'giardino':'🌱', 'organizzazione':'📦',
+  'grandi-elettrodomestici':'🧺', 'piccoli-elettrodomestici':'☕',
+  'elettroutensili':'🪚', 'utensili-mano':'🔨', 'ferramenta':'🔩',
+  'olio-condimenti':'🫒', 'dolci-conserve':'🍯', 'spezie-erbe':'🌿', 'bevande':'🍷', 'pasta-riso':'🍝',
+  'creme-cosmetici':'🧴', 'profumi':'🌸', 'integratori':'💊', 'apparecchi-estetica':'💡',
+  'donna':'👗', 'uomo':'👔', 'unisex':'👕',
+  'scarpe':'👟', 'borse-zaini':'🎒', 'piccoli-accessori':'🕶️',
+  'orologi-smartwatch':'⌚', 'gioielli':'💍',
+  'passeggini-attrezzatura':'🍼', 'giocattoli':'🧸', 'abbigliamento-bimbi':'🧒',
+  'attrezzatura-sportiva':'⚽', 'outdoor':'🏕️', 'mare-piscina':'🏖️', 'giochi-tavolo':'🎲', 'maglie-sportive':'🎽',
+  'corsa-gravel':'🚴', 'mtb':'🚵', 'ebike':'⚡', 'citta-pieghevoli':'🚲', 'bici-bimbi':'🚲', 'componenti-bici':'⚙️',
+  'veicoli':'🚗', 'ricambi-motori':'🔧', 'caschi-abbigliamento':'🪖',
+  'cani':'🐕', 'gatti':'🐈', 'acquari-terrari':'🐠',
+  'libri':'📖', 'fumetti-manga':'💥',
+  'vinili':'💿', 'cd-dvd':'📀',
+  'chitarre-bassi':'🎸', 'tastiere-piano':'🎹', 'batteria-percussioni':'🥁', 'fiati-archi':'🎻', 'ampli-studio':'🎙️',
+  'carte-tcg':'🃏', 'edizioni':'📜', 'monete-banconote':'🪙', 'action-figure':'🦸', 'francobolli-documenti':'✉️',
+  'quadri-stampe':'🖼️', 'sculture-ceramiche':'🏺', 'tessuti-ricami':'🧵', 'materiali-creativi':'🎨',
+  'oggetti-decorativi':'🪬', 'su-misura':'✂️',
+  'gift-card':'🎁', 'soggiorni-esperienze':'🏝️',
+  'lingue':'🗣️', 'ripetizioni':'📝', 'musica-lezioni':'🎵', 'informatica-corsi':'👩‍💻', 'bitcoin-corsi':'🟠',
+  'sport-benessere':'🧘', 'cucina-corsi':'👨‍🍳', 'arte-corsi':'🎨', 'crescita-personale':'🌱',
+  'grafica-design':'🎨', 'siti-e-app':'💻', 'traduzioni':'🌍', 'scrittura-testi':'✍️', 'consulenze':'🤝',
+  'riparazioni':'🔧', 'casa-manutenzione':'🧰', 'foto-video-servizi':'📷'};
+/* LE ICONE DI FLOW (18 nov 2026, «in stile barattolo», Andrea): chi ha
+   il suo disegno in assets/sottocategorie/ sta qui, e solo questi si
+   chiedono al server (prove.py confronta l'elenco coi file); gli altri
+   tengono l'emoji. Come per le categorie, se l'immagine non arriva si
+   toglie da sola e resta l'emoji sotto. */
+const ICONE_SOTTO = new Set(['hardware-wallet', 'nodi-mining', 'poster-stampe',
+  'merch', 'cappellini', 'spille-adesivi', 'cover-telefono', 'tazze-bicchieri',
+  'libri-guide', 'servizi-btc']);
+function figSotto(sid, c){
+  const emoji = `<span class="cat-emoji" aria-hidden="true">${EMOJI_SOTTO[sid] || EMOJI_CAT[c] || '📦'}</span>`;
+  if (!ICONE_SOTTO.has(sid)) return emoji;
+  return `<span class="cat-fig"><img src="/assets/sottocategorie/${sid}.webp" alt="" loading="lazy"
+      decoding="async" onerror="this.remove()">${emoji}</span>`;
+}
+function vociSottoRiga(c){
   if (!sottoLeva || !SOTTOCAT[c]) return [];
   const n = sottoConteggi[c] || {};
   return SOTTOCAT[c].filter(([id]) => (Number(n[id]) || 0) > 0)
     .map(([id, nome]) => ({id, nome, n: Number(n[id]) || 0}));
 }
-function chiudiTendinaSotto(){
-  const t = el('tendinaSotto');
-  if (t) t.remove();
+let sottoRigaFirma = '', sottoRigaCat = '', sottoRigaTimer = 0;
+function entraSottoRiga(wrap, riga){
+  clearTimeout(sottoRigaTimer);
+  wrap.classList.remove('sotto-entra');
+  if (effettiRidotti()) return;
+  /* il passo fra due card, misurato: serve all'entrata che parte tutta
+     dalla prima card e si allarga (--dx = quanto ognuna e' lontana) */
+  const celle = riga.querySelectorAll('.cat-cella');
+  const x0 = celle[0] ? celle[0].offsetLeft : 0;
+  celle.forEach(a => a.style.setProperty('--dx', (x0 - a.offsetLeft) + 'px'));
+  void wrap.offsetWidth;   /* riparte anche se la classe c'era gia' */
+  wrap.classList.add('sotto-entra');
+  sottoRigaTimer = setTimeout(() => wrap.classList.remove('sotto-entra'), 1200);
 }
-function apriTendinaSotto(card, c){
-  chiudiTendinaSotto();
-  const dentro = c === activeCat && !vistaBarattolo;
-  const cur = dentro ? activeSotto : null;
+function renderSottoRiga(){
+  const wrap = el('sottoRigaWrap'), riga = el('sottoRiga');
+  if (!wrap || !riga) return;
+  const c = activeCat;
+  const voci = (c !== 'Tutto' && !vistaBarattolo) ? vociSottoRiga(c) : [];
   const tot = Number(conteggiServer && conteggiServer[c]) || 0;
-  const voce = (sid, nome, n) => `<button type="button" role="menuitemradio"
-      aria-checked="${cur === sid}" class="ts-voce${cur === sid ? ' sel' : ''}"
-      data-sotto="${esc(sid)}" onclick="scegliTendinaSotto(this.dataset.sotto)"><span
-      class="ts-nome">${esc(nome)}</span>${n ? `<span class="ts-n">${n}</span>` : ''}</button>`;
-  const t = document.createElement('div');
-  t.id = 'tendinaSotto';
-  t.className = 'tendina-sotto';
-  t.setAttribute('role', 'menu');
-  t.setAttribute('aria-label', 'Sottocategorie di ' + c);
-  t.dataset.cat = c;
-  t.innerHTML = '<span class="ts-punta" aria-hidden="true"></span>'
-    + voce('', 'Tutta la categoria', tot)
-    + vociTendinaSotto(c).map(v => voce(v.id, v.nome, v.n)).join('')
-    + (dentro ? `<button type="button" role="menuitem" class="ts-voce ts-esci"
-        onclick="esciTendinaSotto()"><span class="ts-nome">✕ Torna a Tutto</span></button>` : '');
-  document.body.appendChild(t);
-  /* sotto la card, centrata su di lei ma mai oltre i 12px dal bordo;
-     la punta resta sulla card anche quando il riquadro si sposta */
-  const r = (card || document.body).getBoundingClientRect();
-  const w = t.offsetWidth, vw = document.documentElement.clientWidth;
-  const left = Math.min(Math.max(r.left + r.width / 2 - w / 2, 12), vw - w - 12);
-  t.style.left = (left + scrollX) + 'px';
-  t.style.top = (r.bottom + scrollY + 8) + 'px';
-  t.querySelector('.ts-punta').style.left =
-    Math.min(Math.max(r.left + r.width / 2 - left - 7, 14), w - 28) + 'px';
-  haptic();
-  (t.querySelector('.ts-voce.sel') || t.querySelector('.ts-voce'))?.focus({preventScroll: true});
-}
-function scegliTendinaSotto(sid){
-  const c = el('tendinaSotto')?.dataset.cat;
-  chiudiTendinaSotto();
-  if (!c) return;
-  if (c === activeCat && !vistaBarattolo) {
-    /* stesso reparto, altro scaffale: setCat resta il giudice unico
-       (ricarica la prima pagina, rifa' pillole e striscia) e la entry
-       della cronologia si SOSTITUISCE, come per ogni cambio di filtro */
-    if (sid === activeSotto) return;
-    el('grid').innerHTML = '';
-    el('gridEmpty').style.display = 'none';
-    sottoChiesto = sid;
-    setCat(c);
-    armaScrollReparto();
+  /* la firma, come quella della fila: si ridisegna solo quando cambia
+     qualcosa che si vede, o la riga lampeggerebbe a ogni pagina */
+  const firma = voci.length ? c + '#' + activeSotto + '#' + tot + '#'
+    + voci.map(v => v.id + ':' + v.n).join(',') : '';
+  if (firma === sottoRigaFirma) return;
+  sottoRigaFirma = firma;
+  const sez = el('catSez');
+  if (!voci.length) {
+    wrap.style.display = 'none'; riga.innerHTML = ''; sottoRigaCat = '';
+    if (sez) sez.classList.remove('con-sotto');
     return;
   }
-  /* un altro reparto: la discesa e' quella di sempre, con lo scaffale
-     in mano (apriCategoria non torna indietro qui: c non e' quello
-     acceso, o il barattolo e' acceso e ogni categoria e' un'uscita) */
-  sottoChiesto = sid;
-  apriCategoria(c);
+  /* L'ENTRATA (18 nov 2026, Andrea: «non si apre di scatto»): solo
+     quando la riga COMPARE o cambia reparto, mai quando cambiano i
+     numeri o lo scaffale acceso, che ridisegnano la stessa riga */
+  const entra = c !== sottoRigaCat;
+  sottoRigaCat = c;
+  let k = 0;
+  const card = (sid, nome, n, fig) => `
+    <a class="cat-cella${activeSotto === sid ? ' attiva' : ''}" role="button" tabindex="0"
+       style="--i:${k++}" data-sotto="${esc(sid)}" aria-pressed="${activeSotto === sid}"
+       onclick="scegliSottoRiga(this.dataset.sotto)"
+       onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();scegliSottoRiga(this.dataset.sotto)}">
+      <span class="cat-quad">${fig}</span>
+      <span class="cat-eti">${esc(nome)}</span>${n ? `<span class="sotto-n">${n}</span>` : ''}
+    </a>`;
+  /* SOLO GLI SCAFFALI (18 nov 2026, Andrea): la card «Tutta X» in testa
+     ripeteva il disegno della categoria che sta gia' accesa sopra. Per
+     tornare a tutta la categoria si ritocca lo scaffale acceso; per
+     uscire, la categoria (con la sua ✕). */
+  riga.innerHTML = voci.map(v => card(v.id, v.nome, v.n, figSotto(v.id, c))).join('');
+  wrap.style.display = '';
+  if (sez) sez.classList.add('con-sotto');
+  if (entra) entraSottoRiga(wrap, riga);
+  aggiornaFrecce('sottoRiga');
+  setTimeout(() => centraNellaFila(riga, riga.querySelector('.cat-cella.attiva')), 0);
 }
-function esciTendinaSotto(){
-  chiudiTendinaSotto();
+function scegliSottoRiga(sid){
+  const c = activeCat;
+  if (c === 'Tutto') return;
+  /* il ritocco dello scaffale acceso lo spegne: si torna a tutta la
+     categoria (il gesto di ogni card della fila) */
+  if (sid === activeSotto) sid = '';
+  /* stesso reparto, altro scaffale: setCat resta il giudice unico
+     (ricarica la prima pagina, rifa' pillole e righe) e la entry della
+     cronologia si SOSTITUISCE, come per ogni cambio di filtro */
   haptic();
-  tornaATutto();
+  el('grid').innerHTML = '';
+  el('gridEmpty').style.display = 'none';
+  sottoChiesto = sid;
+  setCat(c);
+  armaScrollReparto();
 }
-/* il tocco fuori chiude (in cattura: arriva prima del click, e un tocco
-   su un'altra card chiude questa e apre la sua); Esc e il ridimensiona
-   anche; e la fila che scorre si porterebbe via la card sotto la punta */
-/* ...ma il tocco sulla card della tendina APERTA la chiude e basta: senza
-   il segno, il click che arriva subito dopo la riaprirebbe */
-let tendinaChiusaSu = null;
-document.addEventListener('pointerdown', e => {
-  const t = el('tendinaSotto');
-  if (!t || t.contains(e.target)) return;
-  const card = e.target.closest?.('#catStrip .cat-cella[data-cat]');
-  tendinaChiusaSu = card && card.dataset.cat === t.dataset.cat
-    ? {cat: t.dataset.cat, at: performance.now()} : null;
-  chiudiTendinaSotto();
-}, true);
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && el('tendinaSotto')) chiudiTendinaSotto();
-});
-window.addEventListener('resize', chiudiTendinaSotto);
-el('catStrip')?.addEventListener('scroll', chiudiTendinaSotto, {passive: true});
 
 /* La card della striscia: toccarla e' una DISCESA verso il reparto,
    quindi passa da apriCategoria, che alza navSpingi. Atterrarci da un
@@ -27435,16 +27501,8 @@ function apriCategoriaDaTocco(e, c){
      dire seguire l'href e ricaricare 900 KB */
   e.preventDefault();
   if (premutaFatta) { premutaFatta = false; return; }
-  /* LA TENDINA DELLE SOTTOCATEGORIE (18 nov 2026, Andrea: «quando
-     clicchi sulla categoria principale si apre una tendina e tu scegli
-     in quella tendina quali annunci mostrare»): se la categoria ha
-     almeno uno scaffale pieno il tocco apre la tendina sotto la card, e
-     la scelta la fa lei. Senza scaffali pieni (o a leva spenta) il
-     tocco e' quello di sempre. */
-  if (tendinaChiusaSu && tendinaChiusaSu.cat === c
-      && performance.now() - tendinaChiusaSu.at < 800) { tendinaChiusaSu = null; return; }
-  tendinaChiusaSu = null;
-  if (vociTendinaSotto(c).length) { apriTendinaSotto(e.currentTarget, c); return; }
+  /* le sottocategorie non passano piu' da qui (18 nov 2026): il tocco
+     filtra subito, e la seconda riga compare da sola sotto la fila */
   apriCategoria(c);
 }
 
@@ -117566,7 +117624,7 @@ async function avviaVetrina(){
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
-    armaFila('lavStrip');
+    armaFila('lavStrip'); armaFila('sottoRiga');
     await fasciaPrima();
     renderGrid();
     /* la pagina ricordata PRIMA dei link d'arrivo (che li' tacciono) */
@@ -118067,7 +118125,7 @@ async function avvia(){
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
-    armaFila('lavStrip');
+    armaFila('lavStrip'); armaFila('sottoRiga');
     await fasciaPrima();
     renderGrid();
     /* IL CARRELLO SALVATO (6 ott 2026) parte qui, in volo insieme a

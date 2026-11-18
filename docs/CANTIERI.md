@@ -91856,3 +91856,69 @@ ramo «un ordine» e il ramo on-chain: 9 rosse); ritoccati
 `prove_avvisi_nuovi_ordini` e `collaudo_ordine_in_pausa` (la riga col
 link, «Apri l'ordine»). NON PROVATO: il tocco su un Telegram vero —
 da guardare sul collaudo con un ordine nuovo nel libro.
+
+## Le sottocategorie in seconda riga, card come le categorie (18 nov 2026, cantiere sotto-riga; Andrea: «c'è bitcoin e se io lo clicco vedo già automaticamente tutte le categorie di bitcoin però mi si apre una seconda riga con le sottocategorie... come se fosse la categoria, però con le icone relative alla sottocategoria»)
+
+La tendina sotto la card (il cantiere sottocategorie di stamattina, già
+su main) lascia il posto a una SECONDA RIGA. Il tocco di una categoria
+torna a filtrare subito: niente più passo in mezzo. Sotto la fila,
+separata dalla riga sottile grigia (`--line`), compare la riga degli
+scaffali, solo con una categoria accesa che ha scaffali PIENI (mai su
+«Tutto», mai nel barattolo dei preferiti), coi loro numeri (i
+`sottoconteggi` globali del server). Un tocco su uno scaffale passa da
+`setCat` con `sottoChiesto`, il giudice unico di prima; il RITOCCO dello
+scaffale acceso torna a tutta la categoria; il ritocco della categoria
+torna a «Tutto», come sempre. La riga ha la sua firma come la fila, così
+non lampeggia a ogni pagina.
+
+Le scelte di Andrea, una per giro, guardando prove vere:
+- card più piccole di quelle delle categorie (72px, nome a 11px col
+  trattino automatico, `hyphens:auto` su `lang="it"`: a 68px
+  «Abbigliamento» si spezzava a metà): dicono da sole che stanno UN
+  LIVELLO SOTTO;
+- l'entrata: cinque prove girate in video (salgono una alla volta, la
+  riga si apre, una card che si allarga, molla dal basso, subito) e ha
+  scelto la «D», LA MOLLA: le card salgono dal basso una dopo l'altra
+  (55 ms di passo, 450 ms, `cubic-bezier(.34,1.56,.64,1)`), solo quando
+  la riga compare o cambia reparto e mai con gli effetti ridotti;
+- NIENTE «Tutta X» in testa: la prima stesura la metteva col disegno
+  della categoria, e ad Andrea dava fastidio il doppione con la card
+  accesa sopra. Ho detto che la sua aveva più senso: la categoria resta
+  in vista, la riga ha solo gli scaffali;
+- LA FILA SOPRA SI SPEGNE («spente, non scure»): con la riga aperta le
+  altre categorie passano in grigio (`grayscale(1)`, opacità .5, 250 ms)
+  e restano toccabili (aprono le loro, riga compresa); la card accesa
+  porta una ✕ in BASSO a destra — in alto finirebbe sotto l'header,
+  perché l'arrivo lascia in vista solo la coda della fila.
+
+L'ARRIVO SALE. Dall'ago 2026 il tocco della card scorreva fino alla riga
+«N oggetti» (decisione di Andrea: in vista la merce, non la striscia).
+Con la seconda riga quell'arrivo la nascondeva proprio sotto l'header,
+cioè la cosa appena aperta non si vedeva: `scorriAlReparto` ora si ferma
+sulla seconda riga quando c'è (sotto c'è già la merce), e su «N oggetti»
+quando non c'è o col barattolo. Detto ad Andrea.
+
+LE ICONE: fatte con Google Flow (Nano Banana, 0 crediti) dal PC di
+Andrea con le sei illustrazioni delle categorie come riferimento di
+stile, due versioni per voce, sfondo scuro uniforme; scelte da me
+(Andrea: «scegli tu, sono tutte belle»); ritagliate in cloud col fondo
+preso dal bordo, riempimento connesso con tolleranza (più i buchi chiusi
+grandi e proprio del colore del fondo: il manico della tazza), orlo
+sfumato, webp 256px in `assets/sottocategorie/<id>.webp`. Per ora le 10
+di Bitcoin; le altre voci tengono la loro emoji (`EMOJI_SOTTO`, tutte
+le 124, una prova vuole ogni id). La rotta `/assets/sottocategorie/{nome}`
+ha la whitelist `ID_SOTTOCATEGORIE` derivata dall'albero (regola 3) e la
+revalidazione delle sorelle; il client chiede solo gli id di
+`ICONE_SOTTO`, e una prova vuole quell'elenco uguale ai file.
+Strada scartata: una pagina di prova a «pannello» che sale da sotto
+(fatta sul PC durante le icone): la seconda riga dentro la vetrina è
+quello che Andrea aveva chiesto.
+
+Provato: la sezione di `prove_sottocategorie_vetrina` riscritta (tocco
+che filtra, niente tendina, riga solo a categoria accesa e senza «Tutta
+X», fila spenta, molla, ritocco dello scaffale, icone = file, rotta
+dall'albero) più l'arrivo del reparto; giro dal vivo sul server locale
+coi conteggi di Bitcoin di produzione finti nella risposta (riga di 10,
+scaffale acceso, ritocco, ✕), la rotta: 200 per un'icona, 404 per una
+voce senza disegno e per un nome storto. Da fare: le icone delle altre
+categorie, a gruppi, con lo stesso giro.
