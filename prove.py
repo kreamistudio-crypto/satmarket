@@ -206895,6 +206895,77 @@ console.log(JSON.stringify(out));
           and rs.index("+ righe") < rs.index("premioOcMioP2P(o)") < rs.index("p2p-scambio-stato"))
 
 
+def prove_premio_conto_onchain():
+    """IL PREMIO NEL CONTO ON-CHAIN, COME SU LIGHTNING (18 nov 2026, cantiere
+    premio-conto-onchain, Andrea: «In un ordine onchain nel dettaglio non
+    viene mostrato nel conto il calcolo della fee/premio del venditore»).
+    Coi pezzi VERI del conto (scorporo, frase e nota del premio, giudice
+    dell'affare, commissione): l'ordine di Andrea (1099 USDT col +5%, che
+    compra BTC) dice il cambio, il Controvalore, «5% meno conveniente» con
+    «Premio richiesto dall'utente» e il Subtotale, e le righe SOMMANO; sul
+    mio ordine preso «Premio che hai richiesto», senza il cambio di adesso;
+    lo sconto col «+»; senza premio o a sats fissi il conto di ieri."""
+    print("\n[il premio nel conto on-chain, come su Lightning]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    banco = "\n".join(_fn_js(mini, f) for f in (
+        "function commissioneOnchainP2P(o, deposito){", "function contoOnchainP2P(o){",
+        "function mezzaCommissioneP2P(fee){", "function scorporaPremioP2P(sats, premio){",
+        "function affareP2P(o){", "function notaPremioP2P(mio, affare, prem){",
+        "function conNotaPremioP2P(riga, nota){", "function decimoP2P(n){",
+        "function etichettaPremioP2P(mio, prem, affare){")) + r"""
+const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const esc = s => String(s == null ? '' : s);
+const fmtEur = e => String(e);
+const feeMiaP2P = () => 0.02, commissioneVivaP2P = () => 0.03, cartelloFeeP2P = () => 'Pioniere';
+const cifraOcP2P = o => Number(o.euro).toFixed(2).replace('.', ',') + ' USDT';
+const rigaTassoContoP2P = (o, detto) => '<div class="ctrl-tasso">1 BTC ≈ 62.688 USDT</div>';
+const nudo = h => String(h).replace(/<span class="premio-nota">(.*?)<\/span>/g, ' / $1')
+  .replace(/<[^>]+>/g, '').replace(/ | /g, ' ');
+const righe = h => [...h.matchAll(/<div class="ctrl-(?:riga[^"]*"><span>(.*?)<\/span><span class="mono">(.*?)<\/span>(.*?)<\/div>|tasso">(.*?)<\/div>)/g)]
+  .map(m => m[4] !== undefined ? 'CAMBIO ' + nudo(m[4]) : nudo(m[1]) + ' | ' + nudo(m[2]) + nudo(m[3]));
+const A = x => Object.assign({id: 1, lato: 'sell', parte: 'compro', ruolo: '', mercato: true, premio: 5,
+  sats: 0, stima: 1665470, euro: 1099, fiat: 'USDT', preso_il: 0, quota_sats: 0, quota_ricevente_sats: 0}, x || {});
+const out = {};
+out.libro = righe(contoOnchainP2P(A()));
+out.mioPreso = righe(contoOnchainP2P(A({parte: 'vendo', ruolo: 'compratore', mio: true, sats: 1665470,
+  stima: 0, preso_il: 9, importo_sats: 1700000, margine_sats: 1080, quota_sats: 41637, quota_ricevente_sats: 16655})));
+out.sconto = righe(contoOnchainP2P(A({lato: 'buy', parte: 'vendo', premio: -2, stima: 100000})));
+out.senzaPremio = righe(contoOnchainP2P(A({premio: 0})));
+out.fisso = righe(contoOnchainP2P(A({mercato: false, sats: 50000, stima: 0})));
+console.log(JSON.stringify(out));
+"""
+    r = _node_banco(banco)
+    if r is None:
+        salta("il premio nel conto on-chain", "node non c'e'")
+        return
+    prova("l'ordine di Andrea nel libro (1099 USDT, +5%, chi prende compra BTC): il "
+          "cambio, il Controvalore ricavato, «5% meno conveniente» con la nota, il "
+          "Subtotale (la cifra della card), poi la fee e il Ricevi di sempre",
+          ["CAMBIO 1 BTC ≈ 62.688 USDT",
+           "Controvalore di 1099,00 USDT | ≈ 1.753.126 sats",
+           "5% meno conveniente | ≈ −87.656 sats / Premio richiesto dall'utente",
+           "Subtotale | ≈ 1.665.470 sats",
+           "Fee P2P 1%Pioniere | ≈ −16.655 sats",
+           "Ricevi | ≈ 1.648.815 sats"], r.get("libro", [])[:6])
+    prova("...e le righe sommano: Controvalore − premio = Subtotale",
+          1665470, 1753126 - 87656)
+    prova("sul MIO ordine preso: «Premio che hai richiesto 5%» senza nota, niente "
+          "cambio di adesso (la cifra e' un fatto), il Subtotale esatto",
+          ["Controvalore di 1099,00 USDT | ≈ 1.753.126 sats",
+           "Premio che hai richiesto 5% | ≈ −87.656 sats",
+           "Subtotale | 1.665.470 sats",
+           "Margine per la rete | 1.080 sats"], r.get("mioPreso", [])[:4])
+    prova("lo SCONTO (−2% su un «compra BTC», chi prende vende): il «+», «2% meno "
+          "conveniente» e «Sconto richiesto dall'utente»",
+          ["CAMBIO 1 BTC ≈ 62.688 USDT",
+           "Controvalore di 1099,00 USDT | ≈ 98.039 sats",
+           "2% meno conveniente | ≈ +1.961 sats / Sconto richiesto dall'utente",
+           "Subtotale | ≈ 100.000 sats"], r.get("sconto", [])[:4])
+    prova("senza premio e a sats fissi il conto di ieri, «Sats dello scambio» in testa",
+          ["Sats dello scambio | ≈ 1.665.470 sats", "Sats dello scambio | 50.000 sats"],
+          [r.get("senzaPremio", [""])[0], r.get("fisso", [""])[0]])
+
+
 def prove_onchain_come_lightning():
     """LO SCAMBIO ON-CHAIN COME QUELLO LIGHTNING (17 nov 2026, cantiere
     convenienza-monete, Andrea: «tutto deve essere come la parte lighting.
@@ -213575,7 +213646,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -214595,6 +214666,7 @@ def main():
     prove_usdt_cifra_copia,
     prove_convenienza_monete,
     prove_onchain_come_lightning,
+    prove_premio_conto_onchain,
     prove_onchain_esiti_recuperati,
     prove_onchain_promemoria,
     prove_onchain_txid_moneta,

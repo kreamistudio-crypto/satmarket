@@ -77194,8 +77194,43 @@ function contoOnchainP2P(o){
     : base - cs) + (versa ? sw : -sw);
   const totSats = n => stima && !(base > 0) ? sats(n)
     : ((cs && circa) || sw) ? '<span class="num">≈ ' + fmt(n) + '<span class="unita-sats"> sats</span></span>' : sats(n);
+  /* IL PREMIO NEL CONTO, COME SU LIGHTNING (18 nov 2026, cantiere
+     premio-conto-onchain, Andrea: «In un ordine onchain nel dettaglio non
+     viene mostrato nel conto il calcolo della fee/premio del venditore»).
+     I sats erano gia' giusti — la stima e la cifra della presa escono da
+     `p2p_onchain_sats_mercato`, col premio GIA' tolto — ma il conto diceva
+     solo «Sats dello scambio», e il 5% non si vedeva da nessuna parte. A
+     mercato col premio, al posto di quella riga, le righe di `contoDettP2P`:
+     il cambio di adesso (solo finche' nessuno prende), il Controvalore
+     RICAVATO all'indietro (`scorporaPremioP2P`, la formula del server
+     rovesciata, quindi col ≈), la riga del premio con la sua frase e la sua
+     nota (`etichettaPremioP2P`/`notaPremioP2P`, lo stesso giudice del
+     badge della card) e il Subtotale, che e' la cifra di sempre. Le righe
+     SOMMANO: Controvalore − premio = Subtotale. Col typeof, come i
+     fratelli: i banchi che ritagliano questa funzione da sola restano
+     quelli di ieri. */
+  const prem = o.mercato ? Math.round(Number(o.premio) || 0) : 0;
+  const conPremio = !!prem && base > 0 && typeof scorporaPremioP2P === 'function'
+    && typeof etichettaPremioP2P === 'function' && typeof affareP2P === 'function';
+  const ctrl = conPremio ? scorporaPremioP2P(base, prem) : 0;
+  /* il giudice guarda da CHI LEGGE: `parte` e' gia' il suo verso (compro =
+     riceve sats), e il lato «del libro» che `affareP2P` vuole e' quello di
+     chi gli sta di fronte — sul MIO ordine, `o.lato` e' il mio e direbbe il
+     rovescio («offerto» su un premio che ho chiesto) */
+  const affare = conPremio && affareP2P({lato: compro ? 'sell' : 'buy', premium: prem});
+  const circaSats = (n, segno) => '<span class="num">≈ ' + (segno || '') + fmt(n)
+    + '<span class="unita-sats"> sats</span></span>';
+  const rigaPremio = conPremio ? r(etichettaPremioP2P(o.mio, prem, affare),
+    circaSats(Math.abs(ctrl - base), prem > 0 ? '−' : '+'), 'premio') : '';
+  const righeBase = conPremio
+    ? (stima && typeof rigaTassoContoP2P === 'function' ? rigaTassoContoP2P(o, 0) : '')
+      + r('Controvalore di <b>' + esc(cifraOc(o)) + '</b>', circaSats(ctrl))
+      + (typeof conNotaPremioP2P === 'function' && typeof notaPremioP2P === 'function'
+        ? conNotaPremioP2P(rigaPremio, notaPremioP2P(o.mio, affare, prem)) : rigaPremio)
+      + r('Subtotale', sats(o.sats), 'sub')
+    : r('Sats dello scambio', sats(o.sats));
   return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
-    + r('Sats dello scambio', sats(o.sats))
+    + righeBase
     + (deposito && o.margine_sats ? r('Margine per la rete', sats(o.margine_sats)) : '')
     + rigaComm
     + rigaSwap

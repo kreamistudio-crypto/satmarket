@@ -91997,3 +91997,44 @@ restano com'erano.
 Provato: un banco node in `prove_p2p_onchain` (insegna a scambio in
 corso senza iconcina, spenta su concluso e annullato, SEPA invariata),
 rosso col codice di prima.
+
+## Il premio nel conto on-chain del P2P (18 nov 2026, cantiere premio-conto-onchain)
+
+Andrea, dal telefono, con due scatti affiancati: «In un ordine onchain
+nel dettaglio non viene mostrato nel conto il calcolo della fee/premio
+del venditore». L'ordine USDT → BTC on-chain col +5% diceva solo «Sats
+dello scambio», «Fee P2P» e «Ricevi»; il gemello Lightning aveva il
+cambio, «Controvalore di 100,00 USDT», «5% meno conveniente / Premio
+richiesto dall'utente» e il «Subtotale».
+
+I SATS ERANO GIUSTI, e l'ho controllato prima di tutto: la stima del
+libro e la cifra della presa escono da `p2p_onchain_sats_mercato`, la
+formula del coordinatore col premio già tolto (1099 USDT al cambio di
+62.688, meno il 5%, fa esattamente il 1.665.470 della card). Mancava
+solo il conto.
+
+DECISO: in `contoOnchainP2P`, a mercato col premio, al posto di «Sats
+dello scambio» le righe di `contoDettP2P`, coi suoi stessi pezzi —
+`rigaTassoContoP2P` (solo finché nessuno prende, come su Lightning),
+il Controvalore RICAVATO con `scorporaPremioP2P` (quindi col ≈), la riga
+del premio con `etichettaPremioP2P`/`notaPremioP2P`/`conNotaPremioP2P`
+e il Subtotale, che è la cifra di sempre. Le righe sommano. Fee, swap,
+margine e le due righe in fondo non cambiano. Senza premio e a sats
+fissi il conto resta quello di ieri.
+
+IL GIUDICE GUARDA DA CHI LEGGE. `affareP2P` vuole il lato «del libro»
+di chi gli sta di fronte: nel foglio di chi prende `o.lato` va bene, ma
+sul MIO ordine in «I miei scambi» è il mio lato e il conto diceva
+«Premio che hai offerto» su un premio che avevo chiesto (la prova l'ha
+preso al primo giro). Il lato si ricava da `parte` (compro → 'sell').
+
+Provato: `prove_premio_conto_onchain` coi pezzi veri in node — l'ordine
+di Andrea nel libro (cambio, 1.753.126 − 87.656 = 1.665.470, fee
+16.655, Ricevi 1.648.815: le cifre dello scatto), il mio ordine preso
+(«Premio che hai richiesto», niente cambio, Subtotale esatto), lo
+sconto col «+», e il conto di ieri senza premio e a sats fissi.
+Controprove: col premio spento e col giudice su `o.lato` la sezione
+diventa rossa. Non provato dal vivo sul telefono: da guardare dopo la
+promozione sullo stesso ordine USDT. Fuori dal chiesto: la riga «Rispetto
+al mercato di adesso» degli ordini on-chain a sats fissi, che Lightning
+ha e on-chain no.
