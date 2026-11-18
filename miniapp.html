@@ -9830,6 +9830,10 @@
   .field .et-sez{margin-top:12px;font-size:12.5px;font-weight:800;
     color:var(--ink)}
   .field .et-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  /* (18 nov 2026) i motivi d'esenzione sono frasi: vanno a capo dentro
+     il bottoncino invece di uscire dal riquadro a 320px */
+  .field .et-chips.et-motivi .chip{white-space:normal;text-align:left;
+    flex-shrink:1;max-width:100%;border-radius:16px}
   .field .et-chips .chip{padding:6px 11px;font-size:12.5px}
   .field .et-base{display:inline-flex;gap:4px;margin-left:6px}
   .field .et-base .chip{padding:3px 10px;font-size:12px}
@@ -60626,8 +60630,11 @@ function domandePayload(){
    Da Luca, via Andrea: per l'art. 14 del Regolamento UE 1169/2011 chi
    compra a distanza legge ingredienti, allergeni, peso netto e valori
    nutrizionali PRIMA di pagare. Una tabella uguale per tutti, coi valori
-   scritti a mano. FACOLTATIVA (decisione di Andrea): il form la offre e
-   ricorda la legge, il giudice e' `etichetta_da_payload` nel server.
+   scritti a mano. Il giudice e' `etichetta_da_payload` nel server.
+   LA TABELLA E' OBBLIGATORIA dal 18 nov 2026 (Andrea; leva
+   ETICHETTA_OBBLIGATORIA): o intera, o «Non dovuta per legge» col suo
+   motivo (ESENZIONI_ETICHETTA, gemello del server). Ingredienti,
+   allergeni e peso restano facoltativi.
    I DUE ELENCHI sono i gemelli di ALLERGENI_UE e NUTRIENTI_UE del
    server: le chiavi sono le sue, qui ci sono i nomi da leggere
    (prove.py fallisce se le chiavi divergono). */
@@ -60642,31 +60649,74 @@ const NUTRIENTI_UE = [['kj','Energia (kJ)'], ['kcal','Energia (kcal)'],
   ['carboidrati','Carboidrati'], ['zuccheri','di cui zuccheri'],
   ['proteine','Proteine'], ['sale','Sale']];
 const UNITA_PESO = ['g', 'kg', 'ml', 'cl', 'l'];
+const ESENZIONI_ETICHETTA = [['fresco','Frutta, verdura o prodotto non lavorato'],
+  ['erbe','Spezie, erbe, sale, caffè o tè'],
+  ['acqua','Acqua o aceto'],
+  ['alcolici','Alcolico oltre l\'1,2%'],
+  ['piccola','Confezione sotto i 25 cm²'],
+  ['artigiano','Artigianale, in piccole quantità, venduto da chi lo fa']];
 /* la leva viva, da /api/me: nasce accesa come nel server */
 let etichettaAttiva = true;
+/* (18 nov 2026) la tabella obbligatoria, stessa fonte e stesso patto */
+let etichettaObbligatoria = true;
 /* lo stato del form: null = «non la so ancora» (la modifica aspetta la
    scheda, e fino ad allora il salvataggio non la tocca) */
 const etichettaVuota = () => ({ingredienti:'', allergeni:[], peso:'', unita:'g',
-                                base:'100g', valori:{}});
+                                base:'100g', valori:{}, nonDovuta:false, esente:'',
+                                origine:'', conservazione:'', lotto:'', scadenza:''});
+/* (18 nov 2026) gli altri campi facoltativi, gemelli di CAMPI_ETICHETTA
+   del server: [chiave, nome, tetto, esempio] (la scadenza e' a parte) */
+const CAMPI_ETICHETTA = [['origine', 'Origine', 120, 'Es. Italia, Sicilia'],
+  ['conservazione', 'Conservazione', 300, 'Es. In luogo fresco e asciutto, dopo l\'apertura in frigo'],
+  ['lotto', 'Lotto', 40, 'Es. L2411']];
 let etichettaSell = etichettaVuota();
 /* dalla scheda al form: i numeri tornano testo da correggere */
 function etichettaDaScheda(e){
   const v = etichettaVuota();
   if (!e || typeof e !== 'object') return v;
   v.ingredienti = String(e.ingredienti || '');
+  for (const [k] of CAMPI_ETICHETTA) v[k] = String(e[k] || '');
+  v.scadenza = /^\d{4}-\d{2}-\d{2}$/.test(e.scadenza || '') ? e.scadenza : '';
   v.allergeni = Array.isArray(e.allergeni) ? e.allergeni.slice() : [];
   v.peso = e.peso ? String(e.peso) : '';
   v.unita = UNITA_PESO.includes(e.unita) ? e.unita : 'g';
   v.base = e.base === '100ml' ? '100ml' : '100g';
   for (const [k] of NUTRIENTI_UE)
     if (e.valori && e.valori[k] != null) v.valori[k] = String(e.valori[k]);
+  /* il motivo dell'esenzione torna solo se la tabella non c'e' */
+  if (!e.valori && ESENZIONI_ETICHETTA.some(([k]) => k === e.esente)) {
+    v.nonDovuta = true; v.esente = e.esente;
+  }
   return v;
 }
+/* la tabella e' intera? L'energia basta in una delle due unita' */
+const etichettaTabellaIntera = e => NUTRIENTI_UE.every(([k]) =>
+  k === 'kj' || k === 'kcal' || String(e.valori[k] || '').trim() !== '')
+  && ['kj', 'kcal'].some(k => String(e.valori[k] || '').trim() !== '');
 const etichettaNelForm = () => etichettaAttiva && !editandoNostr
   && el('sellCat') && el('sellCat').value === CAT_ETICHETTA;
+/* la scadenza vive nel deposito nascosto del selettore di casa (niente
+   selettore di sistema): si rilegge da li' prima di ogni ridisegno e
+   prima del payload — ma SOLO se il campo a schermo e' quello dello
+   stesso stato: un form rimesso a nuovo (dopo una pubblicazione, o la
+   scheda arrivata in modifica) non deve ereditare la data di prima */
+let etichettaDisegnata = null;
+function etichettaLeggiScadenza(){
+  const inp = el('etScad');
+  if (inp && etichettaSell && etichettaSell === etichettaDisegnata)
+    etichettaSell.scadenza = inp.value || '';
+}
+function togliScadenzaEtichetta(){
+  haptic();
+  const inp = el('etScad');
+  if (inp) inp.value = '';
+  if (etichettaSell) etichettaSell.scadenza = '';
+  selettoreCasaAllinea('etScad');
+}
 function renderEtichettaForm(){
   const campo = el('sellEtichettaField'), box = el('sellEtichettaBox');
   if (!campo || !box) return;
+  etichettaLeggiScadenza();
   /* la strada firmata (Nostr) non la porta, come le domande */
   if (!etichettaNelForm()) { campo.style.display = 'none'; return; }
   campo.style.display = '';
@@ -60679,9 +60729,13 @@ function renderEtichettaForm(){
     <input id="etV_${k}" type="text" inputmode="decimal" maxlength="8"
       aria-label="${esc(n)}" value="${esc(e.valori[k] || '')}"
       oninput="scriviValoreEtichetta('${k}', this.value)">`;
+  const obb = etichettaObbligatoria;
+  etichettaDisegnata = e;
   box.innerHTML = `
-    <div class="dom-tit">🏷️ Etichetta dell'alimento <span class="dom-fac">facoltativa</span></div>
-    <div class="dom-hint">La legge europea (Reg. UE 1169/2011) chiede che chi compra online legga queste informazioni prima di pagare. Copiale dalla confezione. Se il tuo prodotto ne è esentato, lascia vuoto.</div>
+    <div class="dom-tit">🏷️ Etichetta dell'alimento <span class="dom-fac">${obb ? 'tabella obbligatoria' : 'facoltativa'}</span></div>
+    <div class="dom-hint">La legge europea (Reg. UE 1169/2011) chiede che chi compra online legga queste informazioni prima di pagare. Copiale dalla confezione. ${obb
+      ? 'La tabella nutrizionale è obbligatoria; il resto lo aggiungi se ce l\'hai.'
+      : 'Se il tuo prodotto ne è esentato, lascia vuoto.'}</div>
     <div class="et-sez">Peso netto</div>
     <div class="et-riga">
       <input id="etPeso" type="text" inputmode="decimal" maxlength="9" placeholder="Es. 500"
@@ -60697,15 +60751,53 @@ function renderEtichettaForm(){
     <div class="et-chips" role="group" aria-label="Allergeni presenti">${
       ALLERGENI_UE.map(([k, n]) => `<button type="button" class="chip${e.allergeni.includes(k) ? ' active' : ''}"
         aria-pressed="${e.allergeni.includes(k)}" onclick="scegliAllergene('${k}', this)">${n}</button>`).join('')}</div>
+    ${CAMPI_ETICHETTA.map(([k, n, tetto, es]) => `<div class="et-sez">${n}</div>
+    <input id="etC_${k}" type="text" maxlength="${tetto}" placeholder="${esc(es)}"
+      aria-label="${n}" value="${esc(e[k])}" oninput="etichettaSell.${k}=this.value">`).join('')}
+    <div class="et-sez">Scadenza</div>
+    ${selettoreCasaCampo('etScad', {valore: e.scadenza, soloData: true, vuoto: 'Nessuna scadenza'})}
+    <div class="et-chips"><button type="button" class="chip" onclick="togliScadenzaEtichetta()">Senza scadenza</button></div>
     <div class="et-sez">Valori nutrizionali medi per
       <span class="et-base" role="radiogroup" aria-label="Valori per">${
         ['100g', '100ml'].map(b => `<button type="button" role="radio" class="chip${e.base===b ? ' active' : ''}"
           aria-checked="${e.base===b}" onclick="scegliBaseEtichetta('${b}')">${b === '100g' ? '100 g' : '100 ml'}</button>`).join('')}</span></div>
-    <div class="et-griglia">
+    ${e.nonDovuta ? '' : `<div class="et-griglia">
       ${NUTRIENTI_UE.map(([k, n]) => num(k, n + (k === 'kj' || k === 'kcal' ? '' : ' (g)'),
                                          k === 'saturi' || k === 'zuccheri')).join('')}
     </div>
-    <div class="dom-hint">Compila tutta la tabella o lasciala vuota. L'energia basta in kJ o in kcal: l'altra si calcola da sola.</div>`;
+    <div class="dom-hint">${obb ? 'Compila tutta la tabella.' : 'Compila tutta la tabella o lasciala vuota.'} L'energia basta in kJ o in kcal: l'altra si calcola da sola.</div>`}
+    <div class="et-chips" id="etNonDovuta">
+      <button type="button" class="chip${e.nonDovuta ? ' active' : ''}" aria-pressed="${e.nonDovuta}"
+        onclick="scegliNonDovuta()">Non dovuta per legge</button></div>
+    ${e.nonDovuta ? `<div class="dom-hint">Perché la legge non la chiede?</div>
+    <div class="et-chips et-motivi" role="radiogroup" aria-label="Perché la tabella non è dovuta">${
+      ESENZIONI_ETICHETTA.map(([k, n]) => `<button type="button" role="radio" class="chip${e.esente===k ? ' active' : ''}"
+        aria-checked="${e.esente===k}" onclick="scegliEsenzione('${k}')">${esc(n)}</button>`).join('')}</div>
+    <div class="dom-hint">Chi compra legge il motivo nella pagina dell'annuncio.</div>` : ''}`;
+}
+/* «Non dovuta per legge»: la griglia sparisce e si chiede il perche'.
+   I valori scritti restano in memoria: chi ci ripensa li ritrova. */
+function scegliNonDovuta(){
+  haptic();
+  etichettaSell.nonDovuta = !etichettaSell.nonDovuta;
+  renderEtichettaForm();
+}
+function scegliEsenzione(k){
+  haptic();
+  etichettaSell.esente = k;
+  renderEtichettaForm();
+}
+/* IL CONTROLLO PRIMA DEL VIAGGIO (18 nov 2026): la frase che il form
+   dice a chi pubblica un alimento senza tabella, o '' se va bene. Il
+   giudice resta il server; qui si ferma il tocco prima delle foto. */
+function etichettaMancante(){
+  if (!etichettaNelForm() || !etichettaObbligatoria) return '';
+  if (etichettaSell === null) return 'Un attimo: sto caricando l\'etichetta';
+  const e = etichettaSell;
+  if (e.nonDovuta)
+    return e.esente ? '' : 'Scegli perché la tabella nutrizionale non è dovuta';
+  return etichettaTabellaIntera(e) ? ''
+    : 'Negli alimenti la tabella nutrizionale è obbligatoria: compilala, oppure tocca «Non dovuta per legge»';
 }
 function scegliAllergene(k, b){
   haptic();
@@ -60742,11 +60834,18 @@ function scriviValoreEtichetta(k, v){
 function etichettaPayload(){
   if (etichettaSell === null || !etichettaAttiva || editandoNostr) return {};
   if (!etichettaNelForm()) return {etichetta: {}};
+  etichettaLeggiScadenza();
   const e = etichettaSell;
-  return {etichetta: {ingredienti: e.ingredienti.trim(), allergeni: e.allergeni.slice(),
+  const et = {ingredienti: e.ingredienti.trim(), allergeni: e.allergeni.slice(),
+    ...Object.fromEntries(CAMPI_ETICHETTA.map(([k]) => [k, String(e[k] || '').trim()])),
+    scadenza: String(e.scadenza || '').trim(),
     peso: String(e.peso).trim(), unita: e.unita, base: e.base,
-    valori: Object.fromEntries(NUTRIENTI_UE.map(([k]) => [k, String(e.valori[k] || '').trim()])
-                                .filter(([, v]) => v !== ''))}};
+    valori: e.nonDovuta ? {}
+      : Object.fromEntries(NUTRIENTI_UE.map(([k]) => [k, String(e.valori[k] || '').trim()])
+                                .filter(([, v]) => v !== ''))};
+  /* (18 nov 2026) «non dovuta»: niente valori, solo il motivo */
+  if (e.nonDovuta && e.esente) et.esente = e.esente;
+  return {etichetta: et};
 }
 /* LA SCHEDA: una tabella uguale per tutti, sotto la descrizione e prima
    del venditore — quindi prima di qualsiasi «Compra». L'etichetta
@@ -60765,6 +60864,11 @@ function htmlEtichetta(e){
   if (Array.isArray(e.allergeni) && e.allergeni.length)
     pezzi.push(`<div class="et-t">Allergeni</div><div class="et-testo">${
       e.allergeni.filter(k => nome[k]).map(k => `<b>${esc(nome[k])}</b>`).join(', ')}</div>`);
+  /* (18 nov 2026) origine, conservazione, lotto e scadenza */
+  for (const [k, n] of CAMPI_ETICHETTA)
+    if (e[k]) pezzi.push(`<div class="et-t">${n}</div><div class="et-testo">${esc(e[k])}</div>`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(e.scadenza || ''))
+    pezzi.push(`<div class="et-t">Scadenza</div><div class="et-testo">${esc(e.scadenza.split('-').reverse().join('/'))}</div>`);
   const v = e.valori;
   if (v && typeof v === 'object' && v.kcal != null) {
     const riga = (k, n, dicui) => `<tr${dicui ? ' class="et-dicui"' : ''}><th>${n}</th><td>${numIt(v[k])} g</td></tr>`;
@@ -60775,6 +60879,11 @@ function htmlEtichetta(e){
         ${riga('carboidrati', 'Carboidrati')}${riga('zuccheri', 'di cui zuccheri', true)}
         ${riga('proteine', 'Proteine')}${riga('sale', 'Sale')}
       </tbody></table>`);
+  } else {
+    /* (18 nov 2026) la tabella che la legge non chiede: si dice perche' */
+    const motivo = Object.fromEntries(ESENZIONI_ETICHETTA)[e.esente];
+    if (motivo)
+      pezzi.push(`<div class="et-t">Valori nutrizionali</div><div class="et-testo">Non dovuti per legge: ${esc(motivo.toLowerCase())}</div>`);
   }
   return pezzi.length ? `<div class="desc-tit">Etichetta</div><div class="etichetta">${pezzi.join('')}</div>` : '';
 }
@@ -62429,6 +62538,15 @@ async function publish(){
   if (mostraConsegna && el('sellConsServ')?.checked
       && !(parseInt(el('sellServDurata')?.value, 10) > 0)) {
     toast('Quanto dura? Scrivi i minuti: è quello che rende la prestazione una cosa precisa'); return;
+  }
+  /* LA TABELLA NUTRIZIONALE (18 nov 2026): obbligatoria negli alimenti,
+     anche in modifica — gli annunci di prima si mettono in regola al
+     primo ritocco, come la condizione */
+  const manca = etichettaMancante();
+  if (manca) {
+    el('sellEtichettaField').scrollIntoView({block:'center',
+      behavior: tourRidotto() ? 'auto' : 'smooth'});
+    toast(manca); return;
   }
   /* IL CONTROLLO «e' un comune vero?» RESTA FUORI dalla strada
      firmata, ed e' l'unica delle quattro che non si apre (ago 2026):
@@ -116363,6 +116481,7 @@ async function avvia(){
     /* (17 nov 2026) l'etichetta degli alimenti: accesa di serie, e solo
        un false esplicito del server la spegne */
     etichettaAttiva = me.etichetta_alimenti !== false;
+    etichettaObbligatoria = me.etichetta_obbligatoria !== false;
     renderEtichettaForm();
     aggiornaBottoneMM();
     astaLeve = me.asta_leve || null;

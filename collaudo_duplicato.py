@@ -163,7 +163,10 @@ def jpeg_vero(seme=0):
 BASE = {"titolo": "Miele di acacia 500g", "prezzo_sats": 30000,
         "categoria": "Alimenti e bevande", "zona": "Torino (TO)",
         "descrizione": "Del nostro apiario", "consegna": "spedizione",
-        "spedizione_sats": 2000, "quantita": 6}
+        "spedizione_sats": 2000, "quantita": 6,
+        # (18 nov 2026) negli alimenti la tabella nutrizionale e'
+        # obbligatoria: il motivo d'esenzione la sostituisce
+        "etichetta": {"esente": "artigiano"}}
 
 
 def main():

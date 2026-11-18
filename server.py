@@ -30476,8 +30476,10 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # scrittura, cosi' il 400 non lascia un annuncio a meta'
     domande = domande_da_payload(d, consegna, anche_dig)
     # l'etichetta degli alimenti (17 nov 2026), stesso patto: il 400
-    # prima di ogni scrittura
-    etichetta = etichetta_da_payload(d, categoria_valida(d.get("categoria")))
+    # prima di ogni scrittura; `nuovo` (18 nov): qui la tabella si esige
+    # anche quando la chiave manca
+    etichetta = etichetta_da_payload(d, categoria_valida(d.get("categoria")),
+                                     nuovo=True)
     no_casa = non_spedisce_casa_da_payload(d, consegna)
     guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
@@ -37300,6 +37302,14 @@ def _leve_stato():
                          "comprare",
                   spento="il form non la offre e la scheda non la mostra; "
                          "quelle già scritte restano nel database"),
+            # LA TABELLA OBBLIGATORIA (18 nov 2026): accesa di serie
+            _leva("Tabella nutrizionale obbligatoria",
+                  "ETICHETTA_OBBLIGATORIA", ETICHETTA_OBBLIGATORIA,
+                  acceso="un alimento si pubblica (o si modifica) solo con "
+                         "la tabella nutrizionale intera, o dichiarando "
+                         "il motivo per cui la legge non la chiede",
+                  spento="la tabella torna facoltativa: si può pubblicare "
+                         "un alimento senza"),
             # LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026): accesa di
             # serie, la leva e' l'interruttore d'emergenza
             _leva("Fotografia dell'annuncio all'acquisto",
@@ -40113,10 +40123,18 @@ def domande_lette(colonna) -> list:
 # obbligatorie di un alimento — ingredienti, allergeni, quantita' netta,
 # dichiarazione nutrizionale. Una tabella UGUALE PER TUTTI, coi valori
 # scritti a mano dal venditore.
-# FACOLTATIVA (decisione di Andrea, 17 nov): molti piccoli produttori
-# sono esentati dalla tabella nutrizionale (Allegato V), e obbligarla
-# fermerebbe chi non la deve. Il form la offre e ricorda che la legge la
-# chiede; il server non la esige.
+# FACOLTATIVA il 17 nov, OBBLIGATORIA dal 18 nov (Andrea: «per chi
+# inserisce un prodotto alimentare deve essere obbligatorio»): la
+# TABELLA NUTRIZIONALE si esige, il resto (ingredienti, allergeni, peso)
+# resta facoltativo. Chi per legge non la deve (Allegato V e art. 16:
+# il fresco non trasformato, erbe e spezie, gli alcolici, il piccolo
+# produttore che vende direttamente) lo DICHIARA con un motivo
+# (`ESENZIONI_ETICHETTA`), e la scheda lo mostra a chi compra: il 17 nov
+# la facoltativa nasceva proprio per non fermare chi non la deve, e la
+# dichiarazione tiene quel perche' senza lasciare la porta aperta a chi
+# semplicemente non la scrive. Vale per chi PUBBLICA e per chi MODIFICA
+# dal form: gli annunci gia' online e gli importati (CSV, negozi, Nostr)
+# restano come sono finche' qualcuno non li ritocca.
 # VIVE SOLO IN «Alimenti e bevande»: altrove la chiave si butta in
 # silenzio (come le domande fuori dal digitale) e la scheda non la manda
 # nemmeno se in colonna e' rimasta (un moderatore che sposta l'annuncio
@@ -40136,7 +40154,34 @@ try:
     ETICHETTA_ALIMENTI = ETICHETTA_ALIMENTI is not False
 except ImportError:
     ETICHETTA_ALIMENTI = True
+# LA TABELLA OBBLIGATORIA (18 nov 2026, cantiere etichetta-obbligatoria):
+# accesa di serie, e la leva e' l'interruttore d'emergenza — spenta, la
+# tabella torna facoltativa come il 17 nov. Conta solo con
+# ETICHETTA_ALIMENTI accesa: senza etichetta non c'e' niente da esigere.
+try:
+    from config import ETICHETTA_OBBLIGATORIA
+    if not isinstance(ETICHETTA_OBBLIGATORIA, bool):
+        print("[etichetta] ETICHETTA_OBBLIGATORIA non e' True/False: "
+              "la tabella nutrizionale resta obbligatoria")
+    ETICHETTA_OBBLIGATORIA = ETICHETTA_OBBLIGATORIA is not False
+except ImportError:
+    ETICHETTA_OBBLIGATORIA = True
 CATEGORIA_ETICHETTA = "Alimenti e bevande"
+# I motivi per cui la legge non chiede la tabella (Reg. UE 1169/2011):
+# chiavi interne, i NOMI li scrive il gemello ESENZIONI_ETICHETTA del
+# client (prove.py fallisce se divergono).
+# L'elenco l'ha passato Andrea (18 nov), e sta sull'Allegato V:
+#   fresco    — 1: prodotti non trasformati di un solo ingrediente
+#               (frutta e verdura fresche, sementi, germogli)
+#   erbe      — 4, 5, 7, 8: spezie, erbe aromatiche, sale, caffe',
+#               cicoria, te' e infusi senza altri ingredienti
+#   acqua     — 3 e 11: acque (anche gassate o aromatizzate) e aceto
+#   alcolici  — art. 16, 4: bevande sopra l'1,2% di alcol
+#   piccola   — 18: confezione con la faccia piu' grande sotto i 25 cm²
+#   artigiano — 19: piccole quantita' fornite direttamente dal
+#               produttore a chi compra
+ESENZIONI_ETICHETTA = ("fresco", "erbe", "acqua", "alcolici", "piccola",
+                       "artigiano")
 # I 14 dell'Allegato II, nell'ordine della legge. Le chiavi sono interne
 # e non cambiano; il NOME che si legge lo scrive il client (il gemello
 # ALLERGENI_UE in miniapp.html, e prove.py fallisce se divergono).
@@ -40155,6 +40200,18 @@ NUTRIENTI_UE = (("kj", 3800), ("kcal", 900), ("grassi", 100),
 TETTO_NUTRIENTE_ML = 150
 UNITA_PESO = ("g", "kg", "ml", "cl", "l")
 MAX_INGREDIENTI = 1500
+# GLI ALTRI CAMPI FACOLTATIVI (18 nov 2026, Andrea: «origine /
+# provenienza, modalita' di conservazione, eventualmente lotto e
+# scadenza, sempre facoltativi»): (chiave, nome da dire, tetto). Una riga
+# sola ciascuno, stesse regole degli ingredienti (niente link ne'
+# contatti, filtro parole). La SCADENZA e' a parte: una data vera,
+# AAAA-MM-GG. Una data passata non si rifiuta: il «da consumarsi
+# preferibilmente entro» si puo' vendere anche dopo, e chi compra la
+# legge prima di pagare.
+CAMPI_ETICHETTA = (("origine", "origine", 120),
+                   ("conservazione", "conservazione", 300),
+                   ("lotto", "lotto", 40))
+_RE_DATA_ETICHETTA = re.compile(r"\d{4}-\d{2}-\d{2}")
 _RE_LINK_ETICHETTA = re.compile(r"https?://|www\.|\bt\.me/|@\w{3,}", re.I)
 
 
@@ -40181,7 +40238,8 @@ NOMI_NUTRIENTI = {"kj": "energia (kJ)", "kcal": "energia (kcal)",
                   "proteine": "proteine", "sale": "sale"}
 
 
-def etichetta_da_payload(d: dict, categoria: str) -> str | None:
+def etichetta_da_payload(d: dict, categoria: str,
+                        nuovo: bool = False) -> str | None:
     """Il giudice unico dell'etichetta (pubblica e modifica): il JSON da
     scrivere in colonna, '' per «nessuna», None se la chiave NON c'e' o
     la leva e' spenta (in modifica = conserva quella di prima: il patto
@@ -40190,8 +40248,24 @@ def etichetta_da_payload(d: dict, categoria: str) -> str | None:
     Fuori da «Alimenti e bevande» vale '' in silenzio: l'annuncio che
     cambia categoria se la lascia dietro.
     IL 400 E NON IL TRONCAMENTO, come per le domande: un valore storto o
-    una tabella a meta' si dicono, non si aggiustano."""
-    if not ETICHETTA_ALIMENTI or "etichetta" not in d:
+    una tabella a meta' si dicono, non si aggiustano.
+
+    LA TABELLA OBBLIGATORIA (18 nov 2026): con `ETICHETTA_OBBLIGATORIA`
+    un alimento passa solo con la tabella intera O con un motivo di
+    `ESENZIONI_ETICHETTA`. `nuovo` e' pubblica: li' anche la chiave
+    assente e' un 400 (il client di ieri, in cache, non la manda — e un
+    annuncio nuovo senza tabella e' proprio quel che non deve nascere).
+    In modifica la chiave assente resta «conserva»: e' il patto che
+    lascia in pace gli annunci di prima finche' il form non li ritocca."""
+    if not ETICHETTA_ALIMENTI:
+        return None
+    if "etichetta" not in d:
+        if (nuovo and ETICHETTA_OBBLIGATORIA
+                and categoria == CATEGORIA_ETICHETTA):
+            raise HTTPException(400, "Negli alimenti serve la tabella "
+                                     "nutrizionale: aggiorna l'app "
+                                     "(chiudila e riaprila) e la trovi "
+                                     "nel modulo")
         return None
     if categoria != CATEGORIA_ETICHETTA:
         return ""
@@ -40216,6 +40290,31 @@ def etichetta_da_payload(d: dict, categoria: str) -> str | None:
                                  "Barattolo non è ammessa")
     if ingr:
         fuori["ingredienti"] = ingr
+    # (18 nov 2026) origine, conservazione e lotto: una riga ciascuno
+    for chiave, nome, tetto in CAMPI_ETICHETTA:
+        testo = " ".join(str(g.get(chiave) or "").split())
+        if not testo:
+            continue
+        if len(testo) > tetto:
+            raise HTTPException(400, f"Etichetta: «{nome}» è troppo lungo "
+                                     f"(massimo {tetto} caratteri)")
+        if _RE_LINK_ETICHETTA.search(testo):
+            raise HTTPException(400, f"Etichetta: in «{nome}» niente link "
+                                     f"né contatti")
+        if controlla_vietato("", testo):
+            raise HTTPException(400, f"Etichetta: in «{nome}» c'è una "
+                                     f"parola che su Barattolo non è "
+                                     f"ammessa")
+        fuori[chiave] = testo
+    scad = str(g.get("scadenza") or "").strip()
+    if scad:
+        try:
+            if not _RE_DATA_ETICHETTA.fullmatch(scad):
+                raise ValueError
+            time.strptime(scad, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(400, "Etichetta: la scadenza non è una data")
+        fuori["scadenza"] = scad
     allergeni = g.get("allergeni") or []
     if not isinstance(allergeni, list):
         raise HTTPException(400, "Gli allergeni non si leggono: riprova")
@@ -40268,6 +40367,18 @@ def etichetta_da_payload(d: dict, categoria: str) -> str | None:
                                      "100 g su 100 g. Ricontrolla i valori")
         fuori["base"] = base
         fuori["valori"] = {k: valori[k] for k, _ in NUTRIENTI_UE}
+    else:
+        # niente tabella: o la legge non la chiede (e si dice perche'),
+        # o con la leva accesa l'alimento non passa. Con la tabella il
+        # motivo non serve e non si scrive: la tabella vince.
+        esente = g.get("esente")
+        if esente in ESENZIONI_ETICHETTA:
+            fuori["esente"] = esente
+        elif ETICHETTA_OBBLIGATORIA:
+            raise HTTPException(400, "Negli alimenti la tabella "
+                                     "nutrizionale è obbligatoria: "
+                                     "compilala, oppure tocca «Non dovuta "
+                                     "per legge» e scegli il motivo")
     return json.dumps(fuori, ensure_ascii=False) if fuori else ""
 
 
@@ -52847,6 +52958,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
+    # ...e la tabella obbligatoria (18 nov 2026), perche' il form dica
+    # «obbligatoria» solo quando il server la esige davvero
+    profilo["etichetta_obbligatoria"] = ETICHETTA_OBBLIGATORIA
     # NIP-85 (set 2026): la pubkey di servizio e i relay servono al
     # browser per costruire e firmare il kind 10040 (la dichiarazione di
     # fiducia in Barattolo per il tag "30382:rank") — mai una copia a

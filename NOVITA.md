@@ -620,3 +620,9 @@ frase: Se in disputa l'oggetto va restituito perché era rotto, bloccato o diver
 dove: Ordini → un ordine in reso deciso così: il riquadro «↩️ Rispedisci l'oggetto per il rimborso» con «🏷️ Il reso lo paga il venditore», e dopo 3 giorni il bottone «⏰ Il venditore non ha mandato l'etichetta». Chi vende vede «🏷️ Il reso è a tue spese» con «💬 Manda l'etichetta in chat». Il moderatore ha il bottone «📦 Reso a spese del venditore» fra le decisioni della disputa.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-18 · etichetta-obbligatoria
+frase: Chi vende alimenti o bevande ora compila la tabella nutrizionale, come chiede la legge europea per la vendita online. Se per il suo prodotto non serve (frutta fresca, spezie, alcolici, artigianale in piccole quantità…) tocca «Non dovuta per legge» e sceglie il motivo, che chi compra legge nell'annuncio. Si possono aggiungere anche origine, conservazione, lotto e scadenza.
+dove: Vendi → categoria «Alimenti e bevande» → riquadro «🏷️ Etichetta dell'alimento» (tabella, «Non dovuta per legge», Origine, Conservazione, Lotto, Scadenza); nella pagina dell'annuncio, la sezione «Etichetta» sotto la descrizione.
+leva: ETICHETTA_OBBLIGATORIA (accesa di serie)
+pubblico: sì

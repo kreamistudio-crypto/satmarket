@@ -13,7 +13,12 @@ su un database usa-e-getta — pubblica, modifica e la scheda del singolo
 annuncio — e si chiedono le cose che solo la filiera intera puo' dire:
   · un alimento pubblicato con l'etichetta la ritrova nella scheda,
     coi numeri puliti e l'energia completata dal conto;
-  · un alimento senza etichetta pubblica come ieri (facoltativa);
+  · LA TABELLA E' OBBLIGATORIA (18 nov 2026): un alimento senza tabella
+    e senza motivo d'esenzione e' un 400 che non lascia righe, anche dal
+    client di ieri che non manda la chiave; col motivo passa, e la scheda
+    lo dice; spenta la leva ETICHETTA_OBBLIGATORIA, torna facoltativa;
+  · in modifica gli annunci di prima restano in pace finche' il form
+    non li ritocca (chiave assente = conserva);
   · una tabella a meta' o storta e' un 400 che non lascia righe;
   · fuori da «Alimenti e bevande» la chiave si butta, e la scheda non
     mostra un'etichetta rimasta in colonna;
@@ -222,16 +227,102 @@ def main():
     prova("...per 100 g", "100g", (e or {}).get("base"))
 
     # ---------------------------------------------------------------
-    print("\n[facoltativa: senza etichetta si pubblica come ieri]")
-    codice, r2 = pubblica("Marmellata di fichi")
-    prova("si pubblica senza la chiave", 200, codice)
+    print("\n[obbligatoria: senza tabella non si pubblica (18 nov 2026)]")
+    prova("la leva nasce accesa senza riga nel config", True,
+          SRV.ETICHETTA_OBBLIGATORIA)
+    codice, detail = pubblica("Marmellata di fichi")
+    prova("il client di ieri (niente chiave): 400 che dice di aggiornare, "
+          "nessuna riga", (400, True, 0),
+          (codice, "aggiorna l'app" in str(detail),
+           conta("Marmellata di fichi")))
+    codice, detail = pubblica("Olio nuovo", etichetta={"valori": {}})
+    prova("un'etichetta tutta vuota: 400 che nomina la tabella e "
+          "l'esenzione, nessuna riga", (400, True, True, 0),
+          (codice, "obbligatoria" in str(detail),
+           "Non dovuta per legge" in str(detail), conta("Olio nuovo")))
+    codice, detail = pubblica("Olio novello", etichetta={
+        "ingredienti": "Olive", "peso": "750", "unita": "ml"})
+    prova("...anche con ingredienti e peso ma senza tabella", (400, 0),
+          (codice, conta("Olio novello")))
+    codice, detail = pubblica("Olio di frantoio", etichetta={
+        "esente": "inventato", "valori": {}})
+    prova("...e un motivo che non esiste non vale", (400, 0),
+          (codice, conta("Olio di frantoio")))
+    codice, r2 = pubblica("Marmellata della nonna", etichetta={
+        "esente": "artigiano", "ingredienti": "Fichi, zucchero"})
+    prova("col motivo d'esenzione si pubblica", 200, codice)
     a2 = r2["id"] if codice == 200 else 0
-    prova("...colonna vuota, e la scheda non ha la chiave", ("", False),
-          (colonna(a2, "etichetta"), "etichetta" in scheda(a2)))
-    codice, r3 = pubblica("Olio nuovo", etichetta={"valori": {}})
-    prova("un'etichetta tutta vuota vale «nessuna»", (200, ""),
-          (codice, colonna(r3["id"], "etichetta") if codice == 200
-           else None))
+    e2 = scheda(a2).get("etichetta") or {}
+    prova("...e la scheda porta il motivo e gli ingredienti, senza tabella",
+          ("artigiano", "Fichi, zucchero", False),
+          (e2.get("esente"), e2.get("ingredienti"), "valori" in e2))
+    codice, r3 = pubblica("Miele con tabella", etichetta={
+        **ETICHETTA, "esente": "artigiano"})
+    prova("con la tabella il motivo non si scrive: la tabella vince",
+          (200, False, True),
+          (codice, "esente" in (scheda(r3["id"]).get("etichetta") or {}),
+           "valori" in (scheda(r3["id"]).get("etichetta") or {}))
+          if codice == 200 else (codice,))
+    for motivo in SRV.ESENZIONI_ETICHETTA:
+        codice, r = pubblica(f"Esente {motivo}",
+                             etichetta={"esente": motivo})
+        prova(f"il motivo «{motivo}» passa e si rilegge", (200, motivo),
+              (codice, (scheda(r["id"]).get("etichetta") or {})
+               .get("esente") if codice == 200 else None))
+    codice, _ = pubblica("Sedia senza etichetta", categoria="Casa e giardino",
+                         condizione="buono")
+    prova("fuori dagli alimenti l'obbligo non c'e'", 200, codice)
+    SRV.ETICHETTA_OBBLIGATORIA = False
+    try:
+        codice, r7 = pubblica("Confettura facoltativa")
+        prova("leva spenta: si pubblica senza la chiave, come il 17 nov",
+              (200, ""), (codice, colonna(r7["id"], "etichetta")
+                          if codice == 200 else None))
+        codice, r8 = pubblica("Confettura vuota", etichetta={"valori": {}})
+        prova("...e un'etichetta vuota vale «nessuna»", (200, ""),
+              (codice, colonna(r8["id"], "etichetta")
+               if codice == 200 else None))
+        codice, r9 = pubblica("Confettura esente",
+                              etichetta={"esente": "artigiano"})
+        prova("...il motivo, se c'e', si scrive lo stesso",
+              (200, "artigiano"),
+              (codice, (scheda(r9["id"]).get("etichetta") or {})
+               .get("esente") if codice == 200 else None))
+    finally:
+        SRV.ETICHETTA_OBBLIGATORIA = True
+
+    # ---------------------------------------------------------------
+    print("\n[i campi facoltativi del 18 nov: origine, conservazione, "
+          "lotto, scadenza]")
+    codice, rc = pubblica("Miele di sulla", etichetta={
+        **ETICHETTA, "origine": "  Italia,   Calabria ",
+        "conservazione": "In luogo fresco\ne asciutto", "lotto": "L2411",
+        "scadenza": "2027-12-31"})
+    ec = scheda(rc["id"]).get("etichetta") or {} if codice == 200 else {}
+    prova("si rileggono puliti, su una riga", (200, "Italia, Calabria",
+          "In luogo fresco e asciutto", "L2411", "2027-12-31"),
+          (codice, ec.get("origine"), ec.get("conservazione"),
+           ec.get("lotto"), ec.get("scadenza")))
+    codice, rc = pubblica("Miele di tiglio", etichetta={
+        **ETICHETTA, "scadenza": "2020-01-31"})
+    prova("una scadenza passata non si rifiuta (il «preferibilmente "
+          "entro» si vende)", 200, codice)
+    codice, rc = pubblica("Miele senza extra", etichetta=ETICHETTA)
+    prova("...e senza i campi nuovi le chiavi non ci sono",
+          [False] * 4, [k in (scheda(rc["id"]).get("etichetta") or {})
+                        for k in ("origine", "conservazione", "lotto",
+                                  "scadenza")] if codice == 200 else None)
+    for nome, extra, frase in (
+            ("origine troppo lunga", {"origine": "x" * 121}, "troppo lungo"),
+            ("un contatto nella conservazione",
+             {"conservazione": "scrivimi @venditore"}, "link"),
+            ("una scadenza storta", {"scadenza": "31/12/2027"}, "non è una data"),
+            ("una data che non esiste", {"scadenza": "2027-02-30"},
+             "non è una data")):
+        titolo = f"Extra {nome}"
+        codice, detail = pubblica(titolo, etichetta={**ETICHETTA, **extra})
+        prova(f"{nome}: 400 che lo dice, nessuna riga", (400, True, 0),
+              (codice, frase in str(detail), conta(titolo)))
 
     # ---------------------------------------------------------------
     print("\n[le tabelle storte si dicono, e non lasciano righe]")
@@ -312,7 +403,23 @@ def main():
           "niente", (400, ["sesamo"]),
           (codice, json.loads(colonna(aid, "etichetta")).get("allergeni")))
     codice, _ = modifica(aid, etichetta={})
-    prova("chiave vuota: si cancella", (200, ""),
+    prova("chiave vuota: con la tabella obbligatoria e' un 400 che non "
+          "tocca niente", (400, ["sesamo"]),
+          (codice, json.loads(colonna(aid, "etichetta")).get("allergeni")))
+    codice, _ = modifica(aid, etichetta={"esente": "fresco"})
+    prova("...col motivo si sostituisce la tabella", (200, "fresco", False),
+          (codice, (scheda(aid).get("etichetta") or {}).get("esente"),
+           "valori" in (scheda(aid).get("etichetta") or {})))
+    SRV.ETICHETTA_OBBLIGATORIA = False
+    try:
+        codice, _ = modifica(aid, etichetta={})
+        prova("...e a leva spenta la chiave vuota cancella, come il 17 nov",
+              (200, ""), (codice, colonna(aid, "etichetta")))
+    finally:
+        SRV.ETICHETTA_OBBLIGATORIA = True
+    codice, _ = modifica(aid, descrizione="Un annuncio di prima")
+    prova("un annuncio di prima SENZA etichetta si ritocca dal client di "
+          "ieri (chiave assente = conserva)", (200, ""),
           (codice, colonna(aid, "etichetta")))
     modifica(aid, etichetta=ETICHETTA)
     codice, _ = modifica(aid, categoria="Casa e giardino",
