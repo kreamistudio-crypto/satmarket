@@ -171833,13 +171833,69 @@ def prove_fotografia_annuncio():
                                                       ["a1_0.jpg"]),
           (scritte, di_nuovo, dati["titolo"], dati["foto"]))
     amb["_fotografa_annunci"](con, 11, [1], 700)   # ordine chiuso: foto a1_5
-    prova("...le foto protette: quelle dell'ordine APERTO, non del chiuso",
-          {"a1_0.jpg"}, amb["_foto_protette_da_ordini"](con, 1))
-    amb["_fotografa_annunci"](con, 12, [1], 800)
-    prova("...due ordini aperti, due fotografie diverse: si tengono tutte",
-          {"a1_0.jpg", "a1_5.jpg"}, amb["_foto_protette_da_ordini"](con, 1))
-    prova("...un annuncio senza ordini aperti non protegge niente", set(),
-          amb["_foto_protette_da_ordini"](con, 2) - {""})
+    prova("...le foto protette: lo storico si tiene a prescindere, anche "
+          "dell'ordine chiuso", {"a1_0.jpg", "a1_5.jpg"},
+          amb["_foto_protette_da_ordini"](con, 1))
+    prova("...un annuncio senza foto in archivio non protegge niente", set(),
+          amb["_foto_protette_da_ordini"](con, 2))
+
+    # --- 3b) LA PULIZIA DOPO UN ANNO, su un database e una cartella veri ----
+    import tempfile as _tf
+    cartella = _tf.mkdtemp(prefix="prove-fotografia-")
+    amb["re"] = re
+    i = src.index("NOME_FOTO = re.compile(")
+    exec(src[i:src.index("\n\n", i)], amb)
+
+    class _Con:
+        """Il database del banco, che la pulizia non chiude davvero."""
+        def __getattr__(self, k):
+            return getattr(con, k)
+
+        def close(self):
+            pass
+    amb.update({"db": _Con, "FOTO_DIR": cartella, "os": os,
+                "time": __import__("time"), "re": re,
+                "print": lambda *a, **k: None})
+    exec(src[src.index("FOTOGRAFIA_GIORNI = "):].split("\n", 1)[0], amb)
+    exec(pezzo("pulisci_fotografie_vecchie"), amb)
+    ANNO = amb["FOTOGRAFIA_GIORNI"] * 86400
+    for n in ("a1_0.jpg", "a1_0_min.jpg", "a1_5.jpg", "a1_5_min.jpg",
+              "a1_8.jpg", "a2_0.jpg"):
+        open(os.path.join(cartella, n), "wb").close()
+    con.execute("DELETE FROM ordine_fotografie")
+    con.execute("UPDATE annunci SET foto='[\"a1_8.jpg\"]' WHERE id=1")
+    vecchia = lambda oid, foto: con.execute(
+        "INSERT INTO ordine_fotografie VALUES(?,1,?,1)",
+        (oid, _js.dumps({"titolo": "x", "foto": foto})))
+    vecchia(11, ["a1_0.jpg", "a1_8.jpg", "a2_0.jpg", "../a1_9.jpg"])  # chiuso
+    vecchia(10, ["a1_5.jpg"])                       # in disputa da un anno
+    con.execute("INSERT INTO ordine_fotografie VALUES(12,1,?,?)",
+                (_js.dumps({"foto": ["a1_0.jpg"]}), ANNO))  # giovane
+    esito = amb["pulisci_fotografie_vecchie"](ANNO + 2)
+    resta = lambda n: os.path.exists(os.path.join(cartella, n))
+    prova("3b) la pulizia: via la riga dell'ordine chiuso oltre l'anno, "
+          "restano la disputa ferma e la giovane", [12, 10],
+          [r[0] for r in con.execute("SELECT ordine_id FROM ordine_fotografie "
+                                     "ORDER BY creato DESC")])
+    prova("...la foto ancora nominata da una fotografia giovane resta, "
+          "e quella dell'annuncio di oggi pure", [True, True, True],
+          [resta("a1_0.jpg"), resta("a1_0_min.jpg"), resta("a1_8.jpg")])
+    prova("...un nome di un altro annuncio o storto non si tocca", True,
+          resta("a2_0.jpg"))
+    con.execute("DELETE FROM ordine_fotografie WHERE ordine_id=12")
+    con.execute("UPDATE ordini SET stato='refunded' WHERE id=10")
+    esito = amb["pulisci_fotografie_vecchie"](ANNO + 2)
+    prova("...a disputa chiusa la sua foto se ne va, con la miniatura",
+          ({"righe": 1, "file": 2}, False, False),
+          (esito, resta("a1_5.jpg"), resta("a1_5_min.jpg")))
+    prova("...e senza niente da fare non tocca niente", {"righe": 0, "file": 0},
+          amb["pulisci_fotografie_vecchie"](ANNO + 2))
+    i = src.index("\nasync def orologio():")
+    oro = codice(src[i:src.index("\n\n\n", i)])
+    prova("...e gira nell'orologio, in un try suo", True,
+          "pulisci_fotografie_vecchie()" in oro
+          and oro.index("pulisci_fotografie_vecchie()")
+          > oro.index("await controlla_scadenze()"))
 
     # --- 4) I GANCI: il pagamento, la modifica, la rotta --------------------
     inc = codice(pezzo("_incassa_ordine"))

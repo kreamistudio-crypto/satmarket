@@ -17,7 +17,9 @@ filiera intera puo' dire:
   4. LA CORSA: l'ordine si paga MENTRE la modifica e' in volo (fra la
      guardia e la scrittura ci sono la moderazione e le foto): le foto
      vecchie, nominate dalla fotografia, restano sul disco;
-  5. senza ordini aperti la modifica cancella le foto vecchie come ieri;
+  5. senza fotografie la modifica cancella le foto vecchie come ieri;
+  5b. LO STORICO DI UN ANNO: a ordine chiuso le foto cambiate restano;
+     passato l'anno la pulizia dell'orologio toglie riga e file;
   6. la rotta e' dei moderatori; un ordine di prima ha la lista vuota;
   7. a leva spenta il pagamento non fotografa, e l'incasso va lo stesso.
 
@@ -283,13 +285,40 @@ def scena_corsa():
 
 
 def scena_senza_ordini():
-    print("\n[5) senza ordini aperti la modifica cancella come ieri]")
+    print("\n[5) senza fotografie la modifica cancella come ieri]")
     c, r = pubblica("Cuffie senza fili")
     aid = r["id"]
     vecchie = foto_di(aid)
     c, _ = modifica(aid, foto=[jpeg_vero(55)])
     prova("modifica con foto nuove: 200, le vecchie via dal disco",
           (200, [False]), (c, sul_disco(vecchie)))
+
+
+def scena_un_anno():
+    print("\n[5b) lo storico di un anno, anche a ordine chiuso]")
+    c, r = pubblica("Lampada da tavolo")
+    aid = r["id"]
+    vecchie = foto_di(aid)
+    oid = ordine(aid)
+    paga(oid)
+    db_esegui("UPDATE ordini SET stato='released' WHERE id=?", oid)
+    c, _ = modifica(aid, foto=[jpeg_vero(33)])
+    nuove = foto_di(aid)
+    prova("ordine chiuso, foto cambiate: la modifica passa e le vecchie "
+          "restano (lo storico si tiene a prescindere)", (200, [True]),
+          (c, sul_disco(vecchie)))
+    esito = SRV.pulisci_fotografie_vecchie()
+    prova("...la pulizia prima dell'anno non toglie niente",
+          ({"righe": 0, "file": 0}, [True]), (esito, sul_disco(vecchie)))
+    db_esegui("UPDATE ordine_fotografie SET creato=creato-? WHERE "
+              "ordine_id=?", (SRV.FOTOGRAFIA_GIORNI + 1) * 86400, oid)
+    esito = SRV.pulisci_fotografie_vecchie()
+    prova("...passato l'anno: via la riga e le foto vecchie (con la "
+          "miniatura), restano quelle di oggi", (1, [False], [True]),
+          (esito["righe"], sul_disco(vecchie), sul_disco(nuove)))
+    prova("...e il moderatore trova la lista vuota, mai un errore",
+          (200, []), (lambda c_d: (c_d[0], c_d[1].get("fotografie")))(
+              fotografia(oid)))
 
 
 def scena_rotta(oid):
@@ -353,6 +382,7 @@ def main():
     scena_guardia(aid)
     _, oid2 = scena_corsa()
     scena_senza_ordini()
+    scena_un_anno()
     scena_rotta(oid2)
     scena_leva_spenta()
     scena_guasto()
