@@ -1253,6 +1253,11 @@ STRADINA_ATTIVA = False
 # Andrea («gli acquisti non li aggiungere»): nel cassetto restano le
 # vendite, come prima. True li mostra; i contatori non cambiano mai.
 ACQUISTI_NEL_PROFILO = False
+# AMBER CHE SI APRE DA SOLO 📲 (18 nov 2026, cantiere amber-da-solo): su
+# Android «Entra con nostrconnect» apre il firmatario del telefono
+# (Amber) col link nostrconnect://, invece di far copiare e incollare la
+# stringa. ACCESA di serie; False torna al QR e al link da copiare.
+NOSTRCONNECT_APRI_APP = True
 # L'APP IN INGLESE 🌍 (17 nov 2026, tappa 1): chi ha Telegram (o il
 # browser) in una lingua che non e' l'italiano legge in inglese le parti
 # gia' tradotte — vetrina, scheda dell'annuncio, carrello, cassa, foglio

@@ -9761,6 +9761,25 @@
   `navPila`, che ordina per posizione nel DOM, quindi quel foglio va
   DOPO `#nostrSheet` nel markup e prima di `#collegaSheet`. C'è la
   prova sull'ordine e su `closeSheet`.
+  AMBER SI APRE DA SOLO (18 nov 2026, cantiere amber-da-solo): su
+  Android la STESSA URI del QR diventa anche un link, «📲 Apri Amber e
+  approva» (`#nostrApriApp`), perché Amber — variante `free`, quella che
+  si scarica — dichiara lo schema `nostrconnect` e passa il link alla
+  stessa approvazione del QR. `mostraQrConnessione` lo accende con
+  `firmatarioQuiOfferto` (pura: leva + Android dallo user agent o da
+  `tg.platform`) e lo lancia DA SOLO una volta, prima di disegnare il
+  codice, se il tocco su «Entra con nostrconnect» è ancora fresco
+  (`navigator.userActivation.isActive`): è l'eccezione dichiarata alla
+  regola del wallet («ogni lancio è un link che l'utente tocca»), e
+  regge perché è il PRIMO lancio di quel tocco. Il cane da guardia è
+  quello del wallet (`attendiWallet`, col suo giro): se la pagina non si
+  nasconde, `avvisaFirmatarioMuto` lo dice e fuori da Telegram offre la
+  forma `intent://` (`intentNostrconnect`). Niente cambia nel giro
+  NIP-46: segreto, relay, ascolto e cassetta sono quelli del QR. Su
+  iPhone no (iOS sospende la pagina, Safari dà un errore suo davanti a
+  uno schema senza app): lì resta il consiglio del bunker. La leva
+  `NOSTRCONNECT_APRI_APP` (accesa di serie) viaggia accanto a
+  `relay_nip46` in `/api/listings` e `/api/login/nostr/relay`.
   DICE DUE STRADE E NON UNA: 📱 Amber per chi entra dal telefono
   («installa, crea una chiave nuova, torna qui e inquadra»), 💻
   nstart.me per chi sta al browser — e ognuna finisce col PASSO

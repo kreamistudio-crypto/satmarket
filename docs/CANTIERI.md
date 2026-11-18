@@ -91391,3 +91391,52 @@ DECISO: (1) UN EVENTO PER PRODOTTO, giudice unico `annuncio_per_nostr`: la famig
 SCARTATO: un evento per variante (2.305 eventi dalla stessa chiave in poche ore, che Nostrology riduce comunque a uno); il capofila come intestatario (il `d` cambierebbe a ogni esaurito: un evento nuovo e una lapide ogni volta); i ganci dentro `importa_negozio.py` (gira in un thread col database suo, e non dice quali righe ha toccato); uno script a mano sul VPS per gli arretrati (il riallineamento li prende da solo, e uno script è un gesto in più per Andrea); firmare i prodotti dei negozi sempre col nostro nome scavalcando il bivio (la regola d'agosto vale anche qui: è la reputazione del negoziante).
 PROVATO: `collaudo_negozi_su_nostr` (nuovo, server vero con un WooCommerce di cartone e relay finti, 28: due eventi per un singolo e tre varianti, d della testa, titolo, «da», stock sommato, tag client; giro identico = zero eventi; esaurito di una variante = un evento sullo stesso d; il gancio dell'ordine su una variante = famiglia attiva; tutte esaurite = sold e il rifornimento la riaccende; tolto dal negozio = kind 5; il tetto a scaglioni; la leva spenta anche sui ganci e il recupero alla riaccensione; lo scollegamento con più prodotti del tetto = una lapide per ognuno). Controprove, ognuna rossa: famiglia non raggruppata, impronta ignorata, aggancio al giro tolto, leva non guardata dai ganci, scollegamento col tetto, stato di chi chiama sulla famiglia. `prove_negozi_su_nostr` (nuova: il giudice su sqlite vero — testa tolta che resta testa, capofila vivo e non l'esaurita più economica, parità di prezzo alla più vecchia, sold, None — e le cuciture: ordine giro→riallineamento, scollegamento senza tetto, giudice prima del bivio e nella coda, leva nei tre posti, collaudo nelle due liste; controprova sul None rossa). La sentinella di `prove_firme_nostr` «esce prima che la piattaforma firmi» ha preso la prima stesura (l'impronta firmava prima del bivio): ora l'impronta del ramo della piattaforma si calcola dall'evento vero, quella del bivio solo dentro il bivio.
 RESTA DA GUARDARE: dal vivo, dopo la promozione, il journal del giro dei negozi («🟣 Negozio #N su Nostr: … pubblicati, … al prossimo giro») e Nostrology il giorno dopo (atteso: da 395 a circa 600); se qualche negoziante ha la sua chiave e «sul mio profilo», i suoi prodotti finiscono in coda alla sua firma (anche un centinaio di firme): si guarda prima di stupirsi del sollecito.
+
+## Amber si apre da solo nel login col telefono (18 nov 2026, cantiere amber-da-solo; un utente: «in nostrich il login con remote signer apre automaticamente un popup di amber per autorizzare l'accesso. Su barattolo invece copio e incollo la stringa a mano»; Andrea: «Sì, aprilo.»)
+
+DECISO. Su Android la URI `nostrconnect://` del QR diventa anche un
+link, «📲 Apri Amber e approva», e parte DA SOLO una volta appena è
+pronta, se il tocco su «📱 Entra con nostrconnect» è ancora fresco
+(`navigator.userActivation.isActive`). Il giro NIP-46 non cambia: stessa
+URI, stesso segreto, stessi relay, ascolto aperto prima, cassetta del
+server per la risposta che arriva mentre la pagina dorme. Se dopo
+l'attimo la pagina non si è nascosta, l'avviso «Non si è aperto nessun
+firmatario» (il cane da guardia del wallet, `attendiWallet`), e fuori da
+Telegram il «Riprova in un altro modo» con la forma `intent://`. Dal
+computer e su iPhone tutto come prima. Leva `NOSTRCONNECT_APRI_APP`,
+accesa di serie, nel pannello delle leve.
+IL PERCHÉ DEL ROVESCIO. Il commento sopra `mostraQrConnessione` diceva
+che un `nostrconnect://` toccabile «lo aprirebbe solo se l'app ha
+registrato quello schema». Guardato nel sorgente di Amber (master del 18
+nov 2026): il manifest della variante `free` (GitHub, Zapstore, F-Droid)
+dichiara `<data android:scheme="nostrconnect" />`, e `IntentUtils` passa
+il link a `NostrConnectUtils.getIntentFromNostrConnect`, la stessa
+approvazione del QR. La variante `offline` no, ma quella il NIP-46 non
+lo parla. Il lancio da solo è un'eccezione dichiarata alla regola del
+wallet («NIENTE parte da uno script»): Chrome ferma il SECONDO lancio di
+un tocco, non il primo; se il tocco è scaduto non parte niente e resta
+il bottone.
+STRADE SCARTATE. 1) Il NIP-55 per il web (`nostrsigner:` con
+`callbackUrl`): torna con un redirect a una pagina, che dentro Telegram
+apre il browser e non la Mini App, e non dà una sessione NIP-46 da
+conservare. 2) iPhone: il nostrconnect sullo stesso telefono muore di
+iOS (10 ott 2026) e Safari mostra un errore suo davanti a uno schema
+senza app; resta il consiglio del bunker di Clave. 3) Il pacchetto di
+Amber nell'intent: il link lo apre qualunque firmatario del telefono
+che dichiari lo schema.
+PROVATO. `prove_login_qr` (+17): la leva accesa nel codice e nel config
+d'esempio, che viaggia nelle due porte e il client la legge da tutte e
+due, il pannello; il lancio prima del disegno e solo col tocco fresco; il
+bottone è un link sopra il QR; sotto node `firmatarioQuiOfferto`,
+`intentNostrconnect` e `mostraQrConnessione` (Android col tocco fresco,
+scaduto, senza API, PC, dentro Telegram, leva spenta) e l'avviso fuori e
+dentro Telegram. Controprove: tolto il tocco fresco, aggiunto l'iPhone,
+tolta la leva, tolto l'intent: rosse. Giro dal vivo in Chromium col
+Pixel 7 emulato sul server vero (relay di cartone, nessun relay vero):
+il bottone porta la URI, il lancio parte da solo, e senza un'app
+l'avviso compare col Riprova; dal PC niente bottone.
+NON PROVATO DAL VIVO: un Android vero con Amber, né dentro Telegram
+(che i link `lightning:` li passa al sistema, e lo stesso dovrebbe fare
+con questo) né nell'app installata. Da guardare sul collaudo: che Amber
+si apra da solo, che dopo l'ok si torni e si entri, e dentro Telegram
+che il lancio da solo non sia fermato (allora resta il bottone).

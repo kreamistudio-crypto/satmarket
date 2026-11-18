@@ -126237,6 +126237,140 @@ def prove_login_qr():
           True, bool(_et) and _et in _guida)
 
     # ==================================================================
+    # AMBER SI APRE DA SOLO (18 nov 2026, cantiere amber-da-solo; un
+    # utente: «in nostrich il login con remote signer apre
+    # automaticamente un popup di amber [...] su barattolo invece copio e
+    # incollo la stringa a mano»). Su Android la URI del QR diventa un
+    # link che Amber apre (lo schema `nostrconnect` lo dichiara la sua
+    # variante `free`), e parte da solo UNA volta se il tocco e' fresco.
+    # La leva NOSTRCONNECT_APRI_APP, accesa di serie, viaggia coi relay.
+    prova("AMBER DA SOLO: la leva e' accesa di serie nel codice e nel "
+          "config d'esempio", (True, True),
+          ("except ImportError:\n    NOSTRCONNECT_APRI_APP = True\n"
+           "NOSTRCONNECT_APRI_APP = bool(NOSTRCONNECT_APRI_APP)" in src,
+           "\nNOSTRCONNECT_APRI_APP = True\n" in open(
+               "config_esempio.py", encoding="utf-8").read()))
+    prova("...viaggia accanto ai relay, nella busta di prima pagina e "
+          "nella porta del login", (True, True),
+          ('risposta["nostrconnect_apri"] = NOSTRCONNECT_APRI_APP' in src,
+           '"nostrconnect_apri": NOSTRCONNECT_APRI_APP}' in src))
+    prova("...e il client la legge da tutte e due, assente = spenta",
+          (2, True),
+          (mini.count("if (j.nostrconnect_apri !== undefined) "
+                      "nostrconnectApri = j.nostrconnect_apri === true;"),
+           "let nostrconnectApri = false;" in mini))
+    prova("...e sta nel pannello delle leve", True,
+          '"NOSTRCONNECT_APRI_APP", NOSTRCONNECT_APRI_APP,' in src)
+    _mq = pezzo_js(mini, "async function mostraQrConnessione(uri){", "\n}\n")
+    prova("il lancio da solo parte PRIMA del disegno del codice e solo col "
+          "tocco ancora fresco", (True, True),
+          (0 <= _mq.find("app.click();") < _mq.find("await disegnaQr("),
+           "const fresco = !!(navigator.userActivation && "
+           "navigator.userActivation.isActive);" in _mq
+           and "if (qui && app && fresco) {" in _mq))
+    _fa = mini[mini.index('<div id="nostrQrBox"'):]
+    _fa = _fa[:_fa.index('<div class="qr" id="nostrQr">')]
+    prova("il bottone e' un LINK (il tocco e' suo) e sta sopra il QR, "
+          "spento finche' non si accende", (True, True),
+          ('<a class="btn primary" id="nostrApriApp" href="#" '
+           'style="display:none;' in _fa,
+           'onclick="apriFirmatarioQui(this)"' in _fa))
+    if _shq.which("node"):
+        _bq = ("const scrivi = console.log; console.log = () => {};   // le righe 🟪 tacciono\n"
+               "const nodi = {};\n"
+               "const el = id => (nodi[id] ||= {id, style: {}, textContent: '', href: '#', clic: 0,\n"
+               "  getAttribute(k){ return this[k]; }, click(){ this.clic++; apriFirmatarioQui(this); }});\n"
+               "let walletGiro = 0, guardie = [], detto = '';\n"
+               "function attendiWallet(giro, poi){ guardie.push(poi); }\n"
+               "function bunkerDice(t){ detto = t; }\n"
+               "async function disegnaQr(){ return true; }\n"
+               + pezzo_js(mini, "function stradaWallet(dentroTelegram, ua){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function firmatarioQuiOfferto(leva, ua, piattaformaTg){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function intentNostrconnect(uri){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function apriFirmatarioQui(a){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function avvisaFirmatarioMuto(a){", "\n}\n") + "\n}\n"
+               + "let navigator = {}, tg = null, nostrconnectApri = true;\n"
+               + _mq + "\n}\n"
+               + r"""
+const URI = 'nostrconnect://PUB?relay=wss%3A%2F%2Fa.example&secret=s';
+const ANDROID = 'Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile';
+const PC = 'Mozilla/5.0 (Windows NT 10.0) Chrome/130';
+async function giro(ua, attivo, piattaforma, dentro){
+  for (const k of Object.keys(nodi)) delete nodi[k];
+  guardie = []; detto = '';
+  navigator = {userAgent: ua, userActivation: attivo === null ? undefined : {isActive: attivo}};
+  tg = piattaforma ? {platform: piattaforma, initData: dentro ? 'x' : ''} : null;
+  el('nostrQrBox').style.display = 'none';
+  await mostraQrConnessione(URI);
+  const a = el('nostrApriApp');
+  return [a.style.display, a.href, a.clic, el('nostrQrAiutoApp').style.display,
+          el('nostrQrAiuto').style.display, /Apri Amber/.test(detto)];
+}
+(async () => {
+  const r = {};
+  r.tabella = [firmatarioQuiOfferto(true, ANDROID, ''), firmatarioQuiOfferto(true, PC, ''),
+    firmatarioQuiOfferto(true, PC, 'android'), firmatarioQuiOfferto(true, 'iPhone', 'ios'),
+    firmatarioQuiOfferto(false, ANDROID, 'android')];
+  r.intent = [intentNostrconnect(URI), intentNostrconnect('https://x.example')];
+  r.android = await giro(ANDROID, true, '', false);
+  r.scaduto = await giro(ANDROID, false, '', false);
+  r.senzaApi = await giro(ANDROID, null, '', false);
+  r.pc = await giro(PC, true, '', false);
+  r.telegram = await giro(PC, true, 'android', true);
+  nostrconnectApri = false;
+  r.spenta = await giro(ANDROID, true, '', false);
+  nostrconnectApri = true;
+  // il cane da guardia dice «niente si e' aperto»: l'avviso, e fuori da
+  // Telegram il Riprova con l'intent; dentro Telegram niente intent
+  await giro(ANDROID, true, '', false);
+  guardie[0](false);
+  r.mutoFuori = [el('nostrApriMuto').style.display, el('nostrApriIntent').style.display,
+                 el('nostrApriIntent').href];
+  await giro(ANDROID, true, 'android', true);
+  guardie[0](false);
+  r.mutoDentro = [el('nostrApriMuto').style.display, el('nostrApriIntent').style.display];
+  await giro(ANDROID, true, '', false);
+  guardie[0](true);
+  r.aperto = el('nostrApriMuto').style.display;
+  scrivi(JSON.stringify(r));
+})();
+""")
+        _rq = _spq.run(["node", "-e", _bq], capture_output=True, text=True, timeout=30)
+        _dq = json.loads(_rq.stdout or "null") if _rq.returncode == 0 else {}
+        if not _dq:
+            prova("AMBER DA SOLO gira sotto node", "0", _rq.stderr[:400])
+        else:
+            prova("si offre su Android (user agent o piattaforma di Telegram), "
+                  "mai dal PC, mai su iPhone, mai a leva spenta",
+                  [True, False, True, False, False], _dq["tabella"])
+            prova("la forma intent:// tiene la URI intera, e non nasce da un "
+                  "link che non e' nostrconnect",
+                  ["intent://PUB?relay=wss%3A%2F%2Fa.example&secret=s"
+                   "#Intent;scheme=nostrconnect;end", ""], _dq["intent"])
+            _URI = "nostrconnect://PUB?relay=wss%3A%2F%2Fa.example&secret=s"
+            prova("ANDROID col tocco fresco: il bottone porta la URI del QR e "
+                  "parte da solo UNA volta, con la riga d'aiuto sua",
+                  ["", _URI, 1, "", "none", True], _dq["android"])
+            prova("...col tocco scaduto (relay lenti) non parte niente: resta "
+                  "il bottone", ["", _URI, 0, "", "none", True], _dq["scaduto"])
+            prova("...e senza l'API dell'attivazione neppure",
+                  ["", _URI, 0, "", "none", True], _dq["senzaApi"])
+            prova("DAL PC niente bottone e niente lancio: il QR di sempre",
+                  ["none", "#", 0, "none", "", False], _dq["pc"])
+            prova("DENTRO TELEGRAM su Android si offre anche se lo user agent "
+                  "non lo dice", ["", _URI, 1, "", "none", True], _dq["telegram"])
+            prova("A LEVA SPENTA tutto come prima", ["none", "#", 0, "none", "", False],
+                  _dq["spenta"])
+            prova("se non si apre niente l'avviso lo dice, e fuori da Telegram "
+                  "offre l'intent", ["", "", "intent://PUB?relay=wss%3A%2F%2F"
+                  "a.example&secret=s#Intent;scheme=nostrconnect;end"], _dq["mutoFuori"])
+            prova("...dentro Telegram l'avviso senza intent (e' di Chrome)",
+                  ["", "none"], _dq["mutoDentro"])
+            prova("...e se Amber si e' aperto, nessun avviso", "none", _dq["aperto"])
+    else:
+        salta("Amber da solo sotto node", "node non c'e'")
+
+    # ==================================================================
     # E SI FA GIRARE. Le sentinelle qui sopra dicono che le righe ci
     # sono, mai che il giro risponda giusto — e qui le tre domande che
     # contano sono proprio COSA finisce nel codice a schermo, QUANDO

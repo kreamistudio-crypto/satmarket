@@ -674,3 +674,9 @@ frase: I prodotti dei negozi collegati (Shopify e WooCommerce) adesso escono anc
 dove: nessun bottone: succede da solo a ogni giro del negozio (una volta all'ora); i prodotti si vedono in qualunque app Nostr che mostra gli annunci (NIP-99).
 leva: NEGOZI_SU_NOSTR (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · amber-da-solo
+frase: Su Android entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e Amber si apre da solo per chiederti l'ok. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
+dove: Entra con Nostr → «📱 Entra con nostrconnect»; se Amber non si apre da solo, il bottone «📲 Apri Amber e approva». Dal computer resta il codice QR da inquadrare.
+leva: NOSTRCONNECT_APRI_APP (accesa di serie)
+pubblico: sì

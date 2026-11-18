@@ -13461,8 +13461,10 @@ def login_nostr_relay():
     con la vetrina (`/api/listings`), ma sull'istanza di prova chi non e'
     entrato la vetrina non la vede, e il bottone «Col telefono» del login
     sparirebbe. Sta sotto /api/login/ apposta: e' una porta del login, e
-    dice solo indirizzi pubblici scritti nel codice."""
-    return {"relay_nip46": RELAYS_NIP46}
+    dice solo indirizzi pubblici scritti nel codice. Con loro viaggia la
+    leva che apre Amber da solo (18 nov 2026, cantiere amber-da-solo)."""
+    return {"relay_nip46": RELAYS_NIP46,
+            "nostrconnect_apri": NOSTRCONNECT_APRI_APP}
 
 
 @app.get("/api/login/nostr/sfida")
@@ -30636,6 +30638,10 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # login lo apre soprattutto chi NON e' ancora entrato, e
         # /api/me in vetrina non esiste.
         risposta["relay_nip46"] = RELAYS_NIP46
+        # ...e se sul telefono Android il firmatario (Amber) si apre da
+        # solo col link `nostrconnect://` (18 nov 2026, cantiere
+        # amber-da-solo): la leva NOSTRCONNECT_APRI_APP, accesa di serie
+        risposta["nostrconnect_apri"] = NOSTRCONNECT_APRI_APP
         # I RELAY DELLA COPIA CIFRATA DEL PROFILO DI SCAMBIO (11 ott 2026,
         # cantiere «tor-chiavi-scambio»): quelli di casa (RELAY_NOSTR, o i
         # relay di serie) piu' lo specchio nostro, senza doppioni. Il
@@ -37412,6 +37418,16 @@ def _leve_stato():
                   acceso="il server apre account per venditori che non ci "
                          "conoscono e manda loro un DM di benvenuto. È "
                          "anche l'interruttore d'emergenza: False e riavvia"),
+            # AMBER CHE SI APRE DA SOLO (18 nov 2026, cantiere
+            # amber-da-solo): accesa di serie, nessun segreto
+            _leva("Il login col telefono apre Amber da solo",
+                  "NOSTRCONNECT_APRI_APP", NOSTRCONNECT_APRI_APP,
+                  acceso="su Android «Entra con nostrconnect» apre Amber "
+                         "(o il firmatario del telefono) col link "
+                         "nostrconnect://, e c'è il bottone «📲 Apri Amber»; "
+                         "QR e link da copiare restano sotto",
+                  spento="come prima: QR e link da copiare e incollare a "
+                         "mano nel firmatario"),
             _leva("Barattolo pubblica su Nostr",
                   "NOSTR_NSEC_PIATTAFORMA", _NOSTR is not None,
                   spento="gli annunci non escono come eventi NIP-99 (manca "
@@ -116253,6 +116269,19 @@ try:
 except ImportError:
     ACQUISTI_NEL_PROFILO = False
 ACQUISTI_NEL_PROFILO = bool(ACQUISTI_NEL_PROFILO)
+# LA LEVA DI AMBER CHE SI APRE DA SOLO: NOSTRCONNECT_APRI_APP (18 nov
+# 2026, cantiere amber-da-solo; un utente: «in nostrich il login con
+# remote signer apre automaticamente un popup di amber [...] su
+# barattolo invece copio e incollo la stringa a mano»). ACCESA di serie
+# (regola delle leve nuove): su Android il login col telefono apre il
+# firmatario col link `nostrconnect://`. False torna al QR e al link da
+# copiare. Viaggia col client accanto a `relay_nip46`; il perche' sopra
+# `mostraQrConnessione` nella miniapp.
+try:
+    from config import NOSTRCONNECT_APRI_APP
+except ImportError:
+    NOSTRCONNECT_APRI_APP = True
+NOSTRCONNECT_APRI_APP = bool(NOSTRCONNECT_APRI_APP)
 STRADINA_AMICI_MAX = 12      # quanti amici si mostrano, i piu' alti
 
 # LE ZONE DEL TABELLONE, dal basso (la Terra) verso l'alto (la Luna):

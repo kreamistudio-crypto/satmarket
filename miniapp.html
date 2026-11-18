@@ -18564,10 +18564,23 @@ document.getElementById('cartello')?.remove();</script>
          solo dentro `.payout` e `.campo-file` — quindi qui dentro non
          vestirebbe niente e la riga uscirebbe col corpo del titolo. -->
     <div id="nostrQrBox" style="display:none">
+      <!-- AMBER SI APRE DA SOLO (18 nov 2026, cantiere amber-da-solo):
+           su Android il link `nostrconnect://` lo apre Amber, che ha
+           dichiarato lo schema. Il bottone e' un LINK, quindi il tocco
+           e' suo; lo accende `mostraQrConnessione` e la leva
+           NOSTRCONNECT_APRI_APP, e se non si apre niente l'avviso sotto
+           lo dice (`avvisaFirmatarioMuto`). QR e link restano sotto per
+           chi firma da un altro telefono. -->
+      <a class="btn primary" id="nostrApriApp" href="#" style="display:none;margin-top:10px;text-decoration:none" onclick="apriFirmatarioQui(this)">📲 Apri Amber e approva</a>
+      <div class="wallet-avviso" id="nostrApriMuto" role="status" style="display:none;margin:10px 0 0">
+        <span>⚠️ Non si è aperto nessun firmatario. Se hai Amber su questo telefono tocca di nuovo «Apri Amber e approva»; se no copia il link qui sotto, o inquadra il codice dal telefono dove firmi.</span>
+        <a class="btn ghost" id="nostrApriIntent" href="#" style="display:none" onclick="riprovaFirmatarioQui(this)">📲 Riprova in un altro modo</a>
+      </div>
       <div class="qr" id="nostrQr"></div>
       <div class="invoice" id="nostrQrUri" style="user-select:all;margin-top:10px"></div>
       <button class="btn mini" style="margin-top:6px" onclick="copiaUriConnessione()">📋 Copia il link</button>
-      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link, incollalo nell'app, approva e <b>torna qui</b>: la risposta ti aspetta. Su <b>iPhone con Clave</b> è più sicura la strada del <b>bunker://</b> qui sotto (Clave firma senza che tu cambi app).</div>
+      <div id="nostrQrAiutoApp" style="display:none;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Con <b>Amber su questo telefono</b> basta il bottone verde: approva e <b>torna qui</b>, la risposta ti aspetta. Il codice serve solo se firmi da un <b>altro</b> telefono.</div>
+      <div id="nostrQrAiuto" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link, incollalo nell'app, approva e <b>torna qui</b>: la risposta ti aspetta. Su <b>iPhone con Clave</b> è più sicura la strada del <b>bunker://</b> qui sotto (Clave firma senza che tu cambi app).</div>
     </div>
     <!-- AL POSTO DEL QR, L'ANELLO (16 nov 2026, cantiere accesso-
          rotellina): appena il firmatario ha risposto il codice non serve
@@ -19275,6 +19288,10 @@ function linkDentroTelegram(link){
    parte, che e' peggio di un bottone che manca. Cosi' resta vuota
    anche in DEMO da file://, dove un server non c'e'. */
 let relayNip46 = [];
+/* ...e se su Android il firmatario si apre da solo (18 nov 2026, cantiere
+   amber-da-solo): la leva NOSTRCONNECT_APRI_APP, che viaggia accanto ai
+   relay. Assente = server di ieri = spenta, e resta il QR di sempre. */
+let nostrconnectApri = false;
 /* i relay su cui va la copia cifrata del profilo di scambio, e la chiave
    pubblica di Barattolo per il contatto (11 ott 2026): dal server, mai
    scritti a mano qui */
@@ -21204,6 +21221,7 @@ async function loadListings(anonimo){
      ieri, o lista vuota) il bottone «Col telefono» non compare e le
      altre porte restano quelle di sempre */
   if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46;
+  if (j.nostrconnect_apri !== undefined) nostrconnectApri = j.nostrconnect_apri === true;
   if (Array.isArray(j.relay_copia_p2p)) relayCopiaP2P = j.relay_copia_p2p.map(String);
   if (typeof j.pub_casa === 'string' && /^[0-9a-f]{64}$/.test(j.pub_casa)) pubCasa = j.pub_casa;
   /* la leva dello scambio P2P per chi /api/me non ce l'ha (la vetrina
@@ -79166,18 +79184,112 @@ async function firmatarioNostrConnect(){
 
 /* Il codice a schermo, e la stringa sotto per chi ha il firmatario su
    QUESTO telefono: li' il QR non si puo' inquadrare da soli, e
-   copiare-e-incollare e' l'unica strada che funziona sempre — un
-   `nostrconnect://` toccabile lo aprirebbe solo se l'app ha registrato
-   quello schema, e promettere una porta che non si apre e' peggio che
-   non prometterla. */
+   copiare-e-incollare e' la strada che funziona sempre.
+
+   E SU ANDROID IL FIRMATARIO SI APRE DA SOLO (18 nov 2026, cantiere
+   amber-da-solo; un utente: «in nostrich il login con remote signer apre
+   automaticamente un popup di amber [...] su barattolo invece copio e
+   incollo la stringa a mano»). Ieri qui c'era scritto che un
+   `nostrconnect://` toccabile «lo aprirebbe solo se l'app ha registrato
+   quello schema»: e' vero, e Amber l'ha registrato — nel sorgente (18
+   nov 2026) la variante che si scarica (`free`: GitHub, Zapstore,
+   F-Droid) dichiara `<data android:scheme="nostrconnect" />` e passa il
+   link a `NostrConnectUtils`, cioe' alla stessa approvazione del QR. La
+   variante `offline` no, ma quella il NIP-46 non lo parla comunque.
+   COME: la URI e' la STESSA del QR (stesso segreto, stessi relay, stesso
+   ascolto gia' aperto), quindi niente cambia nel giro: cambia solo chi
+   la consegna al firmatario.
+   • Il bottone «📲 Apri Amber e approva» e' un LINK con quella URI: il
+     tocco e' suo, come la porta del wallet (`portaWallet`), e dentro
+     Telegram funziona come il `lightning:` (lo script di Telegram,
+     `openLink`, gli schemi che non sono http li rifiuta: vedi «COME SI
+     APRE IL WALLET»).
+   • E PARTE DA SOLO UNA VOLTA, appena la URI e' pronta, se il tocco su
+     «Entra con nostrconnect» e' ancora fresco
+     (`navigator.userActivation.isActive`): e' la richiesta dell'utente,
+     ed e' l'eccezione dichiarata alla regola del wallet («NIENTE parte
+     da uno script»). Regge perche' e' il PRIMO lancio di quel tocco —
+     Chrome ferma il secondo, non il primo — e perche' se il tocco e'
+     scaduto (relay lenti) non parte niente e resta il bottone.
+   • Se dopo l'attimo la pagina non si e' nascosta, nessun firmatario si
+     e' fatto vivo: l'avviso lo dice (`avvisaFirmatarioMuto`, il cane da
+     guardia del wallet), e fuori da Telegram offre anche la forma
+     `intent://` per l'app installata (la TWA).
+   SOLO ANDROID, e non e' pigrizia: su iPhone il nostrconnect sullo
+   stesso telefono muore di iOS (la pagina sospesa mentre si approva in
+   Clave) e Safari, davanti a uno schema senza app, mostra un errore
+   suo — li' resta il consiglio del bunker (10 ott 2026). Dal computer
+   il firmatario sta su un altro dispositivo: li' il QR. */
+/* PURA: si offre il firmatario sul telefono? Con la leva accesa, su
+   Android: la piattaforma che dichiara Telegram, o lo user agent. */
+function firmatarioQuiOfferto(leva, ua, piattaformaTg){
+  if (!leva) return false;
+  if (['android', 'android_x'].includes(String(piattaformaTg || ''))) return true;
+  return /Android/i.test(String(ua || ''));
+}
+/* PURA: la forma intent:// di un nostrconnect:// ('' se non lo e'),
+   il calco di `intentWallet` */
+function intentNostrconnect(uri){
+  const m = /^nostrconnect:\/\/(.+)$/i.exec(String(uri || '').trim());
+  return m ? 'intent://' + m[1] + '#Intent;scheme=nostrconnect;end' : '';
+}
+/* il tocco (o il lancio da solo) su «Apri Amber»: il link parte nativo,
+   qui si guarda soltanto se qualcosa e' passato davanti alla pagina. Il
+   giro e' quello del wallet: le due porte non sono mai aperte insieme,
+   e un tocco piu' nuovo fa tacere quello vecchio. */
+function apriFirmatarioQui(a){
+  const avviso = el('nostrApriMuto');
+  if (avviso) avviso.style.display = 'none';
+  const giro = ++walletGiro;
+  attendiWallet(giro, aperto => { if (!aperto) avvisaFirmatarioMuto(a); });
+}
+function avvisaFirmatarioMuto(a){
+  const avviso = el('nostrApriMuto');
+  const box = el('nostrQrBox');
+  if (!avviso || !box || box.style.display === 'none') return false;
+  const fuori = stradaWallet(!!(tg && tg.initData), navigator.userAgent) === 'android';
+  const intent = fuori ? intentNostrconnect(a && a.getAttribute ? a.getAttribute('href') : '') : '';
+  const rip = el('nostrApriIntent');
+  if (rip) { rip.href = intent || '#'; rip.style.display = intent ? '' : 'none'; }
+  avviso.style.display = '';
+  return true;
+}
+/* il «Riprova» con l'intent: un link, il tocco e' il suo; se resta
+   muto anche lui sparisce, e restano il link e il QR */
+function riprovaFirmatarioQui(link){
+  const giro = ++walletGiro;
+  attendiWallet(giro, aperto => { if (!aperto && link) link.style.display = 'none'; });
+}
 async function mostraQrConnessione(uri){
   const box = el('nostrQrBox');
   if (!box) return;
   el('nostrQrUri').textContent = uri;
   const anello = el('nostrEntro');   // un codice nuovo: l'anello di prima non c'entra
   if (anello) anello.style.display = 'none';
+  const qui = firmatarioQuiOfferto(nostrconnectApri, navigator.userAgent, tg && tg.platform);
+  const app = el('nostrApriApp');
+  if (app) { app.href = qui ? uri : '#'; app.style.display = qui ? '' : 'none'; }
+  const muto = el('nostrApriMuto');
+  if (muto) muto.style.display = 'none';
+  const aiutoApp = el('nostrQrAiutoApp'), aiuto = el('nostrQrAiuto');
+  if (aiutoApp) aiutoApp.style.display = qui ? '' : 'none';
+  if (aiuto) aiuto.style.display = qui ? 'none' : '';
   box.style.display = '';
+  /* il lancio da solo PRIMA di disegnare il codice: il disegno puo'
+     caricare la sua libreria, e il tocco fresco non aspetta */
+  const fresco = !!(navigator.userActivation && navigator.userActivation.isActive);
+  if (qui && app && fresco) {
+    console.log('🟪 [qr] apro il firmatario del telefono col nostrconnect://');
+    app.click();
+  }
   const fatto = await disegnaQr(el('nostrQr'), uri, 'Byte');
+  if (qui) {
+    bunkerDice("Approva in Amber (o nel firmatario del telefono) e torna "
+      + "qui: resto in ascolto, la risposta ti aspetta. Se non si è "
+      + "aperto, tocca «Apri Amber e approva»; se firmi da un altro "
+      + "telefono, inquadra il codice.");
+    return;
+  }
   bunkerDice(fatto
     ? "Inquadra il codice col tuo firmatario (Amber su Android, Clave "
     + "su iPhone, nsec.app…) e approva: resto in ascolto. Se per "
@@ -116947,7 +117059,10 @@ function mostraCollaudoPrivato(stato){
     /* i relay del bunker arrivano di solito con la vetrina, che qui chi
        non è entrato non vede: si chiedono alla porta del login */
     fetch(`${API_BASE}/login/nostr/relay`).then(r => r.ok ? r.json() : {})
-      .then(j => { if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46; })
+      .then(j => {
+        if (Array.isArray(j.relay_nip46)) relayNip46 = j.relay_nip46;
+        if (j.nostrconnect_apri !== undefined) nostrconnectApri = j.nostrconnect_apri === true;
+      })
       .catch(() => {});
     const n = document.createElement('button');
     n.type = 'button';

@@ -32,6 +32,7 @@ Il bot di Telegram serve a tre cose: aprire Barattolo, mandarti gli avvisi sui t
 Non servono email, password o numero di telefono. Si entra in due modi:
 - con Telegram: dentro la Mini App sei già riconosciuto; sul sito c'è «Entra con Telegram»;
 - con una chiave Nostr: «Entra con Nostr», con un'estensione del browser, un bunker (nostrconnect) o un'app che firma. La chiave privata (nsec) non arriva mai ai server di Barattolo: quando serve una firma la fa il tuo browser o il tuo bunker.
+- su Android con Amber non serve più copiare e incollare la stringa: tocchi «📱 Entra con nostrconnect» e Amber si apre da solo; approvi e torni su Barattolo. Se non si apre, c'è il bottone «📲 Apri Amber e approva»; il codice QR e «Copia il link» restano per chi firma da un altro telefono. Su iPhone con Clave resta consigliato il bunker://.
 
 Entrare sul sito passando dal bot (se nelle REGOLAZIONI del pannello «Entra dal bot» è accesa): sul sito «Entra con Telegram» apre il bot @ilbarattolobot con un link fatto apposta (sul sito .onion il link arriva come QR, da inquadrare col telefono). Tocchi «Avvia» e il bot chiede «🔑 Entri su Barattolo come …?», mostrando tre figure del mercatino (per esempio 🍯 Miele, 🚲 Bici, 📚 Libri). Tocchi quella che la pagina ti mostra e sei dentro, con l'account che hai aperto in quel momento nell'app di Telegram: chi ha due account sceglie così quale usare. Il link vale due minuti e una volta sola. Se non sei stato tu a chiederlo, tocca «❌ Non sono stato io»: anche una figura sbagliata chiude il tentativo. ATTENZIONE ALLA TRUFFA: la figura giusta la vede solo chi ha chiesto di entrare, sulla sua pagina. Se qualcuno ti manda un link del bot e ti dice o ti scrive quale figura toccare, vuole entrare nel tuo account: non toccare la figura, tocca «❌ Non sono stato io». Barattolo e lo staff non ti chiedono mai di toccare una figura.
 
@@ -1142,7 +1143,7 @@ Tutorial
 Esci
 
 <!-- pezzo schermata-038 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · On-chain (1/4)
+## Schermata «On-chain e finestre della Mini App» · On-chain (1/5)
 
 ## On-chain
 ✕
@@ -1255,7 +1256,7 @@ Ho capito
 Come funziona il deposito
 
 <!-- pezzo schermata-039 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 📖 Come si spedisce? (2/4)
+## Schermata «On-chain e finestre della Mini App» · 📖 Come si spedisce? (2/5)
 
 ## 📖 Come si spedisce?
 Imballa bene. Una scatola robusta, i vuoti riempiti
@@ -1344,7 +1345,7 @@ Annulla il conto
 💰 Offri
 
 <!-- pezzo schermata-040 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🔨 Fai la tua puntata (3/4)
+## Schermata «On-chain e finestre della Mini App» · 🔨 Fai la tua puntata (3/5)
 
 ## 🔨 Fai la tua puntata
  sats
@@ -1404,12 +1405,20 @@ Inquadralo col telefono: entra l'account aperto nel Telegram del telefono.
 Chiudi
 ## 🧪 Collaudo privato
 Un attimo…
+
+<!-- pezzo schermata-041 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (4/5)
+
 ## Entra con Nostr
  Dimostri di possedere la tua chiave firmando una sfida.
  La chiave privata non viene mai inviata a nessuno.
 🔄 Riprova
 📱 Entra con nostrconnect
+ 📲 Apri Amber e approva
+ ⚠️ Non si è aperto nessun firmatario. Se hai Amber su questo telefono tocca di nuovo «Apri Amber e approva»; se no copia il link qui sotto, o inquadra il codice dal telefono dove firmi.
+ 📲 Riprova in un altro modo
 📋 Copia il link
+Con Amber su questo telefono basta il bottone verde: approva e torna qui, la risposta ti aspetta. Il codice serve solo se firmi da un altro telefono.
 Se il firmatario ce l'hai su questo telefono il codice non lo puoi inquadrare da solo: copia il link, incollalo nell'app, approva e torna qui: la risposta ti aspetta. Su iPhone con Clave è più sicura la strada del bunker:// qui sotto (Clave firma senza che tu cambi app).
  Sto entrando…
 🧩 Con l'estensione del browser
@@ -1427,10 +1436,6 @@ Scrivilo prima di entrare, in qualunque modo entri: si collega da solo.
  Non hai ancora un profilo Nostr?
 Creane uno
 Annulla
-
-<!-- pezzo schermata-041 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 🌱 Crea il tuo profilo Nostr (4/4)
-
 ## 🌱 Crea il tuo profilo Nostr
  Su Nostr non c'è un account con email e password: c'è una
  chiave. La parte pubblica è il tuo nome (la npub), quella
@@ -1461,6 +1466,10 @@ Annulla
  del mondo Nostr, e la chiave che creano è tua e funziona con
  qualsiasi app, non solo qui.
 Ho capito, torno all'accesso
+
+<!-- pezzo schermata-042 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · 👛 Il tuo primo wallet (5/5)
+
 ## 👛 Il tuo primo wallet
 I sats restano nel tuo wallet, non su Barattolo: li teniamo solo il tempo di un affare.
  Scarica Wallet of Satoshi
@@ -2336,4 +2345,12 @@ pubblico: sì
 frase: I prodotti dei negozi collegati (Shopify e WooCommerce) adesso escono anche su Nostr, come tutti gli altri annunci di Barattolo: un annuncio per prodotto, con le varianti (taglie, colori) raccolte in uno solo col prezzo «da». Si aggiornano da soli quando cambiano prezzo o disponibilità, e un prodotto tolto dal negozio sparisce anche da lì.
 dove: nessun bottone: succede da solo a ogni giro del negozio (una volta all'ora); i prodotti si vedono in qualunque app Nostr che mostra gli annunci (NIP-99).
 leva: NEGOZI_SU_NOSTR (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-107 | novita -->
+## Novità · 2026-11-18 · amber-da-solo
+
+frase: Su Android entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e Amber si apre da solo per chiederti l'ok. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
+dove: Entra con Nostr → «📱 Entra con nostrconnect»; se Amber non si apre da solo, il bottone «📲 Apri Amber e approva». Dal computer resta il codice QR da inquadrare.
+leva: NOSTRCONNECT_APRI_APP (accesa di serie)
 pubblico: sì
