@@ -4008,6 +4008,62 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   dell'apertura» alle prese, «⚠️ Paracadute P2P: battito saltato» se il
   giro inciampa (il prossimo arriva lo stesso).
 
+- LA `-bar10`: IL TEMPO PER PAGARE (patch 0013), immagine
+  `mostro:v0.20.2-bar10` (preparata il 18 nov 2026, cantiere
+  `tempo-pagamento`, scelta di Andrea: «Tutto insieme, nodo compreso»;
+  NON ANCORA SUL NODO, la voce sta in `docs/DA-FARE-ANDREA.md`). Il
+  perché: CANTIERI, «Il tempo per pagare nel P2P»; il disegno: README del
+  fork, «LA 0013». Una patch sola sopra le undici della `-bar9`, nessuna
+  salita di versione, NESSUNA MIGRAZIONE di sqlx: la tabella sua
+  (`barattolo_payment_windows`) la crea il modulo con `CREATE TABLE IF
+  NOT EXISTS`, e la `-bar9` la ignora — IL RITORNO È IL SOLO CAMBIO
+  D'IMMAGINE, senza il database di prima.
+  PRIMA IL SERVER, POI IL NODO: la rotta `/api/p2p/finestre` nasce con la
+  promozione del cantiere; il nodo nuovo davanti al server di ieri
+  prende 404 e si comporta come la `-bar9`.
+  LE DUE LEVE DEL SERVER. `P2P_TEMPO_PER_PAGARE` (accesa di serie, non
+  si aggiunge niente) e `P2P_FINESTRA_SEGRETO`, un segreto SUO (la M6
+  dell'audit), uguale a `BARATTOLO_FINESTRA_SEGRETO` del compose del
+  nodo. Senza il segreto la rotta risponde 404 e nessuno scambio si
+  annulla da solo; la pagina offre la scelta SOLO quando il 38385 del
+  nodo annuncia `barattolo_payment_windows` (cioè quando il nodo ha le
+  due variabili). L'INTERRUTTORE D'EMERGENZA: `P2P_TEMPO_PER_PAGARE =
+  False` nel config del VPS e riavvio spegne la scelta nella pagina e
+  chiude la porta (404): gli scambi nuovi tornano al solo tempo della
+  garanzia. Quelli il cui tempo il nodo HA GIÀ letto lo tengono (al più
+  24 ore): per fermare anche quelli si tolgono le due variabili dal
+  compose e `up -d mostro`. Riaperta la porta, il server non dà tempo
+  a uno scambio attivo da più di 15 minuti (`P2P_FINESTRA_RITARDO_MAX_S`):
+  il nodo che chiede tardi non annulla sotto gli occhi di chi non
+  aveva visto il timer.
+  IL SEGRETO NON PASSA DALLA CHAT: nasce sul VPS (`secrets.token_hex`,
+  mai stampato), Andrea lo copia UNA volta dal suo terminale del VPS al
+  `read -s` del nodo, e i due lati si confrontano con otto lettere di
+  impronta (il comando della `-bar9`, fase 1, e).
+  LA BUILD, coi numeri del cloud: sul branch `barattolo/v0.20.2` del nodo
+  (undici commit, albero `16734181`) `git am` della sola `0013-*.patch`
+  dà l'albero `bdad9c3479602556e2db1ddbeefc8cc2dd809d7d`; i test nello
+  stadio `builder` col filtro della `-bar9` più `barattolo_finestra
+  payment_window` dicono `740 passed; 0 failed; 1 ignored`, e
+  `util::tests::` `90 passed`. Il binario deve contenere la parola
+  `barattolo_payment_windows`.
+  IL CONTROLLO DOPO IL CAMBIO: nel log del nodo NESSUNA riga
+  «barattolo_finestra: BARATTOLO_FINESTRA_URL / BARATTOLO_FINESTRA_SEGRETO
+  not set» (c'è solo se manca una variabile); dal VPS
+  `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://barattolo.store/api/p2p/finestre`
+  → `403` (la porta c'è, il segreto no: 404 vuol dire leva spenta o
+  segreto mancante); nell'app, «Pubblica» → «Vendi BTC» col SEPA mostra
+  la sezione «Tempo per pagare» (col solo SEPA Instant il cursore si
+  muove; col SEPA ordinario resta a 24 ore). Nel journal del VPS, al primo scambio
+  attivo: niente da vedere (la rotta non scrive se va tutto bene); se il
+  nodo chiede tardi, «· Tempo per pagare: … chiesto dal nodo N minuti
+  dopo l'attivo». Sul nodo, quando un tempo finisce:
+  `payment_window: order … canceled — the buyer's time to pay ended with
+  no fiat sent` e `barattolo_eventi: order … expired: delivered`.
+  QUEL CHE NON SI PROVA IN FRETTA: l'annullo vero vuole il tempo scelto
+  da una garanzia pagata senza «Ho inviato». La prova breve è uno scambio
+  da 15 minuti col SEPA Instant fra i due account di Andrea, lasciato
+  scadere.
 - LA SALITA ALLA 0.20.2, immagine `mostro:v0.20.2-bar9` (preparata il 29
   ott 2026, cantiere `mostro-0202`, decisione di Andrea: «fork intero
   sulla 0.20.2»; ✅ FATTA SUL NODO il 30 ott 2026, in servizio dalle

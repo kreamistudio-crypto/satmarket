@@ -1202,6 +1202,15 @@ P2P_PARACADUTE = False
 # Spenta per ogni ordine finche' non si scrivono i due prezzi; mai su
 # Barattozon ne' sugli ordini in moneta. Solo False spegne.
 P2P_RIPUBBLICA = True
+# IL TEMPO PER PAGARE (18 nov 2026): ACCESO di serie. Chi vende sceglie
+# entro quanto chi prende manda gli euro (un orologio da 15 minuti a 24
+# ore; sotto le 24 solo coi metodi veloci), e allo scadere senza «Ho
+# inviato» il nodo annulla da solo (patch 0013, che chiede a
+# /api/p2p/finestre col segreto qui sotto); sull'on-chain avviso e
+# disputa. Sul Lightning la pagina offre la scelta solo se anche il nodo
+# la annuncia.
+# Solo False spegne: niente scelta e niente risposta al nodo.
+P2P_TEMPO_PER_PAGARE = True
 # LA CHAT NELLO SCAMBIO (12 ott 2026): ACCESA di serie. Dentro ogni
 # scambio preso le due parti si scrivono; i messaggi passano dal server
 # gia' chiusi dal telefono, stanno in un file a parte (`chat-scambi.db`,
@@ -1333,6 +1342,14 @@ P2P_SCONTO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # avvisi restano quelli del libro pubblico (presa, concluso, annullato,
 # scaduto), che allora partono subito invece di aspettare il coordinatore.
 P2P_EVENTI_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# Il segreto con cui il coordinatore CHIEDE a /api/p2p/finestre il tempo
+# per pagare degli scambi appena attivi (patch 0013, 18 nov 2026). Lo
+# stesso valore va nel compose del nodo (`BARATTOLO_FINESTRA_SEGRETO`,
+# accanto a `BARATTOLO_FINESTRA_URL`). UN SEGRETO SUO: chi lo ruba impara
+# il tempo per pagare di un ordine, che sta gia' sulla card. Vuoto o
+# segnaposto = la rotta NON ESISTE (404) e nessuno scambio si annulla da
+# solo allo scadere del tempo per pagare.
+P2P_FINESTRA_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # Il segreto con cui la RONDA DEL NODO chiede a /api/nodo/pagamenti-noti
 # se un pagamento uscito dal nodo e' un payout di Barattolo (28 set
 # 2026): risponde solo si'/no per ogni hash. Lo stesso valore va sul nodo

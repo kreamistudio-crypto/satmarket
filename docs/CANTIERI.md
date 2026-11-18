@@ -91130,3 +91130,124 @@ PROVATO: `prove_bitcoin_only_p2p` riscritta (giudici in node per le due
 pillole, memoria, banner, Novità, scelta che pulisce la bozza; controprova),
 suite severa e collaudi della CI nel venv senza coincurve.
 NON PROVATO: un telefono vero dentro Telegram.
+
+## Il tempo per pagare nel P2P: un orologio da 15 minuti a 24 ore, e il nodo che annulla (18 nov 2026, cantiere tempo-pagamento; Andrea, da JJ che scambia tanto: «se uno ha fretta dice io metto l'ordine però nel momento in cui lo prendi hai un'ora di tempo per scambiare», poi «Sì, apri il cantiere» e sulla scheda «Tutto insieme, nodo compreso»)
+
+IL PROBLEMA, VISTO DA VICINO. Il «24 ore» che si leggeva in giro non lo
+faceva rispettare nessuno: uno scambio Lightning `active` (garanzia
+bloccata, niente «pagato») lo chiude solo il guardiano della garanzia, a
+~92 ore (`hold_invoice_cltv_delta` 576 meno il margine), e chi prende e
+sparisce tiene fermi i sats di chi vende per quattro giorni; l'annullo
+d'accordo lui non lo manda. Per chi scambia tanto col SEPA Instant è il
+blocco della giornata.
+
+LE DECISIONI (la prima versione: al posto delle tre soglie oggi c'è
+L'OROLOGIO, qui sotto). Chi pubblica una VENDITA sceglie 1, 4 o 24 ore (24 di
+serie; col SEPA Instant fra i metodi la pagina propone 1 ora, e lo dice).
+Niente tempo col PayCode (la scadenza è quella di Amazon), col contanti di
+persona e per posta (un appuntamento e una busta non stanno in un'ora),
+sugli acquisti (lì chi paga è chi pubblica, e si sceglierebbe il tempo da
+sé) e sull'on-chain (ha i suoi tempi e un altro motore). Chi prende lo
+legge PRIMA nel dettaglio («⏱ Se lo prendi hai 1 ora…»); il tempo parte
+quando i sats sono in garanzia, e da lì tutti e due vedono il riquadro
+che scende (negli ultimi 15 minuti si scalda); il bot manda promemoria
+col tempo che resta (due per un'ora, due per quattro, tre per un giorno:
+l'ultimo dice chiaro che senza «Ho inviato» si annulla anche se si è
+pagato), e a chi vende quello del recapito a dieci minuti invece di
+un'ora. ALLO SCADERE ANNULLA IL NODO (patch 0013 del fork), non il server:
+è lui ad avere la garanzia in mano. Lui CHIEDE il tempo al server come la
+0005 chiede lo sconto (`/api/p2p/finestre`, un segreto suo per la M6),
+perché il filo di Mostro non ha un campo per lui e cambiarlo romperebbe
+gli altri client; conta dal minuto in cui LUI vede lo scambio attivo,
+quindi annulla un poco dopo il termine che chi compra legge, mai prima.
+Un server bugiardo può al più annullare uno scambio attivo dopo un'ora,
+coi sats che tornano a chi vende. Il «non completato» a chi compra segue
+la regola della garanzia scaduta (recapito detto, niente «pagato» né
+disputa) più una: il recapito deve essere arrivato nella PRIMA metà del
+tempo — chi vende che lo dice al cinquantanovesimo minuto non fa contare
+niente. La leva `P2P_TEMPO_PER_PAGARE` è ACCESA di serie (regola delle
+leve) ed è l'interruttore d'emergenza: spenta, la scelta sparisce e la
+porta del nodo tace. LA PAGINA OFFRE LA SCELTA SOLO SE IL NODO LA
+ANNUNCIA (`barattolo_payment_windows` nel 38385): mai promettere un
+annullo che nessuno fa, e il server può andare in produzione prima del
+nodo. LA DOMANDA TARDIVA NON HA TEMPO: se il nodo chiede più di 15
+minuti dopo l'attivo (porta chiusa e riaperta), il server non risponde
+con un tempo — lo scambio si annullerebbe sotto gli occhi di chi non
+aveva visto il timer.
+
+L'OROLOGIO, LO STESSO GIORNO (prima che niente andasse su develop;
+Andrea, letta la prima versione: «secondo me questa tempistica non
+dipende dal lightning o da un chain al contrario dipende dal metodo [...]
+se fai con sepa instant allora lì sì che ti posso chiedere anche di
+meno», «non a soglie che decidiamo noi mentre tipo un orologio con un
+timer che decidi tu», «uguale sia per Lightning che on-chain», «se deve
+richiedere una patch mostro facciamola»). Le tre soglie sono diventate
+un OROLOGIO in minuti, da 15 a 1440 a quarti d'ora (la pagina ha 34
+fermi: un quarto d'ora fino a due ore, mezz'ora fino a sei, poi un'ora;
+il server e il nodo accettano ogni minuto intero dentro l'intervallo), 24
+ore di serie, e la proposta «1 ora col SEPA Instant» è sparita. SOTTO LE
+24 ORE SOLO SE TUTTI I METODI SONO VELOCI — SEPA Instant, Revolut,
+Satispay, PayPal, gli USDT e le monete (`P2P_METODI_VELOCI`, la busta
+delle leve li dà alla pagina) —: con anche un lento (il bonifico
+ordinario, Wise, che verso una banca può metterci un giorno, i contanti)
+il tempo che VALE è 24 ore, perché chi prende potrebbe scegliere proprio
+quello; si conta a ogni lettura (`_minuti_coi_metodi_p2p`), mai scritto,
+e la pagina ferma il cursore e nomina il metodo lento. Nel libro il
+bollino «⏱ 30 min» sulle card coi tempi corti (Andrea: «sai già che
+questo è un utente che ha un po' più di fretta»), nello scambio un anello
+che si svuota. I promemoria si contano dall'orologio
+(`_intervalli_tempo_pagare_p2p`: un giorno come i tre di sempre, un'ora a
+20 e 45 minuti, un quarto d'ora uno solo a 10). ANCHE L'ON-CHAIN:
+`p2p_onchain_ordini.minuti_pagare` dalla rotta `/pubblica`, e
+`p2p_onchain_minuti_pagamento` prende il posto delle 24 ore fisse nel
+termine, nei testi e nei promemoria; allo scadere non annulla nessuno (il
+2-di-3 vuole due firme): l'avviso e la disputa di sempre. Il nodo:
+`MIN_WINDOW`/`MAX_WINDOW` al posto della lista, il 38385 dice
+`900-86400`, la patch rifatta (albero `bdad9c34` al posto di `d893a2f3`,
+che il nodo non ha mai visto).
+
+STRADE SCARTATE. Un tempo più corto per tutti col SEPA Instant (la prima
+idea di Andrea): toglie la scelta a chi vende e punisce chi compra con un
+bonifico normale. L'annullo dal server (un giro che chiede al nodo di
+annullare): il server non ha la garanzia, e un `cancel` firmato al posto
+di qualcuno non esiste. Un campo nuovo nel 38383: gli altri client lo
+ignorerebbero e il nodo dovrebbe fidarsi di un tag scritto da chiunque.
+Il «non completato» a chi compra sempre: lo pagherebbe anche chi non
+aveva dove mandare gli euro. Un cursore lineare da 15 a 1440 minuti (i
+tempi corti, quelli che contano, starebbero nel primo 4% della barra). Il
+tempo corto sul metodo SCELTO da chi prende invece che su tutti: il
+metodo scelto il nodo non lo sa, e il tempo lo legge prima della presa.
+L'annullo automatico sull'on-chain: il rimborso vuole la firma di chi
+vende o una disputa.
+
+PROVATO. Il nodo: la 0013 (patcher a sette agganci, modulo
+`barattolo_finestra.rs`) compilata nel cloud sopra le undici della `-bar9`:
+`git am` dà l'albero `bdad9c34`, `cargo test` 2001 verdi 0 rosse (fra
+loro le sei prove pure del modulo, le tre del giro nello scheduler —
+annulla un attivo a tempo finito, non tocca fiat-sent né chi non ha
+tempo, riprova se l'annullo fallisce — e quella del corpo dell'evento);
+col filtro della liturgia 740/0/1 e 90/0. Il server e la pagina:
+`prove_tempo_pagare_p2p` nuova (categoria p2p: sentinelle sull'orologio e
+sui metodi veloci uguali in server, pagina e nodo, sul tag e sulle variabili; i giudici
+puri, il database, la domanda tardiva, il recapito tardi, la pagina in
+node, l'on-chain coi suoi promemoria), con due controprove (il termine e
+la metà del tempo storti fanno rosso; senza il giudice dei metodi un'ora
+si prometterebbe sul bonifico ordinario). `collaudo_tempo_pagare` nuovo
+sulle rotte vere (anche l'ordine col bonifico ordinario che chiede un'ora
+ed esce a 24; controprova della prima versione: porta senza leva e
+recapito tardi rotti → 6 rosse), nella gabbia e in CI. Ritoccate le prove di forma che leggevano i pezzi
+toccati (la risposta dei volti, l'ordine delle scatole del foglio in tre
+posti, il «cambiato qualcosa» della fotografia in due, le chiavi della
+busta a 23) e i banchi che eseguono i pezzi nuovi prendono costanti e
+giudici veri da un posto solo (`tempo_pagare_nel_banco`). LEZIONE: il
+riquadro «vicino alla fine» col corallo l'ha fermato la sentinella del
+colore del P2P (nessuna regola P2P parla corallo): resta arancio.
+NON PROVATO: l'annullo vero sul nodo (vuole la `-bar10`, voce 24 di
+DA-FARE-ANDREA, e un quarto d'ora di attesa), un telefono vero dentro
+Telegram, la rotta `/pubblica` dell'on-chain col tempo (provato il
+giudice estratto, non la rotta: vuole una xpub vera).
+RESTA DA GUARDARE: con la porta riaperta dopo più di 15 minuti il timer
+della pagina mostra «finito, si sta annullando» su uno scambio che il
+nodo non annullerà (innocuo: chi compra paga lo stesso); gli scambi il
+cui tempo il nodo ha già letto lo tengono anche a leva spenta (si
+fermano togliendo le due variabili dal compose).

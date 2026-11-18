@@ -37578,3 +37578,44 @@ mai il kind 0 di nessuno: regola ferrea 2).
   Restano italiani: le descrizioni delle leve (testo per Andrea), i
   dati (titoli, negozi), i mesi brevi del P2P, il bot e gli errori del
   server (tappa 3, con l'interruttore della lingua salvato sul server).
+- IL TEMPO PER PAGARE NEL P2P (18 nov 2026, cantiere tempo-pagamento;
+  il perché in CANTIERI, «Il tempo per pagare nel P2P»). Chi pubblica una
+  VENDITA sceglie il tempo su un OROLOGIO, in minuti, da 15 a 1440 a
+  quarti d'ora (`P2P_MINUTI_PAGARE_MIN/MAX/PASSO`, gli stessi della
+  pagina e di `MIN_WINDOW`/`MAX_WINDOW` in
+  `deploy/mostro/barattolo_finestra.rs`, in secondi); la pagina ha 34
+  fermi (`P2P_MINUTI_PAGARE_FERMI`), il server accetta ogni quarto d'ora.
+  SOTTO LE 24 ORE SOLO COI METODI TUTTI VELOCI (`P2P_METODI_VELOCI`, gli
+  USDT e le monete: `_metodi_veloci_p2p`): con un lento il tempo che VALE
+  e' 24 ore (`_minuti_coi_metodi_p2p`), contato a ogni lettura, mai
+  scritto. Mai col PayCode, col contanti di persona o per posta, sugli
+  acquisti (`_ordine_col_tempo_p2p`, `tempoPagarePossibileP2P`).
+  SULL'ON-CHAIN (`p2p_onchain_ordini.minuti_pagare`, dalla rotta
+  `/pubblica`) lo legge `p2p_onchain_minuti_pagamento`, che prende il
+  posto delle ore fisse nel termine e nei promemoria; allo scadere non si
+  annulla niente, avviso e disputa come prima. LA STRADA DEL
+  DATO: la pagina lo dichiara nell'intestazione (`/api/p2p/ordini`,
+  campo `minuti_pagare`, la porta di zona e filtro: solo da maker, la prima
+  resta) e lo scrive in `p2p_ordini.minuti_pagare`; esce dai volti
+  (`/api/p2p/facce`), dalla fotografia del libro e dall'archivio
+  (`/api/p2p/scambi`: `minuti_pagare` e `paga_entro`, il termine uguale per
+  le due parti, da `_attivo_dal_p2p`: la garanzia pagata o la fattura
+  data col dettaglio `active`). IL NODO lo chiede (patch 0013) a
+  `POST /api/p2p/finestre` (bearer `P2P_FINESTRA_SEGRETO`, 404 a leva
+  spenta o senza segreto, 403 a segreto sbagliato): `{"ordini": [...]}`
+  → `{"finestre": {id: secondi}}`, coi soli ordini che un tempo ce
+  l'hanno, e niente per uno scambio attivo da più di 15 minuti
+  (`P2P_FINESTRA_RITARDO_MAX_S`, la domanda tardiva). Allo scadere senza
+  «Ho inviato» annulla lui, e racconta `expired` / `payment-window`: il
+  motivo dell'annullo è `tempo_pagare_scaduto`, e il «non completato» a
+  chi compra segue la regola della garanzia scaduta più una
+  (`_recapito_tardi_p2p`: il recapito detto nella seconda metà del tempo
+  non conta). I promemoria a chi compra, col tempo che resta, hanno i
+  momenti di `_intervalli_tempo_pagare_p2p` (al posto dei tre di sempre),
+  e a chi vende quello del recapito (`_recapito_corto_s_p2p`, fino a 4
+  ore). Sulla card del libro il bollino «⏱ 30 min» per i tempi corti
+  (`bollinoTempoPagareP2P`), nello scambio l'anello che si svuota
+  (`anelloTempoP2P`). LA PAGINA offre la scelta solo se
+  la leva (`tempoPagare` nella busta) E il 38385 del nodo
+  (`barattolo_payment_windows` = `900-86400`) dicono di sì
+  (`tempoPagareAttivoP2P`; sull'on-chain basta la leva).

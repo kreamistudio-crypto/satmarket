@@ -644,3 +644,9 @@ frase: In Esplora le categorie hanno le sottocategorie: tocchi una categoria e s
 dove: Esplora → «Esplora per categorie», tocca una categoria: la tendina sotto la card («Tutta la categoria» e le sottocategorie con annunci); la card accesa scrive la scelta sotto il nome. Vendi → il campo «Sottocategoria (facoltativa)» sotto la categoria.
 leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · tempo-pagamento
+frase: Nel P2P chi vende sceglie con un orologio quanto tempo ha chi compra per pagare, da 15 minuti a 24 ore (sotto le 24 solo coi metodi veloci, come SEPA Instant, Revolut o USDT). Chi prende lo vede già nel libro («⏱ 30 min»), e allo scadere senza «Ho inviato» lo scambio Lightning si annulla da solo e i sats tornano a chi vende; sull'on-chain si apre la disputa.
+dove: P2P → «Pubblica» → «Vendi BTC», la sezione «Tempo per pagare» (il cursore con l'anello) sotto «Chi può prendere l'ordine»; sulla card del libro il bollino «⏱ …» per i tempi sotto le 24 ore; nel dettaglio dell'ordine la riga «Se lo prendi hai…»; nella pagina dello scambio il riquadro con l'anello.
+leva: P2P_TEMPO_PER_PAGARE (accesa di serie); sull'on-chain compare con la promozione, sul Lightning solo dopo la -bar10 sul nodo (patch 0013): «pubblico» diventa sì quel giorno
+pubblico: no

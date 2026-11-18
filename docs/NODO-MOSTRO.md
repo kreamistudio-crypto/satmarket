@@ -655,3 +655,22 @@ eventi sono uguali sul nodo e sul VPS (`12b649c7`): la prima lettura
 diversa era il `\x27` nel `tr` del comando, corretto in PRODUZIONE. I
 numeri e il registro: PRODUZIONE, «LA SALITA ALLA 0.20.2», «COM'È
 ANDATA SUL NODO».
+
+LA 0013, IL TEMPO PER PAGARE (preparata il 18 nov 2026, cantiere
+`tempo-pagamento`; NON ANCORA SUL NODO: `docs/DA-FARE-ANDREA.md`, voce
+24). Il problema: uno scambio `active` lo chiude solo il guardiano della
+garanzia, a ~92 ore, e chi prende e sparisce tiene fermi i sats di chi
+vende per quattro giorni. Ora chi pubblica su Barattolo sceglie il tempo
+su un orologio, da 15 minuti a 24 ore, e il nodo lo CHIEDE al server ogni minuto (`BARATTOLO_FINESTRA_URL`
+→ `/api/p2p/finestre`, bearer `BARATTOLO_FINESTRA_SEGRETO`, un segreto
+suo come vuole la M6): allo scadere, con l'ordine ancora `active`, annulla
+la hold invoice come il ramo `Active` del guardiano e lo dice al server
+(`expired` / `payment-window`). Il tempo parte quando il NODO vede lo
+scambio attivo, quindi mai prima di quel che legge chi compra. Quel che
+un server compromesso ottiene: annullare uno scambio attivo dopo almeno
+un quarto d'ora, coi sats che tornano a chi vende; mai un `fiat-sent`, mai una
+disputa. Senza le due variabili è inerte, e un server muto vale «nessun
+tempo». Nessuna migrazione: la tabella sua la crea il modulo, e il
+ritorno alla `-bar9` è il solo cambio d'immagine. Compilata e provata
+nel cloud: albero `bdad9c34`, 2001 prove `cargo` verdi (PRODUZIONE, «LA
+`-bar10`»).
