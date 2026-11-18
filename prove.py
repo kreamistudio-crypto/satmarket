@@ -164289,6 +164289,41 @@ console.log(JSON.stringify([
               json.loads(r.stdout.strip()) if r.returncode == 0 else r.stderr[-300:])
     except (OSError, subprocess.TimeoutExpired):
         salta("la moneta nella scatola dei metodi di «I miei scambi»", "node assente")
+    # L'INSEGNA BLU DI BARATTOZON ANCHE SULLA CARD ON-CHAIN DI «I MIEI
+    # SCAMBI» (18 nov 2026, Andrea con la foto: «la stringa barattozon deve
+    # essere tutta blu», «come si vede nel lighting, uguale»): lo stesso
+    # giudice dei soli marchi, la scatola `p2p-paga-marchio` senza
+    # l'iconcina, e spenta (`p2p-paga-spenta`) a scambio concluso o
+    # annullato; un metodo col nome (SEPA) resta com'era
+    banco_ins = (pz("function pagaConReteP2P(paga, rete){")
+                 + "".join(pz(f) for f in ("function segnoReteCardP2P(rete){",
+                                           "function pagaReteCardP2P(paga, rete){",
+                                           "function rigaScambioOnchainP2P(o){"))
+                 + r"""
+const segnoReteP2P = r => '<span class="p2p-rete R' + r + '"></span>';
+const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n);
+const dataBreveP2P = t => '', iconaMetodiP2P = () => '<i>ICONA</i>', marchioMetodoP2P = m => m;
+const soloMarchiP2P = ms => ms.length > 0 && ms.every(m => m === 'Barattozon');
+const gruppoOnchainP2P = o => o.g, statoOnchainCardP2P = () => ({t: 'x'});
+const toccaAMeOnchainP2P = () => false, tintaOnchainP2P = () => '';
+const o = {id: 3, parte: 'vendo', sats: 1, euro: 1, stato: 'preso'};
+const box = c => (c.match(/<div class="p2p-box p2p-paga[^"]*"/) || [''])[0];
+const bz = g => rigaScambioOnchainP2P(Object.assign({metodi: ['Barattozon'], g}, o));
+const sepa = rigaScambioOnchainP2P(Object.assign({metodi: ['SEPA'], g: 'corso'}, o));
+console.log(JSON.stringify([box(bz('corso')), /ICONA/.test(bz('corso')),
+  box(bz('fatti')), box(bz('morti')), box(sepa), /ICONA/.test(sepa)]));
+""")
+    try:
+        r = subprocess.run(["node", "-e", banco_ins], capture_output=True, text=True, timeout=30)
+        prova("...e Barattozon ci entra con l'insegna blu della card Lightning, "
+              "senza l'iconcina; spenta a scambio concluso o annullato; SEPA com'era",
+              ['<div class="p2p-box p2p-paga p2p-paga-rete p2p-paga-marchio"', False,
+               '<div class="p2p-box p2p-paga p2p-paga-rete p2p-paga-marchio p2p-paga-spenta"',
+               '<div class="p2p-box p2p-paga p2p-paga-rete p2p-paga-marchio p2p-paga-spenta"',
+               '<div class="p2p-box p2p-paga p2p-paga-rete"', True],
+              json.loads(r.stdout.strip()) if r.returncode == 0 else r.stderr[-300:])
+    except (OSError, subprocess.TimeoutExpired):
+        salta("l'insegna di Barattozon sulla card on-chain di «I miei scambi»", "node assente")
     riga_ln = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
     prova("...e la card Lightning di «I miei scambi» passa dalla stessa porta, "
           "senza piu' il segno nell'angolo", (True, False),

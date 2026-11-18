@@ -75562,6 +75562,12 @@ function rigaScambioOnchainP2P(o){
     : (g === 'corso' ? '<span class="p2p-aspetta">✋ Aspetta</span>' : '');
   const tinta = tintaOnchainP2P(o).replace(' badge ', '');
   const metodi = o.metodi || [];
+  /* L'INSEGNA BLU DI BARATTOZON, come sulla card di Lightning (18 nov 2026,
+     Andrea con la foto: «la stringa barattozon deve essere tutta blu»):
+     lo STESSO giudice (`soloMarchiP2P`), la stessa scatola
+     `.p2p-paga-marchio` senza l'iconcina davanti, e sullo scambio finito
+     (concluso o annullato) la stessa insegna spenta `.p2p-paga-spenta` */
+  const insegna = typeof soloMarchiP2P === 'function' && soloMarchiP2P(metodi);
   return '<div class="p2p-ord p2p-scambio p2p-scambio-oc' + (tinta ? ' tinta tono-' + tinta : '')
     + (annullato ? ' spenta' : '') + '" role="button" tabindex="0" data-id="' + Number(o.id) + '" '
     + 'onclick="apriScambioOnchainMioP2P(this.dataset.id)">'
@@ -75571,8 +75577,10 @@ function rigaScambioOnchainP2P(o){
     + (typeof premioOcMioP2P === 'function' ? premioOcMioP2P(o) : '')
     + '<div class="p2p-scambio-stato' + tintaOnchainP2P(o) + '"><span>' + esc(st.t) + '</span>' + agire
     + (st.d ? '<span class="p2p-aspetta-riga">' + esc(st.d) + '</span>' : '') + '</div>'
-    + (typeof pagaReteCardP2P === 'function' ? pagaReteCardP2P : x => x)(metodi.length ? '<div class="p2p-box p2p-paga" title="' + esc(metodi.join(', ')) + '">'
-       + iconaMetodiP2P(metodi) + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '', 'btc')
+    + (typeof pagaReteCardP2P === 'function' ? pagaReteCardP2P : x => x)(metodi.length ? '<div class="p2p-box p2p-paga'
+       + (insegna ? ' p2p-paga-marchio' : '') + (insegna && (chiuso || annullato) ? ' p2p-paga-spenta' : '')
+       + '" title="' + esc(metodi.join(', ')) + '">'
+       + (insegna ? '' : iconaMetodiP2P(metodi)) + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '', 'btc')
     /* il tempo per pagare come bordo di sotto, la barra delle card del
        libro (17 nov 2026): solo a deposito confermato */
     + (o.stato === 'depositato' && Number(o.paga_entro) > 0 && typeof barraScadenzaP2P === 'function'

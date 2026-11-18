@@ -91979,3 +91979,21 @@ nuova, a rete giù, senza presa nuova, altrove, il tasto della chat),
 controprova (tolti la pensione e il giudice della riga chiusa: 6
 rosse). NON PROVATO DAL VIVO: la Mini App di Andrea con uno scambio
 preso dalla web app — da guardare dopo la promozione.
+
+## L'insegna blu di Barattozon anche sulla card on-chain di «I miei scambi» (18 nov 2026, cantiere barattozon-blu; Andrea con la foto: «nei miei ordini la stringa barattozon deve essere tutta blu», «come si vede nel lighting, uguale»)
+
+La card on-chain di «I miei scambi» (`rigaScambioOnchainP2P`) scriveva
+la scatola dei metodi come una scatola qualunque: carta grigia,
+iconcina davanti e il marchio piccolo. La card Lightning della stessa
+lista (`rigaScambioP2P`) dal 10 ott usa l'INSEGNA: quando dentro c'è
+solo un marchio (`soloMarchiP2P`) la scatola prende `p2p-paga-marchio`
+(fondo navy pieno, marchio nudo, niente iconcina) e a scambio finito
+`p2p-paga-spenta`. Ora la card on-chain fa lo stesso, con lo stesso
+giudice e le stesse classi, nessun CSS nuovo; «finito» lì vuol dire
+gruppo `fatti` o `morti` (concluso, annullato, rimborsato). La moneta ₿
+resta a destra (`pagaReteCardP2P`), SEPA e gli altri metodi col nome
+restano com'erano.
+
+Provato: un banco node in `prove_p2p_onchain` (insegna a scambio in
+corso senza iconcina, spenta su concluso e annullato, SEPA invariata),
+rosso col codice di prima.
