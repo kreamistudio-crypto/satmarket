@@ -193060,6 +193060,33 @@ console.log(JSON.stringify(r));
           ["contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),\n"
            "                       FRASE_INTERVALLO_DOPO_PRESA)" in _fn_js(mini, "function schedaOnchainP2P(o){"),
            "if ((o.tabacchino || Number(o.euro_min) > 0) && typeof tabacchinoP2P" in mini])
+    # LA FRASE DELLA PRESA, nei due versi (18 nov 2026): chi compra in «Vendi
+    # BTC» paga il PayCode al tabacchino, chi vende in «Compra BTC» non
+    # riceve euro; gli altri ordini restano con le frasi di prima
+    frase = _fn_js(mini, "function corpoPresaOcP2P(o, vendeLui){") + r"""
+const p2pOcPresaRete = {}, p2pOnchainLibro = {oreDeposito: 6}, esc = s => String(s);
+const fmtSoldiP2P = e => Number(e).toFixed(2).replace('.', ','), satsCardOnchainP2P = o => '≈ 1 sats';
+const P2P_TABACCHINO = 'Contanti al tabacchino';
+const tabacchinoP2P = m => (m || []).some(x => String(x).indexOf(P2P_TABACCHINO) === 0);
+const metodoPresaOcP2P = o => (o.metodi || [])[0] || '';
+const bzOcInCompraP2P = o => o.lato === 'buy' && tabacchinoP2P(o.metodi) && Number(o.euro_min) > 0;
+console.log(JSON.stringify([
+  corpoPresaOcP2P({id: 1, lato: 'sell', metodi: ['Contanti al tabacchino 39.99'], euro: 39.99}, true),
+  corpoPresaOcP2P({id: 2, lato: 'buy', metodi: ['Contanti al tabacchino'], euro: 250, euro_min: 25}, false),
+  corpoPresaOcP2P({id: 3, lato: 'sell', metodi: ['Revolut'], euro: 50}, true)]));
+"""
+    out = _node_banco(frase)
+    if out is None:
+        salta("il banco della frase della presa Barattozon on-chain", "serve node")
+        return
+    prova("la frase della presa: in «Vendi BTC» si paga il PayCode al tabacchino, in «Compra "
+          "BTC» lo paga chi compra, gli altri ordini con gli euro come prima",
+          [[True, False], [True, False], [False, True]],
+          [["lo paghi in contanti al tabacchino e tocchi «🧾 Ho pagato al tabacchino»" in out[0],
+            "mandi gli euro" in out[0]],
+           ["Chi compra paga in contanti al tabacchino il tuo PayCode Amazon" in out[1],
+            "ti manda" in out[1]],
+           ["al tabacchino" in out[2], "mandi gli euro col metodo scritto" in out[2]]])
 
 
 def prove_estensione_barattozon():

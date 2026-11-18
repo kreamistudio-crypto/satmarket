@@ -90608,3 +90608,12 @@ nel venv senza coincurve; scatti in Chromium della carta, del foglio di
 chi prende, del foglio del PayCode e del mio dettaglio. NON PROVATO: un
 telefono vero (il logo di Barattozon negli scatti non c'è perché la
 pagina girava da file).
+
+## La frase della presa di Barattozon on-chain in «Vendi BTC» (18 nov 2026, seguito di barattozon-oc-carta; Andrea vuole «tutto uguale al Lightning»)
+Chi prende un Barattozon on-chain in «Vendi BTC» (compra sats pagando il
+PayCode di chi vende) leggeva sotto il foglio «mandi gli euro col metodo
+scritto e tocchi «Ho inviato gli euro»». Ora: «vedi il suo PayCode
+Amazon, lo paghi in contanti al tabacchino e tocchi «🧾 Ho pagato al
+tabacchino»», il nome vero del gesto nella scheda. PROVATO:
+`prove_barattozon_onchain`, banco node delle tre frasi (Vendi BTC,
+Compra BTC, un ordine qualsiasi); controprova rossa.

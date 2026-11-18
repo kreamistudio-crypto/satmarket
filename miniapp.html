@@ -73368,6 +73368,11 @@ function corpoPresaOcP2P(o, vendeLui){
   return paroleOc(o, vendeLui
       ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
         + (cont ? 'Quando sono confermati vi vedete dove ti scrive lui, consegni i contanti e tocchi «Ho consegnato i contanti»; '
+           /* Barattozon in «Vendi BTC» (18 nov 2026, barattozon-oc-carta,
+              Andrea: «tutto uguale al Lightning»): non si mandano euro, si
+              paga il SUO PayCode al tabacchino */
+           : typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi)
+           ? 'Quando sono confermati vedi il suo PayCode Amazon, lo paghi in contanti al tabacchino e tocchi «🧾 Ho pagato al tabacchino»; '
            : 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; ')
         + (ln
           ? 'lui li libera e, con lo swap, ti arrivano in Lightning, meno la tua metà della commissione e il costo dello swap. '
