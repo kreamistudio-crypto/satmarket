@@ -9775,9 +9775,12 @@
   quello del wallet (`attendiWallet`, col suo giro): se la pagina non si
   nasconde, `avvisaFirmatarioMuto` lo dice e fuori da Telegram offre la
   forma `intent://` (`intentNostrconnect`). Niente cambia nel giro
-  NIP-46: segreto, relay, ascolto e cassetta sono quelli del QR. Su
-  iPhone no (iOS sospende la pagina, Safari dà un errore suo davanti a
-  uno schema senza app): lì resta il consiglio del bunker. La leva
+  NIP-46: segreto, relay, ascolto e cassetta sono quelli del QR. E DAL
+  18 NOV SERA ANCHE SU IPHONE con Clave (cantiere clave-da-solo): Clave
+  dichiara lo schema (`Info.plist`), e la sospensione della pagina di
+  iOS la copre la cassetta del server; `firmatarioQuiOfferto` dice
+  'android' o 'ios' e `NOME_FIRMATARIO_QUI` mette Amber o Clave nei
+  testi. Il consiglio del bunker di Clave resta nella sua tendina. La leva
   `NOSTRCONNECT_APRI_APP` (accesa di serie) viaggia accanto a
   `relay_nip46` in `/api/listings` e `/api/login/nostr/relay`.
   DICE DUE STRADE E NON UNA: 📱 Amber per chi entra dal telefono

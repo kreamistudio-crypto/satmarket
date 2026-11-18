@@ -126356,7 +126356,7 @@ def prove_login_qr():
     if _shq.which("node"):
         _bq = ("const scrivi = console.log; console.log = () => {};   // le righe 🟪 tacciono\n"
                "const nodi = {};\n"
-               "const el = id => (nodi[id] ||= {id, style: {}, textContent: '', href: '#', clic: 0,\n"
+               "const el = id => (nodi[id] ||= {id, style: {}, textContent: '', innerHTML: '', href: '#', clic: 0,\n"
                "  getAttribute(k){ return this[k]; }, click(){ this.clic++; apriFirmatarioQui(this); }});\n"
                "let walletGiro = 0, guardie = [], detto = '';\n"
                "function attendiWallet(giro, poi){ guardie.push(poi); }\n"
@@ -126364,6 +126364,7 @@ def prove_login_qr():
                "async function disegnaQr(){ return true; }\n"
                + pezzo_js(mini, "function stradaWallet(dentroTelegram, ua){", "\n}\n") + "\n}\n"
                + pezzo_js(mini, "function firmatarioQuiOfferto(leva, ua, piattaformaTg){", "\n}\n") + "\n}\n"
+               + "const NOME_FIRMATARIO_QUI = {android: 'Amber', ios: 'Clave'};\n"
                + pezzo_js(mini, "function intentNostrconnect(uri){", "\n}\n") + "\n}\n"
                + pezzo_js(mini, "function apriFirmatarioQui(a){", "\n}\n") + "\n}\n"
                + pezzo_js(mini, "function avvisaFirmatarioMuto(a){", "\n}\n") + "\n}\n"
@@ -126373,6 +126374,7 @@ def prove_login_qr():
 const URI = 'nostrconnect://PUB?relay=wss%3A%2F%2Fa.example&secret=s';
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile';
 const PC = 'Mozilla/5.0 (Windows NT 10.0) Chrome/130';
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1';
 async function giro(ua, attivo, piattaforma, dentro){
   for (const k of Object.keys(nodi)) delete nodi[k];
   guardie = []; detto = '';
@@ -126382,15 +126384,22 @@ async function giro(ua, attivo, piattaforma, dentro){
   await mostraQrConnessione(URI);
   const a = el('nostrApriApp');
   return [a.style.display, a.href, a.clic, el('nostrQrAiutoApp').style.display,
-          el('nostrQrAiuto').style.display, /Apri Amber/.test(detto)];
+          el('nostrQrAiuto').style.display, /Apri (Amber|Clave)/.test(detto)];
 }
+const nomi = () => [el('nostrApriApp').textContent, /Clave su questo telefono/.test(el('nostrQrAiutoApp').innerHTML),
+                    /Apri Clave e approva/.test(el('nostrApriMutoTesto').textContent), /Approva in Clave/.test(detto)];
 (async () => {
   const r = {};
   r.tabella = [firmatarioQuiOfferto(true, ANDROID, ''), firmatarioQuiOfferto(true, PC, ''),
     firmatarioQuiOfferto(true, PC, 'android'), firmatarioQuiOfferto(true, 'iPhone', 'ios'),
-    firmatarioQuiOfferto(false, ANDROID, 'android')];
+    firmatarioQuiOfferto(false, ANDROID, 'android'), firmatarioQuiOfferto(true, IPHONE, ''),
+    firmatarioQuiOfferto(true, PC, 'ios'), firmatarioQuiOfferto(false, IPHONE, 'ios'),
+    firmatarioQuiOfferto(true, PC, 'tdesktop')];
   r.intent = [intentNostrconnect(URI), intentNostrconnect('https://x.example')];
   r.android = await giro(ANDROID, true, '', false);
+  r.androidNomi = nomi();
+  r.iphone = await giro(IPHONE, true, '', false);
+  r.iphoneNomi = nomi();
   r.scaduto = await giro(ANDROID, false, '', false);
   r.senzaApi = await giro(ANDROID, null, '', false);
   r.pc = await giro(PC, true, '', false);
@@ -126410,6 +126419,10 @@ async function giro(ua, attivo, piattaforma, dentro){
   await giro(ANDROID, true, '', false);
   guardie[0](true);
   r.aperto = el('nostrApriMuto').style.display;
+  // su iPhone l'avviso senza intent (e' solo di Android)
+  await giro(IPHONE, true, '', false);
+  guardie[0](false);
+  r.mutoIphone = [el('nostrApriMuto').style.display, el('nostrApriIntent').style.display];
   scrivi(JSON.stringify(r));
 })();
 """)
@@ -126418,9 +126431,10 @@ async function giro(ua, attivo, piattaforma, dentro){
         if not _dq:
             prova("AMBER DA SOLO gira sotto node", "0", _rq.stderr[:400])
         else:
-            prova("si offre su Android (user agent o piattaforma di Telegram), "
-                  "mai dal PC, mai su iPhone, mai a leva spenta",
-                  [True, False, True, False, False], _dq["tabella"])
+            prova("si offre su Android e (dal 18 nov sera) su iPhone, dallo user "
+                  "agent o dalla piattaforma di Telegram; mai dal PC, mai a leva spenta",
+                  ["android", "", "android", "ios", "", "ios", "ios", "", ""],
+                  _dq["tabella"])
             prova("la forma intent:// tiene la URI intera, e non nasce da un "
                   "link che non e' nostrconnect",
                   ["intent://PUB?relay=wss%3A%2F%2Fa.example&secret=s"
@@ -126429,6 +126443,14 @@ async function giro(ua, attivo, piattaforma, dentro){
             prova("ANDROID col tocco fresco: il bottone porta la URI del QR e "
                   "parte da solo UNA volta, con la riga d'aiuto sua",
                   ["", _URI, 1, "", "none", True], _dq["android"])
+            prova("...e i testi dicono Amber", ["📲 Apri Amber e approva", False, False, False],
+                  _dq["androidNomi"])
+            prova("IPHONE col tocco fresco: il bottone porta la URI e parte da solo, "
+                  "come su Android", ["", _URI, 1, "", "none", True], _dq["iphone"])
+            prova("...e i testi dicono Clave: bottone, aiuto, avviso e foglio",
+                  ["📲 Apri Clave e approva", True, True, True], _dq["iphoneNomi"])
+            prova("...e l'avviso su iPhone senza intent (e' solo di Android)",
+                  ["", "none"], _dq["mutoIphone"])
             prova("...col tocco scaduto (relay lenti) non parte niente: resta "
                   "il bottone", ["", _URI, 0, "", "none", True], _dq["scaduto"])
             prova("...e senza l'API dell'attivazione neppure",

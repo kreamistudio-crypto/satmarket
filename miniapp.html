@@ -18598,10 +18598,12 @@ document.getElementById('cartello')?.remove();</script>
            e' suo; lo accende `mostraQrConnessione` e la leva
            NOSTRCONNECT_APRI_APP, e se non si apre niente l'avviso sotto
            lo dice (`avvisaFirmatarioMuto`). QR e link restano sotto per
-           chi firma da un altro telefono. -->
+           chi firma da un altro telefono. E DAL 18 NOV SERA ANCHE SU
+           IPHONE con Clave (cantiere clave-da-solo): i nomi dell'app nei
+           testi li mette `mostraQrConnessione` (`NOME_FIRMATARIO_QUI`). -->
       <a class="btn primary" id="nostrApriApp" href="#" style="display:none;margin-top:10px;text-decoration:none" onclick="apriFirmatarioQui(this)">📲 Apri Amber e approva</a>
       <div class="wallet-avviso" id="nostrApriMuto" role="status" style="display:none;margin:10px 0 0">
-        <span>⚠️ Non si è aperto nessun firmatario. Se hai Amber su questo telefono tocca di nuovo «Apri Amber e approva»; se no copia il link qui sotto, o inquadra il codice dal telefono dove firmi.</span>
+        <span id="nostrApriMutoTesto">⚠️ Non si è aperto nessun firmatario. Se hai Amber su questo telefono tocca di nuovo «Apri Amber e approva»; se no copia il link qui sotto, o inquadra il codice dal telefono dove firmi.</span>
         <a class="btn ghost" id="nostrApriIntent" href="#" style="display:none" onclick="riprovaFirmatarioQui(this)">📲 Riprova in un altro modo</a>
       </div>
       <div class="qr" id="nostrQr"></div>
@@ -79281,18 +79283,35 @@ async function firmatarioNostrConnect(){
      e' fatto vivo: l'avviso lo dice (`avvisaFirmatarioMuto`, il cane da
      guardia del wallet), e fuori da Telegram offre anche la forma
      `intent://` per l'app installata (la TWA).
-   SOLO ANDROID, e non e' pigrizia: su iPhone il nostrconnect sullo
-   stesso telefono muore di iOS (la pagina sospesa mentre si approva in
-   Clave) e Safari, davanti a uno schema senza app, mostra un errore
-   suo — li' resta il consiglio del bunker (10 ott 2026). Dal computer
-   il firmatario sta su un altro dispositivo: li' il QR. */
-/* PURA: si offre il firmatario sul telefono? Con la leva accesa, su
-   Android: la piattaforma che dichiara Telegram, o lo user agent. */
+   E ANCHE SU IPHONE, CON CLAVE (18 nov 2026 sera, cantiere
+   clave-da-solo; Andrea, provato Amber: «Dovrebbe anche andare per clave
+   su iOS»). Il primo giro lo escludeva per due ragioni, e tutte e due
+   sono cadute o pesano meno: 1) «il nostrconnect sullo stesso iPhone
+   muore di iOS», che sospende la pagina mentre si approva in Clave — ma
+   dal 10 ott 2026 la risposta arrivata mentre si dorme la tiene la
+   cassetta del server (`cassettaNip46`) e al ritorno si legge, e nella
+   URI c'e' `relay.powr.build`, quello di Clave; 2) Clave lo schema lo
+   dichiara: nel sorgente (DocNR/clave, 230229a) `Info.plist` ha
+   `CFBundleURLSchemes` = `nostrconnect`, e `ClaveApp` passa il link alla
+   stessa approvazione del QR. Resta che Safari, davanti a uno schema
+   senza app, mostra un errore suo: lo vede solo chi tocca «Entra con
+   nostrconnect» senza un firmatario sul telefono, e sotto c'e' l'avviso
+   col QR. Il consiglio del bunker di Clave resta nella sua tendina:
+   firma via notifica, ed e' ancora la strada piu' solida.
+   Dal computer il firmatario sta su un altro dispositivo: li' il QR. */
+/* PURA: si offre il firmatario sul telefono, e quale? Con la leva
+   accesa: 'android' o 'ios' (la piattaforma che dichiara Telegram, o lo
+   user agent), '' altrove. Il nome dell'app nei testi viene da qui. */
 function firmatarioQuiOfferto(leva, ua, piattaformaTg){
-  if (!leva) return false;
-  if (['android', 'android_x'].includes(String(piattaformaTg || ''))) return true;
-  return /Android/i.test(String(ua || ''));
+  if (!leva) return '';
+  const p = String(piattaformaTg || ''), u = String(ua || '');
+  if (['android', 'android_x'].includes(p)) return 'android';
+  if (p === 'ios') return 'ios';
+  if (/Android/i.test(u)) return 'android';
+  if (/iPhone|iPad|iPod/.test(u)) return 'ios';
+  return '';
 }
+const NOME_FIRMATARIO_QUI = {android: 'Amber', ios: 'Clave'};
 /* PURA: la forma intent:// di un nostrconnect:// ('' se non lo e'),
    il calco di `intentWallet` */
 function intentNostrconnect(uri){
@@ -79340,6 +79359,17 @@ async function mostraQrConnessione(uri){
   const aiutoApp = el('nostrQrAiutoApp'), aiuto = el('nostrQrAiuto');
   if (aiutoApp) aiutoApp.style.display = qui ? '' : 'none';
   if (aiuto) aiuto.style.display = qui ? 'none' : '';
+  /* il nome dell'app che il telefono ha di solito: Amber o Clave. I
+     testi sono nostri, il nome viene da una tabella chiusa */
+  const nome = NOME_FIRMATARIO_QUI[qui] || 'Amber';
+  if (app && qui) app.textContent = `📲 Apri ${nome} e approva`;
+  const mutoTesto = el('nostrApriMutoTesto');
+  if (mutoTesto && qui) mutoTesto.textContent = `⚠️ Non si è aperto nessun firmatario. `
+    + `Se hai ${nome} su questo telefono tocca di nuovo «Apri ${nome} e approva»; `
+    + `se no copia il link qui sotto, o inquadra il codice dal telefono dove firmi.`;
+  if (aiutoApp && qui) aiutoApp.innerHTML = `Con <b>${nome} su questo telefono</b> `
+    + `basta il bottone verde: approva e <b>torna qui</b>, la risposta ti aspetta. `
+    + `Il codice serve solo se firmi da un <b>altro</b> telefono.`;
   box.style.display = '';
   /* il lancio da solo PRIMA di disegnare il codice: il disegno puo'
      caricare la sua libreria, e il tocco fresco non aspetta */
@@ -79350,10 +79380,10 @@ async function mostraQrConnessione(uri){
   }
   const fatto = await disegnaQr(el('nostrQr'), uri, 'Byte');
   if (qui) {
-    bunkerDice("Approva in Amber (o nel firmatario del telefono) e torna "
-      + "qui: resto in ascolto, la risposta ti aspetta. Se non si è "
-      + "aperto, tocca «Apri Amber e approva»; se firmi da un altro "
-      + "telefono, inquadra il codice.");
+    bunkerDice(`Approva in ${nome} (o nel firmatario del telefono) e torna `
+      + `qui: resto in ascolto, la risposta ti aspetta. Se non si è `
+      + `aperto, tocca «Apri ${nome} e approva»; se firmi da un altro `
+      + `telefono, inquadra il codice.`);
     return;
   }
   bunkerDice(fatto

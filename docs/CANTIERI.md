@@ -91671,3 +91671,30 @@ spenta = si prende senza, «Compra BTC» non la scrive, la perdita da
 sola col tempo scaduto e con la rinuncia contro il LND di cartone, e
 niente perdita con «Ho inviato» toccato o senza recapito). NON PROVATO:
 un LND vero (come tutta la cauzione on-chain, voce 20).
+
+## Clave si apre da solo anche su iPhone (18 nov 2026 sera, cantiere clave-da-solo, seguito di amber-da-solo; Andrea, provato Amber sul collaudo: «si si apre di default, funziona :)», poi «Dovrebbe anche andare per clave su iOS»)
+
+DECISO. Il bottone e il lancio da solo del nostrconnect:// valgono
+anche su iPhone (user agent iPhone/iPad/iPod o `tg.platform` 'ios'):
+`firmatarioQuiOfferto` ora dice 'android' o 'ios', e i testi (bottone,
+avviso, aiuto, riga del foglio) nominano Amber o Clave
+(`NOME_FIRMATARIO_QUI`). Niente `intent://` su iPhone. Il consiglio del
+bunker di Clave resta nella sua tendina, aperta su iOS come prima.
+PERCHÉ ADESSO SÌ. Il primo giro escludeva iOS per due motivi. 1) «Il
+nostrconnect sullo stesso iPhone muore di iOS» (la pagina sospesa mentre
+si approva in Clave): dal 10 ott 2026 la risposta arrivata mentre si
+dorme la tiene la cassetta del server e al ritorno si legge, e nella URI
+c'è `relay.powr.build`, quello di Clave. 2) Clave lo schema lo dichiara:
+nel sorgente (DocNR/clave, 230229a, 5 set 2026) `Info.plist` ha
+`CFBundleURLSchemes` = `nostrconnect`. Resta l'errore di Safari davanti a
+uno schema senza app: lo vede solo chi tocca «Entra con nostrconnect»
+senza un firmatario sul telefono, e sotto ha l'avviso col QR.
+PROVATO. `prove_login_qr`: la tabella di `firmatarioQuiOfferto` (9 casi),
+iPhone col tocco fresco (bottone, lancio da solo), i testi con Clave e
+con Amber, l'avviso su iPhone senza intent. Controprove: tolto il ramo
+iPhone, nome fisso: rosse. Giro dal vivo in Chromium con l'iPhone 15 e il
+Pixel 7 emulati (relay di cartone): «Apri Clave e approva», lancio da
+solo, avviso senza intent; su Android come prima.
+NON PROVATO DAL VIVO: un iPhone vero con Clave. Da guardare: che Safari
+lasci partire il lancio da solo dopo l'attesa dei relay (se no resta il
+bottone), e che dopo l'ok in Clave, tornati su Barattolo, si entri.

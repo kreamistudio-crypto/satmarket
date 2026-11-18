@@ -676,8 +676,8 @@ leva: NEGOZI_SU_NOSTR (accesa di serie)
 pubblico: sì
 
 ## 2026-11-18 · amber-da-solo
-frase: Su Android entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e Amber si apre da solo per chiederti l'ok. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
-dove: Entra con Nostr → «📱 Entra con nostrconnect»; se Amber non si apre da solo, il bottone «📲 Apri Amber e approva». Dal computer resta il codice QR da inquadrare.
+frase: Dal telefono entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e il tuo firmatario si apre da solo per chiederti l'ok, Amber su Android e Clave su iPhone. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
+dove: dal sito nel browser, «…o entra con Nostr» → «📱 Entra con nostrconnect»; se l'app non si apre da sola, il bottone «📲 Apri Amber e approva» (su iPhone «Apri Clave e approva»). Dal computer resta il codice QR da inquadrare.
 leva: NOSTRCONNECT_APRI_APP (accesa di serie)
 pubblico: sì
 

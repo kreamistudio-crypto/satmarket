@@ -32,7 +32,7 @@ Il bot di Telegram serve a tre cose: aprire Barattolo, mandarti gli avvisi sui t
 Non servono email, password o numero di telefono. Si entra in due modi:
 - con Telegram: dentro la Mini App sei già riconosciuto; sul sito c'è «Entra con Telegram»;
 - con una chiave Nostr: «Entra con Nostr», con un'estensione del browser, un bunker (nostrconnect) o un'app che firma. La chiave privata (nsec) non arriva mai ai server di Barattolo: quando serve una firma la fa il tuo browser o il tuo bunker.
-- su Android con Amber non serve più copiare e incollare la stringa: tocchi «📱 Entra con nostrconnect» e Amber si apre da solo; approvi e torni su Barattolo. Se non si apre, c'è il bottone «📲 Apri Amber e approva»; il codice QR e «Copia il link» restano per chi firma da un altro telefono. Su iPhone con Clave resta consigliato il bunker://.
+- dal sito sul telefono non serve più copiare e incollare la stringa: tocchi «📱 Entra con nostrconnect» e il firmatario si apre da solo, Amber su Android e Clave su iPhone; approvi e torni su Barattolo. Se non si apre, c'è il bottone «📲 Apri Amber e approva» (o «Apri Clave e approva»); il codice QR e «Copia il link» restano per chi firma da un altro telefono. Su iPhone il bunker:// di Clave resta la strada più solida.
 
 Entrare sul sito passando dal bot (se nelle REGOLAZIONI del pannello «Entra dal bot» è accesa): sul sito «Entra con Telegram» apre il bot @ilbarattolobot con un link fatto apposta (sul sito .onion il link arriva come QR, da inquadrare col telefono). Tocchi «Avvia» e il bot chiede «🔑 Entri su Barattolo come …?», mostrando tre figure del mercatino (per esempio 🍯 Miele, 🚲 Bici, 📚 Libri). Tocchi quella che la pagina ti mostra e sei dentro, con l'account che hai aperto in quel momento nell'app di Telegram: chi ha due account sceglie così quale usare. Il link vale due minuti e una volta sola. Se non sei stato tu a chiederlo, tocca «❌ Non sono stato io»: anche una figura sbagliata chiude il tentativo. ATTENZIONE ALLA TRUFFA: la figura giusta la vede solo chi ha chiesto di entrare, sulla sua pagina. Se qualcuno ti manda un link del bot e ti dice o ti scrive quale figura toccare, vuole entrare nel tuo account: non toccare la figura, tocca «❌ Non sono stato io». Barattolo e lo staff non ti chiedono mai di toccare una figura.
 
@@ -2358,8 +2358,8 @@ pubblico: sì
 <!-- pezzo novita-107 | novita -->
 ## Novità · 2026-11-18 · amber-da-solo
 
-frase: Su Android entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e Amber si apre da solo per chiederti l'ok. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
-dove: Entra con Nostr → «📱 Entra con nostrconnect»; se Amber non si apre da solo, il bottone «📲 Apri Amber e approva». Dal computer resta il codice QR da inquadrare.
+frase: Dal telefono entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e il tuo firmatario si apre da solo per chiederti l'ok, Amber su Android e Clave su iPhone. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
+dove: dal sito nel browser, «…o entra con Nostr» → «📱 Entra con nostrconnect»; se l'app non si apre da sola, il bottone «📲 Apri Amber e approva» (su iPhone «Apri Clave e approva»). Dal computer resta il codice QR da inquadrare.
 leva: NOSTRCONNECT_APRI_APP (accesa di serie)
 pubblico: sì
 
