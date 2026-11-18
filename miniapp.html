@@ -7561,6 +7561,28 @@
   @media (prefers-reduced-motion: reduce){
     .serie-festa{transition:none}
     .serie-festa.show .serie-f{animation:none}}
+  /* LA BRACE DEL GIORNO (18 nov 2026, la «E» scelta da Andrea): il
+     cerchio di oggi parte scuro come una brace, si accende, respira due
+     volte e resta come sempre; il numero della riga rotola da ieri a
+     oggi. Le classi le mette `serieAccendi`, una volta al giorno. */
+  .serie-g.oggi.brace i{animation:serie-brace 2.4s ease-in-out both}
+  .serie-g.oggi.brace i .serie-f{animation:serie-brace-f 2.4s ease-in-out both}
+  @keyframes serie-brace{
+    0%{background:#5A2A0C;box-shadow:0 0 0 3px var(--sats-soft)}
+    30%{background:var(--sats);box-shadow:0 0 0 3px var(--sats-soft),0 0 16px 4px rgba(247,147,26,.55)}
+    55%{background:#D9790F;box-shadow:0 0 0 3px var(--sats-soft),0 0 6px 1px rgba(247,147,26,.3)}
+    80%{background:var(--sats);box-shadow:0 0 0 3px var(--sats-soft),0 0 16px 4px rgba(247,147,26,.5)}
+    100%{background:var(--sats);box-shadow:0 0 0 3px var(--sats-soft)}}
+  @keyframes serie-brace-f{
+    0%{opacity:.35;transform:scale(.8)}30%{opacity:1;transform:scale(1.1)}
+    55%{transform:scale(.97)}80%{transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+  .serie-rullo{display:inline-block;height:1.25em;line-height:1.25em;
+    overflow:hidden;vertical-align:bottom}
+  .serie-rullo>span{display:block;text-align:center;
+    animation:serie-rotola .7s cubic-bezier(.3,1.4,.5,1) .55s both}
+  @keyframes serie-rotola{0%{transform:translateY(0)}100%{transform:translateY(-50%)}}
+  @media (prefers-reduced-motion: reduce){
+    .serie-g.oggi.brace i,.serie-g.oggi.brace i .serie-f,.serie-rullo>span{animation:none}}
   /* La faccina di chi ha lasciato il feedback (ago 2026): il cerchio
      dell'avatar rimpicciolito, che qui accompagna il nome e non lo
      comanda — e' un francobollo, non un ritratto. */
@@ -21776,6 +21798,51 @@ function serieArrivata(s, ritardo, ridisegna){
   mySerie = serieBusta(s);
   if (ridisegna) renderProfilo();
   if (mySerie && mySerie.nuova) setTimeout(() => serieFesta(mySerie), ritardo || 0);
+}
+/* LA BRACE DEL GIORNO (18 nov 2026, Andrea: «ogni volta che apri l'app,
+   se vai nella pagina profilo e guardi lo streak la prima volta in quel
+   giorno, lo streak fa un'animazione carina che indica che oggi sei
+   entrato»; scelta la «E · Brace che respira» fra cinque, «ma deve
+   muoversi anche il numerino che da 1 passa a 2»). Il cerchio di oggi
+   si accende piano e respira due volte; il numero della riga rotola da
+   ieri a oggi. UNA VOLTA AL GIORNO PER TELEFONO: il giorno l'ha detto il
+   server (`oggi`, quello italiano) e qui si ricorda l'ultimo acceso,
+   per account. Il saluto (`serieFesta`) resta com'e': quello e' del
+   primo passaggio, questa del primo SGUARDO al Profilo. Al primo giorno
+   la brace si accende lo stesso, il numero no (da 0 a 1 non e' una
+   fila). Senza memoria del telefono non si accende: meglio niente che
+   a ogni apertura. Con gli effetti ridotti la brace e' gia' accesa (il
+   CSS) e il numero non rotola (qui). */
+const SERIE_ACCESA_CHIAVE = 'barattolo_serie_accesa';
+function serieDaAccendere(b, ultima){
+  return !!(b && b.oggi && b.oggi_contato && b.giorni >= 1 && ultima !== b.oggi);
+}
+function serieRulloHTML(g){
+  const n = Math.floor(Number(g)) || 0;
+  return n >= 2 ? `<span class="serie-rullo"><span>${n - 1}<br>${n}</span></span>` : '';
+}
+function serieAccendi(){
+  if (document.hidden || DEMO || VETRINA) return;
+  if (document.querySelector('.view.active')?.id !== 'view-profilo') return;
+  const box = el('profiloTestata');
+  if (!box || !mySerie) return;
+  const chiave = SERIE_ACCESA_CHIAVE + ':' + (myTgId || '');
+  let ultima;
+  try { ultima = localStorage.getItem(chiave); } catch(e) { return; }
+  if (!serieDaAccendere(mySerie, ultima)) return;
+  try { localStorage.setItem(chiave, mySerie.oggi); } catch(e) { return; }
+  const oggi = box.querySelector('.serie-g.oggi');
+  if (oggi) { oggi.classList.remove('brace'); void oggi.offsetWidth; oggi.classList.add('brace'); }
+  const num = box.querySelector('.serie-riga .serie-n');
+  /* con gli effetti ridotti il numero non rotola: resta quello di oggi
+     (il rullo fermo mostrerebbe quello di ieri) */
+  const rullo = effettiRidotti() ? '' : serieRulloHTML(mySerie.giorni);
+  if (num && rullo) {
+    num.innerHTML = rullo;
+    /* finito il giro, torna il numero e basta (chi legge ad alta voce
+       non deve sentire «uno due») */
+    setTimeout(() => { if (num.isConnected) num.textContent = String(mySerie.giorni); }, 1600);
+  }
 }
 /* IL GIORNO ITALIANO VISTO DAL TELEFONO, solo per decidere se vale la
    pena bussare al server (che poi decide lui): «AAAA-MM-GG», o '' dove
@@ -43904,6 +43971,9 @@ function renderProfilo(){
   /* Le sezioni per ultime: la loro visibilita' si LEGGE da quella
      dei cassetti, che le righe qui sopra hanno appena deciso. */
   aggiornaGruppiProfilo();
+  /* la brace del giorno: una volta al giorno, e solo se il Profilo
+     e' davvero davanti agli occhi (renderProfilo gira anche dietro) */
+  serieAccendi();
 }
 
 /* ---- «Completa il profilo (N di M)»: il promemoria consultabile.

@@ -608,3 +608,9 @@ frase: Barattozon on-chain adesso c'è anche in «Compra BTC»: scegli il tabacc
 dove: Il P2P, «Compra BTC» → metodo «Contanti al tabacchino», il tasto «On-chain» in cima al foglio; chi prende scrive importo, PayCode e scadenza nel foglio della presa.
 leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
 pubblico: sì
+
+## 2026-11-18 · fiamma-giorno
+frase: La prima volta al giorno che apri il Profilo, la tua serie te lo dice: il cerchio di oggi si accende piano come una brace e il numero dei giorni di fila sale da ieri a oggi. Una volta al giorno, e basta.
+dove: Profilo, la riga «🔥 N giorni di fila» sotto il nome e la fila dei sette giorni, il cerchio «oggi».
+leva: SERIE_GIORNI_ATTIVA (quella della serie, già accesa)
+pubblico: sì

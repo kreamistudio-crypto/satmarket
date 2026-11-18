@@ -90463,3 +90463,44 @@ dopo il deposito); i sentinella toccati in `prove_p2p_onchain`,
 `prove_onchain_contanti`. DA GUARDARE: alla presa il conto (sats e
 commissioni) non si vede finché non c'è l'importo; la card mostra la
 stima sul massimo della fascia.
+
+## La brace del giorno, la prima volta che guardi il Profilo (18 nov 2026, cantiere fiamma-giorno; Andrea: «ogni volta che apri l'app se vai proprio nella pagina profilo e guardi lo streak la prima volta in quel giorno, lo streak fa una animazione carina che indica che oggi sei entrato», poi «Brace che respira ma deve muoversi anche il numerino che da 1 passa a 2»)
+LA SCELTA: cinque animazioni in una pagina di prova (A accensione, B
+fiammata con scintille, C onda della settimana, D contatore che rotola,
+E brace che respira); Andrea ha preso la E col rullo della D. Il cerchio
+«oggi» parte scuro come una brace (#5A2A0C), si accende, respira due
+volte e resta com'è sempre (2,4 s); il numero della riga «N giorni di
+fila» rotola da N-1 a N (0,7 s, dopo mezzo secondo). Il rullo dura poco
+e poi la riga torna al solo numero: un lettore di schermo non deve
+leggere «4 5».
+QUANDO: `serieAccendi`, in fondo a `renderProfilo`. Parte solo col
+Profilo DAVANTI (`.view.active` è `view-profilo`, app non in tasca, né
+demo né vetrina): renderProfilo gira anche dietro, all'avvio e dopo un
+titolo scelto, e lì la brace andrebbe sprecata. Una volta al giorno PER
+TELEFONO E PER ACCOUNT: il giorno lo dice il server (`oggi` della busta,
+quello italiano) e si ricorda in `localStorage` alla chiave
+`barattolo_serie_accesa:<tg_id>`. Senza memoria del telefono non parte:
+meglio niente che a ogni apertura. Vuole `oggi_contato` (il server ha
+timbrato oggi). Il primo giorno la brace sì, il rullo no (da 0 a 1 non è
+una fila). Il saluto `serieFesta` resta com'era: quello è del primo
+PASSAGGIO del giorno, questa del primo SGUARDO al Profilo.
+SCARTATO: la memoria sul server (una colonna per un'animazione è troppo,
+e due telefoni che la vedono entrambi non sono un danno); la brace anche
+nella testata della stradina (lì la riga c'è, ma il gesto chiesto è il
+Profilo).
+MENO MOVIMENTO: con `prefers-reduced-motion` (e gli «Effetti ridotti»
+dell'app, regola universale) la fiamma è subito accesa e il numero è
+quello di oggi.
+PROVATO: `prove_serie_brace` nuova (il giudice, il rullo, serieAccendi in
+node su una pagina di cartone: una volta sola, il giorno dopo sì, un
+altro account sì, Profilo dietro no senza bruciare il giorno, tasca e
+demo no, senza memoria no; il filo in renderProfilo; il CSS e il
+reduced-motion), con controprove (tolto il controllo del giorno, della
+vista, il filo, il reduced-motion: rosse). Suite severa intera. Dal vivo
+sul server vero del worktree in collaudo, 375 px, scuro e chiaro: serie
+portata a 5 nel database di cartone, il numero rotola 4→5, la brace
+respira, la seconda visita del giorno non riparte, nessun errore di
+pagina. Video: /mnt/project-files/serie-giorni/brace-del-giorno.mp4.
+NON PROVATO: un telefono vero.
+DA FARE (aspetta l'ok di Andrea, stesso thread): la Classifica Streak
+con le posizioni scritte e le medaglie solo se non condivise da più di 3.

@@ -209057,6 +209057,116 @@ console.log(JSON.stringify(out));
     prova("in demo, senza l'ora di Roma o senza serie non si bussa mai",
           [2, 2, 2], [o.get("demo"), o.get("senza_intl"), o.get("senza_serie")])
 
+def prove_serie_brace():
+    """LA BRACE DEL GIORNO (18 nov 2026, cantiere fiamma-giorno; Andrea:
+    la prima volta al giorno che guardi il Profilo «lo streak fa
+    un'animazione carina», scelta la «E · Brace che respira» col numero
+    che rotola da ieri a oggi). Il giudice puro (una volta al giorno, da
+    `oggi` del server), il rullo del numero, e `serieAccendi` in node su
+    una pagina di cartone: solo col Profilo davanti, una volta sola, mai
+    senza memoria del telefono. Poi i fili: renderProfilo la chiama, il
+    CSS ha la brace e la rispetta chi vuole meno movimento."""
+    print("\n[la brace del giorno: una volta al giorno, col Profilo davanti]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i = mini.index("const SERIE_ACCESA_CHIAVE = ")
+    pezzi = mini[i:mini.index("\n}\n", mini.index("function serieAccendi(){", i)) + 3]
+    banco = ("let DEMO = false, VETRINA = false, myTgId = 111, mySerie = null, fermo = false;\n"
+             "const effettiRidotti = () => fermo;\n"
+             "const nodi = {};\n"
+             "function nodo(){ const cl = new Set(); return {innerHTML: '', textContent: '', isConnected: true,\n"
+             "  offsetWidth: 1, classList: {add: c => cl.add(c), remove: c => cl.delete(c), has: c => cl.has(c)}}; }\n"
+             "let vista = 'view-profilo', memoria = {}, memoriaRotta = false;\n"
+             "const document = {hidden: false, querySelector: q => q === '.view.active' ? {id: vista} : null};\n"
+             "const localStorage = {getItem: k => { if (memoriaRotta) throw new Error('no'); return k in memoria ? memoria[k] : null; },\n"
+             "  setItem: (k, v) => { if (memoriaRotta) throw new Error('no'); memoria[k] = String(v); }};\n"
+             "let testata = null;\n"
+             "function nuovaTestata(){ nodi.oggi = nodo(); nodi.num = nodo(); nodi.num.textContent = '2';\n"
+             "  testata = {querySelector: q => q === '.serie-g.oggi' ? nodi.oggi : (q === '.serie-riga .serie-n' ? nodi.num : null)}; }\n"
+             "const el = id => id === 'profiloTestata' ? testata : null;\n"
+             "const timer = []; function setTimeout(f){ timer.push(f); }\n"
+             + pezzi + """
+const B = (giorni, oggi, contato) => ({giorni, oggi, oggi_contato: contato !== false});
+const out = {};
+out.giudice = [serieDaAccendere(B(2, '2026-11-18'), null), serieDaAccendere(B(2, '2026-11-18'), '2026-11-17'),
+  serieDaAccendere(B(2, '2026-11-18'), '2026-11-18'), serieDaAccendere(B(2, ''), null),
+  serieDaAccendere(B(2, '2026-11-18', false), null), serieDaAccendere(null, null), serieDaAccendere(B(1, '2026-11-18'), null)];
+out.rullo = [serieRulloHTML(1), serieRulloHTML(2), serieRulloHTML(10), serieRulloHTML('3<img src=x>'), serieRulloHTML(null)];
+// la prima volta col Profilo davanti: brace e rullo, e il giorno resta in memoria
+mySerie = B(2, '2026-11-18'); nuovaTestata(); serieAccendi();
+out.prima = [nodi.oggi.classList.has('brace'), nodi.num.innerHTML, memoria['barattolo_serie_accesa:111'] || null];
+timer.forEach(f => f()); out.dopo = nodi.num.textContent;
+// la seconda volta lo stesso giorno: niente
+nuovaTestata(); serieAccendi(); out.seconda = [nodi.oggi.classList.has('brace'), nodi.num.innerHTML];
+// il giorno dopo si riaccende
+mySerie = B(3, '2026-11-19'); nuovaTestata(); serieAccendi(); out.domani = [nodi.oggi.classList.has('brace'), nodi.num.innerHTML];
+// un altro account sullo stesso telefono ha la sua
+myTgId = 222; nuovaTestata(); serieAccendi(); out.altro = nodi.oggi.classList.has('brace');
+// Profilo non davanti: niente, e il giorno NON si brucia
+myTgId = 333; vista = 'view-esplora'; nuovaTestata(); serieAccendi();
+out.dietro = [nodi.oggi.classList.has('brace'), 'barattolo_serie_accesa:333' in memoria];
+vista = 'view-profilo';
+// app in tasca, demo: niente
+document.hidden = true; nuovaTestata(); serieAccendi(); out.tasca = nodi.oggi.classList.has('brace'); document.hidden = false;
+DEMO = true; nuovaTestata(); serieAccendi(); out.demo = nodi.oggi.classList.has('brace'); DEMO = false;
+// primo giorno: la brace si', il rullo no
+myTgId = 444; mySerie = B(1, '2026-11-19'); nuovaTestata(); serieAccendi();
+out.primo = [nodi.oggi.classList.has('brace'), nodi.num.innerHTML];
+// effetti ridotti: la brace si' (il CSS la tiene ferma), il numero non rotola
+myTgId = 666; mySerie = B(4, '2026-11-19'); fermo = true; nuovaTestata(); serieAccendi();
+out.fermo = [nodi.oggi.classList.has('brace'), nodi.num.innerHTML]; fermo = false;
+// senza memoria del telefono: niente, mai a ogni apertura
+myTgId = 555; memoriaRotta = true; nuovaTestata(); serieAccendi(); out.senza = nodi.oggi.classList.has('brace');
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco)
+    if o is None:
+        salta("il banco della brace", "node assente")
+    else:
+        prova("il giudice: si accende se il server ha contato oggi e oggi non e' "
+              "gia' acceso; mai senza giorno, senza conto o senza serie",
+              [True, True, False, False, False, False, True], o.get("giudice"))
+        prova("il rullo: da ieri a oggi dal 2° giorno, niente al primo, e un "
+              "numero storto non porta markup",
+              ["", '<span class="serie-rullo"><span>1<br>2</span></span>',
+               '<span class="serie-rullo"><span>9<br>10</span></span>', "", ""],
+              o.get("rullo"))
+        prova("la prima volta col Profilo davanti: brace, rullo 1→2, il giorno "
+              "in memoria per account; finito il giro torna il numero",
+              [[True, '<span class="serie-rullo"><span>1<br>2</span></span>',
+                "2026-11-18"], "2"], [o.get("prima"), o.get("dopo")])
+        prova("la seconda volta lo stesso giorno non riparte; il giorno dopo si",
+              [[False, ""], [True, '<span class="serie-rullo"><span>2<br>3</span></span>']],
+              [o.get("seconda"), o.get("domani")])
+        prova("un altro account sullo stesso telefono ha la sua brace", True,
+              o.get("altro"))
+        prova("col Profilo dietro non si accende e il giorno NON si brucia; "
+              "app in tasca e demo nemmeno", [[False, False], False, False],
+              [o.get("dietro"), o.get("tasca"), o.get("demo")])
+        prova("il primo giorno: la brace si', il numero non rotola (da 0 a 1 "
+              "non e' una fila)", [True, ""], o.get("primo"))
+        prova("con gli effetti ridotti il numero non rotola: resta quello di "
+              "oggi", [True, ""], o.get("fermo"))
+        prova("senza memoria del telefono non si accende (meglio niente che a "
+              "ogni apertura)", False, o.get("senza"))
+    rp = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    prova("renderProfilo la chiama per ULTIMA, dopo la testata ridisegnata",
+          True, rp.rstrip().endswith("serieAccendi();"))
+    _css = re.sub(r"/\*[\s\S]*?\*/", "", mini[mini.index("<style"):mini.index("</style>")])
+    prova("il CSS ha la brace, il respiro della fiamma e il rullo",
+          [True, True, True, True],
+          [".serie-g.oggi.brace i{animation:serie-brace 2.4s" in _css,
+           "@keyframes serie-brace{" in _css, "@keyframes serie-brace-f{" in _css,
+           "@keyframes serie-rotola{" in _css])
+    rid = [m.group(0) for m in re.finditer(r"@media \(prefers-reduced-motion: reduce\)\{[^@]*?\}\}", _css)]
+    prova("chi vuole meno movimento vede subito la fiamma accesa: la brace "
+          "e il rullo fermi nel CSS, e il rullo non nasce (effettiRidotti)",
+          [True, True],
+          [any(".serie-g.oggi.brace i,.serie-g.oggi.brace i .serie-f,.serie-rullo>span{animation:none}" in r
+               for r in rid),
+           "const rullo = effettiRidotti() ? '' : serieRulloHTML(mySerie.giorni);"
+           in pezzo_js(mini, "function serieAccendi(){", "\n}\n")])
+
+
 def prove_serie_classifica():
     """LA CLASSIFICA DELLA SERIE 🔥 (17 nov 2026, sera, cantiere
     serie-classifica; Andrea: «una classifica degli utenti che accedono
@@ -210441,7 +210551,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni serie_classifica finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria avvisi_barattolo serie_giorni serie_classifica serie_brace finestra ordini_prova tutorial
     caccia_a_tappo
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
@@ -211625,6 +211735,7 @@ def main():
               prove_avvisi_barattolo,
               prove_serie_giorni,
               prove_serie_classifica,
+              prove_serie_brace,
               prove_sentinella_server_fermo,
               prove_caccia_a_tappo,
               prove_categorie_delle_prove)
