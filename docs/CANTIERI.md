@@ -91018,3 +91018,15 @@ alla LocalBitcoins: il più semplice per chi usa gli swap, ma è custodia
 di sats altrui sul server, contro la regola di non tenere i fondi degli
 utenti (e il nodo di cartone del MiCA). Proposta: (a) subito, (b) se
 gli intermediari crescono, (c) no.
+
+## La Classifica Streak mostra le prime 50 (18 nov 2026, cantiere classifica-50; Andrea: «La classifica [Streak] mostra le prime 50 persone, non solo le prime 20»)
+`SERIE_CLASSIFICA_TOP` da 20 a 50 nel server: escono le prime 50 righe,
+e chi sta più giù continua a vedere la sua posizione a parte. Il foglio
+scorre già da solo (`.serie-cl-lista`, 56vh). Il conto dei pari per le
+medaglie resta esatto per lo stesso motivo di prima (le prime righe ci
+sono tutte). Mattina dello stesso giorno Andrea aveva detto «Fai vedere
+le prime 20 persone»: ora 50. Niente leva né config: è una costante.
+PROVATO: `prove_serie_classifica` (la misura nel server, il taglio a 50
+con 60 in gara e la riga a parte del 60°), le sezioni che leggono i
+documenti, `collaudo_serie_giorni`. NON PROVATO: un telefono vero con 50
+righe vere (in produzione oggi sono meno).

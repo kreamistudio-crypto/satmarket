@@ -21753,7 +21753,7 @@ function serieClassificaHTML(d){
   const totale = Math.floor(Number(d.totale)) || d.voci.length;
   const altri = totale - d.voci.length - (d.mia ? 1 : 0);
   /* quante persone dividono ogni posto: le prime righe ci sono tutte, e
-     un pari merito che parte fra i primi tre e va oltre la ventesima ne
+     un pari merito che parte fra i primi tre e va oltre l'ultima riga ne
      ha comunque piu' di tre in lista */
   const pari = {};
   d.voci.forEach(v => { const p = Math.floor(Number(v && v.posizione)) || 0; pari[p] = (pari[p] || 0) + 1; });

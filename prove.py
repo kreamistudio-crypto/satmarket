@@ -210190,12 +210190,13 @@ def prove_serie_classifica():
     print("\n[la classifica della serie: giudice, lettura, rotta, foglio]")
     import sqlite3, time as _time, calendar as _cal
     amb = {"time": _time, "SERIE_TAPPE": (7, 30, 100, 365)}
-    exec("SERIE_CLASSIFICA_TOP = 20\nSERIE_CLASSIFICA_MIN = 2\n", amb)
+    exec("SERIE_CLASSIFICA_TOP = 50\nSERIE_CLASSIFICA_MIN = 2\n", amb)
     for nome in ("_giorno_roma", "_giorno_prima", "serie_podio",
                  "serie_classifica"):
         exec(pezzo(nome), amb)
-    prova("le due misure stanno scritte nel server: 20 righe, dal 2° giorno",
-          True, "\nSERIE_CLASSIFICA_TOP = 20\nSERIE_CLASSIFICA_MIN = 2\n" in _SORGENTE)
+    prova("le due misure stanno scritte nel server: 50 righe (erano 20 fino al "
+          "18 nov 2026), dal 2° giorno",
+          True, "\nSERIE_CLASSIFICA_TOP = 50\nSERIE_CLASSIFICA_MIN = 2\n" in _SORGENTE)
     podio = amb["serie_podio"]
     # ---- il giudice ----
     e = podio([(1, 5), (2, 9), (3, 5), (4, 2), (5, 1)], (), 3)
@@ -210211,9 +210212,9 @@ def prove_serie_classifica():
           ([(1, 5, 1), (3, 5, 1), (4, 2, 3)], 3, None),
           ([(r["id"], r["giorni"], r["posizione"]) for r in e["voci"]],
            e["totale"], e["mia"]))
-    e = podio([(i, 100 - i) for i in range(1, 31)], (), 30)
-    prova("fuori escono le prime 20; chi sta dopo ha la sua riga a parte",
-          (20, 30, {"id": 30, "giorni": 70, "posizione": 30}),
+    e = podio([(i, 100 - i) for i in range(1, 61)], (), 60)
+    prova("fuori escono le prime 50; chi sta dopo ha la sua riga a parte",
+          (50, 60, {"id": 60, "giorni": 40, "posizione": 60}),
           (len(e["voci"]), e["totale"], e["mia"]))
     prova("al lancio partono tutti insieme: trenta persone a 3 giorni sono "
           "tutte prime", {1},
@@ -210283,13 +210284,13 @@ def prove_serie_classifica():
           ("Carla", 30, 1), (lambda v: (v["nome"], v["giorni"], v["posizione"]))(leggi(con, 3, ADESSO)["voci"][0]))
     prova("il giorno dopo la fila di chi ieri non e' passato non c'e' piu'",
           False, any(v["nome"] == "Bruno" for v in leggi(con, 1, ADESSO + 86400)["voci"]))
-    for i in range(100, 125):
+    for i in range(100, 155):
         con.execute("INSERT INTO utenti(tg_id, nome) VALUES(?,?)", (i, "U%d" % i))
         con.execute("INSERT INTO serie_giorni VALUES(?,?,?,?)", (i, 8, 8, "2026-11-20"))
     c = leggi(con, 6, ADESSO)
-    prova("oltre le venti: venti righe fuori, e a chi guarda da sotto la SUA "
-          "riga a parte, col suo posto vero",
-          (20, 30, {"posizione": 30, "nome": "—", "avatar": "", "giorni": 3, "io": True}),
+    prova("oltre le cinquanta: cinquanta righe fuori, e a chi guarda da sotto "
+          "la SUA riga a parte, col suo posto vero",
+          (50, 60, {"posizione": 60, "nome": "—", "avatar": "", "giorni": 3, "io": True}),
           (len(c["voci"]), c["totale"], c["mia"]))
     con.close()
 
