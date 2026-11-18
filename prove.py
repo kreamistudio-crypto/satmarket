@@ -52168,6 +52168,29 @@ def prove_scoprire():
            "? riga : document.querySelector('.strumenti'));" in _sr))
     prova("...scritto in un posto solo", 1,
           mini.count("riga : document.querySelector('.strumenti')"))
+    # LO SCATTO (18 nov 2026, Andrea: «la pagina fa uno scatto»): due
+    # salti prima della discesa, misurati frame per frame. go() chiudeva
+    # col suo scrollTo(0) anche restando in Esplora, e la griglia
+    # svuotata nuda accorciava la pagina (lo scroll si schiacciava sul
+    # fondo nuovo). Ora: la posizione resta nello stesso frame, e la
+    # griglia tiene l'altezza vecchia come pavimento fino a dopo l'arrivo.
+    _ac2 = pezzo_js(mini, "function apriCategoria(c){", "\n}")
+    _sc2 = pezzo_js(mini, "function scegliSottoRiga(sid){", "\n}\n")
+    prova("categoria e scaffale svuotano la griglia tenendone l'altezza",
+          (True, True, 0, 0),
+          ("svuotaGrigliaFerma();" in _ac2, "svuotaGrigliaFerma();" in _sc2,
+           _ac2.count("el('grid').innerHTML = '';"),
+           _sc2.count("el('grid').innerHTML = '';")))
+    prova("...restando in Esplora la pagina non torna in cima", True,
+          "const yPrima = window.scrollY;\n  go('esplora');\n"
+          "  if (restiamoQui) window.scrollTo(0, yPrima);" in _ac2)
+    _sv = pezzo_js(mini, "function svuotaGrigliaFerma(){", "\n}\n")
+    _rg = pezzo_js(mini, "function renderGrid(items){", "\n}\n")
+    prova("...il pavimento e' l'altezza di prima, e lo toglie renderGrid "
+          "dopo la discesa (o subito, senza discesa)", (True, True, True),
+          ("g.style.minHeight = g.offsetHeight + 'px';" in _sv,
+           "liberaGrigliaFerma(800);" in _rg,
+           "} else if (el('grid').style.minHeight) liberaGrigliaFerma(0);" in _rg))
     # apriCategoria ARMA dopo go() (che chiude col suo scrollTo della
     # vista: prima, lo scroll verrebbe riportato in cima un rigo
     # dopo); il RITOCCO che spegne passa da tornaATutto, che non

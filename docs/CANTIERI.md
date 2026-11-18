@@ -92038,3 +92038,28 @@ diventa rossa. Non provato dal vivo sul telefono: da guardare dopo la
 promozione sullo stesso ordine USDT. Fuori dal chiesto: la riga «Rispetto
 al mercato di adesso» degli ordini on-chain a sats fissi, che Lightning
 ha e on-chain no.
+
+## Lo scatto della pagina al tocco di una categoria o di uno scaffale (18 nov 2026, cantiere scatto-riga; Andrea, subito dopo la promozione: «la pagina fa uno scatto... Dovrebbe semplicemente andare giù e basta»)
+
+Misurato frame per frame col giro locale (scrollY, altezza del
+documento e della griglia a ogni frame dopo il tocco), due salti prima
+della discesa liscia. UNO: `apriCategoria` chiama `go('esplora')`, che
+chiude con `scrollTo(0, posizioneDaRendere(view))` — e per chi e' GIA'
+in Esplora vuol dire la CIMA: la pagina saltava su di colpo e poi
+l'arrivo del reparto la riportava giu'. DUE: categoria e scaffale
+svuotavano la griglia nuda prima di chiedere al server, la pagina si
+accorciava di colpo e il browser schiacciava lo scroll sul fondo nuovo.
+La cura: restando in Esplora la posizione si rimette nello stesso frame
+di `go()` (il salto non si dipinge mai: `go` resta intatto per tutti
+gli altri chiamanti); la griglia si svuota con `svuotaGrigliaFerma`, che
+tiene l'altezza vecchia come `min-height`, e `renderGrid` la toglie 800
+ms dopo l'arrivo del reparto (la discesa liscia dura ~mezzo secondo) o
+subito se non c'e' discesa. Strada scartata: non svuotare la griglia —
+la decisione d'agosto «meglio mezzo secondo di vuoto che mezzo secondo
+di bugia» resta: si svuota, ma senza far crollare la pagina.
+Provato: la traccia rifatta dopo la cura (tocco Bitcoin: y resta 40,
+poi scende liscia fino alla seconda riga, nessun frame a 0; tocco di uno
+scaffale: la pagina non si muove, la riga e' gia' al suo posto), tre
+prove nuove accanto a quelle dello scroll del reparto, suite severa
+30.396/0, collaudi della vetrina verdi.
+Correzione dritta in produzione col cherry-pick firmato di Andrea.

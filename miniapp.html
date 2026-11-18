@@ -26871,6 +26871,24 @@ if (window.IntersectionObserver) {
    subito): scritto due volte, il punto d'arrivo e' quello che un
    giorno diverge. */
 let scrollRepartoInAttesa = false;
+/* LA GRIGLIA SI SVUOTA MA TIENE L'ALTEZZA (18 nov 2026, lo scatto
+   segnalato da Andrea): svuotata nuda, la pagina diventava corta di
+   colpo e il browser la tirava su (lo scroll si schiaccia sul nuovo
+   fondo) — uno scatto prima di ogni discesa. L'altezza vecchia resta
+   come pavimento finche' renderGrid non disegna la nuova e l'arrivo
+   non ha finito di scorrere. */
+let grigliaFermaTimer = 0;
+function svuotaGrigliaFerma(){
+  const g = el('grid');
+  clearTimeout(grigliaFermaTimer);
+  g.style.minHeight = g.offsetHeight + 'px';
+  g.innerHTML = '';
+  el('gridEmpty').style.display = 'none';
+}
+function liberaGrigliaFerma(dopo){
+  clearTimeout(grigliaFermaTimer);
+  grigliaFermaTimer = setTimeout(() => { el('grid').style.minHeight = ''; }, dopo);
+}
 function scorriAlReparto(){
   /* CON LA SECONDA RIGA L'ARRIVO SALE (18 nov 2026): la riga degli
      scaffali e' la cosa da vedere appena toccata la categoria («mi si
@@ -26959,11 +26977,17 @@ function apriCategoria(c){
     navGradinoReparto = ramoVetrina === 'esplora'
                       ? (history.state?.d || 0) + 1 : 0;
   }
-  el('grid').innerHTML = '';
-  el('gridEmpty').style.display = 'none';
+  svuotaGrigliaFerma();
   setCat(c);
   if (!restiamoQui) { navSpingi = true; navGradinoReparto = 0; }
+  /* SENZA SCATTO IN CIMA (18 nov 2026, Andrea: «la pagina fa uno
+     scatto»): go() chiude con lo scrollTo della vista, che per chi e'
+     GIA' in Esplora vuol dire la cima — un salto secco prima che
+     l'arrivo del reparto scenda liscio. Restando qui la pagina resta
+     dov'era (nello stesso frame: il salto non si dipinge mai). */
+  const yPrima = window.scrollY;
   go('esplora');
+  if (restiamoQui) window.scrollTo(0, yPrima);
   /* DOPO go(), che chiude con lo scrollTo della vista: prima, lo
      scroll dell'accensione verrebbe riportato in cima un rigo dopo */
   armaScrollReparto();
@@ -27192,7 +27216,9 @@ function renderGrid(items){
   if (scrollRepartoInAttesa) {
     scrollRepartoInAttesa = false;
     if (el('view-esplora').classList.contains('active')) scorriAlReparto();
-  }
+    /* il pavimento resta per la discesa (liscia, ~mezzo secondo) */
+    liberaGrigliaFerma(800);
+  } else if (el('grid').style.minHeight) liberaGrigliaFerma(0);
   /* LA VETRINA E' DISEGNATA, ed e' questo che il guscio di apertura
      aspetta: il PRIMO render della griglia — con le card, con lo
      stato vuoto o coi dati finti della demo — e' il momento in cui
@@ -27512,8 +27538,7 @@ function scegliSottoRiga(sid){
      (ricarica la prima pagina, rifa' pillole e righe) e la entry della
      cronologia si SOSTITUISCE, come per ogni cambio di filtro */
   haptic();
-  el('grid').innerHTML = '';
-  el('gridEmpty').style.display = 'none';
+  svuotaGrigliaFerma();
   sottoChiesto = sid;
   setCat(c);
   armaScrollReparto();
