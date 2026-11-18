@@ -14154,7 +14154,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = '64cd707b30';
+const LINGUA_VER = 'edfe3936a7';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -98670,7 +98670,7 @@ function sezioneParacaduteNuovoP2P(tab){
     + voce(verso, 0, 'Nessuna') + P2P_PARACADUTE_SOGLIE.map(n => voce(verso, n, n + '%')).join('') + '</div>';
   return sezioneNuovoP2P({
     titolo: '🪂 Paracadute',
-    corpo: riga('su', '📈 Se BTC sale') + riga('giu', '📉 Se BTC scende'),
+    corpo: riga('su', '🟢 Se BTC sale') + riga('giu', '🔴 Se BTC scende'),
     sotto: '<div class="hint">' + fraseParacaduteP2P(scelta) + '</div>'
   });
 }

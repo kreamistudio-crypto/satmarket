@@ -189429,7 +189429,7 @@ c.sezione = [sez.split('§')[0], (sez.match(/<button/g) || []).length,
              (sez.match(/data-n="0"[^>]*>Nessuna</g) || []).length,
              ['5%', '10%', '20%'].every(x => sez.split('>' + x + '<').length === 3),
              accesi(sez), sez.split('§')[2],
-             sez.indexOf('📈 Se BTC sale') > 0 && sez.indexOf('📈 Se BTC sale') < sez.indexOf('📉 Se BTC scende'),
+             sez.indexOf('🟢 Se BTC sale') > 0 && sez.indexOf('🟢 Se BTC sale') < sez.indexOf('🔴 Se BTC scende'),
              sez.indexOf('id="p2pNuovoParacaduteSu"') > 0 && sez.indexOf('id="p2pNuovoParacaduteGiu"') > 0];
 p2pNuovoParacadute = 10;              /* la forma di prima: un numero, nei due versi */
 const sez10 = sezioneParacaduteNuovoP2P(false);
@@ -189655,7 +189655,7 @@ console.log(JSON.stringify(c));
            spento, spento], c.get("frasi"))
     prova("...corta: nessuna passa i cento caratteri", True,
           all(len(x) <= 100 for x in c.get("frasi") or ["x" * 999]))
-    prova("LA SEZIONE: «🪂 Paracadute» con DUE RIGHE, «📈 Se BTC sale» sopra e «📉 Se BTC "
+    prova("LA SEZIONE: «🪂 Paracadute» con DUE RIGHE, «🟢 Se BTC sale» sopra e «🔴 Se BTC "
           "scende» sotto, ognuna Nessuna · 5% · 10% · 20% — e di serie e' accesa «Nessuna» "
           "in tutte e due",
           ["🪂 Paracadute", 8, 2, True, ["su0", "giu0"],

@@ -1556,7 +1556,7 @@ delle leve»). A leva spenta niente di questa sezione esiste.
 **Pubblicando.**
 - 📱 Nel foglio «Vuoi vendere Bitcoin» / «Vuoi comprare Bitcoin», dopo
   «Pausa degli ordini»: la sezione «**🪂 Paracadute**» con DUE righe
-  (dal 17 nov 2026), «**📈 Se BTC sale**» e sotto «**📉 Se BTC
+  (dal 17 nov 2026), «**🟢 Se BTC sale**» e sotto «**🔴 Se BTC
   scende**», ognuna con quattro scelte, «**Nessuna**» · «**5%**» ·
   «**10%**» · «**20%**». Di serie è accesa «Nessuna» in tutte e due, e
   sotto: «Scegli se togliere l'ordine quando BTC sale, quando scende, o

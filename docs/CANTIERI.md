@@ -92063,3 +92063,18 @@ scaffale: la pagina non si muove, la riga e' gia' al suo posto), tre
 prove nuove accanto a quelle dello scroll del reparto, suite severa
 30.396/0, collaudi della vetrina verdi.
 Correzione dritta in produzione col cherry-pick firmato di Andrea.
+
+## I pallini verde e rosso nel paracadute (18 nov 2026, cantiere paracadute-pallini; Andrea: «a fianco alle scritte "se BTC sale" mettici un pallino verde, a fianco a "se BTC scende" un pallino rosso, non le icone dei grafici come adesso»)
+
+Solo grafica. Nel foglio «Pubblica» del P2P le due righe del
+«🪂 Paracadute» passano da «📈 Se BTC sale» / «📉 Se BTC scende» a
+«🟢 Se BTC sale» / «🔴 Se BTC scende»: un emoji al posto dell'altro in
+`sezioneParacaduteNuovoP2P`, nella chiave inglese di `lingua/en.js`
+(che si cerca per testo intero, quindi va cambiata insieme), nel libro
+di Tappo (`sapere.md`, `conoscenza.md` rigenerato) e nella guida dei
+passi. La card dell'ordine («🪂 Paracadute ↑10% ↓5%») resta con le
+frecce: Andrea ha chiesto le due scritte. La voce di NOVITA del 17 nov
+resta com'era (è la storia del post).
+
+Provato: `prove_paracadute` legge l'ordine delle due righe coi pallini
+nuovi; controprova: rimettere 📈 nel codice fa rossa la sezione.
