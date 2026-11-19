@@ -26246,6 +26246,21 @@ PAROLE_VIETATE = {
 # volesse spacciare avorio vero per «color avorio» passa questo strato
 # ma non l'AI, che legge il contesto: imperfezione dichiarata, e
 # comunque chi aggira scrive «ivory» o «osso» e la lista non lo vede.
+# I COLORI ACCANTO (19 nov 2026, da un caso VERO: «Collana Beige»
+# fermata come «animali protetti: avorio»). Chi descrive un gioiello o
+# un vestito scrive i colori in fila — «beige avorio», «toni beige e
+# avorio», «colori: panna, avorio» — e la fila non combacia con nessuna
+# frase del colore. «avorio» attaccato a un altro COLORE (con o senza
+# «e» in mezzo, in tutti e due i versi) e' un colore. Solo colori puri:
+# «oro», «argento», «ebano», «osso» e «corallo» sono anche MATERIALI, e
+# «avorio e oro» e' proprio la statuetta che non si vende. «bianco» sta
+# solo DAVANTI (le frasi del colore lo hanno gia'): «avorio bianco» e'
+# come si descrive la zanna vera.
+COLORI_ACCANTO_AVORIO = (
+    "beige", "panna", "crema", "ecru", "sabbia", "tortora", "nocciola",
+    "cammello", "champagne", "cipria", "perla", "rosa", "nero", "nera",
+    "grigio", "grigia", "marrone", "celeste", "azzurro", "azzurra",
+    "verde", "rosso", "rossa", "blu", "giallo", "gialla", "bordeaux")
 CONTESTI_INNOCENTI = {
     "avorio": (
         # il colore
@@ -26267,7 +26282,19 @@ CONTESTI_INNOCENTI = {
         "imitazione avorio", "tipo avorio", "avorio finto",
         "avorio sintetico", "avorio artificiale", "avorio vegetale",
         # il paese e il modo di dire
-        "costa d avorio", "torre d avorio", "torre di avorio"),
+        "costa d avorio", "torre d avorio", "torre di avorio",
+        # il gioiello e la stoffa (19 nov 2026, «Collana Beige»): la
+        # stessa regola del libro — senza «in» o «d» davanti e' il
+        # colore; «perle d avorio» e «perle in avorio» restano ferme
+        "perle avorio", "perla avorio", "perline avorio", "filo avorio",
+        "cordino avorio", "cordoncino avorio", "nastro avorio",
+        "cotone avorio", "lana avorio", "seta avorio", "pizzo avorio",
+        "raso avorio", "tessuto avorio", "filato avorio",
+        # i colori in fila (vedi COLORI_ACCANTO_AVORIO, qui sopra)
+        *(f"{c} avorio" for c in COLORI_ACCANTO_AVORIO),
+        *(f"{c} e avorio" for c in COLORI_ACCANTO_AVORIO),
+        *(f"avorio {c}" for c in COLORI_ACCANTO_AVORIO),
+        *(f"avorio e {c}" for c in COLORI_ACCANTO_AVORIO)),
 }
 # Le lookaround NON consumano gli spazi: due frasi attaccate
 # («color avorio color avorio») cadono tutte e due.

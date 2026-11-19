@@ -8,7 +8,8 @@ due volte dal filtro parole come «animali protetti». `prove.py` gira il
 giudice estratto; qui si chiamano le ROTTE vere, su un database
 usa-e-getta, e si guarda quel che vede chi vende e quel che resta scritto:
   1. il libro (carta avorio, pagine color avorio) si PUBBLICA, e nel
-     registro non resta nessun blocco dello strato 1;
+     registro non resta nessun blocco dello strato 1; e cosi' la collana
+     beige e avorio del 19 nov 2026 (i colori in fila, le perline);
   2. la statuetta in avorio resta FERMA: 400, col divieto, la PAROLA che
      l'ha fermata e lo «scrivici» con la chat privata — anche con
      BANNER_TEST_LINK assente dal config, che e' il caso di questo banco;
@@ -168,6 +169,14 @@ def main():
     prova("...e il filtro parole non ha scritto niente", [], registro())
     prova("...ne' avvisato i moderatori di un blocco", 0,
           len([t for t in AVVISI if "bloccat" in t]))
+
+    print("\n[1-bis) la collana beige e avorio si pubblica (19 nov 2026)]")
+    collana = chiama(SRV.pubblica, corpo(
+        "Collana Beige",
+        "Fatta a mano, colori beige e avorio. Perline avorio e "
+        "cordino beige, filo avorio."))
+    prova("nasce, con un numero", True, bool(collana.get("id")))
+    prova("...e il filtro parole non ha scritto niente", [], registro())
 
     print("\n[2) la statuetta in avorio resta ferma]")
     r = chiama(SRV.pubblica, corpo("Statuetta in avorio",

@@ -46083,6 +46083,13 @@ def prove_filtro_avorio():
         # colore non combacia, e la copertina vera resta ferma
         ("Libro d'ore", "Copertina in avorio intagliato.", zanna),
         ("Pianoforte antico", "Tasti in avorio.", zanna),
+        # il gioiello e i colori in fila (19 nov 2026): la preposizione
+        # davanti, o un materiale accanto, e la collana resta ferma
+        ("Collana", "Perle d'avorio, fine '800.", zanna),
+        ("Collana", "Perle in avorio.", zanna),
+        ("Statuetta", "In avorio e oro.", zanna),
+        ("Netsuke", "Avorio bianco di elefante.", zanna),
+        ("Collana beige", "Ciondolo in avorio vero.", zanna),
     )
     # --- 2) I FALSI: passano lo strato 1 -----------------------------
     falsi = (
@@ -46113,6 +46120,18 @@ def prove_filtro_avorio():
         ("Lavello", "Finitura avorio opaca."),
         ("Vasca da bagno", "Smalto avorio, anni '70."),
         ("Comodino", "Laccato avorio, due cassetti."),
+        # il caso vero del 19 nov 2026, «Collana Beige» (la descrizione
+        # non si salva: queste sono le forme probabili), e le sorelle
+        ("Collana Beige", "Fatta a mano, colori beige e avorio."),
+        ("Collana Beige", "Colori: beige, avorio."),
+        ("Collana Beige", "Beige/avorio, lunghezza 45 cm."),
+        ("Collana", "Toni panna e avorio."),
+        ("Bracciale", "Avorio e rosa cipria."),
+        ("Collana", "Perle avorio sintetiche."),
+        ("Collana", "Perline avorio e cordino beige."),
+        ("Orecchini", "Filo avorio all'uncinetto."),
+        ("Sciarpa", "Lana avorio, morbida."),
+        ("Abito", "Pizzo avorio, taglia 40."),
     )
     filtro = filtro_da(src)
     for titolo, descr, atteso in veri:
@@ -46164,6 +46183,24 @@ def prove_filtro_avorio():
     for frase in ("rilegatura avorio", "copertina avorio", "pagine avorio",
                   "fogli avorio", "tela avorio", "finitura avorio",
                   "smalto avorio", "laccato avorio"):
+        prova(f"controprova: senza «{frase}» la tabella cade", False,
+              regge(rotto((f'"{frase}",', ''))))
+
+    # e) i colori in fila tolti (19 nov 2026): la collana beige e avorio
+    #    torna ferma
+    prova("controprova: senza i colori in fila", False,
+          regge(rotto(('        *(f"{c} avorio" for c in COLORI_ACCANTO_AVORIO),\n', ""),
+                      ('        *(f"{c} e avorio" for c in COLORI_ACCANTO_AVORIO),\n', ""),
+                      ('        *(f"avorio {c}" for c in COLORI_ACCANTO_AVORIO),\n', ""),
+                      ('        *(f"avorio e {c}" for c in COLORI_ACCANTO_AVORIO)),',
+                       '        ),'))))
+    # f) un materiale fra i colori: «avorio e oro» passerebbe, e la
+    #    statuetta vera con lui
+    prova("controprova: «oro» fra i colori accanto", False,
+          regge(rotto(('"beige", "panna",', '"oro", "beige", "panna",'))))
+    # g) le frasi del gioiello e della stoffa, una per volta
+    for frase in ("perle avorio", "perline avorio", "filo avorio",
+                  "lana avorio", "pizzo avorio"):
         prova(f"controprova: senza «{frase}» la tabella cade", False,
               regge(rotto((f'"{frase}",', ''))))
 
