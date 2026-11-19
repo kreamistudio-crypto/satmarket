@@ -240,6 +240,12 @@ P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = True
 # messaggio che si riscrive ogni minuto col tempo che resta (Lightning e
 # on-chain). Accesa di serie; False la spegne.
 P2P_CONTO_ALLA_ROVESCIA = True
+# La metà della cauzione on-chain persa la manda Barattolo da solo (19 nov
+# 2026), dal registro «da riscuotere», all'indirizzo Lightning del Profilo di
+# chi la riceve. Il tetto in sats: 0 = nessuno (di serie, scelta di Andrea);
+# con un numero, oltre resta a mano. False la spegne.
+P2P_ONCHAIN_CAUZIONE_META_AUTO = True
+P2P_ONCHAIN_CAUZIONE_META_TETTO = 0
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)

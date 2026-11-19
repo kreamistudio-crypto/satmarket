@@ -28711,10 +28711,10 @@ def prove_rimborso_meno_spese():
     # resta fuori. Il giro vero sta nel collaudo; qui le righe che un
     # ritocco toglierebbe senza far rompere niente di visibile.
     prova("«Le mie aste» non la elenca fra i rimborsi da riscuotere", True,
-          "\"AND r.motivo<>'spese_spedizione' \""
+          "\"AND r.motivo NOT IN ('spese_spedizione', 'cauzione_p2p') \""
           in codice(pezzo("mie_puntate")))
     prova("il pallino delle aste nel profilo non la conta", True,
-          "\"stato='da_riscuotere' AND motivo<>'spese_spedizione'\","
+          "\"stato='da_riscuotere' AND motivo NOT IN ('spese_spedizione', 'cauzione_p2p')\","
           in codice(pezzo("mio_profilo")))
     prova("non e' un rimborso nemmeno per chi riconcilia le uscite", True,
           "\"AND t.hash!='' AND x.motivo<>'spese_spedizione'\""
@@ -185105,7 +185105,7 @@ def prove_canale_admin():
           # Barattolo ha firmato un rimborso da solo, nella moderazione
           # (19 nov 2026, regole-sulla-card) «↩️ Riprendi i sats» a tempo
           # finito: un'altra firma di Barattolo da sola, nella moderazione
-          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 36,
+          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 37,
            "liquidita": 5, "moderazione": 26, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -185141,7 +185141,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "116 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "117 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -185164,7 +185164,8 @@ def prove_canale_admin():
           "meta' mandata; dal 18 nov il reso a spese del venditore senza "
           "etichetta, e la firma di Barattolo sul deposito incompleto "
           "annullato; e la cauzione on-chain chiesta da chi vende, persa da sola; "
-          "dal 19 nov «Riprendi i sats» on-chain a tempo finito)", 116,
+          "dal 19 nov «Riprendi i sats» on-chain a tempo finito, e la meta' "
+          "di una cauzione P2P ferma nel registro)", 117,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -215267,6 +215268,64 @@ def prove_conto_alla_rovescia_p2p():
            'str(r[0] or "") == "nostr"' in src])
 
 
+def prove_meta_cauzione_auto():
+    """LA META' DELLA CAUZIONE PERSA MANDATA DA SOLA (19 nov 2026, Andrea:
+    «c'è un modo per far sì che quella metà vada direttamente alla parte
+    interessata?», poi la scheda: «Sì, in automatico con un tetto»).
+
+    Quel che qui si rompe in silenzio: un tubo nuovo verso LNbits accanto
+    alla strada d'uscita (la meta' passa dal registro «da riscuotere»), due
+    righe per la stessa cauzione, il «Metà mandata» a mano su una meta' che
+    parte da sola (pagata due volte), il tetto dimenticato, le parole d'asta
+    a chi riceve una cauzione."""
+    print("\n[la metà della cauzione persa mandata da sola]")
+    src = _SORGENTE
+    amb = {"P2P_ONCHAIN_CAUZIONE_META_AUTO": True, "P2P_ONCHAIN_CAUZIONE_META_TETTO": 5000,
+           "html": __import__("html"), "_fmt_sats": lambda n: f"{int(n):,}".replace(",", ".")}
+    exec(pezzo("p2p_onchain_meta_automatica"), amb)
+    exec(pezzo("p2p_onchain_meta_detta_admin"), amb)
+    A, D = amb["p2p_onchain_meta_automatica"], amb["p2p_onchain_meta_detta_admin"]
+    prova("IL GIUDICE: col tetto parte fino al tetto compreso e mai oltre; senza tetto "
+          "(0, la scelta di Andrea: «Nessun tetto») qualunque cifra; mai a nessuno, mai "
+          "zero, mai a leva spenta",
+          [True, True, False, True, False, False, False],
+          [A(500, 888), A(5000, 888), A(5001, 888),
+           (amb.update(P2P_ONCHAIN_CAUZIONE_META_TETTO=0), A(10 ** 7, 888))[1],
+           A(500, 0), A(0, 888),
+           (amb.update(P2P_ONCHAIN_CAUZIONE_META_AUTO=False), A(500, 888))[1]])
+    prova("LE PAROLE AI MODERATORI: «mandata da sola», «in verifica»/«in coda» col NON "
+          "mandatela a mano, e senza tentativo il «DA MANDARE A MANO» di prima",
+          [True, True, True, True, True],
+          ["Metà mandata da sola" in D("pagata", 500, "Andrea", 1, ""),
+           "NON mandatela a mano" in D("in verifica", 500, "Andrea", 1, ""),
+           "NON mandatela a mano" in D("in coda", 500, "Andrea", 1, ""),
+           "DA MANDARE A MANO" in D("", 500, "Andrea", 1, "a@b.it"),
+           D("pagata", 0, "Andrea", 1, "") == "Nessuna metà da mandare."])
+    auto = pezzo("_p2p_onchain_cauzione_meta_auto")
+    prova("LA STRADA: una riga del registro col motivo suo, legata alla cauzione nella "
+          "stessa transazione e una volta sola, poi la strada d'uscita di sempre; nessuna "
+          "chiave di LNbits qui dentro",
+          [True, True, True, True, False],
+          ["MOTIVO_CAUZIONE_P2P, cassaforte_nuova()" in auto,
+           "WHERE id=? AND meta_rimborso_id=0 AND meta_mandata_il=0" in auto
+           and "con.rollback()" in auto,
+           "esito = await _paga_rimborso(rid)" in auto,
+           src.count("await _p2p_onchain_cauzione_meta_auto(cid, altro, meta)") == 2,
+           "ADMIN_KEY" in auto or "paga_venditore" in auto])
+    man = pezzo("p2p_onchain_cauzione_meta_mandata")
+    rimb = pezzo("_paga_rimborso")
+    prova("NIENTE DOPPIONI: «Metà mandata» a mano dice di no a una meta' che parte da "
+          "sola; il registro la chiama con parole sue e fuori dalle aste",
+          [True, True, True, True],
+          ['if int(_p2p_onchain_campo(r, "meta_rimborso_id", 0) or 0):' in man
+           and "AND meta_mandata_il=0 AND meta_rimborso_id=0" in man,
+           'cauz = _campo(r, "motivo") == "cauzione_p2p"' in rimb
+           and "Metà della cauzione di chi ha preso è tua:" in rimb,
+           src.count("motivo NOT IN ('spese_spedizione', 'cauzione_p2p')") == 2,
+           "P2P_ONCHAIN_CAUZIONE_META_AUTO = True" in open("config_esempio.py", encoding="utf-8").read()
+           and '"P2P_ONCHAIN_CAUZIONE_META_AUTO", P2P_ONCHAIN_CAUZIONE_META_AUTO,' in src])
+
+
 def prove_ritorno_nel_libro_onchain():
     """L'ORDINE ON-CHAIN CHE RINASCE NEL LIBRO, E IL TEMPO DAL RECAPITO (19 nov
     2026, cantiere ritorno-nel-libro; Andrea: «No, perché sparisce, scusa?
@@ -216061,6 +216120,7 @@ CATEGORIE = {
     ritorno_nel_libro_onchain
     riprendi_scaduto_onchain
     conto_alla_rovescia_p2p
+    meta_cauzione_auto
     """.split(),
     "mercatino": """
     guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio
@@ -217316,6 +217376,7 @@ def main():
               prove_ritorno_nel_libro_onchain,
               prove_riprendi_scaduto_onchain,
               prove_conto_alla_rovescia_p2p,
+              prove_meta_cauzione_auto,
               prove_avvisi_barattolo,
               prove_serie_giorni,
               prove_serie_classifica,

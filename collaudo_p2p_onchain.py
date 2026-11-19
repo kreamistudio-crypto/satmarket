@@ -1713,6 +1713,10 @@ def main():
     # prende in tutto il giro e' il 999, un moderatore; il 111 non lo e'
     porticina = SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN
     SRV.P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
+    # (19 nov 2026) la meta' mandata DA SOLA ha il suo passo, in fondo alla
+    # sezione: fin li' il giro a mano di prima, che resta la strada oltre il tetto
+    meta_auto_prima = SRV.P2P_ONCHAIN_CAUZIONE_META_AUTO
+    SRV.P2P_ONCHAIN_CAUZIONE_META_AUTO = False
     # ...mentre l'on-chain e' aperto a tutti, com'e' in produzione dal 16
     # nov: il 111 deve poter prendere, sennò la porticina non si vede
     solo_admin_oc = SRV.ONCHAIN_SOLO_ADMIN
@@ -1981,8 +1985,9 @@ def main():
     prova("la scheda: a chi l'ha messa «persa»; a chi ha pubblicato la meta' da ricevere; "
           "al moderatore quanto mandare e a chi",
           ({"stato": "persa", "sats": 3000, "mia": True},
-           {"sats": 1500, "mandata": False, "ln": False},
-           {"sats": 1500, "a": 888, "nome": "Alan", "ln_address": "", "mandata": False}),
+           {"sats": 1500, "mandata": False, "auto": False, "ln": False},
+           {"sats": 1500, "a": 888, "nome": "Alan", "ln_address": "", "mandata": False,
+            "auto": False}),
           (uno(999, c5).get("cauzione"), uno(888, c5).get("cauzione_meta"),
            (uno(777, c5).get("cauzione") or {}).get("meta")))
     prova("...e a chi ha preso nessuna meta', a chi ha pubblicato nessuna cauzione",
@@ -2157,6 +2162,97 @@ def main():
     asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 30))
     prova("...e senza il recapito di chi vende non si perde mai (la regola del «non completato»)",
           "tenuta", riga_cauz(k3)["stato"])
+    # -- LA META' MANDATA DA SOLA (19 nov 2026, Andrea: «Sì, in automatico con
+    #    un tetto»): una riga nel registro «da riscuotere», la strada d'uscita
+    #    di sempre; qui la si guarda da fuori (la strada ha i suoi collaudi)
+    print("\n[la metà della cauzione persa mandata da sola]")
+    SRV.P2P_ONCHAIN_CAUZIONE_META_AUTO = True
+    k7, k8, k9 = presa_chiesta(), presa_chiesta(), presa_chiesta()
+    for k in (k7, k8, k9):            # vivi e col recapito: nessuna si perde ancora
+        metti(k, stato="depositato", depositato_il=ora)
+    metti(k7, stato="rimborsato", mancato_perche="onchain-rinuncia", chiuso_il=ora)
+
+    def registro(k):
+        con = SRV.db()
+        try:
+            rid = con.execute("SELECT meta_rimborso_id FROM p2p_onchain_cauzioni WHERE ordine_id=?",
+                              (k,)).fetchone()[0]
+            r = con.execute("SELECT * FROM rimborsi_asta WHERE id=?", (rid,)).fetchone()
+            return dict(r) if r else None
+        finally:
+            con.close()
+
+    # senza indirizzo Lightning (Alan non l'ha): la riga nasce, il pagamento
+    # non parte, resta «da riscuotere» e nessuno la manda a mano
+    n_b = len(BOTTONI)
+    banco.AVVISI.clear()
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 40))
+    rg = registro(k7) or {}
+    prova("SENZA INDIRIZZO: la meta' entra nel registro di chi vende (1500, motivo suo, "
+          "da riscuotere), chi vende sa di scrivere l'indirizzo, i moderatori leggono «NON "
+          "mandatela a mano», e «Metà mandata» a mano dice 409",
+          (1500, 888, "cauzione_p2p", "da_riscuotere", True, True, False, 409),
+          (rg.get("importo_sats"), rg.get("tg_id"), rg.get("motivo"), rg.get("stato"),
+           any(chi == 888 and "metà di una cauzione" in t for chi, t in banco.DETTO[-200:])
+           or any(chi == 888 and "metà di una cauzione" in t for chi, t, _ in BOTTONI[n_b:]),
+           any("NON mandatela a mano" in str(a) for a in banco.AVVISI),
+           any("DA MANDARE A MANO" in str(a) for a in banco.AVVISI),
+           mandata(777, k7).status_code))
+    prova("...la scheda: a chi vende «arriva da sola», al moderatore niente tasto",
+          (True, False, True),
+          (uno(888, k7)["cauzione_meta"]["auto"], uno(888, k7)["cauzione_meta"]["mandata"],
+           (uno(777, k7).get("cauzione") or {}).get("meta", {}).get("auto")))
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 50))
+    con = SRV.db()
+    n_righe = con.execute("SELECT COUNT(*) FROM rimborsi_asta WHERE motivo='cauzione_p2p'").fetchone()[0]
+    con.close()
+    prova("...un altro giro non ne fa una seconda", 1, n_righe)
+    # il pagamento andato e quello incerto: la strada d'uscita finta, per
+    # guardare la colla (la riga, il timbro, le parole)
+    paga_vera = SRV._paga_rimborso
+    async def paga_ok(rid):
+        con = SRV.db()
+        con.execute("UPDATE rimborsi_asta SET stato='riscosso', payout_stato='uscito' WHERE id=?", (rid,))
+        con.commit()
+        con.close()
+        return {"ok": True, "stato": "riscosso"}
+    async def paga_incerta(rid):
+        return {"ok": False, "stato": "da_riscuotere", "incerto": True}
+    SRV._paga_rimborso = paga_ok
+    banco.AVVISI.clear()
+    metti(k8, stato="rimborsato", mancato_perche="onchain-rinuncia", chiuso_il=ora)
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 60))
+    prova("PAGATA: la cauzione e' timbrata «mandata» (da nessuno), la scheda lo dice e i "
+          "moderatori leggono «mandata da sola»",
+          (True, 0, True, True),
+          (bool(riga_cauz(k8)["meta_mandata_il"]), riga_cauz(k8)["meta_mandata_da"],
+           uno(888, k8)["cauzione_meta"]["mandata"],
+           any("Metà mandata da sola" in str(a) for a in banco.AVVISI)))
+    SRV._paga_rimborso = paga_incerta
+    metti(k9, stato="rimborsato", mancato_perche="onchain-rinuncia", chiuso_il=ora)
+    n_b = len(BOTTONI)
+    banco.AVVISI.clear()
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 70))
+    prova("INCERTA: niente timbro, chi vende sa che e' in verifica, i moderatori «NON "
+          "mandatela a mano»",
+          (False, True, True),
+          (bool(riga_cauz(k9)["meta_mandata_il"]),
+           any(chi == 888 and "in verifica" in t for chi, t, _ in BOTTONI[n_b:]),
+           any("Metà in verifica" in str(a) for a in banco.AVVISI)))
+    SRV._paga_rimborso = paga_vera
+    tetto_meta = SRV.P2P_ONCHAIN_CAUZIONE_META_TETTO
+    prova("DI SERIE NESSUN TETTO (Andrea: «Nessun tetto»): parte qualunque cifra; con un "
+          "tetto scritto, oltre resta a mano; a leva spenta pure",
+          (0, True, False, False, True),
+          (tetto_meta, SRV.p2p_onchain_meta_automatica(10 ** 6, 888),
+           (setattr(SRV, "P2P_ONCHAIN_CAUZIONE_META_TETTO", 5000),
+            SRV.p2p_onchain_meta_automatica(5001, 888))[1],
+           (setattr(SRV, "P2P_ONCHAIN_CAUZIONE_META_TETTO", tetto_meta),
+            setattr(SRV, "P2P_ONCHAIN_CAUZIONE_META_AUTO", False),
+            SRV.p2p_onchain_meta_automatica(1500, 888))[2],
+           (setattr(SRV, "P2P_ONCHAIN_CAUZIONE_META_AUTO", True),
+            SRV.p2p_onchain_meta_automatica(1500, 888))[1]))
+    SRV.P2P_ONCHAIN_CAUZIONE_META_AUTO = meta_auto_prima
     # -- LND muto
     LND["muto"] = True
     r = cauz(999, m6, "Contanti")
@@ -2168,17 +2264,17 @@ def main():
                 cauz(999, m6, "Contanti").status_code)[1])
     SRV.LND_PONTE_MACAROON_CAUZIONE = MAC_C
     prova("al nodo passano solo hodl, cancel, la lettura di una fattura e le DUE saldature "
-          "chieste dal moderatore (una a LND muto) e le DUE della cauzione chiesta persa da "
-          "sola: nient'altro salda una cauzione",
-          (set(), 4),
+          "chieste dal moderatore (una a LND muto), le DUE della cauzione chiesta persa da "
+          "sola e le TRE della meta' mandata da sola: nient'altro salda una cauzione",
+          (set(), 7),
           ({v[1] for v in LND["visti"] if not v[1].startswith("/v1/invoice/")}
            - {"/v2/invoices/hodl", "/v2/invoices/cancel", "/v2/invoices/settle"},
            len(saldate())))
     con = SRV.db()
     con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (m1, m2, m3, m4, m5, m6, c3, c1, g1, g2, c5, c6, k1["id"], k0["id"], k111["id"]))
-    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?)",
-                (k_buy.get("id") or 0, k2, k3, k4))
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato' WHERE id IN (?,?,?,?,?,?,?)",
+                (k_buy.get("id") or 0, k2, k3, k4, k7, k8, k9))
     con.commit()
     con.close()
     SRV.P2P_ONCHAIN_CAUZIONE, SRV.LND_PONTE_MACAROON_CAUZIONE = False, ""
@@ -2474,7 +2570,10 @@ def main():
             if chi in (999, 888) and not (b and b[0] in ("🟠 Apri lo scambio",
                                                          "🚫 Non ripubblicarlo")
                                           and "?scambio=bar-onchain-" in b[1])
-            and "Hai ricevuto una recensione" not in t]
+            and "Hai ricevuto una recensione" not in t
+            # (19 nov 2026) la meta' della cauzione la dice il registro «da
+            # riscuotere», la strada di sempre: non e' un avviso dello scambio
+            and "della metà di una cauzione da incassare" not in t]
     prova("in tutto il giro nessun avviso alle parti parte senza il bottone, "
           "e il segno della catena ⛓️ non c'e' piu' in nessuno",
           ([], [], True),

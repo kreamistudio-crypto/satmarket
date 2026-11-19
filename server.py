@@ -34390,6 +34390,7 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
         "               WHERE x.id=r.ordine_id) > 0 "
         "      THEN 'codici confermati, ordine #' || r.ordine_id "
         "    ELSE 'spese di spedizione, ordine #' || r.ordine_id END "
+        "  WHEN r.motivo='cauzione_p2p' THEN 'metà di una cauzione P2P' "
         "  ELSE COALESCE(a.titolo, '') END AS titolo "
         "FROM rimborsi_asta r LEFT JOIN annunci a ON a.id=r.annuncio_id "
         "WHERE r.payout_stato='incerto' "
@@ -38071,6 +38072,13 @@ def _leve_stato():
                          "ha depositato: per tutti gli altri e' come spento",
                   spento="«Riprendi i sats» vale per chiunque abbia "
                          "depositato (se la leva e' accesa)"),
+            # LA META' DELLA CAUZIONE MANDATA DA SOLA (19 nov 2026)
+            _leva("Metà della cauzione mandata da sola",
+                  "P2P_ONCHAIN_CAUZIONE_META_AUTO", P2P_ONCHAIN_CAUZIONE_META_AUTO,
+                  acceso="la metà di una cauzione on-chain persa parte da sola "
+                         "verso l'indirizzo Lightning di chi la riceve (con "
+                         "P2P_ONCHAIN_CAUZIONE_META_TETTO, oltre quel tetto a mano)",
+                  spento="la metà la manda un moderatore a mano"),
             # IL CONTO ALLA ROVESCIA NEL BOT (19 nov 2026, regole-sulla-card)
             _leva("Conto alla rovescia nel bot",
                   "P2P_CONTO_ALLA_ROVESCIA", P2P_CONTO_ALLA_ROVESCIA,
@@ -43177,7 +43185,7 @@ def mie_puntate(x_tg_init_data: str = Header(""),
         # nello stesso registro ma NON sono un rimborso d'asta: qui, in
         # «Le mie aste», non si elencano — chi vende le trova
         # nell'ordine
-        "AND r.motivo<>'spese_spedizione' "
+        "AND r.motivo NOT IN ('spese_spedizione', 'cauzione_p2p') "
         "ORDER BY r.creato DESC", (user["id"],))]
     con.close()
     return {"puntate": righe, "da_riscuotere": rimborsi,
@@ -43233,8 +43241,14 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         # LA DIVISIONE DEI CODICI (16 nov 2026) viaggia sulla stessa
         # riga delle spese, e le parole lo sanno dall'ordine
         codici = spese and _quota_e_codici(con, oid_spese)
+        # LA META' DI UNA CAUZIONE P2P PERSA (19 nov 2026): stesso binario,
+        # parole sue. Il motivo e' scritto a lettere (`MOTIVO_CAUZIONE_P2P`
+        # vive col P2P on-chain, e i banchi montano questa funzione da sola)
+        cauz = _campo(r, "motivo") == "cauzione_p2p"
         bolt11 = ""
         taccuino = {"etichetta": (
+            f"Metà della cauzione P2P persa, a chi vende (riga #{rimborso_id})"
+            if cauz else
             f"Codici confermati pagati a chi vende, ordine #{oid_spese}"
             if codici else
             f"Spese di spedizione rese a chi vende, ordine #{oid_spese}"
@@ -43267,6 +43281,9 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
                 return {"ok": False, "stato": r["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "rimborsi_asta", rimborso_id, bolt11, "puntatore",
+                f"Metà della cauzione P2P persa (riga #{rimborso_id}): "
+                f"<b>{_fmt_sats(importo)} sats</b>."
+                if cauz else
                 f"Codici confermati pagati a chi vende sull'ordine "
                 f"#{oid_spese}: <b>{_fmt_sats(importo)} sats</b>."
                 if codici else
@@ -43294,6 +43311,9 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
             con.commit()
             con.close()
             await notifica(r["tg_id"],
+                           f"🔐 <b>Metà della cauzione di chi ha preso è tua:</b> "
+                           f"{_fmt_sats(importo)} sats in arrivo sul tuo wallet. ⚡"
+                           if cauz else
                            f"💾 <b>Codici incassati:</b> "
                            f"{_fmt_sats(importo)} sats dei codici confermati "
                            f"dell'ordine #{oid_spese} sono in arrivo sul tuo "
@@ -43317,6 +43337,12 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
         con.close()
         await notifica(
             r["tg_id"], _msg_ritentiamo(importo) if ritenta else
+            # la meta' della cauzione (19 nov 2026): niente fattura da
+            # incollare, basta l'indirizzo (salvarlo la fa ripartire)
+            f"🔐 <b>Hai {_fmt_sats(importo)} sats della metà di una cauzione "
+            f"da incassare.</b> Scrivi o correggi il tuo Lightning address nel "
+            f"Profilo: appena c'è, arrivano da soli."
+            if cauz else
             f"💾 <b>Hai {_fmt_sats(importo)} sats dei codici confermati "
             f"da incassare</b> sull'ordine #{oid_spese}. Imposta il tuo "
             f"Lightning address nel Profilo, oppure apri l'ordine nella "
@@ -43512,6 +43538,7 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
                 if _quota_e_codici(con, int(_campo(r, "ordine_id", 0) or 0))
                 else "(le spese di spedizione)")
                if _campo(r, "motivo") == MOTIVO_SPESE_RESE
+               else "(la metà della cauzione)" if _campo(r, "motivo") == "cauzione_p2p"
                else "(rimborso integrale)"))
     no = rifiuto_scadenza(bolt11)   # qui si paga all'istante
     if no:
@@ -53576,7 +53603,7 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # nello stesso registro ma non sono «aste su cui agire»: fuori)
     da_riscuotere = con2.execute(
         "SELECT COUNT(*) AS n FROM rimborsi_asta WHERE tg_id=? AND "
-        "stato='da_riscuotere' AND motivo<>'spese_spedizione'",
+        "stato='da_riscuotere' AND motivo NOT IN ('spese_spedizione', 'cauzione_p2p')",
         (user["id"],)).fetchone()["n"]
     con2.close()
     profilo["aste_da_agire"] = superato + da_riscuotere
@@ -98707,6 +98734,23 @@ async def sollecita_rimborsi_puntate():
             except Exception as e:
                 print(f"⚠️ Sollecito spese saltato (#{r['id']}): {e}")
             continue
+        # LA META' DI UNA CAUZIONE P2P (19 nov 2026): parole sue
+        if r["motivo"] == "cauzione_p2p":
+            try:
+                if r["solleciti"] < SOLLECITO_INCASSO_MAX:
+                    await notifica(r["tg_id"],
+                        f"🔐 <b>Hai {_fmt_sats(r['importo_sats'])} sats della metà "
+                        f"di una cauzione da incassare.</b> Scrivi il tuo Lightning "
+                        f"address nel Profilo: appena c'è, arrivano da soli. ⚡")
+                else:
+                    await notifica_admin(
+                        f"🧊 <b>Metà di una cauzione P2P ferma:</b> riga #{r['id']}, "
+                        f"<b>{_fmt_sats(r['importo_sats'])} sats</b> per {r['tg_id']}. "
+                        f"Ha ignorato {SOLLECITO_INCASSO_MAX} solleciti: serve un "
+                        f"occhio umano.", argomento="errori")
+            except Exception as e:
+                print(f"⚠️ Sollecito della cauzione saltato (#{r['id']}): {e}")
+            continue
         try:
             if r["solleciti"] < SOLLECITO_INCASSO_MAX:
                 await notifica(r["tg_id"],
@@ -112526,8 +112570,10 @@ def _p2p_onchain_prepara(con):
     # persona, che un moderatore manda A MANO (decisione di Andrea);
     # `meta_mandata_il/da` = quando e chi ha detto «mandata».
     gia_c = {r[1] for r in con.execute("PRAGMA table_info(p2p_onchain_cauzioni)")}
+    # `meta_rimborso_id` (19 nov 2026) = la riga «da riscuotere» con cui
+    # Barattolo manda la meta' da solo (0 = a mano, come prima)
     for col in ("saldando_il", "persa_da", "meta_sats", "meta_a",
-                "meta_mandata_il", "meta_mandata_da"):
+                "meta_mandata_il", "meta_mandata_da", "meta_rimborso_id"):
         if col not in gia_c:
             con.execute(f"ALTER TABLE p2p_onchain_cauzioni ADD COLUMN {col} "
                         "INTEGER NOT NULL DEFAULT 0")
@@ -114191,6 +114237,26 @@ P2P_ONCHAIN_CAUZIONE_CLTV = 576         # i blocchi dell'HTLC, come Mostro
 P2P_ONCHAIN_CAUZIONE_PRESA_S = 900      # tenuta ma non usata: poi torna
 P2P_ONCHAIN_CAUZIONE_GUARDA_S = 600     # ogni quanto si richiede a LND una in gioco
 P2P_ONCHAIN_CAUZIONE_SALDANDO_S = 120   # una «saldando» appesa: poi si chiede a LND
+# LA META' DELLA CAUZIONE PERSA MANDATA DA SOLA (19 nov 2026, Andrea: «c'è
+# un modo per far sì che quella metà vada direttamente alla parte
+# interessata?», poi la scheda: «Sì, in automatico con un tetto»). La meta'
+# entra nel REGISTRO «da riscuotere» (`rimborsi_asta`, motivo suo) e parte
+# dalla stessa strada d'uscita delle spese rese: la cintura dell'importo,
+# una sola mano, l'incerto che si congela, il Lightning address del Profilo
+# e il recupero quando lo scrive. Nessun tubo nuovo verso LNbits. Il tetto
+# in sats: 0 = nessun tetto, di serie (Andrea, 19 nov: «Nessun tetto»); con
+# un numero, oltre resta a mano come prima. Accesa di serie; False la spegne.
+MOTIVO_CAUZIONE_P2P = "cauzione_p2p"
+try:
+    from config import P2P_ONCHAIN_CAUZIONE_META_AUTO
+    P2P_ONCHAIN_CAUZIONE_META_AUTO = P2P_ONCHAIN_CAUZIONE_META_AUTO is not False
+except ImportError:
+    P2P_ONCHAIN_CAUZIONE_META_AUTO = True
+try:
+    from config import P2P_ONCHAIN_CAUZIONE_META_TETTO
+    P2P_ONCHAIN_CAUZIONE_META_TETTO = max(int(P2P_ONCHAIN_CAUZIONE_META_TETTO), 0)
+except (ImportError, TypeError, ValueError):
+    P2P_ONCHAIN_CAUZIONE_META_TETTO = 0
 P2P_ONCHAIN_CAUZIONE_MEMO = ("Barattolo: cauzione dello scambio P2P. "
                              "Resta in sospeso e torna a fine scambio")
 P2P_ONCHAIN_STATI_CHIUSI = ("rilasciato", "rimborsato", "annullato", "scaduto")
@@ -114475,11 +114541,27 @@ def _p2p_onchain_cauzione_di(con, o, tg_id: int, admin: bool = False) -> dict | 
         a = int(_p2p_onchain_campo(r, "meta_a", 0) or 0)
         u = con.execute("SELECT nome, ln_address FROM utenti WHERE tg_id=?",
                         (a,)).fetchone() if a else None
+        rid = int(_p2p_onchain_campo(r, "meta_rimborso_id", 0) or 0)
         d["meta"] = {"sats": int(_p2p_onchain_campo(r, "meta_sats", 0) or 0),
                      "a": a, "nome": str(u["nome"] or "") if u else "",
                      "ln_address": str(u["ln_address"] or "") if u else "",
-                     "mandata": bool(int(_p2p_onchain_campo(r, "meta_mandata_il", 0) or 0))}
+                     "mandata": bool(int(_p2p_onchain_campo(r, "meta_mandata_il", 0) or 0))
+                     or _p2p_onchain_meta_riscossa(con, rid),
+                     # (19 nov 2026) la manda Barattolo da solo: niente tasto
+                     "auto": bool(rid)}
     return d
+
+
+def _p2p_onchain_meta_riscossa(con, rid: int) -> bool:
+    """La riga «da riscuotere» della meta' (19 nov 2026) e' stata pagata?
+    (anche dopo, quando chi la riceve ha scritto il suo indirizzo)"""
+    if not rid:
+        return False
+    try:
+        r = con.execute("SELECT stato FROM rimborsi_asta WHERE id=?", (int(rid),)).fetchone()
+    except sqlite3.OperationalError:
+        return False
+    return bool(r and r["stato"] == "riscosso")
 
 
 def _p2p_onchain_cauzione_meta_di(con, o, tg_id: int) -> dict | None:
@@ -114498,7 +114580,9 @@ def _p2p_onchain_cauzione_meta_di(con, o, tg_id: int) -> dict | None:
     u = con.execute("SELECT ln_address FROM utenti WHERE tg_id=?",
                     (int(tg_id),)).fetchone()
     return {"sats": int(r["meta_sats"] or 0),
-            "mandata": bool(int(r["meta_mandata_il"] or 0)),
+            "mandata": bool(int(r["meta_mandata_il"] or 0))
+            or _p2p_onchain_meta_riscossa(con, int(_p2p_onchain_campo(r, "meta_rimborso_id", 0) or 0)),
+            "auto": bool(int(_p2p_onchain_campo(r, "meta_rimborso_id", 0) or 0)),
             "ln": bool(u and str(u["ln_address"] or "").strip())}
 
 
@@ -114565,6 +114649,93 @@ def p2p_onchain_cauzione_persa_da_sola(o, riga) -> str:
     return ""
 
 
+def p2p_onchain_meta_automatica(meta, altro) -> bool:
+    """PURA: la meta' di una cauzione persa parte da sola? Leva accesa,
+    qualcuno a cui darla, e non oltre il tetto se c'e' (0 = nessuno)."""
+    try:
+        tetto = int(P2P_ONCHAIN_CAUZIONE_META_TETTO or 0)
+        return bool(P2P_ONCHAIN_CAUZIONE_META_AUTO and int(altro or 0) > 0
+                    and int(meta or 0) > 0 and (tetto <= 0 or int(meta) <= tetto))
+    except (TypeError, ValueError):
+        return False
+
+
+async def _p2p_onchain_cauzione_meta_auto(cid: int, altro: int, meta: int) -> str:
+    """LA META' MANDATA DA SOLA (19 nov 2026). La riga «da riscuotere» nasce
+    nella STESSA transazione che la lega alla cauzione (`meta_rimborso_id`,
+    scritto una volta sola: due giri non ne fanno due), poi parte dalla
+    strada d'uscita del registro (`_paga_rimborso`). Torna 'pagata', 'in
+    verifica' (esito incerto: si congela, la decidono i moderatori dalla
+    coda), 'in coda' (non e' partita: resta «da riscuotere» e parte da sola
+    quando chi la riceve scrive il suo Lightning address), o '' se non si
+    e' tentato (leva, tetto, o gia' fatto): allora resta a mano."""
+    if not p2p_onchain_meta_automatica(meta, altro):
+        return ""
+    adesso = int(time.time())
+    con = _p2p_onchain_db()
+    try:
+        r = con.execute("SELECT meta_rimborso_id, meta_mandata_il FROM p2p_onchain_cauzioni"
+                        " WHERE id=? AND stato='persa'", (int(cid),)).fetchone()
+        if not r or int(r["meta_rimborso_id"] or 0) or int(r["meta_mandata_il"] or 0):
+            return ""
+        con.execute(
+            "INSERT INTO rimborsi_asta(annuncio_id, tg_id, puntata_id, importo_sats,"
+            " motivo, stato, ordine_id, cassaforte, payout_stato, payout_verso,"
+            " creato, aggiornato) VALUES(0, ?, 0, ?, ?, 'da_riscuotere', 0, ?,"
+            " 'da_riprovare', 'puntatore', ?, ?)",
+            (int(altro), int(meta), MOTIVO_CAUZIONE_P2P, cassaforte_nuova(),
+             adesso, adesso))
+        rid = int(con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"])
+        cur = con.execute("UPDATE p2p_onchain_cauzioni SET meta_rimborso_id=?"
+                          " WHERE id=? AND meta_rimborso_id=0 AND meta_mandata_il=0",
+                          (rid, int(cid)))
+        if not cur.rowcount:
+            con.rollback()
+            return ""
+        con.commit()
+    finally:
+        con.close()
+    try:
+        esito = await _paga_rimborso(rid)
+    except Exception as e:
+        # la riga resta «da riscuotere»: la riprende il giro dei sospesi
+        print(f"⚠️ cauzione on-chain #{cid}: la metà non è partita ({e})", flush=True)
+        return "in coda"
+    if esito.get("ok"):
+        con = _p2p_onchain_db()
+        try:
+            con.execute("UPDATE p2p_onchain_cauzioni SET meta_mandata_il=?, meta_mandata_da=0"
+                        " WHERE id=? AND meta_mandata_il=0", (int(time.time()), int(cid)))
+            con.commit()
+        finally:
+            con.close()
+        return "pagata"
+    if esito.get("incerto") or esito.get("in_volo"):
+        return "in verifica"
+    return "in coda"
+
+
+def p2p_onchain_meta_detta_admin(esito: str, meta: int, nome: str, altro: int, ln: str) -> str:
+    """PURA: la coda dell'avviso ai moderatori sulla meta' (19 nov 2026):
+    mandata da sola, in coda, in verifica, o da mandare a mano come prima."""
+    chi = f"{html.escape(nome or '')} ({int(altro)})"
+    if not (altro and meta):
+        return "Nessuna metà da mandare."
+    if esito == "pagata":
+        return f"✅ <b>Metà mandata da sola:</b> {_fmt_sats(meta)} sats a {chi}. Non serve altro."
+    if esito == "in verifica":
+        return (f"⚠️ <b>Metà in verifica:</b> {_fmt_sats(meta)} sats a {chi}, pagamento "
+                "dall'esito incerto. Guardate la coda dei pagamenti incerti: NON mandatela a mano.")
+    if esito == "in coda":
+        return (f"⏳ <b>Metà non ancora partita:</b> {_fmt_sats(meta)} sats a {chi}. È nel suo "
+                "«da riscuotere» e parte da sola quando scrive il suo indirizzo Lightning. "
+                "NON mandatela a mano.")
+    return (f"<b>DA MANDARE A MANO: {_fmt_sats(meta)} sats</b> a {chi}"
+            + (f", indirizzo Lightning <code>{html.escape(ln)}</code>" if ln
+               else ": non ha un indirizzo Lightning nel Profilo, va chiesta una fattura")
+            + ". Poi nella scheda dello scambio: «✅ Metà mandata».")
+
+
 async def _p2p_onchain_cauzione_persa_da_sola(o, r, motivo: str, adesso: int) -> bool:
     """La cauzione chiesta da chi vende, persa DA SOLA (il giudice e'
     `p2p_onchain_cauzione_persa_da_sola`): gli stessi gesti del moderatore
@@ -114605,7 +114776,15 @@ async def _p2p_onchain_cauzione_persa_da_sola(o, r, motivo: str, adesso: int) ->
         "🔐 <b>Cauzione persa:</b> " + f"{_fmt_sats(sats)} sats.\n\n"
         f"Lo scambio chiedeva una cauzione e {fatto}, quindi la cauzione non "
         "torna. Metà va a chi vende.", _p2p_onchain_bottone(o))
-    if altro and meta:
+    # (19 nov 2026) la meta' parte da sola: chi la riceve lo sa dal
+    # registro («in arrivo», o «scrivi il tuo indirizzo»)
+    esito_meta = await _p2p_onchain_cauzione_meta_auto(cid, altro, meta)
+    if esito_meta == "in verifica":
+        await _notifica_p2p_onchain(o, altro,
+            "🔐 <b>Metà della cauzione di chi ha preso è tua:</b> "
+            f"{_fmt_sats(meta)} sats. Il pagamento è in verifica: arrivano appena "
+            "è confermato.", _p2p_onchain_bottone(o))
+    if altro and meta and not esito_meta:
         await _notifica_p2p_onchain(o, altro,
             "🔐 <b>Metà della cauzione di chi ha preso è tua:</b> "
             + f"{_fmt_sats(meta)} sats.\n\n"
@@ -114618,14 +114797,10 @@ async def _p2p_onchain_cauzione_persa_da_sola(o, r, motivo: str, adesso: int) ->
         f"🔐 <b>Cauzione persa da sola</b> sullo scambio P2P on-chain #{int(o['id'])} "
         f"({'rinuncia dopo il deposito' if motivo == 'rinuncia' else 'tempo per pagare scaduto'}): "
         f"{_fmt_sats(sats)} sats incassati sul nodo.\n\n"
-        + (f"<b>DA MANDARE A MANO: {_fmt_sats(meta)} sats</b> a "
-           f"{html.escape(str(u['nome'] or '') if u else '')} ({altro})"
-           + (f", indirizzo Lightning <code>{html.escape(ln)}</code>" if ln
-              else ": non ha un indirizzo Lightning nel Profilo, va chiesta una fattura")
-           + ". Poi nella scheda dello scambio: «✅ Metà mandata»."
-           if altro and meta else "Nessuna metà da mandare."))
+        + p2p_onchain_meta_detta_admin(esito_meta, meta,
+                                       str(u["nome"] or "") if u else "", altro, ln))
     print(f"🔐 cauzione on-chain: scambio #{int(o['id'])}, {_fmt_sats(sats)} sats PERSI "
-          f"da soli ({motivo}); metà da mandare a mano: {_fmt_sats(meta)}", flush=True)
+          f"da soli ({motivo}); metà {_fmt_sats(meta)}: {esito_meta or 'a mano'}", flush=True)
     return True
 
 
@@ -114873,7 +115048,13 @@ async def p2p_onchain_cauzione_brucia(oid: int, x_tg_init_data: str = Header("")
         "Un moderatore ha deciso che non hai fatto la tua parte nello scambio: "
         "la cauzione non torna. Se pensi che ci sia un errore, "
         "scrivi ai moderatori.", _p2p_onchain_bottone(o))
-    if altro and meta:
+    esito_meta = await _p2p_onchain_cauzione_meta_auto(cid, altro, meta)
+    if esito_meta == "in verifica":
+        await _notifica_p2p_onchain(o, altro,
+            "🔐 <b>Metà della cauzione dell'altra persona è tua:</b> "
+            f"{_fmt_sats(meta)} sats. Il pagamento è in verifica: arrivano appena "
+            "è confermato.", _p2p_onchain_bottone(o))
+    if altro and meta and not esito_meta:
         await _notifica_p2p_onchain(o, altro,
             "🔐 <b>Metà della cauzione dell'altra persona è tua:</b> "
             + f"{_fmt_sats(meta)} sats.\n\n"
@@ -114885,15 +115066,12 @@ async def p2p_onchain_cauzione_brucia(oid: int, x_tg_init_data: str = Header("")
     await notifica_admin(argomento="dispute", testo=
         f"🔐 <b>Cauzione bruciata</b> sullo scambio P2P on-chain #{int(oid)} dal "
         f"moderatore {int(user['id'])}: {_fmt_sats(sats)} sats incassati sul nodo.\n\n"
-        + (f"<b>DA MANDARE A MANO: {_fmt_sats(meta)} sats</b> a "
-           f"{html.escape(str(u['nome'] or '') if u else '')} ({altro})"
-           + (f", indirizzo Lightning <code>{html.escape(ln)}</code>" if ln
-              else ": non ha un indirizzo Lightning nel Profilo, va chiesta una fattura")
-           + ". Poi nella scheda dello scambio: «✅ Metà mandata»."
-           if altro and meta else "Nessuna metà da mandare."))
+        + p2p_onchain_meta_detta_admin(esito_meta, meta,
+                                       str(u["nome"] or "") if u else "", altro, ln))
     print(f"🔐 cauzione on-chain: scambio #{int(oid)}, {_fmt_sats(sats)} sats BRUCIATI dal "
-          f"moderatore {int(user['id'])}; metà da mandare a mano: {_fmt_sats(meta)}", flush=True)
-    return {"ok": True, "sats": sats, "meta": meta}
+          f"moderatore {int(user['id'])}; metà {_fmt_sats(meta)}: {esito_meta or 'a mano'}",
+          flush=True)
+    return {"ok": True, "sats": sats, "meta": meta, "meta_esito": esito_meta}
 
 
 @app.post("/api/p2p/onchain/{oid}/cauzione/meta-mandata")
@@ -114915,9 +115093,16 @@ async def p2p_onchain_cauzione_meta_mandata(oid: int, x_tg_init_data: str = Head
             raise HTTPException(409, "Su questo scambio non c'è una metà da mandare")
         if int(r["meta_a"] or 0) == int(user["id"]):
             raise HTTPException(403, "La metà è tua: la segna un altro moderatore")
+        # (19 nov 2026) la meta' che manda Barattolo da solo non si segna a
+        # mano: sarebbe la strada per pagarla due volte
+        if int(_p2p_onchain_campo(r, "meta_rimborso_id", 0) or 0):
+            raise HTTPException(409, "Questa metà la manda Barattolo da solo "
+                                     "(è nel «da riscuotere» di chi la riceve): "
+                                     "non serve mandarla a mano")
         cur = con.execute(
             "UPDATE p2p_onchain_cauzioni SET meta_mandata_il=?, meta_mandata_da=?"
-            " WHERE id=? AND meta_mandata_il=0", (adesso, int(user["id"]), int(r["id"])))
+            " WHERE id=? AND meta_mandata_il=0 AND meta_rimborso_id=0",
+            (adesso, int(user["id"]), int(r["id"])))
         con.commit()
         if not cur.rowcount:
             return {"ok": True, "gia": True}
@@ -125525,7 +125710,7 @@ def _impegni_cancellazione(con, tg_id: int) -> list:
             "FROM rimborsi_asta WHERE tg_id=? AND stato='da_riscuotere'",
             (tg,)):
         if r["n"]:
-            voci.append(f"hai {_fmt_sats(r['s'])} sats d'asta da riscuotere: "
+            voci.append(f"hai {_fmt_sats(r['s'])} sats da riscuotere: "
                         f"riscuotili prima")
     # 3) I PAGAMENTI A BARATTOLO (banner, indirizzo del negozio): una
     #    fattura viva, o un rimborso deciso e non ancora uscito

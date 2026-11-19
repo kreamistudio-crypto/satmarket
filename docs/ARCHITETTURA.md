@@ -36924,6 +36924,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `cauzione_meta` {sats, mandata, ln} a chi spetta. Sul telefono:
   `riquadroCauzioneOcP2P` (col gesto e la metà), `metaCauzioneOcP2P`,
   `bruciaCauzioneOcP2P`, `metaMandataOcP2P`.
+  LA METÀ MANDATA DA SOLA (19 nov 2026; CANTIERI, «La metà della cauzione
+  persa mandata da sola»). Dopo la saldatura, chi annuncia la perdita (la
+  perdita da sola e il brucia del moderatore) chiama
+  `_p2p_onchain_cauzione_meta_auto`: se `p2p_onchain_meta_automatica`
+  (leva `P2P_ONCHAIN_CAUZIONE_META_AUTO`, tetto
+  `P2P_ONCHAIN_CAUZIONE_META_TETTO`, 0 = nessuno, di serie) dice sì, nasce una riga di
+  `rimborsi_asta` col motivo `cauzione_p2p` (`MOTIVO_CAUZIONE_P2P`,
+  `ordine_id` 0, la cassaforte del denaro nuovo) legata alla cauzione in
+  `meta_rimborso_id` nella stessa transazione, e parte da `_paga_rimborso`:
+  la strada d'uscita del registro, nessun tubo nuovo. Esiti: `pagata`
+  (timbro `meta_mandata_il`, `meta_mandata_da` 0), `in verifica`
+  (incerto: congelata), `in coda` (resta «da riscuotere», riparte quando
+  chi la riceve salva il Lightning address), '' (non tentata: a mano come
+  prima). Con `meta_rimborso_id` il «Metà mandata» a mano dice 409; la
+  scheda dice `auto` e «mandata» anche dal registro
+  (`_p2p_onchain_meta_riscossa`). Le parole ai moderatori:
+  `p2p_onchain_meta_detta_admin`. Nel registro la riga sta fuori dalle
+  aste («Le mie aste», il contatore) e ha parole sue (pagata, ferma,
+  sollecito, fattura incollata).
 - IL RIMBORSO ON-CHAIN CHE NON SI INCAGLIA (17 nov 2026, cantiere
   onchain-rimborso-liscio; CANTIERI, «Il rimborso on-chain che non si
   incaglia»). La regola del 10 nov non cambia (un rimborso vuoto non è

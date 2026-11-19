@@ -75153,7 +75153,11 @@ function riquadroCauzioneOcP2P(o){
       + '<div class="contanti-gesti"><button type="button" class="btn allarme" onclick="bruciaCauzioneOcP2P('
       + Number(o.id) + ')">🔐 Brucia la cauzione</button></div>';
   const m = c.meta;
-  if (stato === 'persa' && m && m.sats > 0)
+  /* (19 nov 2026) la meta' che manda Barattolo da solo: niente tasto */
+  if (stato === 'persa' && m && m.sats > 0 && m.auto)
+    h += '<div class="hint">' + (m.mandata ? '✅ Metà mandata da sola: ' : '⏳ <b>Metà in partenza da sola</b> (non mandarla a mano): ')
+      + fmt(m.sats) + ' sats a <b>' + esc(m.nome || '') + '</b> (' + Number(m.a) + ').</div>';
+  else if (stato === 'persa' && m && m.sats > 0)
     h += '<div class="hint">' + (m.mandata ? '✅ Metà mandata: ' : '⚠️ <b>Metà da mandare a mano:</b> ')
       + fmt(m.sats) + ' sats a <b>' + esc(m.nome || '') + '</b> (' + Number(m.a) + ')'
       + (m.mandata ? '.' : m.ln_address
@@ -75169,6 +75173,12 @@ function metaCauzioneOcP2P(o){
   const m = o && o.cauzione_meta;
   if (!m || !(m.sats > 0)) return '';
   const quanto = fmt(m.sats) + ' sats';
+  /* (19 nov 2026) la manda Barattolo da solo, dal registro «da riscuotere» */
+  if (m.auto)
+    return '<div class="p2p-box cauzione-box"><b>⚖️ Metà della cauzione dell\'altra persona è tua:</b> ' + esc(quanto) + '. '
+      + (m.mandata ? 'Partita verso il tuo wallet: controlla.'
+        : m.ln ? 'Sta partendo verso il tuo indirizzo Lightning del Profilo.'
+        : '<b>Scrivi il tuo indirizzo Lightning nel Profilo</b>: appena c\'è, arriva da sola.') + '</div>';
   if (m.mandata)
     return '<div class="p2p-box cauzione-box"><b>⚖️ Metà della cauzione mandata:</b> un moderatore ti ha inviato ' + esc(quanto) + '. Controlla il tuo wallet.</div>';
   return '<div class="p2p-box cauzione-box"><b>⚖️ Metà della cauzione dell\'altra persona è tua:</b> ' + esc(quanto) + '. '
@@ -75188,7 +75198,8 @@ async function eseguiBruciaCauzioneOcP2P(id){
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()}, body: '{}'});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || 'non bruciata');
-    toast('🔐 Cauzione bruciata' + (d.meta > 0 ? ': ora manda ' + fmt(d.meta) + ' sats all\'altra persona' : ''), 7000);
+    toast('🔐 Cauzione bruciata' + (d.meta > 0 ? (d.meta_esito ? ': la metà (' + fmt(d.meta) + ' sats) la manda Barattolo da solo'
+      : ': ora manda ' + fmt(d.meta) + ' sats all\'altra persona') : ''), 7000);
   } catch(e) { toast('🔐 ' + (e.message || 'errore'), 7000); }
   renderP2POnchain();
 }

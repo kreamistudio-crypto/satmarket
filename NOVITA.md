@@ -788,3 +788,15 @@ frase: Negli scambi P2P on-chain con la cauzione, quando la cauzione ti torna il
 dove: Il bot di Barattolo, dopo uno scambio on-chain chiuso in cui avevi bloccato la cauzione: il messaggio «🔐 La cauzione è tornata nel tuo wallet» con «Apri lo scambio».
 leva: P2P_ONCHAIN_CAUZIONE spenta di serie (in produzione accesa solo per i moderatori)
 pubblico: no
+
+## 2026-11-19 · onchain-passi
+frase: Negli scambi P2P on-chain i passi sono quelli di uno scambio Lightning: chi vende scrive prima dove vuole gli euro, chi compra paga e tocca «Ho inviato gli euro», e solo allora chi vende vede «Ricevuti: libera i sats». E il bot avvisa appena la rete vede il deposito, prima ancora della conferma.
+dove: P2P → «I miei scambi» → uno scambio on-chain: col deposito visto «Deposito inviato» senza più «Blocca i sats»; coi sats nel deposito, a chi vende «💶 Indica dove ricevere gli euro».
+leva: nessuna
+pubblico: sì
+
+## 2026-11-19 · meta-cauzione-auto
+frase: Negli scambi P2P on-chain con la cauzione, se chi ha preso la perde, la metà che spetta a chi vende parte da sola verso il suo indirizzo Lightning del Profilo, senza aspettare un moderatore.
+dove: Il bot di Barattolo: «🔐 Metà della cauzione di chi ha preso è tua: … in arrivo sul tuo wallet». Senza indirizzo Lightning nel Profilo il bot chiede di scriverlo, e la metà parte appena c'è.
+leva: P2P_ONCHAIN_CAUZIONE_META_AUTO (accesa di serie, senza tetto: P2P_ONCHAIN_CAUZIONE_META_TETTO = 0); la cauzione stessa P2P_ONCHAIN_CAUZIONE, in produzione solo per i moderatori
+pubblico: no
