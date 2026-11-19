@@ -100020,8 +100020,8 @@ def tempo_pagare_nel_banco(amb, acceso=True):
     for f in ("_minuti_pagare_scelta_p2p", "_metodo_veloce_p2p",
               "_metodi_veloci_p2p", "_minuti_coi_metodi_p2p", "_ordine_col_tempo_p2p",
               "_dichiara_minuti_pagare_p2p", "_minuti_pagare_righe_p2p", "_minuti_pagare_p2p",
-              "_finestre_per_nodo_p2p", "_attivo_dal_p2p", "_recapito_dal_p2p",
-              "_inizio_tempo_pagare_p2p", "_paga_entro_p2p",
+              "_finestre_per_nodo_p2p", "_pubblica_per_nodo_p2p", "_attivo_dal_p2p",
+              "_recapito_dal_p2p", "_inizio_tempo_pagare_p2p", "_paga_entro_p2p",
               "_recapito_tardi_p2p", "_durata_detta_p2p", "_intervalli_tempo_pagare_p2p",
               "_recapito_corto_s_p2p", "_testi_tempo_pagare_p2p",
               "_minuti_pagare_ordine_p2p"):
@@ -181625,7 +181625,7 @@ console.log(JSON.stringify(R));
                        for nome in ("P2P_TABACCHINO_VITA_S", "P2P_PAYCODE_MIN_S",
                                     "P2P_TABACCHINO_MARGINE_S"))
     banco6 = costanti + "let p2pInfo = null;\n" + "".join(_fn_js(m, f) for f in (
-        "function tempoParoleP2P(sec){", "function finestraDiP2P(info, pubblica){",
+        "function tempoParoleP2P(sec){", "function finestraDiP2P(info, pubblica, o){",
         "function margineTabacchinoP2P(info){",
         "function vitaLibroMargineP2P(scade, adesso, margine){",
         "function vitaLibroVivaP2P(scade, adesso){", "function margineParoleP2P(){",
@@ -181879,6 +181879,19 @@ c.scadAttesa = [scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultim
                 scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: 1000, mio: true}, I),
                 scadenzaAttesaPubblicaP2P({stato: 'attivo', ultimaMossa: 1000}, I),
                 scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore'}, I)];
+/* (19 nov 2026, patch 0015) chi pubblica ha al piu' il tempo per pagare che ha
+   scelto, SOLO col tag del nodo; i minuti dell'ordine qui li da' un finto */
+function minutiPagareOrdineP2P(o){ return o && o.min || 0; }
+const IC = {scadenzaSec: 1800, scadenzaPubblicaSec: 10800, limitePubblica: 2, pubblicaColTempo: true};
+c.colTempo = [finestraDiP2P(IC, true, {min: 30}), finestraDiP2P(IC, true, {min: 15}),
+              finestraDiP2P(IC, true, {min: 1440}), finestraDiP2P(IC, true, {min: 0}),
+              finestraDiP2P(I, true, {min: 30}), finestraDiP2P(IC, false, {min: 15}),
+              finestraDiP2P(IC, true),
+              scadenzaAttesaPubblicaP2P({stato: 'attesa_hold_venditore', ultimaMossa: 1000, min: 30}, IC)];
+p2pInfo = IC;
+c.miaColTempo = [finestraMiaP2P({mio: true, min: 30}), finestraMiaP2P({mio: false, min: 30})];
+c.infoColTempo = testoDueTempiInfoP2P(IC);
+p2pInfo = I;
 c.testoAttesa = [testoAttesaPubblicaP2P(10800, 9670), testoAttesaPubblicaP2P(10800, 0),
                  testoAttesaPubblicaP2P(1800, 60), testoAttesaPubblicaP2P(0, 0)];
 const ORA = Math.floor(Date.now() / 1000);
@@ -181988,6 +182001,14 @@ console.log(JSON.stringify(c));
     prova("la finestra per ruolo: chi prende mezz'ora, chi pubblica le sue ore; senza il tag "
           "ha il tempo di tutti, senza il 38385 il ripiego",
           [1800, 10800, 1800, 900, 900], c["finestre"])
+    prova("PATCH 0015 (19 nov 2026, Andrea: «mi sembra giusto che abbia 30 minuti anche chi "
+          "ha pubblicato»): col tag del nodo chi pubblica ha al piu' il tempo per pagare "
+          "scelto (30 minuti, 15), mai di piu' delle sue ore (24 ore: tre ore), le sue ore "
+          "senza scelta, senza il tag o senza l'ordine; chi prende la sua mezz'ora; e "
+          "l'attesa di chi ha preso conta i 30 minuti",
+          [[1800, 900, 10800, 10800, 10800, 1800, 10800, 2800], [1800, 1800], True],
+          [c["colTempo"], c["miaColTempo"],
+           "se ha scelto un tempo per pagare più corto, ha quello" in c["infoColTempo"]])
     prova("...il MIO gesto: le ore di chi pubblica solo se l'ordine l'ho pubblicato io",
           [[10800, 1800, 1800], [11800, 2800]], [c["mia"], c["scadGesto"]])
     prova("...e il mio ordine torna nel libro solo se l'ho pubblicato io E il servizio lo dice",
@@ -215109,6 +215130,12 @@ def prove_tempo_pagare_p2p():
           "richiede), chi non ha un tempo 0 («mai», il nodo non chiede piu')",
           {O[0]: None, O[1]: None, O[2]: 0, O[3]: 0, O[4]: 0, O[5]: 0},
           amb["_finestre_per_nodo_p2p"](con, O[:6]))
+    prova("PATCH 0015 (19 nov 2026, Andrea: «mi sembra giusto che abbia 30 minuti anche chi "
+          "ha pubblicato»): al nodo anche il tempo scelto, per chi pubblica, in secondi e "
+          "senza «non ancora» (la scelta c'e' dalla pubblicazione): coi minuti della card "
+          "(il bonifico ordinario vale 24 ore), 0 a chi non ne ha uno",
+          {O[0]: 86400, O[1]: 14400, O[2]: 0, O[3]: 0, O[4]: 0, O[5]: 0},
+          amb["_pubblica_per_nodo_p2p"](con, O[:6]))
     try:
         amb["_finestre_per_nodo_p2p"](con, "tutti")
         alzato = ""
@@ -215157,6 +215184,12 @@ def prove_tempo_pagare_p2p():
            (con.execute("DELETE FROM p2p_momenti WHERE ordine=? AND momento='garanzia_pagata'",
                         (O[1],)), fin(con, [O[1]], 99999))[1]])
     momento(O[1], "garanzia_pagata", 1000, "active")
+    momento(O[1], "preso", 5000)
+    pub = amb["_pubblica_per_nodo_p2p"]
+    prova("...e LA DOMANDA TARDIVA NON HA TEMPO anche per chi pubblica: dalla presa 15 "
+          "minuti si', 16 no (valgono le sue ore)",
+          [{O[1]: 14400}, {O[1]: 0}], [pub(con, [O[1]], 5000 + 900), pub(con, [O[1]], 5000 + 960)])
+    con.execute("DELETE FROM p2p_momenti WHERE ordine=? AND momento='preso'", (O[1],))
     prova("...e chi ha la garanzia ma non la dichiarazione del recapito (qui solo l'avviso "
           "partito, una riga di ieri): null finche' il telefono non lo dice",
           {O[4]: None}, fin(con, [O[4]], 1000 + 60))

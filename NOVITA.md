@@ -830,3 +830,9 @@ frase: Con più account sullo stesso telefono, la voce «📲 Notifiche sul tele
 dove: Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono», su un account diverso da quello che riceve le notifiche: la nota «Su questo telefono ora arrivano le notifiche di un altro tuo account…» e il tasto «Attiva qui».
 leva: WEB_PUSH_ATTIVO (accesa di serie)
 pubblico: sì
+
+## 2026-11-19 · pubblica-col-tempo
+frase: Negli scambi P2P Lightning, se chi vende ha scelto un tempo per pagare corto, quando qualcuno prende l'ordine ha lo stesso tempo anche lui per bloccare i sats, invece di tre ore: chi compra non resta ad aspettare.
+dove: P2P → «I miei scambi» → lo scambio appena preso: «Chi ha pubblicato ha fino a 30 minuti per rispondere»; nel foglio «Pubblica», sotto «Tempo per pagare».
+leva: nessuna
+pubblico: no

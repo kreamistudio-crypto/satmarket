@@ -82099,6 +82099,10 @@ function infoDaEvento(ev){
        giudici sono `finestraDiP2P` e `tornaNelLibroP2P`. */
     scadenzaPubblicaSec: Math.floor(num('maker_expiration_seconds')),
     limitePubblica: Math.floor(num('maker_timeout_limit')),
+    /* (19 nov 2026, patch 0015 del fork) il nodo da' a chi pubblica, per
+       bloccare i sats, al piu' il tempo per pagare che ha scelto per chi
+       compra: lo dice il tag, e solo allora `finestraDiP2P` lo conta */
+    pubblicaColTempo: tagValore(ev, 'barattolo_maker_payment_window') === '1',
     /* IL TEMPO PER PAGARE (18 nov 2026, patch 0013 del fork): l'intervallo
        che il nodo FA RISPETTARE, in secondi («900-86400»: da 15 minuti a 24
        ore, a minuti interi). Senza il tag il nodo non annulla niente allo
@@ -83225,7 +83229,9 @@ function testoDueTempiInfoP2P(info){
   if (!(i.scadenzaSec > 0) || !(i.scadenzaPubblicaSec > i.scadenzaSec)) return '';
   return 'Preso l\'ordine, il primo passo tocca sempre a chi l\'ha preso, che ha <b>'
     + tempoParoleP2P(i.scadenzaSec) + '</b>: ha il telefono in mano. Poi tocca a chi l\'ha pubblicato, che ha <b>'
-    + tempoParoleP2P(i.scadenzaPubblicaSec) + '</b>: non sa quando glielo prenderanno. '
+    + tempoParoleP2P(i.scadenzaPubblicaSec) + '</b>: non sa quando glielo prenderanno'
+    + (i.pubblicaColTempo ? ' (se ha scelto un tempo per pagare più corto, ha quello: chi vuole fretta la fa anche lui)' : '')
+    + '. '
     + 'Se compri, dici dove vuoi i sats e poi chi vende li blocca; se vendi, blocchi i sats e poi chi compra dice dove li vuole.';
 }
 /* la voce «se il tempo scade» quando l'ordine torna nel libro anche se a
@@ -98742,9 +98748,13 @@ function quotaAnelloP2P(svg, quota){
 function notaTempoPagareP2P(min, lenti){
   const base = 'Chi prende il tuo ordine ha <b>' + minutiPagareDetteP2P(min)
     + '</b> per inviarti i soldi e toccare «Ho inviato», contando da quando gli dici dove mandarli. ';
-  const fine = typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
+  const oc = typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc;
+  const fine = oc
     ? 'Se non lo fa in tempo, potrai aprire una disputa.'
-    : 'Se non lo fa in tempo, lo scambio si annulla da solo e i sats tornano a te.';
+    : 'Se non lo fa in tempo, lo scambio si annulla da solo e i sats tornano a te.'
+      /* (19 nov 2026, patch 0015) ...e lo stesso tempo vale per te */
+      + (typeof p2pInfo !== 'undefined' && p2pInfo && p2pInfo.pubblicaColTempo && minutiPagareSceltaP2P(min) < P2P_MINUTI_PAGARE_MAX
+        ? ' Quando qualcuno lo prende, anche tu hai al massimo <b>' + minutiPagareDetteP2P(min) + '</b> per bloccare i sats.' : '');
   const lento = lenti && lenti.length
     ? ' <br>Per scendere sotto le 24 ore servono solo metodi veloci (SEPA Instant, Revolut, '
       + 'Satispay, PayPal, USDT o cripto): ' + esc(lenti.join(', '))
@@ -99286,11 +99296,22 @@ function contoLungoP2P(sec){
 }
 /* PURA: la finestra del gesto di CHI — `pubblica` = chi ha pubblicato
    l'ordine. Senza il tag del coordinatore chi pubblica ha il tempo di
-   tutti; senza il 38385 il ripiego di sempre (900 s). */
-function finestraDiP2P(info, pubblica){
+   tutti; senza il 38385 il ripiego di sempre (900 s).
+   `o`, L'ORDINE (19 nov 2026, patch 0015; Andrea: «se io pubblico un
+   ordine e imposto il tempo per pagarlo a chi lo prende diciamo 30
+   minuti, mi sembra giusto che abbia 30 minuti anche chi ha
+   pubblicato»): col nodo che lo fa rispettare (`pubblicaColTempo`), chi
+   ha pubblicato ha al piu' il tempo per pagare che ha scelto. */
+function finestraDiP2P(info, pubblica, o){
   const i = info || {};
   const base = i.scadenzaSec > 0 ? i.scadenzaSec : 900;
-  return (pubblica && i.scadenzaPubblicaSec > 0) ? i.scadenzaPubblicaSec : base;
+  const sua = (pubblica && i.scadenzaPubblicaSec > 0) ? i.scadenzaPubblicaSec : base;
+  if (!pubblica || !i.pubblicaColTempo || !o) return sua;
+  /* i minuti dello scambio come li dice il server (anche dopo un
+     ricarico della pagina), sennò quelli dell'ordine nel libro */
+  const m = (typeof minutiPagareScambioP2P === 'function' ? Number(minutiPagareScambioP2P(o)) || 0 : 0)
+    || (typeof minutiPagareOrdineP2P === 'function' ? Number(minutiPagareOrdineP2P(o)) || 0 : 0);
+  return m > 0 ? Math.min(sua, m * 60) : sua;
 }
 /* ---- IL MARGINE DI BARATTOZON SEGUE IL TEMPO DI CHI PUBBLICA (12 ott
    2026, cantiere pausa-in-vista; il numero l'ha approvato Andrea) ----
@@ -99339,7 +99360,7 @@ function margineParoleP2P(){
 }
 /* la finestra del MIO gesto su quest'ordine */
 function finestraMiaP2P(o){
-  return finestraDiP2P(p2pInfo, !!(o && o.mio));
+  return finestraDiP2P(p2pInfo, !!(o && o.mio), o);
 }
 /* a tempo scaduto il MIO ordine torna nel libro invece di annullarsi?
    Solo se l'ho pubblicato io e il servizio di scambio lo annuncia */
@@ -99362,7 +99383,7 @@ const P2P_STATI_ATTESA_PUBBLICA = ['attesa_hold_venditore', 'attesa_fattura_comp
 function scadenzaAttesaPubblicaP2P(o, info){
   if (!o || o.mio || P2P_STATI_ATTESA_PUBBLICA.indexOf(o.stato) < 0) return 0;
   const da = Math.floor(Number(o.ultimaMossa) || 0);
-  return da > 0 ? da + finestraDiP2P(info, true) : 0;
+  return da > 0 ? da + finestraDiP2P(info, true, o) : 0;
 }
 /* PURA: la frase, in tre pezzi come quella del proprio gesto (il conto
    in mezzo lo riscrive il battito) */
@@ -99378,7 +99399,7 @@ function testoAttesaPubblicaP2P(finestra, resta){
 function rigaAttesaPubblicaP2P(o){
   if (!o || o.mio || o.soloVista || P2P_STATI_ATTESA_PUBBLICA.indexOf(o.stato) < 0) return '';
   const fine = scadenzaAttesaPubblicaP2P(o, p2pInfo);
-  const t = testoAttesaPubblicaP2P(p2pInfo && p2pInfo.scadenzaSec > 0 ? finestraDiP2P(p2pInfo, true) : 0,
+  const t = testoAttesaPubblicaP2P(p2pInfo && p2pInfo.scadenzaSec > 0 ? finestraDiP2P(p2pInfo, true, o) : 0,
                                    fine ? fine - Date.now() / 1000 : 0);
   /* `finito` quando non c'e' un conto da battere: il battito non lo tocca */
   return '<div class="p2p-gesto-tempo p2p-attesa-pubblica' + (t.conto ? '' : ' finito') + '" role="timer"'

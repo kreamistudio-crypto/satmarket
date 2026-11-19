@@ -1,5 +1,16 @@
 # IL FORK DI MOSTRO — le dodici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
+**Dal 19 novembre 2026 c'è la 0015, NON ANCORA SUL NODO** (immagine
+`-bar12`, `docs/DA-FARE-ANDREA.md`, voce 28; cantiere `pubblica-col-tempo`):
+su una vendita col tempo per pagare scelto, chi pubblica ha al massimo
+quel tempo per pagare la garanzia (al posto delle sue tre ore), chiesto al
+server con la domanda della 0013. Come la 0014 non ha un patcher: la
+`.patch` è la sorgente (tocca `barattolo_finestra.rs`, `barattolo_tempo.rs`,
+e le due chiamate in `db.rs` e `scheduler.rs`). `git am` delle quattordici
+`.patch` su un clone pulito della `v0.20.2` dà l'albero `de96252a`, e
+`cargo test` dice 2009 verdi, 0 rosse, 4 ignorate. Il perché: NODO-MOSTRO,
+«LA 0015».
+
 **Dal 19 novembre 2026 la 0014 È SUL NODO** (immagine `mostro:v0.20.2-bar11`,
 11:52 UTC; PRODUZIONE, «LA `-bar11`»)
 (cantiere `ritorno-nel-libro`, sotto, «LA 0014»): allo scadere del tempo

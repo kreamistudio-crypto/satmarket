@@ -37954,7 +37954,13 @@ mai il kind 0 di nessuno: regola ferrea 2).
   spenta o senza segreto, 403 a segreto sbagliato): `{"ordini": [...]}`
   → `{"finestre": {id: secondi}}`, coi soli ordini che un tempo ce
   l'hanno, e niente per uno scambio attivo da più di 15 minuti
-  (`P2P_FINESTRA_RITARDO_MAX_S`, la domanda tardiva). Allo scadere senza
+  (`P2P_FINESTRA_RITARDO_MAX_S`, la domanda tardiva). Dal 19 nov 2026
+  (patch 0015, cantiere pubblica-col-tempo) la risposta porta accanto
+  `pubblica`, `{id: secondi}` (`_pubblica_per_nodo_p2p`): il tempo scelto,
+  che il nodo da' anche a chi pubblica per bloccare i sats se e' piu' corto
+  delle sue tre ore; col tag `barattolo_maker_payment_window` nel 38385 il
+  server e la pagina contano quel tempo per chi pubblica
+  (`_finestra_pubblica_ordine_p2p`, `finestraDiP2P(info, true, o)`). Allo scadere senza
   «Ho inviato» annulla lui, e racconta `expired` / `payment-window`: il
   motivo dell'annullo è `tempo_pagare_scaduto`, e il «non completato» a
   chi compra segue la regola della garanzia scaduta più una

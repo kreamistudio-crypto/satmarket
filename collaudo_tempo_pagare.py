@@ -289,8 +289,13 @@ async def giro_intero():
           "ancora», il nodo richiede), chi non ha un tempo 0 («mai»)",
           {UNA: None, QUATTRO: None, LENTO: None, BZ: 0, CONT: 0, COMPRO: 0, ALTRUI: 0,
            STORTO: 0}, r.get("finestre"))
-    prova("...e nient'altro esce: ne' chi ha pubblicato ne' chi ha preso", ["finestre", "ok"],
+    prova("...e nient'altro esce: ne' chi ha pubblicato ne' chi ha preso (dal 19 nov 2026, "
+          "patch 0015, accanto il tempo scelto per chi pubblica)", ["finestre", "ok", "pubblica"],
           sorted(r))
+    prova("PATCH 0015: per chi pubblica il tempo scelto in secondi, senza «non ancora» "
+          "(un'ora, quattro ore, il bonifico ordinario 24 ore), 0 a chi non ne ha uno",
+          {UNA: 3600, QUATTRO: 14400, LENTO: 86400, BZ: 0, CONT: 0, COMPRO: 0, ALTRUI: 0,
+           STORTO: 0}, r.get("pubblica"))
 
     print("\n4) lo scambio di un'ora diventa attivo")
     t = int(time.time()) - 120

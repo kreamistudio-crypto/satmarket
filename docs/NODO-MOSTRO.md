@@ -711,3 +711,25 @@ comunque a chi vende. Nessuna migrazione di mostrod: la colonna la
 aggiunge il modulo, e il ritorno alla `-bar10` è il solo cambio
 d'immagine (la colonna la ignora). Compilata e provata nel cloud: albero
 `b45281d5`, 2005 prove `cargo` verdi, 4 ignorate.
+
+LA 0015, IL TEMPO DI CHI PUBBLICA SEGUE LA SUA SCELTA (preparata il 19 nov
+2026, cantiere `pubblica-col-tempo`; immagine `-bar12`, NON ANCORA SUL NODO:
+`docs/DA-FARE-ANDREA.md`, voce 28). Andrea: «se io pubblico un ordine e
+imposto il tempo per pagarlo a chi lo prende diciamo 30 minuti, mi sembra
+giusto che abbia 30 minuti anche chi ha pubblicato»; sulla scheda «Sì,
+stesso tempo per tutti». Su una vendita in `waiting-payment` (chi pubblica
+deve pagare la garanzia) il nodo chiede al server, con la stessa domanda
+della 0013, il tempo per pagare scelto (`{"pubblica": {id: secondi}}`,
+stesse regole: minuti interi da 900 a 86400), lo tiene in una tabella sua
+(`barattolo_maker_windows`, fuori dalle migrazioni, ripulita quando
+l'ordine lascia il libro e le attese) e la finestra di chi pubblica su
+quell'ordine diventa la PIU' CORTA fra le sue tre ore e la scelta. Allo
+scadere fa quel che la 0011 fa da sempre: l'ordine torna nel libro, e alla
+seconda di fila si toglie. Un server di prima (senza `pubblica`), un id che
+manca o la tabella illeggibile = nessuna scelta, valgono le tre ore. Nel
+38385 il tag `barattolo_maker_payment_window = 1`: l'app conta il tempo
+corto SOLO se lo vede. Quel che un server compromesso ottiene in più:
+accorciare a 15 minuti l'attesa di chi pubblica, e l'ordine torna nel
+libro; nessun sats si muove. Compilata e provata nel cloud: albero
+`de96252a`, 2009 prove `cargo` verdi, 4 ignorate (il giro filtrato del nodo:
+748 + 90).

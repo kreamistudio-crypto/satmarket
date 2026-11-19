@@ -62692,7 +62692,11 @@ async def finestre_p2p(req: Request):
     `{finestre: {ordine: secondi}}` coi soli ordini che un tempo ce
     l'hanno: per il nodo uno che manca e' «nessun tempo», e allora vale la
     sola scadenza della garanzia. NIENT'ALTRO ESCE: ne' chi ha pubblicato
-    ne' chi ha preso. POST perche' gli id non finiscano nei log."""
+    ne' chi ha preso. POST perche' gli id non finiscano nei log.
+    Dal 19 nov 2026 (patch 0015) accanto c'e' `pubblica`, `{ordine:
+    secondi}`: il tempo scelto, che il nodo da' anche a chi pubblica per
+    bloccare i sats se e' piu' corto delle sue ore (`_pubblica_per_nodo_p2p`).
+    Un nodo di prima lo ignora."""
     _porta_finestra_p2p(req.headers.get("authorization", ""))
     try:
         d = await req.json()
@@ -62700,13 +62704,14 @@ async def finestre_p2p(req: Request):
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
     try:
-        finestre = _finestre_per_nodo_p2p(con, (d or {}).get("ordini"),
-                                          int(time.time()))
+        adesso = int(time.time())
+        finestre = _finestre_per_nodo_p2p(con, (d or {}).get("ordini"), adesso)
+        pubblica = _pubblica_per_nodo_p2p(con, (d or {}).get("ordini"), adesso)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return JSONResponse({"ok": True, "finestre": finestre},
+    return JSONResponse({"ok": True, "finestre": finestre, "pubblica": pubblica},
                         headers={"Cache-Control": "no-store"})
 
 
@@ -63484,6 +63489,28 @@ def _finestra_pubblica_p2p(info) -> tuple:
     if s:
         return s, True
     return _finestra_gesto_p2p(info)
+
+
+def _pubblica_col_tempo_p2p(info) -> bool:
+    """PURA: il nodo da' a chi pubblica, per bloccare i sats, al piu' il
+    tempo per pagare che ha scelto? (`barattolo_maker_payment_window` nel
+    38385, patch 0015 del fork, 19 nov 2026). Senza il tag, le sue ore."""
+    return str(_tag_evento_p2p(info, "barattolo_maker_payment_window") or "") == "1" \
+        if isinstance(info, dict) else False
+
+
+def _finestra_pubblica_ordine_p2p(con, info, ordine: str) -> tuple:
+    """La finestra di CHI HA PUBBLICATO su UN ordine: la sua
+    (`_finestra_pubblica_p2p`), o il tempo per pagare che ha scelto se e'
+    piu' corto e il nodo lo fa rispettare (19 nov 2026, patch 0015;
+    Andrea: «mi sembra giusto che abbia 30 minuti anche chi ha
+    pubblicato»). Torna `(secondi, letta)`. Fail-open: un intoppo vale le
+    sue ore."""
+    secondi, letta = _finestra_pubblica_p2p(info)
+    if not (letta and ordine and _pubblica_col_tempo_p2p(info)):
+        return secondi, letta
+    minuti = _minuti_pagare_ordine_p2p(con, ordine)
+    return (min(secondi, minuti * 60) if minuti > 0 else secondi), letta
 
 
 def _finestra_di_p2p(info, pubblica: bool) -> tuple:
@@ -64837,8 +64864,13 @@ def _esito_chi_pubblica_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         "AND momento='preso' AND fonte='mostro'", (ordine, giro)).fetchone()[0]
     cosa = "pagato la garanzia" if ruolo == "vende" else "dato la fattura"
     dettaglio = come
+    # (19 nov 2026, patch 0015) la finestra di chi ha pubblicato su QUESTO
+    # ordine; da `globals()` perche' i banchi delle prove che ritagliano
+    # questa funzione non portano il giudice nuovo, e li' valgono le sue ore
+    _fpo = (globals().get("_finestra_pubblica_ordine_p2p")
+            or (lambda _c, info, _o: _finestra_pubblica_p2p(info)))
     if _ha_provato_p2p(con, tg, ordine, int(presa or 0)
-                       or ts - _finestra_pubblica_p2p(_P2P_FOTO["info"])[0]):
+                       or ts - _fpo(con, _P2P_FOTO["info"], ordine)[0]):
         gia = con.execute(
             "SELECT 1 FROM p2p_esiti WHERE tg_id=? AND esito='scusato' AND quando>=? "
             "AND NOT (ordine=? AND giro=?) LIMIT 1",
@@ -65675,6 +65707,45 @@ def _finestre_per_nodo_p2p(con, ordini, adesso: int = 0) -> dict:
                   "nessun tempo, vale la garanzia", flush=True)
             fuori[o] = 0
             continue
+        fuori[o] = minuti * 60
+    return fuori
+
+
+def _pubblica_per_nodo_p2p(con, ordini, adesso: int = 0) -> dict:
+    """IL TEMPO DI CHI PUBBLICA SEGUE LA SUA SCELTA (19 nov 2026, patch
+    0015; Andrea: «se io pubblico un ordine e imposto il tempo per pagarlo
+    a chi lo prende diciamo 30 minuti, mi sembra giusto che abbia 30 minuti
+    anche chi ha pubblicato»). `{ordine: secondi | 0}` per OGNI ordine
+    chiesto: i minuti del tempo per pagare che chi vende ha scelto, in
+    secondi, e il nodo da' a chi pubblica il PIU' CORTO fra quello e le sue
+    tre ore per bloccare i sats. 0 = nessuna scelta (il nodo tiene le tre
+    ore). Qui, a differenza della finestra di chi compra, niente «non
+    ancora»: la scelta c'e' da quando l'ordine e' pubblicato.
+    LA DOMANDA TARDIVA NON HA TEMPO, come la sorella: se il nodo chiede
+    molto dopo la presa (la porta era chiusa), il tempo sarebbe gia' finito
+    e l'ordine tornerebbe nel libro sotto gli occhi di chi non aveva visto
+    nessun conto. Allora 0: valgono le tre ore."""
+    pulite = _ordini_puliti_p2p(ordini)
+    tempi = _minuti_pagare_righe_p2p(con, pulite)
+    fuori = {}
+    for o in pulite:
+        minuti = tempi.get(o, 0)
+        if not minuti:
+            fuori[o] = 0
+            continue
+        if adesso:
+            try:
+                presa = con.execute(
+                    "SELECT MAX(quando) FROM p2p_momenti WHERE ordine=? AND "
+                    "momento='preso'", (o,)).fetchone()[0]
+            except sqlite3.OperationalError:
+                presa = 0
+            if presa and int(adesso) - int(presa) > P2P_FINESTRA_RITARDO_MAX_S:
+                print(f"· Tempo di chi pubblica: {o[:8]} chiesto dal nodo "
+                      f"{(int(adesso) - int(presa)) // 60} minuti dopo la presa: "
+                      "nessuna scelta, valgono le sue ore", flush=True)
+                fuori[o] = 0
+                continue
         fuori[o] = minuti * 60
     return fuori
 
@@ -72359,7 +72430,13 @@ def _promemoria_p2p_vivo(con, r, adesso: int) -> tuple:
     # risponde l'ordine torna nel libro invece di annullarsi
     pubblica = _tocca_a_chi_pubblica_p2p(con, ordine, r["tg_id"])
     if pubblica:
-        finestra, letta = _finestra_pubblica_p2p(_P2P_FOTO["info"])
+        # (19 nov 2026, patch 0015) la finestra di chi ha pubblicato su QUESTO
+        # ordine; da `globals()` perche' i banchi delle prove che ritagliano
+        # questa funzione non portano il giudice nuovo, e li' valgono le sue ore
+        _fpo = (globals().get("_finestra_pubblica_ordine_p2p")
+                or (lambda _c, info, _o: _finestra_pubblica_p2p(info)))
+        # (19 nov 2026, patch 0015) al piu' il tempo per pagare che ha scelto
+        finestra, letta = _fpo(con, _P2P_FOTO["info"], ordine)
     resta = _scadenza_gesto_p2p(quando, finestra) - int(adesso)
     if resta < P2P_PROMEMORIA_MINIMO_S:
         return "", "non resta nemmeno un minuto"
@@ -78309,6 +78386,11 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # avviso a lui non parte (ha preso con l'app in mano: se poi la posa,
     # e' proprio a lui che serve). Una richiesta rifatta nello stesso
     # giro sposta la sua attesa, non ne aggiunge una.
+    # (19 nov 2026, patch 0015) la finestra di chi ha pubblicato su QUESTO
+    # ordine; da `globals()` perche' i banchi delle prove che ritagliano
+    # questa funzione non portano il giudice nuovo, e li' valgono le sue ore
+    _fpo = (globals().get("_finestra_pubblica_ordine_p2p")
+            or (lambda _c, info, _o: _finestra_pubblica_p2p(info)))
     gesto = P2P_GESTI_A_TEMPO.get(momento)
     finestra, finestra_letta = _finestra_gesto_p2p(_P2P_FOTO["info"])
     if gesto and fatto["venditore" if gesto[1] == "vende" else "compratore"]:
@@ -78320,7 +78402,10 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         # della scadenza (`_piano_promemoria_p2p`); a chi ha preso, e a
         # leva spenta, resta quello di meta' tempo
         tocca_pubblica = bool(lato_maker) and gesto[1] == lato_maker
-        finestra_sua = _finestra_di_p2p(_P2P_FOTO["info"], tocca_pubblica)[0]
+        # (19 nov 2026, patch 0015) a chi ha pubblicato al piu' il tempo per
+        # pagare che ha scelto, se il nodo lo fa rispettare
+        finestra_sua = (_fpo(con, _P2P_FOTO["info"], ordine)[0]
+                        if tocca_pubblica else _finestra_di_p2p(_P2P_FOTO["info"], False)[0])
         scadenza = _scadenza_gesto_p2p(ev["ts"], finestra_sua)
         con.execute("DELETE FROM p2p_attese WHERE ordine=? AND momento LIKE ? AND "
                     "giro=? AND tg_id=? AND fonte='promemoria'",
@@ -78360,7 +78445,9 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         # quello (`_dopo_scadenza_p2p`)
         apre_pubblica = bool(lato_maker) and P2P_GESTI_A_TEMPO[apre][1] == lato_maker
         dati["tempo_gesto"] = _frase_tempo_gesto_p2p(_scadenza_gesto_p2p(
-            ev["ts"], _finestra_di_p2p(_P2P_FOTO["info"], apre_pubblica)[0]) - adesso)
+            ev["ts"], (_fpo(con, _P2P_FOTO["info"], ordine)[0]
+                       if apre_pubblica else _finestra_di_p2p(_P2P_FOTO["info"], False)[0]))
+            - adesso)
         if apre_pubblica and _limite_pubblica_p2p(_P2P_FOTO["info"]):
             dati["dopo_scadenza"] = _dopo_scadenza_p2p(_P2P_FOTO["info"], True)
     if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:

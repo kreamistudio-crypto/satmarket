@@ -59,15 +59,20 @@ D = "7e3a0000-0d0d-4a2b-9c3d-00000000000d"      # vendita di 111: annullata a ma
 V1 = "7e3a0000-0101-4a2b-9c3d-000000000011"     # tre vendite di 333, concluse in fretta
 V2 = "7e3a0000-0202-4a2b-9c3d-000000000012"
 V3 = "7e3a0000-0303-4a2b-9c3d-000000000013"
+E = "7e3a0000-1e1e-4a2b-9c3d-00000000001e"      # vendita di 111 con un'ora per pagare (patch 0015)
+F = "7e3a0000-1f1f-4a2b-9c3d-00000000001f"      # la stessa, col nodo che la fa rispettare
 PUBBLICA, PRENDE, VELOCE = banco.VENDE, banco.COMPRA, banco.ESTRANEO
 ALTRI = {444: "c3" * 32, 555: "d4" * 32}
 CHIAVE_VELOCE = "e5" * 32
 _TAG = re.compile(r"</?[bi]>")
 
 
-def info(prende=1800, pubblica=10800, limite=2):
+def info(prende=1800, pubblica=10800, limite=2, col_tempo=False):
     """Il 38385 di cartone: i soli tag che servono."""
     tags = [["d", "x"], ["expiration_seconds", str(prende)]]
+    if col_tempo:
+        # la patch 0015: chi pubblica ha al piu' il tempo per pagare scelto
+        tags.append(["barattolo_maker_payment_window", "1"])
     if pubblica:
         tags.append(["maker_expiration_seconds", str(pubblica)])
     if limite:
@@ -175,6 +180,12 @@ def semina_ordini():
                     "VALUES(?,?,?,1,'')", (tg, f"Persona {tg}", f"neg{tg}"))
         con.execute("INSERT OR REPLACE INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,?)",
                     (chiave, tg, adesso))
+    con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
+                "metodi,minuti_pagare) VALUES(?,?,?,'pending','sell',1,15000,'10,00 €',?,60)",
+                (E, PUBBLICA, adesso, json.dumps(["Revolut"])))
+    con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
+                "metodi,minuti_pagare) VALUES(?,?,?,'pending','sell',1,15000,'10,00 €',?,60)",
+                (F, PUBBLICA, adesso, json.dumps(["Revolut"])))
     for ordine, chi in ((A, PUBBLICA), (B, PUBBLICA), (C, PUBBLICA), (D, PUBBLICA),
                         (V1, VELOCE), (V2, VELOCE), (V3, VELOCE)):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
@@ -429,6 +440,26 @@ async def giro():
     p = (await posso(PASSA, [NA1, NA2]))["ordini"]
     prova("tolta la pausa tornano da soli: fuori dalle pause, e si prendono",
           ([], True, True), (sorted(f["pause"]), p[NA1]["ok"], p[NA2]["ok"]))
+
+    print("\n8-quater) chi ha scelto un'ora per pagare ha un'ora anche per bloccare i sats (patch 0015)")
+    SRV.P2P_TEMPO_PER_PAGARE = True
+    await presa(E, t0 + 100)
+    prova("SENZA il tag del nodo: le sue tre ore, come prima (i tre promemoria)",
+          [("garanzia_promemoria", t0 + 101 + 600), ("garanzia_promemoria2", t0 + 101 + 3600),
+           ("garanzia_promemoria3", t0 + 101 + 10800 - 1800)], attese(E, PUBBLICA))
+    SRV._P2P_FOTO["info"] = info(col_tempo=True)
+    await presa(F, t0 + 110)
+    # (Andrea: «mi sembra giusto che abbia 30 minuti anche chi ha pubblicato»)
+    prova("COL TAG: l'ora che ha scelto per chi compra vale anche per lui — i promemoria "
+          "dentro l'ora, il secondo mezz'ora prima della fine",
+          [("garanzia_promemoria", t0 + 111 + 600), ("garanzia_promemoria2", t0 + 111 + 3600 - 1800)],
+          attese(F, PUBBLICA))
+    prova("...e il primo avviso gli dice i minuti che restano di QUELL'ORA, non delle tre ore",
+          True, bool(re.search(r"⏳ Hai \d+ minuti, poi l'ordine torna nel libro",
+                               detto(PUBBLICA, "Paga la garanzia"))))
+    prova("...mentre un ordine senza scelta tiene le sue ore anche col tag", 10800,
+          SRV._finestra_pubblica_ordine_p2p(banco.con_db(), SRV._P2P_FOTO["info"], C)[0])
+    SRV._P2P_FOTO["info"] = info()
 
     print("\n9) dimentica il profilo")
     await scrivi_pausa(PUBBLICA, {"una_fino": int(time.time()) + 3600})

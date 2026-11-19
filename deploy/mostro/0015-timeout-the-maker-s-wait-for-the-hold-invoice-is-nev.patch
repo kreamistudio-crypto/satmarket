@@ -1,0 +1,547 @@
+From 1e54a6dde5245e65d30cfece8b8bd7345d524831 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Thu, 19 Nov 2026 21:00:00 +0000
+Subject: [PATCH] timeout: the maker's wait for the hold invoice is never
+ longer than the time to pay he chose
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Patch 0011 gives the maker of an order a waiting window of his own
+(`maker_expiration_seconds`, three hours on this node), because he cannot
+know when his order will be taken. A seller who sets a short time to pay
+on the timer (patch 0013) tells the buyer he trades fast; the buyer must
+not then wait three hours for his hold invoice.
+
+For a sell order in `waiting-payment`, the payment-window job now asks the
+marketplace server the time to pay the maker chose — the same request,
+answered in a second table, `{"pubblica": {id: seconds}}`, checked like
+the buyer's window (whole minutes, 900..86400) — and keeps it in a side
+table, `barattolo_maker_windows`, out of the migrations and pruned once
+the order leaves the book and the waiting states. The maker's window on
+that order is the shorter of his own and his choice: in
+`find_order_by_seconds` (the cutoff follows the shortest choice) and in
+`reconfirm_timeout_eligibility`. When it lapses, patch 0011 runs as
+before (back to the book, removed at the limit).
+
+A server without the table, an id it leaves out, or an unreadable side
+table all mean "no choice": the maker keeps his own window. The info
+event carries `barattolo_maker_payment_window = 1` next to
+`barattolo_payment_windows`.
+---
+ src/barattolo_finestra.rs | 290 +++++++++++++++++++++++++++++++++++++-
+ src/barattolo_tempo.rs    |  78 ++++++++++
+ src/db.rs                 |  20 ++-
+ src/scheduler.rs          |   7 +-
+ 4 files changed, 386 insertions(+), 9 deletions(-)
+
+diff --git a/src/barattolo_finestra.rs b/src/barattolo_finestra.rs
+index 0cf15bd..2eab64a 100644
+--- a/src/barattolo_finestra.rs
++++ b/src/barattolo_finestra.rs
+@@ -72,6 +72,28 @@
+ //! `barattolo_fees` and `barattolo_maker_lapses`: rolling back to an image
+ //! without this patch needs nothing.
+ //!
++//! PATCH 0015: THE MAKER'S TIME TO LOCK THE SATS FOLLOWS HIS CHOICE
++//! (Andrea, 19 Nov 2026: «se io pubblico un ordine e imposto il tempo per
++//! pagarlo a chi lo prende diciamo 30 minuti, mi sembra giusto che abbia
++//! 30 minuti anche chi ha pubblicato»). Patch 0011 gives the maker a
++//! waiting window of his own (`maker_expiration_seconds`, three hours on
++//! this node) because he cannot know when his order will be taken. A
++//! seller who sets 30 minutes on the timer is telling the buyer he trades
++//! fast: the buyer must not wait three hours for the hold invoice. So, for
++//! a SELL order waiting for its maker's hold invoice (`waiting-payment`),
++//! the daemon asks the server the time to pay the maker chose — the same
++//! request, answered in a second table, `{"pubblica": {id: seconds}}` —
++//! and the maker's window on that order is the SHORTER of the two. When it
++//! lapses, patch 0011 does what it always did: back to the book, removed
++//! at the limit. The answer is checked like the buyer's ([`window_from`]);
++//! a missing table (a server older than this patch) or a missing id is
++//! "no choice", written once: the maker keeps his own window. What a
++//! compromised server can do: shorten a maker's wait to 15 minutes, and
++//! the order goes back to the book — no sats move.
++//! The choices are kept in a side table, `barattolo_maker_windows`, out of
++//! the migrations like the others, and dropped once the order has left
++//! the book and the waiting states.
++//!
+ //! Without `BARATTOLO_FINESTRA_URL` and `BARATTOLO_FINESTRA_SEGRETO` this
+ //! module is inert: no request, no row, no tag in the info event.
+ 
+@@ -128,10 +150,12 @@ pub fn enabled() -> bool {
+     endpoint().is_some()
+ }
+ 
+-/// The info-event pair (kind 38385): the range a maker may choose from,
++/// The info-event pairs (kind 38385): the range a maker may choose from,
+ /// `"900-86400"` (seconds, whole minutes in between), only
+ /// when this daemon enforces them. A client that does not see it must not
+-/// promise that a trade cancels by itself.
++/// promise that a trade cancels by itself. Patch 0015 adds
++/// `barattolo_maker_payment_window = 1`: the maker's own wait for the hold
++/// invoice is never longer than the time to pay he chose.
+ pub fn info_pairs() -> Vec<(&'static str, String)> {
+     info_pairs_when(enabled())
+ }
+@@ -141,7 +165,10 @@ pub fn info_pairs_when(on: bool) -> Vec<(&'static str, String)> {
+     if !on {
+         return Vec::new();
+     }
+-    vec![("barattolo_payment_windows", format!("{MIN_WINDOW}-{MAX_WINDOW}"))]
++    vec![
++        ("barattolo_payment_windows", format!("{MIN_WINDOW}-{MAX_WINDOW}")),
++        ("barattolo_maker_payment_window", "1".to_string()),
++    ]
+ }
+ 
+ /// PURE: a value of the server's answer as a window in seconds, or 0. Only
+@@ -339,6 +366,13 @@ pub async fn due_orders(pool: &SqlitePool, now: i64) -> Result<Vec<Order>, sqlx:
+ }
+ 
+ async fn ask_server(ids: &[String]) -> Result<HashMap<String, i64>, String> {
++    let raw = ask_raw(ids).await?;
++    parse_answer(&raw, ids).ok_or_else(|| "unreadable answer".to_string())
++}
++
++/// The POST itself, shared by the buyer's windows and (patch 0015) the
++/// makers' choices: the body as text, capped at [`MAX_ANSWER_BYTES`].
++async fn ask_raw(ids: &[String]) -> Result<String, String> {
+     let (url, secret) = endpoint().ok_or_else(|| "not configured".to_string())?;
+     let response = crate::barattolo_fee::http()
+         .post(&url)
+@@ -366,8 +400,7 @@ async fn ask_server(ids: &[String]) -> Result<HashMap<String, i64>, String> {
+         }
+         raw.extend_from_slice(&chunk);
+     }
+-    parse_answer(&String::from_utf8_lossy(&raw), ids)
+-        .ok_or_else(|| "unreadable answer".to_string())
++    Ok(String::from_utf8_lossy(&raw).into_owned())
+ }
+ 
+ /// One refresh: stamp the trades newly active, ask the server the windows
+@@ -421,6 +454,169 @@ pub async fn refresh(pool: &SqlitePool, now: i64) {
+     }
+ }
+ 
++// ---- PATCH 0015: the maker's time to lock the sats follows his choice ----
++
++/// PURE: the makers' choices in the server's answer, for the ids asked.
++/// Every id asked gets an entry — the window, or 0 for "no choice" — so it
++/// is asked once: the choice of a published order never changes (the
++/// server keeps the first one). A readable answer without the `pubblica`
++/// table is a server older than this patch: all 0, the makers keep their
++/// own window. `None` only for an unreadable answer (asked again).
++pub fn parse_makers(body: &str, asked: &[String]) -> Option<HashMap<String, i64>> {
++    let value: serde_json::Value = serde_json::from_str(body).ok()?;
++    value.get("finestre")?;
++    let table = match value.get("pubblica") {
++        None => return Some(asked.iter().map(|id| (id.clone(), 0)).collect()),
++        Some(t) if t.is_object() => t,
++        Some(_) => return None,
++    };
++    Some(
++        asked
++            .iter()
++            .map(|id| (id.clone(), table.get(id.as_str()).map(window_from).unwrap_or(0)))
++            .collect(),
++    )
++}
++
++pub async fn ensure_maker_table(pool: &SqlitePool) -> Result<(), sqlx::Error> {
++    sqlx::query(
++        "CREATE TABLE IF NOT EXISTS barattolo_maker_windows (
++            order_id TEXT PRIMARY KEY,
++            seconds INTEGER NOT NULL,
++            learned_at INTEGER NOT NULL
++        )",
++    )
++    .execute(pool)
++    .await
++    .map(|_| ())
++}
++
++/// The SELL orders waiting for their maker's hold invoice whose choice is
++/// not known yet, the longest waiting first.
++pub async fn waiting_makers(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
++    ensure_maker_table(pool).await?;
++    let rows = sqlx::query_as::<_, (uuid::Uuid,)>(
++        "SELECT o.id FROM orders o
++         WHERE o.status = 'waiting-payment' AND o.kind = 'sell'
++           AND NOT EXISTS (SELECT 1 FROM barattolo_maker_windows m WHERE m.order_id = o.id)
++         ORDER BY o.taken_at LIMIT ?1",
++    )
++    .bind(MAX_PER_REQUEST as i64)
++    .fetch_all(pool)
++    .await?;
++    Ok(rows.into_iter().map(|r| r.0.to_string()).collect())
++}
++
++/// Writes the choices. A row already there is never rewritten.
++pub async fn store_makers(
++    pool: &SqlitePool,
++    choices: &HashMap<String, i64>,
++    now: i64,
++) -> Result<(), sqlx::Error> {
++    ensure_maker_table(pool).await?;
++    for (order_id, seconds) in choices {
++        let Ok(id) = uuid::Uuid::parse_str(order_id) else {
++            continue;
++        };
++        let written = sqlx::query(
++            "INSERT OR IGNORE INTO barattolo_maker_windows (order_id, seconds, learned_at)
++             VALUES (?1, ?2, ?3)",
++        )
++        .bind(id)
++        .bind(*seconds)
++        .bind(now)
++        .execute(pool)
++        .await?
++        .rows_affected();
++        if written > 0 && *seconds > 0 {
++            info!(
++                "barattolo_finestra: order {order_id}: the maker has at most {} minutes to lock the sats",
++                seconds / 60
++            );
++        }
++    }
++    Ok(())
++}
++
++/// Drops the choices of orders that left the book and the waiting states
++/// (finished, canceled, or a trade under way): the table stays small.
++pub async fn prune_makers(pool: &SqlitePool) -> Result<(), sqlx::Error> {
++    ensure_maker_table(pool).await?;
++    sqlx::query(
++        "DELETE FROM barattolo_maker_windows WHERE order_id NOT IN
++         (SELECT id FROM orders
++          WHERE status IN ('pending', 'waiting-payment', 'waiting-buyer-invoice'))",
++    )
++    .execute(pool)
++    .await
++    .map(|_| ())
++}
++
++/// The known choices, `{order id: seconds}`, only the real ones (> 0).
++pub async fn maker_windows(pool: &SqlitePool) -> Result<HashMap<String, i64>, sqlx::Error> {
++    ensure_maker_table(pool).await?;
++    let rows = sqlx::query_as::<_, (uuid::Uuid, i64)>(
++        "SELECT order_id, seconds FROM barattolo_maker_windows WHERE seconds > 0",
++    )
++    .fetch_all(pool)
++    .await?;
++    Ok(rows.into_iter().map(|(id, s)| (id.to_string(), s)).collect())
++}
++
++/// The choice of one order, or 0 (none, unknown, or the table unreadable:
++/// then the maker has his own window, as before this patch).
++pub async fn maker_window_of(pool: &SqlitePool, order_id: uuid::Uuid) -> i64 {
++    if ensure_maker_table(pool).await.is_err() {
++        return 0;
++    }
++    sqlx::query_as::<_, (i64,)>(
++        "SELECT seconds FROM barattolo_maker_windows WHERE order_id = ?1",
++    )
++    .bind(order_id)
++    .fetch_optional(pool)
++    .await
++    .ok()
++    .flatten()
++    .map(|r| r.0.max(0))
++    .unwrap_or(0)
++}
++
++/// One refresh of the makers' choices. Never errors: a failure is one log
++/// line on change, and the maker keeps his own window until the server
++/// answers.
++pub async fn refresh_makers(pool: &SqlitePool, now: i64) {
++    static WAS_OK: AtomicBool = AtomicBool::new(true);
++    if let Err(e) = prune_makers(pool).await {
++        warn!("barattolo_finestra: could not prune the makers' choices ({e})");
++    }
++    let ids = match waiting_makers(pool).await {
++        Ok(ids) if !ids.is_empty() => ids,
++        Ok(_) => return,
++        Err(e) => {
++            warn!("barattolo_finestra: could not read the makers' table ({e})");
++            return;
++        }
++    };
++    let answer = match tokio::time::timeout(LOOKUP_BUDGET, ask_raw(&ids)).await {
++        Ok(Ok(raw)) => parse_makers(&raw, &ids).ok_or_else(|| "unreadable answer".to_string()),
++        Ok(Err(reason)) => Err(reason),
++        Err(_) => Err(format!("no answer in {}s", LOOKUP_BUDGET.as_secs())),
++    };
++    match answer {
++        Ok(choices) => {
++            WAS_OK.store(true, Ordering::Relaxed);
++            if let Err(e) = store_makers(pool, &choices, now).await {
++                warn!("barattolo_finestra: could not write the makers' choices ({e})");
++            }
++        }
++        Err(reason) => {
++            if WAS_OK.swap(false, Ordering::Relaxed) {
++                warn!("barattolo_finestra: makers' choices NOT known ({reason}): they keep their own window");
++            }
++        }
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+@@ -498,10 +694,92 @@ mod tests {
+         assert!(info_pairs_when(false).is_empty());
+         assert_eq!(
+             info_pairs_when(true),
+-            vec![("barattolo_payment_windows", "900-86400".to_string())]
++            vec![
++                ("barattolo_payment_windows", "900-86400".to_string()),
++                ("barattolo_maker_payment_window", "1".to_string()),
++            ]
+         );
+     }
+ 
++    #[test]
++    fn every_maker_asked_gets_a_choice_once() {
++        let asked = vec!["a".to_string(), "b".to_string(), "c".to_string()];
++        let got = parse_makers(
++            r#"{"finestre": {"a": null}, "pubblica": {"a": 1800, "c": 7}}"#,
++            &asked,
++        )
++        .unwrap();
++        assert_eq!(got["a"], 1800);
++        assert_eq!(got["b"], 0, "missing = no choice, not asked again");
++        assert_eq!(got["c"], 0, "outside the range = no choice");
++        assert_eq!(got.len(), 3);
++        // a server older than patch 0015: no table, everybody keeps his window
++        let got = parse_makers(r#"{"finestre": {}}"#, &asked).unwrap();
++        assert!(got.values().all(|s| *s == 0) && got.len() == 3);
++        // unreadable: asked again
++        assert!(parse_makers("not json", &asked).is_none());
++        assert!(parse_makers(r#"{"pubblica": {"a": 1800}}"#, &asked).is_none());
++        assert!(parse_makers(r#"{"finestre": {}, "pubblica": [1]}"#, &asked).is_none());
++    }
++
++    async fn insert_kind(pool: &SqlitePool, status: &str, kind: &str, taken_at: i64) -> String {
++        use mostro_core::db::Crud;
++        let order = Order {
++            id: uuid::Uuid::new_v4(),
++            kind: kind.to_string(),
++            status: status.to_string(),
++            creator_pubkey: "c".repeat(64),
++            fiat_code: "EUR".to_string(),
++            payment_method: "SEPA".to_string(),
++            taken_at,
++            ..Default::default()
++        }
++        .create(pool)
++        .await
++        .unwrap();
++        order.id.to_string()
++    }
++
++    #[tokio::test]
++    async fn only_sell_orders_waiting_for_the_makers_hold_invoice_are_asked() {
++        let pool = pool().await;
++        let late = insert_kind(&pool, "waiting-payment", "sell", 2000).await;
++        let early = insert_kind(&pool, "waiting-payment", "sell", 1000).await;
++        // a buy order waiting for payment waits for its TAKER
++        let buy = insert_kind(&pool, "waiting-payment", "buy", 1000).await;
++        let pending = insert_kind(&pool, "pending", "sell", 0).await;
++        let ids = waiting_makers(&pool).await.unwrap();
++        assert_eq!(ids, vec![early.clone(), late.clone()]);
++        assert!(!ids.contains(&buy) && !ids.contains(&pending));
++
++        let mut choices = HashMap::new();
++        choices.insert(early.clone(), 1800);
++        choices.insert(late.clone(), 0);
++        store_makers(&pool, &choices, 3000).await.unwrap();
++        // asked once: both answered, nothing left to ask
++        assert!(waiting_makers(&pool).await.unwrap().is_empty());
++        // a row is never rewritten
++        choices.insert(early.clone(), 86400);
++        store_makers(&pool, &choices, 3100).await.unwrap();
++        let known = maker_windows(&pool).await.unwrap();
++        assert_eq!(known.len(), 1, "only the real choices");
++        assert_eq!(known[&early], 1800);
++        let early_id = uuid::Uuid::parse_str(&early).unwrap();
++        assert_eq!(maker_window_of(&pool, early_id).await, 1800);
++        assert_eq!(maker_window_of(&pool, uuid::Uuid::parse_str(&late).unwrap()).await, 0);
++        assert_eq!(maker_window_of(&pool, uuid::Uuid::new_v4()).await, 0);
++
++        // the trade went on: the choice is dropped at the next refresh
++        sqlx::query("UPDATE orders SET status = 'active' WHERE id = ?1")
++            .bind(early_id)
++            .execute(&pool)
++            .await
++            .unwrap();
++        prune_makers(&pool).await.unwrap();
++        assert!(maker_windows(&pool).await.unwrap().is_empty());
++        assert_eq!(maker_window_of(&pool, early_id).await, 0);
++    }
++
+     async fn insert(pool: &SqlitePool, status: &str, held_at: i64) -> String {
+         use mostro_core::db::Crud;
+         let order = Order {
+diff --git a/src/barattolo_tempo.rs b/src/barattolo_tempo.rs
+index 8eb7e6d..571c609 100644
+--- a/src/barattolo_tempo.rs
++++ b/src/barattolo_tempo.rs
+@@ -102,6 +102,54 @@ pub fn elapsed(status: &str, kind: &str, taken_at: i64, now: i64, taker_secs: u3
+     taken_at < now - window_of(status, kind, taker_secs) as i64
+ }
+ 
++// PATCH 0015 (Andrea, 19 Nov 2026: «se io pubblico un ordine e imposto il
++// tempo per pagarlo a chi lo prende diciamo 30 minuti, mi sembra giusto che
++// abbia 30 minuti anche chi ha pubblicato»): on a sell order whose maker
++// chose a time to pay, his own window is never longer than that choice.
++// `chosen` is what `barattolo_finestra` learned from the server (0 = none).
++
++/// PURE: the maker's window on ONE order — his own, or the time to pay he
++/// chose for the buyer when that is shorter.
++pub fn maker_window_with_choice(own: u32, chosen: i64) -> u32 {
++    if chosen > 0 {
++        own.min(chosen.min(u32::MAX as i64) as u32)
++    } else {
++        own
++    }
++}
++
++/// The waiting window of whoever holds the duty on an order whose maker's
++/// choice is `chosen`.
++pub fn window_for(status: &str, kind: &str, taker_secs: u32, chosen: i64) -> u32 {
++    window_with(
++        status,
++        kind,
++        taker_secs,
++        maker_window_with_choice(maker_window(taker_secs), chosen),
++    )
++}
++
++/// [`elapsed`] with the maker's choice on that order.
++pub fn elapsed_for(
++    status: &str,
++    kind: &str,
++    taken_at: i64,
++    now: i64,
++    taker_secs: u32,
++    chosen: i64,
++) -> bool {
++    taken_at < now - window_for(status, kind, taker_secs, chosen) as i64
++}
++
++/// PURE: the cutoff of `find_order_by_seconds` once the makers' choices
++/// are known: the shortest of the two windows and of every choice.
++pub fn shortest_window_with(shortest: u32, choices: impl IntoIterator<Item = i64>) -> u32 {
++    choices
++        .into_iter()
++        .filter(|c| *c > 0)
++        .fold(shortest, |m, c| maker_window_with_choice(m, c))
++}
++
+ /// PURE: after how many maker lapses in a row the order is removed, or 0
+ /// when the republish is off — not configured, below 2, or a node that
+ /// bonds the maker.
+@@ -279,6 +327,36 @@ mod tests {
+         assert!(!elapsed("waiting-payment", "sell", 1_000, 1_900, 900));
+     }
+ 
++    #[test]
++    fn the_makers_choice_shortens_his_own_window_never_lengthens_it() {
++        // three hours of his own, 30 minutes chosen for the buyer: 30 minutes
++        assert_eq!(maker_window_with_choice(10_800, 1800), 1800);
++        // 24 hours chosen: his three hours stay
++        assert_eq!(maker_window_with_choice(10_800, 86_400), 10_800);
++        // no choice: his own window
++        assert_eq!(maker_window_with_choice(10_800, 0), 10_800);
++        assert_eq!(maker_window_with_choice(10_800, -5), 10_800);
++        // the cutoff of the query follows the shortest choice
++        assert_eq!(shortest_window_with(1800, vec![3600, 900, 0]), 900);
++        assert_eq!(shortest_window_with(1800, Vec::<i64>::new()), 1800);
++        assert_eq!(shortest_window_with(1800, vec![7200]), 1800);
++    }
++
++    #[test]
++    fn the_choice_counts_only_where_the_duty_is_the_makers() {
++        if settings().is_some_and(|s| s.maker_expiration_seconds.is_some()) {
++            return;
++        }
++        // with no settings loaded both parties have the window passed in:
++        // the choice can only shorten the MAKER's
++        assert_eq!(window_for("waiting-payment", "sell", 1800, 900), 900);
++        assert_eq!(window_for("waiting-buyer-invoice", "sell", 1800, 900), 1800);
++        assert_eq!(window_for("waiting-payment", "buy", 1800, 900), 1800);
++        assert!(elapsed_for("waiting-payment", "sell", 1_000, 1_901, 1800, 900));
++        assert!(!elapsed_for("waiting-payment", "sell", 1_000, 1_900, 1800, 900));
++        assert!(!elapsed_for("waiting-buyer-invoice", "sell", 1_000, 1_901, 1800, 900));
++    }
++
+     #[test]
+     fn the_limit_is_off_unless_it_can_put_the_order_back_at_least_once() {
+         assert_eq!(limit_from(None, false), 0);
+diff --git a/src/db.rs b/src/db.rs
+index 9172f9b..5b3e4ea 100644
+--- a/src/db.rs
++++ b/src/db.rs
+@@ -669,7 +669,15 @@ pub async fn find_order_by_seconds(pool: &SqlitePool) -> Result<Vec<Order>, Most
+     // Without the new key the two are the same number, and this is
+     // upstream's query.
+     let taker_seconds = mostro_settings.expiration_seconds;
+-    let exp_seconds = crate::barattolo_tempo::shortest_window(taker_seconds) as u64;
++    // Patch 0015: on a sell order whose maker chose a time to pay, his
++    // window is never longer than that choice. Unreadable = none known.
++    let choices = crate::barattolo_finestra::maker_windows(pool)
++        .await
++        .unwrap_or_default();
++    let exp_seconds = crate::barattolo_tempo::shortest_window_with(
++        crate::barattolo_tempo::shortest_window(taker_seconds),
++        choices.values().copied(),
++    ) as u64;
+     let expire_time = Timestamp::now() - exp_seconds;
+     let order = sqlx::query_as::<_, Order>(
+         r#"
+@@ -687,7 +695,15 @@ pub async fn find_order_by_seconds(pool: &SqlitePool) -> Result<Vec<Order>, Most
+     Ok(order
+         .into_iter()
+         .filter(|o| {
+-            crate::barattolo_tempo::elapsed(&o.status, &o.kind, o.taken_at, now, taker_seconds)
++            let chosen = choices.get(&o.id.to_string()).copied().unwrap_or(0);
++            crate::barattolo_tempo::elapsed_for(
++                &o.status,
++                &o.kind,
++                o.taken_at,
++                now,
++                taker_seconds,
++                chosen,
++            )
+         })
+         .collect())
+ }
+diff --git a/src/scheduler.rs b/src/scheduler.rs
+index 99145dd..72b4895 100644
+--- a/src/scheduler.rs
++++ b/src/scheduler.rs
+@@ -631,7 +631,10 @@ async fn reconfirm_timeout_eligibility(
+         || fresh.status == Status::WaitingPayment.to_string();
+     // Barattolo fork (patch 0011): the window is the one of whoever holds
+     // the duty — the maker has a window of his own.
+-    let window = crate::barattolo_tempo::window_of(&fresh.status, &fresh.kind, exp_seconds);
++    // Patch 0015: and on a sell order, never longer than the time to pay
++    // its maker chose.
++    let chosen = crate::barattolo_finestra::maker_window_of(pool, fresh.id).await;
++    let window = crate::barattolo_tempo::window_for(&fresh.status, &fresh.kind, exp_seconds, chosen);
+     let still_expired = fresh.taken_at < Utc::now().timestamp() - window as i64;
+     (still_waiting && still_expired).then_some(fresh)
+ }
+@@ -1034,6 +1037,8 @@ async fn job_barattolo_payment_window(ctx: AppContext) {
+     tokio::spawn(async move {
+         loop {
+             let now = Utc::now().timestamp();
++            // patch 0015: the makers' choices, for their wait in `waiting-payment`
++            crate::barattolo_finestra::refresh_makers(ctx.pool(), now).await;
+             crate::barattolo_finestra::refresh(ctx.pool(), now).await;
+             if let Err(e) = barattolo_payment_window_pass(&ctx, &mut ln_client, now).await {
+                 error!("payment window pass failed: {e}");
+-- 
+2.43.0
+
