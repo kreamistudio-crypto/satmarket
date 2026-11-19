@@ -205,7 +205,7 @@ La cassa in negozio (se nelle REGOLAZIONI del pannello «Cassa in negozio» è a
 <!-- pezzo libro-021 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (1/22)
 
-Nel P2P non compri da Barattolo: compri da un'altra persona. Vi accordate su un prezzo, gli euro viaggiano fra voi due col metodo scelto, e i sats restano bloccati in garanzia finché gli euro non sono arrivati. Barattolo non tocca i tuoi euro. Si entra dal tasto «P2P» in basso; lì ci sono il «Libro ordini», «I miei scambi», «Pubblica» e «Info P2P», che spiega tutto con calma.
+Nel P2P non compri da Barattolo: compri da un'altra persona. Vi accordate su un prezzo, gli euro viaggiano fra voi due col metodo scelto, e i sats restano bloccati finché gli euro non sono arrivati (sul Lightning con una fattura «trattenuta», non in un deposito di Barattolo). Barattolo non tocca i tuoi euro. Si entra dal tasto «P2P» in basso; lì ci sono il «Libro ordini», «I miei scambi», «Pubblica» e «Info P2P», che spiega tutto con calma.
 
 Come funziona, in cinque passi:
 1. Qualcuno pubblica un ordine: dice se compra o vende sats, per quanti euro e con quali metodi di pagamento. L'ordine va nel libro, che vedono tutti.
@@ -214,7 +214,7 @@ Come funziona, in cinque passi:
 4. Chi compra manda gli euro col metodo scelto, al recapito che l'altra persona lascia dentro lo scambio, e poi lo dice nell'app.
 5. Chi vende controlla di aver ricevuto gli euro e libera i sats: arrivano all'indirizzo Lightning o alla fattura di chi compra.
 
-La garanzia: i sats in garanzia possono prendere due strade sole, andare a chi compra o tornare a chi vende. Nessuno può dirottarli altrove. A tenerli è il coordinatore, un programma che si chiama Mostro: lo fa girare Barattolo, sul suo nodo.
+La garanzia: nello scambio Lightning chi vende paga una fattura «trattenuta» (hold invoice), e i sats restano bloccati nella rete Lightning, non in un deposito di Barattolo. Possono prendere due strade sole: andare a chi compra quando chi vende conferma di aver ricevuto gli euro, o tornare a chi vende. Nessuno, nemmeno Barattolo, può prenderli o dirottarli altrove. A farli andare da una parte o dall'altra è il coordinatore, un programma che si chiama Mostro, che Barattolo fa girare sul suo nodo. Per il P2P Lightning non dire mai che Barattolo «fa da garante», «tiene i sats» o ha un «deposito di garanzia»: il deposito di garanzia di Barattolo c'è solo nel mercatino (sugli scambi on-chain c'è il deposito a due firme su tre, spiegato più sotto).
 
 Come si legge una card del libro: in alto a destra due quadratini con una freccia dicono cosa invii e cosa ricevi (le stelle blu dell'Europa per gli euro, la T verde di Tether per gli USDT, il fulmine nero per i sats su Lightning, la ₿ arancio per bitcoin on-chain). Sotto ci sono la cifra da inviare e quella da ricevere, i metodi di pagamento e, nel riquadro in fondo, la faccia di chi ha pubblicato con le sue stelline e quanti scambi P2P ha già fatto («✅ 22 scambi P2P»); toccando la faccia si apre il suo negozio (anche sulle card on-chain; se non ha ancora un negozio, l'app te lo dice e non apre l'ordine). La riga colorata sul bordo di sotto è il tempo che resta all'ordine: si accorcia, diventa arancio negli ultimi tre giorni e rossa, lampeggiante, nell'ultimo.
 
