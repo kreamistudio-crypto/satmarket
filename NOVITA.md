@@ -758,3 +758,9 @@ frase: Per i moderatori: la chiave di moderatore ora segue l'account. Il disposi
 dove: Pannello 👑 → «⚖️ Moderazione P2P»: aprila una volta dal dispositivo che ha la chiave, poi dall'altro; compare «🔑 La tua chiave di moderatore è arrivata anche qui» e i bottoni per prendere e decidere ci sono.
 leva: nessuna
 pubblico: no
+
+## 2026-11-19 · parole-casa
+frase: Il wallet on-chain nasce solo dove le sue 12 parole hanno subito un backup: dentro Telegram o entrando con Nostr. E quando Barattolo te le chiede, ti dice da dove riprenderle.
+dove: Profilo → «₿ On-chain». Dal sito col login Telegram, se il wallet non c'è ancora, il messaggio dice di crearlo da @ilbarattolobot; nel foglio «🔑 Serve la chiave del tuo wallet» e nel riquadro «Il tuo wallet è su un altro dispositivo» la frase dice dove stanno le parole (cloud di Telegram, browser del sito, relay Nostr).
+leva: nessuna
+pubblico: sì

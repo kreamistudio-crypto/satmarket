@@ -93,7 +93,7 @@ def main():
     print("\n[1. un account nuovo non ha wallet]")
     r = c.get("/api/wallet/unico", headers=h(ALAN, "Alan"))
     prova("GET 200", 200, r.status_code)
-    prova("impronta vuota, pavimento 0", {"impronta": "", "prossimo": 0},
+    prova("impronta vuota, pavimento 0", {"impronta": "", "prossimo": 0, "case": []},
           r.json())
     prova("senza identita' non si legge", True,
           c.get("/api/wallet/unico").status_code in (401, 403))
@@ -148,12 +148,37 @@ def main():
     prova("il pavimento e' 10", 10,
           c.get("/api/wallet/unico", headers=h(ALAN)).json()["prossimo"])
 
+    print("\n[5b. dove stanno le parole: solo il NOME della casa (19 nov 2026, parole-casa)]")
+    casa = lambda imp, k, tg=ALAN: c.post("/api/wallet/unico/casa", headers=h(tg),
+                                         json={"impronta": imp, "casa": k})
+    r = casa("73c5da0a", "nuvola")
+    prova("il cloud di Telegram: 200 con la casa", (200, ["nuvola"]),
+          (r.status_code, r.json().get("case")))
+    prova("...due volte la stessa non cambia niente", ["nuvola"],
+          casa("73C5DA0A", "nuvola").json().get("case"))
+    prova("...i relay si aggiungono, in ordine fisso", ["nuvola", "relay"],
+          casa("73c5da0a", "relay").json().get("case"))
+    prova("...e la lettura le dice", ["nuvola", "relay"],
+          c.get("/api/wallet/unico", headers=h(ALAN)).json()["case"])
+    r = casa("deadbeef", "nuvola")
+    prova("un'impronta che non e' la registrata: 409, e non scrive", (409, "altro", ["nuvola", "relay"]),
+          (r.status_code, r.json().get("motivo"),
+           c.get("/api/wallet/unico", headers=h(ALAN)).json()["case"]))
+    for imp, k in (("73c5da0a", "carta"), ("73c5da0a", ""), ("73c5da0a", None),
+                   ("73c5da0a", ["nuvola"]), ("zzzz", "nuvola"), (None, "relay")):
+        prova(f"casa {k!r} / impronta {imp!r}: 400", 400, casa(imp, k).status_code)
+    prova("senza identita' non si scrive", True,
+          c.post("/api/wallet/unico/casa", json={"impronta": "73c5da0a",
+                 "casa": "nuvola"}).status_code in (401, 403))
+    prova("su un account senza wallet: 409", 409, casa("73c5da0a", "nuvola", ALTRO).status_code)
+
     print("\n[6. sostituire il principale non abbassa il pavimento]")
     r = c.post("/api/wallet/unico", headers=h(ALAN, "Alan"),
                json={"impronta": "deadbeef", "sostituisci": True})
     prova("sostituito", (200, True, "deadbeef"),
           (r.status_code, r.json().get("sostituito"), r.json().get("impronta")))
-    prova("pavimento ancora 10", {"impronta": "deadbeef", "prossimo": 10},
+    prova("pavimento ancora 10, e le case ripartono da zero (erano dell'altro)",
+          {"impronta": "deadbeef", "prossimo": 10, "case": []},
           c.get("/api/wallet/unico", headers=h(ALAN)).json())
     r = c.post("/api/wallet/unico/numero", headers=h(ALAN), json={"minimo": 0})
     prova("il numero dopo e' 10", 10, r.json().get("numero"))
@@ -163,7 +188,7 @@ def main():
           r.status_code)
 
     print("\n[7. due account non si vedono]")
-    prova("l'altro e' ancora vuoto", {"impronta": "", "prossimo": 0},
+    prova("l'altro e' ancora vuoto", {"impronta": "", "prossimo": 0, "case": []},
           c.get("/api/wallet/unico", headers=h(ALTRO)).json())
     r = c.post("/api/wallet/unico", headers=h(ALTRO, "Altro"),
                json={"impronta": "73c5da0a"})
@@ -178,8 +203,9 @@ def main():
     con = SRV.db()
     colonne = [x[1] for x in con.execute("PRAGMA table_info(wallet_unico)")]
     con.close()
+    # (19 nov 2026, parole-casa) `case_copie`: solo nomi di case
     prova("le colonne", ["tg_id", "impronta", "prossimo", "creato",
-                         "aggiornato"], colonne)
+                         "aggiornato", "case_copie"], colonne)
 
     print(f"\n{PASSATE} passate, {FALLITE} fallite")
     return 1 if FALLITE else 0

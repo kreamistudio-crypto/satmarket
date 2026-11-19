@@ -3156,6 +3156,7 @@ FRENI = {
     # il wallet unico (2 nov 2026 sera): l'impronta si registra di rado,
     # un numero si prenota a ogni cambio
     "wallet_unico": (20, 3600),       # registrare l'impronta del wallet, per persona
+    "wallet_casa": (20, 3600),        # dire dove sta una copia delle parole (19 nov 2026)
     "wallet_numero": (120, 3600),     # il numero di un cambio, per persona
     "onchain_indirizzo": (20, 3600),  # un indirizzo di prova fra due ammessi, per persona
     # la tappa 3 (23 ott 2026): il «controlla adesso» chiede a mempool,
@@ -124208,7 +124209,12 @@ def _wallet_prepara(con):
         impronta TEXT NOT NULL,
         prossimo INTEGER DEFAULT 0,
         creato INTEGER DEFAULT 0,
-        aggiornato INTEGER DEFAULT 0)""")
+        aggiornato INTEGER DEFAULT 0,
+        case_copie TEXT DEFAULT '')""")
+    # DOVE STANNO LE PAROLE (19 nov 2026, cantiere parole-casa): vedi
+    # `_wallet_casa`. Per i database nati prima, la colonna si aggiunge
+    if "case_copie" not in _colonne_di(con, "wallet_unico"):
+        con.execute("ALTER TABLE wallet_unico ADD COLUMN case_copie TEXT DEFAULT ''")
 
 
 def _wallet_db():
@@ -124218,10 +124224,27 @@ def _wallet_db():
 
 
 def _wallet_riga(con, tg_id: int) -> dict:
-    r = con.execute("SELECT impronta, prossimo FROM wallet_unico "
+    r = con.execute("SELECT impronta, prossimo, case_copie FROM wallet_unico "
                     "WHERE tg_id=?", (int(tg_id),)).fetchone()
-    return ({"impronta": r["impronta"], "prossimo": int(r["prossimo"] or 0)}
-            if r else {"impronta": "", "prossimo": 0})
+    return ({"impronta": r["impronta"], "prossimo": int(r["prossimo"] or 0),
+             "case": _wallet_case_lista(r["case_copie"])}
+            if r else {"impronta": "", "prossimo": 0, "case": []})
+
+
+# LE CASE DELLE PAROLE (19 nov 2026, cantiere parole-casa; Alan: «ogni
+# profilo genera 12 parole in automatico e le manda sul cloud di telegram
+# o sui relay nostr in base a dove ha fatto il login [...] Barattolo come
+# server deve solamente sapere dove stanno così che possa dire all'utente
+# come recuperarle»; Andrea: «come dice Alan»). Il telefono che ha fatto
+# una copia riuscita lo dice qui: «nuvola» (il cloud di Telegram) o
+# «relay» (la cassetta NIP-78). Solo il NOME della casa, mai il contenuto,
+# e solo per l'impronta registrata: un'altra impronta e' un 409 e non
+# scrive niente. Un wallet principale nuovo riparte senza case.
+_WALLET_CASE = ("nuvola", "relay")
+
+
+def _wallet_case_lista(testo) -> list:
+    return [c for c in _WALLET_CASE if c in str(testo or "").split(",")]
 
 
 def _wallet_numero(valore) -> int:
@@ -124400,13 +124423,52 @@ def _wallet_registra(tg_id: int, impronta: str, sostituisci: bool,
             return JSONResponse(status_code=409, content={
                 "ok": False, "motivo": "altro", "impronta": c["impronta"],
                 "prossimo": c["prossimo"]})
-        con.execute("UPDATE wallet_unico SET impronta=?, aggiornato=? "
-                    "WHERE tg_id=?", (impronta, adesso, tg_id))
+        # un principale nuovo riparte senza case: quelle erano dell'altro
+        con.execute("UPDATE wallet_unico SET impronta=?, aggiornato=?, "
+                    "case_copie='' WHERE tg_id=?", (impronta, adesso, tg_id))
         con.commit()
         print(f"🔑 Wallet unico: l'account {tg_id} ha scelto un altro "
               f"wallet principale", flush=True)
         return {"ok": True, "impronta": impronta, "prossimo": c["prossimo"],
                 "sostituito": True}
+    finally:
+        con.close()
+
+
+@app.post("/api/wallet/unico/casa")
+async def wallet_unico_casa(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """DOVE STA UNA COPIA DELLE PAROLE (19 nov 2026, cantiere parole-casa):
+    il telefono dice il nome di una casa dove la copia e' riuscita. Il
+    giudice e' `_wallet_casa`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_casa", user["id"])
+    d = await leggi_json(req)
+    impronta = d.get("impronta")
+    impronta = impronta.strip().lower() if isinstance(impronta, str) else ""
+    casa = d.get("casa") if isinstance(d.get("casa"), str) else ""
+    async with _lucchetto_wallet:
+        return _wallet_casa(int(user["id"]), impronta, casa, int(time.time()))
+
+
+def _wallet_casa(tg_id: int, impronta: str, casa: str, adesso: int):
+    """Il corpo di `wallet_unico_casa`, dentro il lucchetto: 400 se la
+    forma non va, 409 se l'impronta non e' quella registrata, sennò la
+    casa si aggiunge (due volte la stessa non cambia niente)."""
+    if not _WALLET_IMPRONTA_FORMA.match(impronta) or casa not in _WALLET_CASE:
+        raise HTTPException(400, "Richiesta non valida")
+    con = _wallet_db()
+    try:
+        c = _wallet_riga(con, tg_id)
+        if c["impronta"] != impronta:
+            return JSONResponse(status_code=409, content={
+                "ok": False, "motivo": "altro", "impronta": c["impronta"]})
+        case = _wallet_case_lista(",".join(c["case"] + [casa]))
+        if case != c["case"]:
+            con.execute("UPDATE wallet_unico SET case_copie=?, aggiornato=? "
+                        "WHERE tg_id=?", (",".join(case), adesso, tg_id))
+            con.commit()
+        return {"ok": True, "case": case}
     finally:
         con.close()
 

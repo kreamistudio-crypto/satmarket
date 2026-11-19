@@ -92330,3 +92330,59 @@ pulizia al cambio chiave → rosso ognuna.
 RESTA DA GUARDARE. Non provato dal vivo: dopo la promozione, aprire
 «⚖️ Moderazione P2P» dal telefono che ha la chiave, poi dal PC: deve
 comparire «🔑 La tua chiave di moderatore è arrivata anche qui».
+
+## Il wallet on-chain nasce solo dove le parole hanno casa, e il server sa dove stanno (19 nov 2026, cantiere parole-casa; Alan: «ogni profilo genera 12 parole in automatico e le manda sul cloud di telegram o sui relay nostr in base a dove ha fatto il login [...] Barattolo come server deve solamente sapere dove stanno così che possa dire all'utente come recuperarle»; Andrea: «Risolvi tu», «come dice Alan»)
+
+IL CASO DAL VIVO. Andrea, venditore on-chain nella Mini App, «✍️ Metti la
+seconda firma» dopo la rinuncia di chi compra: «Serve la chiave del tuo
+wallet: è nata su un altro dispositivo». Il wallet del suo account era
+nato SUL SITO col login Telegram: fuori da Telegram il cloud non si
+scrive, senza una nsec nel browser i relay nemmeno, e le parole erano
+rimaste chiuse in quel browser. La Mini App vedeva il wallet (l'impronta
+di `wallet_unico`) e non la chiave. Il buco del 2 nov («Un wallet solo»)
+fermava il SECONDO wallet, non il primo nato senza casa.
+
+LA DECISIONE (l'idea di Alan, che coincide con la regola ferrea 2):
+1. IL WALLET NASCE SOLO DOVE LE PAROLE HANNO CASA: dentro Telegram (il
+   cloud) o con un account Nostr (i relay). Dal sito un account Telegram
+   non lo fa nascere, nemmeno con «Ho perso quelle parole»: il messaggio
+   dice di crearlo da @ilbarattolobot e poi incollarlo sul sito. Un
+   wallet che c'è già si usa come prima: si ferma solo la nascita.
+2. IL SERVER SA DOVE STANNO, NON COSA: il nome delle case dove una copia
+   è riuscita («nuvola», «relay»), colonna `case_copie` di
+   `wallet_unico`, rotta `POST /api/wallet/unico/casa`; mai parole né
+   chiavi. Il telefono lo dice a ogni copia segnata e, per le ricevute
+   che aveva già, alla ronda. Le frasi che chiedono le parole (l'errore
+   «altrove», il riquadro del Profilo, il foglio del P2P) dicono da dove
+   riprenderle: nel cloud di Telegram, nel browser del sito, sui relay.
+3. CHI HA GIÀ LE PAROLE NATE SUL SITO le incolla una volta nella Mini App:
+   `walletUsaParoleDi` le mette già nel cloud di Telegram
+   (`onchainMettiAlSicuro`), e non vengono più chieste. Il testo del
+   backup sul sito diceva «apri Barattolo dentro Telegram (la copia nel
+   cloud si fa da sola)», falso per chi ha le parole solo sul sito: ora
+   dice di incollarle là.
+
+STRADE SCARTATE. Tenere le parole on-chain sul server, anche cifrate col
+seme del conto come le chiavi Lightning e la chiave di moderatore di oggi:
+sarebbero i soldi delle persone in mano a Barattolo (regola ferrea 2, la
+trappola custodial della tappa 1c: col terzo pezzo del 2-di-3 sarebbero
+due chiavi su tre). Un ponte sito → Mini App che porti le parole: le
+farebbe passare da un canale in più.
+
+LE PROVE. In `prove_chiave_che_nasce_da_sola`: un account Telegram dal
+sito non fa nascere niente (né scrive né registra, anche con
+`nuovoPrincipale`), dentro Telegram sì, un account Nostr fuori da Telegram
+sì, e la fermata sta fra la domanda al server e le parole. In
+`prove_parole_uniche` (banco del Profilo): la copia nel cloud lo dice al
+server, le ricevute di prima pure, una casa già saputa non si ridice,
+parole che non sono il principale non dicono niente, la carta no, le
+frasi di dove riprenderle e il riquadro. `collaudo_wallet_unico` (44, sul
+server vero): la rotta, l'ordine fisso, 409 e 400, chi non ha wallet, la
+sostituzione che azzera, la colonna. Controprove: fermata tolta,
+`walletNasceQui` sempre vero, ronda senza le ricevute, copia segnata senza
+avviso al server, 409 tolto, sostituzione che tiene le case → rosso ognuna.
+
+RESTA DA GUARDARE. Dal vivo: Andrea incolla le parole del sito nella Mini
+App (una volta) e firma; poi la Mini App non le chiede più. Un account
+Telegram che usa SOLO il sito ora deve aprire la Mini App una volta per
+avere il wallet on-chain.

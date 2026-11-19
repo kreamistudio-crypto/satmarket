@@ -376,7 +376,7 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 
 - L'ordine on-chain che torna nel libro (dal 19 novembre 2026): quando uno scambio on-chain salta per colpa di chi l'ha preso (annulla prima del deposito, non deposita nel suo tempo di 6 ore, rinuncia dopo il deposito, o non paga e un moderatore rimanda i sats a chi vende), l'ordine di chi l'aveva pubblicato rinasce nel libro uguale: stesso prezzo, stessi metodi, stesso tempo per pagare, con un nome nuovo. Lo scambio vecchio resta chiuso com'era, con la sua chat. Il bot avvisa chi aveva pubblicato con «🔁 Il tuo ordine è tornato nel libro» e il tasto «🚫 Non ripubblicarlo», che apre l'ordine nuovo: lì lo si ritira con un tocco. Alla presa dopo chi mette i bitcoin deposita di nuovo e paga di nuovo la commissione di rete (il deposito 2-di-3 vecchio conteneva la chiave dell'altra persona). Non vale per Barattozon (il PayCode).
 - Ritirarsi dopo che l'altro ha bloccato i sats (scambi on-chain, dal 17 novembre 2026): non c'è nessuna cauzione e nessuna penale in denaro. Però a chi compra bitcoin e rinuncia a deposito già confermato, quando chi vende aveva già scritto dove pagare, viene contato uno «scambio non completato», come nel Lightning: il primo è tollerato, con un secondo nello stesso mese non si prendono gli ordini con filtro (1+, 3+, 5+) per 30 giorni, e da due in 90 giorni compare sul profilo. Il foglio di «↩️ Rinuncio» lo dice prima della firma. In più chi aveva bloccato i sats può lasciargli una recensione dalla pagina dello scambio (solo lui: chi si è ritirato no). Lo stesso «non completato» vale per chi lascia finire il tempo per pagare senza toccare «Ho inviato» e poi un moderatore, in disputa, rimanda i sats a chi vende. Non conta mai se chi vende non aveva scritto dove pagare, né prima del deposito confermato (lì c'è «✕ Annulla»).
-- Se serve la chiave del wallet (dal 17 novembre 2026): succede a chi firma uno scambio on-chain da un dispositivo diverso da quello su cui è nato il suo wallet. Barattolo prima la cerca da solo (nel cloud di Telegram o sui relay Nostr); se non la trova apre il foglio «🔑 Serve la chiave del tuo wallet», dove si incollano le 12 parole: si leggono sull'altro dispositivo, in Profilo, «₿ On-chain», «Mostra le 12 parole». Restano solo su quel dispositivo, a Barattolo non arrivano, e il gesto riparte da solo.
+- Se serve la chiave del wallet (dal 17 novembre 2026): succede a chi firma uno scambio on-chain da un dispositivo diverso da quello su cui è nato il suo wallet. Barattolo prima la cerca da solo (nel cloud di Telegram o sui relay Nostr); se non la trova apre il foglio «🔑 Serve la chiave del tuo wallet», dove si incollano le 12 parole: il foglio dice dove riprenderle (dal 19 novembre 2026: nel cloud di Telegram, nel browser del sito dove il wallet è nato, o sui relay Nostr); si leggono là in Profilo, «₿ On-chain», «Mostra le 12 parole». A Barattolo non arrivano, e il gesto riparte da solo.
 - La commissione (dal 16 novembre 2026) è quella degli scambi Lightning, metà a testa e con gli stessi sconti: chi vende deposita la sua metà insieme ai sats, chi compra riceve i sats meno la sua metà. Nel conto dello scambio, e già nel foglio prima di prendere, c'è la riga «Fee P2P» con la percentuale, come negli scambi Lightning. Se lo scambio finisce col rimborso a chi vende, torna tutto, commissione compresa. Sotto i 546 sats di commissione in tutto non si paga niente.
 
 <!-- pezzo libro-039 | libro -->
@@ -409,7 +409,7 @@ Ricevere o pagare su un'altra rete (se nei NUMERI DI OGGI «P2P su un'altra rete
 - Lo swap ha i suoi limiti di cifra (quelli di SATS Routing): fuori dai limiti l'app lo dice e lo scambio si fa sulla rete dell'ordine.
 
 <!-- pezzo libro-042 | libro -->
-## Libro · Bitcoin on-chain (1/2)
+## Libro · Bitcoin on-chain (1/3)
 
 Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla rete principale di Bitcoin: la moneta arancione ₿ le indica in tutta l'app. Quali sono accese, e per chi, lo dicono i NUMERI DI OGGI: una funzione spenta lì non c'è.
 
@@ -419,7 +419,7 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 - PayJoin negli acquisti on-chain del mercatino (dal 16 novembre 2026, se nei NUMERI DI OGGI è disponibile): il QR e «₿ Apri nel wallet» portano anche un link PayJoin («pj=»), e nel foglio di pagamento compare la riga «🔀 PayJoin». Se il tuo wallet lo sa fare (per esempio Sparrow, BlueWallet, Wasabi, Bull Bitcoin, Cake Wallet), mentre paghi Barattolo aggiunge alla transazione una sua piccola moneta: così chi guarda la blockchain non può più dire che tutti gli ingressi sono tuoi, né leggere a colpo d'occhio quale uscita è il tuo resto. Paghi la stessa cifra, e il deposito a tre chiavi riceve esattamente gli stessi sats. Il tuo wallet può mettere qualche sats in più di commissione di rete per l'ingresso aggiunto (lo decide lui, entro il limite che si dà). Se il wallet non lo sa fare, o se in quel momento Barattolo non ha una moneta pronta, si paga come sempre, senza differenze. La riga non c'è sempre: compare solo quando il PayJoin si può fare. Negli scambi P2P e nello Swap il PayJoin non c'è.
 
 <!-- pezzo libro-043 | libro -->
-## Libro · Bitcoin on-chain (2/2)
+## Libro · Bitcoin on-chain (2/3)
 
 - Quando paghi on-chain (un ordine, il deposito di uno scambio P2P, lo Swap) l'app scrive i sats da mandare e, sotto, la riga «In BTC» con la stessa cifra in bitcoin (per esempio 0,00008128 BTC): molti wallet on-chain la chiedono così. Un tocco la copia, col punto (0.00008128), pronta da incollare nel wallet. Se invece inquadri il QR, la cifra il wallet la compila da solo; anche «₿ Apri nel wallet» apre il wallet con indirizzo e cifra già scritti.
 - Profilo → «📥 Come ricevi»: due righe, «Quando ti pagano in Lightning, ricevi in» e «Quando ti pagano on-chain, ricevi in». Lì scegli se i sats ti arrivano in Lightning, on-chain, oppure «Ogni volta» (decidi tu ordine per ordine).
@@ -428,10 +428,15 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 - Profilo → «₿ On-chain»: «Dove ricevi i bitcoin» (l'unica cosa da compilare: il tuo indirizzo o il tuo wallet), poi la chiave e le 12 parole. Le 12 parole servono solo a FIRMARE i tuoi scambi on-chain: i sats non arrivano lì. Non darle mai a nessuno.
 - Le 12 parole hanno bisogno di una copia fuori dal telefono: Barattolo la salva cifrata nel cloud di Telegram e/o sui relay Nostr. Se manca la copia sui relay, nel Profilo c'è «Salva sui relay Nostr». Dal 16 novembre 2026, chi non ha nessuna copia (succede a chi entra dal sito o da Tor senza Nostr: lì il cloud di Telegram non c'è, e Tor Browser cancella tutto quando lo chiudi) prima di pubblicare o prendere un ordine on-chain vede le 12 parole, le scrive su carta e ne riscrive tre a caso per controllo; lo stesso controllo c'è dietro «Le ho scritte su carta» nel Profilo. Le parole restano sul telefono: Barattolo non le chiede mai. Se qualcuno su Tor rivede il foglio a ogni apertura, è normale: Tor cancella anche il segno che il controllo è fatto (e le parole stesse: le ritrova incollandole dal Profilo).
 - Il wallet è uno solo, fra la Mini App in Telegram e il sito: se apri Barattolo da un altro posto, ti chiede di incollare le stesse 12 parole invece di crearne di nuove.
+
+<!-- pezzo libro-044 | libro -->
+## Libro · Bitcoin on-chain (3/3)
+
+- Dove nasce il wallet on-chain (dal 19 novembre 2026): solo dove le 12 parole hanno subito una copia che segue l'account, cioè dentro Telegram (la Mini App, copia nel cloud di Telegram) o entrando con Nostr (copia cifrata sui relay). Chi entra nel sito col login Telegram non lo fa nascere lì: apre Barattolo dentro Telegram (@ilbarattolobot), lo crea da lì, e sul sito incolla le 12 parole in Profilo → «₿ On-chain». Barattolo sa solo DOVE sta la copia, mai le parole, e quando le chiede dice da dove riprenderle. Chi ha un wallet nato sul sito: lo apre là (Profilo → «₿ On-chain» → «Mostra le 12 parole») e incolla le parole una volta nella Mini App; da lì la copia va nel cloud di Telegram e non vengono più chieste.
 - Se non hai ancora scelto dove ricevere, la consegna dei bitcoin a te aspetta: l'app ti manda a Profilo → «₿ On-chain» per sceglierlo.
 - La seconda firma: i sats on-chain escono con due firme su tre. Di solito il tuo telefono mette la sua da solo quando apri Barattolo; nell'ordine c'è anche il tasto «✍️ Metti la seconda firma», che mostra l'anello mentre firma e poi dice com'è andata, o perché non ha firmato (per esempio: la tua chiave sta solo sul telefono con cui hai pagato o venduto). Quando i sats sono partiti l'ordine lo dice, con il link «Vedi la transazione», e il tasto sparisce.
 
-<!-- pezzo libro-044 | libro -->
+<!-- pezzo libro-045 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (1/2)
 
 La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «Cambio») sposta i TUOI sats fra Lightning e un tuo indirizzo bitcoin on-chain, nelle due direzioni, senza un ordine di mezzo. Se è accesa lo dicono i NUMERI DI OGGI.
@@ -445,7 +450,7 @@ La pagina «Swap» (la scheda in basso; fino al 12 novembre 2026 si chiamava «C
 
 La privacy dello Swap, cioè chi vede cosa:
 
-<!-- pezzo libro-045 | libro -->
+<!-- pezzo libro-046 | libro -->
 ## Libro · Lo Swap: spostare i tuoi sats fra Lightning e bitcoin on-chain (2/2)
 
 - Barattolo si segna, legati al tuo account, la direzione, la cifra, il numero dello swap e l'indirizzo del servizio dove passano i bitcoin. Non si segna il tuo indirizzo bitcoin né la tua fattura Lightning. Però dal numero dello swap, sulla blockchain pubblica, si può seguire dove sono andati i bitcoin.
@@ -455,7 +460,7 @@ La privacy dello Swap, cioè chi vede cosa:
 - Payjoin: nello Swap non si usa. Da Lightning a bitcoin la transazione verso il tuo indirizzo la prepara il tuo telefono per lo swap, e non sa fare Payjoin: se incolli un link Payjoin («bitcoin:…?pj=…») l'app tiene solo l'indirizzo e i bitcoin arrivano lì con una transazione normale. Da bitcoin a Lightning l'indirizzo del servizio non accetta Payjoin, quindi anche il tuo wallet manda una transazione normale.
 - Il consiglio di sempre: un indirizzo nuovo per ogni swap, in un wallet di cui solo tu hai le chiavi.
 
-<!-- pezzo libro-046 | libro -->
+<!-- pezzo libro-047 | libro -->
 ## Libro · La Caccia a Tappo (il gioco) (1/2)
 
 La Caccia a Tappo è il gioco di Barattolo (se nelle REGOLAZIONI del pannello «Caccia a Tappo (il gioco)» è accesa). Si apre dal Profilo → «Livello e recensioni» → «🔩 Caccia a Tappo», e funziona uguale nella Mini App di Telegram, nell'app e sul sito.
@@ -470,14 +475,14 @@ Coi bulloni, nella scheda «Bottega», si prendono: attrezzi che si consumano (�
 
 Per chi vende: se Tappo si nasconde in un tuo annuncio e qualcuno lo trova, il bot te lo dice (senza dire chi è stato). Non devi fare niente: sono visite in più. Nei tuoi annunci, per te, Tappo non si nasconde mai.
 
-<!-- pezzo libro-047 | libro -->
+<!-- pezzo libro-048 | libro -->
 ## Libro · La Caccia a Tappo (il gioco) (2/2)
 
 Il Mondo di Tappo (scheda «Mondo», la prima): Tappo cammina dentro la dispensa, sei zone una sopra l'altra, una per scaffale. Si guida toccando dove andare o trascinando il dito (dal computer anche frecce o WASD). Nel mondo si raccolgono i bulloni sparsi (ognuno si prende una volta), si aprono i barattoli (portano agli annunci di quella categoria), si legge il cartello con la caccia del giorno, si entra in bottega e, nella prima zona, il Banco del cambio porta agli scambi P2P. Le zone più in alto si aprono trovando Tappo più volte. Sul palco di ogni zona ci sono gli annunci in evidenza: chi vende può metterci un suo annuncio in vetrina per un giorno spendendo 40 bulloni (uno al giorno a testa, al massimo 3 annunci per zona). L'evidenza vale solo dentro il gioco, non in Esplora.
 
 Le missioni di Tappo: otto scene brevi a carte, una per zona della «🚀 Rotta per la Luna», il tabellone dei livelli (e tutte in cima alla scheda «Sfide» della Caccia a Tappo), ognuna subito prima della casella che insegna: Tappo ha un problema, Barattolo lo risolve, e alla fine un bottone porta a fare la cosa vera nell'app. Sono «Dal baratto ai sats» (la storia del denaro, prima di «Attiva l'incasso automatico in Lightning»), «Il barattolo col lucchetto» (il deposito di garanzia), «Le dodici parole» (le chiavi sono tue: dove tenere la frase di recupero, e nessuno, nemmeno Barattolo, la chiede mai), «La staffetta del fulmine» (Lightning), «L'oblò scuro» (la privacy: cosa sa Barattolo di te), «Il quaderno di tutti» (Bitcoin è un registro che tengono in tanti, e nessuno lo trucca), «L'antenna di Tappo» (Nostr: gli annunci su tanti relay e un nome che è una chiave tua) e «L'ultimo bullone» (il dimezzamento e i 21 milioni). Ogni missione monta un pezzo del razzo con cui Tappo vuole arrivare sulla Luna, all'halving del 2028. Danno da una a tre stelle: la prima volta pagano bulloni, rigiocarle per le tre stelle si può ma non paga di nuovo. Non danno XP. Le parole e i conti dentro le missioni sono finti.
 
-<!-- pezzo libro-048 | libro -->
+<!-- pezzo libro-049 | libro -->
 ## Libro · Nostr
 
 Gli annunci di Barattolo vengono pubblicati anche su Nostr, una rete aperta: esistono sui relay anche indipendentemente da Barattolo. Se colleghi una tua chiave Nostr dal Profilo, i tuoi annunci escono firmati da te (la firma la fa il tuo browser) e restano tuoi. Gli avvisi possono arrivarti anche su Nostr, oltre che su Telegram. La chiave privata (nsec) non va mai data a nessuno, nemmeno a Barattolo.
@@ -486,7 +491,7 @@ Il nome verificato su Nostr (se nelle REGOLAZIONI del pannello «Nome verificato
 
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
-<!-- pezzo libro-049 | libro -->
+<!-- pezzo libro-050 | libro -->
 ## Libro · I tuoi dati, in breve
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
@@ -502,12 +507,12 @@ Cancellare l'account: nel Profilo, nel gruppo «Impostazioni» accanto a «🔐 
 
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-050 | libro -->
+<!-- pezzo libro-051 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-051 | libro | sempre -->
+<!-- pezzo libro-052 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -517,7 +522,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-052 | libro | sempre -->
+<!-- pezzo libro-053 | libro | sempre -->
 ## Libro · Parlare con una persona (1/2)
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
@@ -526,7 +531,7 @@ Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla 
 
 I livelli: ogni persona ha un livello che sale con gli XP (li danno solo gli acquisti e le vendite concluse, più una quota per chi inviti) e con il numero di affari conclusi: Nuovo arrivato, Bottega avviata, Mercante pratico, Mercante esperto, Maestro del banco. Lo trovi nel Profilo, nel cassetto «🎖 Livello e titolo». Dal 17 novembre 2026 i livelli si sfogliano come tessere, scorrendo col dito: sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo e quanto manca, i livelli già passati hanno la spunta, quelli davanti il lucchetto; sotto ci sono i vantaggi del livello che stai guardando, ✅ se già tuoi, 🔒 se ancora da sbloccare (sconto sul banner del negozio, link del negozio a scelta, il titolo da mettere sotto il nome, lo sconto sulle commissioni P2P dal livello 5). Il livello si vede anche sul tuo negozio e in classifica, accanto al titolo.
 
-<!-- pezzo libro-053 | libro | sempre -->
+<!-- pezzo libro-054 | libro | sempre -->
 ## Libro · Parlare con una persona (2/2)
 
 Rotta per la Luna (pronta dal 17 novembre 2026, ma PER ORA SPENTA: nel Profilo non c'è ancora, e se qualcuno la chiede si risponde che arriverà presto; nei primi giorni si chiamava «la stradina»). Quando sarà accesa: nel Profilo, nel cassetto «Livello e recensioni», c'è «🚀 Rotta per la Luna», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». All'ingresso di ogni zona Tappo racconta in una frase cosa si impara lì (per esempio al porto: mettere al sicuro i sats con un wallet on-chain e la firma Nostr). La storia è quella del razzo di bulloni, la stessa del gioco di Tappo: Tappo costruisce un razzo per la Luna, un pezzo per zona (piedini, serbatoio, motore, ali, oblò, punta, antenna), il Tarlo e la Gazza dispettosi provano a rubargli i bulloni, e all'halving del 2028 il razzo parte. Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: sta sulla prima casella che manca, quella da fare adesso (quelle fatte più su restano accese), e quando la fai cammina fino alla successiva. La prima volta Tappo si presenta e racconta il razzo (si rivede col tasto «❓ Come funziona» in cima). Toccando la casella da fare, la scheda in basso dice a cosa serve, con «Come funziona?» e i passi (per esempio il primo acquisto spiega il deposito di garanzia); sulle caselle già fatte la scheda non esce. Il bottone «Vai» porta dritto al posto giusto (il cassetto del Profilo, la vetrina, un negozio da seguire, «Vendi») e un riflettore, come nei tutorial dell'app, indica cosa toccare; appena la cosa è fatta l'app torna da sola alla Rotta per la Luna. Quando finisci una zona compare il razzo che prende il pezzo nuovo; toccando il razzo in cima lo si rivede. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». La strada si scopre camminando: si vede la zona dove sei e quella dopo, grigia e spenta, con le caselle ancora misteriose (un cerchio col punto di domanda); quando fai una casella, la prossima si accende e il suo nome compare, con un suono; più su c'è un lucchetto, e il pezzo successivo si apre finendo la zona dove sei. In cima, in fondo alla barra, c'è il razzo di Tappo, che cresce di un pezzo a ogni zona (otto pezzi, dalla pedana ai motori accesi). Il tasto «🗺 Vedi tutta», in alto a destra, mostra il viaggio intero in una schermata (le zone ancora chiuse hanno il lucchetto); toccando una zona si torna lì. Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
@@ -2478,3 +2483,11 @@ frase: Per i moderatori: la chiave di moderatore ora segue l'account. Il disposi
 dove: Pannello 👑 → «⚖️ Moderazione P2P»: aprila una volta dal dispositivo che ha la chiave, poi dall'altro; compare «🔑 La tua chiave di moderatore è arrivata anche qui» e i bottoni per prendere e decidere ci sono.
 leva: nessuna
 pubblico: no
+
+<!-- pezzo novita-121 | novita -->
+## Novità · 2026-11-19 · parole-casa
+
+frase: Il wallet on-chain nasce solo dove le sue 12 parole hanno subito un backup: dentro Telegram o entrando con Nostr. E quando Barattolo te le chiede, ti dice da dove riprenderle.
+dove: Profilo → «₿ On-chain». Dal sito col login Telegram, se il wallet non c'è ancora, il messaggio dice di crearlo da @ilbarattolobot; nel foglio «🔑 Serve la chiave del tuo wallet» e nel riquadro «Il tuo wallet è su un altro dispositivo» la frase dice dove stanno le parole (cloud di Telegram, browser del sito, relay Nostr).
+leva: nessuna
+pubblico: sì

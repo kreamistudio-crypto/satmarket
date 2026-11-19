@@ -35767,6 +35767,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `barattolo_onchain_prima`), `onchainParolePrima(impronta)`, e i record dei
   cambi timbrati con `impronta` (`swapTimbraImpronta`), che
   `swapParoleDi` guarda per primo.
+  DOVE NASCE E DOVE STA (19 nov 2026, cantiere parole-casa; perché in
+  CANTIERI, «Il wallet on-chain nasce solo dove le parole hanno casa»).
+  `walletNasceQui()` (dentro Telegram, `cloudTelegram()`, o account Nostr,
+  `myTgId < 0`) ferma la NASCITA in `onchainSemeAssicurato` dopo la
+  domanda al server e prima di `generateMnemonic`, anche con
+  `nuovoPrincipale`: dal sito un account Telegram riceve
+  `walletNasceInTelegram()` (`tipo: 'telegram'`). Il server tiene il NOME
+  delle case dove una copia è riuscita, colonna `case_copie` («nuvola»,
+  «relay»), rotta `POST /api/wallet/unico/casa` (`_wallet_casa`: 400 sulla
+  forma, 409 se l'impronta non è la registrata; freno `wallet_casa`), la
+  lettura la dà in `case`, e una sostituzione la azzera. Nel telefono
+  `walletDiciCasa` (da `walletSegnaCopia` e, per le ricevute di prima, da
+  `walletBackupRonda`) e `walletDoveStanno()`, la frase di dove riprenderle
+  che usano `walletAltrove`, il riquadro «altrove» e il foglio del P2P.
   I PASSI (`swapPassi[ordine]`): `preventivo` → `parole` (solo con le
   parole non ancora `copiata`) → `creo`; il passo `indirizzo` non c'è
   più. Il campo dell'indirizzo (`campoIndirizzoSwap`: `#swapIndirizzo_<n>`,

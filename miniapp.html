@@ -69751,7 +69751,7 @@ function eventoCopiaOnchain(cifrato, adesso){
    - le parole sostituite NON si buttano: restano qui (e nel cloud di
      Telegram, dove c'e') per i cambi gia' fatti con loro. */
 const walletImpronte = new Map();     // parole -> impronta (il conto costa)
-let walletUnicoStato = null;          // {impronta, prossimo} dal server
+let walletUnicoStato = null;          // {impronta, prossimo, case} dal server
 const ONCHAIN_CLOUD_PRIMA = 'barattolo_onchain_prima';
 function walletPrimaChiave(){ return `barattolo_onchain_prima_${myTgId || 'x'}`; }
 
@@ -69769,7 +69769,7 @@ async function onchainImpronta(parole){
 function walletAltrove(impronta){
   const e = new Error('Il tuo wallet on-chain è già nato su un altro '
     + 'dispositivo. Per usarlo anche qui apri Profilo → «On-chain» '
-    + 'e incolla le sue 12 parole.');
+    + 'e incolla le sue 12 parole: ' + walletDoveStanno());
   e.tipo = 'altrove';
   e.impronta = String(impronta || '');
   return e;
@@ -69884,6 +69884,7 @@ function walletSegnaCopia(imp, dove){
   d[dove] = Date.now();
   try { localStorage.setItem(walletCopieChiave(), JSON.stringify(d)); } catch(e){}
   walletPillolaVia();   // c'e' una copia: il bottone del backup non serve piu'
+  walletDiciCasa(imp, dove);   // il server sa dove sta (19 nov 2026, parole-casa)
 }
 /* IL BOTTONE DEL BACKUP AL POSTO DEL TOAST (3 nov 2026, Andrea: «al
    posto del messaggio fai comparire un bottone fisso chiudibile che
@@ -69947,6 +69948,9 @@ async function walletBackupRonda(){
     }
   }
   const dopo = walletCopieLette(imp);
+  /* le ricevute che c'erano gia', e che il server non sa (19 nov 2026) */
+  for (const casa of ['nuvola', 'relay'])
+    if (dopo[casa] && st.impronta === imp && !walletCaseLista(st.case).includes(casa)) walletDiciCasa(imp, casa);
   if (!dopo.nuvola && !dopo.relay && !dopo.carta && !walletRondaAvvisata) {
     walletRondaAvvisata = true;
     walletPillolaMostra();
@@ -69994,6 +69998,8 @@ async function onchainSemeAssicurato(opz){
      le sue parole si incollano dal Profilo. Il server muto ferma tutto */
   const st = await walletUnicoLeggi();
   if (st.impronta && !opz.nuovoPrincipale) throw walletAltrove(st.impronta);
+  /* 3b) (19 nov 2026, parole-casa) nasce solo dove le parole hanno una casa */
+  if (!walletNasceQui()) throw walletNasceInTelegram();
   /* 4) nasce adesso, random, qui dentro */
   parole = B.generateMnemonic(B.wordlist, 128);
   if (!B.validateMnemonic(parole, B.wordlist)) {
@@ -70545,7 +70551,8 @@ async function walletUnicoLeggi(){
   const r = await fetch(`${API_BASE}/wallet/unico`, {headers: {'X-Tg-Init-Data': authHdr()}});
   const d = await r.json().catch(() => null);
   if (!r.ok || !d) throw walletServerMuto();
-  walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0};
+  walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0,
+                      case: walletCaseLista(d.case)};
   return walletUnicoStato;
 }
 /* registra l'impronta; {ok} o {ok: false, altro: l'impronta che c'e'} */
@@ -70559,8 +70566,72 @@ async function walletUnicoRegistra(impronta, sostituisci){
     return {ok: false, altro: walletUnicoStato.impronta};
   }
   if (!r.ok || !d) throw walletServerMuto();
-  walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0};
+  const prima = walletUnicoStato && walletUnicoStato.impronta === String(d.impronta || '')
+    ? walletUnicoStato.case : [];
+  walletUnicoStato = {impronta: String(d.impronta || ''), prossimo: Number(d.prossimo) || 0,
+                      case: d.sostituito ? [] : walletCaseLista(prima)};
   return {ok: true};
+}
+/* LE CASE DELLE PAROLE (19 nov 2026, cantiere parole-casa; Alan: «Barattolo
+   come server deve solamente sapere dove stanno così che possa dire
+   all'utente come recuperarle»). Il server tiene il NOME delle case dove
+   una copia e' riuscita — «nuvola» (il cloud di Telegram), «relay» (la
+   cassetta NIP-78) — mai il contenuto. Il telefono lo dice dopo una copia
+   riuscita (`walletSegnaCopia`) e, una volta per sessione, per le ricevute
+   che aveva gia' (`walletBackupRonda`). Fail-open: un server muto non
+   ferma niente, la prossima ronda ci riprova. */
+function walletCaseLista(x){
+  return Array.isArray(x) ? ['nuvola', 'relay'].filter(c => x.includes(c)) : [];
+}
+async function walletDiciCasa(imp, casa){
+  if (casa !== 'nuvola' && casa !== 'relay') return false;
+  const st = walletUnicoStato;
+  if (st && st.impronta === imp && (st.case || []).includes(casa)) return false;
+  try {
+    const r = await fetch(`${API_BASE}/wallet/unico/casa`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({impronta: imp, casa: casa})});
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) return false;
+    if (walletUnicoStato && walletUnicoStato.impronta === imp) walletUnicoStato.case = walletCaseLista(d.case);
+    return true;
+  } catch(e){ return false; }
+}
+/* DOVE RIPRENDERE LE PAROLE, detto da quel che il server sa delle case.
+   La frase che segue «Per usarlo anche qui incolla le sue 12 parole:» */
+function walletDoveStanno(){
+  const st = walletUnicoStato || {};
+  const k = walletCaseLista(st.case);
+  const relay = k.includes('relay')
+    ? ' Ce n\'è anche una copia cifrata sui relay Nostr: «👁 Mostra le 12 parole» la riprende da sola, se entri con la tua chiave Nostr.' : '';
+  if (cloudTelegram() && !k.includes('nuvola'))
+    return 'non sono nel cloud di Telegram, sono rimaste nel browser dove il wallet è nato (Barattolo dal sito): aprile là, '
+      + 'Profilo → «On-chain» → «Mostra le 12 parole», e incollale qui una volta. Da qui la copia va nel cloud di Telegram '
+      + 'e non te le chiediamo più.' + relay;
+  if (!cloudTelegram() && k.includes('nuvola'))
+    return 'stanno nel cloud di Telegram: apri Barattolo dentro Telegram (@' + BOT_TG + '), Profilo → «On-chain» → '
+      + '«Mostra le 12 parole», e incollale qui.' + relay;
+  return 'le trovi sul dispositivo dove è nato, in Profilo → «On-chain» → «Mostra le 12 parole».' + relay;
+}
+/* DOVE PUO' NASCERE IL WALLET (19 nov 2026, cantiere parole-casa; Alan:
+   «ogni profilo genera 12 parole in automatico e le manda sul cloud di
+   telegram o sui relay nostr in base a dove ha fatto il login»). Solo
+   dove le parole hanno una casa che segue l'account: DENTRO TELEGRAM (il
+   cloud) o con un ACCOUNT NOSTR (i relay). Il sito con un account
+   Telegram non ne ha nessuna — il cloud di Telegram si legge e si scrive
+   solo dalla Mini App — e le parole nate li' restavano chiuse in un
+   browser: la Mini App vedeva il wallet e non la chiave (19 nov, la
+   seconda firma di Andrea). Un wallet che c'e' gia' li' si usa e si
+   incolla come prima: qui si ferma solo la NASCITA. */
+function walletNasceQui(){
+  return !!cloudTelegram() || Number(myTgId) < 0;
+}
+function walletNasceInTelegram(){
+  const e = new Error('Il tuo wallet on-chain nasce dentro Telegram, dove le 12 parole hanno il loro backup: '
+    + 'apri Barattolo da @' + BOT_TG + ', crealo da lì, e poi per usarlo anche qui incolla le sue 12 parole '
+    + 'in Profilo → «On-chain».');
+  e.tipo = 'telegram';
+  return e;
 }
 /* IL NUMERO DI UN CAMBIO, dal pavimento del server: le stesse parole su
    due dispositivi non danno mai la stessa chiave a due cambi. `minimo` e'
@@ -71288,6 +71359,7 @@ function walletUnicoBlocco(c){
     <button class="btn orange" onclick="walletIncollaParole(this)">Usa queste parole</button>`;
   const dove = `le trovi sul dispositivo dove è nato: Profilo → «On-chain»
       → «Mostra le 12 parole»`;
+  const doveAltrove = esc(walletDoveStanno());
   if (c.stato === 'diverso') return `<div class="payout wallet-unico"><h4>Hai due wallet</h4>
     <div class="hint">Su questo dispositivo c'è un wallet diverso da quello
       principale del tuo account (il principale finisce in
@@ -71300,9 +71372,7 @@ function walletUnicoBlocco(c){
   return `<div class="payout wallet-unico"><h4>Il tuo wallet è su un altro dispositivo</h4>
     <div class="hint">Il wallet on-chain del tuo account è nato su un
       altro dispositivo (finisce in <span class="mono">${esc(c.principale)}</span>).
-      Per usarlo anche qui incolla le sue 12 parole: ${dove}. Se ne hai
-      una copia sui relay Nostr, «👁 Mostra le 12 parole» qui sotto la
-      riprende da sola.</div>
+      Per usarlo anche qui incolla le sue 12 parole: ${doveAltrove}</div>
     ${campo}
     <button class="btn link" onclick="walletNuovoPrincipale(this)">Ho perso quelle parole: fai nascere un wallet nuovo</button></div>`;
 }
@@ -71319,7 +71389,7 @@ function walletBloccoBackup(c){
     <div class="hint">Le 12 parole stanno solo su questo dispositivo: se lo perdi,
       perdi il wallet. ${puo
       ? `Tocca «Salva il backup»: la copia va ${dove}${c.nostr ? ' (il tuo firmatario Nostr può chiederti di approvare)' : ''}.`
-      : 'Qui non si può fare una copia da sola: apri Barattolo dentro Telegram (la copia nel cloud si fa da sola), oppure scrivi le 12 parole su carta con «👁 Mostra le 12 parole».'}</div>
+      : 'Qui non si può fare una copia da sola: apri Barattolo dentro Telegram e incolla lì le 12 parole (Profilo → «On-chain»): da lì la copia va nel cloud di Telegram. Oppure scrivile su carta con «👁 Mostra le 12 parole».'}</div>
     ${puo ? '<button class="btn orange" onclick="walletSalvaBackup(this)">Salva il backup</button>' : ''}
     <button class="btn link" onclick="walletParoleSuCarta()">Le ho scritte su carta</button></div>`;
 }
@@ -75327,9 +75397,16 @@ function apriParoleOnchainP2P(o, poi){
   p2pOcParoleOrdine = o || null;
   const box = el('p2pOcParoleCorpo');
   if (!box) return;
+  /* (19 nov 2026, parole-casa) dove riprenderle lo dice quel che il server
+     sa delle case; senza, la frase di sempre */
+  /* col typeof: i banchi che ritagliano il foglio senza il wallet unico restano in piedi */
+  const dove = typeof walletDoveStanno === 'function' && typeof walletUnicoStato !== 'undefined'
+      && walletUnicoStato && walletUnicoStato.impronta
+    ? 'Incolla qui le sue 12 parole: ' + esc(walletDoveStanno()) + ' '
+    : 'Incolla qui le sue 12 parole: le trovi là, in Profilo → «₿ On-chain» → «Mostra le 12 parole». ';
   box.innerHTML = '<div class="hint">Per firmare serve la chiave del tuo wallet on-chain, e <b>su questo dispositivo non c\'è</b>: '
-    + 'è nata su un altro. Incolla qui le sue 12 parole: le trovi là, in Profilo → «₿ On-chain» → «Mostra le 12 parole». '
-    + 'Restano solo su questo dispositivo, a Barattolo non arrivano.</div>'
+    + 'è nata su un altro. ' + dove
+    + 'A Barattolo non arrivano.</div>'
     + '<textarea id="p2pOcParoleCampo" class="mono" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" '
     + 'placeholder="le 12 parole, separate da uno spazio"></textarea>'
     + '<button class="btn orange" onclick="usaParoleOnchainP2P(this)">Usa queste parole e continua</button>'

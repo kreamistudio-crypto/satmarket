@@ -155736,7 +155736,7 @@ def prove_freni():
            "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
            # il wallet unico (2 nov 2026 sera): registrare l'impronta 20
            # all'ora, prenotare il numero di un cambio 120 all'ora
-           "wallet_unico": (20, 3600), "wallet_numero": (120, 3600),
+           "wallet_unico": (20, 3600), "wallet_casa": (20, 3600), "wallet_numero": (120, 3600),
            # la tappa 3 (23 ott 2026): «controlla adesso» 60 all'ora,
            # proposte e co-firme 30 all'ora
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
@@ -160780,6 +160780,9 @@ def prove_chiave_che_nasce_da_sola():
     for firma in ("function eventoCopiaOnchain(cifrato, adesso){",
                   "async function onchainImpronta(parole){",
                   "function walletAltrove(impronta){",
+                  # (19 nov 2026, parole-casa) dove puo' nascere, e dove stanno
+                  "function walletCaseLista(x){", "function walletDoveStanno(){",
+                  "function walletNasceQui(){", "function walletNasceInTelegram(){",
                   "async function onchainSemeAssicurato(opz){"):
         pezzi.append(pezzo_js(mini, firma, "\n}\n") + "\n}")
     banco = """
@@ -160802,6 +160805,10 @@ let CLOUD = {ok: false, testo: ''}, IN_TELEGRAM = false, RELAY = '';
 const cloudLeggiEsito = async () => CLOUD;
 const cloudTelegram = () => (IN_TELEGRAM ? {} : null);
 const onchainDaiRelay = async () => RELAY;
+/* (19 nov 2026, parole-casa) chi e': un numero negativo e' un account
+   Nostr (i relay sono la sua casa anche fuori da Telegram) */
+let myTgId = -7, walletUnicoStato = null;
+const BOT_TG = 'ilbarattolobot';
 /* (wallet-unico) il server: l'impronta che ha, o muto; le registrazioni */
 const walletImpronte = new Map();
 let SERVER = {impronta: ''}, MUTO = false, REGISTRATE = [];
@@ -160821,6 +160828,7 @@ __PEZZI__
     IN_TELEGRAM = !!st.inTelegram;
     RELAY = st.relay || '';
     SERVER = st.server || {impronta: ''}; MUTO = !!st.muto; REGISTRATE = [];
+    myTgId = st.conto || -7;
     onchainNato = '';
     try { const p = await onchainSemeAssicurato(st.opz);
           return {nato: onchainNato, parole: p, registrate: REGISTRATE, memoria: memoria}; }
@@ -160842,8 +160850,16 @@ __PEZZI__
   /* 5) IL CASO CHE CONTA: dentro Telegram col cloud MUTO non deve
         nascere niente — si ferma e lo dice */
   out.muta = await giro({cloud: {ok: false, testo: ''}, inTelegram: true});
-  /* 6) ...ma FUORI da Telegram il cloud non esiste: la' si nasce */
+  /* 6) ...ma FUORI da Telegram il cloud non esiste: la' nasce un account
+        Nostr (la sua casa sono i relay) */
   out.fuori = await giro({cloud: {ok: false, testo: ''}});
+  /* 6b) (19 nov 2026, parole-casa) un account TELEGRAM fuori da Telegram
+        (il sito) non fa nascere niente: le parole non avrebbero casa */
+  out.sitoTg = await giro({cloud: {ok: false, testo: ''}, conto: 5});
+  out.sitoTgNuovo = await giro({cloud: {ok: false, testo: ''}, conto: 5,
+                                server: {impronta: 'abcd1234'}, opz: {nuovoPrincipale: true}});
+  /* ...e dentro Telegram, col cloud vuoto, lo stesso account nasce */
+  out.dentroTg = await giro({cloud: {ok: true, testo: ''}, inTelegram: true, conto: 5});
   /* (wallet-unico) l'impronta: la master fingerprint del BIP-32 (il
      vettore noto delle dodici «abandon … about») */
   out.impronta = await onchainImpronta('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about');
@@ -160898,8 +160914,20 @@ __PEZZI__
           "nasce niente, e si dice", [None, True],
           [o["muta"].get("nato"),
            "non risponde" in (o["muta"].get("errore") or "")])
-    prova("...ma fuori da Telegram il cloud non esiste, e la' si nasce",
+    prova("...ma fuori da Telegram il cloud non esiste, e la' nasce un account Nostr (i relay)",
           "nuovo", o["fuori"]["nato"])
+    prova("(parole-casa) un account Telegram dal sito NON fa nascere il wallet, nemmeno "
+          "«ho perso quelle parole»: niente scritto, niente registrato, e si dice di aprire Telegram",
+          [["telegram", "", 0, True], ["telegram", "", 0]],
+          [[o["sitoTg"].get("tipo"), o["sitoTg"].get("memoria"), len(o["sitoTg"].get("registrate") or []),
+            "nasce dentro Telegram" in (o["sitoTg"].get("errore") or "")],
+           [o["sitoTgNuovo"].get("tipo"), o["sitoTgNuovo"].get("memoria"),
+            len(o["sitoTgNuovo"].get("registrate") or [])]])
+    prova("(parole-casa) ...e dentro Telegram, col cloud vuoto, lo stesso account nasce",
+          "nuovo", o["dentroTg"].get("nato"))
+    prova("(parole-casa) la nascita si ferma DOPO la domanda al server e PRIMA delle parole", True,
+          corpo.index("walletUnicoLeggi()") < corpo.index("if (!walletNasceQui()) throw walletNasceInTelegram();")
+          < corpo.index("generateMnemonic"))
     prova("(wallet-unico) l'impronta e' la master fingerprint del BIP-32 "
           "(le dodici «abandon … about» danno 73c5da0a)", "73c5da0a", o["impronta"])
     prova("(wallet-unico) il wallet che nasce si registra con la sua impronta, "
@@ -169597,7 +169625,10 @@ async function walletUnicoNumero(parole, minimo){
         "async function walletSalvaRelay(btn){",
         "function walletCopieLette(imp){",
         "function walletSegnaCopia(imp, dove){",
-        "async function walletBackupRonda(){")]
+        "async function walletBackupRonda(){",
+        # (19 nov 2026, parole-casa) le case delle parole
+        "function walletCaseLista(x){", "async function walletDiciCasa(imp, casa){",
+        "function walletDoveStanno(){")]
     # (10 nov 2026) il tetto del firmatario e il velo della copia
     pezzi_w.append(pezzo_js(mini, "let ONCHAIN_FIRMATARIO_MS = 60000;",
                             "\n\n/* La cassetta sui relay, in SCRITTURA") + "\n")
@@ -169642,18 +169673,29 @@ const onchainSuiRelay = async () => { RELAY_SCRITTI++;
   if (RELAY_TARDI) await new Promise(ok => setTimeout(ok, RELAY_TARDI)); return RELAY_OK; };
 const bottoneInAttesa = (b, t) => { VELO.push(t); return () => VELO.push('via'); };
 const el = () => TESTO_VELO;
-const walletUnicoLeggi = async () => { if (MUTO) throw new Error('muto'); return SERVER; };
+let walletUnicoStato = null;
+const walletUnicoLeggi = async () => { if (MUTO) throw new Error('muto'); walletUnicoStato = SERVER; return SERVER; };
 const walletUnicoRegistra = async (imp, sost) => {
   if (SERVER.impronta && SERVER.impronta !== imp && !sost) return {ok: false, altro: SERVER.impronta};
   SERVER = {impronta: imp, prossimo: SERVER.prossimo}; return {ok: true};
 };
+/* (19 nov 2026, parole-casa) la rotta delle case: si contano le chiamate */
+const BOT_TG = 'ilbarattolobot', API_BASE = '/api';
+const authHdr = () => 'x';
+let CASE_DETTE = [];
+const fetch = async (u, o) => { const c = JSON.parse(o.body); CASE_DETTE.push([u, c.impronta, c.casa]);
+  const k = (SERVER.case || []).concat(SERVER.impronta === c.impronta ? [c.casa] : []);
+  if (SERVER.impronta === c.impronta) SERVER.case = k;
+  return {ok: SERVER.impronta === c.impronta, json: async () => ({ok: true, case: k})}; };
 """ + "".join(pezzi_w) + """
 const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = false; NUVOLA = {}; NUVOLA_ROTTA = false; TG = false; SICURO = [];
   NSEC = false; RELAY_OK = false; TOAST = []; RELAY_SCRITTI = 0; walletRondaFatta = false; walletRondaAvvisata = false;
-  RELAY_TARDI = 0; VELO = []; TESTO_VELO = {}; ONCHAIN_FIRMATARIO_MS = 60000; ONCHAIN_COPIA_DOPO_MS = 6000; };
+  RELAY_TARDI = 0; VELO = []; TESTO_VELO = {}; ONCHAIN_FIRMATARIO_MS = 60000; ONCHAIN_COPIA_DOPO_MS = 6000;
+  CASE_DETTE = []; walletUnicoStato = null; };
 (async () => {
   const out = {};
   const iA = await onchainImpronta(A), iC = await onchainImpronta(C);
+  out.iA = iA;
   /* 1) a che punto e' il dispositivo */
   pulito(); out.nessuno = (await walletUnicoControlla()).stato;
   pulito(); MUTO = true; out.muto = (await walletUnicoControlla()).stato;
@@ -169741,6 +169783,37 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
                        VELO.slice(-1)[0], TESTO_VELO.textContent === ONCHAIN_COPIA_FIRMATARIO];
   await new Promise(ok => setTimeout(ok, 250));
   out.firmatarioMuto = [tardiSubito, !!walletCopieLette(iA).relay];
+  /* 10) (19 nov 2026, parole-casa) il server sa DOVE stanno: la copia
+         riuscita lo dice, le ricevute di prima pure, e una volta basta */
+  pulito(); TG = true; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); await new Promise(ok => setTimeout(ok, 5));
+  out.casaNuvola = [CASE_DETTE, SERVER.case];
+  pulito(); TG = true; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: []};
+  NUVOLA[ONCHAIN_CLOUD] = JSON.stringify({parole: A});
+  LS[walletCopieChiave()] = JSON.stringify({impronta: iA, nuvola: 1});
+  await walletBackupRonda(); await new Promise(ok => setTimeout(ok, 5));
+  out.casaRicevuta = CASE_DETTE.map(x => x[2]);
+  pulito(); TG = true; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: ['nuvola']};
+  LS[walletCopieChiave()] = JSON.stringify({impronta: iA, nuvola: 1});
+  await walletBackupRonda(); await new Promise(ok => setTimeout(ok, 5));
+  out.casaGiaSaputa = CASE_DETTE.length;
+  /* parole che non sono il principale: il server non sente niente */
+  pulito(); TG = true; LS.seme = C; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); await new Promise(ok => setTimeout(ok, 5));
+  out.casaNonPrincipale = CASE_DETTE.length;
+  /* fuori dalla ronda: ogni copia segnata (relay da «Salva il backup»), ma la carta no */
+  pulito(); SERVER = {impronta: iA, prossimo: 0, case: []}; walletUnicoStato = SERVER;
+  walletSegnaCopia(iA, 'carta'); walletSegnaCopia(iA, 'relay'); await new Promise(ok => setTimeout(ok, 5));
+  out.casaSegnata = CASE_DETTE.map(x => x[2]);
+  /* le frasi: dentro Telegram senza la nuvola, fuori con la nuvola, coi relay, senza niente */
+  const frase = (tg, k) => { TG = tg; walletUnicoStato = {impronta: iA, case: k}; return walletDoveStanno(); };
+  out.dove = [frase(true, []).includes('rimaste nel browser dove il wallet è nato'),
+              frase(false, ['nuvola']).includes('stanno nel cloud di Telegram: apri Barattolo dentro Telegram (@ilbarattolobot)'),
+              frase(false, ['relay']).includes('copia cifrata sui relay Nostr'),
+              frase(false, []).startsWith('le trovi sul dispositivo dove è nato'),
+              frase(true, ['nuvola']).startsWith('le trovi sul dispositivo dove è nato')];
+  TG = false; walletUnicoStato = {impronta: iA, case: ['nuvola']};
+  out.doveRiquadro = walletUnicoBlocco({stato: 'altrove', principale: iA}).includes('stanno nel cloud di Telegram');
   console.log(JSON.stringify(out));
 })();
 """
@@ -169757,6 +169830,17 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
                r.get("altrove"), r.get("nuvola")])
         prova("(wallet-unico) il riquadro c'e' solo quando c'e' qualcosa da fare",
               ["", "", True, True], r.get("blocchi"))
+        prova("(parole-casa) la copia riuscita nel cloud lo dice al server: il nome della casa, mai le parole",
+              [[["/api/wallet/unico/casa", r.get("iA"), "nuvola"]], ["nuvola"]], r.get("casaNuvola"))
+        prova("(parole-casa) ...le ricevute di prima pure, e una casa gia' saputa non si ridice; "
+              "parole che non sono il principale non dicono niente",
+              [["nuvola"], 0, 0], [r.get("casaRicevuta"), r.get("casaGiaSaputa"), r.get("casaNonPrincipale")])
+        prova("(parole-casa) ...ogni copia segnata anche fuori dalla ronda, la carta no",
+              ["relay"], r.get("casaSegnata"))
+        prova("(parole-casa) le frasi su dove riprenderle: dentro Telegram senza nuvola il browser, "
+              "fuori con la nuvola Telegram, i relay, la frase di sempre",
+              [True, True, True, True, True], r.get("dove"))
+        prova("(parole-casa) ...e il riquadro «altrove» del Profilo la usa", True, r.get("doveRiquadro"))
         g = r.get("giuste") or []
         prova("(wallet-unico) incollare: storte e sbagliate non toccano niente; le "
               "giuste (maiuscole e spazi a caso) entrano, quelle di prima restano "
