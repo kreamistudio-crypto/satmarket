@@ -119561,6 +119561,76 @@ def prove_negozi_su_nostr():
               elenco in open(os.path.join(QUI, "ci", nome),
                              encoding="utf-8").read())
 
+    # 6. LA FIRMA DI RIPIEGO (19 nov 2026, cantiere negozi-firma-ripiego;
+    #    Andrea, scheda «Sì, dopo 3 giorni senza firma»): il prodotto di
+    #    un negozio collegato che aspetta la firma del titolare da 3
+    #    giorni esce col nostro nome; la sua coda resta, e se firma dopo
+    #    passa a nome suo. Il giudice su sqlite vero, col tempo fermo.
+    import time as _time
+    adesso = 1_000_000
+    amb = {"time": type("T", (), {"time": staticmethod(lambda: adesso)}),
+           "da_connettore": lambda a: bool(a.get("fonte")),
+           "NEGOZI_FIRMA_RIPIEGO_GIORNI": 3}
+    exec(pezzo("firma_di_ripiego"), amb)
+    ripiego = amb["firma_di_ripiego"]
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY,"
+                " tg_id INTEGER, azione TEXT, creato INTEGER)")
+
+    def coda(azione, giorni):
+        con.execute("DELETE FROM firme_nostr")
+        if azione:
+            con.execute("INSERT INTO firme_nostr VALUES(1, 7, ?, ?)",
+                        (azione, adesso - int(giorni * 86400)))
+
+    def negozio(**k):
+        a = {"id": 1, "fonte": "woo", "nostr_event_id": "",
+             "nostr_autore": ""}
+        a.update(k)
+        return a
+    coda("pubblica", 2.9)
+    prova("in coda da meno di 3 giorni: aspetta la sua firma", False,
+          ripiego(con, negozio()))
+    coda("pubblica", 3)
+    prova("...da 3 giorni: esce col nostro nome", True,
+          ripiego(con, negozio()))
+    prova("...ma solo se viene da un negozio collegato (gli annunci a "
+          "mano non cambiano)", False, ripiego(con, negozio(fonte="")))
+    coda("pubblica", 0)
+    prova("un evento NOSTRO gia' in piazza resta vero anche prima dei 3 "
+          "giorni", True, ripiego(con, negozio(nostr_event_id="ev")))
+    coda("active", 10)
+    prova("un evento gia' FIRMATO DA LUI aspetta sempre la sua firma",
+          False, ripiego(con, negozio(nostr_event_id="ev",
+                                      nostr_autore="ab" * 32)))
+    coda("", 0)
+    prova("senza niente in coda non c'e' niente da ripiegare", False,
+          ripiego(con, negozio()))
+    coda("pubblica", 30)
+    amb["NEGOZI_FIRMA_RIPIEGO_GIORNI"] = 0
+    prova("con la leva a 0 aspetta la sua firma per sempre", False,
+          ripiego(con, negozio()))
+    del _time
+    # Le cuciture: il bivio chiede al giudice nel ramo della coda (e con
+    # «no» sul suo profilo non serve: esce gia' col nostro nome), e il
+    # riallineamento spinge chi ha superato i giorni — la sua impronta
+    # e' gia' segnata da quando la firma e' andata in coda.
+    prova("il bivio manda col nostro nome chi aspetta da troppo", True,
+          "elif chiave_nostr_provata(u) \\\n"
+          "                and not firma_di_ripiego(con, a):" in funnel)
+    prova("...e il riallineamento lo spinge anche a impronta uguale",
+          True, "and firma_di_ripiego(con, riga)"
+          in pezzo("nostr_del_negozio"))
+    prova("...mai un prodotto esaurito che in piazza non c'e' mai stato",
+          True, 'status != "sold"' in pezzo("nostr_del_negozio"))
+    prova("la leva dei giorni e' a 3 nel codice", True,
+          "    NEGOZI_FIRMA_RIPIEGO_GIORNI = 3\n" in _SORGENTE)
+    prova("...nel config d'esempio", True,
+          "\nNEGOZI_FIRMA_RIPIEGO_GIORNI = 3\n" in esempio)
+    prova("...e nel pannello delle leve", True,
+          '"NEGOZI_FIRMA_RIPIEGO_GIORNI",' in _SORGENTE)
+
 
 def prove_connettori_categoria():
     """LA CATEGORIA DI UN NEGOZIO COLLEGATO (16 nov 2026, richiesta di

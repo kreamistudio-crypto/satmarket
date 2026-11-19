@@ -1944,6 +1944,12 @@ CONNETTORI_NEGOZIO_PER_TUTTI = False
 # e' l'interruttore d'emergenza (quel che e' gia' in piazza resta).
 NEGOZI_SU_NOSTR = True
 
+# Il titolare di un negozio collegato con la chiave Nostr provata firma
+# lui i suoi prodotti; se non lo fa entro questi giorni li pubblica
+# Barattolo col suo nome, e se firma dopo passano a nome suo (19 nov
+# 2026, cantiere negozi-firma-ripiego). 0 = aspettano la sua firma.
+NEGOZI_FIRMA_RIPIEGO_GIORNI = 3
+
 # Quanti prodotti si leggono per collegamento a ogni giro. MILLE dal 1
 # ott 2026 (era 200: un negozio da mille prodotti non entrava mai per
 # intero, i lettori si fermavano sempre allo stesso punto).

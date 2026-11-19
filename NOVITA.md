@@ -669,6 +669,12 @@ dove: P2P → «I miei scambi» → uno scambio on-chain col deposito fatto: il 
 leva: nessuna
 pubblico: sì
 
+## 2026-11-19 · negozi-firma-ripiego
+frase: Chi ha un negozio collegato e una chiave Nostr sua ha 3 giorni per firmare i suoi prodotti e pubblicarli a nome suo; se non lo fa, li pubblica Barattolo, così compaiono comunque su Nostr. Se firma dopo, tornano a nome suo da soli.
+dove: nessun bottone nuovo: il titolare firma come sempre con «✍️ Firma i tuoi N annunci per Nostr» nel Profilo; passati 3 giorni succede da solo al giro del negozio.
+leva: NEGOZI_FIRMA_RIPIEGO_GIORNI (3 di serie)
+pubblico: sì
+
 ## 2026-11-18 · negozi-su-nostr
 frase: I prodotti dei negozi collegati (Shopify e WooCommerce) adesso escono anche su Nostr, come tutti gli altri annunci di Barattolo: un annuncio per prodotto, con le varianti (taglie, colori) raccolte in uno solo col prezzo «da». Si aggiornano da soli quando cambiano prezzo o disponibilità, e un prodotto tolto dal negozio sparisce anche da lì.
 dove: nessun bottone: succede da solo a ogni giro del negozio (una volta all'ora); i prodotti si vedono in qualunque app Nostr che mostra gli annunci (NIP-99).

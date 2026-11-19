@@ -37600,6 +37600,15 @@ def _leve_stato():
                   spento="i prodotti dei negozi collegati restano solo in "
                          "vetrina: niente eventi nuovi né aggiornamenti, e "
                          "quel che è già in piazza resta com'è"),
+            _leva("Negozi collegati: firma di Barattolo dopo (giorni)",
+                  "NEGOZI_FIRMA_RIPIEGO_GIORNI",
+                  NEGOZI_FIRMA_RIPIEGO_GIORNI,
+                  acceso="se il titolare ha una chiave Nostr sua e non "
+                         "firma i suoi prodotti entro questi giorni, li "
+                         "pubblica Barattolo col suo nome; se firma dopo, "
+                         "passano a nome suo",
+                  spento="i prodotti di chi ha una chiave Nostr sua "
+                         "aspettano la sua firma, anche per sempre"),
             _leva("Post automatici", "POST_AUTOMATICI", bool(POST_AUTOMATICI),
                   spento="i nuovi annunci non vengono raccontati da nessuna "
                          "parte (il ciclo di vita dei post già fatti "
@@ -84315,6 +84324,37 @@ def annuncio_per_nostr(con, a: dict, status: str):
     return riga, status
 
 
+def firma_di_ripiego(con, a) -> bool:
+    """Il prodotto di un negozio collegato che va in piazza col NOSTRO
+    nome anche se il titolare ha la chiave Nostr provata (19 nov 2026,
+    cantiere negozi-firma-ripiego; Andrea: «Sì, dopo 3 giorni senza
+    firma»). `a` e' la riga che va in piazza, cioe' la testa della
+    famiglia quando c'e' una famiglia.
+
+    Vale solo se la sua PUBBLICAZIONE aspetta in coda (azione
+    'pubblica': il suo evento non e' mai nato) e:
+    - aspetta da NEGOZI_FIRMA_RIPIEGO_GIORNI o piu' — il titolare non e'
+      passato a firmare, e il prodotto non resta fuori per sempre;
+    - oppure in piazza c'e' gia' un evento NOSTRO: quello resta vero
+      (prezzo, giacenza, esaurito) finche' lui non firma il suo, invece
+      di restare fermo a com'era.
+    La riga in coda non si tocca mai da qui: e' la porta per cui, appena
+    il titolare firma, l'annuncio passa a nome suo (il POST delle firme
+    scrive il suo evento e seppellisce il nostro). Un evento gia' FIRMATO
+    DA LUI (aggiornamenti 'active'/'sold' in coda) non e' affar nostro:
+    la sua reputazione resta sua."""
+    if not NEGOZI_FIRMA_RIPIEGO_GIORNI or not da_connettore(a):
+        return False
+    f = con.execute("SELECT azione, creato FROM firme_nostr "
+                    "WHERE annuncio_id=?", (a["id"],)).fetchone()
+    if not f or f["azione"] != "pubblica" or a["nostr_autore"]:
+        return False
+    if a["nostr_event_id"]:
+        return True
+    return (f["creato"] or 0) <= \
+        time.time() - NEGOZI_FIRMA_RIPIEGO_GIORNI * 86400
+
+
 def _impronta_nostr(evento: dict) -> str:
     """L'impronta di quel che un evento DICE in piazza: tag e testo,
     senza firma, id e ora (che cambiano a ogni firma anche quando non
@@ -84395,7 +84435,8 @@ async def annuncio_su_nostr(annuncio_id: int, status: str,
                 segna_impronta()
                 con.close()
                 return True
-        elif chiave_nostr_provata(u):
+        elif chiave_nostr_provata(u) \
+                and not firma_di_ripiego(con, a):
             gia = con.execute("SELECT azione FROM firme_nostr "
                               "WHERE annuncio_id=?",
                               (annuncio_id,)).fetchone()
@@ -101040,6 +101081,22 @@ except ImportError:
 # farsi prendere per spam.
 MAX_NOSTR_NEGOZIO_PER_GIRO = 100
 
+# LA FIRMA DI RIPIEGO DEI NEGOZI COLLEGATI (19 nov 2026, cantiere
+# negozi-firma-ripiego; Andrea, scheda «Sì, dopo 3 giorni senza firma»).
+# Col BIVIO il prodotto di un titolare con la chiave Nostr provata
+# aspetta la SUA firma, e a firmare e' il suo browser: ma i prodotti di
+# un negozio collegato arrivano da soli, a centinaia, e il titolare puo'
+# non aprire mai l'app — SWAG, 155 prodotti fermi in coda. Passati
+# questi giorni senza firma li pubblica Barattolo col suo nome; la riga
+# in coda RESTA, e se il titolare firma dopo il suo evento nasce e il
+# nostro muore (il trasloco di sempre, nel POST delle firme). Solo i
+# negozi collegati: gli annunci scritti a mano li firma chi c'e' in quel
+# momento, e per loro la regola d'agosto non cambia. 0 = spento.
+try:
+    from config import NEGOZI_FIRMA_RIPIEGO_GIORNI
+except ImportError:
+    NEGOZI_FIRMA_RIPIEGO_GIORNI = 3
+
 # CHI VEDE LA PORTA (set 2026, decisione di Andrea, dalla segnalazione
 # di un venditore): il collegamento vive in una sezione di «📥 Importa in
 # blocco / catalogo esterno», e PER ORA la vedono solo i negozi GIA'
@@ -102328,8 +102385,14 @@ async def nostr_del_negozio(connettore_id: int,
             if status == "sold" and not t["nostr_event_id"] \
                     and not t["nostr_impronta"]:
                 continue
+            # (19 nov 2026, negozi-firma-ripiego) l'impronta e' segnata
+            # gia' quando la firma va in coda: un prodotto che aspetta
+            # il titolare da troppi giorni va spinto a mano, e il bivio
+            # lo manda col nostro nome (`firma_di_ripiego`)
             if _impronta_nostr(evento_annuncio(riga, status)) \
-                    != (t["nostr_impronta"] or ""):
+                    != (t["nostr_impronta"] or "") \
+                    or (not riga["nostr_event_id"] and status != "sold"
+                        and firma_di_ripiego(con, riga)):
                 da_fare.append(("pubblica", t["id"], status))
         con.close()
         # le lapidi prima: costano poco e tolgono di mezzo il falso

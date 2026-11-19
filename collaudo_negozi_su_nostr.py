@@ -26,6 +26,9 @@ domande:
   · la leva spenta ferma tutto;
   · un negozio fermo (in errore) coi suoi annunci vivi in vetrina va in
     piazza lo stesso, al giro dell'ora;
+  · il titolare con la chiave Nostr provata che non firma: dopo 3
+    giorni firma Barattolo, e se firma dopo passa a nome suo (19 nov
+    2026, cantiere negozi-firma-ripiego);
   · scollegare il negozio cancella dai relay tutto cio' che c'era.
 
 La chiave della piattaforma e' quella di coincurve dove c'e', se no un
@@ -47,6 +50,7 @@ import schnorr_puro
 
 prova = banco.prova
 VENDE = 444
+LUI = 555          # il titolare con la chiave Nostr provata
 NEGOZIO = "https://maglie.test"
 CATALOGO = []
 VARIAZIONI = {}
@@ -340,6 +344,154 @@ def main():
           {tag(e, "client") for e in ev
            if tag(e, "d") in {f"barattolo-{i}" for i in ids_fermo}})
     prova("...e il giro dopo non rimanda niente", 0, len(giro_dell_ora()))
+
+    # ---------------------------------------------------------------
+    print("\n[chi ha la chiave Nostr e non firma: dopo 3 giorni firma Barattolo]")
+    # (19 nov 2026, cantiere negozi-firma-ripiego; Andrea, scheda «Sì,
+    # dopo 3 giorni senza firma»: i 155 prodotti di SWAG fermi in coda
+    # per la firma del titolare, che l'app non la apre)
+    if SRV.ChiavePubblicaNostr is None:
+        SRV.ChiavePubblicaNostr = schnorr_puro.ChiaveXOnly
+        print("   (coincurve assente: monto schnorr_puro.ChiaveXOnly, come in CI)")
+    nostra = SRV._NOSTR[1]
+    sk_lui = nuova_chiave()
+    sua = schnorr_puro.pubblica(sk_lui).hex()
+    npub = SRV.hex_to_npub(sua)
+    con = SRV.db()
+    con.execute("INSERT INTO utenti(tg_id,nome,npub,npub_verificata,"
+                "npub_accesso,registrato) VALUES(?,?,?,1,?,?)",
+                (LUI, "Titolare", npub, npub, adesso))
+    cid_r = con.execute(
+        "INSERT INTO connettori(tg_id,fonte,url_negozio,credenziali,"
+        "consegna,zona,creato,stato) VALUES(?,'woo','https://ripiego.test',"
+        "'plain:{}','ritiro','Pavia (PV)',?,'pausa')",
+        (LUI, adesso)).lastrowid
+    con.commit()
+    con.close()
+
+    def prodotto_r(k):
+        con = SRV.db()
+        aid = con.execute(
+            "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
+            "prezzo_sats,zona,stato,creato,connettore_id,fonte,"
+            "origine_chiave,valuta,prezzo_eur,foto) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (LUI, f"Felpa {k}", "Buona", "Altro", 2000 + k, "Pavia (PV)",
+             "attivo", adesso, cid_r, "woo", f"r{k}", "eur", 2.0 + k,
+             "[]")).lastrowid
+        con.commit()
+        con.close()
+        return aid
+
+    def piazza_r():
+        prima = len(SPEDITI)
+        asyncio.run(SRV.nostr_del_negozio(cid_r))
+        return SPEDITI[prima:]
+
+    def coda_r():
+        con = SRV.db()
+        r = [tuple(x) for x in con.execute(
+            "SELECT annuncio_id, azione FROM firme_nostr WHERE tg_id=? "
+            "ORDER BY annuncio_id", (LUI,))]
+        con.close()
+        return r
+
+    def invecchia(aid, giorni=3):
+        con = SRV.db()
+        con.execute("UPDATE firme_nostr SET creato=creato-? "
+                    "WHERE annuncio_id=?", (giorni * 86400 + 60, aid))
+        con.commit()
+        con.close()
+
+    def tocca(aid, titolo):
+        con = SRV.db()
+        con.execute("UPDATE annunci SET titolo=? WHERE id=?", (titolo, aid))
+        con.commit()
+        con.close()
+
+    def testa_r(aid):
+        con = SRV.db()
+        r = con.execute("SELECT nostr_event_id, nostr_autore FROM annunci "
+                        "WHERE id=?", (aid,)).fetchone()
+        con.close()
+        return tuple(r)
+
+    r1, r2 = prodotto_r(1), prodotto_r(2)
+    prova("nessun evento col nostro nome: aspettano la SUA firma", 0,
+          len(piazza_r()))
+    prova("...due pubblicazioni in coda per lui",
+          [(r1, "pubblica"), (r2, "pubblica")], coda_r())
+    prova("un giro dopo, ancora niente", 0, len(piazza_r()))
+    invecchia(r1)
+    ev = piazza_r()
+    prova("passati 3 giorni, il primo esce col nome di Barattolo",
+          [(f"barattolo-{r1}", nostra, "Barattolo", "active")],
+          [(tag(e, "d"), e["pubkey"], tag(e, "client"), tag(e, "status"))
+           for e in ev])
+    prova("...la sua firma resta in coda: la porta per tornare a nome suo",
+          [(r1, "pubblica"), (r2, "pubblica")], coda_r())
+    prova("...l'evento e' nostro, e il secondo aspetta ancora",
+          ((ev[0]["id"] if ev else "?", ""), ("", "")),
+          (testa_r(r1), testa_r(r2)))
+    nostro_vecchio = testa_r(r1)[0]
+    prova("il giro dopo non rimanda niente", 0, len(piazza_r()))
+    tocca(r1, "Felpa arancione")
+    ev = piazza_r()
+    prova("un cambio arriva al nostro evento, finche' lui non firma",
+          [(f"barattolo-{r1}", nostra, "Felpa arancione")],
+          [(tag(e, "d"), e["pubkey"], tag(e, "title")) for e in ev])
+    nostro_vecchio = testa_r(r1)[0]
+
+    async def firma_lui():
+        """Il giro del suo browser: GET della coda, firma, POST di
+        ognuna (come `collaudo_annunci_sul_profilo`)."""
+        import hashlib
+        import json
+        banco.come(LUI)
+        prima = len(SPEDITI)
+        d = await SRV.firme_nostr_da_fare("", "")
+        for voce in d["firme"]:
+            ev = voce["evento"]
+            serial = json.dumps([0, sua, ev["created_at"], ev["kind"],
+                                 ev["tags"], ev["content"]],
+                                separators=(",", ":"), ensure_ascii=False)
+            ev_id = hashlib.sha256(serial.encode("utf-8")).hexdigest()
+            sig = schnorr_puro.firma(sk_lui, bytes.fromhex(ev_id),
+                                     os.urandom(32)).hex()
+
+            async def leggi(_req, corpo={"biglietto": voce["biglietto"],
+                                         "pubkey": sua, "sig": sig}):
+                return corpo
+            SRV.leggi_json = leggi
+            await SRV.firma_nostr_fatta(None, "", "")
+        await asyncio.sleep(0.3)      # la lapide parte in sottofondo
+        banco.come(VENDE)
+        return SPEDITI[prima:]
+    ev = asyncio.run(firma_lui())
+    prova("lui firma: tutti e due passano a nome suo", (sua, sua),
+          (testa_r(r1)[1], testa_r(r2)[1]))
+    prova("...il nostro evento prende la lapide", [nostro_vecchio],
+          [tag(e, "e") for e in ev if e["kind"] == 5])
+    prova("...e la coda e' vuota", [], coda_r())
+    tocca(r1, "Felpa blu")
+    prova("da qui i cambi tornano alla sua firma: niente col nostro nome",
+          (0, [(r1, "active")]), (len(piazza_r()), coda_r()))
+    con = SRV.db()
+    con.execute("DELETE FROM firme_nostr WHERE tg_id=?", (LUI,))
+    con.commit()
+    con.close()
+
+    r3 = prodotto_r(3)
+    piazza_r()
+    invecchia(r3)
+    SRV.NEGOZI_FIRMA_RIPIEGO_GIORNI = 0
+    prova("con la leva a 0 aspetta la sua firma anche dopo 3 giorni", 0,
+          len(piazza_r()))
+    SRV.NEGOZI_FIRMA_RIPIEGO_GIORNI = 3
+    prova("...riaccesa, esce col nome di Barattolo",
+          [(f"barattolo-{r3}", nostra)],
+          [(tag(e, "d"), e["pubkey"]) for e in piazza_r()])
+    invecchia(r3, giorni=-1)          # (la sua coda torna giovane)
 
     # ---------------------------------------------------------------
     print("\n[scollegare cancella dai relay tutto cio' che c'era]")

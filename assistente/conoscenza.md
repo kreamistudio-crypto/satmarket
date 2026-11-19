@@ -153,7 +153,7 @@ Gli annunci esauriti: quando vendi l'ultimo pezzo l'annuncio diventa «Esaurito�
 <!-- pezzo libro-015 | libro -->
 ## Libro · Vendere nel mercatino (2/6)
 
-Hai un catalogo grande? Nel Profilo, nel gruppo «Annunci», c'è «📥 Carica tanti annunci insieme»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri. Dal 18 novembre 2026 i prodotti di un negozio collegato escono anche su Nostr, come gli altri annunci: un annuncio per prodotto (le varianti, per esempio le taglie, sono un annuncio solo col prezzo «da»), entro qualche ora dall'entrata, e si aggiornano da soli; un prodotto tolto dal negozio sparisce anche da lì. Se il negozio collegato non risponde per cinque ore di fila il collegamento si ferma («⚠️ non risponde») e il bot lo dice al venditore; da lì Barattolo riprova da solo una volta al giorno e, appena il sito risponde, il collegamento riparte e il bot lo avvisa. Se ha cambiato le chiavi del negozio, le riscrive con ✏️; ▶️ lo riaccende subito. Lo stesso negozio non si collega due volte, nemmeno scrivendo l'indirizzo con maiuscole diverse. Dal 19 novembre 2026, se un prodotto WooCommerce ha delle tendine che non cambiano il prezzo (lasciate su «Qualsiasi» nel negozio, per esempio il gusto), entra come un annuncio solo con le sue tendine: chi compra sceglie nella scheda o alla cassa («🎁 Le tue scelte»), senza scelta non si paga, e il venditore trova la scelta nella nota dell'ordine.
+Hai un catalogo grande? Nel Profilo, nel gruppo «Annunci», c'è «📥 Carica tanti annunci insieme»: scarichi il modello CSV, una riga per annuncio, fino a 500 annunci per volta. Ogni riga vuole almeno una foto, con un link nella colonna «foto» (più d'uno separati da |) oppure coi nomi dei file dentro uno ZIP che carichi insieme; una riga senza foto viene scartata. Prima di pubblicare tocchi «🔎 Controlla il file» e vedi cosa va e cosa no. Se hai un negozio Shopify o WooCommerce, nella stessa sezione lo puoi collegare: i prodotti entrano da soli e restano in pari (se la sezione non la vedi, guarda i NUMERI DI OGGI o chiedi allo staff). Nel collegamento (✏️ sul negozio) c'è anche «Categoria dei prodotti»: se vende tutto dello stesso tipo la sceglie lì e vale per tutti, anche per quelli già entrati; con «Decide il negozio» Barattolo usa la categoria del suo e-commerce quando corrisponde a una delle nostre, e il resto va in «Altro». Gli annunci importati passano dalla moderazione come gli altri. Dal 18 novembre 2026 i prodotti di un negozio collegato escono anche su Nostr, come gli altri annunci: un annuncio per prodotto (le varianti, per esempio le taglie, sono un annuncio solo col prezzo «da»), entro qualche ora dall'entrata, e si aggiornano da soli; un prodotto tolto dal negozio sparisce anche da lì. Chi ha anche una chiave Nostr sua li firma lui, a nome suo, con «✍️ Firma i tuoi N annunci per Nostr» nel Profilo; dal 19 novembre 2026, se non firma entro 3 giorni, li pubblica Barattolo col suo nome, e se firma dopo tornano a nome suo. Se il negozio collegato non risponde per cinque ore di fila il collegamento si ferma («⚠️ non risponde») e il bot lo dice al venditore; da lì Barattolo riprova da solo una volta al giorno e, appena il sito risponde, il collegamento riparte e il bot lo avvisa. Se ha cambiato le chiavi del negozio, le riscrive con ✏️; ▶️ lo riaccende subito. Lo stesso negozio non si collega due volte, nemmeno scrivendo l'indirizzo con maiuscole diverse. Dal 19 novembre 2026, se un prodotto WooCommerce ha delle tendine che non cambiano il prezzo (lasciate su «Qualsiasi» nel negozio, per esempio il gusto), entra come un annuncio solo con le sue tendine: chi compra sceglie nella scheda o alla cassa («🎁 Le tue scelte»), senza scelta non si paga, e il venditore trova la scelta nella nota dell'ordine.
 
 Per incassare da solo imposta il tuo indirizzo Lightning nel Profilo: quando chi compra conferma, i sats ti arrivano lì.
 
@@ -2370,6 +2370,14 @@ leva: nessuna
 pubblico: sì
 
 <!-- pezzo novita-106 | novita -->
+## Novità · 2026-11-19 · negozi-firma-ripiego
+
+frase: Chi ha un negozio collegato e una chiave Nostr sua ha 3 giorni per firmare i suoi prodotti e pubblicarli a nome suo; se non lo fa, li pubblica Barattolo, così compaiono comunque su Nostr. Se firma dopo, tornano a nome suo da soli.
+dove: nessun bottone nuovo: il titolare firma come sempre con «✍️ Firma i tuoi N annunci per Nostr» nel Profilo; passati 3 giorni succede da solo al giro del negozio.
+leva: NEGOZI_FIRMA_RIPIEGO_GIORNI (3 di serie)
+pubblico: sì
+
+<!-- pezzo novita-107 | novita -->
 ## Novità · 2026-11-18 · negozi-su-nostr
 
 frase: I prodotti dei negozi collegati (Shopify e WooCommerce) adesso escono anche su Nostr, come tutti gli altri annunci di Barattolo: un annuncio per prodotto, con le varianti (taglie, colori) raccolte in uno solo col prezzo «da». Si aggiornano da soli quando cambiano prezzo o disponibilità, e un prodotto tolto dal negozio sparisce anche da lì.
@@ -2377,7 +2385,7 @@ dove: nessun bottone: succede da solo a ogni giro del negozio (una volta all'ora
 leva: NEGOZI_SU_NOSTR (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-107 | novita -->
+<!-- pezzo novita-108 | novita -->
 ## Novità · 2026-11-18 · amber-da-solo
 
 frase: Dal telefono entrare con Nostr è più comodo: tocchi «Entra con nostrconnect» e il tuo firmatario si apre da solo per chiederti l'ok, Amber su Android e Clave su iPhone. Approvi, torni su Barattolo e sei dentro, senza copiare e incollare nessuna stringa.
@@ -2385,7 +2393,7 @@ dove: dal sito nel browser, «…o entra con Nostr» → «📱 Entra con nostrc
 leva: NOSTRCONNECT_APRI_APP (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-108 | novita -->
+<!-- pezzo novita-109 | novita -->
 ## Novità · 2026-11-18 · tempo-pagamento
 
 frase: Nel P2P chi vende sceglie con un orologio quanto tempo ha chi compra per pagare, da 15 minuti a 24 ore (sotto le 24 solo coi metodi veloci, come SEPA Instant, Revolut o USDT). Chi prende lo vede già nel libro («⏱ 30 min»), e allo scadere senza «Ho inviato» lo scambio Lightning si annulla da solo e i sats tornano a chi vende; sull'on-chain si apre la disputa.
@@ -2393,7 +2401,7 @@ dove: P2P → «Pubblica» → «Vendi BTC», la sezione «Tempo per pagare» (i
 leva: P2P_TEMPO_PER_PAGARE (accesa di serie); sull'on-chain compare con la promozione, sul Lightning solo dopo la -bar10 sul nodo (patch 0013): «pubblico» diventa sì quel giorno
 pubblico: no
 
-<!-- pezzo novita-109 | novita -->
+<!-- pezzo novita-110 | novita -->
 ## Novità · 2026-11-18 · cauzione-a-scelta
 
 frase: Negli scambi P2P on-chain chi vende può chiedere una cauzione a chi prende il suo ordine, con qualunque metodo: una piccola cauzione in Lightning col QR (il 3%, almeno 1000 sats) che torna a fine scambio. Chi prende la perde se rinuncia dopo il deposito o se lascia scadere il tempo per pagare senza «Ho inviato», e metà va a chi vende.
@@ -2401,7 +2409,7 @@ dove: P2P → «Pubblica» → «Vendi BTC» a rete on-chain, la sezione «Cauzi
 leva: P2P_ONCHAIN_CAUZIONE_A_SCELTA (accesa di serie), ma vive sopra P2P_ONCHAIN_CAUZIONE e il suo macaroon (DA-FARE-ANDREA voce 20) e, a porticina chiusa, solo per i moderatori: «pubblico» diventa sì quando la cauzione on-chain si apre a tutti
 pubblico: no
 
-<!-- pezzo novita-110 | novita -->
+<!-- pezzo novita-111 | novita -->
 ## Novità · 2026-11-18 · annullo-chiesto
 
 frase: Negli scambi on-chain, se chi vende chiede di annullare e chi compra accetta toccando «Rinuncio», a chi compra non si conta più nessuno «scambio non completato»: sta facendo un favore.
@@ -2409,7 +2417,7 @@ dove: P2P → uno scambio on-chain dopo «🙏 Chiedi a chi compra di annullare�
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-111 | novita -->
+<!-- pezzo novita-112 | novita -->
 ## Novità · 2026-11-18 · connettori-ripartono
 
 frase: Chi ha collegato un negozio Shopify o WooCommerce non deve più riaccenderlo a mano se il sito è rimasto giù per qualche ora: Barattolo riprova da solo una volta al giorno e, appena il negozio risponde, il collegamento riparte e il bot te lo dice.
@@ -2417,7 +2425,7 @@ dove: Profilo → «📥 Carica tanti annunci insieme» → «Catalogo esterno»
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-112 | novita -->
+<!-- pezzo novita-113 | novita -->
 ## Novità · 2026-11-18 · apri-ordine-notifica
 
 frase: Negli avvisi dei nuovi ordini P2P ogni riga adesso apre il suo ordine: tocca «🟢 Compra BTC» o «🔴 Vendi BTC» e si apre proprio quella card, anche se è on-chain. Se l'ordine nuovo è uno solo, il tasto in fondo diventa «🫙 Apri l'ordine»; con più ordini resta «🫙 Apri il libro ordini».
@@ -2425,7 +2433,7 @@ dove: il bot, l'avviso «🔔 N nuovi ordini nel libro P2P»; lo stesso tocco su
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-113 | novita -->
+<!-- pezzo novita-114 | novita -->
 ## Novità · 2026-11-18 · sottocategorie-riga
 
 frase: Le sottocategorie ora sono card disegnate come le categorie: tocchi Bitcoin e vedi subito tutti i suoi annunci, e sotto spunta una seconda riga con Hardware wallet, Cappellini, Spille e adesivi, Cover per telefono… ognuna col numero di annunci. Un tocco e filtri.
@@ -2433,7 +2441,7 @@ dove: Esplora → «Esplora per categorie», tocca una categoria: la seconda rig
 leva: SOTTOCATEGORIE_VETRINA (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-114 | novita -->
+<!-- pezzo novita-115 | novita -->
 ## Novità · 2026-11-18 · chiavi-ovunque
 
 frase: Uno scambio P2P preso dalla web app ora si porta avanti anche dalla Mini App in Telegram o dal browser del computer, e viceversa: appena apri il P2P, ogni dispositivo usa le chiavi delle tue 12 parole. E il tasto «Apri lo scambio» del bot, su un ordine ripreso, apre lo scambio di adesso e non quello annullato prima.
@@ -2441,7 +2449,7 @@ dove: P2P → «I miei scambi» e il tasto «⚡ Apri lo scambio» degli avvisi 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-115 | novita -->
+<!-- pezzo novita-116 | novita -->
 ## Novità · 2026-11-19 · scelte-negozio
 
 frase: I prodotti dei negozi WooCommerce con una scelta che non cambia il prezzo (il gusto, il colore del nastro…) ora entrano come un annuncio solo, col titolo giusto e le sue tendine: chi compra sceglie prima di pagare, e la scelta arriva al venditore con l'ordine.
@@ -2449,7 +2457,7 @@ dove: la scheda di un prodotto importato da WooCommerce con tendine «Qualsiasi�
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-116 | novita -->
+<!-- pezzo novita-117 | novita -->
 ## Novità · 2026-11-19 · filtri-p2p-ricordati
 
 frase: Il Filtro del P2P ora si ricorda: valute, metodi, premio, reputazione e Lightning/on-chain restano come li hai lasciati anche quando esci e rientri.
@@ -2457,7 +2465,7 @@ dove: P2P → la pillola «Filtro» sopra il libro: scegli, tocca «Applica», e
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-117 | novita -->
+<!-- pezzo novita-118 | novita -->
 ## Novità · 2026-11-19 · fattura-rifatta-conto
 
 frase: Se la fattura Lightning ti scade e la rigeneri dall'ordine, ora il foglio del pagamento ti rimostra il conto intero (articolo, spedizione, protezione e totale in sats) e, se il negozio regala la spedizione sopra una soglia, quanto ti manca per arrivarci.
@@ -2465,7 +2473,7 @@ dove: Ordini → un ordine «Da pagare» con la fattura scaduta → «⚡ Genera
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-118 | novita -->
+<!-- pezzo novita-119 | novita -->
 ## Novità · 2026-11-19 · ritorno-nel-libro
 
 frase: Nel P2P, se chi prende il tuo ordine non paga in tempo, l'ordine non sparisce più: torna nel libro uguale, e la garanzia torna a te. E il tempo per pagare parte solo quando dici dove vuoi gli euro, non prima. Sull'on-chain l'ordine rinasce nel libro anche quando chi l'ha preso annulla, non deposita o si ritira.
@@ -2473,7 +2481,7 @@ dove: P2P, uno scambio col tempo per pagare: alla presa il riquadro «⏱ Hai �
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-119 | novita -->
+<!-- pezzo novita-120 | novita -->
 ## Novità · 2026-11-19 · chiavi-dal-conto
 
 frase: Uno scambio P2P preso dal sito si porta avanti anche dalla Mini App, e viceversa, senza fare niente: le chiavi degli scambi tornano dal tuo account, come prima del 17 novembre.
@@ -2481,7 +2489,7 @@ dove: P2P → «I miei scambi»: prendi un ordine dal sito, poi tocca «⚡ Apri
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-120 | novita -->
+<!-- pezzo novita-121 | novita -->
 ## Novità · 2026-11-19 · chiave-moderatore-dal-conto
 
 frase: Per i moderatori: la chiave di moderatore ora segue l'account. Il dispositivo che ce l'ha ne lascia una copia chiusa col conto, e sul PC, sul sito o su un altro telefono arriva da sola alla prima apertura delle dispute.
@@ -2489,7 +2497,7 @@ dove: Pannello 👑 → «⚖️ Moderazione P2P»: aprila una volta dal disposi
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-121 | novita -->
+<!-- pezzo novita-122 | novita -->
 ## Novità · 2026-11-19 · parole-casa
 
 frase: Quando Barattolo ti chiede le 12 parole del wallet on-chain, ti dice da dove riprenderle: cloud di Telegram, browser del sito o relay Nostr.
@@ -2497,7 +2505,7 @@ dove: Profilo → «₿ On-chain»; nel foglio «🔑 Serve la chiave del tuo wa
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-122 | novita -->
+<!-- pezzo novita-123 | novita -->
 ## Novità · 2026-11-19 · cassetta-telegram
 
 frase: Il wallet on-chain nasce sia dal sito sia dalla Mini App, ed è sempre uno solo. Le 12 parole raggiungono da sole il cloud di Telegram e, se hai Nostr collegato, i relay: Barattolo le porta chiuse e non le può leggere.
@@ -2505,7 +2513,7 @@ dove: Nato sul sito: apri Barattolo dentro Telegram una volta, poi riapri il sit
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-123 | novita -->
+<!-- pezzo novita-124 | novita -->
 ## Novità · 2026-11-19 · regole-sulla-card
 
 frase: Nel P2P, quando apri un ordine col tempo per pagare, la prima cosa che leggi è quanto tempo avrai e di toccare subito «Ho inviato gli euro» dopo aver pagato, anche sugli ordini on-chain. E se prendi un ordine, il bot ti manda un messaggio col tempo che resta che si aggiorna da solo ogni minuto, senza suonare ogni volta.
@@ -2513,7 +2521,7 @@ dove: P2P → tocca una card col tempo per pagare: la riga «⏱ Se lo prendi ha
 leva: P2P_CONTO_ALLA_ROVESCIA (accesa di serie) per il messaggio del bot; la riga nel foglio nessuna
 pubblico: sì
 
-<!-- pezzo novita-124 | novita -->
+<!-- pezzo novita-125 | novita -->
 ## Novità · 2026-11-19 · riprendi-scaduto
 
 frase: Negli scambi P2P on-chain, se chi ha preso il tuo ordine non tocca «Ho inviato gli euro» entro il tempo per pagare, puoi riprenderti i sats con un tocco su «↩️ Riprendi i sats»: Barattolo firma il rimborso senza aspettare un moderatore, tu metti la seconda firma, e l'ordine torna nel libro.
@@ -2521,7 +2529,7 @@ dove: P2P → «I miei scambi» → uno scambio on-chain col deposito fatto e il
 leva: P2P_ONCHAIN_RIPRENDI_SCADUTO (accesa di serie) con P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN chiusa di serie, cioè solo per i moderatori: «pubblico» diventa sì quando si apre a tutti
 pubblico: no
 
-<!-- pezzo novita-125 | novita -->
+<!-- pezzo novita-126 | novita -->
 ## Novità · 2026-11-19 · cauzione-tornata
 
 frase: Negli scambi P2P on-chain con la cauzione, quando la cauzione ti torna il bot te lo dice: «La cauzione è tornata nel tuo wallet», con i sats.
@@ -2529,7 +2537,7 @@ dove: Il bot di Barattolo, dopo uno scambio on-chain chiuso in cui avevi bloccat
 leva: P2P_ONCHAIN_CAUZIONE spenta di serie (in produzione accesa solo per i moderatori)
 pubblico: no
 
-<!-- pezzo novita-126 | novita -->
+<!-- pezzo novita-127 | novita -->
 ## Novità · 2026-11-19 · onchain-passi
 
 frase: Negli scambi P2P on-chain i passi sono quelli di uno scambio Lightning: chi vende scrive prima dove vuole gli euro, chi compra paga e tocca «Ho inviato gli euro», e solo allora chi vende vede «Ricevuti: libera i sats». E il bot avvisa appena la rete vede il deposito, prima ancora della conferma.
@@ -2537,7 +2545,7 @@ dove: P2P → «I miei scambi» → uno scambio on-chain: col deposito visto «D
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-127 | novita -->
+<!-- pezzo novita-128 | novita -->
 ## Novità · 2026-11-19 · meta-cauzione-auto
 
 frase: Negli scambi P2P on-chain con la cauzione, se chi ha preso la perde, la metà che spetta a chi vende parte da sola verso il suo indirizzo Lightning del Profilo, senza aspettare un moderatore.
@@ -2545,7 +2553,7 @@ dove: Il bot di Barattolo: «🔐 Metà della cauzione di chi ha preso è tua: �
 leva: P2P_ONCHAIN_CAUZIONE_META_AUTO (accesa di serie, senza tetto: P2P_ONCHAIN_CAUZIONE_META_TETTO = 0); la cauzione stessa P2P_ONCHAIN_CAUZIONE, in produzione solo per i moderatori
 pubblico: no
 
-<!-- pezzo novita-128 | novita -->
+<!-- pezzo novita-129 | novita -->
 ## Novità · 2026-11-19 · contanti-oc-cinque-minuti
 
 frase: Negli scambi P2P on-chain in contanti di persona i passi sono quelli del Lightning: chi compra consegna i contanti e tocca «Ho consegnato i contanti», poi chi vende li conta e libera i sats. E chi deve pagare riceve dal bot un promemoria anche a cinque minuti dalla fine del tempo.
@@ -2553,7 +2561,7 @@ dove: P2P → «I miei scambi» → uno scambio on-chain in contanti; il bot di 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-129 | novita -->
+<!-- pezzo novita-130 | novita -->
 ## Novità · 2026-11-19 · bollini-home
 
 frase: Le card «Scambi P2P» della home mostrano gli stessi bollini del libro: «⏱ 30 min» quando chi vende ha scelto un tempo per pagare sotto le 24 ore, e «🔐 Cauzione» quando chi pubblica un ordine on-chain la chiede a chi lo prende.
@@ -2561,7 +2569,7 @@ dove: Home (Esplora) → la fila «Scambi P2P»: i bollini sotto i metodi di pag
 leva: P2P_ONCHAIN_CAUZIONE per il solo «🔐 Cauzione» (in produzione solo per i moderatori); il «⏱» non ha leva
 pubblico: sì
 
-<!-- pezzo novita-130 | novita -->
+<!-- pezzo novita-131 | novita -->
 ## Novità · 2026-11-19 · notifica-account
 
 frase: Se tieni aperti più account sullo stesso telefono, toccando una notifica Barattolo apre da solo l'account a cui è arrivata, e le tendine dei prodotti importati mostrano l'apostrofo giusto.
@@ -2569,7 +2577,7 @@ dove: Una notifica sul telefono per un account diverso da quello aperto: il tocc
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-131 | novita -->
+<!-- pezzo novita-132 | novita -->
 ## Novità · 2026-11-19 · avvisi-bz-lato
 
 frase: Negli avvisi dei nuovi ordini P2P Barattozon è diventato un metodo di pagamento: così puoi farti avvisare solo degli ordini Barattozon in «Compra BTC», o solo di quelli in «Vendi BTC». Le scelte che avevi già fatto restano uguali.
@@ -2577,7 +2585,7 @@ dove: P2P → la campanella 🔔 (o Profilo → «🔔 Avvisi») → «Avvisami 
 leva: nessuna
 pubblico: sì
 
-<!-- pezzo novita-132 | novita -->
+<!-- pezzo novita-133 | novita -->
 ## Novità · 2026-11-19 · push-attive
 
 frase: Con più account sullo stesso telefono, la voce «📲 Notifiche sul telefono» ti dice per quale account arrivano: sugli altri trovi «Attiva qui», che le sposta su quello.
@@ -2585,7 +2593,7 @@ dove: Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono», su un acc
 leva: WEB_PUSH_ATTIVO (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-133 | novita -->
+<!-- pezzo novita-134 | novita -->
 ## Novità · 2026-11-19 · pubblica-col-tempo
 
 frase: Negli scambi P2P Lightning, se chi vende ha scelto un tempo per pagare corto, quando qualcuno prende l'ordine ha lo stesso tempo anche lui per bloccare i sats, invece di tre ore: chi compra non resta ad aspettare.
@@ -2593,7 +2601,7 @@ dove: P2P → «I miei scambi» → lo scambio appena preso: «Chi ha pubblicato
 leva: nessuna
 pubblico: no
 
-<!-- pezzo novita-134 | novita -->
+<!-- pezzo novita-135 | novita -->
 ## Novità · 2026-11-19 · onchain-tempo-deposito
 
 frase: Negli scambi P2P on-chain chi vende con un tempo per pagare corto ha lo stesso tempo per inviare il deposito quando qualcuno prende l'ordine (basta che parta, la conferma arriva dopo), e il tempo più corto da scegliere è 30 minuti.
@@ -2601,7 +2609,7 @@ dove: P2P → «Pubblica» → «Vendi BTC» on-chain → «Tempo per pagare» (
 leva: P2P_ONCHAIN_DEPOSITO_COL_TEMPO (accesa di serie)
 pubblico: sì
 
-<!-- pezzo novita-135 | novita -->
+<!-- pezzo novita-136 | novita -->
 ## Novità · 2026-11-19 · recapito-nel-tempo
 
 frase: Negli scambi P2P col tempo per pagare, anche chi vende ha quel tempo per dire dove vuole gli euro (o gli USDT): riceve i promemoria e vede quanto resta. Se non lo dice in tempo, su Lightning l'ordine torna nel libro, on-chain lo scambio si annulla e i sats tornano a lui; chi compra non deve mandare niente e non gli si conta niente.

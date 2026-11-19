@@ -8193,6 +8193,28 @@
   Mai a spegnimento cominciato. La piazza dice quel che dice la
   vetrina: le giacenze di un negozio fermo sono vecchie in tutt'e due,
   e al primo giro riuscito l'impronta rimette in pari anche i relay.
+  LA FIRMA DI RIPIEGO DEI NEGOZI COLLEGATI (19 nov 2026, cantiere
+  negozi-firma-ripiego; Andrea, scheda «Sì, dopo 3 giorni senza
+  firma»). Col BIVIO il prodotto di un titolare con la chiave provata
+  aspetta la SUA firma: per l'annuncio a mano va bene (chi lo scrive è
+  nell'app e firma subito), per un negozio collegato no — i prodotti
+  arrivano da soli, a centinaia, e il titolare può non aprire mai
+  l'app (SWAG: 155 prodotti in coda, titolare nato su Nostr che non
+  risponde). Il giudice è `firma_di_ripiego(con, a)`: vero per una riga
+  di negozio collegato con la PUBBLICAZIONE in coda (azione 'pubblica',
+  nessun evento suo) da `NEGOZI_FIRMA_RIPIEGO_GIORNI` (3; 0 = spento),
+  oppure con un evento NOSTRO già in piazza (che così resta vero:
+  prezzo, giacenza, esaurito). Il bivio lo chiede nel ramo della coda:
+  vero = si scende al ramo della piattaforma. La riga in coda NON si
+  tocca: è la porta del ritorno, perché alla sua firma il POST delle
+  firme scrive il suo evento e seppellisce il nostro (il trasloco di
+  sempre). Un evento già firmato da lui ('active'/'sold' in coda)
+  resta affar suo. `nostr_del_negozio` spinge chi ha superato i giorni
+  anche a impronta uguale (l'impronta si segna quando la firma va in
+  coda), mai un esaurito che in piazza non c'è mai stato; il tetto e i
+  lotti sono quelli di sempre. Scartato: firmare SUBITO col nostro nome
+  (rovescia la regola d'agosto anche per chi firma in giornata), e
+  toccare gli annunci a mano (per loro il bivio funziona).
   E IL BIVIO VALE ANCHE ALL'INDIETRO (ago 2026, decisione di Andrea):
   `trasloca_annunci_nostr` nell'orologio porta sull'account del
   venditore gli annunci finiti in piazza a nome NOSTRO prima che lui
