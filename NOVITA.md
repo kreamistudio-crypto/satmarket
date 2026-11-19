@@ -812,3 +812,9 @@ frase: Le card «Scambi P2P» della home mostrano gli stessi bollini del libro: 
 dove: Home (Esplora) → la fila «Scambi P2P»: i bollini sotto i metodi di pagamento.
 leva: P2P_ONCHAIN_CAUZIONE per il solo «🔐 Cauzione» (in produzione solo per i moderatori); il «⏱» non ha leva
 pubblico: sì
+
+## 2026-11-19 · notifica-account
+frase: Se tieni aperti più account sullo stesso telefono, toccando una notifica Barattolo apre da solo l'account a cui è arrivata, e le tendine dei prodotti importati mostrano l'apostrofo giusto.
+dove: Una notifica sul telefono per un account diverso da quello aperto: il tocco passa a lui («🔁 Apro …: l'avviso è suo») e apre la pagina dell'avviso. Le tendine «Scegli…» delle box importate da WooCommerce.
+leva: nessuna
+pubblico: sì

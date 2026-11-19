@@ -316,9 +316,11 @@ def main():
         except Exception:
             firmato = False
         prova("fuori dal collaudo: al telefono un corpo che SOLO lui decifra, "
-              "titolo e testo spogli, il tocco sull'ordine",
+              "titolo e testo spogli, il tocco sull'ordine DI QUELL'ACCOUNT "
+              "(`conto`, 19 nov 2026: la pagina passa a lui da sola)",
               {"titolo": "📦 Ordine #7 spedito",
-               "testo": "Il venditore ha spedito & ti avvisa.", "url": "/?ordine=7"},
+               "testo": "Il venditore ha spedito & ti avvisa.",
+               "url": "/?ordine=7&conto=-601"},
               letto)
         prova("...timbrato con la chiave che /api/me ha dato, firma valida, "
               "per l'origine del servizio", [chiave, True, "https://fcm.googleapis.com",

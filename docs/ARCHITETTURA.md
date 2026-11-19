@@ -26434,7 +26434,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   notifica-apre-annuncio: gli avvisi degli annunci hanno il link nel
   testo): uno del sito vale il suo percorso, un `t.me/<bot>?startapp=
   <parola>` vale `/?startapp=<parola>`, che `arrivoDaStartapp` rilegge
-  col vocabolario del client; `sw.js`
+  col vocabolario del client. L'ACCOUNT DELL'AVVISO (19 nov 2026,
+  cantiere notifica-account): all'indirizzo si aggiunge `conto=<tg_id>`,
+  l'account a cui l'avviso e' andato; la pagina lo legge e lo toglie per
+  primo (`CONTO_DELLA_NOTIFICA`, prima di `arrivoDaStartapp`) e, se e'
+  fra gli account aperti su quel browser e non e' l'attivo, ci passa da
+  sola restando sull'indirizzo (`passaAlContoDellaNotifica`); se non e'
+  aperto, un toast. Sta nell'url apposta: il service worker gia'
+  installato non si tocca. `sw.js`
   (`push`, `notificationclick`, `pushsubscriptionchange`) apre solo
   indirizzi della sua origine (`indirizzoDiCasa`). IL TIMBRO (chiave
   privata P-256) NON È NEL CONFIG: lo crea il server al primo bisogno

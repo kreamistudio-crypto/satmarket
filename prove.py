@@ -119721,6 +119721,28 @@ def prove_scelte_negozio():
               {"attributes": [{"id": 4, "name": "Gusto", "variation": True,
                                "options": ["a", "b"]}]},
               [{"id": 4, "name": "gusto", "option": "a"}]))
+    # (19 nov 2026, la box di Uhmami dal vivo) l'API di Woo manda i nomi
+    # con le entita' HTML, e la tendina mostrava «N&#039; 1»
+    prova("LE ENTITA' DI WOO SI SCIOLGONO: «N&#039; 1» diventa «N' 1» nel "
+          "nome e nelle voci, anche doppie («&amp;#039;»); il testo pulito "
+          "resta identico (il giro dell'ora non lo vede cambiato)",
+          [[["Spalmabile Uhmami N' 1", ["Pistacchio & noci", "L'arancia"]]],
+           "Spalmabile Uhmami N' 1"],
+          [m["scelte_aperte_woo"](
+              {"attributes": [{"id": 0, "variation": True,
+                               "name": "Spalmabile Uhmami N&#039; 1",
+                               "options": ["Pistacchio &amp; noci",
+                                           "L&amp;#039;arancia"]}]}, []),
+           m["_testo_attributo"](m["_testo_attributo"](
+               "Spalmabile Uhmami N&#039; 1"))])
+    righe = traduci([box([var(30, [("Palline Uhmami", "L&#039;arancia")]),
+                          var(31, [("Palline Uhmami", "curry")])])],
+                    "woo", CAMBIO)
+    prova("...e una tendina fissata dalla variazione non porta l'entita' nei "
+          "bottoncini ne' nel titolo",
+          ([["Palline Uhmami", "L'arancia"]],
+           "Box Natale La Sfiziosa (pre-ordine) — L'arancia"),
+          (righe[0]["opzioni"], righe[0]["titolo"]))
 
     # --- la scrittura: con la famiglia, a ogni giro ------------------
     corpo = pezzo_src(src, "def _scrivi_famiglia(")
@@ -202574,6 +202596,36 @@ def prove_notifiche_telefono():
                               len(amb["push_carico"]("t\n" + "é" * 5000,
                                   None, "https://barattolo.store")) < 3000])
 
+    # (19 nov 2026, Luca coi due negozi sullo stesso telefono) l'account a
+    # cui l'avviso e' andato viaggia nell'indirizzo: la pagina passa a lui
+    cc = lambda t, b, k: json.loads(amb["push_carico"](
+        t, b, "https://barattolo.store/", k))["url"]
+    prova("L'ACCOUNT DELLA NOTIFICA: `conto=<id>` dopo le altre domande e "
+          "prima dell'ancora, anche sulla home e per un id Nostr enorme; "
+          "senza conto (o storto) l'indirizzo di ieri",
+          ["/annuncio/7?conto=-5", "/?ordine=7&conto=222", "/?conto=111",
+           "/?startapp=annuncio_42&conto=-9223372036854775807",
+           "/p2p?conto=222#scambi", "/annuncio/7", "/annuncio/7"],
+          [cc("x\nhttps://barattolo.store/annuncio/7", None, -5),
+           cc("x\ny", ("Apri", "https://barattolo.store/?ordine=7"), 222),
+           cc("ciao", None, 111),
+           cc("x\nhttps://t.me/ilbarattolobot?startapp=annuncio_42", None,
+              -9223372036854775807),
+           cc("x\ny", ("Apri", "https://barattolo.store/p2p#scambi"), 222),
+           cc("x\nhttps://barattolo.store/annuncio/7", None, None),
+           cc("x\nhttps://barattolo.store/annuncio/7", None, "storto")])
+    pagina = open("miniapp.html", encoding="utf-8").read()
+    prova("la pagina legge e toglie `conto` PRIMA di arrivoDaStartapp (che "
+          "riscrive l'indirizzo intero), e passa all'account quando arriva "
+          "la lista degli account aperti",
+          [True, True, True],
+          [0 < pagina.find("let CONTO_DELLA_NOTIFICA")
+           < pagina.find("\narrivoDaStartapp();"),
+           "avvisoPerAltroConto();\n      passaAlContoDellaNotifica(); });"
+           in pagina,
+           "cambiaAccount(id, true);\n}" in pagina[
+               pagina.find("function passaAlContoDellaNotifica"):]])
+
     # --- 6) ISCRIZIONI E TIMBRO, su un database vero ------------------------
     cartella = _tf.mkdtemp(prefix="prove-push-")
     percorso = os.path.join(cartella, "p.db")
@@ -202664,11 +202716,12 @@ def prove_notifiche_telefono():
                                         ("Apri", "https://barattolo.store/?chat=1")))
     h = spediti[0][1] if spediti else {}
     prova("ai telefoni iscritti: cifrato, timbrato, con TTL e urgenza; il 410 "
-          "toglie la riga, e un indirizzo fuori lista non si chiama nemmeno",
+          "toglie la riga, e un indirizzo fuori lista non si chiama nemmeno; "
+          "il tocco porta l'account dell'avviso (`conto=7`, 19 nov 2026)",
           [[E("vivo"), E("morto")], "aes128gcm", True, "86400", "high",
            [E("vivo")], "push: 1 consegnati, 2 iscrizioni morte tolte",
            b'{"titolo": "\xf0\x9f\x94\x94 Ti hanno scritto", "testo": "Apri la chat", '
-           b'"url": "/?chat=1"}\x02'],
+           b'"url": "/?chat=1&conto=7"}\x02'],
           [sorted(u for u, _, _ in spediti)[::-1] if len(spediti) == 2 else spediti,
            h.get("Content-Encoding"), str(h.get("Authorization", "")).startswith("vapid t="),
            h.get("TTL"), h.get("Urgency"),

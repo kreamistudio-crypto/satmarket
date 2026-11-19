@@ -19037,6 +19037,26 @@ function arrivoDaStartapp(){
     return dove;
   } catch(e) { return ''; }
 }
+/* L'ACCOUNT DELLA NOTIFICA DEL TELEFONO (19 nov 2026, Luca coi suoi
+   due negozi sullo stesso telefono): il server scrive nell'indirizzo
+   della notifica `conto=<id>`, l'account a cui l'avviso e' andato
+   (`push_carico`). Si legge e si TOGLIE dall'indirizzo per primo —
+   prima di arrivoDaStartapp, che riscrive l'indirizzo intero, e prima
+   di ogni lettura delle domande (`/p2p?scambio=`) — e l'account lo
+   cerca passaAlContoDellaNotifica, quando arriva la lista degli
+   account aperti. Testo, mai numero: un id Nostr arriva a -2^63. */
+let CONTO_DELLA_NOTIFICA = (() => {
+  try {
+    const q = new URLSearchParams(location.search);
+    const id = q.get('conto');
+    if (id == null) return '';
+    q.delete('conto');
+    const resto = q.toString();
+    history.replaceState(history.state, '',
+      location.pathname + (resto ? '?' + resto : '') + location.hash);
+    return /^-?\d{1,20}$/.test(id) ? id : '';
+  } catch(e) { return ''; }
+})();
 /* PERSONALE = lo scambio o l'ordine P2P di un avviso del bot, che e'
    sempre del Telegram (vedi avvisoPerAltroConto) */
 arrivoDaStartapp();
@@ -69348,6 +69368,34 @@ function avvisoPerAltroConto(){
   });
 }
 
+/* LA NOTIFICA DEL TELEFONO APRE IL SUO ACCOUNT (19 nov 2026, la
+   segnalazione di Luca, decisione di Andrea: «la notifica deve passare
+   da sola all'account a cui si riferisce»). Il tocco sulla notifica di
+   un negozio apriva l'app sull'account attivo in quel momento — l'altro
+   negozio — e passando a mano l'avviso non si ritrovava piu'. Qui, A
+   DIFFERENZA di avvisoPerAltroConto, si passa DA SOLI e senza domanda:
+   l'indirizzo dice esattamente di chi e' l'avviso, e l'account sta gia'
+   fra quelli aperti su questo browser (il cambio e' una lettura: non
+   muove un sat, non tocca un ordine). Si resta sull'indirizzo della
+   notifica (`restaQui`). Un account che qui non e' aperto non si apre:
+   lo si dice e basta. Una volta sola: l'id si consuma. */
+function passaAlContoDellaNotifica(){
+  const id = CONTO_DELLA_NOTIFICA;
+  if (!id) return;
+  CONTO_DELLA_NOTIFICA = '';
+  /* senza la lista (un server di ieri, la rete) non si sa: si tace */
+  if (!accountVivi() || miniAccount() || !accountAperti.length
+      || id === accountAttivoId) return;
+  const c = accountAperti.find(x => idConto(x) === id);
+  if (!c) {
+    toast('Questo avviso è per un altro tuo account, che qui non è aperto: '
+      + 'entra con quello per leggerlo', 6000);
+    return;
+  }
+  toast(`🔁 Apro ${c.nome || c.username || 'l\'account'}: l'avviso è suo`, 2500);
+  cambiaAccount(id, true);
+}
+
 /* ---------- PWA: banner «installa Barattolo» ---------- */
 /* Solo web MOBILE fuori da Telegram, mai se l'app e' gia' installata,
    mai in DEMO (invitare a installare una demo sarebbe una bugia). Il
@@ -119387,7 +119435,8 @@ async function avvia(){
        avviso del bot e' arrivato mentre e' scelto un altro account
        si chiede (avvisoPerAltroConto) */
     caricaAccount().then(() => { renderPastigliaAccount();
-      vestiContoInVista(); avvisoPerAltroConto(); });
+      vestiContoInVista(); avvisoPerAltroConto();
+      passaAlContoDellaNotifica(); });
     /* le offerte seguono l'identita' come i preferiti: si rileggono
        (servono anche a openDetail per il banner dell'accordo) */
     offerteMie = [];

@@ -629,13 +629,13 @@ def esplodi_woo(p: dict) -> list:
                      if isinstance(a, dict) and a.get("option")]
         scelte = scelte_aperte_woo(p, attributi)
         if scelte:
-            fisse = tuple(_chiave_attributo(a) + (str(a.get("option"))
-                                                  .strip().casefold(),)
-                          for a in attributi)
+            fisse = tuple(_chiave_attributo(a) + (_testo_attributo(
+                a.get("option")).casefold(),) for a in attributi)
             if fisse in viste:
                 continue
             viste.add(fisse)
-        opzioni = ", ".join(str(a.get("option")).strip() for a in attributi)
+        opzioni = ", ".join(_testo_attributo(a.get("option"))
+                            for a in attributi)
         # il codice articolo come nome solo se non c'e' altro da dire: con
         # le scelte aperte la variante si distingue da quelle (le tendine)
         nome = opzioni or ("" if scelte else
@@ -665,8 +665,8 @@ def esplodi_woo(p: dict) -> list:
             "virtual": bool(v.get("virtual")) or bool(p.get("virtual")),
             "downloadable": (bool(v.get("downloadable"))
                              or bool(p.get("downloadable"))),
-            "_opzioni": [[str(a.get("name") or "").strip() or "Variante",
-                          str(a.get("option")).strip()]
+            "_opzioni": [[_testo_attributo(a.get("name")) or "Variante",
+                          _testo_attributo(a.get("option"))]
                          for a in attributi]
                         or ([["Variante", nome]] if nome else []),
             "_scelte": scelte,
@@ -698,6 +698,25 @@ MAX_VALORI_SCELTA = 40    # le voci di una tendina
 MAX_TESTO_SCELTA = 60     # il nome di una tendina, o una sua voce
 
 
+def _testo_attributo(t) -> str:
+    """Il nome di una tendina, o una sua voce, come testo piano su una
+    riga (19 nov 2026, il negozio Uhmami): l'API di WooCommerce manda i
+    nomi degli attributi con le ENTITA' HTML — «Spalmabile Uhmami N&#039;
+    1» — e la pagina, che giustamente escapa, mostrava «N&#039;» al
+    posto dell'apice. Si sciolgono qui, alla fonte, una volta: dalla
+    colonna alla tendina, fino alla nota del venditore e al controllo
+    del server sulla voce scelta, viaggia lo stesso testo. A punto
+    fisso, come `spoglia_titolo`: un «&amp;#039;» doppio si scioglie
+    tutto, e un testo gia' pulito resta IDENTICO (il giro dell'ora non
+    lo vede cambiato)."""
+    t = str(t or "")
+    while True:
+        prima = t
+        t = " ".join(html.unescape(t).split())
+        if t == prima:
+            return t
+
+
 def _chiave_attributo(a: dict) -> tuple:
     """Come si riconosce lo stesso attributo sul padre e sulla
     variazione: l'id per quelli globali (Prodotti → Attributi), il nome
@@ -707,7 +726,7 @@ def _chiave_attributo(a: dict) -> tuple:
     except (TypeError, ValueError):
         aid = 0
     return ("id", aid) if aid else (
-        "nome", str(a.get("name") or "").strip().casefold())
+        "nome", _testo_attributo(a.get("name")).casefold())
 
 
 def scelte_aperte_woo(padre: dict, fissi: list) -> list:
@@ -721,10 +740,10 @@ def scelte_aperte_woo(padre: dict, fissi: list) -> list:
             continue
         if _chiave_attributo(a) in prese:
             continue
-        nome = " ".join(str(a.get("name") or "").split())[:MAX_TESTO_SCELTA]
+        nome = _testo_attributo(a.get("name"))[:MAX_TESTO_SCELTA]
         voci = []
         for o in a.get("options") or []:
-            o = " ".join(str(o or "").split())[:MAX_TESTO_SCELTA]
+            o = _testo_attributo(o)[:MAX_TESTO_SCELTA]
             if o and o not in voci:
                 voci.append(o)
         if nome and voci:

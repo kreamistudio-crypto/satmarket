@@ -20473,7 +20473,7 @@ def push_vapid(endpoint: str, chiave, sub: str, adesso: float) -> str:
     return f"vapid t={testa}.{corpo}.{firma}, k={push_pubblica_di(chiave)}"
 
 
-def push_carico(testo: str, bottone, base: str) -> bytes:
+def push_carico(testo: str, bottone, base: str, conto=None) -> bytes:
     """PURA: dall'avviso di Telegram alla notifica. La prima riga e' il
     titolo, il resto il testo (spoglio dell'HTML, una riga, al piu'
     PUSH_TESTO_MAX caratteri). Il tocco apre il primo bottone che porta
@@ -20488,7 +20488,18 @@ def push_carico(testo: str, bottone, base: str) -> bytes:
     ?startapp=<parola>` (`link_telegram`, `_link_esplora_telegram`) vale
     `/?startapp=<parola>`, che la pagina ritraduce col SUO vocabolario
     (`arrivoDaStartapp`) — una sola tabella delle parole, quella del
-    client. Il bottone, se c'e', vince sempre sul testo."""
+    client. Il bottone, se c'e', vince sempre sul testo.
+    L'ACCOUNT DELLA NOTIFICA (19 nov 2026, Luca coi negozi «Un tempo per
+    te» e «Uhmami» sullo stesso telefono): `conto` e' il tg_id a cui
+    l'avviso e' andato, e viaggia nell'indirizzo come `conto=<id>`. Il
+    tocco apriva la pagina sull'account ATTIVO in quel momento, cioe'
+    spesso l'altro negozio, e l'avviso «spariva». La pagina lo legge
+    per prima cosa (`CONTO_DELLA_NOTIFICA`) e, se quell'account e' fra
+    quelli aperti su questo browser, passa a lui da sola. Sta
+    nell'INDIRIZZO e non in un campo a parte apposta: il service worker
+    gia' installato sui telefoni apre l'url com'e', e funziona senza
+    aspettare che si aggiorni. Testo, mai numero: un id nato con Nostr
+    arriva a -2^63, che in JavaScript si arrotonda."""
     righe = [r.strip() for r in spoglia_html(str(testo or "")).splitlines()
              if r.strip()]
     titolo, resto = (righe[0], righe[1:]) if righe else ("Barattolo", [])
@@ -20523,6 +20534,15 @@ def push_carico(testo: str, bottone, base: str) -> bytes:
             if url:
                 break
     url = url or "/"
+    try:
+        conto = int(conto) if conto is not None else None
+    except (TypeError, ValueError):
+        conto = None
+    if conto:
+        # prima del «#» (la pagina tiene l'ancora), dopo le altre domande
+        via, ancora = (url.split("#", 1) + [""])[:2]
+        via += ("&" if "?" in via else "?") + f"conto={conto}"
+        url = via + (f"#{ancora}" if ancora else "")
     return json.dumps({"titolo": titolo[:80], "testo": corpo, "url": url},
                       ensure_ascii=False).encode()
 
@@ -20605,7 +20625,7 @@ async def _manda_push(tg_id: int, testo: str, bottone=None) -> str:
         righe = await asyncio.to_thread(_push_iscrizioni_di, tg_id)
         if not righe:
             return ""
-        carico = push_carico(testo, bottone, URL_PUBBLICO)
+        carico = push_carico(testo, bottone, URL_PUBBLICO, tg_id)
         if MODALITA_COLLAUDO:
             print(f"📲 [push simulato per utente {tg_id}, {len(righe)} "
                   f"telefoni] {carico.decode()}")
