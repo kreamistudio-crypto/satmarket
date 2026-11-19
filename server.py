@@ -38086,6 +38086,15 @@ def _leve_stato():
                          "gli altri e' come spenta",
                   spento="la cauzione del contanti on-chain vale per "
                          "chiunque prenda in contanti (se la leva e' accesa)"),
+            # IL DEPOSITO COL TEMPO DI CHI PUBBLICA (19 nov 2026)
+            _leva("Deposito on-chain nel tempo per pagare di chi vende",
+                  "P2P_ONCHAIN_DEPOSITO_COL_TEMPO",
+                  globals().get("P2P_ONCHAIN_DEPOSITO_COL_TEMPO", True),
+                  acceso="chi vende on-chain col suo tempo per pagare deve "
+                         "inviare il deposito entro quel tempo, sennò lo "
+                         "scambio si annulla da solo",
+                  spento="chi vende on-chain ha sempre sei ore per il "
+                         "deposito"),
             # LA CAUZIONE A SCELTA DI CHI PUBBLICA (18 nov 2026)
             _leva("Cauzione on-chain a scelta di chi pubblica",
                   "P2P_ONCHAIN_CAUZIONE_A_SCELTA", P2P_ONCHAIN_CAUZIONE_A_SCELTA,
@@ -111917,6 +111926,21 @@ P2P_ONCHAIN_PREFISSO = "bar-onchain-"   # il `d` del 38383: nostro, riconoscibil
 # 2-di-3 nasce alla presa
 P2P_ONCHAIN_ORE_LIBRO = 168
 P2P_ONCHAIN_ORE_DEPOSITO = 6    # dalla presa: entro quando il deposito va confermato
+# IL DEPOSITO COL TEMPO DI CHI PUBBLICA (19 nov 2026, cantiere onchain-tempo-
+# deposito; Andrea, scheda «Sì, deve inviarlo entro quel tempo», e «per
+# l'onchain il tempo minimo [...] per entrambi le parti è 30 minuti»): chi
+# pubblica una vendita on-chain e sceglie un tempo per pagare deve INVIARE
+# il deposito entro quel tempo (basta vederlo in rete: la conferma arriva
+# quando arriva), non piu' entro sei ore; e on-chain il tempo per pagare
+# non scende sotto i 30 minuti, per tutti e due. Passato il tempo senza un
+# sats in rete, la ronda annulla lo scambio (`_p2p_onchain_chiudi_invii_mancati`).
+try:
+    from config import P2P_ONCHAIN_DEPOSITO_COL_TEMPO   # la leva: False = sei ore come prima
+    P2P_ONCHAIN_DEPOSITO_COL_TEMPO = P2P_ONCHAIN_DEPOSITO_COL_TEMPO is not False
+except ImportError:
+    P2P_ONCHAIN_DEPOSITO_COL_TEMPO = True
+P2P_ONCHAIN_MINUTI_PAGARE_MIN = 30      # il tempo per pagare piu' corto, on-chain
+P2P_ONCHAIN_INVIO_MARGINE_S = 5 * 60    # una transazione appena partita, prima di annullare
 # IL TEMPO PER PAGARE (17 nov 2026, cantiere convenienza-monete; Andrea:
 # «uno mi ha preso l'ordine, ma quanto tempo ho io per inviare USDE? Non
 # viene indicato», e sulla scheda ha scelto «24 ore monete, 72 ore
@@ -112323,8 +112347,34 @@ def p2p_onchain_minuti_pagamento(o) -> int:
             if _ordine_col_tempo_p2p(str(_p2p_onchain_campo(o, "lato", "") or ""),
                                      _p2p_onchain_metodi(o)) else 0
         if m:
-            return m
+            # (19 nov 2026) on-chain mai sotto i 30 minuti, anche una scelta
+            # di ieri da 15
+            return max(int(globals().get("P2P_ONCHAIN_MINUTI_PAGARE_MIN", 0) or 0), m)
     return p2p_onchain_ore_pagamento(o) * 60
+
+
+def p2p_onchain_secondi_deposito(o, depositante: int) -> int:
+    """PURA: quanto ha chi deposita, dalla presa, per INVIARE il deposito.
+    Sei ore (`P2P_ONCHAIN_ORE_DEPOSITO`) di serie; il tempo per pagare
+    scelto da chi pubblica, se piu' corto, quando a depositare e' lui (una
+    vendita col suo tempo: 19 nov 2026, «stesso tempo per tutti»). Mai col
+    PayCode, mai a leva spenta."""
+    ore = int(P2P_ONCHAIN_ORE_DEPOSITO) * 3600
+    if not globals().get("P2P_ONCHAIN_DEPOSITO_COL_TEMPO", False):
+        return ore
+    if int(depositante or 0) != int(_p2p_onchain_campo(o, "maker_id", 0) or 0):
+        return ore
+    if (str(_p2p_onchain_campo(o, "paycode", "") or "")
+            or int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0)):
+        return ore
+    try:
+        scelti = int(_p2p_onchain_campo(o, "minuti_pagare", 0) or 0)
+    except (TypeError, ValueError):
+        scelti = 0
+    if scelti <= 0:
+        return ore
+    minuti = int(_p2p_onchain_minuti(o) or 0)
+    return min(ore, minuti * 60) if minuti > 0 else ore
 
 
 def _p2p_onchain_minuti(o) -> int:
@@ -112961,6 +113011,22 @@ def _p2p_onchain_quanto(o, netti: bool = False) -> str:
             + (f" via {metodi}" if metodi else ""))
 
 
+def testo_tempo_deposito_onchain(o, dep: int) -> str:
+    """PURA: la riga del tempo nell'avviso della presa a chi deposita. Sei
+    ore: «poi chi compra può rinunciare», come sempre. Il tempo scelto da
+    chi pubblica (19 nov 2026, `p2p_onchain_secondi_deposito`): basta
+    INVIARLO entro quel tempo, la conferma arriva dopo; sennò lo scambio si
+    annulla da solo."""
+    sec = int(_p2p_onchain_campo(o, "deposito_entro", 0) or 0) \
+        - int(_p2p_onchain_campo(o, "preso_il", 0) or 0)
+    if sec <= 0 or sec >= int(P2P_ONCHAIN_ORE_DEPOSITO) * 3600:
+        return (f"\n\n⏳ <b>Hai {P2P_ONCHAIN_ORE_DEPOSITO} ore</b>, "
+                "poi chi compra può rinunciare.")
+    return (f"\n\n⏳ <b>Hai {_durata_detta_p2p(sec)}</b> per inviarlo, il tempo "
+            "per pagare che hai scelto: basta che la transazione parta, la conferma "
+            "può arrivare dopo. Se non la invii in tempo lo scambio si annulla.")
+
+
 def _p2p_onchain_testi_presa(o, nome: str = "") -> dict:
     """PURA: `{tg_id: testo}` dell'avviso della PRESA, alle due parti.
     Chi ha pubblicato legge «Il tuo ordine on-chain è stato preso!», chi
@@ -112981,7 +113047,11 @@ def _p2p_onchain_testi_presa(o, nome: str = "") -> dict:
               "sats</b> (prezzo + margine di rete"
               + (" + la tua metà della commissione" if int(o['quota_sats'] or 0) else "")
               + ") nell'indirizzo 2-di-3."
-              f"\n\n⏳ <b>Hai {P2P_ONCHAIN_ORE_DEPOSITO} ore</b>, poi chi compra può rinunciare."),
+              # (19 nov 2026) il tempo per inviarlo: da `globals()`, i banchi
+              # che ritagliano questa funzione hanno le sei ore di sempre
+              + (globals().get("testo_tempo_deposito_onchain")
+                 or (lambda _o, _d: f"\n\n⏳ <b>Hai {P2P_ONCHAIN_ORE_DEPOSITO} ore</b>, "
+                                    "poi chi compra può rinunciare."))(o, dep)),
         ric: (testa(ric) + f"Compri {quanto}.\n\n"
               "Apri Barattolo: appena chi vende deposita i sats e la rete li "
               + ("conferma, vedi il PayCode da pagare al tabacchino."
@@ -114064,6 +114134,10 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     if minuti_pagare and not _ordine_col_tempo_p2p(
             lato, metodi if isinstance(metodi, list) else []):
         minuti_pagare = 0
+    # (19 nov 2026, onchain-tempo-deposito) on-chain mai sotto i 30 minuti:
+    # chi vende deve anche inviare il deposito in quel tempo
+    if minuti_pagare:
+        minuti_pagare = max(int(P2P_ONCHAIN_MINUTI_PAGARE_MIN), minuti_pagare)
     # LA CAUZIONE A SCELTA (18 nov 2026): solo un si' vero, solo con la
     # leva e la cauzione accese per chi pubblica (a porticina chiusa, un
     # moderatore)
@@ -115725,7 +115799,11 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             " WHERE id=? AND stato='pending'",
             (user["id"], dep, ric, ind_id, margine, prezzo + margine + q_dep,
              incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
-             adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
+             # (19 nov 2026) il tempo per INVIARE il deposito: sei ore, o
+             # quello scelto da chi pubblica e deposita, se piu' corto
+             adesso + (p2p_onchain_secondi_deposito(o, dep)
+                       if "p2p_onchain_secondi_deposito" in globals()
+                       else P2P_ONCHAIN_ORE_DEPOSITO * 3600), adesso, prezzo,
              cambio_presa, r_tipo, r_valore, r_firma, r_indice, quota,
              quota_dove, q_ric, scelto if piu_metodi else "",
              # (19 nov 2026, ritorno-nel-libro) quando e' nato il recapito:
@@ -118685,6 +118763,88 @@ async def _p2p_onchain_chiudi_depositi_mancati(adesso: int) -> int:
     return fatti
 
 
+
+# CHI HA PUBBLICATO E NON INVIA IL DEPOSITO (19 nov 2026, cantiere onchain-
+# tempo-deposito; Andrea: «Sì, deve inviarlo entro quel tempo»). Chi vende
+# on-chain col suo tempo per pagare ha quel tempo per INVIARE il deposito
+# (`p2p_onchain_secondi_deposito`); passato, senza un sats visto in rete,
+# lo scambio si annulla da solo, come nel Lightning quando chi pubblica non
+# blocca i sats. L'ordine NON rinasce (chi l'ha pubblicato e' sparito, e
+# rimetterlo nel libro farebbe aspettare un altro); la cauzione di chi ha
+# preso torna col giro delle cauzioni (lo scambio e' chiuso senza
+# deposito: non si perde). Solo le vendite col tempo scelto: le sei ore di
+# sempre restano a «Rinuncia: il deposito non è arrivato», a mano.
+def _p2p_onchain_invii_mancati(con, adesso: int) -> list:
+    """Gli scambi dove deposita chi ha pubblicato, col tempo per inviare
+    finito (piu' `P2P_ONCHAIN_INVIO_MARGINE_S`) e niente in rete: le righe,
+    senza toccarle."""
+    if not globals().get("P2P_ONCHAIN_DEPOSITO_COL_TEMPO", False):
+        return []
+    return [dict(o) for o in con.execute(
+        "SELECT * FROM p2p_onchain_ordini WHERE stato='preso' AND deposito_entro>0"
+        " AND deposito_entro<=? AND deposito_entro-preso_il<?"
+        " AND COALESCE(visti_sats,0)=0 AND COALESCE(ricevuti_sats,0)=0"
+        " AND depositante_id=maker_id AND COALESCE(minuti_pagare,0)>0"
+        " AND COALESCE(paycode,'')='' AND COALESCE(tab_min_cent,0)=0"
+        " AND COALESCE(proposta_psbt,'')='' AND COALESCE(decisione_da,0)=0"
+        " ORDER BY id LIMIT 20",
+        (int(adesso) - P2P_ONCHAIN_INVIO_MARGINE_S,
+         int(P2P_ONCHAIN_ORE_DEPOSITO) * 3600)).fetchall()]
+
+
+async def _p2p_onchain_chiudi_invii_mancati(adesso: int) -> int:
+    """Chiude gli scambi di `_p2p_onchain_invii_mancati`, mai alla cieca:
+    la rete guardata adesso. Torna quanti."""
+    con = _p2p_onchain_db()
+    try:
+        righe = _p2p_onchain_invii_mancati(con, adesso)
+    finally:
+        con.close()
+    fatti = 0
+    for o in righe:
+        try:
+            # la rete guardata ADESSO (se mempool tace, alla prossima ronda)
+            if await _p2p_onchain_controlla(int(o["id"])) != "preso":
+                continue
+            con = _p2p_onchain_db()
+            try:
+                cur = con.execute(
+                    "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+                    " chiuso_perche='invio-scaduto', aggiornato=? WHERE id=?"
+                    " AND stato='preso' AND COALESCE(visti_sats,0)=0"
+                    " AND COALESCE(ricevuti_sats,0)=0",
+                    (int(adesso), int(adesso), int(o["id"])))
+                con.commit()
+            finally:
+                con.close()
+            if not cur.rowcount:
+                continue
+            fatti += 1
+            _p2p_onchain_rifai_foto()
+            asyncio.create_task(_p2p_onchain_pubblica(int(o["id"])))
+            print(f"⏰ P2P on-chain: scambio {o['id']}, chi vende non ha inviato "
+                  "il deposito in tempo: annullato", flush=True)
+            await _notifica_p2p_onchain(
+                o, int(o["maker_id"]),
+                f"{P2P_ONCHAIN_SEGNO} ❌ <b>Il tempo per inviare il deposito è finito</b> e "
+                f"lo scambio on-chain è annullato. Era {_p2p_onchain_quanto(o)}."
+                "\n\nNessun sats si è mosso. Se li mandi adesso all'indirizzo di "
+                "prima, un moderatore te li deve rimandare indietro: non farlo.",
+                _p2p_onchain_bottone(o))
+            await _notifica_p2p_onchain(
+                o, int(o["taker_id"]),
+                f"{P2P_ONCHAIN_SEGNO} ❌ <b>Chi vende non ha inviato il deposito in "
+                f"tempo</b> e lo scambio on-chain è annullato. Era {_p2p_onchain_quanto(o)}."
+                "\n\nNessun sats si è mosso e non devi mandare niente"
+                + (": la cauzione ti torna nel wallet." if int(_p2p_onchain_campo(
+                    o, "cauzione_chiesta", 0) or 0) else "."),
+                _p2p_onchain_bottone(o))
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: invio mancato dello scambio {o['id']} "
+                  f"non chiuso: {e}", flush=True)
+    return fatti
+
+
 async def _p2p_onchain_ronda() -> None:
     """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
     minuti): gli scambi presi si guardano su mempool; gli ordini nel
@@ -118799,6 +118959,12 @@ async def _p2p_onchain_ronda() -> None:
         await _p2p_onchain_chiudi_depositi_mancati(adesso)
     except Exception as e:
         print(f"⚠️ P2P on-chain: depositi mancati non guardati: {e}", flush=True)
+    # (19 nov 2026, onchain-tempo-deposito) chi ha pubblicato col suo tempo
+    # e non ha inviato il deposito: lo scambio si annulla
+    try:
+        await _p2p_onchain_chiudi_invii_mancati(adesso)
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: invii mancati non guardati: {e}", flush=True)
 
 
 @app.get("/vendor/btc.js")

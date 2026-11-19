@@ -77254,6 +77254,11 @@ function schedaOnchainP2P(o){
         ? '⏰ Il tempo per pagare è finito senza «Ho inviato gli euro»: chi vende si è ripreso i sats. Barattolo ha firmato il rimborso.'
         : o.chiuso_perche === 'deposito-scaduto'
         ? 'Annullato: il tempo per il deposito è finito senza sats.'
+        /* (19 nov 2026, onchain-tempo-deposito) chi vende non l'ha inviato
+           nel tempo per pagare che aveva scelto */
+        : o.chiuso_perche === 'invio-scaduto'
+        ? (o.ruolo === 'compratore' ? 'Annullato: non hai inviato il deposito nel tempo che avevi scelto.'
+           : 'Annullato: chi vende non ha inviato il deposito in tempo. Nessun sats si è mosso.')
         : 'Annullato prima del deposito.')
         /* (19 nov 2026, ritorno-nel-libro) l'ordine rinato nel libro */
         + (o.rinato_in ? ' 🔁 L\'ordine è tornato nel libro.' : '')
@@ -78141,6 +78146,11 @@ function copiaOnchainP2P(testo){
    visto lo chiude chi se ne accorge (`chiudiFoglioP2P`). */
 let p2pOcDeposito = null, p2pOcDepositoOrologio = null;
 const p2pOcDepositoVisti = new Set();   // gli scambi a cui il foglio si e' gia' aperto da solo
+/* PURA: il deposito ha il tempo corto di chi vende (meno delle sei ore)? */
+function depositoColTempoOnchainP2P(o){
+  const p = Number(o && o.preso_il) || 0, e = Number(o && o.deposito_entro) || 0;
+  return p > 0 && e > p && e - p < 6 * 3600;
+}
 /* PURA: tocca a me depositare? */
 function depositoDaFareOnchainP2P(o){
   return !!(o && o.ruolo === 'compratore' && o.stato === 'preso' && o.indirizzo && o.indirizzo.indirizzo);
@@ -78209,6 +78219,11 @@ function renderDepositoOnchainP2P(){
       + '<span id="p2pOcDepositoScade"></span>'
       + '<a class="btn mini" id="p2pOcDepositoWallet" href="#">₿ Apri nel wallet</a></div>'
     + '<button class="btn primary" onclick="copiaOnchainP2P(p2pOcDeposito.indirizzo.indirizzo)">📋 Copia l\'indirizzo</button>'
+    /* (19 nov 2026, onchain-tempo-deposito) col tempo scelto da chi vende:
+       conta l'INVIO, non la conferma */
+    + (typeof depositoColTempoOnchainP2P === 'function' && depositoColTempoOnchainP2P(o)
+       ? '<div class="hint">⏱ Basta che il deposito <b>parta entro le ' + new Date(Number(o.deposito_entro) * 1000).toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})
+         + '</b>: la conferma può arrivare dopo. Se non parte in tempo, lo scambio si annulla da solo.</div>' : '')
     + '<div class="hint">Quando il deposito si vede in rete questo foglio si chiude da solo: non c\'è niente da confermare. '
       + 'Con una conferma, circa dieci minuti, lo scambio va avanti.</div>';
   el('p2pOcDepositoIndirizzo').textContent = o.indirizzo.indirizzo;
@@ -98615,6 +98630,7 @@ const P2P_MINUTI_PAGARE_MIN = 15;
 const P2P_MINUTI_PAGARE_MAX = 1440;
 const P2P_MINUTI_PAGARE_PASSO = 15;
 const P2P_MINUTI_PAGARE_DI_SERIE = 1440;
+const P2P_ONCHAIN_MINUTI_PAGARE_MIN = 30;   /* on-chain il tempo piu' corto (19 nov 2026) */
 /* i fermi del cursore, in minuti: tutti multipli del passo */
 const P2P_MINUTI_PAGARE_FERMI = (function(){
   const f = [];
@@ -98712,7 +98728,16 @@ function tempoPagarePossibileP2P(lato, metodi, oc){
    non ha scelto), coi metodi; 0 se il foglio un tempo non lo puo' avere */
 function minutiPagareFoglioP2P(scelta, lato, metodi, oc, attivo, veloci){
   if (!attivo || !tempoPagarePossibileP2P(lato, metodi, oc)) return 0;
-  return minutiCoiMetodiP2P(minutiPagareSceltaP2P(scelta) || P2P_MINUTI_PAGARE_DI_SERIE, metodi, veloci);
+  const m = minutiCoiMetodiP2P(minutiPagareSceltaP2P(scelta) || P2P_MINUTI_PAGARE_DI_SERIE, metodi, veloci);
+  /* (19 nov 2026, onchain-tempo-deposito; Andrea: «per l'onchain il tempo
+     minimo [...] per entrambi le parti è 30 minuti») on-chain mai sotto */
+  return oc && m && typeof P2P_ONCHAIN_MINUTI_PAGARE_MIN !== 'undefined' ? Math.max(P2P_ONCHAIN_MINUTI_PAGARE_MIN, m) : m;
+}
+/* PURA: il primo fermo del cursore che si puo' scegliere: on-chain 30 minuti */
+function fermoMinimoP2P(oc){
+  if (!oc) return 0;
+  const k = P2P_MINUTI_PAGARE_FERMI.indexOf(P2P_ONCHAIN_MINUTI_PAGARE_MIN);
+  return k > 0 ? k : 0;
 }
 /* PURA: l'indice del fermo piu' vicino (per difetto) ai minuti */
 function fermoDaMinutiP2P(min){
@@ -98751,6 +98776,10 @@ function notaTempoPagareP2P(min, lenti){
   const oc = typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc;
   const fine = oc
     ? 'Se non lo fa in tempo, potrai aprire una disputa.'
+      /* (19 nov 2026, onchain-tempo-deposito) ...e lo stesso tempo vale per te */
+      + (minutiPagareSceltaP2P(min) && minutiPagareSceltaP2P(min) < 360
+        ? ' Quando qualcuno lo prende, anche tu hai al massimo <b>' + minutiPagareDetteP2P(min)
+          + '</b> per inviare il deposito: basta che parta, la conferma può arrivare dopo.' : '')
     : 'Se non lo fa in tempo, lo scambio si annulla da solo e i sats tornano a te.'
       /* (19 nov 2026, patch 0015) ...e lo stesso tempo vale per te */
       + (typeof p2pInfo !== 'undefined' && p2pInfo && p2pInfo.pubblicaColTempo && minutiPagareSceltaP2P(min) < P2P_MINUTI_PAGARE_MAX
@@ -98808,9 +98837,12 @@ function pienoTempoPagareP2P(k){
 /* il dito sul cursore: tutto IN PLACE, mai il foglio rifatto (il cursore
    perderebbe la presa a meta' gesto) */
 function scegliTempoPagareNuovoP2P(i){
-  const k = Math.max(0, Math.min(P2P_MINUTI_PAGARE_FERMI.length - 1, Math.floor(Number(i) || 0)));
+  /* on-chain il dito non scende sotto i 30 minuti: il cursore torna li' */
+  const kMin = typeof fermoMinimoP2P === 'function' ? fermoMinimoP2P(typeof p2pNuovoOc !== 'undefined' && !!p2pNuovoOc) : 0;
+  const k = Math.max(kMin, Math.min(P2P_MINUTI_PAGARE_FERMI.length - 1, Math.floor(Number(i) || 0)));
   const min = P2P_MINUTI_PAGARE_FERMI[k];
   const cur0 = el('p2pTempoPagareCursore');
+  if (cur0 && Number(cur0.value) < kMin) cur0.value = String(kMin);
   if (cur0) cur0.style.setProperty('--pieno', pienoTempoPagareP2P(k) + '%');
   if (min === p2pNuovoMinutiPagare) return;
   p2pNuovoMinutiPagare = min;

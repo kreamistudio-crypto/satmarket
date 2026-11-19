@@ -37971,7 +37971,16 @@ mai il kind 0 di nessuno: regola ferrea 2).
   che il nodo da' anche a chi pubblica per bloccare i sats se e' piu' corto
   delle sue tre ore; col tag `barattolo_maker_payment_window` nel 38385 il
   server e la pagina contano quel tempo per chi pubblica
-  (`_finestra_pubblica_ordine_p2p`, `finestraDiP2P(info, true, o)`). Allo scadere senza
+  (`_finestra_pubblica_ordine_p2p`, `finestraDiP2P(info, true, o)`).
+  SULL'ON-CHAIN (19 nov 2026, cantiere onchain-tempo-deposito) il tempo
+  per pagare non scende sotto i 30 minuti (`P2P_ONCHAIN_MINUTI_PAGARE_MIN`,
+  alla pubblicazione, alla lettura e nel cursore), e chi pubblica una
+  vendita col suo tempo ha quel tempo, al piu' sei ore, per INVIARE il
+  deposito (`p2p_onchain_secondi_deposito` → `deposito_entro`; conta la
+  rete che vede la transazione, `visti_sats`, non la conferma); passato,
+  la ronda annulla lo scambio (`_p2p_onchain_chiudi_invii_mancati`,
+  `chiuso_perche='invio-scaduto'`) e l'ordine non rinasce. Leva
+  `P2P_ONCHAIN_DEPOSITO_COL_TEMPO`. Allo scadere senza
   «Ho inviato» annulla lui, e racconta `expired` / `payment-window`: il
   motivo dell'annullo è `tempo_pagare_scaduto`, e il «non completato» a
   chi compra segue la regola della garanzia scaduta più una

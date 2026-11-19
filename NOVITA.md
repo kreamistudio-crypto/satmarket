@@ -836,3 +836,9 @@ frase: Negli scambi P2P Lightning, se chi vende ha scelto un tempo per pagare co
 dove: P2P → «I miei scambi» → lo scambio appena preso: «Chi ha pubblicato ha fino a 30 minuti per rispondere»; nel foglio «Pubblica», sotto «Tempo per pagare».
 leva: nessuna
 pubblico: no
+
+## 2026-11-19 · onchain-tempo-deposito
+frase: Negli scambi P2P on-chain chi vende con un tempo per pagare corto ha lo stesso tempo per inviare il deposito quando qualcuno prende l'ordine (basta che parta, la conferma arriva dopo), e il tempo più corto da scegliere è 30 minuti.
+dove: P2P → «Pubblica» → «Vendi BTC» on-chain → «Tempo per pagare» (il cursore parte da 30 minuti, e la nota sotto lo dice); nello scambio, il foglio «🔒 Blocca i sats»: «⏱ Basta che il deposito parta entro le …».
+leva: P2P_ONCHAIN_DEPOSITO_COL_TEMPO (accesa di serie)
+pubblico: sì

@@ -215609,6 +215609,169 @@ console.log(JSON.stringify(out));
            tp(oc(0, ["SEPA"]))[5].startswith("🟠 ⏰ Mancano cinque minuti")])
 
 
+def prove_onchain_tempo_deposito():
+    """IL DEPOSITO COL TEMPO DI CHI PUBBLICA (19 nov 2026, cantiere onchain-
+    tempo-deposito; Andrea: «Sì, deve inviarlo entro quel tempo», e «per
+    l'onchain il tempo minimo [...] per entrambi le parti è 30 minuti»).
+    Quel che qui si rompe in silenzio: un PayCode che si ritrova col tempo
+    corto, un acquisto (deposita chi prende) che perde le sue sei ore, una
+    scelta da 15 minuti che on-chain resta 15, la ronda che annulla un
+    deposito gia' visto o uno scambio con le sei ore di sempre."""
+    print("\n[il deposito on-chain col tempo di chi pubblica, e i 30 minuti]")
+    import sqlite3
+    import subprocess
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "sqlite3": sqlite3, "time": time,
+           "P2P_TEMPO_PER_PAGARE": True, "P2P_ONCHAIN_ORE_PAGAMENTO_MONETE": 24,
+           "P2P_ONCHAIN_ORE_PAGAMENTO_SOLDI": 24, "P2P_ONCHAIN_ORE_PAGAMENTO_TAB": 72,
+           "p2p_onchain_tab_scade": lambda o: 0, "P2P_COIN_METODI": {},
+           "P2P_METODI_VELOCI": {"SEPA Instant", "Revolut", "Satispay", "PayPal"},
+           "P2P_TABACCHINO": "Tabacchino", "P2P_CONTANTI": "Contanti",
+           "P2P_POSTA": "Contante per posta"}
+    amb["P2P_ONCHAIN_DEPOSITO_COL_TEMPO"] = (
+        "except ImportError:\n    P2P_ONCHAIN_DEPOSITO_COL_TEMPO = True\n" in src
+        and "P2P_ONCHAIN_DEPOSITO_COL_TEMPO = P2P_ONCHAIN_DEPOSITO_COL_TEMPO is not False" in src)
+    for nome in ("P2P_ONCHAIN_ORE_DEPOSITO",
+                 "P2P_ONCHAIN_MINUTI_PAGARE_MIN", "P2P_ONCHAIN_INVIO_MARGINE_S",
+                 "P2P_MINUTI_PAGARE_MIN", "P2P_MINUTI_PAGARE_MAX", "P2P_MINUTI_PAGARE_PASSO"):
+        j = src.index(f"\n{nome} = ") + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb)
+    prova("le leve: il deposito col tempo ACCESO di serie, on-chain minimo 30 minuti, "
+          "cinque minuti di margine prima di annullare",
+          [True, 30, 300, 6],
+          [amb["P2P_ONCHAIN_DEPOSITO_COL_TEMPO"], amb["P2P_ONCHAIN_MINUTI_PAGARE_MIN"],
+           amb["P2P_ONCHAIN_INVIO_MARGINE_S"], amb["P2P_ONCHAIN_ORE_DEPOSITO"]])
+    for f in ("_p2p_onchain_campo", "_minuti_pagare_scelta_p2p", "_metodo_veloce_p2p",
+              "_metodi_veloci_p2p", "_minuti_coi_metodi_p2p", "p2p_onchain_ore_pagamento",
+              "p2p_onchain_minuti_pagamento", "_p2p_onchain_minuti",
+              "p2p_onchain_secondi_deposito", "_durata_detta_p2p",
+              "testo_tempo_deposito_onchain", "_p2p_onchain_invii_mancati"):
+        exec(pezzo(f), amb)
+    amb["_ordine_col_tempo_p2p"] = lambda lato, metodi: lato == "sell"
+    amb["_p2p_onchain_metodi"] = lambda o: json.loads(o.get("metodi") or "[]")
+    amb["p2p_onchain_usdt"] = amb["p2p_onchain_coin"] = lambda o: False
+    M, D = amb["p2p_onchain_minuti_pagamento"], amb["p2p_onchain_secondi_deposito"]
+    vend = {"lato": "sell", "maker_id": 111, "taker_id": 222, "depositante_id": 111,
+            "metodi": '["Revolut"]', "minuti_pagare": 30, "paycode": "", "tab_min_cent": 0}
+    prova("I 30 MINUTI: una scelta di ieri da 15 on-chain vale 30; 30, 45 e 2 ore restano "
+          "quelle; senza scelta le 24 ore di sempre",
+          [30, 30, 45, 120, 1440],
+          [M(dict(vend, minuti_pagare=15)), M(vend), M(dict(vend, minuti_pagare=45)),
+           M(dict(vend, minuti_pagare=120)), M(dict(vend, minuti_pagare=0))])
+    prova("IL TEMPO PER INVIARE: chi pubblica e deposita ha il suo tempo (30 min, 2 ore), "
+          "al piu' sei ore (con 8 ore o senza scelta: sei); chi prende e deposita "
+          "(un acquisto) sei ore; col PayCode o la fascia sei ore; a leva spenta sei ore",
+          [1800, 7200, 21600, 21600, 21600, 21600, 21600, 21600],
+          [D(vend, 111), D(dict(vend, minuti_pagare=120), 111),
+           D(dict(vend, minuti_pagare=480), 111), D(dict(vend, minuti_pagare=0), 111),
+           D(dict(vend, maker_id=333, depositante_id=444), 444),
+           D(dict(vend, paycode='{"pc": "1"}'), 111), D(dict(vend, tab_min_cent=2500), 111),
+           (amb.update(P2P_ONCHAIN_DEPOSITO_COL_TEMPO=False), D(vend, 111),
+            amb.update(P2P_ONCHAIN_DEPOSITO_COL_TEMPO=True))[1]])
+    prova("un metodo lento porta il tempo a 24 ore, e il deposito alle sei", 21600,
+          D(dict(vend, metodi='["Bonifico SEPA"]'), 111))
+    T = amb["testo_tempo_deposito_onchain"]
+    t30 = T({"preso_il": 1000, "deposito_entro": 2800}, 111)
+    prova("L'AVVISO DELLA PRESA a chi deposita: col tempo corto «Hai 30 minuti per "
+          "inviarlo», basta che parta e lo scambio si annulla; con sei ore la frase di sempre",
+          [True, True, True, True],
+          ["⏳ <b>Hai 30 minuti</b> per inviarlo" in t30, "la conferma può arrivare dopo" in t30,
+           "lo scambio si annulla" in t30,
+           T({"preso_il": 1000, "deposito_entro": 1000 + 21600}, 111)
+           == "\n\n⏳ <b>Hai 6 ore</b>, poi chi compra può rinunciare."])
+
+    # --- LA RONDA sul database ------------------------------------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_onchain_ordini(")
+    con.execute(src[i:src.index('aggiornato INTEGER NOT NULL)"""', i)] + "aggiornato INTEGER NOT NULL)")
+    k = src.index("PRAGMA table_info(p2p_onchain_ordini)")
+    a = src.index("for col, tipo in (", k) + len("for col, tipo in ")
+    for col, tipo in eval(src[a:src.index(":\n        if col not in gia:", a)]):
+        con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+
+    def ordine(**k):
+        d = {"ordine": "bar-onchain-" + str(time.time_ns()), "lato": "sell",
+             "maker_id": 111, "taker_id": 222, "depositante_id": 111, "ricevente_id": 222,
+             "prezzo_sats": 120000, "euro_cent": 7500, "metodi": '["Revolut"]',
+             "stato": "preso", "scade": 10, "creato": 1, "aggiornato": 1,
+             "prezzo_tipo": "fisso", "premio": 0, "minuti_pagare": 30,
+             "preso_il": 10000, "deposito_entro": 10000 + 1800}
+        d.update(k)
+        cur = con.execute(f"INSERT INTO p2p_onchain_ordini({','.join(d)}) VALUES("
+                          f"{','.join('?' * len(d))})", list(d.values()))
+        return cur.lastrowid
+    ok = ordine()
+    ordine(deposito_entro=10000 + 1800 + 200)                 # nel margine
+    ordine(visti_sats=5000)                                   # partito: la rete l'ha visto
+    ordine(deposito_entro=10000 + 21600, preso_il=10000 - 21600 + 1800)   # sei ore di sempre
+    ordine(maker_id=333, taker_id=444, depositante_id=444, ricevente_id=333,
+           lato="buy")                                        # deposita chi ha preso
+    ordine(minuti_pagare=0)                                   # senza tempo scelto
+    ordine(paycode='{"pc": "1"}')                             # Barattozon
+    ordine(proposta_psbt="cHNidP8")                           # c'e' gia' una firma
+    ordine(stato="depositato")                                # gia' depositato
+    adesso = 10000 + 1800 + 5 * 60 + 10
+    prova("LA RONDA prende SOLO lo scambio dove deposita chi ha pubblicato col suo tempo, "
+          "finito da piu' di cinque minuti, niente in rete, nessuna firma, niente PayCode",
+          [ok], [r["id"] for r in amb["_p2p_onchain_invii_mancati"](con, adesso)])
+    amb["P2P_ONCHAIN_DEPOSITO_COL_TEMPO"] = False
+    prova("a leva spenta la ronda non annulla niente", [],
+          amb["_p2p_onchain_invii_mancati"](con, adesso))
+    amb["P2P_ONCHAIN_DEPOSITO_COL_TEMPO"] = True
+    chiudi, ronda = pezzo("_p2p_onchain_chiudi_invii_mancati"), pezzo("_p2p_onchain_ronda")
+    presa = pezzo("p2p_onchain_prendi") if "def p2p_onchain_prendi(" in src else src
+    prova("I FILI: la ronda chiama la chiusura, che guarda la rete ADESSO e chiude solo "
+          "senza sats; la presa scrive il tempo per inviare; la pubblicazione tiene i 30 "
+          "minuti; l'ordine NON rinasce",
+          [True, True, True, True, True, True],
+          ["await _p2p_onchain_chiudi_invii_mancati(adesso)" in ronda,
+           'if await _p2p_onchain_controlla(int(o["id"])) != "preso":' in chiudi,
+           "chiuso_perche='invio-scaduto'" in chiudi and "COALESCE(visti_sats,0)=0" in chiudi,
+           "adesso + (p2p_onchain_secondi_deposito(o, dep)" in presa,
+           "minuti_pagare = max(int(P2P_ONCHAIN_MINUTI_PAGARE_MIN), minuti_pagare)" in src,
+           "_rinasci" not in chiudi])
+
+    # --- L'APP ---------------------------------------------------------------
+    js = "\n".join([
+        "const P2P_MINUTI_PAGARE_MIN = 15, P2P_MINUTI_PAGARE_MAX = 1440, P2P_MINUTI_PAGARE_PASSO = 15,"
+        " P2P_MINUTI_PAGARE_DI_SERIE = 1440;",
+        "const P2P_ONCHAIN_MINUTI_PAGARE_MIN = 30;",
+        "const P2P_TABACCHINO = 'Tabacchino', P2P_CONTANTI = 'Contanti', P2P_POSTA = 'Posta';",
+        "const P2P_METODI_VELOCI = ['SEPA Instant', 'Revolut', 'Satispay', 'PayPal'];",
+        "function tabacchinoP2P(){ return false; }",
+        pezzo_js(mini, "const P2P_MINUTI_PAGARE_FERMI = (function(){", "})();") + "})();",
+        pezzo_js(mini, "function minutiPagareSceltaP2P(v){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function metodoVeloceP2P(m, veloci){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function metodiVelociTuttiP2P(metodi, veloci){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function minutiCoiMetodiP2P(min, metodi, veloci){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function tempoPagarePossibileP2P(lato, metodi, oc){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function minutiPagareFoglioP2P(scelta, lato, metodi, oc, attivo, veloci){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function fermoMinimoP2P(oc){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function depositoColTempoOnchainP2P(o){", "\n}\n") + "\n}",
+        "const F = (s, oc) => minutiPagareFoglioP2P(s, 'vendo', ['Revolut'], oc, true);",
+        "console.log(JSON.stringify([F(15, true), F(15, false), F(45, true), F(0, true),"
+        " P2P_MINUTI_PAGARE_FERMI[fermoMinimoP2P(true)], fermoMinimoP2P(false),"
+        " depositoColTempoOnchainP2P({preso_il: 1000, deposito_entro: 2800}),"
+        " depositoColTempoOnchainP2P({preso_il: 1000, deposito_entro: 1000 + 21600}),"
+        " depositoColTempoOnchainP2P({})]));"])
+    r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    try:
+        out = json.loads(r.stdout)
+    except Exception:
+        out = {"errore": r.stderr[-300:]}
+    prova("L'APP: on-chain il foglio manda almeno 30 minuti (Lightning resta 15), il "
+          "cursore parte da 30; il foglio del deposito sa quando il tempo e' corto",
+          [30, 15, 45, 1440, 30, 0, True, False, False], out)
+    prova("i testi: la nota di «Pubblica» on-chain, la riga nel foglio del deposito, "
+          "lo scambio annullato per l'invio mancato",
+          [True, True, True],
+          ["</b> per inviare il deposito: basta che parta, la conferma può arrivare dopo." in mini,
+           "⏱ Basta che il deposito <b>parta entro le " in mini,
+           "o.chiuso_perche === 'invio-scaduto'" in mini])
+
+
 def prove_riprendi_scaduto_onchain():
     """«↩️ RIPRENDI I SATS» COL TEMPO PER PAGARE FINITO (19 nov 2026, cantiere
     riprendi-scaduto; Andrea: «nell'on-chain non si può far tornare da
@@ -216697,6 +216860,7 @@ CATEGORIE = {
     filtro_libro_ricordato
     tempo_pagare_p2p
     ritorno_nel_libro_onchain
+    onchain_tempo_deposito
     riprendi_scaduto_onchain
     conto_alla_rovescia_p2p
     meta_cauzione_auto
@@ -217954,6 +218118,7 @@ def main():
               prove_filtro_libro_ricordato,
               prove_tempo_pagare_p2p,
               prove_ritorno_nel_libro_onchain,
+              prove_onchain_tempo_deposito,
               prove_riprendi_scaduto_onchain,
               prove_conto_alla_rovescia_p2p,
               prove_meta_cauzione_auto,

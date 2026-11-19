@@ -824,6 +824,41 @@ def main():
     prova("...e anche questo torna nel libro, e chi l'ha pubblicato lo ritira", (True, 200),
           (figlio is not None, gesto(999, figlio["id"], "annulla").status_code if figlio else 0))
 
+    # IL DEPOSITO COL TEMPO DI CHI PUBBLICA (19 nov 2026, cantiere onchain-
+    # tempo-deposito; Andrea: «Sì, deve inviarlo entro quel tempo», minimo 30)
+    print("\n[il deposito col tempo di chi pubblica]")
+    prima_tempo = SRV.P2P_TEMPO_PER_PAGARE
+    SRV.P2P_TEMPO_PER_PAGARE = True
+    o6b = pubblica(999, sats=30000, euro_cent=2700, metodi=["Revolut"],
+                   minuti_pagare=15).json()
+    banco.DETTO.clear()
+    gesto(888, o6b["id"], "prendi")
+    ob6 = uno(999, o6b["id"])
+    prova("una vendita on-chain con 15 minuti ne vale 30, e chi vende ha 30 minuti per "
+          "INVIARE il deposito, detto nell'avviso della presa",
+          (30, 1800, True),
+          (ob6["minuti_pagamento"], ob6["deposito_entro"] - ob6["preso_il"],
+           detto_a(999, "Hai 30 minuti</b> per inviarlo")))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET preso_il=?, deposito_entro=? WHERE id=?",
+                (int(time.time()) - 1800 - 6 * 60, int(time.time()) - 6 * 60, o6b["id"]))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    ob6 = uno(999, o6b["id"])
+    con = SRV.db()
+    rinato6 = con.execute("SELECT id FROM p2p_onchain_ordini WHERE rinato_da=?",
+                          (o6b["id"],)).fetchone()
+    con.close()
+    prova("finito il tempo senza un sats in rete: la ronda annulla, lo dice a tutt'e due, "
+          "e l'ordine NON torna nel libro (era chi vende a dover inviare)",
+          ("annullato", "invio-scaduto", True, True, None),
+          (ob6["stato"], ob6.get("chiuso_perche"),
+           detto_a(999, "Il tempo per inviare il deposito è finito"),
+           detto_a(888, "Chi vende non ha inviato il deposito"), rinato6))
+    SRV.P2P_TEMPO_PER_PAGARE = prima_tempo
+
     # ---- 9) la scadenza nel libro e la ronda ------------------------------
     print("\n[la ronda: la scadenza nel libro]")
     o7 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
