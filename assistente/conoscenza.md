@@ -22,7 +22,7 @@ Dove si trova:
 
 Barattolo in inglese (dal 17 novembre 2026): se il Telegram o il browser di chi apre Barattolo non è in italiano, tutta l'app compare in inglese da sola — vetrina, schede, acquisto, Ordini, scambio P2P, Vendi, Profilo, aste, raccolte, avvisi e assistenza — coi prezzi scritti all'inglese («1,234.50 €»). Restano in italiano, per ora, i messaggi del bot di Telegram e gli avvisi di errore del server; l'interruttore della lingua nel Profilo arriva in una tappa successiva. Per vedere l'inglese da un telefono italiano si apre barattolo.store/?lingua=en, e ?lingua=it riporta all'italiano; la scelta resta su quel dispositivo. Se qualcuno scrive a Tappo in inglese, Tappo risponde in inglese.
 
-Le chiavi degli scambi P2P (dal 17 novembre 2026): nascono dalle 12 parole del wallet on-chain, le stesse che hanno la copia nel cloud di Telegram o sui relay Nostr. Ovunque ci siano quelle parole (telefono, Telegram Desktop, browser) gli scambi nuovi si governano da lì: uno scambio preso dalla web app si porta avanti anche dalla Mini App o dal browser del computer, e viceversa (dal 18 novembre 2026 ogni dispositivo passa alle chiavi delle parole appena apri il P2P, senza aspettare il primo gesto). Gli scambi aperti prima continuano dal dispositivo dove sono stati presi: il profilo di prima resta lì «in pensione» solo per finirli. Se su un dispositivo le parole non ci sono, al primo gesto P2P l'app chiede di incollarle da Profilo → «Wallet e incassi». Se lo scambio dice «Le chiavi di questo scambio non sono in questo browser», è di un profilo di prima: si finisce da dove è stato preso, o si scrive a @ilbarattolobot se quella memoria è persa.
+Le chiavi degli scambi P2P (dal 19 novembre 2026, di nuovo come prima del 17): le ricava il tuo account, uguali ovunque entri con lui — Mini App, sito, app, Telegram Desktop. Uno scambio preso dal sito si porta avanti dalla Mini App e viceversa, senza incollare niente. Le 12 parole del wallet on-chain servono SOLO all'on-chain. Dal 17 al 19 novembre le chiavi nascevano dalle 12 parole: chi ha preso uno scambio in quei giorni lo finisce dal dispositivo dove l'ha preso (resta lì «in pensione» solo per finirlo). Chi entra con Nostr ritrova il profilo entrando con la stessa chiave Nostr. Se lo scambio dice «Le chiavi di questo scambio non sono in questo browser», è di un altro profilo: si finisce da dove è stato preso, o si scrive a @ilbarattolobot se quella memoria è persa.
 
 <!-- pezzo libro-002 | libro | sempre -->
 ## Libro · Cos'è Barattolo (2/2)
@@ -2460,5 +2460,13 @@ pubblico: sì
 
 frase: Nel P2P, se chi prende il tuo ordine non paga in tempo, l'ordine non sparisce più: torna nel libro uguale, e la garanzia torna a te. E il tempo per pagare parte solo quando dici dove vuoi gli euro, non prima. Sull'on-chain l'ordine rinasce nel libro anche quando chi l'ha preso annulla, non deposita o si ritira.
 dove: P2P, uno scambio col tempo per pagare: alla presa il riquadro «⏱ Hai … per pagare» coi tre passi; nella pagina dello scambio l'anello che parte da «Indica dove ricevere gli euro» e la riga rossa negli ultimi dieci minuti; il bot avvisa dieci minuti prima della fine. Sull'on-chain l'avviso «🔁 Il tuo ordine è tornato nel libro» con «🚫 Non ripubblicarlo». Sul Lightning il ritorno nel libro arriva con l'aggiornamento del nodo.
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-119 | novita -->
+## Novità · 2026-11-19 · chiavi-dal-conto
+
+frase: Uno scambio P2P preso dal sito si porta avanti anche dalla Mini App, e viceversa, senza fare niente: le chiavi degli scambi tornano dal tuo account, come prima del 17 novembre.
+dove: P2P → «I miei scambi»: prendi un ordine dal sito, poi tocca «⚡ Apri lo scambio» nel bot. Nella Mini App i bottoni del passo ci sono, senza «Le chiavi di questo scambio non sono in questo browser».
 leva: nessuna
 pubblico: sì

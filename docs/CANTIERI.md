@@ -92218,3 +92218,60 @@ COSA SI È DECISO. (1) LA 0014 SUL NODO: allo scadere il ramo del taker-timeout 
 SCARTATO. Riaprire lo scambio vecchio sull'on-chain: l'indirizzo 2-di-3 contiene la chiave di chi ha preso e non si riusa, e chat, appuntamenti, cauzione e presenze del giro 0 avrebbero dovuto imparare un «secondo giro». Un patcher per la 0014: un secondo posto da tenere uguale su codice nostro. Far partire il tempo dal recapito nel solo server lasciando il nodo contare dall'attivo: il nodo avrebbe annullato prima di quel che leggeva chi compra. Un tasto «Non ripubblicarlo» che ritira da solo dal bot: servirebbe un callback del bot nuovo; il tasto apre l'ordine e lì si ritira con un tocco. Far rinascere anche quando annulla chi ha pubblicato prima del tempo del deposito: l'ha chiuso lui.
 PROVATO. Nodo (nel cloud): `git am` delle tredici `.patch` su un clone pulito della `v0.20.2` → albero `b45281d5ac2ffd5920713c898829ff229a11e5de`; `cargo test` 2005 verdi, 0 rosse, 4 ignorate; il filtro di DA-FARE 744/0/1 e 90/0; quattro controprove rosse (Canceled al posto di Pending, niente pulizia delle righe tornate pending, tempo da `seen_active_at`, null letto come 0) e rimesse. Server: `prove_tempo_pagare_p2p` riscritta (il termine dal recapito e dal giro, i promemoria con l'ultimo, la risposta al nodo con null e 0, la domanda tardiva dal recapito, la 0014 e i suoi fili, il banner, la riga rossa, il tempo fermo) e `prove_ritorno_nel_libro_onchain` nuova (chi fa rinascere, la rinascita sul database coi patti di prima, una volta sola con la sua controprova, mercato e acquisto, la ronda dei depositi mancati, i fili, il tempo fermo della pagina). `collaudo_tempo_pagare` sulle rotte vere: il tempo che non parte senza recapito, i secondi dopo, i promemoria dal recapito, la domanda tardiva, e il 6b col nodo nuovo che rimette nel libro (42 verdi). `collaudo_p2p_onchain` sul giro vero: chi prende annulla prima del deposito e l'ordine rinasce uguale nel libro (stato, sats, recapito, il nome nello scambio chiuso), chi l'ha pubblicato lo ritira con un tocco; la rinuncia dopo la finestra del deposito idem; i promemoria e il tempo finito contati dal recapito. Tutto insieme, sull'albero del commit: `PROVE_SEVERE=1 python prove.py` nel venv minimo della CI (senza httpx né coincurve) 30.531 passate, 0 fallite, 0 saltate; collaudi della CI senza proxy 161 verdi, 0 rossi (albero rifatto su develop `83688755`).
 RESTA DA GUARDARE. La `-bar11` sul nodo (DA-FARE, voce 26) e la prova dal vivo coi due account: il quarto d'ora che parte da «Indica dove ricevere gli euro» e l'ordine di nuovo nel libro. Sull'on-chain la rinascita non è provata dal vivo (nessun collaudo delle rotte on-chain la tocca). Fuori dal chiesto: il bottone del bot apre l'ordine ma non lo ritira da solo.
+
+## Le chiavi degli scambi tornano dal conto: lo scambio preso dal sito si porta avanti dalla Mini App (19 nov 2026, cantiere chiavi-dal-conto; Andrea: «Voglio che la cosa sia semplice. Torniamo al punto 2. Io devo aprire un ordine della web app e poi devo poterlo continuare anche nella mini app, punto.»)
+
+DAL CAMPO, in produzione, il giorno dopo chiavi-ovunque: uno scambio
+Lightning preso dalla web app, e nella Mini App («⚡ Apri lo scambio» del
+bot) di nuovo «🔑 Le chiavi di questo scambio non sono in questo browser…
+Questo è di un profilo di prima» e «Per scrivere all'altra persona apri
+lo scambio dal dispositivo da cui l'hai fatto». LE DUE DIAGNOSI («🩺 Copia
+la diagnosi», incollate da Andrea) hanno detto il fatto senza indovinare:
+web app sul profilo delle 12 parole (518c…, indice 2, le due prese nuove
+con la chiave), Mini App sul profilo vecchio (bae6…, indice 164, le due
+prese nuove senza chiave). Il passaggio senza gesto di chiavi-ovunque
+c'era e girava, ma le parole nella Mini App NON C'ERANO: né nel telefono
+né nel cloud di Telegram, perché la web app, fuori da Telegram, il cloud
+non lo scrive (e i relay li legge solo chi ha una chiave Nostr).
+LE DUE STRADE proposte ad Andrea: (1) tenere le parole, con la pagina che
+dice «qui mancano le 12 parole, incollale» e un tasto, e lo sblocco
+subito dopo l'incolla (scritta, provata con controprova, mai pushata: la
+patch è rimasta fuori); (2) tornare al profilo del conto, com'era prima
+del 17 nov. Andrea ha scelto la (2) («a livello di sicurezza... esattamente
+come era prima?» — sì: torna «Barattolo sa rifare le chiavi degli scambi
+Lightning», già scritto in «Info P2P»; l'on-chain resta sulle parole).
+COSA SI È FATTO. La costante `P2P_CHIAVI_DALLE_PAROLE = false` chiude le
+quattro porte da cui il profilo nasceva dalle parole: il seme della
+sessione (`semeContoP2P`), il gesto (`assicuraMazzo` non chiama più
+`gestoDalleParoleP2P`), la gamba dell'app (`adottaProfiloContoP2P`) e il
+passaggio del render (`passaAlleParoleP2P`). Il giudice
+(`giudicaMazzoP2P`) con un mazzo delle parole e il seme del conto diverso
+lo manda IN PENSIONE (non sulla mensola: le sue righe restano e finisce i
+suoi scambi, la meccanica del 17 nov) e rimette vivo il profilo del conto;
+`pensionaPerIlContoP2P`, se quel profilo era in pensione su questo
+dispositivo — il caso della web app di Andrea, che il 18 aveva pensionato
+bae6… — lo riprende con indice e nascita suoi e lo toglie dalla pensione
+(`togliDallaPensioneP2P`); il pavimento del server per quell'identità
+(`p2p_indice`, 164) fa il resto. La riga della pagina senza chiavi
+(`comeRiprendereChiaviP2P`) non manda più alle 12 parole. Il codice delle
+parole resta, spento, coi suoi banchi.
+SCARTATO. Cancellare il codice delle parole: è una riga da riaccendere e
+ha i suoi banchi; e la (1) intera, non scelta. Far passare le parole fra
+web app e Mini App attraverso il server: chi tiene il server le
+leggerebbe.
+IL PREZZO. Chi ha preso uno scambio coi profili delle parole (17-19 nov)
+lo finisce dal dispositivo dove l'ha preso; quelli di Andrea (fb9f07a5,
+e06a4b19) sono già chiusi. La reputazione sul coordinatore torna quella
+del profilo del conto.
+PROVATO. `prove_chiavi_dal_conto` (nuova, categoria p2p): la costante
+spenta, le quattro porte, un banco node coi pezzi veri di pensione,
+seme e giudice (il profilo del conto torna dalla pensione con l'indice
+164, nasce dal seme se non c'era, stesso seme = timbro, conto muto =
+niente), la riga della pagina per Telegram e per il nativo; sentinelle di
+`prove_chiavi_dalle_parole` e `prove_chiavi_ovunque` aggiornate alla
+costante. Controprova: costante accesa, pensione senza ripresa, giudice
+senza il ramo, porta del gesto senza la costante, riga di prima — rosse.
+RESTA DA GUARDARE. Non provato dal vivo: dopo la promozione, nella web
+app di Andrea il profilo che torna bae6… (diagnosi: «profilo: bae6…
+indice 164»), poi uno scambio preso dal sito e portato avanti dalla Mini
+App.

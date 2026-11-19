@@ -746,3 +746,9 @@ frase: Nel P2P, se chi prende il tuo ordine non paga in tempo, l'ordine non spar
 dove: P2P, uno scambio col tempo per pagare: alla presa il riquadro «⏱ Hai … per pagare» coi tre passi; nella pagina dello scambio l'anello che parte da «Indica dove ricevere gli euro» e la riga rossa negli ultimi dieci minuti; il bot avvisa dieci minuti prima della fine. Sull'on-chain l'avviso «🔁 Il tuo ordine è tornato nel libro» con «🚫 Non ripubblicarlo». Sul Lightning il ritorno nel libro arriva con l'aggiornamento del nodo.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · chiavi-dal-conto
+frase: Uno scambio P2P preso dal sito si porta avanti anche dalla Mini App, e viceversa, senza fare niente: le chiavi degli scambi tornano dal tuo account, come prima del 17 novembre.
+dove: P2P → «I miei scambi»: prendi un ordine dal sito, poi tocca «⚡ Apri lo scambio» nel bot. Nella Mini App i bottoni del passo ci sono, senza «Le chiavi di questo scambio non sono in questo browser».
+leva: nessuna
+pubblico: sì

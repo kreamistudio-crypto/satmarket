@@ -83300,7 +83300,7 @@ function renderP2P(){
      chiavi-ovunque: vedi `passaAlleParoleP2P`). Dopo il passaggio il
      render rilegge l'archivio con le chiavi nuove: le righe «solo da
      guardare» nate dalle parole altrove prendono la loro trade key */
-  if (mz && !daGiudicare && !p2pVersoParole && myTgId && !DEMO && !VETRINA
+  if (P2P_CHIAVI_DALLE_PAROLE && mz && !daGiudicare && !p2pVersoParole && myTgId && !DEMO && !VETRINA
       && !mz.parole && mz.origine !== 'mia' && typeof passaAlleParoleP2P === 'function') {
     p2pVersoParole = true;
     passaAlleParoleP2P().then(cambiato => {
@@ -84398,7 +84398,7 @@ function semeContoP2P(){
   /* (17 nov 2026) PRIMA LE 12 PAROLE, senza farle nascere; la strada di
      ieri resta il ripiego del giudizio, che con un mazzo delle parole in
      mano non scalza niente */
-  if (!p2pSemeGiro && typeof semeDaParoleP2P === 'function')
+  if (!p2pSemeGiro && P2P_CHIAVI_DALLE_PAROLE && typeof semeDaParoleP2P === 'function')
     p2pSemeGiro = semeDaParoleP2P().catch(() => null).then(w => w || semeProfiloP2P());
   if (!p2pSemeGiro) p2pSemeGiro = semeProfiloP2P();
   return p2pSemeGiro;
@@ -84510,6 +84510,29 @@ async function passaAlContoP2P(m, s){
    profilo delle parole.
    L'ECCEZIONE DICHIARATA resta la strada sovrana (`origine 'mia'`): una
    chiave che l'utente ha messo lui, e che il foglio gli promette sua. */
+/* ═══ LE CHIAVI DEGLI SCAMBI TORNANO DAL CONTO (19 nov 2026, cantiere
+   chiavi-dal-conto; Andrea, con uno scambio Lightning preso dalla web app
+   che nella mini app diceva «le chiavi non sono in questo browser»:
+   «Voglio che la cosa sia semplice. Torniamo al punto 2. Io devo aprire
+   un ordine della web app e poi devo poterlo continuare anche nella mini
+   app, punto.») ════════════════════════════════════════════════════════
+   IL FATTO, dalle due diagnosi: la web app aveva il profilo delle 12
+   parole, la mini app il vecchio — le parole stavano solo nella web app,
+   che fuori da Telegram non scrive il cloud di Telegram. La strada delle
+   parole chiedeva un incolla per dispositivo; Andrea ha scelto di
+   tornare a com'era prima del 17 nov: il profilo di scambio lo ricava il
+   conto (`/api/p2p/seme` per chi entra da Telegram, la copia sui relay o
+   la nsec per il nativo Nostr), uguale su mini app, sito e app senza
+   fare niente. Il prezzo, detto e accettato: Barattolo sa rifare le
+   chiavi degli scambi Lightning, come prima (lo dice gia' «Info P2P»).
+   Le 12 parole restano SOLO per l'on-chain.
+   SPENTO QUI, NON CANCELLATO: con `false` nessuno fa nascere il profilo
+   dalle parole (`semeContoP2P`, `adottaProfiloContoP2P`, `assicuraMazzo`,
+   il render), e il giudice rimanda in pensione il profilo delle parole
+   di chi c'era gia' passato (`giudicaMazzoP2P`): finisce i suoi scambi,
+   e il vivo torna quello del conto — dalla pensione, con l'indice suo,
+   se era li' (`pensionaPerIlContoP2P`). */
+const P2P_CHIAVI_DALLE_PAROLE = false;
 const P2P_STRADA_PAROLE = "m/44'/1237'/38383'/0/0";
 /* PURA (col bundle in mano): la sk dell'identita' dalle parole, '' se
    le parole sono storte o la chiave non e' una chiave */
@@ -84592,6 +84615,10 @@ function mandaInPensioneP2P(m){
   console.log('🔑 [p2p] profilo: ' + String(m.pub).slice(0, 8)
               + ' in pensione, resta solo per finire i suoi scambi');
 }
+function togliDallaPensioneP2P(sk){
+  const resto = mazziPensioneP2P().filter(d => d.sk !== sk);
+  try { localStorage.setItem(chiaveP2P(MOSTRO_PENSIONE), JSON.stringify(resto)); } catch(e){}
+}
 function scordaPensioneP2P(){
   try { localStorage.removeItem(chiaveP2P(MOSTRO_PENSIONE)); } catch(e){}
 }
@@ -84626,8 +84653,13 @@ function mazzoRigaP2P(o){
 async function pensionaPerIlContoP2P(m, s){
   await caricaNostrTools();
   if (s.sk === m.sk) return passaAlContoP2P(m, s);
+  /* (19 nov 2026, chiavi-dal-conto) IL PROFILO CHE TORNA DALLA PENSIONE
+     riprende l'indice e la nascita suoi, ed esce dalla pensione: e' il
+     profilo del conto di chi era passato alle parole e ora ci torna */
+  const prima = mazziPensioneP2P().find(d => d.sk === s.sk) || null;
   mandaInPensioneP2P(m);
-  ricordaMazzo(mazzoDalSemeP2P(s));
+  if (prima) togliDallaPensioneP2P(s.sk);
+  ricordaMazzo(mazzoDalSemeP2P(s, prima ? Object.assign({backupFatto: true}, prima) : null));
   await registraChiaviP2P([mazzoMostro().pub]);
   return mazzoMostro();
 }
@@ -84639,10 +84671,18 @@ async function giudicaMazzoP2P(m){
   /* (17 nov 2026) IL PROFILO DELLE PAROLE NON LO SCALZA UN RIPIEGO: se
      qui il seme e' arrivato da un'altra strada (le parole non si sono
      raggiunte in silenzio), il vivo resta lui */
-  if (ora.parole && !s.parole) { p2pMazzoEsito = 'mio'; return; }
+  if (P2P_CHIAVI_DALLE_PAROLE && ora.parole && !s.parole) { p2pMazzoEsito = 'mio'; return; }
   if (s.sk === ora.sk) {
     await passaAlContoP2P(ora, s);         /* qui timbra e basta: stessa sk */
     p2pMazzoEsito = 'mio';
+    return;
+  }
+  /* (19 nov 2026, chiavi-dal-conto) IL PROFILO DELLE PAROLE TORNA AL
+     CONTO: va in pensione — finisce i suoi scambi — e il vivo torna
+     quello del conto. Vedi `P2P_CHIAVI_DALLE_PAROLE`. */
+  if (!P2P_CHIAVI_DALLE_PAROLE && ora.parole) {
+    await pensionaPerIlContoP2P(ora, s);
+    p2pMazzoEsito = 'pensione';
     return;
   }
   /* DICE DI VENIRE DA UN CONTO CHE NON E' IL MIO — o non dice quale:
@@ -85293,11 +85333,17 @@ function copiaP2PNonOra(){ chiudiFoglioCopiaP2P(false); }
    Stanno QUI e non nel motore dello scambio: la' una sentinella vieta
    le parole di protocollo a schermo, per chi entra da Telegram. */
 function comeRiprendereChiaviP2P(){
+  const nativo = numeroConto(myTgId) < 0;
+  /* (19 nov 2026, chiavi-dal-conto) il profilo e' di nuovo quello del conto */
+  if (!P2P_CHIAVI_DALLE_PAROLE)
+    return 'Il tuo profilo di scambio torna da solo '
+      + (nativo ? 'entrando con la stessa chiave Nostr' : 'entrando dal tuo Telegram, nella Mini App o dal sito')
+      + ': gli scambi nati con lui li governi da ogni dispositivo. Questo è di un altro profilo, e lo finisci dal dispositivo dove l\'hai preso.';
   /* (17 nov 2026, chiavi-dalle-parole) gli scambi nuovi nascono dalle 12
      parole e tornano ovunque ci siano loro: una riga senza chiavi e' di
      un profilo di prima, o di un dispositivo dove le parole non ci sono */
   return 'Gli scambi nuovi nascono dalle 12 parole del tuo wallet on-chain, che tornano da sole '
-    + (numeroConto(myTgId) < 0 ? 'entrando con la stessa chiave Nostr' : 'aprendo Barattolo dal tuo Telegram')
+    + (nativo ? 'entrando con la stessa chiave Nostr' : 'aprendo Barattolo dal tuo Telegram')
     + ': quelli li governi da ogni dispositivo. Questo è di un profilo di prima, e lo finisci dal dispositivo dove l\'hai preso.';
 }
 function contattoSupportoP2P(){
@@ -86143,8 +86189,8 @@ function assicuraMazzo(){
      un ordine nuovo nato con un profilo di dispositivo e' esattamente
      quello che altrove non si governa. Fuori resta solo la strada
      sovrana; vetrina e demo non arrivano a firmare niente. */
-  if (typeof gestoDalleParoleP2P === 'function' && typeof onchainSemeAssicurato === 'function'
-      && !DEMO && !VETRINA && myTgId
+  if (P2P_CHIAVI_DALLE_PAROLE && typeof gestoDalleParoleP2P === 'function'
+      && typeof onchainSemeAssicurato === 'function' && !DEMO && !VETRINA && myTgId
       && !(m && (m.parole || m.origine === 'mia')))
     return gestoDalleParoleP2P();
   /* il mazzo c'e': il gesto parte SUBITO e la riconciliazione col cloud
@@ -86304,7 +86350,8 @@ function adottaProfiloContoP2P(){
   if (mazzoNuvola === 'illeggibile' || mazzoNuvola === 'diverso') return Promise.resolve(null);
   if (!contoInCorso) contoInCorso = (async () => {
     /* (17 nov 2026) prima le 12 parole, poi la strada di ieri */
-    const s = (typeof semeDaParoleP2P === 'function' ? await semeDaParoleP2P().catch(() => null) : null)
+    const s = (P2P_CHIAVI_DALLE_PAROLE && typeof semeDaParoleP2P === 'function'
+               ? await semeDaParoleP2P().catch(() => null) : null)
       || await semeProfiloP2P();
     /* senza seme (409: nativo Nostr senza nsec nel browser) resta la
        copia cifrata sui relay (11 ott 2026): si RIPRENDE, non si genera */

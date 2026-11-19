@@ -87040,8 +87040,10 @@ def prove_chiavi_dalle_parole():
     prova("il seme della sessione chiede PRIMA le parole, poi la strada di ieri",
           True, sc.index("semeDaParoleP2P()") < sc.index("semeProfiloP2P()"))
     gm = pezzo_js(mini, "async function giudicaMazzoP2P(m){", "\n}\n")
-    prova("il giudice: un ripiego non scalza il profilo delle parole, e con una storia si va in pensione",
-          [True, True], ["if (ora.parole && !s.parole) { p2pMazzoEsito = 'mio'; return; }" in gm,
+    prova("il giudice: un ripiego non scalza il profilo delle parole (a strada delle parole "
+          "accesa, vedi `prove_chiavi_dal_conto`), e con una storia si va in pensione",
+          [True, True], ["if (P2P_CHIAVI_DALLE_PAROLE && ora.parole && !s.parole) "
+                         "{ p2pMazzoEsito = 'mio'; return; }" in gm,
                          "if (s.parole) { await pensionaPerIlContoP2P(dopo, s);" in gm])
     co = pezzo_js(mini, "async function chiamataOrdineP2P(o, azione, payload){", "\n}\n")
     prova("la porta dei gesti firma con il profilo della RIGA, ma pubblicare e prendere col vivo",
@@ -87266,9 +87268,12 @@ def prove_p2p_conto_dispositivo():
     # ...e CINQUE dal 17 nov 2026 («chiavi-dalle-parole»): la nascita
     # del passaggio con la pensione (`pensionaPerIlContoP2P`); il gesto
     # dalle parole passa `vecchio` col suo nome lungo e non si conta qui
+    # ...e dal 19 nov 2026 («chiavi-dal-conto») la nascita della pensione
+    # riprende il profilo che torna dalla pensione: `vecchio` e' lui
     prova("...e i cinque usi passano tutti di li'", 5,
           blocco_mazzo.count("mazzoDalSemeP2P(s)")
-          + blocco_mazzo.count("mazzoDalSemeP2P(s, m)"))
+          + blocco_mazzo.count("mazzoDalSemeP2P(s, m)")
+          + blocco_mazzo.count("mazzoDalSemeP2P(s, prima ? "))
     prova("...e il campo viaggia nel testo, andata e ritorno", True,
           "conto: numeroConto(m.conto)});" in blocco_mazzo
           and "conto: d ? numeroConto(d.conto) : 0};" in blocco_mazzo)
@@ -87591,7 +87596,8 @@ console.log(JSON.stringify(out));
                       "function senzaStoriaP2P(m){",
                       "function mazzoDalSemeP2P(s, vecchio){",
                       "async function passaAlContoP2P(m, s){",
-                      "async function giudicaMazzoP2P(m){")) + r"""
+                      "async function giudicaMazzoP2P(m){")) + "\n" \
+            + _riga_js(mini, "const P2P_CHIAVI_DALLE_PAROLE = ") + r"""
 let LOCALE = null, SEME = null, SCAMBI = {}, LAPIDI = {};
 let PARCHEGGIO = null, NOTA = '', REGISTRATE = null, p2pPavimento = null;
 let p2pMazzoEsito = '', myTgId = 111, semeChiesto = 0;
@@ -214720,7 +214726,7 @@ def prove_chiavi_ovunque():
     prova("il render lo chiama UNA volta per sessione, solo col mazzo giudicato, fuori da "
           "demo e vetrina, mai sulla strada sovrana; e dopo il passaggio ridisegna",
           [True, True, True],
-          ["if (mz && !daGiudicare && !p2pVersoParole && myTgId && !DEMO && !VETRINA\n"
+          ["if (P2P_CHIAVI_DALLE_PAROLE && mz && !daGiudicare && !p2pVersoParole && myTgId && !DEMO && !VETRINA\n"
            "      && !mz.parole && mz.origine !== 'mia' && typeof passaAlleParoleP2P === 'function') {\n"
            "    p2pVersoParole = true;" in rnd,
            (lambda t: "if (!cambiato) return;" in t and "renderP2P();" in t)(
@@ -214786,6 +214792,114 @@ const console = {log: t => visto.push(['log'])};
           "l'esito e' «mio»", [True, "mio"],
           [(R.get("stessa") or [None])[0], (R.get("stessa") or [0, 0, 0, None])[3]])
     prova("...due render insieme: una promessa sola, un seme solo", [True, True, 1], R.get("una"))
+
+
+def prove_chiavi_dal_conto():
+    """LE CHIAVI DEGLI SCAMBI TORNANO DAL CONTO (19 nov 2026, cantiere
+    chiavi-dal-conto; Andrea: «Torniamo al punto 2. Io devo aprire un
+    ordine della web app e poi devo poterlo continuare anche nella mini
+    app, punto.»). La strada delle 12 parole del 17 nov e' SPENTA da una
+    costante (`P2P_CHIAVI_DALLE_PAROLE`): nessuno fa piu' nascere il
+    profilo dalle parole, e chi c'era passato torna al profilo del conto
+    al primo giudizio della sessione, col profilo delle parole in
+    pensione per finire i suoi scambi."""
+    print("\n[le chiavi degli scambi tornano dal conto: la strada delle parole spenta]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    prova("la costante e' spenta", True, "\nconst P2P_CHIAVI_DALLE_PAROLE = false;\n" in mini)
+    sc = _senza_commenti_js(pezzo_js(mini, "function semeContoP2P(){", "\n}\n"))
+    am = _senza_commenti_js(pezzo_js(mini, "function assicuraMazzo(){", "\n}\n"))
+    ad = _senza_commenti_js(pezzo_js(mini, "function adottaProfiloContoP2P(){", "\n}\n"))
+    i = mini.index("function renderP2P(")
+    rnd = _senza_commenti_js(mini[i:mini.index("\n}\n", i)])
+    prova("le quattro porte da cui il profilo nasceva dalle parole passano dalla costante: "
+          "il seme della sessione, il gesto, la gamba dell'app, il render",
+          [True, True, True, True],
+          ["if (!p2pSemeGiro && P2P_CHIAVI_DALLE_PAROLE && typeof semeDaParoleP2P" in sc,
+           "if (P2P_CHIAVI_DALLE_PAROLE && typeof gestoDalleParoleP2P === 'function'" in am,
+           "(P2P_CHIAVI_DALLE_PAROLE && typeof semeDaParoleP2P === 'function'" in ad,
+           "if (P2P_CHIAVI_DALLE_PAROLE && mz && !daGiudicare && !p2pVersoParole" in rnd])
+    prog = """
+let DEMO = false, VETRINA = false, myTgId = 111, p2pMazzoEsito = '', p2pPavimento = null;
+let mazzo = null, seme = null, ordini = {}, registrate = [];
+const store = {};
+const localStorage = {getItem: k => (k in store ? store[k] : null),
+                      setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }};
+const chiaveP2P = k => k + '@111';
+const FORMA_HEX64 = /^[0-9a-f]{64}$/;
+const numeroConto = x => Number(x) || 0;
+const mazzoMostro = () => mazzo;
+const ricordaMazzo = m => { mazzo = m; };
+const ordiniP2P = () => ordini, lapidiP2P = () => ({});
+async function semeContoP2P(){ return seme; }
+async function caricaNostrTools(){}
+async function registraChiaviP2P(l){ registrate.push(l[0]); return true; }
+async function passaAlContoP2P(m, s){ mazzo = Object.assign({}, m, {timbrato: 1}); return mazzo; }
+async function parcheggiaMazzoAltruiP2P(){ throw new Error('mensola: non doveva'); }
+window = {NostrTools: {getPublicKey: b => 'P' + b, utils: {hexToBytes: h => h}}};
+""" + "".join(_riga_js(mini, r) for r in (
+        "const P2P_CHIAVI_DALLE_PAROLE = ", "const MOSTRO_PENSIONE = ")) + "".join(
+        _fn_js(mini, f) for f in (
+            "function mazziPensioneP2P(){", "function mandaInPensioneP2P(m){",
+            "function togliDallaPensioneP2P(sk){", "function senzaStoriaP2P(m){",
+            "function mazzoDalSemeP2P(s, vecchio){", "async function pensionaPerIlContoP2P(m, s){",
+            "async function giudicaMazzoP2P(m){")) + """
+const H = c => c.repeat(64);
+(async () => {
+  const R = {};
+  const giro = async (prima) => {
+    for (const k in store) delete store[k];
+    registrate = []; p2pMazzoEsito = ''; ordini = {x: {}};
+    mazzo = {sk: H('a'), pub: H('b'), indice: 2, creato: 5, parole: 1, origine: 'conto', conto: 111};
+    seme = {sk: H('c'), versione: 0};
+    prima();
+    await giudicaMazzoP2P(mazzo);
+    return {esito: p2pMazzoEsito, vivo: mazzo && mazzo.sk.slice(0, 1), indice: mazzo && mazzo.indice,
+            creato: mazzo && mazzo.creato, parole: mazzo && mazzo.parole, backup: mazzo && mazzo.backupFatto,
+            pensione: mazziPensioneP2P().map(d => d.sk.slice(0, 1) + d.indice), registrate: registrate.length};
+  };
+  /* il profilo del conto era andato in pensione il 18: torna lui, con l'indice suo */
+  R.torna = await giro(() => {
+    mandaInPensioneP2P({sk: H('c'), pub: H('d'), indice: 164, creato: 3, origine: 'conto', conto: 111}); });
+  /* mai stato in pensione qui (la web app nata dopo): nasce dal seme */
+  R.nuovo = await giro(() => {});
+  /* stesso profilo: si timbra e basta */
+  R.stesso = await giro(() => { seme = {sk: H('a'), versione: 0}; });
+  /* il conto non risponde: non si tocca */
+  R.muto = await giro(() => { seme = null; });
+  console.log(JSON.stringify(R));
+})().catch(e => { process.stdout.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    R = _node_banco(prog)
+    if R is None:
+        salta("le chiavi tornano dal conto (banco node)", "node non c'e'")
+    else:
+        prova("IL PROFILO DELLE PAROLE TORNA AL CONTO: va in pensione, e il profilo del conto "
+              "che era in pensione torna vivo con indice e nascita suoi, fuori dalla pensione",
+              {"esito": "pensione", "vivo": "c", "indice": 164, "creato": 3, "parole": 0,
+               "backup": True, "pensione": ["a2"], "registrate": 1}, R.get("torna"))
+        prova("...senza il conto in pensione qui: nasce dal seme del conto, quello delle parole "
+              "in pensione",
+              ["pensione", "c", 0, ["a2"], 1],
+              [(R.get("nuovo") or {}).get(k) for k in ("esito", "vivo", "parole", "pensione", "registrate")])
+        prova("...il seme del conto E' quello vivo: si timbra e basta; il conto muto: niente",
+              [["mio", "a", []], ["ignoto", "a", []]],
+              [[(R.get(k) or {}).get(c) for c in ("esito", "vivo", "pensione")] for k in ("stesso", "muto")])
+    js = """
+let myTgId = 111;
+const numeroConto = x => Number(x) || 0;
+""" + _riga_js(mini, "const P2P_CHIAVI_DALLE_PAROLE = ") + _fn_js(mini, "function comeRiprendereChiaviP2P(){") + """
+const a = comeRiprendereChiaviP2P(); myTgId = -5; const b = comeRiprendereChiaviP2P();
+console.log(JSON.stringify([a, b]));
+"""
+    T = _node_banco(js)
+    if T is None:
+        salta("la riga delle chiavi (banco node)", "node non c'e'")
+        return
+    prova("la riga della pagina non manda piu' alle 12 parole: il profilo torna dall'account "
+          "(Mini App o sito) o dalla chiave Nostr",
+          [False, True, False, True],
+          ["12 parole" in T[0], "dal tuo Telegram, nella Mini App o dal sito" in T[0], "12 parole" in T[1],
+           "stessa chiave Nostr" in T[1]])
 
 
 def prove_categorie_delle_prove():
@@ -214960,7 +215074,7 @@ def _esce(f):
 # cambio libero), onchain (il 2-di-3 e RGB).
 CATEGORIE = {
     "p2p": """
-    vetrina_pulita apri_ordine_notifica chiavi_ovunque
+    vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
@@ -216275,6 +216389,7 @@ def main():
               prove_caccia_a_tappo,
               prove_apri_ordine_notifica,
               prove_chiavi_ovunque,
+              prove_chiavi_dal_conto,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

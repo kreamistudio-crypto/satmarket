@@ -37617,6 +37617,22 @@ mai il kind 0 di nessuno: regola ferrea 2).
      gesti lo usa tranne per `take-*`/`new-order`, che nascono col vivo.
   3) UN SEME DI RIPIEGO NON SCALZA un mazzo delle parole (`giudicaMazzoP2P`).
   Eccezione: la strada sovrana (`origine 'mia'`).
+  ⚠️ SPENTA DAL 19 NOV 2026 (cantiere chiavi-dal-conto, scelta di
+  Andrea: «Io devo aprire un ordine della web app e poi devo poterlo
+  continuare anche nella mini app, punto»). La costante
+  `P2P_CHIAVI_DALLE_PAROLE = false` chiude le quattro porte da cui il
+  profilo nasceva dalle parole (`semeContoP2P`, `assicuraMazzo`,
+  `adottaProfiloContoP2P`, il passaggio del render): il profilo di
+  scambio torna quello del CONTO (`/api/p2p/seme` per chi entra da
+  Telegram, la copia sui relay o la nsec per il nativo). Chi era gia'
+  passato alle parole ci torna al primo giudizio della sessione
+  (`giudicaMazzoP2P`): il mazzo delle parole va in pensione — finisce i
+  suoi scambi con la meccanica di sopra — e il vivo torna quello del
+  conto, ripreso dalla pensione con indice e nascita suoi se c'era
+  (`pensionaPerIlContoP2P`, `togliDallaPensioneP2P`). Il codice delle
+  parole resta, spento: riaccenderlo e' una riga, ma rifa' il buco del
+  19 nov (parole solo nella web app, che il cloud di Telegram non lo
+  scrive). Le 12 parole restano solo per l'on-chain.
 
 - LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo; il perché in
   CANTIERI, «La Caccia a Tappo: il gioco dentro Barattolo»). Il gioco
