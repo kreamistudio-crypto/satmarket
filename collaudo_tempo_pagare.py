@@ -320,17 +320,21 @@ async def giro_intero():
           (sc.get("paga_entro"), sv.get("paga_entro"),
            (await finestre({"ordini": [UNA]})).get("finestre")))
     prova("a chi compra i promemoria col tempo che resta, dal recapito, e NON i tre di sempre",
-          [("euro_tempo1", "sollecito_euro"), ("euro_tempo2", "sollecito_euro")],
+          [("euro_tempo1", "sollecito_euro"), ("euro_tempo2", "sollecito_euro"),
+           ("euro_tempo3", "sollecito_euro")],
           attese(UNA, PRENDE))
     sca = scadenze(UNA, PRENDE, "sollecito_euro")
     testi = [x[1] for x in sca]
-    prova("...il primo dice i 40 minuti che restano, l'ULTIMO a dieci minuti dalla fine chiede "
-          "«hai già mandato gli euro?» e dice che scade anche se ha pagato",
-          [True, True, True, [t + 60 + 1200, t + 60 + 3000]],
+    prova("...il primo dice i 40 minuti che restano, quello a dieci minuti dalla fine chiede "
+          "«hai già mandato gli euro?» e dice che scade anche se ha pagato, e dal 19 nov 2026 "
+          "ne arriva un altro a cinque minuti (Andrea)",
+          [True, True, True, True, [t + 60 + 1200, t + 60 + 3000, t + 60 + 3300]],
           ["Hai ancora 40 minuti" in testi[0],
            testi[1].startswith("⏰ Mancano 10 minuti: hai già mandato gli euro?"),
-           "anche se hai già pagato" in testi[1], [x[0] for x in sca]]
-          if len(testi) == 2 else testi)
+           "anche se hai già pagato" in testi[1],
+           testi[2].startswith("⏰ Mancano 5 minuti: hai già mandato gli euro?"),
+           [x[0] for x in sca]]
+          if len(testi) == 3 else testi)
 
     # IL CONTO ALLA ROVESCIA NEL BOT (19 nov 2026, regole-sulla-card): nasce
     # insieme ai promemoria, con la stessa fine, e il giro lo manda

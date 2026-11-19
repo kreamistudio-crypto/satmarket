@@ -77035,10 +77035,11 @@ function schedaOnchainP2P(o){
       if (contOc) {
         testo = ricevo
           ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Quando vi vedete, consegna <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> in contanti e dillo qui.`
-          : `Deposito confermato. Quando vi vedete, chi compra ti consegna <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> in contanti: `
-            + 'contali davanti a lui, poi libera i sats. Mai prima.';
-        gesti = (ricevo ? bott('orange', `contantiConsegnatiOcP2P(${o.id})`, '💵 Ho consegnato i contanti')
-                        : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+          : `Deposito confermato. Quando vi vedete, chi compra ti consegna <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> in contanti `
+            + 'e tocca «Ho consegnato i contanti»: allora contali davanti a lui e libera i sats. Mai prima.';
+        /* (19 nov 2026, Andrea: «ha senso renderlo uguale a Lightning»)
+           «Ricevuti» arriva dopo «Ho consegnato», come in `azioneP2P` */
+        gesti = (ricevo ? bott('orange', `contantiConsegnatiOcP2P(${o.id})`, '💵 Ho consegnato i contanti') : '')
           + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
           + g('disputa', '⚖️ Apri una disputa');
         break;

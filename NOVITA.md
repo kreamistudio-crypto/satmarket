@@ -800,3 +800,9 @@ frase: Negli scambi P2P on-chain con la cauzione, se chi ha preso la perde, la m
 dove: Il bot di Barattolo: «🔐 Metà della cauzione di chi ha preso è tua: … in arrivo sul tuo wallet». Senza indirizzo Lightning nel Profilo il bot chiede di scriverlo, e la metà parte appena c'è.
 leva: P2P_ONCHAIN_CAUZIONE_META_AUTO (accesa di serie, senza tetto: P2P_ONCHAIN_CAUZIONE_META_TETTO = 0); la cauzione stessa P2P_ONCHAIN_CAUZIONE, in produzione solo per i moderatori
 pubblico: no
+
+## 2026-11-19 · contanti-oc-cinque-minuti
+frase: Negli scambi P2P on-chain in contanti di persona i passi sono quelli del Lightning: chi compra consegna i contanti e tocca «Ho consegnato i contanti», poi chi vende li conta e libera i sats. E chi deve pagare riceve dal bot un promemoria anche a cinque minuti dalla fine del tempo.
+dove: P2P → «I miei scambi» → uno scambio on-chain in contanti; il bot di Barattolo, promemoria «⏰ Mancano 5 minuti: hai già mandato gli euro?».
+leva: nessuna
+pubblico: sì

@@ -72019,7 +72019,9 @@ SOLLECITO_EURO_TESTI = {
 # dei promemoria si contano da loro (`_intervalli_tempo_pagare_p2p`).
 # L'ULTIMO CADE DIECI MINUTI PRIMA DELLA FINE, cinque coi tempi sotto
 # l'ora (19 nov 2026, Andrea: «deve essere chiara questa roba qua, perché
-# altrimenti uno magari non capisce e perde i soldi»).
+# altrimenti uno magari non capisce e perde i soldi»). Da un'ora in su
+# ne segue UN ALTRO a cinque minuti dalla fine, con le stesse parole
+# (19 nov 2026, Andrea: «voglio anche un avviso quando mancano 5 minuti»).
 SOLLECITO_TEMPO_PAGARE_PRIMI = (
     "💶 Promemoria: i sats sono in garanzia e aspettano i tuoi euro. Hai "
     "ancora {resto} per inviarli al recapito che trovi nella pagina dello "
@@ -72081,7 +72083,11 @@ def _intervalli_tempo_pagare_p2p(minuti: int) -> tuple:
     else:
         punti = ()
     ultimo = m - (10 if m >= 60 else 5)
-    return tuple(p * 60 for p in punti if p <= ultimo - 10) + (ultimo * 60,)
+    # ...e da un'ora in su UN ALTRO a cinque minuti dalla fine (19 nov
+    # 2026, Andrea: «voglio anche un avviso quando mancano 5 minuti»)
+    cinque = (m - 5,) if m >= 60 else ()
+    return (tuple(p * 60 for p in punti if p <= ultimo - 10)
+            + tuple(p * 60 for p in (ultimo,) + cinque))
 
 
 def _recapito_corto_s_p2p(minuti: int) -> tuple:
@@ -72102,7 +72108,9 @@ def _testi_tempo_pagare_p2p(minuti: int) -> tuple:
     intervalli = _intervalli_tempo_pagare_p2p(m)
     testi = {}
     for i, fra in enumerate(intervalli, 1):
-        modello = (SOLLECITO_TEMPO_PAGARE_ULTIMO if i == len(intervalli)
+        # gli ultimi dieci minuti (a dieci e a cinque) hanno le parole
+        # dell'ultimo: «hai già mandato gli euro?»
+        modello = (SOLLECITO_TEMPO_PAGARE_ULTIMO if m * 60 - fra <= 10 * 60
                    else SOLLECITO_TEMPO_PAGARE_PRIMI)
         testi[i] = modello.format(resto=_durata_detta_p2p(m * 60 - fra))
     return intervalli, testi
@@ -118127,7 +118135,7 @@ def _p2p_onchain_intervalli_pagare(o) -> tuple:
     # della fine, come nel Lightning: «hai gia' mandato gli euro?»
     return (3600, 6 * 3600,
             minuti * 60 - P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S,
-            minuti * 60 - 10 * 60)
+            minuti * 60 - 10 * 60, minuti * 60 - 5 * 60)
 
 
 def _p2p_onchain_testi_pagare(o) -> dict:
@@ -118146,7 +118154,8 @@ def _p2p_onchain_testi_pagare(o) -> dict:
             fuori[i] = (
                 f"{S} ⏰ Mancano {resto}: hai già mandato gli euro? Tocca subito «Ho "
                 "inviato gli euro». Senza il bottone, allo scadere chi vende può "
-                "aprire una disputa anche se hai già pagato." if i == len(punti) else
+                "aprire una disputa anche se hai già pagato."
+                if minuti * 60 - fra <= 10 * 60 else
                 f"{S} 💶 Promemoria: i sats sono nel 2-di-3 e aspettano i tuoi "
                 f"euro. Hai ancora {resto} per inviarli al recapito che trovi "
                 "nella pagina dello scambio e toccare «Ho inviato gli euro».")
@@ -118164,6 +118173,10 @@ def _p2p_onchain_testi_pagare(o) -> dict:
             "euro e tocca «Ho inviato gli euro»: dopo, chi vende può aprire una "
             "disputa e a decidere sarà un moderatore."),
         4: (f"{S} ⏰ Mancano dieci minuti: hai già mandato gli euro? Tocca subito "
+            "«Ho inviato gli euro». Senza il bottone, allo scadere chi vende può "
+            "aprire una disputa anche se hai già pagato."),
+        # (19 nov 2026, Andrea) ...e l'ultimo a cinque minuti
+        5: (f"{S} ⏰ Mancano cinque minuti: hai già mandato gli euro? Tocca subito "
             "«Ho inviato gli euro». Senza il bottone, allo scadere chi vende può "
             "aprire una disputa anche se hai già pagato."),
     }
@@ -118235,14 +118248,18 @@ def _p2p_onchain_testi_deposito_contanti(o, euro: str, ore: int) -> list:
         (o["ricevente_id"], "🔒 <b>Chi vende ha messo i sats nel deposito di "
          f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
          f"Ora vi vedete: porta <b>{euro} €</b> in contanti. L'appuntamento è nello "
-         "scambio. Consegna i contanti solo quando chi vende libera i sats davanti "
-         "a te, poi tocca «Ho consegnato i contanti»."
+         # (19 nov 2026, Andrea: «ha senso renderlo uguale a Lightning») i
+         # passi del Lightning: prima i contanti e «Ho consegnato», poi
+         # chi vende li conta e libera
+         "scambio. Quando vi vedete consegnali e tocca «Ho consegnato i contanti»: "
+         "chi vende li conta e libera i sats davanti a te."
          f"\n\n⏳ <b>Avete {ore} ore</b>, poi chi vende può aprire una disputa."),
         (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> ora vi vedete. "
          f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
          f"Chi compra ti porta {euro} € in contanti. Scrivi nello scambio dove "
-         "vedervi, se non l'hai fatto. Contali davanti a lui, poi tocca «Ricevuti: "
-         "libera i sats» lì, davanti a lui. Mai prima."
+         "vedervi, se non l'hai fatto. Quando te li consegna, lui tocca «Ho "
+         "consegnato i contanti»: allora contali davanti a lui e tocca «Ricevuti: "
+         "libera i sats» lì. Mai prima."
          f"\n\n⏳ Avete <b>{ore} ore</b> per l'incontro.")]
 
 

@@ -214726,7 +214726,8 @@ def prove_tempo_pagare_p2p():
           "prima della fine (cinque sotto l'ora): un giorno a 1, 12, 20 ore e a 23 e 50; "
           "un'ora a 20 e 50 minuti (il 45 cadeva a meno di dieci minuti dall'ultimo); "
           "quattro ore a una, a tre e a 3 e 50; un quarto d'ora uno solo, a 10 minuti",
-          [(3600, 43200, 72000, 85800), (1200, 3000), (3600, 10800, 13800), (600,), ()],
+          [(3600, 43200, 72000, 85800, 86100), (1200, 3000, 3300), (3600, 10800, 13800, 14100),
+           (600,), ()],
           [punti(1440), punti(60), punti(240), punti(15), punti(7)])
     i1, t1 = testi(60)
     i24, t24 = testi(1440)
@@ -214734,12 +214735,16 @@ def prove_tempo_pagare_p2p():
     prova("i promemoria: il primo dice il tempo che RESTA, l'ultimo chiede «hai già mandato "
           "gli euro?» e dice che scade anche se si e' pagato; un quarto d'ora ne ha uno, che "
           "e' l'ultimo",
-          [2, 4, 1, True, True, True, True, True, ((), {})],
+          [3, 5, 1, True, True, True, True, True, True, True, ((), {})],
           [len(i1), len(i24), len(i15), "Hai ancora 40 minuti" in t1[1],
            t1[2].startswith("⏰ Mancano 10 minuti: hai già mandato gli euro?")
            and "anche se hai già pagato" in t1[2],
+           # (19 nov 2026, Andrea) ...e da un'ora in su uno anche a cinque minuti
+           t1[3].startswith("⏰ Mancano 5 minuti: hai già mandato gli euro?")
+           and "anche se hai già pagato" in t1[3],
            "Hai ancora 4 ore" in t24[3],
            t24[4].startswith("⏰ Mancano 10 minuti"),
+           t24[5].startswith("⏰ Mancano 5 minuti"),
            t15[1].startswith("⏰ Mancano 5 minuti"), testi(2)])
     prova("...e su TUTTO l'orologio i promemoria crescono e cadono prima della fine", True,
           all(punti(k) and all(0 < a < b for a, b in zip(punti(k), punti(k)[1:] + (k * 60,)))
@@ -215141,11 +215146,13 @@ console.log(JSON.stringify(out));
     prova("...i promemoria: col tempo corto quelli dell'orologio, col giorno i tre di sempre "
           "e dal 19 nov 2026 l'ultimo dieci minuti prima della fine; l'ultimo corto chiede "
           "«hai già mandato gli euro?» e dice la DISPUTA, non l'annullo",
-          [(1500,), (3600, 21600, 72000, 85800), 1, True, False, 4, True],
+          [(1500,), (3600, 21600, 72000, 85800, 86100), 1, True, False, 5, True, True],
           [ip(oc(30, ["Revolut"])), ip(oc(0, ["SEPA"])), len(t30),
            "Mancano 5 minuti: hai già mandato gli euro?" in t30[1] and "disputa" in t30[1],
            "annulla" in t30[1], len(tp(oc(0, ["SEPA"]))),
-           tp(oc(0, ["SEPA"]))[4].startswith("🟠 ⏰ Mancano dieci minuti")])
+           tp(oc(0, ["SEPA"]))[4].startswith("🟠 ⏰ Mancano dieci minuti"),
+           # (19 nov 2026, Andrea) ...e uno a cinque
+           tp(oc(0, ["SEPA"]))[5].startswith("🟠 ⏰ Mancano cinque minuti")])
 
 
 def prove_riprendi_scaduto_onchain():
@@ -215264,9 +215271,9 @@ def prove_riprendi_scaduto_onchain():
            5 - src.count("Apri lo scambio e tocca «✍️ Metti la seconda firma»")])
     # (19 nov 2026, Andrea alla prova B: «deve funzionare come in uno scambio
     # normalissimo») LE MOSSE DEL LIGHTNING NELL'ON-CHAIN
-    # (il contanti di persona ha il suo giro, `contOc`: fuori da questo conto)
+    # (19 nov 2026, Andrea: «ha senso renderlo uguale a Lightning») anche il
+    # contanti di persona: «Ricevuti» dopo «Ho consegnato i contanti»
     dep = sch[sch.index("    case 'depositato':"):sch.index("    case 'euro_inviati':")]
-    dep = dep[:dep.index("      if (contOc) {")] + dep[dep.index("      /* in USDT (2 nov 2026)"):]
     prova("COME UNO SCAMBIO NORMALE: col deposito visto niente «Blocca i sats»; coi sats "
           "nel 2-di-3 «Ricevuti: libera i sats» non c'e' (arriva dopo «Ho inviato»), chi "
           "vende senza recapito ha «Indica dove ricevere gli euro», chi compra paga solo "

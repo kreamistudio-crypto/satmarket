@@ -1512,7 +1512,8 @@ def main():
     prova("a deposito confermato i due avvisi parlano dell'incontro, non del conto",
           ("depositato", True, True, False),
           (uno(888, oc_c)["stato"], detto_a(999, "in contanti"),
-           detto_a(888, "Contali davanti a lui"), detto_a(888, "sul tuo conto")))
+           detto_a(888, "lui tocca «Ho consegnato i contanti»: allora contali"),
+           detto_a(888, "sul tuo conto")))
     prova("un terzo non segna niente: 404; su uno scambio non in contanti: 409",
           (404, 409), (gesto(777, oc_c, "sono-qui").status_code,
                        (lambda: (gesto(999, oc_s, "prendi"),
