@@ -3818,10 +3818,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `-bar5` NON esiste, ed è la ragione per cui il rollback lo toglie.
   Dal 17 nov 2026 la lista vuole anche «Contante per posta», il nono
   metodo: `["Contanti", "Contante per posta"]`, voce per voce a parola
-  intera — DA-FARE-ANDREA, voce 18, finché non è fatto. Ma SOLO quando
-  la leva del client `P2P_POSTA_ATTIVO` sarà accesa in produzione: oggi è
-  spenta di serie e Andrea la vuole spenta anche dopo la promozione, la
-  si accende solo sul collaudo, dal suo config.)
+  intera. ✅ SUL NODO DAL 19 NOV 2026 (riga 301, entrata col riavvio
+  della `-bar10`; copia `settings.toml.prima-posta-2026-11-18`): scritta
+  prima che la leva del client `P2P_POSTA_ATTIVO` si accenda in
+  produzione (oggi spenta di serie, e Andrea la vuole spenta; la si
+  accende solo sul collaudo, dal suo config), così il giorno che si
+  accende la cauzione c'è già. Non provata dal vivo: con la leva spenta
+  nessuno sceglie quel metodo.)
   Poi si rilegge: `grep -n -A7 "^\[anti_abuse_bond\]" ~/nodo/mostro/settings.toml`
   e `grep -n "hold_invoice_expiration_window" ~/nodo/mostro/settings.toml`
   → il blocco di sette righe e `= 900`. ⚠️ Il blocco vale dall'`up -d`
@@ -4011,7 +4014,8 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
 - LA `-bar10`: IL TEMPO PER PAGARE (patch 0013), immagine
   `mostro:v0.20.2-bar10` (preparata il 18 nov 2026, cantiere
   `tempo-pagamento`, scelta di Andrea: «Tutto insieme, nodo compreso»;
-  NON ANCORA SUL NODO, la voce sta in `docs/DA-FARE-ANDREA.md`). Il
+  ✅ FATTA SUL NODO il 19 nov 2026, in servizio dalle 08:28 UTC, com'è
+  andata in fondo a questa voce, «COM'È ANDATA SUL NODO»). Il
   perché: CANTIERI, «Il tempo per pagare nel P2P»; il disegno: README del
   fork, «LA 0013». Una patch sola sopra le undici della `-bar9`, nessuna
   salita di versione, NESSUNA MIGRAZIONE di sqlx: la tabella sua
@@ -4064,6 +4068,45 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   da una garanzia pagata senza «Ho inviato». La prova breve è uno scambio
   da 15 minuti col SEPA Instant fra i due account di Andrea, lasciato
   scadere.
+  COM'È ANDATA SUL NODO (18-19 nov 2026, dal thread della promozione,
+  tutto incollato da Andrea). 18 nov sera: il segreto sul VPS
+  (`P2P_FINESTRA_SEGRETO`, la porta risponde `403`); sul nodo immagine
+  `-bar9`, sorgente pulito sul branch `barattolo/v0.20.2`, albero
+  `16734181`, 16 GB liberi; `git am` della `0013-*.patch` → albero
+  `bdad9c3479602556e2db1ddbeefc8cc2dd809d7d`; test `740 passed; 0
+  failed; 1 ignored` e `90 passed`; build, `barattolo_payment_windows` 6
+  volte nel binario; il compose `.bar10` con l'immagine e le due righe
+  FINESTRA, `compose-ok`, impronta uguale al VPS; copie
+  `docker-compose.yml.prima-bar10` e
+  `settings.toml.prima-posta-2026-11-18`, e la riga del contante per posta
+  scritta (riga 301, `only_payment_methods = ["Contanti", "Contante per
+  posta"]`, vale dal riavvio). Il comando del cambio si è FERMATO DA SOLO
+  (due scambi aperti: uno `active`, uno `settled-hold-invoice` col
+  pagamento da 296.399 sats in volo). 19 nov: il pagamento è `SUCCEEDED`;
+  resta lo scambio `active`, fermo da 21 ore (362.235 sats, SEPA
+  Instant, abbandonato da chi prende), e Andrea sceglie di cambiare
+  adesso invece di aspettare che lo chiuda il guardiano della garanzia
+  (verso domenica 22, hold al blocco 977009). Il comando del cambio è
+  stato riscritto per quel caso: procede solo se il compose è uguale alla
+  copia di ieri e gli scambi sono esattamente «1 `active`, 0 altri».
+  08:28:40 → 08:28:51 UTC, libro fermo undici secondi; `mostro:v0.20.2-bar10`,
+  «Settings correctly loaded!», `barattolo_fee` e `barattolo_eventi`
+  di sempre, nessuna riga «barattolo_finestra: … not set»; l'avviso
+  `blockchain.info` 403 è quello di sempre (una fonte del prezzo su
+  quattro). Nell'app il cursore «Tempo per pagare» compare anche su
+  Lightning. Lo scambio rimasto non ha tempo (nato prima; il server non
+  ne dà a uno attivo da più di 15 minuti): lo chiude il guardiano, DA
+  GUARDARE domenica 22. NON ANCORA PROVATI dal vivo: l'annullo allo
+  scadere (la prova da 15 minuti fra i due account di Andrea, sopra) e
+  la cauzione col «Contante per posta» (la leva `P2P_POSTA_ATTIVO` è
+  spenta in produzione, quindi nessuno la sceglie).
+  LA LEZIONE DEL PASSO 1: il controllo di sola lettura chiedeva branch e
+  albero nello stesso `git rev-parse --abbrev-ref`, che vale per TUTTI
+  gli argomenti: stampa il branch e per l'albero NIENTE, con l'uscita a
+  0, e così il controllo sembra fatto. Si è rimediato con una seconda
+  riga. La forma giusta, per la prossima immagine, sono due domande:
+  `git -C ~/nodo/mostro-src rev-parse --abbrev-ref HEAD && git -C
+  ~/nodo/mostro-src rev-parse HEAD^{tree}`.
 - LA SALITA ALLA 0.20.2, immagine `mostro:v0.20.2-bar9` (preparata il 29
   ott 2026, cantiere `mostro-0202`, decisione di Andrea: «fork intero
   sulla 0.20.2»; ✅ FATTA SUL NODO il 30 ott 2026, in servizio dalle

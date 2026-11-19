@@ -607,7 +607,7 @@ chiusa con l'annullo di chi aveva preso); la disputa automatica a ~92
 ore; il ritorno alla `-bar7` (i due file `.prima-bar8` e `up -d`).
 
 LA 0.20.2 IN SERVIZIO DAL 30 OTT 2026, immagine `mostro:v0.20.2-bar9`
-(preparata il 29 ott, cantiere `mostro-0202`; la liturgia in PRODUZIONE,
+(dal 19 nov la `-bar10`, sotto, «LA 0013»; preparata il 29 ott, cantiere `mostro-0202`; la liturgia in PRODUZIONE,
 «LA SALITA ALLA 0.20.2», il perché in CANTIERI, «Mostro 0.20.2»; com'è
 andata sul nodo in fondo a questa voce). Upstream ha fatto sei versioni
 dalla nostra 0.19.0 (la `v0.20.2` è del 28 ott). Il fork è stato
@@ -657,8 +657,8 @@ numeri e il registro: PRODUZIONE, «LA SALITA ALLA 0.20.2», «COM'È
 ANDATA SUL NODO».
 
 LA 0013, IL TEMPO PER PAGARE (preparata il 18 nov 2026, cantiere
-`tempo-pagamento`; NON ANCORA SUL NODO: `docs/DA-FARE-ANDREA.md`, voce
-25). Il problema: uno scambio `active` lo chiude solo il guardiano della
+`tempo-pagamento`; SUL NODO DAL 19 NOV 2026, 08:28 UTC, immagine
+`mostro:v0.20.2-bar10`, le dodici patch). Il problema: uno scambio `active` lo chiude solo il guardiano della
 garanzia, a ~92 ore, e chi prende e sparisce tiene fermi i sats di chi
 vende per quattro giorni. Ora chi pubblica su Barattolo sceglie il tempo
 su un orologio, da 15 minuti a 24 ore, e il nodo lo CHIEDE al server ogni minuto (`BARATTOLO_FINESTRA_URL`
@@ -674,3 +674,20 @@ tempo». Nessuna migrazione: la tabella sua la crea il modulo, e il
 ritorno alla `-bar9` è il solo cambio d'immagine. Compilata e provata
 nel cloud: albero `bdad9c34`, 2001 prove `cargo` verdi (PRODUZIONE, «LA
 `-bar10`»).
+
+COM'È ANDATA SUL NODO (19 nov 2026, 08:28 UTC, cantiere `tempo-pagamento`):
+la build il 18 sera, un comando alla volta e tutto incollato da Andrea —
+lo stesso albero del cloud (`bdad9c34`), 740/0/1 e 90/0, il compose con
+le due righe FINESTRA e l'impronta del segreto uguale al VPS. Il cambio
+si è fermato da solo il 18 su due scambi aperti; il 19, chiuso il
+pagamento da 296.399 sats, ne restava uno `active` abbandonato da 21 ore
+(362.235 sats, SEPA Instant), e Andrea ha scelto di cambiare con lui nel
+libro: undici secondi di libro fermo. Col riavvio è entrata anche la riga
+del contante per posta nel `settings.toml` (`only_payment_methods =
+["Contanti", "Contante per posta"]`). Log pulito, il cursore «Tempo per
+pagare» compare su Lightning. RESTA DA GUARDARE: lo scambio rimasto lo
+chiude il guardiano della garanzia verso domenica 22 (nessun tempo per
+pagare: è nato prima). NON PROVATI: l'annullo allo scadere (la prova da
+15 minuti fra due account) e la cauzione col contante per posta (leva
+`P2P_POSTA_ATTIVO` spenta in produzione). I numeri: PRODUZIONE, «LA
+`-bar10`», «COM'È ANDATA SUL NODO».

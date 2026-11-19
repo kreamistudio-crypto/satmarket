@@ -213625,9 +213625,19 @@ def prove_tempo_pagare_p2p():
           [len(pp), b"\r" in testo_pp, b"+++ b/src/barattolo_finestra.rs" in testo_pp,
            "| 0013 | `patch-0013-tempo-per-pagare.py` + `barattolo_finestra.rs` |"
            in open(os.path.join(cartella, "README.md"), encoding="utf-8").read()])
-    prova("...e DA-FARE-ANDREA ha i comandi, con l'albero e i numeri del cloud", [True, True],
-          ["bdad9c3479602556e2db1ddbeefc8cc2dd809d7d" in open("docs/DA-FARE-ANDREA.md", encoding="utf-8").read(),
-           "740 passed; 0 failed; 1 ignored" in open("docs/DA-FARE-ANDREA.md", encoding="utf-8").read()])
+    # La voce di DA-FARE-ANDREA e' FATTA (19 nov 2026, la `-bar10` sul nodo) e se
+    # n'e' andata: l'albero e i numeri, del cloud e del nodo, restano in PRODUZIONE.
+    produzione = open("docs/PRODUZIONE.md", encoding="utf-8").read()
+    prova("...e PRODUZIONE ha la salita, con l'albero e i numeri (cloud e nodo)", [True, True],
+          ["bdad9c3479602556e2db1ddbeefc8cc2dd809d7d" in produzione,
+           "740 passed; 0 failed; 1 ignored" in produzione])
+    # Il passo 1 della -bar10 chiedeva branch e albero nello STESSO `rev-parse
+    # --abbrev-ref`, che vale per tutti gli argomenti: il branch usciva, l'albero
+    # no, e l'uscita era 0. Nessun documento lo ripropone.
+    prova("nessun documento chiede branch e albero nello stesso rev-parse --abbrev-ref",
+          [], [f for f in sorted(os.listdir("docs")) + ["../deploy/mostro/README.md"]
+               if f.endswith(".md") and re.search(r"rev-parse --abbrev-ref HEAD HEAD\^\{tree\}",
+                                                   open(os.path.join("docs", f), encoding="utf-8").read())])
 
     # --- 2) I GIUDICI PURI DEL SERVER --------------------------------------
     import sqlite3

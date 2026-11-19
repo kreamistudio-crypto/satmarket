@@ -650,18 +650,15 @@ sudo grep -n "^URL_PUBBLICO" /srv/collaudo/barattolo/config.py
 Se uno dei tre non entra, non si tocca niente: si porta la frase
 dell'errore alla sessione.
 
-## 18. La cauzione anche sul «Contante per posta»: una riga nel settings.toml del nodo (17 nov 2026, cantiere contante-per-posta; Andrea sulla scheda: «Sì, con cauzione obbligatoria»)
+## 18. Il «Contante per posta» sul collaudo: la leva del client (17 nov 2026, cantiere contante-per-posta; Andrea sulla scheda: «Sì, con cauzione obbligatoria»)
 
 **Perché.** L'app ha il nono metodo P2P, «Contante per posta» (la busta
-di banconote spedita). La cauzione di chi prende la decide il NODO, dalla
-lista `only_payment_methods` del blocco `[anti_abuse_bond]` (patch 0008 e
-0010 del fork): oggi c'è solo «Contanti», quindi chi prende un ordine
-scegliendo «Contante per posta» NON blocca niente finché la riga non
-cambia. Il client non promette niente da solo: legge la lista dal 38385.
-Il confronto è a parola intera, senza maiuscole, voce per voce (la
-virgola separa): «Contante per posta» va scritto così, intero. Il perché:
-CANTIERI, «Il contante per posta: la nona voce del P2P». Va fatto DOPO la
-promozione (prima, nessun client la manda), e a LIBRO FERMO.
+di banconote spedita). La parte del NODO è FATTA (19 nov 2026, col
+riavvio della `-bar10`): `only_payment_methods = ["Contanti", "Contante
+per posta"]`, quindi chi prende scegliendolo blocca la cauzione
+(PRODUZIONE, «LA SALITA ALLA -bar7», il blocco `[anti_abuse_bond]`).
+Resta la leva del client sul collaudo, per la prova. Il perché:
+CANTIERI, «Il contante per posta: la nona voce del P2P».
 
 **A. LA LEVA DEL CLIENT, SOLO SUL COLLAUDO (17 nov 2026, cantiere
 leva-posta; Andrea: «Lasciala spenta la leva per questa funzione. Quando
@@ -695,37 +692,6 @@ Atteso `ok` e `200`. Poi nell'app del collaudo:
 P2P → «Pubblica» → «Altri metodi ▾» mostra «Contante per posta», e Info
 P2P ha la voce. Senza la riga, la voce non c'è: è il comportamento della
 produzione.
-
-**B. LA CAUZIONE, SUL NODO.** Va fatto solo quando la leva si accenderà
-in produzione (oggi no): finché la voce non si offre a nessuno, la riga
-del nodo non serve, e aggiungerla prima non fa danni ma non prova niente.
-
-Sola lettura (NODO):
-```
-grep -n "only_payment_methods" ~/nodo/mostro/settings.toml
-```
-Atteso: `only_payment_methods = ["Contanti"]`. Se c'è già «Contante per
-posta», non c'è niente da fare.
-
-**Scrive (NODO), a libro fermo:** la copia, la riga, la rilettura, il riavvio.
-```
-cp -p ~/nodo/mostro/settings.toml ~/nodo/mostro/settings.toml.prima-posta-$(date +%F)
-```
-```
-sed -i 's/^only_payment_methods = \["Contanti"\]$/only_payment_methods = ["Contanti", "Contante per posta"]/' ~/nodo/mostro/settings.toml
-```
-```
-grep -n -A7 "^\[anti_abuse_bond\]" ~/nodo/mostro/settings.toml
-```
-Atteso: il blocco di sempre, con `only_payment_methods = ["Contanti", "Contante per posta"]`.
-```
-cd ~/nodo && docker compose restart mostro && sleep 20 && docker compose logs --tail=30 mostro
-```
-Nei log nessun errore di settings. Poi dal telefono, su un ordine che
-accetta «Contante per posta»: scegliendolo alla presa la riga «🔐 La
-cauzione di chi prende» compare (col testo «col contante per posta»),
-scegliendo SEPA no. Fatta, questa voce si cancella e il nuovo valore va
-in PRODUZIONE («LA SALITA ALLA -bar7», il blocco `[anti_abuse_bond]`).
 
 ## 19. Le raccolte con deposito di garanzia: la leva sul collaudo, per la prova di Alan (17 nov 2026, cantiere raccolta)
 
@@ -957,143 +923,3 @@ risolvili adesso»). Si vedono nella tendina con la promozione che porta
 l'albero nuovo. Restano senza sottocategoria solo 14 annunci di prova
 («Prova», «Test», «Balu», «Tastiera»).
 
-## 25. Il tempo per pagare nel P2P: il segreto sul VPS, poi la `-bar10` sul nodo (18 nov 2026, cantiere tempo-pagamento; Andrea: «Tutto insieme, nodo compreso»)
-
-**Perché.** Chi pubblica una vendita sceglie il tempo per il pagamento
-con un orologio, da 15 minuti a 24 ore, e allo scadere il NODO annulla
-lo scambio (patch 0013). Sull'on-chain il tempo vale già con la
-promozione (lì non annulla nessuno: avviso e disputa). Il
-codice del server arriva con la promozione; senza questi passi l'app
-non mostra la scelta (la offre solo se il nodo la annuncia) e niente si
-annulla da solo. Va fatto DOPO la promozione, in quest'ordine: A sul
-VPS, poi B sul nodo. Il perché e i numeri: PRODUZIONE, «LA `-bar10`».
-
-**A. IL SEGRETO, SUL VPS** (`ssh root@46.62.162.103`). Sola lettura, deve dire `0`:
-```
-sudo grep -c "^P2P_FINESTRA_SEGRETO" /srv/barattolo/config.py
-```
-Scrive: la copia, il segreto nuovo (nasce lì e non si vede), il controllo, il riavvio.
-```
-sudo cp -p /srv/barattolo/config.py /srv/barattolo/config.py.prima-finestra
-```
-```
-S=$(python3 -c "import secrets; print(secrets.token_hex(32))") && printf '\n# il tempo per pagare (18 nov 2026, patch 0013): la porta del nodo\nP2P_FINESTRA_SEGRETO = %s%s%s\n' '"' "$S" '"' | sudo tee -a /srv/barattolo/config.py > /dev/null && unset S && echo scritto
-```
-```
-sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"
-```
-```
-sudo systemctl restart barattolo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" -X POST https://barattolo.store/api/p2p/finestre
-```
-Atteso `scritto`, `ok` e `403` (la porta c'è; `404` = segreto non letto
-o leva spenta). Nel pannello «⚙️ Stato delle leve»: «Tempo per pagare —
-porta del coordinatore» accesa. L'impronta, da segnarsi (otto lettere):
-```
-sudo grep "^P2P_FINESTRA_SEGRETO" /srv/barattolo/config.py | cut -d= -f2- | tr -cd 'A-Za-z0-9_-' | sha256sum | cut -c1-8
-```
-
-**B. LA `-bar10`, SUL NODO** (`ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`),
-un comando alla volta, il cambio a libro fermo.
-
-1) Sola lettura: l'immagine e il sorgente.
-```
-docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && git -C ~/nodo/mostro-src status --short | wc -l && git -C ~/nodo/mostro-src rev-parse --abbrev-ref HEAD HEAD^{tree} && df -h / | tail -1
-```
-Atteso `mostro:v0.20.2-bar9`, `0`, `barattolo/v0.20.2`,
-`16734181e552e552f54b0c18c5ce2381764e67fe`, e almeno 6 GB liberi.
-
-2) Sul PC (PowerShell, nel repo sulla punta di `main` dopo la promozione), le patch prese da git:
-```
-git archive HEAD deploy/mostro --format=tar -o $env:TEMP\mostro-bar10.tar
-```
-```
-scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\mostro-bar10.tar debian@vm-1937.lnvps.cloud:
-```
-Sul nodo:
-```
-mkdir -p ~/nodo/patch-bar10 && tar xf ~/mostro-bar10.tar -C ~/nodo/patch-bar10 --strip-components=2 && ls ~/nodo/patch-bar10/0013-*.patch
-```
-
-3) La patch e l'albero:
-```
-cd ~/nodo/mostro-src && git am ~/nodo/patch-bar10/0013-*.patch && git rev-parse HEAD^{tree}
-```
-Atteso `bdad9c3479602556e2db1ddbeefc8cc2dd809d7d` (lo stesso del cloud).
-Se `git am` si ferma: `git am --abort` e si incolla a Claude.
-
-4) I test prima della build (due lanci, come la `-bar9`):
-```
-docker build -f docker/Dockerfile --target builder -t mostro-test:bar10 .
-```
-```
-docker run --rm mostro-test:bar10 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods barattolo_tempo nip33 find_order_by_seconds a_dispute_the_daemon_opens barattolo_finestra payment_window
-```
-Atteso `740 passed; 0 failed; 1 ignored`.
-```
-docker run --rm mostro-test:bar10 cargo test --release -- util::tests::
-```
-Atteso `90 passed; 0 failed`. Numeri diversi: si incolla a Claude, e il
-sorgente torna con `git reset --hard HEAD~1`.
-
-5) La build vera e il controllo del binario:
-```
-docker build -f docker/Dockerfile -t mostro:v0.20.2-bar10 .
-```
-```
-docker run --rm --entrypoint sh mostro:v0.20.2-bar10 -c "grep -c barattolo_payment_windows /usr/local/bin/mostrod"
-```
-Atteso un numero sopra zero.
-
-6) Il compose nuovo, preparato e letto PRIMA del cambio. Sul VPS, nel
-TUO terminale (mai in chat), mostra il segreto per copiarlo:
-```
-sudo grep "^P2P_FINESTRA_SEGRETO" /srv/barattolo/config.py | cut -d'"' -f2
-```
-Poi sul nodo lo incolli quando lo chiede (non si vede):
-```
-cd ~/nodo && read -rsp "Segreto del tempo per pagare: " S && echo && if [ ${#S} -ne 64 ]; then echo "Non sono 64 lettere: non scrivo niente"; else export S && sed 's#mostro:v0.20.2-bar9#mostro:v0.20.2-bar10#' docker-compose.yml | awk '{print} /BARATTOLO_EVENTI_URL=/{l=$0; sub(/BARATTOLO_EVENTI_URL=[A-Za-z0-9_:\/.-]*/, "BARATTOLO_FINESTRA_URL=https://barattolo.store/api/p2p/finestre", l); print l} /BARATTOLO_EVENTI_SEGRETO=/{l=$0; sub(/BARATTOLO_EVENTI_SEGRETO=[A-Za-z0-9_-]*/, "BARATTOLO_FINESTRA_SEGRETO=" ENVIRON["S"], l); print l}' > docker-compose.yml.bar10 && echo pronto; fi; unset S
-```
-Poi `clear` sul VPS. Il controllo (il segreto resta nascosto):
-```
-diff docker-compose.yml docker-compose.yml.bar10 | sed 's/SEGRETO=.*/SEGRETO=(nascosto)/'; docker compose -f docker-compose.yml.bar10 config -q && echo compose-ok
-```
-Atteso: l'immagine cambiata, DUE righe nuove (`BARATTOLO_FINESTRA_URL=…/api/p2p/finestre`
-e `BARATTOLO_FINESTRA_SEGRETO=(nascosto)`) e `compose-ok`. L'impronta
-deve essere la stessa del punto A:
-```
-grep -o "BARATTOLO_FINESTRA_SEGRETO=.*" ~/nodo/docker-compose.yml.bar10 | head -1 | cut -d= -f2- | tr -cd 'A-Za-z0-9_-' | sha256sum | cut -c1-8
-```
-
-7) La copia di riserva del compose (il database non serve: nessuna migrazione):
-```
-cp -p ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-bar10
-```
-
-8) IL CAMBIO, UN COMANDO: se c'è uno scambio aperto non tocca niente.
-```
-cd ~/nodo && n=$(sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute(\"SELECT COUNT(*) FROM orders WHERE status IN ('waiting-payment','waiting-buyer-invoice','waiting-taker-bond','active','fiat-sent','settled-hold-invoice','in-progress','dispute')\").fetchone()[0])") && echo "scambi aperti: $n" && [ "$n" = 0 ] && date -u && cp -p docker-compose.yml.bar10 docker-compose.yml && docker compose up -d mostro && date -u
-```
-
-9) Il controllo, subito:
-```
-docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && docker compose logs mostro --since 3m | grep -i -E "barattolo_|Settings correctly|error|panic" | head -30
-```
-Atteso `mostro:v0.20.2-bar10`, «Settings correctly loaded!», le righe
-di `barattolo_fee` e `barattolo_eventi` di sempre, e NESSUNA riga
-«barattolo_finestra: … not set» (se c'è, manca una variabile). Poi
-nell'app: «Pubblica» → «Vendi BTC» col SEPA Instant mostra «Tempo per
-pagare» col cursore che si muove.
-
-10) La prova dal vivo coi tuoi due account: una vendita col solo SEPA
-Instant e il cursore a 15 minuti, presa dall'altro, garanzia pagata, e
-NON toccare «Ho inviato gli euro». Tutti e due vedono l'anello che si
-svuota; dopo il quarto d'ora (entro un minuto in più) lo scambio si
-annulla, i sats tornano, e arrivano i due messaggi «⏰ Il
-tempo per pagare è finito…».
-
-ROLLBACK (solo se la `-bar10` non regge): `cd ~/nodo && cp -p docker-compose.yml.prima-bar10 docker-compose.yml && docker compose up -d mostro`
-→ `-bar9`; il database resta quello (la tabella in più la `-bar9` la
-ignora), e il sorgente torna con `git -C ~/nodo/mostro-src reset --hard HEAD~1`.
-Fatta, questa voce si cancella e il README del fork, NODO-MOSTRO e la
-riga dell'immagine in `CLAUDE.md` (`-bar9` → `-bar10`, dodici patch) si
-chiedono a Claude.

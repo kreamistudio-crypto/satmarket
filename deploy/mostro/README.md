@@ -1,13 +1,13 @@
-# IL FORK DI MOSTRO — le undici patch, dal 29 ott 2026 sopra il tag v0.20.2
+# IL FORK DI MOSTRO — le dodici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
-**Dal 18 novembre 2026 c'è la 0013, PREPARATA E NON ANCORA SUL NODO**: il
-tempo per pagare scelto da chi pubblica (cantiere `tempo-pagamento`,
-sotto, «LA 0013»). Sta sopra la 0012, ha il suo patcher e il suo modulo
-(`barattolo_finestra.rs`), ed è stata COMPILATA E PROVATA nel cloud: `git
-am` delle dodici `.patch` su un clone pulito della `v0.20.2` dà l'albero
-`bdad9c34`, e `cargo test` dice 2001 verdi, 0 rosse. Il nodo gira ancora
-la `-bar9` (undici patch) finché Andrea non fa la voce di
-`docs/DA-FARE-ANDREA.md`; l'immagine nuova sarà la `-bar10`.
+**Dal 19 novembre 2026 la 0013 È SUL NODO** (immagine `mostro:v0.20.2-bar10`,
+08:28 UTC; sotto, «IN SERVIZIO»): il tempo per pagare scelto da chi
+pubblica (cantiere `tempo-pagamento`, sotto, «LA 0013»). Sta sopra la
+0012, ha il suo patcher e il suo modulo (`barattolo_finestra.rs`), ed è
+stata COMPILATA E PROVATA nel cloud prima del nodo: `git am` delle dodici
+`.patch` su un clone pulito della `v0.20.2` dà l'albero `bdad9c34`, e
+`cargo test` dice 2001 verdi, 0 rosse. Sul nodo lo stesso albero e gli
+stessi numeri (740/0/1 e 90/0).
 
 **Dal 29 ottobre 2026 il fork sta sulla `v0.20.2`** (`fe2a905`, uscita il
 28 ott; cantiere `mostro-0202`, decisione di Andrea: il fork intero,
@@ -727,7 +727,35 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.20.2-bar9` dal 30 ott 2026, 07:37 UTC: le UNDICI
+Immagine `mostro:v0.20.2-bar10` dal 19 nov 2026, 08:28 UTC: le DODICI
+patch di questa cartella sopra la `v0.20.2`, cioè le undici della `-bar9`
+più la 0013 (il tempo per pagare). Sul nodo `git am` della sola
+`0013-*.patch` (presa da git sulla punta di `main`, 18 nov sera) sopra il
+branch `barattolo/v0.20.2` ha dato l'albero
+`bdad9c3479602556e2db1ddbeefc8cc2dd809d7d`, lo stesso del cloud; i test
+nello stadio `builder` `740 passed; 0 failed; 1 ignored` e `90 passed`,
+e il binario contiene `barattolo_payment_windows` (6 volte). Nessuna
+migrazione. Il compose ha l'immagine nuova e DUE righe in più
+(`BARATTOLO_FINESTRA_URL` → `/api/p2p/finestre` e
+`BARATTOLO_FINESTRA_SEGRETO`, impronta uguale a quella del VPS); col
+cambio è entrata anche la riga nuova del `settings.toml`,
+`only_payment_methods = ["Contanti", "Contante per posta"]` (riga 301:
+la cauzione di chi prende anche col contante per posta, che in
+produzione resta dietro `P2P_POSTA_ATTIVO` spenta). Il cambio (08:28:40
+→ 08:28:51) è avvenuto con UNO scambio `active` nel libro, fermo da 21
+ore e abbandonato da chi prende, per scelta di Andrea (362.235 sats,
+SEPA Instant). Non ha un tempo per pagare: è nato prima, e il server non
+ne dà a uno scambio attivo da più di 15 minuti
+(`P2P_FINESTRA_RITARDO_MAX_S`) — detto dal codice, non visto nel log.
+Lo chiude il guardiano della garanzia, come con la `-bar9`, verso
+domenica 22 (la hold scade al blocco 977009): da guardare. Al riavvio «Settings correctly loaded!», `barattolo_fee`
+e `barattolo_eventi` di sempre, nessuna riga «barattolo_finestra: … not
+set»; nell'app il cursore «Tempo per pagare» compare anche su Lightning.
+Il ritorno è il solo cambio d'immagine (`docker-compose.yml.prima-bar10`,
+e `settings.toml.prima-posta-2026-11-18` per la riga): PRODUZIONE, «LA
+`-bar10`», COM'È ANDATA SUL NODO.
+
+Fino al 19 nov 2026, immagine `mostro:v0.20.2-bar9` dal 30 ott 2026, 07:37 UTC: le UNDICI
 patch di questa cartella sopra la `v0.20.2` (`fe2a905`), messe sul nodo
 con `git am` delle `.patch` prese da git (commit `bc47e0c`), sul branch
 `barattolo/v0.20.2` — albero `16734181`, lo stesso del cloud byte per
