@@ -121621,30 +121621,61 @@ def prove_avvisi_nuovi_ordini():
     amb = {"html": html, "URL_PUBBLICO": "https://barattolo.store", "time": time}
     gemelli_link_telegram(amb)      # a leva spenta: il link di sempre
     for riga in ("TIPI_AVVISI_NUOVI_P2P = ", "SOGLIE_AVVISI_NUOVI_P2P = ", "RETI_AVVISI_NUOVI_P2P = ",
-                 "VALUTE_AVVISI_NUOVI_P2P = ", "METODI_AVVISI_NUOVI_P2P = "):
+                 "VALUTE_AVVISI_NUOVI_P2P = ", "METODI_AVVISI_NUOVI_P2P = ",
+                 # (19 nov 2026) Barattozon fra i metodi: le righe di ieri
+                 "TIPI_AVVISI_NUOVI_P2P_IERI = ", "SEGNO_AVVISI_NUOVI_P2P = ",
+                 "METODO_BZ_AVVISI_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("   #")[0], amb)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
     exec(src[i:src.index("}\n", i) + 2], amb)
-    for f in ("_campo_riga", "_pref_avvisi_nuovi_p2p", "_euro_tabacchino", "_metodi_libro",
+    for f in ("_campo_riga", "_avvisi_da_ieri", "_pref_avvisi_nuovi_p2p", "_euro_tabacchino", "_metodi_libro",
               "_tabacchino_libro", "_euro_libro", "_tipo_nuovo_p2p", "_euro_nuovo_p2p",
               "_convenienza_nuovo_p2p", "_passa_avviso_nuovo_p2p", "_frase_convenienza_p2p",
               "_testo_avviso_nuovi_p2p", "_nuovi_dalla_foto_p2p", "_tag_evento_p2p",
               "_evento_libro_p2p", "_avviso_onchain_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     pref = amb["_pref_avvisi_nuovi_p2p"]
-    T3 = ["vendita", "acquisto", "barattozon"]
+    # EMENDATA (19 nov 2026, Andrea: «notifiche solo per ordini barattozon
+    # di tipo compra btc», scelta «Barattozon fra i metodi»): i tipi sono i
+    # due lati, Barattozon e' il primo dei metodi. `T3` resta il nome: le
+    # preferenze «tutto» delle prove qui sotto
+    T3 = ["vendita", "acquisto"]
+    BZ = "Contanti al tabacchino"
     SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []}
     prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
           [SPENTO, SPENTO, SPENTO],
           [pref(None), pref({"tg_id": 1}),
            pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
     prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle sei",
-          [{"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "2", "rete": "", "valuta": "",
+          [{"attivo": True, "tipi": ["vendita"], "soglia": "2", "rete": "", "valuta": "",
             "metodi": []},
-           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []}],
+           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []},
+           {"attivo": True, "tipi": ["acquisto"], "soglia": "", "rete": "", "valuta": "",
+            "metodi": [BZ, "SEPA"]}],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
-           pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"})])
+           pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"}),
+           # la forma nuova (19 nov 2026): il segno `v2`, e Barattozon nei metodi
+           pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|acquisto|v2|",
+                 "avvisi_nuovi_metodi": "|SEPA|" + BZ + "|"})])
+    # LE RIGHE DI IERI TRADOTTE (19 nov 2026): stesso effetto, salvo
+    # Barattozon con un lato solo, che adesso vale solo da quel lato
+    ieri = amb["_avvisi_da_ieri"]
+    TUTTI_MENO_BZ = [m for m in amb["METODI_AVVISI_NUOVI_P2P"] if m != BZ]
+    prova("le righe di ieri: solo Barattozon = i due lati col metodo Barattozon; Barattozon "
+          "coi metodi «tutti» = «tutti»; coi metodi scelti = quelli piu' Barattozon; senza "
+          "Barattozon e coi metodi «tutti» = tutti gli altri; coi metodi scelti = quelli",
+          [(T3, [BZ]), (["vendita"], []), (["acquisto"], [BZ, "SEPA", "Revolut"]),
+           (T3, TUTTI_MENO_BZ), (["vendita"], ["Revolut"])],
+          [ieri(["barattozon"], []), ieri(["vendita", "barattozon"], []),
+           ieri(["acquisto", "barattozon"], ["Revolut", "SEPA"]),
+           ieri(["vendita", "acquisto"], []), ieri(["vendita"], ["Revolut"])])
+    prova("...e la riga di ieri si rilegge gia' tradotta, quella nuova no",
+          [(T3, TUTTI_MENO_BZ), (T3, [])],
+          [(lambda d: (d["tipi"], d["metodi"]))(pref({"avvisi_nuovi_p2p": 1,
+                                                       "avvisi_nuovi_tipi": "|vendita|acquisto|"})),
+           (lambda d: (d["tipi"], d["metodi"]))(pref({"avvisi_nuovi_p2p": 1,
+                                                       "avvisi_nuovi_tipi": "|vendita|acquisto|v2|"}))])
     prova("...le tre sotto zero si rileggono, una sconosciuta (−7, −1) torna «tutti»",
           ["-10", "-5", "-2", "", ""],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_soglia": v})["soglia"]
@@ -121699,18 +121730,40 @@ def prove_avvisi_nuovi_ordini():
            passa(PV("USDT"), "acquisto", None, "ln", "EUR")])
     # IL METODO (18 nov 2026, cantiere vetrina-pulita)
     PM = lambda ms: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": ms}
+    # EMENDATA (19 nov 2026): Barattozon e' un metodo — passa se e' scelto
+    # fra i metodi, e dal suo lato: «Compra BTC» (sell) vendita, «Vendi BTC»
+    # (buy) acquisto
     prova("IL METODO: nessuno scelto passa tutto; con dei metodi passa l'ordine che ne accetta "
-          "almeno uno, non gli altri ne' quello senza metodi; Barattozon passa dalla sua chip",
-          [True, True, False, False, True],
+          "almeno uno, non gli altri ne' quello senza metodi; Barattozon solo se scelto",
+          [True, True, False, False, False],
           [passa(PM([]), "vendita", None, "ln", "EUR", ["SEPA"]),
            passa(PM(["Revolut"]), "vendita", None, "ln", "EUR", ["SEPA", "Revolut"]),
            passa(PM(["Revolut"]), "vendita", None, "ln", "EUR", ["SEPA"]),
            passa(PM(["Revolut"]), "acquisto", None, "ln", "EUR", []),
            passa(PM(["Revolut"]), "barattozon", None, "ln", "EUR", ["Contanti al tabacchino"])])
+    prova("BARATTOZON FRA I METODI (19 nov 2026): solo Barattozon in «Compra BTC» passa "
+          "l'ordine Barattozon di chi vende sats, non quello di chi li compra ne' un SEPA",
+          [True, False, False, True, True],
+          [passa({"attivo": True, "tipi": ["vendita"], "soglia": "", "metodi": [BZ]},
+                 "barattozon", None, "ln", "EUR", [BZ], "sell"),
+           passa({"attivo": True, "tipi": ["vendita"], "soglia": "", "metodi": [BZ]},
+                 "barattozon", None, "ln", "EUR", [BZ], "buy"),
+           passa({"attivo": True, "tipi": ["vendita"], "soglia": "", "metodi": [BZ]},
+                 "vendita", None, "ln", "EUR", ["SEPA"], "sell"),
+           # on-chain il tipo e' gia' il lato, e il metodo dice Barattozon
+           passa({"attivo": True, "tipi": ["vendita"], "soglia": "", "metodi": [BZ]},
+                 "vendita", None, "onchain", "EUR", [BZ], "sell"),
+           # senza il lato, Barattozon sta dove e' nato: «Compra BTC»
+           passa({"attivo": True, "tipi": ["vendita"], "soglia": "", "metodi": []},
+                 "barattozon", None, "ln", "EUR", [BZ])])
+    # EMENDATA (19 nov 2026): la riga di ieri coi tre tipi di serie aveva
+    # Barattozon acceso, quindi ai metodi scelti si aggiunge Barattozon
     prova("...i metodi si rileggono nell'ordine del catalogo, lo sconosciuto si perde, nessuno = tutti",
-          [["SEPA", "Revolut"], [], []],
+          [[BZ, "SEPA", "Revolut"], [], [], ["SEPA", "Revolut"]],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_metodi": v})["metodi"]
-           for v in ("|Revolut|x|SEPA|", "|x|", None)])
+           for v in ("|Revolut|x|SEPA|", "|x|", None)]
+          + [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|vendita|acquisto|v2|",
+                   "avvisi_nuovi_metodi": "|Revolut|x|SEPA|"})["metodi"]])
     prova("spento non passa niente; acceso passa il tipo scelto e non gli altri",
           [False, True, False],
           [passa(P(False, ["vendita"], ""), "vendita", 9), passa(P(True, ["vendita"], ""), "vendita", None),
@@ -122135,7 +122188,8 @@ delete globalThis.usdtVistoP2P;
 // vuota, ogni chip si accende da sola, i due svizzeri solo coi franchi
 myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', metodi: ['Revolut', 'x', 'SEPA']});
 const conMetodi = contenutoAvvisiNuoviP2P();
-INVII = []; scegliMetodoAvvisiNuoviP2P(5); scegliMetodoAvvisiNuoviP2P(1); scegliMetodoAvvisiNuoviP2P('');
+// (19 nov 2026) Barattozon e' il primo: PayPal e' il 6, SEPA il 2
+INVII = []; scegliMetodoAvvisiNuoviP2P(6); scegliMetodoAvvisiNuoviP2P(2); scegliMetodoAvvisiNuoviP2P('');
 scegliMetodoAvvisiNuoviP2P(99);
 globalThis.chfVistoP2P = () => true;
 const conChf = contenutoAvvisiNuoviP2P();
@@ -122145,7 +122199,12 @@ out.metodi = [myAvvisiNuoviP2P.metodi, normalizzaAvvisiNuoviP2P({metodi: ['Revol
   conMetodi.indexOf('<div class="section-label">Metodo di pagamento</div>') >= 0,
   attive(conMetodi).filter(a => /Metodo/.test(a)), INVII.slice(),
   attive(contenutoAvvisiNuoviP2P()).filter(a => /Metodo/.test(a)),
-  [conMetodi.indexOf('>TWINT<') < 0, conChf.indexOf('>TWINT<') >= 0, conChf.indexOf('>Bonifico CH<') >= 0]];
+  [conMetodi.indexOf('>TWINT<') < 0, conChf.indexOf('>TWINT<') >= 0, conChf.indexOf('>Bonifico CH<') >= 0],
+  /* (19 nov 2026) Barattozon in testa ai metodi, col nome del catalogo
+     vestito; fra i tipi non c'e' piu' */
+  [conMetodi.indexOf('onclick="scegliMetodoAvvisiNuoviP2P(1)" disabled') < 0
+     && /scegliMetodoAvvisiNuoviP2P\(1\)"[^>]*>Barattozon</.test(conMetodi),
+   conMetodi.indexOf("scegliTipoAvvisiNuoviP2P('barattozon')") < 0]];
 p2pLeve.avvisiNuovi = false;
 out.fuoriCasa = [campanellaP2P(), rigaAvvisiNuoviP2P()];
 p2pLeve.avvisiNuovi = true; DEMO = true;
@@ -122182,9 +122241,10 @@ console.log(JSON.stringify(out));
            "Arriva nella chat del bot Telegram e come messaggio Nostr"], out["dove"])
     prova("acceso: le scelte si toccano, e i due gesti partono", ([True, True], 2),
           (out["accesoTocca"], len(out["invii"])))
-    prova("con «tutti»: le tre chip dei tipi e «Tutti» accese, nessuna chip di soglia",
+    # EMENDATA (19 nov 2026): i tipi sono due, Barattozon e' fra i metodi
+    prova("con «tutti»: le due chip dei tipi e «Tutti» accese, nessuna chip di soglia",
           (["scegliTipoAvvisiNuoviP2P('vendita')", "scegliTipoAvvisiNuoviP2P('acquisto')",
-            "scegliTipoAvvisiNuoviP2P('barattozon')", "scegliMetodoAvvisiNuoviP2P('')",
+            "scegliMetodoAvvisiNuoviP2P('')",
             "scegliSogliaAvvisiNuoviP2P('')"], True),
           (out["tutti"], out["senzaChip"]))
     prova("SPENTO DI SERIE: il corpo si spegne a vista, «Spenti», la campana VUOTA", [True, True, True, True],
@@ -122204,7 +122264,7 @@ console.log(JSON.stringify(out));
     prova("...e da «Tutti» il tocco su «Con un limite» parte da «A prezzo di mercato o meglio», non dal −10",
           "scegliSogliaAvvisiNuoviP2P('0')", out["limiteParte"])
     prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle sei = «tutti»",
-          {"attivo": True, "tipi": ["vendita", "barattozon"], "soglia": "", "rete": "", "valuta": "",
+          {"attivo": True, "tipi": ["vendita"], "soglia": "", "rete": "", "valuta": "",
            "metodi": []},
           out["normalizza"])
     prova("LA RETE: la sezione solo a chi l'on-chain lo vede, accesa la scelta salvata, il "
@@ -122235,7 +122295,7 @@ console.log(JSON.stringify(out));
           (True, True, True),
           ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,' in src,
            # (16 nov 2026) USDT, CHF o EUR: il giudice unico della valuta on-chain
-           'p2p_onchain_valuta(o), _metodi_libro(metodi)):' in pezzo("_accoda_onchain_nuovo_p2p"),
+           'p2p_onchain_valuta(o), _metodi_libro(metodi),' in pezzo("_accoda_onchain_nuovo_p2p"),
            # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» a chi i franchi li vede
            'vista = p2p_usdt_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
            and 'vista = p2p_chf_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")))
@@ -122245,9 +122305,9 @@ console.log(JSON.stringify(out));
           "lo sconosciuto, la sezione c'e', accesi i due scelti, i gesti accendono, spengono, "
           "tornano a «Tutti» e ignorano un numero fuori catalogo; i due svizzeri solo coi franchi",
           [[], ["SEPA", "Revolut"], True,
-           ["scegliMetodoAvvisiNuoviP2P(1)", "scegliMetodoAvvisiNuoviP2P(3)"],
+           ["scegliMetodoAvvisiNuoviP2P(2)", "scegliMetodoAvvisiNuoviP2P(4)"],
            [{"metodi": ["SEPA", "Revolut", "PayPal"]}, {"metodi": ["Revolut"]}, {"metodi": []}],
-           ["scegliMetodoAvvisiNuoviP2P('')"], [True, True, True]],
+           ["scegliMetodoAvvisiNuoviP2P('')"], [True, True, True], [True, True]],
           out["metodi"])
     metodi_cli = re.findall(r"'([^']+)'", m[m.index("const P2P_AVVISI_METODI = ["):
                                           m.index("];", m.index("const P2P_AVVISI_METODI = ["))])
@@ -122255,6 +122315,7 @@ console.log(JSON.stringify(out));
           list(eval(re.search(r"\nMETODI_AVVISI_NUOVI_P2P = (\([^)]*\))", src).group(1))), metodi_cli)
     prova("...e il gesto li porta al server, che li salva nella sua colonna e li rilegge", True,
           "metodi: voluto.metodi || []})});" in m
+          and "body: JSON.stringify({v: 2, attivo:" in m
           and '"avvisi_nuovi_metodi TEXT DEFAULT \'\'",' in src
           and "avvisi_nuovi_metodi=? WHERE tg_id=?" in src
           and '"avvisi_nuovi_valuta": valuta, "avvisi_nuovi_metodi": metodi_txt})}' in src)

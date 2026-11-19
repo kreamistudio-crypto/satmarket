@@ -58579,8 +58579,8 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
     """«🔔 Avvisami dei nuovi ordini P2P» (9 ott 2026, richiesta di
     Andrea; dal 18 nov 2026 anche i METODI di pagamento, `metodi`):
     le TRE preferenze in una rotta sola — l'interruttore, i tipi
-    di ordine che vuole (vendita BTC, acquisto BTC, Barattozon, almeno
-    uno) e la soglia di convenienza ('' = tutti, oppure 0 / 2 / 5 punti
+    di ordine che vuole (vendita BTC, acquisto BTC, almeno uno; fino al
+    19 nov 2026 c'era anche Barattozon, che adesso e' un metodo) e la soglia di convenienza ('' = tutti, oppure 0 / 2 / 5 punti
     almeno a suo favore). Le salvano uguali il bottone della testata del
     libro e il cassetto Avvisi del Profilo, e tornano come le legge
     /api/me (`_pref_avvisi_nuovi_p2p`): due viste, uno stato.
@@ -58596,13 +58596,19 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         raise HTTPException(409, "Gli avvisi dei nuovi ordini sono spenti")
     d = await leggi_json(req)
     attivo = 1 if d.get("attivo") else 0
+    # BARATTOZON FRA I METODI (19 nov 2026): il telefono di oggi manda
+    # `v: 2`, i tipi sono i due lati e Barattozon sta nei metodi. Un
+    # telefono di ieri (senza `v`) manda ancora i tre tipi: si leggono come
+    # ieri e si traducono (`_avvisi_da_ieri`) prima di scrivere
+    nuovo = d.get("v") == 2
+    catalogo_tipi = TIPI_AVVISI_NUOVI_P2P if nuovo else TIPI_AVVISI_NUOVI_P2P_IERI
     grezzi = d.get("tipi")
     if grezzi is None:
-        tipi = list(TIPI_AVVISI_NUOVI_P2P)
+        tipi = list(catalogo_tipi)
     else:
         if not isinstance(grezzi, list):
             raise HTTPException(400, "Tipi in formato sbagliato")
-        tipi = [t for t in TIPI_AVVISI_NUOVI_P2P if t in grezzi]
+        tipi = [t for t in catalogo_tipi if t in grezzi]
         if not tipi:
             raise HTTPException(400, "Scegli almeno un tipo di ordine")
     soglia = str(d.get("soglia") if d.get("soglia") is not None else "").strip()
@@ -58642,8 +58648,7 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
                 any(str(m) not in METODI_AVVISI_NUOVI_P2P for m in grezzi_m):
             con.close()
             raise HTTPException(400, "Metodo di pagamento sconosciuto")
-        metodi_txt = ("|" + "|".join(m for m in METODI_AVVISI_NUOVI_P2P
-                                     if m in grezzi_m) + "|") if grezzi_m else ""
+        metodi = [m for m in METODI_AVVISI_NUOVI_P2P if m in grezzi_m]
     else:
         try:
             r = con.execute("SELECT avvisi_nuovi_metodi FROM utenti WHERE tg_id=?",
@@ -58651,15 +58656,20 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         except sqlite3.OperationalError:
             r = None
         metodi_txt = str(r[0] or "") if r else ""
+        metodi = [m for m in METODI_AVVISI_NUOVI_P2P if f"|{m}|" in metodi_txt]
+    if not nuovo:
+        tipi, metodi = _avvisi_da_ieri(tipi, metodi)
+    metodi_txt = ("|" + "|".join(metodi) + "|") if metodi else ""
+    tipi_txt = "|" + "|".join(tipi) + "|" + SEGNO_AVVISI_NUOVI_P2P + "|"
     con.execute("UPDATE utenti SET avvisi_nuovi_p2p=?, avvisi_nuovi_tipi=?, "
                 "avvisi_nuovi_soglia=?, avvisi_nuovi_rete=?, avvisi_nuovi_valuta=?, "
                 "avvisi_nuovi_metodi=? WHERE tg_id=?",
-                (attivo, "|" + "|".join(tipi) + "|", soglia, rete, valuta, metodi_txt,
+                (attivo, tipi_txt, soglia, rete, valuta, metodi_txt,
                  user["id"]))
     con.commit()
     con.close()
     return {"ok": True, "avvisi_nuovi_p2p": _pref_avvisi_nuovi_p2p(
-        {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": "|" + "|".join(tipi) + "|",
+        {"avvisi_nuovi_p2p": attivo, "avvisi_nuovi_tipi": tipi_txt,
          "avvisi_nuovi_soglia": soglia, "avvisi_nuovi_rete": rete,
          "avvisi_nuovi_valuta": valuta, "avvisi_nuovi_metodi": metodi_txt})}
 
@@ -74955,7 +74965,20 @@ async def _giro_garanzie_p2p():
 # conviene a chi legge solo se chi ha pubblicato COMPRA).
 # IL CANALE LO SCEGLIE `notifica()`: bot Telegram a chi entra da
 # Telegram, DM Nostr a chi entra con Nostr, o la preferenza del cassetto.
-TIPI_AVVISI_NUOVI_P2P = ("vendita", "acquisto", "barattozon")
+# BARATTOZON E' UN METODO, NON UN TIPO (19 nov 2026, Andrea: «Mi piacerebbe
+# poter avere le notifiche solo per ordini barattozon di tipo compra btc e
+# non di tipo vendi btc», scelta «Barattozon fra i metodi»). Fino ad allora
+# i tipi erano tre — vendita, acquisto, Barattozon — e un ordine Barattozon
+# passava dalla sua chip qualunque fosse il lato: «solo Barattozon in Compra
+# BTC» non si poteva dire. Adesso i tipi sono i due lati, e Barattozon sta
+# in testa ai metodi (`METODI_AVVISI_NUOVI_P2P`): due filtri che non si
+# pestano i piedi, il lato e il come. Le righe scritte prima si leggono
+# con la regola di ieri tradotta (`_avvisi_da_ieri`): nessuno riceve di
+# piu' o di meno, salvo chi aveva acceso Barattozon con un lato solo —
+# lui adesso lo riceve solo da quel lato, che e' quel che la chip diceva.
+TIPI_AVVISI_NUOVI_P2P = ("vendita", "acquisto")
+TIPI_AVVISI_NUOVI_P2P_IERI = ("vendita", "acquisto", "barattozon")
+SEGNO_AVVISI_NUOVI_P2P = "v2"   # nei tipi scritti: la riga e' gia' nella forma nuova
 NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BTC",
                               "barattozon": "Barattozon"}
 # (14 nov 2026, cantiere avvisi-sconvenienti, Andrea: «se io voglio vedere
@@ -74969,9 +74992,11 @@ VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")   # '' = tutte; gemelle di P2P_
 # un utente: «Si possono filtrare le notifiche del bot per buy e per sell
 # oltre che per tipo di pagamento?», Andrea: «Sì, aprila»). Nessuno scelto =
 # tutti, come prima. Gemelle di P2P_AVVISI_METODI nel client, e una prova le
-# tiene uguali. Barattozon NON c'e': ha gia' la sua chip fra i tipi, e un
-# ordine Barattozon passa da quella e non da qui.
-METODI_AVVISI_NUOVI_P2P = ("SEPA", "SEPA Instant", "Revolut", "Satispay", "PayPal", "Wise", "Contanti", "Contante per posta", "TWINT", "Bonifico CH")
+# tiene uguali. Barattozon c'e' dal 19 nov 2026, in testa e col nome del
+# libro, «Contanti al tabacchino» (`_metodi_libro`): prima aveva la sua chip
+# fra i tipi (vedi TIPI_AVVISI_NUOVI_P2P).
+METODO_BZ_AVVISI_P2P = "Contanti al tabacchino"   # il primo dei metodi qui sotto
+METODI_AVVISI_NUOVI_P2P = ("Contanti al tabacchino", "SEPA", "SEPA Instant", "Revolut", "Satispay", "PayPal", "Wise", "Contanti", "Contante per posta", "TWINT", "Bonifico CH")
 TIMBRO_NUOVI_P2P = "p2p_nuovi_ordini_visto"  # il segnalibro: il created_at piu' nuovo gia' guardato
 _P2P_NUOVI = {"noti": None}   # gli id che la fotografia conosceva al giro prima (None = mai guardata)
 
@@ -74984,6 +75009,28 @@ def _campo_riga(riga, nome, default):
     except (KeyError, IndexError, TypeError):
         return default
     return default if v is None else v
+
+
+def _avvisi_da_ieri(tipi, metodi):
+    """PURA: le preferenze scritte PRIMA del 19 nov 2026 (tre tipi, e i
+    metodi senza Barattozon) nella forma nuova (due lati, Barattozon fra i
+    metodi), con lo stesso effetto. Torna (tipi, metodi).
+    • solo la chip Barattozon: i due lati, e il solo metodo Barattozon;
+    • Barattozon acceso coi metodi «tutti»: i metodi restano «tutti»;
+    • Barattozon acceso con dei metodi scelti: quei metodi piu' Barattozon;
+    • Barattozon spento: i metodi scelti, o — se erano «tutti» — tutti gli
+      altri, perche' «tutti» adesso comprende Barattozon."""
+    tipi = [t for t in TIPI_AVVISI_NUOVI_P2P_IERI if t in (tipi or [])]
+    metodi = [m for m in (metodi or []) if m != METODO_BZ_AVVISI_P2P]
+    bz = "barattozon" in tipi
+    lati = [t for t in TIPI_AVVISI_NUOVI_P2P if t in tipi]
+    if not lati:
+        return list(TIPI_AVVISI_NUOVI_P2P), [METODO_BZ_AVVISI_P2P]
+    if bz:
+        return lati, ([m for m in METODI_AVVISI_NUOVI_P2P
+                       if m == METODO_BZ_AVVISI_P2P or m in metodi] if metodi else [])
+    return lati, ([m for m in METODI_AVVISI_NUOVI_P2P if m in metodi] if metodi
+                  else [m for m in METODI_AVVISI_NUOVI_P2P if m != METODO_BZ_AVVISI_P2P])
 
 
 def _pref_avvisi_nuovi_p2p(riga) -> dict:
@@ -74999,8 +75046,10 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     except (TypeError, ValueError):
         attivo = False
     tipi_txt = str(_campo_riga(riga, "avvisi_nuovi_tipi", "") or "")
-    tipi = [t for t in TIPI_AVVISI_NUOVI_P2P if f"|{t}|" in tipi_txt] \
-        or list(TIPI_AVVISI_NUOVI_P2P)
+    nuova = f"|{SEGNO_AVVISI_NUOVI_P2P}|" in tipi_txt
+    tipi = [t for t in (TIPI_AVVISI_NUOVI_P2P if nuova else TIPI_AVVISI_NUOVI_P2P_IERI)
+            if f"|{t}|" in tipi_txt] \
+        or list(TIPI_AVVISI_NUOVI_P2P if nuova else TIPI_AVVISI_NUOVI_P2P_IERI)
     soglia = str(_campo_riga(riga, "avvisi_nuovi_soglia", "") or "").strip()
     if soglia not in SOGLIE_AVVISI_NUOVI_P2P:
         soglia = ""
@@ -75014,6 +75063,9 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     # che il catalogo non ha piu' si perde, e se non ne resta nessuno vale tutti
     metodi_txt = str(_campo_riga(riga, "avvisi_nuovi_metodi", "") or "")
     metodi = [m for m in METODI_AVVISI_NUOVI_P2P if f"|{m}|" in metodi_txt]
+    # una riga di prima del 19 nov 2026 si traduce (`_avvisi_da_ieri`)
+    if not nuova:
+        tipi, metodi = _avvisi_da_ieri(tipi, metodi)
     return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valuta": valuta,
             "metodi": metodi}
 
@@ -75078,7 +75130,7 @@ def _convenienza_nuovo_p2p(lato: str, premio, sats, euro: float, cambio: float):
 
 
 def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
-                            valuta: str = "EUR", metodi=None) -> bool:
+                            valuta: str = "EUR", metodi=None, lato: str = "") -> bool:
     """PURA: queste preferenze vogliono quest'ordine? Acceso, del tipo
     giusto, della RETE giusta (30 ott 2026: 'onchain' o 'ln', '' = tutte;
     chi chiama la spegne a chi l'on-chain non lo vede), della VALUTA
@@ -75086,6 +75138,11 @@ def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
     chi gli USDT non li vede) e — se la soglia c'e' — con una convenienza
     nota almeno pari alla soglia. Con «tutti» ('') passa anche a
     convenienza ignota."""
+    # il TIPO e' il lato (19 nov 2026): un ordine Barattozon (`tipo`
+    # 'barattozon') sta nel tipo del suo lato, `sell` vendita e `buy`
+    # acquisto; senza il lato, nel tab dove e' nato, «Compra BTC»
+    if tipo == "barattozon":
+        tipo = {"buy": "acquisto"}.get(str(lato or ""), "vendita")
     if not pref.get("attivo") or tipo not in (pref.get("tipi") or []):
         return False
     if pref.get("rete") and pref.get("rete") != rete:
@@ -75094,11 +75151,10 @@ def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
         return False
     # IL METODO (18 nov 2026, cantiere vetrina-pulita): con dei metodi scelti
     # passa l'ordine che ne accetta almeno uno — i nomi come li DICE il libro
-    # (`_metodi_libro`). Barattozon no: la sua chip e' fra i tipi, e chi l'ha
-    # accesa lo vuole qualunque metodo abbia scelto per gli altri.
+    # (`_metodi_libro`). Barattozon compreso, dal 19 nov 2026: e' un metodo
+    # come gli altri, «Contanti al tabacchino» nel libro.
     voluti = pref.get("metodi") or []
-    if voluti and tipo != "barattozon" and \
-            not any(str(m).strip() in voluti for m in metodi or []):
+    if voluti and not any(str(m).strip() in voluti for m in metodi or []):
         return False
     soglia = pref.get("soglia") or ""
     if soglia == "":
@@ -75348,7 +75404,8 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
             if (chf and not p2p_chf_ammesso(tg)) or (coin and not p2p_coin_ammesso(tg)):
                 continue
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "onchain",
-                                           p2p_onchain_valuta(o), _metodi_libro(metodi)):
+                                           p2p_onchain_valuta(o), _metodi_libro(metodi),
+                                           str(o["lato"] or "")):
                 continue
             if not _avvisi_p2p_accesi(con, tg):
                 continue
@@ -75427,7 +75484,7 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             if autore and tg == autore:
                 continue                      # mai per i suoi
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,
-                                           _metodi_libro(o["metodi"])):
+                                           _metodi_libro(o["metodi"]), str(o["lato"] or "")):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
                 continue

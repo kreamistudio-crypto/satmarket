@@ -229,3 +229,4 @@ collaudo_fotografia_annuncio.py
 collaudo_sottocategorie_vetrina.py
 collaudo_vetrina_pulita.py
 collaudo_tempo_pagare.py
+collaudo_avvisi_bz_metodo.py

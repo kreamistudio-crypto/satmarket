@@ -313,8 +313,10 @@ piccoli». C'è anche un «Filtro». Accanto alla levetta del tema, sulla
 stessa riga, la campanella 🔔 (dal 9 ott 2026; piena e arancio se gli
 avvisi sono accesi, vuota se spenti): apre un foglio dal basso con, in
 cima, il solo interruttore «🔔 Avvisami dei nuovi ordini P2P»
-(Spenti/Attivi, spento di serie); sotto «Tipo di ordini» («Vendita BTC»
-/ «Acquisto BTC» / «Barattozon», a scelta multipla) e «Convenienza»
+(Spenti/Attivi, spento di serie); sotto «Tipo di ordini» («Compra BTC»
+/ «Vendi BTC», a scelta multipla; fino al 19 nov 2026 c'era anche
+«Barattozon», che adesso è il primo dei metodi), «Metodo di pagamento»
+(«Tutti» o le pillole «Barattozon», «SEPA», …) e «Convenienza»
 («Tutti» / «Con un limite», e con la seconda le chip «Fino a 10%
 peggio» / «Fino a 5% peggio» / «Fino a 2% peggio» / «A prezzo di
 mercato o meglio» / «Almeno 2% meglio» / «Almeno 5% meglio»; dal 14 nov

@@ -47537,8 +47537,11 @@ async function setAvvisiP2P(attivi){
    stanno in «Compra BTC»; quelli di chi COMPRA (`acquisto`) in «Vendi
    BTC». Fino ad allora le chip dicevano «Vendita BTC / Acquisto BTC», il
    lato di chi pubblica, e andavano rigirate a mente. Gli id restano. */
-const P2P_AVVISI_TIPI = [['vendita', 'Compra BTC'], ['acquisto', 'Vendi BTC'],
-                         ['barattozon', '']];
+/* BARATTOZON NON E' PIU' UN TIPO (19 nov 2026, Andrea: «notifiche solo
+   per ordini barattozon di tipo compra btc»): sta in testa ai metodi
+   (`P2P_AVVISI_METODI`), e i tipi sono i due lati — vedi
+   TIPI_AVVISI_NUOVI_P2P nel server */
+const P2P_AVVISI_TIPI = [['vendita', 'Compra BTC'], ['acquisto', 'Vendi BTC']];
 const nomeTipoAvvisiP2P = t =>
   t[1] || (vesteMetodoP2P(P2P_TABACCHINO) || {}).nome || t[0];
 /* (14 nov 2026, cantiere avvisi-sconvenienti, Andrea: «vedere anche gli
@@ -47567,10 +47570,17 @@ const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['CHF', 'Solo fr
    un utente: «filtrare le notifiche del bot per buy e per sell oltre che per
    tipo di pagamento»): nessuno scelto = «Tutti», come prima; con dei metodi
    scelti arriva l'ordine che ne accetta almeno uno. Gemelle di
-   METODI_AVVISI_NUOVI_P2P nel server. Barattozon non c'e': ha la sua chip
-   fra i tipi. I due svizzeri si vedono solo a chi vede i franchi. */
-const P2P_AVVISI_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contante per posta', 'TWINT', 'Bonifico CH'];
+   METODI_AVVISI_NUOVI_P2P nel server. Barattozon c'e' dal 19 nov 2026, in
+   testa, col nome del libro («Contanti al tabacchino») e sulla chip quello del
+   catalogo vestito (`nomeMetodoAvvisiP2P`). I due svizzeri si vedono solo
+   a chi vede i franchi. */
+/* ⚠️ il nome scritto per esteso e non `P2P_TABACCHINO`: quella const nasce
+   cinquantamila righe piu' giu', e qui sarebbe toccata nella sua temporal
+   dead zone al carico. Una prova tiene i due nomi uguali. */
+const P2P_AVVISI_METODI = ['Contanti al tabacchino', 'SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wise', 'Contanti', 'Contante per posta', 'TWINT', 'Bonifico CH'];
 const P2P_AVVISI_METODI_CHF = ['TWINT', 'Bonifico CH'];
+const nomeMetodoAvvisiP2P = m =>
+  m === P2P_TABACCHINO ? ((vesteMetodoP2P(P2P_TABACCHINO) || {}).nome || m) : m;
 /* PURA: le preferenze come arrivano dal server, rimesse in forma — i
    tipi nell'ordine delle chip (vuoto = tutti), la soglia solo se e' una
    delle sei, spento se manca tutto (un server di ieri) */
@@ -47663,7 +47673,7 @@ function contenutoAvvisiNuoviP2P(){
     + pill('Tutti', !(p.metodi || []).length, "scegliMetodoAvvisiNuoviP2P('')")
     + P2P_AVVISI_METODI.filter(m => P2P_AVVISI_METODI_CHF.indexOf(m) < 0
         || (typeof chfVistoP2P === 'function' && chfVistoP2P())).map(m =>
-        pill(m, (p.metodi || []).indexOf(m) >= 0,
+        pill(nomeMetodoAvvisiP2P(m), (p.metodi || []).indexOf(m) >= 0,
              'scegliMetodoAvvisiNuoviP2P(' + (P2P_AVVISI_METODI.indexOf(m) + 1) + ')')).join('')
     + '</div>'
     + '<div class="section-label">Convenienza</div>'
@@ -47721,7 +47731,9 @@ async function setAvvisiNuoviP2P(patch){
   try {
     const r = await fetch(`${API_BASE}/me/avvisi-nuovi-p2p`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia,
+       /* `v: 2` (19 nov 2026): i tipi sono i due lati e Barattozon sta fra
+          i metodi — un telefono di ieri non lo manda, e il server traduce */
+       body: JSON.stringify({v: 2, attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia,
                              rete: voluto.rete || '', valuta: voluto.valuta || '',
                              metodi: voluto.metodi || []})});
     const d = await r.json().catch(()=>({}));

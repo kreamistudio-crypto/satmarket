@@ -29639,7 +29639,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   leva globale `P2P_AVVISI_NUOVI_ORDINI` (accesa di serie, nel pannello
   delle leve con la finestra `P2P_AVVISI_NUOVI_MINUTI`, 15): per persona
   SPENTI di serie — `utenti.avvisi_nuovi_p2p`, `avvisi_nuovi_tipi`
-  ('|vendita|acquisto|barattozon|'), `avvisi_nuovi_soglia` ('' = tutti,
+  ('|vendita|acquisto|v2|': dal 19 nov 2026 i tipi sono i due LATI e
+  Barattozon e' il primo dei metodi, «Contanti al tabacchino», in
+  `avvisi_nuovi_metodi`; il segno `v2` distingue la forma nuova, e una
+  riga di prima — '|vendita|acquisto|barattozon|' — si legge tradotta da
+  `_avvisi_da_ieri`, che traduce anche il telefono di ieri senza `v: 2`;
+  il giudice mette un ordine Barattozon nel tipo del suo lato),
+  `avvisi_nuovi_soglia` ('' = tutti,
   '0'/'2'/'5' = solo da quella convenienza in su) — scritte dalla rotta
   `/api/me/avvisi-nuovi-p2p` e lette da `_pref_avvisi_nuovi_p2p` per
   `/api/me`. Due porte, uno stato: il bottone 🔔 nella testata del libro

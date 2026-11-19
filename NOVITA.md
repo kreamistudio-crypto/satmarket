@@ -818,3 +818,9 @@ frase: Se tieni aperti più account sullo stesso telefono, toccando una notifica
 dove: Una notifica sul telefono per un account diverso da quello aperto: il tocco passa a lui («🔁 Apro …: l'avviso è suo») e apre la pagina dell'avviso. Le tendine «Scegli…» delle box importate da WooCommerce.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · avvisi-bz-lato
+frase: Negli avvisi dei nuovi ordini P2P Barattozon è diventato un metodo di pagamento: così puoi farti avvisare solo degli ordini Barattozon in «Compra BTC», o solo di quelli in «Vendi BTC». Le scelte che avevi già fatto restano uguali.
+dove: P2P → la campanella 🔔 (o Profilo → «🔔 Avvisi») → «Avvisami dei nuovi ordini P2P»: «Tipo di ordini» ha «Compra BTC» e «Vendi BTC», e «Barattozon» è la prima pillola di «Metodo di pagamento».
+leva: nessuna
+pubblico: sì
