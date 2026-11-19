@@ -713,7 +713,8 @@ d'immagine (la colonna la ignora). Compilata e provata nel cloud: albero
 `b45281d5`, 2005 prove `cargo` verdi, 4 ignorate.
 
 LA 0015, IL TEMPO DI CHI PUBBLICA SEGUE LA SUA SCELTA (preparata il 19 nov
-2026, cantiere `pubblica-col-tempo`; immagine `-bar12`, NON ANCORA SUL NODO:
+2026, cantiere `pubblica-col-tempo`; immagine `-bar12`, IN SERVIZIO dal 19
+nov 2026, 22:16 UTC: PRODUZIONE, «LA `-bar12`»; le prove dal vivo:
 `docs/DA-FARE-ANDREA.md`, voce 28). Andrea: «se io pubblico un ordine e
 imposto il tempo per pagarlo a chi lo prende diciamo 30 minuti, mi sembra
 giusto che abbia 30 minuti anche chi ha pubblicato»; sulla scheda «Sì,

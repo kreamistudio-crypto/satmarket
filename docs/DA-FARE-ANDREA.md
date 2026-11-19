@@ -969,122 +969,27 @@ Andata bene, la porticina si apre a tutti con UNA riga nel config del VPS e
 il riavvio: `P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = False`. Fatta, questa
 voce si cancella.
 
-## 28. Chi pubblica ha lo stesso tempo per bloccare i sats: la `-bar12` sul nodo (19 nov 2026, cantiere pubblica-col-tempo; Andrea sulla scheda: «Sì, stesso tempo per tutti»)
+## 28. Le due prove dal vivo della `-bar12` (19 nov 2026, cantieri pubblica-col-tempo e recapito-nel-tempo)
 
-**Perché.** Oggi chi pubblica ha sempre 3 ore per bloccare i sats dopo
-la presa (`maker_expiration_seconds`), anche se a chi compra ha dato 30
-minuti per pagare. Con la `-bar12` (patch 0015) su una vendita col tempo
-per pagare scelto, chi pubblica ha AL MASSIMO quel tempo (30 minuti → 30
-minuti; 24 ore → restano le 3 ore). Se non blocca in tempo l'ordine torna
-nel libro, come oggi. E dalla sera del 19 nov (cantiere recapito-nel-tempo,
-«ogni passo deve durare 15 minuti») lo stesso tempo vale per «dove vuoi
-gli euro»: se a garanzia bloccata chi vende non lo dice entro il tempo
-scelto, il server lo segnala (`senza_recapito`) e il nodo rimette l'ordine
-nel libro ridando la garanzia. Niente segreti nuovi, niente righe nel config:
-cambia solo l'immagine. Promozione e `-bar12` in qualunque ordine: col
-server di prima il nodo non sa le scelte e tiene le 3 ore; con l'app di
-prima il tag nuovo si ignora.
+La `-bar12` è IN SERVIZIO sul nodo dal 19 nov 2026, 22:16 UTC (PRODUZIONE,
+«LA `-bar12`»). Le regole nuove partono quando il server in produzione
+le chiede, cioè DOPO LA PROMOZIONE che porta 0f69ee63, a336356e e
+e512e213. Poi, coi tuoi due account:
 
-**SUL NODO** (`ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`),
-un comando alla volta, il cambio a libro fermo.
-
-**FATTO 19 nov 2026, 23:14 Rome: passi 1-7** (albero `deb731c3`, test 750 e
-90, immagine `mostro:v0.20.2-bar12` costruita, `docker-compose.yml.bar12`
-e la copia `.prima-bar12` pronti). Il passo 8 si è fermato da solo su uno
-scambio aperto (`ff3855c0`, attivo): si RIPARTE DAL PASSO 8 quando chiude.
-
-1) Sola lettura: l'immagine e il sorgente.
-```
-docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && git -C ~/nodo/mostro-src status --short | wc -l && git -C ~/nodo/mostro-src rev-parse --abbrev-ref HEAD && git -C ~/nodo/mostro-src rev-parse HEAD^{tree} && df -h / | tail -1
-```
-Atteso `mostro:v0.20.2-bar11`, `0`, `barattolo/v0.20.2`,
-`b45281d5ac2ffd5920713c898829ff229a11e5de`, e almeno 6 GB liberi.
-
-2) Sul PC (PowerShell, nel repo, su `develop` dopo il `git pull`, o su
-`main` dopo la promozione), le patch prese da git:
-```
-git archive HEAD deploy/mostro --format=tar -o $env:TEMP\mostro-bar12.tar
-```
-```
-scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\mostro-bar12.tar debian@vm-1937.lnvps.cloud:
-```
-Sul nodo:
-```
-mkdir -p ~/nodo/patch-bar12 && tar xf ~/mostro-bar12.tar -C ~/nodo/patch-bar12 --strip-components=2 && ls ~/nodo/patch-bar12/0015-*.patch
-```
-
-3) La patch e l'albero:
-```
-cd ~/nodo/mostro-src && git am ~/nodo/patch-bar12/0015-*.patch && git rev-parse HEAD^{tree}
-```
-Atteso `deb731c3e17a18427a0eca4c27064dd8cde54646` (lo stesso del cloud).
-Se `git am` si ferma: `git am --abort` e si incolla a Claude.
-
-4) I test prima della build (due lanci):
-```
-docker build -f docker/Dockerfile --target builder -t mostro-test:bar12 .
-```
-```
-docker run --rm mostro-test:bar12 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods barattolo_tempo nip33 find_order_by_seconds a_dispute_the_daemon_opens barattolo_finestra payment_window
-```
-Atteso `750 passed; 0 failed; 1 ignored`.
-```
-docker run --rm mostro-test:bar12 cargo test --release -- util::tests::
-```
-Atteso `90 passed; 0 failed`. Numeri diversi: si incolla a Claude, e il
-sorgente torna con `git reset --hard HEAD~1`.
-
-5) La build vera e il controllo del binario:
-```
-docker build -f docker/Dockerfile -t mostro:v0.20.2-bar12 .
-```
-```
-docker run --rm --entrypoint sh mostro:v0.20.2-bar12 -c "grep -c barattolo_maker_payment_window /usr/local/bin/mostrod"
-```
-Atteso un numero sopra zero.
-
-6) Il compose nuovo (cambia solo l'immagine), preparato e letto PRIMA del cambio:
-```
-cd ~/nodo && sed 's#mostro:v0.20.2-bar11#mostro:v0.20.2-bar12#' docker-compose.yml > docker-compose.yml.bar12 && diff docker-compose.yml docker-compose.yml.bar12 | sed 's/SEGRETO=.*/SEGRETO=(nascosto)/'; docker compose -f docker-compose.yml.bar12 config -q && echo compose-ok
-```
-Atteso: UNA riga cambiata (l'immagine) e `compose-ok`.
-
-7) La copia di riserva del compose:
-```
-cp -p ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-bar12
-```
-
-8) IL CAMBIO, UN COMANDO: se c'è uno scambio aperto non tocca niente.
-```
-cd ~/nodo && n=$(sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute(\"SELECT COUNT(*) FROM orders WHERE status IN ('waiting-payment','waiting-buyer-invoice','waiting-taker-bond','active','fiat-sent','in-progress','dispute')\").fetchone()[0])") && echo "scambi aperti: $n" && [ "$n" = 0 ] && date -u && cp -p docker-compose.yml.bar12 docker-compose.yml && docker compose up -d mostro && date -u
-```
-(Come il 19 nov, `settled-hold-invoice` non si conta: lo scambio
-`9f2b98c6` che aspetta la fattura nuova il cambio d'immagine non lo tocca.)
-
-9) Il controllo, subito:
-```
-docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && docker compose logs mostro --since 3m | grep -i -E "barattolo_|Settings correctly|error|panic" | head -30
-```
-Atteso `mostro:v0.20.2-bar12`, «Settings correctly loaded!», le righe di
-`barattolo_fee` e `barattolo_eventi` di sempre, e NESSUNA riga
-«barattolo_finestra: … not set».
-
-10) La prova dal vivo coi tuoi due account (DOPO la promozione E la
-`-bar12`): una vendita Lightning col solo SEPA Instant e il cursore a 15
-minuti. Dall'altro account la prendi: la pagina dello scambio deve dire
-«Chi ha pubblicato ha fino a 15 minuti per rispondere». Dal primo NON
-pagare la garanzia: dopo 15 minuti (entro un minuto in più) l'ordine torna
-nel libro e arriva «tornato nel libro». Nel journal del nodo:
+1) Una vendita Lightning col solo SEPA Instant e il cursore a 15 minuti.
+Dall'altro account la prendi: la pagina dello scambio deve dire «Chi ha
+pubblicato ha fino a 15 minuti per rispondere». Dal primo NON pagare la
+garanzia: dopo 15 minuti (entro un minuto in più) l'ordine torna nel
+libro e arriva «tornato nel libro». Nel journal del nodo:
 `docker compose logs mostro --since 30m | grep "at most 15 minutes"`.
-Seconda prova, «dove vuoi gli euro»: stessa vendita a 15 minuti, la
-prendi, dal primo account paghi la garanzia ma NON tocchi «Indica dove
-ricevere gli euro». Arrivano i due promemoria (a 7 minuti e mezzo e a 5
-dalla fine); dopo 15 minuti dall'attivo (entro un minuto in più)
-l'ordine torna nel libro, arriva «Non hai detto in tempo dove ricevere
-gli euro» e la garanzia torna.
 
-ROLLBACK (solo se la `-bar12` non regge): `cd ~/nodo && cp -p docker-compose.yml.prima-bar12 docker-compose.yml && docker compose up -d mostro`
-→ `-bar11`; il database resta quello (la tabella in più la `-bar11` la
-ignora), e il sorgente torna con `git -C ~/nodo/mostro-src reset --hard HEAD~1`.
-Fatta, questa voce si cancella e il README del fork, NODO-MOSTRO e la
-riga dell'immagine in `CLAUDE.md` (`-bar11` → `-bar12`) si chiedono a Claude.
+2) «Dove vuoi gli euro»: stessa vendita a 15 minuti, la prendi, dal primo
+account paghi la garanzia ma NON tocchi «Indica dove ricevere gli euro».
+Arrivano i due promemoria (a 7 minuti e mezzo e a 5 dalla fine); dopo 15
+minuti dall'attivo (entro un minuto in più) l'ordine torna nel libro,
+arriva «Non hai detto in tempo dove ricevere gli euro» e la garanzia torna.
+
+ROLLBACK (solo se la `-bar12` non regge): `cd ~/nodo && cp -p
+docker-compose.yml.prima-bar12 docker-compose.yml && docker compose up -d
+mostro` → `-bar11`; il sorgente torna con `git -C ~/nodo/mostro-src reset
+--hard HEAD~1`. Fatte le due prove, questa voce si cancella.

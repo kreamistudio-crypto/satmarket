@@ -1,7 +1,7 @@
 # IL FORK DI MOSTRO — le dodici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
-**Dal 19 novembre 2026 c'è la 0015, NON ANCORA SUL NODO** (immagine
-`-bar12`, `docs/DA-FARE-ANDREA.md`, voce 28; cantiere `pubblica-col-tempo`):
+**Dal 19 novembre 2026 la 0015 È SUL NODO** (immagine
+`mostro:v0.20.2-bar12`, 22:16 UTC; PRODUZIONE, «LA `-bar12`»; cantiere `pubblica-col-tempo`):
 su una vendita col tempo per pagare scelto, chi pubblica ha al massimo
 quel tempo per pagare la garanzia (al posto delle sue tre ore), chiesto al
 server con la domanda della 0013. Come la 0014 non ha un patcher: la

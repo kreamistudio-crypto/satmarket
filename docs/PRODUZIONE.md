@@ -4142,6 +4142,43 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   promozione: `docs/DA-FARE-ANDREA.md`, voce 26). Fino alla promozione il
   server di produzione chiama «annullato» lo scambio tornato nel libro:
   solo il testo, i sats tornano giusti.
+- LA `-bar12`: OGNI PASSO NEL TEMPO SCELTO (patch 0015), immagine
+  `mostro:v0.20.2-bar12`, IN SERVIZIO dal 19 nov 2026, 22:16 UTC (cantieri
+  `pubblica-col-tempo` e `recapito-nel-tempo`; il perché: NODO-MOSTRO, «LA
+  0015», e il README del fork). Nessun segreto, nessuna riga nel config:
+  cambia solo l'immagine. Le regole nuove partono quando il server le
+  chiede (`pubblica` e `senza_recapito` nella risposta di
+  `/api/p2p/finestre`): col server di prima il nodo si comporta come la
+  `-bar11`. Rollback: `cp -p docker-compose.yml.prima-bar12
+  docker-compose.yml && docker compose up -d mostro` (la tabella in più
+  la `-bar11` la ignora).
+  COM'È ANDATA SUL NODO (19 nov 2026 sera, thread «Rimettere nel libro
+  l'ordine scaduto», tutto incollato da Andrea). Passo 1: `-bar11`,
+  sorgente pulito, `barattolo/v0.20.2`, albero `b45281d5`, 12 GB liberi.
+  Le patch con `git archive origin/develop` (e512e213) sul PC, `git am`
+  della `0015-*.patch` → albero `deb731c3e17a18427a0eca4c27064dd8cde54646`,
+  lo stesso del cloud; test `750 passed; 0 failed; 1 ignored` e `90
+  passed`; build, `barattolo_maker_payment_window` nel binario (1); il
+  compose `.bar12` con UNA riga cambiata, `compose-ok`; copia
+  `docker-compose.yml.prima-bar12`. Il comando del cambio si è FERMATO DA
+  SOLO su uno scambio aperto: `ff3855c0`, Barattozon, `active` da 174
+  minuti, che non poteva chiudersi prima del mattino (i tabacchini
+  aprono domani). Andrea: «possiamo procedere». Letto prima nel sorgente:
+  all'avvio `find_held_invoices` riaggancia gli scambi `active` coi sats
+  in garanzia, e le regole nuove non toccano un Barattozon (nessun tempo
+  per pagare). Il comando rilanciato contando tutto TRANNE
+  `hex(id) LIKE 'FF3855C0%'`: 0, cambio alle 22:16:35, contenitore su alle
+  22:16:51. Nel journal «Settings correctly loaded!», le righe di
+  `barattolo_fee` e `barattolo_eventi`, «Resubscribing order id -
+  ff3855c0-…» e subito dopo il WARN «Ignoring hold-invoice payment for an
+  order already past the pre-payment window»: È IL REPLAY ATTESO (LND
+  ripete l'`Accepted` alla nuova iscrizione, `hold_invoice_paid` lo
+  ignora perché lo scambio è già `active`; `src/flow.rs`, doc della
+  funzione), non un guasto. Il 403 di blockchain.info è quello di sempre.
+  LA LEZIONE: con uno scambio aperto che non può chiudersi a breve si
+  può cambiare immagine, ma solo dopo aver letto che il riavvio lo
+  riaggancia e che la patch nuova non lo tocca, e col comando che lascia
+  passare QUEL solo scambio per id.
 - LA SALITA ALLA 0.20.2, immagine `mostro:v0.20.2-bar9` (preparata il 29
   ott 2026, cantiere `mostro-0202`, decisione di Andrea: «fork intero
   sulla 0.20.2»; ✅ FATTA SUL NODO il 30 ott 2026, in servizio dalle
