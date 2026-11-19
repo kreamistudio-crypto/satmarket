@@ -213685,6 +213685,7 @@ def prove_tempo_pagare_p2p():
                "function tempoPagarePossibileP2P(lato, metodi, oc){",
                "function minutiPagareFoglioP2P(scelta, lato, metodi, oc, attivo, veloci){",
                "function fermoDaMinutiP2P(min){", "function pienoTempoPagareP2P(k){",
+               "function ombreTempoPagareP2P(){",
                "function quotaTempoP2P(min){",
                "function anelloTempoP2P(quota, id){",
                "function prendiMinutiPagareP2P(m){", "function minutiPagareOrdineP2P(o){",
@@ -213717,6 +213718,10 @@ out.fermi = [P2P_MINUTI_PAGARE_FERMI.length, P2P_MINUTI_PAGARE_FERMI[0], P2P_MIN
   P2P_MINUTI_PAGARE_FERMI.every(m => minutiPagareSceltaP2P(m) === m),
   P2P_MINUTI_PAGARE_FERMI.every((m, i, a) => !i || a[i - 1] < m), fermoDaMinutiP2P(1440), fermoDaMinutiP2P(65)];
 out.pieno = [0, 33, 3, -4, 99, 'x'].map(pienoTempoPagareP2P);
+{ const om = ombreTempoPagareP2P(), tutte = P2P_MINUTI_PAGARE_FERMI.map(minutiPagareDetteP2P);
+  const dentro = (om.match(/<span class="ombra" aria-hidden="true">[^<]*<\/span>/g) || []);
+  out.ombre = [tutte.every(t => om.indexOf('>' + t + '<') >= 0), dentro.length, new Set(tutte).size,
+    om.indexOf('>2 ore e 30 minuti<') >= 0]; }
 out.veloci = [metodoVeloceP2P('SEPA Instant'), metodoVeloceP2P('USDT (Tron)'), metodoVeloceP2P('ETH (Ethereum) 0.01'),
   metodoVeloceP2P('USDe (Base)'), metodoVeloceP2P('SEPA'), metodoVeloceP2P('Wise'), metodoVeloceP2P('Revolut', ['Satispay'])];
 out.coi = [minutiCoiMetodiP2P(60, ['SEPA Instant', 'Satispay']), minutiCoiMetodiP2P(60, ['SEPA Instant', 'SEPA']),
@@ -213782,6 +213787,19 @@ console.log(JSON.stringify(out));
            "accent-color" in css,
            "' style=\"--pieno:' + pienoTempoPagareP2P(fermoDaMinutiP2P(min)) + '%\"'" in mini,
            "cur0.style.setProperty('--pieno', pienoTempoPagareP2P(k) + '%');" in mini])
+    cval = mini[mini.index("  .p2p-orologio-val{"):mini.index("  /* IL POLLICE LO DISEGNA LA PAGINA")]
+    prova("LA SCRITTA NON SPOSTA IL CURSORE (Andrea, dal video: «quando tengo premuto il "
+          "cursore e lo muovo mi fa questi scatti»): nella cella della scritta stanno, "
+          "invisibili, le scritte di TUTTI i fermi (una volta sola ciascuna, la piu' lunga "
+          "compresa), impilate in una griglia senza a capo; la scritta viva e' uno span con "
+          "l'id che il dito riscrive, e le ombre arrivano col disegno",
+          [True, 34, 34, True, True, True, True, True],
+          o["ombre"] + ["display:grid" in cval,
+                        ".p2p-orologio-val>span{grid-area:1/1;white-space:nowrap}" in cval,
+                        ".p2p-orologio-val>.ombra{visibility:hidden}" in cval,
+                        "'<div class=\"p2p-orologio-val\"><span id=\"p2pTempoPagareVal\">' + "
+                        "minutiPagareDetteP2P(min) + '</span>'\n      + ombreTempoPagareP2P() + '</div>'"
+                        in mini])
     prova("i metodi veloci della pagina, coi ripieghi e con la lista del server",
           [True, True, True, True, False, False, False], o["veloci"])
     prova("con un metodo lento il tempo resta 24 ore, e la nota li nomina",

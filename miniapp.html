@@ -3638,7 +3638,19 @@
   .p2p-orologio{display:flex;align-items:center;gap:12px}
   .p2p-orologio .p2p-anello{width:44px;height:44px}
   .p2p-orologio-val{flex:0 0 auto;min-width:92px;font-weight:800;font-size:15px;
-    color:var(--sats-text);font-variant-numeric:tabular-nums}
+    color:var(--sats-text);font-variant-numeric:tabular-nums;display:grid}
+  /* LA SCRITTA NON SPOSTA IL CURSORE (19 nov 2026, cantiere cursore-
+     trascinato; Andrea, dal video: «quando tengo premuto il cursore e lo
+     muovo mi fa questi scatti, non dovrebbe farlo»). La scritta cambiava
+     larghezza col tempo scelto («15 minuti» corta, «2 ore e 30 minuti»
+     lunga) e il cursore, che prende il resto della riga, scivolava di
+     lato SOTTO IL DITO: il dito fermo cadeva su un altro fermo, e in
+     mezzo rimbalzava a 15 minuti. Ora tutte le scritte possibili stanno
+     impilate nella stessa cella, invisibili (`.ombra`): la cella e'
+     larga quanto la piu' lunga col font vero del telefono, e quella che
+     si vede ci cambia dentro senza muovere niente. */
+  .p2p-orologio-val>span{grid-area:1/1;white-space:nowrap}
+  .p2p-orologio-val>.ombra{visibility:hidden}
   /* IL POLLICE LO DISEGNA LA PAGINA (18 nov 2026, cantiere cursore-tempo;
      Andrea: «se tengo premuto e striscio il pallino c'e' questo bug»,
      «c'e' anche senza registrare lo schermo»). Col cursore NATIVO
@@ -98045,7 +98057,8 @@ function sezioneTempoPagareNuovoP2P(){
     titolo: 'Tempo per pagare',
     corpo: '<div class="p2p-orologio' + (lenti.length ? ' fermo' : '') + '" id="p2pTempoPagareOrologio">'
       + anelloTempoP2P(quotaTempoP2P(min), 'p2pTempoPagareAnello')
-      + '<div class="p2p-orologio-val" id="p2pTempoPagareVal">' + minutiPagareDetteP2P(min) + '</div>'
+      + '<div class="p2p-orologio-val"><span id="p2pTempoPagareVal">' + minutiPagareDetteP2P(min) + '</span>'
+      + ombreTempoPagareP2P() + '</div>'
       + '<input type="range" id="p2pTempoPagareCursore" min="0" max="' + (P2P_MINUTI_PAGARE_FERMI.length - 1)
       + '" step="1" value="' + fermoDaMinutiP2P(min) + '"' + (lenti.length ? ' disabled' : '') + fermo
       + ' style="--pieno:' + pienoTempoPagareP2P(fermoDaMinutiP2P(min)) + '%"'
@@ -98053,6 +98066,18 @@ function sezioneTempoPagareNuovoP2P(){
       + '</div>',
     sotto: '<div class="hint" id="p2pTempoPagareNota">' + notaTempoPagareP2P(min, lenti) + '</div>'
   });
+}
+/* PURA: le scritte di TUTTI i fermi, invisibili, nella cella della
+   scritta: la tengono larga quanto la piu' lunga, cosi' il cursore
+   accanto non si muove mentre il dito lo trascina (19 nov 2026,
+   cantiere cursore-trascinato). Senza doppioni: «24 ore» una volta. */
+function ombreTempoPagareP2P(){
+  const viste = [];
+  P2P_MINUTI_PAGARE_FERMI.forEach(m => {
+    const t = minutiPagareDetteP2P(m);
+    if (viste.indexOf(t) < 0) viste.push(t);
+  });
+  return viste.map(t => '<span class="ombra" aria-hidden="true">' + t + '</span>').join('');
 }
 /* PURA: quanta pista e' arancio al passo k (in %, per `--pieno`): il
    cursore e' disegnato dalla pagina e il tratto pieno non viene da se' */
