@@ -214875,7 +214875,7 @@ def prove_tempo_pagare_p2p():
                "function prendiMinutiPagareP2P(m){", "function minutiPagareOrdineP2P(o){",
                "function bollinoTempoPagareP2P(min){",
                "function rigaTempoPagareDettP2P(o, tuo, oc){",
-               "function bannerTempoPagareP2P(min, oc){",
+               "function bannerTempoPagareP2P(min, oc, o){",
                "function rigaTempoPagareScambioP2P(o, adesso){")))
 
     def banco(js):
@@ -214945,7 +214945,8 @@ const s = (stato, lato, entro, min) => rigaTempoPagareScambioP2P({stato, lato, p
 out.scambio = [s('attivo', 'compro', 1000 + 3000, 60), s('attivo', 'vendo', 1000 + 600, 60),
   s('attivo', 'compro', 999, 60), s('euro_inviati', 'compro', 5000, 60), s('attivo', 'compro', 0, 60),
   s('attivo', 'vendo', 0, 60), s('attivo', 'compro', 0, 0), s('attivo', 'compro', 1000 + 600, 60)];
-out.banner = [bannerTempoPagareP2P(60, false), bannerTempoPagareP2P(30, true), bannerTempoPagareP2P(7, false)];
+out.banner = [bannerTempoPagareP2P(60, false), bannerTempoPagareP2P(30, true), bannerTempoPagareP2P(7, false),
+  bannerTempoPagareP2P(30, false, {usdt: true}), bannerTempoPagareP2P(30, true, {usdt: true})];
 console.log(JSON.stringify(out));
 """)
     o = _node_banco(banco(fns))
@@ -215065,13 +215066,22 @@ console.log(JSON.stringify(out));
           "dove gli si informa di come funziona»): il titolo col tempo, i tre passi, e "
           "l'ultima riga dice cosa succede senza il bottone (Lightning: scade; on-chain: la "
           "disputa); senza un tempo, nessun banner",
-          [True, True, True, True, True, None],
+          [True, True, True, True, True, None, True, True],
           [bn[0]["titolo"] == "⏱ Hai 1 ora per pagare",
            "1) Chi vende ti indica dove mandare gli euro: da quel momento hai 1 ora." in bn[0]["corpo"]
            and "3) Tocca subito «Ho inviato gli euro»." in bn[0]["corpo"],
-           "lo scambio scade e i sats tornano a chi vende, anche se hai pagato" in bn[0]["corpo"],
+           # (19 nov 2026) le parole di Andrea
+           bn[0]["corpo"].endswith("Se il tempo finisce ma non hai premuto il bottone «Ho inviato "
+                                   "gli euro», lo scambio scade e i sats tornano a chi vende, "
+                                   "anche se hai pagato."),
            bn[1]["titolo"] == "⏱ Hai 30 minuti per pagare",
-           "chi vende può aprire una disputa" in bn[1]["corpo"], bn[2]])
+           "non hai premuto il bottone «Ho inviato gli euro», chi vende può aprire una disputa"
+           in bn[1]["corpo"], bn[2],
+           # ...e nella valuta dell'ordine, Lightning e on-chain (in USDT: niente «euro»)
+           "Manda gli USDT." in bn[3]["corpo"] and "«Ho inviato gli USDT»" in bn[3]["corpo"]
+           and "euro" not in bn[3]["corpo"],
+           "«Ho inviato gli USDT», chi vende può aprire" in bn[4]["corpo"]
+           and "euro" not in bn[4]["corpo"]])
     rotto = fns.replace("  return metodiVelociTuttiP2P(metodi, veloci) ? m : P2P_MINUTI_PAGARE_MAX;",
                         "  return m;", 1)
     prova("controprova: il banco rotto si e' davvero rotto", True, rotto != fns)

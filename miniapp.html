@@ -75276,7 +75276,7 @@ async function prendiOnchainP2P(id, extra){
      disputa, perche' qui allo scadere non scade niente da solo */
   const minOcB = riga && riga.lato === 'sell' ? Number(riga.minuti_pagamento) || 0 : 0;
   const bannerOc = minOcB && !conCauzione && p2pBannerTempoVisto !== 'oc' + id
-    && typeof bannerTempoPagareP2P === 'function' ? bannerTempoPagareP2P(minOcB, true) : null;
+    && typeof bannerTempoPagareP2P === 'function' ? bannerTempoPagareP2P(minOcB, true, riga) : null;
   if (bannerOc) {
     /* a foglio chiuso e col bottone gia' rimesso: si arriva qui dal
        «Compra» del foglio di casa (`eseguiConferma`), lo stesso foglio */
@@ -92992,7 +92992,7 @@ function confermaDettaglioP2P(){
   const minBanner = o.lato === 'sell' && typeof minutiPagareOrdineP2P === 'function'
     ? minutiPagareOrdineP2P(o) : 0;
   const banner = minBanner && p2pBannerTempoVisto !== id && typeof bannerTempoPagareP2P === 'function'
-    ? bannerTempoPagareP2P(minBanner, false) : null;
+    ? bannerTempoPagareP2P(minBanner, false, o) : null;
   if (banner) {
     chiediConferma({titolo: banner.titolo, corpo: banner.corpo, etichetta: 'Ho capito, prendo',
                     indietro: 'Non ora',
@@ -98846,19 +98846,24 @@ const P2P_AVVISO_BOTTONE_PAGATO_OC = '⚠️ Se hai pagato, tocca subito «Ho in
    l'ordine esce fuori un banner dove gli si informa di come funziona
    questo ordine»): i tre passi, coi minuti dell'ordine. `oc` = on-chain,
    dove allo scadere non scade niente da solo: chi vende puo' aprire una
-   disputa. Testo nudo (il foglio lo scrive col textContent). */
-function bannerTempoPagareP2P(min, oc){
+   disputa. Testo nudo (il foglio lo scrive col textContent).
+   (19 nov 2026, Andrea) l'ultima riga con le sue parole: «Se il tempo
+   finisce ma non hai premuto il bottone…»; e `o`, l'ordine, per dirla
+   nella SUA valuta (gli USDT, i franchi...) coi traduttori della pagina,
+   come il riquadro sopra (prima diceva «euro» anche in USDT) */
+function bannerTempoPagareP2P(min, oc, o){
   const m = minutiPagareSceltaP2P(min);
   if (!m) return null;
   const dette = minutiPagareDetteP2P(m);
-  return {
-    titolo: '⏱ Hai ' + dette + ' per pagare',
-    corpo: '1) Chi vende ti indica dove mandare gli euro: da quel momento hai ' + dette + '.\n'
-      + '2) Manda gli euro.\n'
-      + '3) Tocca subito «Ho inviato gli euro».\n\n'
-      + (oc ? 'Se il tempo finisce senza il bottone, chi vende può aprire una disputa e far tornare indietro i suoi sats, anche se hai pagato.'
-            : 'Se il tempo finisce senza il bottone, lo scambio scade e i sats tornano a chi vende, anche se hai pagato.')
-  };
+  const corpo = '1) Chi vende ti indica dove mandare gli euro: da quel momento hai ' + dette + '.\n'
+    + '2) Manda gli euro.\n'
+    + '3) Tocca subito «Ho inviato gli euro».\n\n'
+    + 'Se il tempo finisce ma non hai premuto il bottone «Ho inviato gli euro», '
+    + (oc ? 'chi vende può aprire una disputa e far tornare indietro i suoi sats, anche se hai pagato.'
+          : 'lo scambio scade e i sats tornano a chi vende, anche se hai pagato.');
+  const parole = !o ? null : oc ? (typeof paroleOcP2P === 'function' ? paroleOcP2P : null)
+    : (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P : null);
+  return {titolo: '⏱ Hai ' + dette + ' per pagare', corpo: parole ? parole(o, corpo) : corpo};
 }
 let p2pBannerTempoVisto = '';   // l'ordine del banner gia' letto, per UNA presa
 /* PURA: la riga del tempo che resta nella pagina dello scambio, per chi
