@@ -215136,13 +215136,46 @@ def prove_riprendi_scaduto_onchain():
           [True, True, True, True, True, True, 0, 0],
           ["o.stato === 'depositato' && !!o.proposta" in giudice
            and "o.proposta.verso === 'compratore' && !o.proposta.barattolo" in giudice,
-           "testo = '<b>↩️ Chi compra ha rinunciato</b> 👉 tocca a te" in sch,
+           "testo = '<b>↩️ Chi compra ha rinunciato.</b> Ha già" in sch,
            "gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`, '✍️ Metti la seconda firma');" in sch,
            "} else if (rinunciaOc && ricevo) {" in sch and "gesti = '';" in sch,
            "&& !rinunciaOc ? tempoPagareRigaOcP2P(o) : '')" in sch,
            "+ (rinunciaOc ? '' : recapitoBox)" in sch,
            mini.count("che il telefono mette da solo"),
            5 - src.count("Apri lo scambio e tocca «✍️ Metti la seconda firma»")])
+    # (19 nov 2026, Andrea alla prova B: «deve funzionare come in uno scambio
+    # normalissimo») LE MOSSE DEL LIGHTNING NELL'ON-CHAIN
+    # (il contanti di persona ha il suo giro, `contOc`: fuori da questo conto)
+    dep = sch[sch.index("    case 'depositato':"):sch.index("    case 'euro_inviati':")]
+    dep = dep[:dep.index("      if (contOc) {")] + dep[dep.index("      /* in USDT (2 nov 2026)"):]
+    prova("COME UNO SCAMBIO NORMALE: col deposito visto niente «Blocca i sats»; coi sats "
+          "nel 2-di-3 «Ricevuti: libera i sats» non c'e' (arriva dopo «Ho inviato»), chi "
+          "vende senza recapito ha «Indica dove ricevere gli euro», chi compra paga solo "
+          "col recapito",
+          [True, True, 0, True, True],
+          ["const vistoDep = deposito && typeof depositoVistoOnchainP2P === 'function'" in sch
+           and "gesti = (vistoDep ? g('controlla', '🔎 Controlla la rete')" in sch,
+           "Non depositare di nuovo." in sch,
+           dep.count("liberaOnchainP2P"),
+           "!o.recapito ? bott('orange', 'vaiRecapitoOcP2P()', paroleOc(o, '💶 Indica dove ricevere gli euro'))" in dep,
+           "(o.recapito ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : '')" in dep])
+    amb_v = {"_fmt_sats": lambda n: f"{int(n):,}".replace(",", "."),
+             "p2p_onchain_tab_scade": lambda o: 0, "_p2p_onchain_contanti": lambda o: False}
+    exec(pezzo("_p2p_onchain_testi_visto"), amb_v)
+    v = amb_v["_p2p_onchain_testi_visto"]({"depositante_id": 1, "ricevente_id": 2, "recapito": ""}, 50000)
+    v2 = amb_v["_p2p_onchain_testi_visto"]({"depositante_id": 1, "ricevente_id": 2, "recapito": "IT00"}, 50000)
+    ctl = pezzo("_p2p_onchain_controlla")
+    rec = pezzo("p2p_onchain_recapito")
+    eur = pezzo("p2p_onchain_euro_inviati")
+    prova("I MESSAGGI DEL BOT: il deposito VISTO si dice una volta a tutti e due (a chi "
+          "ha depositato «scrivi dove vuoi gli euro» se manca); «ha scritto dove vuole gli "
+          "euro» a chi compra solo coi sats bloccati; «Ho inviato» senza recapito no",
+          [[1, 2], True, False, True, True, True, True],
+          [[c for c, _ in v], "dove vuoi gli euro" in v[0][1], "dove vuoi gli euro" in v2[0][1],
+           "and not int(o[\"visti_sats\"] or 0))" in ctl and "avvisi = _p2p_onchain_testi_visto(o, visti)" in ctl,
+           'if ((o["stato"] == "depositato" or (contanti and o["stato"] == "preso"))' in rec,
+           "Chi vende non ha ancora scritto dove vuole \"" in eur,
+           "Chi vende ha messo i sats nel deposito di garanzia 2-di-3 ✓</b> \"" in ctl])
 
 
 def prove_conto_alla_rovescia_p2p():

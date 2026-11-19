@@ -115361,6 +115361,14 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                     (visti, ricevuti, json.dumps(buone), adesso, o["id"]))
         stato = o["stato"]
         soglia = int(o["importo_sats"]) - p2p_onchain_ammanco_tollerato(o)
+        # (19 nov 2026, Andrea alla prova: «non arriva neanche un messaggio»)
+        # IL DEPOSITO VISTO dalla rete e non ancora confermato si dice UNA
+        # volta, a tutti e due: il primo passaggio di `visti_sats` da zero
+        # (la colonna e' gia' scritta sopra; il «prima» e' quello letto)
+        visto_ora = (stato == "preso" and visti > 0 and ricevuti < soglia
+                     and not int(o["visti_sats"] or 0))
+        if visto_ora:
+            avvisi = _p2p_onchain_testi_visto(o, visti)
         if stato == "preso" and ricevuti >= soglia:
             cur = con.execute("UPDATE p2p_onchain_ordini SET stato='depositato',"
                               " depositato_il=? WHERE id=? AND stato='preso'",
@@ -115383,13 +115391,19 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                      "«Ho inviato gli euro». Il recapito è nello scambio."
                      f"\n\n⏳ <b>Hai {tempo_detto}</b>, poi chi vende può aprire una disputa."
                      if senza_recapito is False else
+                     # (19 nov 2026) anche senza recapito si dice PRIMA che
+                     # i sats sono bloccati: la riga mancava
+                     "🔒 <b>Chi vende ha messo i sats nel deposito di garanzia 2-di-3 ✓</b> "
+                     f"Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
                      f"Chi vende non ha ancora scritto dove vuole i <b>{euro} €</b>: "
-                     "te lo dice nello scambio, e ti avviso io."
+                     "non mandare niente adesso, ti avviso io appena lo scrive."
                      f"\n\n⏳ Avrai <b>{tempo_detto}</b> per pagare, da quando lo scrive."),
+                    # (19 nov 2026, Andrea: «deve funzionare come in uno
+                    # scambio normalissimo») «Ricevuti» arriva dopo «Ho inviato»
                     (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> aspetta gli euro. "
                      f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
-                     f"Chi compra sta per mandarti {euro} €: quando li vedi sul tuo "
-                     "conto, apri lo scambio e tocca «Ricevuti: libera i sats». Mai prima."
+                     f"Chi compra sta per mandarti {euro} €: quando tocca «Ho inviato gli "
+                     "euro» ti avviso io. Allora controlla il conto e libera i sats. Mai prima."
                      f"\n\n⏳ Chi compra ha <b>{tempo_detto}</b> per pagare."
                      if senza_recapito is False else
                      "🔒 <b>Deposito confermato ✓.</b> "
@@ -115501,6 +115515,12 @@ async def p2p_onchain_euro_inviati(oid: int, req: Request, x_tg_init_data: str =
             perche = p2p_onchain_giudica_txid_usdt(txid, rete["rete"])
             if perche:
                 raise HTTPException(400, perche)
+        if (not coin and not usdt and not p2p_onchain_tab_scade(o)
+                and not _p2p_onchain_contanti(o) and not (o["recapito"] or "").strip()):
+            # (19 nov 2026) come nel Lightning: si paga DOPO che chi vende
+            # ha scritto dove
+            raise HTTPException(409, "Chi vende non ha ancora scritto dove vuole "
+                                     "gli euro: aspetta che lo scriva")
         if not (coin and not usdt):
             con.execute("UPDATE p2p_onchain_ordini SET stato='euro_inviati',"
                         " euro_inviati_il=?, txid_usdt=?, aggiornato=?"
@@ -115786,7 +115806,13 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
             "recapito DOPO il deposito. Quello di prima resta nello storico "
             "dello scambio: se si apre una disputa, guardate anche quello.",
             argomento="moderazione")
-    if o["stato"] in ("preso", "depositato") and o["ricevente_id"]:
+    # (19 nov 2026, Andrea alla prova) PRIMA DEL DEPOSITO CONFERMATO chi
+    # compra non lo sa adesso: un «ha scritto dove vuole gli euro» coi sats
+    # non ancora bloccati inviterebbe a pagare prima. Glielo dice l'avviso
+    # del deposito confermato («Il recapito è nello scambio»). In contanti
+    # e' l'appuntamento: quello serve prima, per mettersi d'accordo
+    if ((o["stato"] == "depositato" or (contanti and o["stato"] == "preso"))
+            and o["ricevente_id"]):
         await _notifica_p2p_onchain(
             o, o["ricevente_id"],
             ("📍 <b>Chi vende ha scritto dove vedervi.</b>\n\nL'appuntamento è nello scambio."
@@ -116975,7 +117001,8 @@ def _p2p_onchain_testi_deposito_tab(o, euro: str) -> list:
          "Il <b>PayCode</b> adesso è nello scambio: pagalo al tabacchino "
          f"(<b>{euro} € in contanti</b>) entro circa {ore} ore, poi tocca «Ho pagato al tabacchino»."),
         (o["depositante_id"], f"🔒 <b>Deposito confermato ✓</b> Vendi {_p2p_onchain_quanto(o)}.\n\n"
-         "Quando su Amazon l'ordine risulta <b>pagato</b>, tocca «Ricevuti: libera i sats». Mai prima.")]
+         "Quando chi compra tocca «Ho pagato al tabacchino» ti avviso io: allora, se su "
+         "Amazon l'ordine risulta <b>pagato</b>, libera i sats. Mai prima.")]
 
 
 def _p2p_onchain_mio_ln(con, oid: int, tg_id: int, confermato: bool = False):
@@ -117990,6 +118017,29 @@ P2P_ONCHAIN_RILASCIO_TAB_TESTI = {
 def _p2p_onchain_solo_contanti(o) -> bool:
     """PURA: i metodi sono il SOLO «Contanti» (le parole di «consegnato»)."""
     return _metodi_libro(_p2p_onchain_metodi(o)) == ["Contanti"]
+
+
+def _p2p_onchain_testi_visto(o, visti: int) -> list:
+    """PURA: i due avvisi del deposito VISTO dalla rete e non ancora
+    confermato (19 nov 2026, Andrea alla prova: «non arriva neanche un
+    messaggio»). A chi ha depositato: non depositare di nuovo, e intanto
+    scrivi dove vuoi i soldi (se non l'ha fatto e lo scambio ne ha uno);
+    a chi compra: non mandare ancora niente. `[(tg_id, testo)]`."""
+    senza_recapito = not str(o["recapito"] or "").strip()
+    chiede_recapito = (senza_recapito and not p2p_onchain_tab_scade(o)
+                       and not _p2p_onchain_contanti(o))
+    avvisi = [(o["depositante_id"],
+               f"👀 <b>La rete ha visto il tuo deposito</b> ({_fmt_sats(visti)} sats). "
+               "Si aspetta la prima conferma, di solito entro un'ora: non depositare "
+               "di nuovo, ti avviso io."
+               + ("\n\nIntanto apri lo scambio e scrivi <b>dove vuoi gli euro</b>."
+                  if chiede_recapito else ""))]
+    if int(o["ricevente_id"] or 0):
+        avvisi.append((o["ricevente_id"],
+                       "👀 <b>Chi vende ha depositato:</b> la rete l'ha visto, si aspetta la "
+                       "prima conferma. Non mandare ancora niente: ti avviso io quando "
+                       "i sats sono bloccati."))
+    return avvisi
 
 
 def _p2p_onchain_testi_deposito_contanti(o, euro: str, ore: int) -> list:

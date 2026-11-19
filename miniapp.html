@@ -76274,6 +76274,14 @@ async function renderP2POnchain(){
    e manca solo la seconda firma di chi ha depositato. In quel momento
    pagare, liberare, il tempo che scorre e «Dove vuoi gli euro» non hanno
    piu' senso: resta la firma. PURA. */
+/* «💶 Indica dove ricevere gli euro» (19 nov 2026): il campo e' gia' nella
+   pagina, sotto; il bottone ci porta e apre la tastiera */
+function vaiRecapitoOcP2P(){
+  const c = document.getElementById('p2pOcRecapitoVivo');
+  if (!c) return;
+  try { c.scrollIntoView({block: 'center'}); } catch (e) {}
+  c.focus();
+}
 function rinunciaInCorsoOcP2P(o){
   return !!o && o.stato === 'depositato' && !!o.proposta
     && o.proposta.verso === 'compratore' && !o.proposta.barattolo;
@@ -76920,8 +76928,16 @@ function schedaOnchainP2P(o){
       if (haParacaduteP2P(versiParacaduteOcP2P(o))) testo += ' 🪂 Paracadute ' + etichettaParacaduteP2P(versiParacaduteOcP2P(o)) + '.';
       gesti = g('annulla', '🗑 Ritira dal libro');
       break;
-    case 'preso':
-      testo = deposito
+    case 'preso': {
+      /* (19 nov 2026, Andrea alla prova: «dopo che la prima conferma viene
+         vista, mi dice ancora di bloccare i sats») il deposito VISTO dalla
+         rete (la card dice gia' «Deposito inviato»): niente «Blocca i sats»,
+         che inviterebbe a pagare due volte; si aspetta la conferma */
+      const vistoDep = deposito && typeof depositoVistoOnchainP2P === 'function' && depositoVistoOnchainP2P(o);
+      testo = vistoDep
+        ? `La rete ha visto i tuoi <b>${fmt(Number(o.visti_sats) || o.importo_sats)} sats</b>: `
+          + 'si aspetta la conferma, di solito entro un\'ora. Non depositare di nuovo. Con una conferma lo scambio va avanti.'
+        : deposito
         ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete`
           + (Number(o.quota_sats) > 0 ? ` + ${fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0))} di commissione` : '') + ') '
           + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
@@ -76931,7 +76947,8 @@ function schedaOnchainP2P(o){
              : 'Ti avvisiamo appena sono confermati: allora mandi gli euro.');
       /* il foglio del deposito, come «🔒 Blocca i sats» di Lightning
          (30 ott 2026): il suo tasto e' quello in evidenza */
-      gesti = (deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
+      gesti = (vistoDep ? g('controlla', '🔎 Controlla la rete')
+               : deposito ? bott('orange', `apriDepositoOnchainP2P(${o.id})`, '🔒 Blocca i sats')
                           + g('controlla', '🔎 Ho depositato: controlla') : g('controlla', '🔎 Controlla la rete'))
         /* «✕ Annulla» anche a chi riceve, finche' nessun sats e' visto
            (17 nov 2026, come nel Lightning prima della garanzia); dopo
@@ -76945,6 +76962,7 @@ function schedaOnchainP2P(o){
         + (deposito && Number(o.ricevuti_sats) > 0 && !o.proposta
            ? g('riprendi', '↩️ Annulla e riprendi i sats') : '');
       break;
+    }
     case 'depositato':
       /* BARATTOZON ON-CHAIN (17 nov 2026): il PayCode nel riquadro qui
          sotto, «Ho pagato al tabacchino» al posto di «Ho inviato gli
@@ -76953,8 +76971,12 @@ function schedaOnchainP2P(o){
       if (tabOc) {
         testo = ricevo
           ? 'Sats confermati. Paga il PayCode qui sotto, poi tocca «Ho pagato al tabacchino».'
-          : 'Deposito confermato. Libera i sats solo quando su Amazon l\'ordine risulta <b>pagato</b>.';
-        gesti = (ricevo ? g('euro-inviati', '🧾 Ho pagato al tabacchino', 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+          : 'Deposito confermato. Chi compra paga il PayCode al tabacchino: quando tocca «Ho pagato» ti avvisiamo, '
+            + 'e liberi i sats solo se su Amazon l\'ordine risulta <b>pagato</b>.';
+        /* (19 nov 2026, Andrea alla prova: «deve funzionare come in uno
+           scambio normalissimo») «Ricevuti: libera i sats» solo dopo il
+           gesto di chi compra, come `azioneP2P` del Lightning */
+        gesti = (ricevo ? g('euro-inviati', '🧾 Ho pagato al tabacchino', 'orange') : '')
           + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
           + g('disputa', '⚖️ Apri una disputa');
         break;
@@ -76997,15 +77019,27 @@ function schedaOnchainP2P(o){
           + g('disputa', '⚖️ Apri una disputa');
         break;
       }
+      /* (19 nov 2026, Andrea alla prova: «io ancora non gli ho inviato
+         nessuna indicazione di dove voglio gli euro, eppure ho il tasto
+         acceso ricevuti libera i sats, non va bene»; «deve funzionare
+         come in uno scambio normalissimo») LE MOSSE DEL LIGHTNING
+         (`azioneP2P`): prima chi vende scrive dove vuole gli euro, poi
+         chi compra paga e tocca «Ho inviato», POI chi vende libera */
       testo = ricevo
-        ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Manda <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> a chi vende `
-          + `(${esc((o.metodi || []).join(', '))})` + (o.recapito ? ` a: <b>${esc(o.recapito)}</b>` : ', col recapito che ti scrive')
-          + ', poi tocca «Ho inviato gli euro».'
-        : `Deposito confermato. Chi compra ti manda <b>${esc(fmtSoldiP2P(o.euro, o))} €</b>: quando li VEDI sul tuo conto, `
-          + 'libera i sats. Mai prima.';
+        ? (o.recapito
+          ? `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Manda <b>${esc(fmtSoldiP2P(o.euro, o))} €</b> a chi vende `
+            + `(${esc((o.metodi || []).join(', '))}) a: <b>${esc(o.recapito)}</b>, poi tocca «Ho inviato gli euro».`
+          : `I <b>${fmt(o.sats)} sats</b> sono nel 2-di-3. Chi vende deve ancora scrivere dove vuole `
+            + `i <b>${esc(fmtSoldiP2P(o.euro, o))} €</b>: ti avvisiamo appena lo fa. Non mandare niente prima.`)
+        : o.recapito
+        ? `Deposito confermato. Chi compra ti manda <b>${esc(fmtSoldiP2P(o.euro, o))} €</b>: quando tocca `
+          + '«Ho inviato gli euro» ti avvisiamo. Allora controlla il conto e libera i sats. Mai prima.'
+        : `Sats bloccati ✓ Ora scrivi qui sotto <b>dove vuoi i ${esc(fmtSoldiP2P(o.euro, o))} €</b> `
+          + 'e tocca «Salva»: da lì chi compra ha il suo tempo per pagarti.';
       /* l'etichetta nella valuta dello scambio (16 nov 2026): solo la
          scritta, mai il `cosa` del gesto */
-      gesti = (ricevo ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
+      gesti = (ricevo ? (o.recapito ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : '')
+               : !o.recapito ? bott('orange', 'vaiRecapitoOcP2P()', paroleOc(o, '💶 Indica dove ricevere gli euro')) : '')
         + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
         /* (19 nov 2026, riprendi-scaduto) il tempo per pagare finito senza
            «Ho inviato»: chi ha depositato si riprende i sats, senza
@@ -77127,11 +77161,11 @@ function schedaOnchainP2P(o){
   /* (19 nov 2026) la rinuncia in corso: resta solo la firma, detta chiara */
   const rinunciaOc = !mod && typeof rinunciaInCorsoOcP2P === 'function' && rinunciaInCorsoOcP2P(o);
   if (rinunciaOc && deposito) {
-    testo = '<b>↩️ Chi compra ha rinunciato</b> 👉 tocca a te<br>Ha già firmato il rimborso: '
+    testo = '<b>↩️ Chi compra ha rinunciato.</b> Ha già firmato il rimborso: '
       + 'tocca «✍️ Metti la seconda firma» e i sats tornano al tuo wallet (meno la commissione di rete).';
     gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`, '✍️ Metti la seconda firma');
   } else if (rinunciaOc && ricevo) {
-    testo = '<b>↩️ Hai rinunciato</b><br>Hai firmato il rimborso: i sats tornano a chi vende '
+    testo = '<b>↩️ Hai rinunciato.</b> Hai firmato il rimborso: i sats tornano a chi vende '
       + 'quando mette la seconda firma. Non mandare soldi.';
     gesti = '';
   }

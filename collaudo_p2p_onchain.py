@@ -487,10 +487,19 @@ def main():
           gesto(999, figlio["id"], "annulla").status_code)
     prova("niente sull'indirizzo: resta preso", "preso",
           gesto(999, oid, "controlla").json()["stato"])
+    banco.DETTO.clear()
     paga(oa, confermata=False)
     d = gesto(999, oid, "controlla").json()
     prova("visti ma non confermati: ancora preso, e lo si vede",
           ("preso", 101080, 0), (d["stato"], d["visti_sats"], d["ricevuti_sats"]))
+    # (19 nov 2026, Andrea alla prova: «non arriva neanche un messaggio»)
+    prova("IL DEPOSITO VISTO SI DICE: a chi ha depositato «non depositare di nuovo», a "
+          "chi compra «non mandare ancora niente»; una seconda occhiata non lo ripete",
+          (True, True, 1),
+          (detto_a(999, "La rete ha visto il tuo deposito"),
+           detto_a(888, "Non mandare ancora niente"),
+           (gesto(888, oid, "controlla"),
+            sum(1 for x in banco.DETTO if "La rete ha visto il tuo deposito" in str(x)))[1]))
     prova("...e ora nessuno dei due annulla: 409", [409, 409],
           [gesto(999, oid, "annulla").status_code,
            gesto(888, oid, "annulla").status_code])
