@@ -92616,3 +92616,62 @@ PERCHÉ COSÌ. La scelta sta solo nel server (`mostro-core` non ha un campo per 
 SCARTATI. Toccare la sola app (un avviso a chi prende «puoi annullare»): il tempo vero lo decide il nodo, e chi prende vedrebbe 30 minuti mentre il nodo ne aspetta 180. Una cache in memoria nel nodo: i test girano in parallelo sullo stesso processo, la tabella è il calco di quelle della 0011 e 0013.
 LASCIATO FUORI (da chiedere). L'on-chain: chi vende ha 6 ore per depositare (`P2P_ONCHAIN_ORE_DEPOSITO`) qualunque sia il tempo per pagare; la conferma della rete rende un tempo corto più delicato, e la domanda era sul Lightning.
 PROVATO. Nodo nel cloud: `git am` delle quattordici patch dà l'albero `de96252a`, `cargo test` 2009 verdi, 0 rosse, 4 ignorate; il giro filtrato del nodo 748 + 90. `prove_tempo_pagare_p2p` (la risposta `pubblica`, la domanda tardiva), `prove_tempo_pubblica_app` (la finestra per ordine col tag e senza); `collaudo_tempo_pagare` (la rotta vera con `pubblica`), `collaudo_tempo_pubblica` (8-quater: senza tag tre ore e tre promemoria, col tag un'ora, due promemoria dentro l'ora e «Hai N minuti»). Da fare sul nodo: DA-FARE voce 28, poi la prova dal vivo da 15 minuti.
+
+## Il falso «il pagamento dei sats non è passato»: il bot avvisava al primo tentativo, il nodo ritentava da solo (19 nov 2026, sera, cantiere payout-tentativi; Andrea: «prima mi dice che non è passata e poi sì, infatti i sats sono poi arrivati»)
+
+IL CASO DAL VIVO, in produzione (main 2e105d89). Andrea compra sats in P2P
+Lightning, fattura di Wallet of Satoshi incollata. Alle 21:05 il bot: «⚠️ Il
+pagamento dei sats non è passato (il tempo è scaduto): apri «Dove ricevere i
+sats» e dai una fattura nuova». Alle 21:06, senza che lui tocchi niente:
+«✅ Scambio concluso! 149.567 sats». Stava già incollando una fattura nuova.
+
+LA CAUSA, letta sui byte di mostrod v0.20.2 (`check_failure_retries` in
+`src/app/release.rs`): il pagamento a chi compra il nodo lo ritenta da solo
+`payment_attempts` volte (3 nel `settings.toml` di serie) ogni
+`payment_retries_interval` (60 s). Al primo fallimento manda a chi compra
+`payment-failed` («riprovo», e la pagina lo diceva già giusto:
+`pagamento_ritentato`), solo all'ultimo l'`add-invoice`. La patch 0007 invece
+racconta `payout-failed` al server a OGNI tentativo caduto, e il server lo
+prendeva per definitivo: avviso del bot, card di chi vende («il pagamento
+verso chi compra non è passato»), archivio di chi compra (`fattura_nuova`).
+
+LA CURA, solo server (il nodo non si tocca): `_payout_definitivo_p2p` conta i
+`payout_fallito` di fila dall'ultimo avvio del pagamento (rilascio, o fattura
+nuova che a mostrod azzera `payment_attempts`); un `concluso` chiude tutto;
+`LND_UNREACHABLE` e `DB_ERROR` non si contano (mostrod non li conta:
+pagamento rimandato). Definitivo al numero `P2P_TENTATIVI_PAGAMENTO` (3, nel
+config d'esempio; si cambia solo se cambia il nodo). Lo leggono i tre giudici:
+l'avviso (`_avvisi_evento_p2p`: prima tace, col journal «tentativo N di 3»),
+`_pagamento_ordine_p2p` (card e messaggio di chi vende) e `_stato_scambio_p2p`
+(archivio: `pagamento_ritentato` finché il nodo ritenta). La regola del caso
+#241: un `concluso` nella cronaca azzera il conto (`_tentativi_payout_p2p`) e
+uno arrivato dopo zittisce l'avviso (`_superato_p2p`).
+
+STRADE SCARTATE. Una patch al nodo che mandi `payout-failed` solo all'ultimo
+tentativo: giusta, ma vuole una `-bar12`, un riavvio a libro fermo e un
+giorno di più, e il server da solo sa contare. Un ritardo a tempo
+sull'avviso: il nodo dice già quando ha finito, basta contare.
+
+COSA È PROVATO. `prove_scambi_ovunque` (primo e secondo tentativo =
+«riprova», il caso di Andrea = concluso, LND irraggiungibile non conta, il
+terzo = fattura nuova, il conto riparte dalla fattura nuova),
+`prove_p2p_eventi` (i primi due tacciono, il terzo parla, il quarto non
+risuona, la fattura nuova riarma al terzo), `prove_p2p_riserva_libro` (chi
+vende legge «in pagamento» dopo due tentativi caduti, «non passato» dopo il
+terzo), `prove_p2p_esito_notifiche`, `prove_ritocchi_scambio` (le fasi del
+giudice); i collaudi `collaudo_pagamento_p2p` (la rotta e gli avvisi veri) e
+`collaudo_scambi_ovunque` (l'archivio vero). Controprova: col numero a 1
+diventano rosse 11 prove e 7 righe dei due collaudi. Suite severa nel venv
+senza coincurve 30.669/0 (le due sezioni di nostr-tools girate a parte, 97/0),
+collaudi 162/0; dopo il rebase su 0f69ee63 (patch 0015, notifiche-telefono:
+nessun simbolo in comune) suite severa intera 30.708/0/0 e i cinque collaudi
+vicini senza proxy 5/0.
+
+IL VALORE VIVO SUL NODO, letto da Andrea la sera stessa (`grep -n
+"^payment_attempts\|^payment_retries_interval" ~/nodo/mostro/settings.toml`):
+`payment_attempts = 3`, `payment_retries_interval = 60`. Coincide col codice:
+nessuna riga nel config del VPS.
+
+RESTA DA GUARDARE. Dal vivo
+dopo la promozione: un pagamento che cade una volta e poi passa non deve
+più dare l'avviso.

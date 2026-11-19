@@ -240,6 +240,11 @@ P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = True
 # messaggio che si riscrive ogni minuto col tempo che resta (Lightning e
 # on-chain). Accesa di serie; False la spegne.
 P2P_CONTO_ALLA_ROVESCIA = True
+# Quante volte il nodo ritenta da solo il pagamento dei sats a chi compra
+# (19 nov 2026): deve essere uguale a `payment_attempts` nel settings.toml
+# del nodo (3). Il bot dice «non è passato, dai una fattura nuova» solo
+# quando sono caduti tutti i tentativi, mai al primo.
+P2P_TENTATIVI_PAGAMENTO = 3
 # La metà della cauzione on-chain persa la manda Barattolo da solo (19 nov
 # 2026), dal registro «da riscuotere», all'indirizzo Lightning del Profilo di
 # chi la riceve. Il tetto in sats: 0 = nessuno (di serie, scelta di Andrea);

@@ -21,7 +21,8 @@ gira il SERVER VERO su un database usa-e-getta, e si cammina:
   2. liberati: la domanda di chi vende risponde «in corso» — e anche a
      chi compra, che e' l'altra parte; all'estraneo e a un ordine che
      non c'e' non risponde niente, e i due casi non si distinguono;
-  3. il pagamento NON passa: «fallito»; la fattura nuova: di nuovo «in
+  3. il pagamento NON passa (tre tentativi caduti, 19 nov 2026; prima
+     e' ancora «in corso»): «fallito»; la fattura nuova: di nuovo «in
      corso»; un secondo fallimento: «fallito»; e due fatti nello stesso
      secondo li decide il fallimento, che e' sempre la conseguenza di
      un tentativo;
@@ -327,25 +328,34 @@ def main():
           pagamento(VENDE, [SOLO_LIBRO]).get("pagamenti"))
 
     print("\n3) il pagamento non passa, la fattura nuova, di nuovo")
+    # (19 nov 2026, payout-tentativi) il nodo ritenta da solo tre volte:
+    # «fallito» solo a tentativi finiti
+    def pag():
+        return (pagamento(VENDE).get("pagamenti") or {}).get(SCAMBIO)
     evento(SCAMBIO, "payout-failed", t0 + 50, dettaglio="INVOICE_EXPIRED")
-    prova("il pagamento non passato: fallito",
-          {"stato": "fallito", "quando": t0 + 50},
-          (pagamento(VENDE).get("pagamenti") or {}).get(SCAMBIO))
+    prova("un tentativo caduto mentre il nodo ritenta: ancora in corso",
+          {"stato": "in_corso", "quando": t0 + 50}, pag())
+    evento(SCAMBIO, "payout-failed", t0 + 52, dettaglio="INVOICE_EXPIRED")
+    evento(SCAMBIO, "payout-failed", t0 + 54, dettaglio="INVOICE_EXPIRED")
+    prova("il pagamento non passato (tre tentativi caduti): fallito",
+          {"stato": "fallito", "quando": t0 + 54}, pag())
     evento(SCAMBIO, "buyer-invoice-added", t0 + 60, attore="buyer",
            dettaglio="new-invoice")
     prova("la fattura nuova: di nuovo in corso",
-          {"stato": "in_corso", "quando": t0 + 60},
-          (pagamento(VENDE).get("pagamenti") or {}).get(SCAMBIO))
-    evento(SCAMBIO, "payout-failed", t0 + 70, dettaglio="NO_ROUTE")
-    prova("un secondo fallimento: fallito",
-          {"stato": "fallito", "quando": t0 + 70},
-          (pagamento(VENDE).get("pagamenti") or {}).get(SCAMBIO))
+          {"stato": "in_corso", "quando": t0 + 60}, pag())
+    for q in (70, 72, 74):
+        evento(SCAMBIO, "payout-failed", t0 + q, dettaglio="NO_ROUTE")
+    prova("un secondo giro di tentativi caduti: fallito",
+          {"stato": "fallito", "quando": t0 + 74}, pag())
     evento(SCAMBIO, "buyer-invoice-added", t0 + 80, attore="buyer",
            dettaglio="new-invoice")
     evento(SCAMBIO, "payout-failed", t0 + 80, dettaglio="INVOICE_INVALID")
-    prova("fattura nuova e fallimento nello stesso secondo: vince il fallimento",
-          {"stato": "fallito", "quando": t0 + 80},
-          (pagamento(VENDE).get("pagamenti") or {}).get(SCAMBIO))
+    prova("fattura nuova e fallimento nello stesso secondo: il conto riparte, ed e' il primo",
+          {"stato": "in_corso", "quando": t0 + 80}, pag())
+    evento(SCAMBIO, "payout-failed", t0 + 82, dettaglio="INVOICE_INVALID")
+    evento(SCAMBIO, "payout-failed", t0 + 84, dettaglio="INVOICE_INVALID")
+    prova("...e al terzo: fallito",
+          {"stato": "fallito", "quando": t0 + 84}, pag())
     evento(SCAMBIO, "buyer-invoice-added", t0 + 90, attore="buyer",
            dettaglio="new-invoice")
 
@@ -458,7 +468,11 @@ def main():
                       "5,00 €, in tutto 7.372 sats commissione compresa."))
 
     avvisi(NON_PASSATO, "released", ora - 61, attore="seller", **NUMERI)
-    prova("il pagamento non passa (la fattura scaduta): lo sente chi compra",
+    prova("i primi due tentativi caduti non li sente nessuno: il nodo ritenta",
+          [[], []], [[chi for chi, _ in avvisi(
+              NON_PASSATO, "payout-failed", ora - q,
+              dettaglio="INVOICE_EXPIRED") or []] for q in (60, 59)])
+    prova("il pagamento non passa (tentativi finiti): lo sente chi compra",
           [COMPRA], [chi for chi, _ in avvisi(
               NON_PASSATO, "payout-failed", ora - 58,
               dettaglio="INVOICE_EXPIRED") or []])

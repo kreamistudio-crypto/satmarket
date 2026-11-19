@@ -78486,6 +78486,22 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
               f"{fatto['venditore'] or '—'}"
               + (f", cauzione di chi {dati['cauzione_di']}" if dati["cauzione_di"] else "")
               + ")", flush=True)
+    # IL PAGAMENTO CADUTO MENTRE IL NODO RITENTA NON E' UNA NOTIZIA (19 nov
+    # 2026, cantiere payout-tentativi): «dai una fattura nuova» parte solo a
+    # tentativi finiti (`_payout_definitivo_p2p`); prima tace, e il campanello
+    # resta libero per l'ultimo
+    if momento == "payout_fallito" and destinatari:
+        cronaca = con.execute(
+            "SELECT momento, quando, dettaglio FROM p2p_momenti WHERE ordine=? "
+            "AND momento IN ('rilasciato', 'payout_fallito', 'fattura_data', "
+            "'concluso')", (ordine,)).fetchall()
+        if not _payout_definitivo_p2p(cronaca):
+            print(f"· Evento P2P: {corto} «payout_fallito»"
+                  + (f"/{ev['dettaglio']}" if ev["dettaglio"] else "")
+                  + f": tentativo {_tentativi_payout_p2p(cronaca)} di "
+                  f"{P2P_TENTATIVI_PAGAMENTO}, il nodo ritenta da solo: "
+                  "l'avviso non parte", flush=True)
+            destinatari = []
     # LA DISPUTA RIAPERTA (12 ott 2026) ha il suo timbro: alle due parti
     # non e' il doppione della prima apertura. Si chiede QUI, prima che
     # `_disputa_evento_p2p` rimetta la riga ad «aperta»
@@ -80663,6 +80679,71 @@ async def luogo_vicino_p2p(req: Request, x_tg_init_data: str = Header(""),
 # fattura nuova — quindi a parita' d'ora viene DOPO, e vince.
 _DOPO_RILASCIO_P2P = {"rilasciato": 0, "fattura_data": 1, "payout_fallito": 2}
 
+# ═══ IL PAGAMENTO FALLITO DAVVERO (19 nov 2026, cantiere payout-tentativi) ═══
+# Lo scambio di Andrea di stasera: alle 21:05 il bot gli scrive «⚠️ Il
+# pagamento dei sats non è passato (il tempo è scaduto): dai una fattura
+# nuova», alle 21:06 — senza che lui tocchi niente — «✅ Scambio
+# concluso», e i sats arrivano. Il nodo il pagamento a chi compra lo
+# RITENTA DA SOLO: `payment_attempts` volte (3 nel `settings.toml` del
+# nodo), una ogni `payment_retries_interval` secondi (60) — letto sui
+# byte di mostrod v0.20.2, `check_failure_retries` in
+# `src/app/release.rs`: al PRIMO fallimento manda a chi compra un
+# `payment-failed` («riprovo da solo», e la pagina lo dice gia' cosi':
+# `pagamento_ritentato`), solo all'ULTIMO l'`add-invoice` che vuol dire
+# «dammi una fattura nuova». La patch 0007 invece racconta al server
+# `payout-failed` a OGNI tentativo caduto, e il server lo prendeva
+# subito per definitivo.
+# LA REGOLA: «non e' passato, dai una fattura nuova» si dice solo quando
+# sono caduti TUTTI i tentativi di fila — dall'ultimo avvio del
+# pagamento, cioe' il rilascio o la fattura nuova (che a mostrod azzera
+# `payment_attempts`, `pay_new_invoice`). Un `success` in mezzo chiude
+# tutto. Due classi di guasto mostrod NON le conta come tentativo
+# (`check_failure_retries_or_log`: LND non sincronizzato o
+# irraggiungibile, il pagamento e' rimandato e basta): non le contiamo
+# nemmeno noi, o diremmo «definitivo» un giro prima di lui.
+# IL NUMERO E' QUELLO DEL NODO: se un giorno `payment_attempts` cambia
+# la', si scrive la stessa cifra nel config del VPS.
+try:
+    from config import P2P_TENTATIVI_PAGAMENTO
+    P2P_TENTATIVI_PAGAMENTO = max(1, int(P2P_TENTATIVI_PAGAMENTO))
+except (ImportError, TypeError, ValueError):
+    P2P_TENTATIVI_PAGAMENTO = 3
+P2P_PAYOUT_NON_CONTATI = ("LND_UNREACHABLE", "DB_ERROR")
+
+
+def _tentativi_payout_p2p(momenti) -> int:
+    """PURA: quanti pagamenti a chi compra sono caduti DI FILA dall'ultimo
+    avvio (il rilascio, o la fattura nuova), sui momenti della cronaca
+    (dizionari o righe con `momento`, `quando`, `dettaglio`). 0 se il
+    pagamento e' riuscito o non e' mai caduto. A parita' d'ora vale il
+    peso di `_DOPO_RILASCIO_P2P` (il fallimento viene dopo il tentativo),
+    e il `concluso` dopo tutti."""
+    def campo(m, k):
+        try:
+            return m[k]
+        except (KeyError, IndexError):
+            return None
+    pesi = dict(_DOPO_RILASCIO_P2P, concluso=3)
+    fila = sorted((m for m in momenti or [] if str(campo(m, "momento") or "") in pesi),
+                  key=lambda m: (int(campo(m, "quando") or 0),
+                                 pesi[str(campo(m, "momento"))]))
+    n = 0
+    for m in fila:
+        nome, det = str(campo(m, "momento")), str(campo(m, "dettaglio") or "")
+        if nome == "concluso":
+            return 0
+        if nome == "rilasciato" or (nome == "fattura_data" and det == "new-invoice"):
+            n = 0
+        elif nome == "payout_fallito" and det not in P2P_PAYOUT_NON_CONTATI:
+            n += 1
+    return n
+
+
+def _payout_definitivo_p2p(momenti) -> bool:
+    """PURA: il pagamento a chi compra e' caduto DAVVERO — il nodo ha
+    finito i suoi tentativi e aspetta una fattura nuova."""
+    return _tentativi_payout_p2p(momenti) >= P2P_TENTATIVI_PAGAMENTO
+
 
 def _pagamenti_p2p(con, ordini, io: int) -> dict:
     """PURA sulla connessione: dove sta il pagamento a chi compra, per
@@ -80731,8 +80812,10 @@ def _pagamento_ordine_p2p(con, ordine: str) -> dict:
     if not fatti:
         return {}
     quando, _peso, momento = max(fatti)
-    return {"stato": "fallito" if momento == "payout_fallito" else "in_corso",
-            "quando": quando}
+    # (19 nov 2026) un tentativo caduto mentre il nodo ritenta da solo e'
+    # ancora «in corso»: «fallito» solo a tentativi finiti
+    fallito = momento == "payout_fallito" and _payout_definitivo_p2p(righe)
+    return {"stato": "fallito" if fallito else "in_corso", "quando": quando}
 
 
 @app.post("/api/p2p/pagamenti")
@@ -80895,7 +80978,11 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
     elif m == "rilasciato":
         s = "rilasciato"
     elif m == "payout_fallito":
-        s = "fattura_nuova" if compro else "rilasciato"
+        # (19 nov 2026) la fattura nuova solo a tentativi finiti: prima il
+        # nodo ritenta da solo, e la pagina lo dice («pagamento_ritentato»)
+        definitivo = _payout_definitivo_p2p(del_giro)
+        s = (("fattura_nuova" if definitivo else "pagamento_ritentato")
+             if compro else "rilasciato")
     elif m == "concluso":
         s = "concluso"
     elif m == "annullo_chiesto":
@@ -80911,7 +80998,7 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
     return {"stato": s,
             "preso": any(str(x.get("momento")) == "preso" for x in del_giro),
             "quando": int(ultimo.get("quando") or 0),
-            "payout_fallito": m == "payout_fallito"}
+            "payout_fallito": m == "payout_fallito" and _payout_definitivo_p2p(del_giro)}
 
 
 def _passo_euro_p2p(dati) -> str:

@@ -29904,6 +29904,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   libro e il recapito, sempre PRIMA dell'invio. Una fattura nuova dopo
   un pagamento fallito (`buyer-invoice-added`/`new-invoice`) cancella
   la riga del `payout_fallito`, così un secondo fallimento risuona.
+  IL `payout_fallito` PARLA SOLO A TENTATIVI FINITI (19 nov 2026,
+  cantiere payout-tentativi): mostrod ritenta da solo il pagamento
+  `payment_attempts` volte (3, ogni 60 s) e la patch 0007 manda
+  `payout-failed` a OGNI tentativo caduto. `_payout_definitivo_p2p`
+  conta i fallimenti di fila dall'ultimo avvio (rilascio o fattura
+  nuova; `LND_UNREACHABLE` e `DB_ERROR` non contano, come in mostrod) e
+  l'avviso a chi compra parte solo al numero `P2P_TENTATIVI_PAGAMENTO`
+  (3, uguale al nodo). Prima tace, e il campanello resta libero.
   LA RETE DI SICUREZZA È IL LIBRO: `_avvisi_libro_p2p` non manda più,
   mette la frase in `p2p_attese` con scadenza a `P2P_RISERVA_S` (60;
   zero a porta chiusa: allora parte nella stessa passata, com'era), e
@@ -31643,7 +31651,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   altrimenti l'ULTIMO fra `rilasciato`, `payout_fallito` e la fattura
   NUOVA (`fattura_data`/`new-invoice`) decide 'fallito' o 'in_corso',
   e a pari secondo vince il fallimento (`_DOPO_RILASCIO_P2P`: è sempre
-  la conseguenza di un tentativo). Chi non è della partita e lo scambio
+  la conseguenza di un tentativo). Dal 19 nov 2026 'fallito' solo a
+  tentativi finiti (`_payout_definitivo_p2p`): un tentativo caduto
+  mentre il nodo ritenta è ancora 'in_corso', e nell'archivio di chi
+  compra è `pagamento_ritentato`, non `fattura_nuova`. Chi non è della partita e lo scambio
   di cui il server non ha sentito niente dopo il rilascio non ricevono
   la riga: «non lo so» non si serve come «in corso».
   NEL CLIENT la domanda sta in un BLOCCO SUO dopo quello delle parti

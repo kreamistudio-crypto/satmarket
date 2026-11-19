@@ -77,6 +77,18 @@ def pezzo(nome, fine="\n\n\n"):
     return src[i:src.index(fine, i)]
 
 
+def blocco_payout_p2p(amb):
+    """(19 nov 2026, cantiere payout-tentativi) I GIUDICI DEL PAGAMENTO
+    CADUTO DAVVERO dentro un banco: `_DOPO_RILASCIO_P2P`, il numero dei
+    tentativi del nodo e le due funzioni, presi dal sorgente come un
+    blocco solo. Senza config (qui) il numero e' quello di serie."""
+    src = _SORGENTE
+    i = src.index("\n_DOPO_RILASCIO_P2P = ") + 1
+    f = src.index("\n\n\n", src.index("def _payout_definitivo_p2p(", i))
+    exec(src[i:f], amb)
+    return amb
+
+
 def riga_senza_traccia():
     """LA POSTA SENZA TRACCIAMENTO (16 nov 2026): segna_spedito e la
     correzione del venditore la nominano per costante, e i banchi che le
@@ -99920,6 +99932,7 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  "P2P_PROMEMORIA_DISTANZA_S = ", "FORMA_FUSO_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
+    blocco_payout_p2p(amb)            # (19 nov 2026) il pagamento caduto davvero
     for blocco, fine in (("STATI_LIBRO_PRESO = (", ")\n"),
                          ("P2P_AZIONI_EVENTO = (", ")\n"),
                          # ...e le azioni che portano importi (1 ott 2026,
@@ -100614,21 +100627,29 @@ def prove_p2p_eventi():
     ORD4 = "abcdefab-cdef-4abc-8def-abcdefabcdef"
     libro(ORD4, B, A, "sell")
     arriva("taken", "buyer", "invoice-next", ORA, ORD4)
-    prova("il pagamento fallito lo sente chi compra, col motivo in parole",
+    # (19 nov 2026, payout-tentativi) il nodo ritenta da solo tre volte:
+    # il primo e il secondo tentativo caduto tacciono, il terzo parla
+    prova("il primo e il secondo tentativo caduto NON avvisano: il nodo ritenta da solo",
+          [[], []],
+          [arriva("payout-failed", "mostro", "TIMEOUT", ORA + 2000 + n, ORD4)
+           for n in (0, 60)])
+    prova("...LND irraggiungibile non conta come tentativo, e tace anche lui",
+          [], arriva("payout-failed", "mostro", "LND_UNREACHABLE", ORA + 2090, ORD4))
+    prova("il pagamento fallito DAVVERO (tentativi finiti) lo sente chi compra, col motivo in parole",
           [(A, "⚠️ Il pagamento dei sats non è passato (non si è trovata una "
                "strada fino al tuo wallet): apri «Dove ricevere i sats» e dai "
                "una fattura nuova.\n\nI sats restano fermi per te finché il "
                "pagamento non passa.")],
-          arriva("payout-failed", "mostro", "NO_ROUTE", ORA + 2000, ORD4))
-    prova("...il secondo e il terzo tentativo fallito NON risuonano", [[], []],
-          [arriva("payout-failed", "mostro", "NO_ROUTE", ORA + 2060 + n, ORD4)
-           for n in (0, 60)])
+          arriva("payout-failed", "mostro", "NO_ROUTE", ORA + 2120, ORD4))
+    prova("...e un altro fallimento dopo non risuona", [],
+          arriva("payout-failed", "mostro", "NO_ROUTE", ORA + 2180, ORD4))
     prova("...un motivo che non si conosce non finisce in faccia a chi compra",
           False, "WEIRD" in amb["_testo_evento_p2p"](
               "payout_fallito", "WEIRD_CODE", "compra", {}))
     arriva("buyer-invoice-added", "buyer", "new-invoice", ORA + 2200, ORD4)
-    prova("una fattura NUOVA riapre il campanello: se fallisse anche lei, risuona",
-          1, len(arriva("payout-failed", "mostro", "TIMEOUT", ORA + 2300, ORD4)))
+    prova("una fattura NUOVA riapre il campanello e azzera il conto: se fallisse anche lei, risuona al terzo tentativo",
+          [0, 0, 1], [len(arriva("payout-failed", "mostro", "TIMEOUT", ORA + 2300 + n, ORD4))
+                      for n in (0, 60, 120)])
     # (13 ott 2026, disputa-per-sbaglio) qui l'ha aperta chi compra: la
     # sente chi VENDE, e a lui si dice anche che puo' rilasciare
     prova("la disputa la sente l'altra parte, con la cifra — e chi vende sa che puo' rilasciare",
@@ -102668,8 +102689,20 @@ def prove_p2p_riserva_libro():
 
     # 5b) il pagamento NON passa prima dello scadere (la fattura scaduta:
     # il caso della prova a due telefoni)
+    # (19 nov 2026, payout-tentativi) i primi due tentativi caduti tacciono:
+    # il nodo ritenta da solo, e chi vende resta «in pagamento»
     con, amb = rilasciato()
-    prova("il pagamento non passato lo sente chi compra, e solo lui", [A],
+    prova("i primi due tentativi caduti non li sente nessuno", [[], []],
+          [[t for t, _ in evento(con, amb, "payout-failed", "mostro", ORA + q,
+                                 "TIMEOUT")] for q in (901, 903)])
+    fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 961)
+    prova("...e al minuto chi vende legge ancora «in pagamento», non «non e' passato»",
+          [(B, testi["in_corso"], "rilascio")], fuori)
+    con.close()
+    con, amb = rilasciato()
+    for q in (901, 903):
+        evento(con, amb, "payout-failed", "mostro", ORA + q, "INVOICE_EXPIRED")
+    prova("il pagamento non passato (tentativi finiti) lo sente chi compra, e solo lui", [A],
           [t for t, _ in evento(con, amb, "payout-failed", "mostro", ORA + 905,
                                 "INVOICE_EXPIRED")])
     fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 961)
@@ -103828,6 +103861,7 @@ def prove_scambi_ovunque():
               "_conto_scambio_p2p"):
         exec(pezzo(f), amb)
     tempo_pagare_nel_banco(amb)       # (18 nov 2026) l'archivio dice il tempo per pagare
+    blocco_payout_p2p(amb)            # (19 nov 2026) il pagamento caduto davvero
     euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
     stato = amb["_stato_scambio_p2p"]
     prova("la cifra del libro torna numero: «10,00 €», «23,47 €», «1.500,00 €», storta, vuota",
@@ -103875,18 +103909,37 @@ def prove_scambi_ovunque():
     ril = fiat + [m("rilasciato", 140, "seller")]
     prova("liberati: in pagamento per tutt'e due", ["rilasciato", "rilasciato"],
           [st(ril, "compro"), st(ril, "vendo")])
-    fall = ril + [m("payout_fallito", 150, "mostro", "NO_ROUTE")]
-    prova("pagamento non passato: a chi compra la fattura nuova, chi vende resta in pagamento e lo sa",
+    # (19 nov 2026, payout-tentativi) il nodo ritenta da solo: al primo e al
+    # secondo tentativo caduto si «riprova», la fattura nuova solo al terzo
+    uno = ril + [m("payout_fallito", 150, "mostro", "TIMEOUT")]
+    due = uno + [m("payout_fallito", 210, "mostro", "TIMEOUT")]
+    prova("primo e secondo tentativo caduto: a chi compra «si riprova da solo», chi vende resta in pagamento e NON lo sa",
+          ["pagamento_ritentato", "rilasciato", False, "pagamento_ritentato", False],
+          [st(uno, "compro"), st(uno, "vendo"),
+           stato(uno, "vendo", "buyer", "", False)["payout_fallito"],
+           st(due, "compro"), stato(due, "vendo", "buyer", "", False)["payout_fallito"]])
+    prova("...e lo scambio di Andrea (19 nov): un tentativo caduto, il secondo passa — concluso",
+          ["concluso", "concluso"],
+          [st(uno + [m("concluso", 211)], "compro"), st(uno + [m("concluso", 211)], "vendo")])
+    prova("...LND irraggiungibile il nodo non lo conta, e nemmeno noi",
+          "pagamento_ritentato",
+          st(due + [m("payout_fallito", 240, "mostro", "LND_UNREACHABLE")], "compro"))
+    fall = due + [m("payout_fallito", 270, "mostro", "NO_ROUTE")]
+    prova("pagamento non passato (tentativi finiti): a chi compra la fattura nuova, chi vende resta in pagamento e lo sa",
           ["fattura_nuova", "rilasciato", True],
           [st(fall, "compro"), st(fall, "vendo"),
            stato(fall, "vendo", "buyer", "", False)["payout_fallito"]])
-    nuova = fall + [m("fattura_data", 160, "buyer", "new-invoice")]
+    prova("...e il conto riparte dalla fattura nuova: un tentativo caduto dopo e' di nuovo «si riprova»",
+          "pagamento_ritentato",
+          st(fall + [m("fattura_data", 280, "buyer", "new-invoice"),
+                     m("payout_fallito", 290, "mostro", "NO_ROUTE")], "compro"))
+    nuova = fall + [m("fattura_data", 300, "buyer", "new-invoice")]
     prova("...la fattura nuova riporta in pagamento", ["rilasciato", "rilasciato"],
           [st(nuova, "compro"), st(nuova, "vendo")])
-    conc = nuova + [m("concluso", 170)]
+    conc = nuova + [m("concluso", 310)]
     prova("concluso", ["concluso", "concluso"], [st(conc, "compro"), st(conc, "vendo")])
     prova("...e i fatti nello stesso secondo li decide il peso: fallito dopo rilasciato",
-          "fattura_nuova", st(fiat + [m("rilasciato", 140, "seller"), m("payout_fallito", 140, "mostro")], "compro"))
+          "pagamento_ritentato", st(fiat + [m("rilasciato", 140, "seller"), m("payout_fallito", 140, "mostro")], "compro"))
     ann_c = pag + [m("annullo_chiesto", 130, "buyer")]
     prova("annullo chiesto da chi compra: lui «ha chiesto», l'altro «propone»",
           ["annullo_chiesto", "annullo_proposto"], [st(ann_c, "compro"), st(ann_c, "vendo")])
@@ -108351,8 +108404,10 @@ def prove_p2p_esito_notifiche():
           _evento("hold-invoice-requested", "mostro", ORA_E + 20, "take") == []
           and len(zitti) == 2 and "nessuno da avvisare" in zitti[1]
           and "compra 700000001, vende 700000002" in zitti[1])
-    # il GIA' DETTO: due pagamenti falliti di fila sono un avviso solo
-    _evento("payout-failed", "mostro", ORA_E + 30, "NO_ROUTE")
+    # il GIA' DETTO: un pagamento fallito dopo quello detto (a tentativi
+    # finiti: tre, 19 nov 2026) non risuona
+    for _q in (30, 40, 50):
+        _evento("payout-failed", "mostro", ORA_E + _q, "NO_ROUTE")
     prova("il gia' detto tace, e il journal dice che e' un doppione e non un guasto", True,
           _evento("payout-failed", "mostro", ORA_E + 90, "NO_ROUTE") == []
           and "«payout_fallito» a 700000001 e' gia' stato detto: non si ripete" in zitti[-1])
@@ -135527,6 +135582,7 @@ const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isCon
                  "STATI_RECENSIONE_P2P = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    blocco_payout_p2p(amb)            # (19 nov 2026) il pagamento caduto davvero
     for nome in ("_ordini_puliti_p2p", "_pagamenti_p2p", "_pagamento_ordine_p2p",
                  "_ammette_recensione_p2p", "_scambio_concluso_p2p",
                  # (10 ott 2026, feedback-p2p) la terza strada: la disputa
@@ -135562,23 +135618,35 @@ const bott = () => ({dataset: {v: '@pseudolo'}, textContent: '📋 Copia', isCon
     fasi.append(P(111))
     ev(O1, "rilasciato", 200)
     fasi.append(P(111))
+    # (19 nov 2026, payout-tentativi) «fallito» solo a tentativi finiti
+    # (tre): prima il nodo ritenta da solo, ed e' ancora in corso
     ev(O1, "payout_fallito", 210, "INVOICE_EXPIRED")
     fasi.append(P(111))
-    ev(O1, "fattura_data", 300, "new-invoice")
+    ev(O1, "payout_fallito", 270, "INVOICE_EXPIRED")
+    ev(O1, "payout_fallito", 330, "INVOICE_EXPIRED")
     fasi.append(P(111))
-    ev(O1, "payout_fallito", 300, "NO_ROUTE")
+    ev(O1, "fattura_data", 400, "new-invoice")
     fasi.append(P(111))
-    ev(O1, "concluso", 400)
+    ev(O1, "payout_fallito", 400, "NO_ROUTE")
+    fasi.append(P(111))
+    ev(O1, "payout_fallito", 460, "NO_ROUTE")
+    ev(O1, "payout_fallito", 520, "NO_ROUTE")
+    fasi.append(P(111))
+    ev(O1, "concluso", 600)
     fasi.append(P(111))
     prova("3) il pagamento a chi compra, fase per fase: niente prima del rilascio "
-          "(la fattura della presa non conta), in corso, non passato, ripartito, "
-          "non passato nello stesso secondo della fattura nuova, riuscito",
+          "(la fattura della presa non conta), in corso, un tentativo caduto e' "
+          "ancora in corso, non passato a tentativi finiti, ripartito, caduto "
+          "nello stesso secondo della fattura nuova (conta da capo), di nuovo "
+          "non passato, riuscito",
           [{}, {},
            {O1: {"stato": "in_corso", "quando": 200}},
-           {O1: {"stato": "fallito", "quando": 210}},
-           {O1: {"stato": "in_corso", "quando": 300}},
-           {O1: {"stato": "fallito", "quando": 300}},
-           {O1: {"stato": "riuscito", "quando": 400}}], fasi)
+           {O1: {"stato": "in_corso", "quando": 210}},
+           {O1: {"stato": "fallito", "quando": 330}},
+           {O1: {"stato": "in_corso", "quando": 400}},
+           {O1: {"stato": "in_corso", "quando": 400}},
+           {O1: {"stato": "fallito", "quando": 520}},
+           {O1: {"stato": "riuscito", "quando": 600}}], fasi)
     prova("...lo dice anche a chi compra, che e' l'altra parte", "riuscito",
           P(222).get(O1, {}).get("stato"))
     prova("...all'estraneo, a nessuno e a un ordine senza parti non dice niente",

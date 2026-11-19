@@ -493,7 +493,14 @@ def main():
     prova("...coi tre importi, ognuno il suo", [[7300, 7372], [7300, 7228]],
           [voce(V, ATTIVO, "sats_ordine", "sats_miei"), voce(C, ATTIVO, "sats_ordine", "sats_miei")])
     banco.evento(ATTIVO, "payout-failed", t + 60, "mostro", "NO_ROUTE")
-    prova("pagamento non passato: a chi compra la fattura nuova, chi vende in pagamento — e il fatto lo leggono tutt'e due",
+    # (19 nov 2026, payout-tentativi) il nodo ritenta da solo: al primo
+    # tentativo caduto a chi compra «si riprova», chi vende non legge niente
+    prova("un tentativo caduto: a chi compra «si riprova da solo», chi vende in pagamento e non lo legge fallito",
+          [["pagamento_ritentato", False], ["rilasciato", False]],
+          [voce(C, ATTIVO, "stato", "payout_fallito"), voce(V, ATTIVO, "stato", "payout_fallito")])
+    banco.evento(ATTIVO, "payout-failed", t + 62, "mostro", "NO_ROUTE")
+    banco.evento(ATTIVO, "payout-failed", t + 64, "mostro", "NO_ROUTE")
+    prova("pagamento non passato (tentativi finiti): a chi compra la fattura nuova, chi vende in pagamento — e il fatto lo leggono tutt'e due",
           [["fattura_nuova", True], ["rilasciato", True]],
           [voce(C, ATTIVO, "stato", "payout_fallito"), voce(V, ATTIVO, "stato", "payout_fallito")])
     banco.evento(ATTIVO, "buyer-invoice-added", t + 70, "buyer", "new-invoice")
