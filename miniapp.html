@@ -48008,7 +48008,7 @@ async function setCanale(canale){
    riga dice come fare (iOS da' il push solo al sito aggiunto alla
    Home, dal 16.4). La chiave pubblica del timbro arriva da /api/me. ---- */
 let myWebPush = {attivo: false};   // da /api/me: {attivo, chiave}
-let pushTelefono = '';             // '' non so ancora · 'si' · 'no' · 'bloccate'
+let pushTelefono = '';             // '' non so ancora · 'si' · 'no' · 'bloccate' · 'altro'
 const pushIOSFuoriHome = () => /iP(hone|ad|od)/.test(navigator.userAgent || '')
   && !navigator.standalone
   && !(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
@@ -48053,8 +48053,14 @@ const rigaPushTelefono = () => {
   </div>`;
   }
   const si = pushTelefono === 'si', bloccate = pushTelefono === 'bloccate';
+  /* 'altro' (19 nov 2026, cantiere push-attive): il telefono e' iscritto,
+     ma per un ALTRO account aperto qui — un telefono suona per un account
+     alla volta, e prima questa riga diceva «Attive» anche qui */
+  const altro = pushTelefono === 'altro';
   const nota = si
     ? 'Attive su questo telefono: ordini, scambi e messaggi ti arrivano anche ad app chiusa.'
+    : altro
+    ? 'Su questo telefono ora arrivano le notifiche di un altro tuo account: arrivano a un account alla volta. Tocca «Attiva qui» per riceverle per questo account.'
     : bloccate
       ? 'Le hai bloccate per Barattolo: riaprile dalle impostazioni del telefono (Notifiche), poi torna qui.'
       : 'Gli avvisi di ordini, scambi e messaggi come notifica, anche ad app chiusa. Vale per questo telefono.';
@@ -48068,7 +48074,7 @@ const rigaPushTelefono = () => {
       ${bloccate ? '' : `<button onclick="${si ? 'spegniPushTelefono()' : 'attivaPushTelefono()'}"
         aria-pressed="${si ? 'true' : 'false'}"
         style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${si?'var(--sats)':'var(--line)'};background:${si?'var(--sats)':'transparent'};color:${si?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
-        ${si ? 'Attive' : 'Attiva'}</button>`}
+        ${si ? 'Attive' : altro ? 'Attiva qui' : 'Attiva'}</button>`}
     </div>
     ${si ? `<button onclick="provaPushTelefono()"
       style="margin-top:8px;font:inherit;font-size:12.5px;font-weight:700;border:0;background:none;color:var(--sats);padding:0;cursor:pointer">🔔 Mandami una notifica di prova</button>`
@@ -48089,13 +48095,27 @@ async function aggiornaStatoPush(){
     if (Notification.permission === 'denied') stato = 'bloccate';
     else if (Notification.permission === 'granted') {
       const s = await subPushTelefono();
-      if (s && stessaChiavePush(s)) stato = 'si';
+      if (s && stessaChiavePush(s)) stato = await pushDiQuestoConto(s) ? 'si' : 'altro';
     }
   } catch(e) { stato = 'no'; }
   if (stato !== pushTelefono) { pushTelefono = stato; ridisegnaRigaPush(); }
 }
+/* Il browser sa se il telefono e' iscritto, non PER CHI: lo sa il
+   server (`push_e_mio`). Senza risposta (rete, server di ieri) vale
+   «si'», com'era prima: un'omissione, mai un allarme falso. */
+async function pushDiQuestoConto(sub){
+  try {
+    const r = await fetch(`${API_BASE}/push/stato`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({endpoint: sub.endpoint})});
+    if (!r.ok) return true;
+    const d = await r.json().catch(()=>({}));
+    return d.mio !== false;
+  } catch(e) { return true; }
+}
 async function attivaPushTelefono(){
   haptic();
+  const daAltro = pushTelefono === 'altro';
   if (!pushPossibile()) return;
   try {
     /* il permesso si chiede SOLO da un tocco: e' questo */
@@ -48121,7 +48141,8 @@ async function attivaPushTelefono(){
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     pushTelefono = 'si';
     ridisegnaRigaPush();
-    toast('📲 Notifiche attive su questo telefono');
+    toast(daAltro ? '📲 Ora su questo telefono arrivano le notifiche di questo account (l\'altro account non le riceve più qui)'
+                  : '📲 Notifiche attive su questo telefono', daAltro ? 6000 : undefined);
   } catch(e) {
     toast('Il telefono non ha accettato le notifiche: riprova fra poco', 6000);
   }

@@ -26455,7 +26455,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   .push.apple.com e .notify.windows.com, https, porta 443, senza
   credenziali, follow_redirects=False. Le tre porte: iscrivi e
   `prova` (una ogni 30 s) vogliono la leva, `togli` solo l'account
-  (il proprio telefono). Chi esce (`esciWeb`, «Esci da tutti»)
+  (il proprio telefono). LA QUARTA, `stato` (19 nov 2026, cantiere
+  push-attive): il browser sa se il telefono è iscritto, non PER CHI;
+  la riga «📲 Notifiche sul telefono» chiede al server (`push_e_mio`,
+  solo «mio / non mio») e su un altro account aperto lì dice «Attiva
+  qui» invece di «Attive». Senza risposta vale «sì», come prima.
+  Chi esce (`esciWeb`, «Esci da tutti»)
   passa da `scordaPushTelefono`; la fusione sposta le righe, la
   cancellazione le toglie (`CANCELLA_TOGLI`). In MODALITA_COLLAUDO
   non esce niente (riga «📲 [push simulato…]»); sulla vm-2050 sì.

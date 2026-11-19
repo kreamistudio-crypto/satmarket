@@ -20598,6 +20598,23 @@ def push_iscrivi(tg_id: int, endpoint: str, p256dh: str, auth: str,
         con.close()
 
 
+def push_e_mio(tg_id: int, endpoint: str) -> bool:
+    """Le notifiche di questo telefono vanno a QUESTO account? (19 nov
+    2026, cantiere push-attive). Un telefono suona per un account alla
+    volta (`push_iscrivi`), e la riga «📲 Notifiche sul telefono» lo
+    chiedeva solo al browser: diceva «Attive» su TUTTI gli account aperti
+    li', anche su quelli a cui le notifiche non arrivano (Luca coi suoi
+    due negozi). Risponde solo «mio / non mio»: di chi sia, se non e'
+    suo, non lo dice a nessuno."""
+    con = db()
+    try:
+        return con.execute("SELECT 1 FROM push_iscrizioni WHERE endpoint=? "
+                           "AND tg_id=?", (str(endpoint or ""), int(tg_id))
+                           ).fetchone() is not None
+    finally:
+        con.close()
+
+
 def push_togli(tg_id: int, endpoint: str) -> int:
     """Toglie un telefono, solo se e' di questo account."""
     con = db()
@@ -55072,6 +55089,18 @@ async def push_iscrivi_rotta(req: Request, x_tg_init_data: str = Header(""),
     n = await asyncio.to_thread(push_iscrivi, user["id"], endpoint,
                                 p256dh, auth, vecchio)
     return {"ok": True, "telefoni": n}
+
+
+@app.post("/api/push/stato")
+async def push_stato_rotta(req: Request, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """La riga del Profilo chiede: questo telefono suona per me? Vedi
+    `push_e_mio`. Non scrive niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    mio = await asyncio.to_thread(push_e_mio, user["id"],
+                                  str(d.get("endpoint") or "").strip()[:1024])
+    return {"ok": True, "mio": mio}
 
 
 @app.post("/api/push/togli")

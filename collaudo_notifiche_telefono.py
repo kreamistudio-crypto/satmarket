@@ -345,6 +345,28 @@ def main():
         SRV.httpx = vero_httpx
         SRV.MODALITA_COLLAUDO = True
 
+    # ---- 4b) DI CHI E' IL TELEFONO (19 nov 2026, cantiere push-attive) ----
+    print("\n[4b) la riga del Profilo: il telefono suona per me?]")
+    stato = lambda e: asyncio.run(SRV.push_stato_rotta(_Richiesta({"endpoint": e})))
+    come(NOSTR)
+    suo = stato(tel.endpoint)
+    come(ALTRO)
+    d_altro = stato(tel.endpoint)
+    prova("chi l'ha iscritto: mio; l'altro account aperto sullo stesso "
+          "telefono: non mio (prima la riga diceva «Attive» a tutti e due); "
+          "un indirizzo sconosciuto: non mio; e la domanda non scrive niente",
+          [{"ok": True, "mio": True}, {"ok": True, "mio": False},
+           {"ok": True, "mio": False}, [tel.endpoint]],
+          [suo, d_altro, stato("https://fcm.googleapis.com/fcm/send/nessuno"),
+           telefoni_di(NOSTR)])
+    asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
+    prova("«Attiva qui» dall'altro account: il telefono passa a lui, e per "
+          "il primo non e' piu' suo (un account alla volta)",
+          [{"ok": True, "mio": True}, []],
+          [stato(tel.endpoint), telefoni_di(NOSTR)])
+    come(NOSTR)
+    asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
+
     # ---- 5) TOGLIERSI ----------------------------------------------------
     print("\n[5) togliersi: solo il proprio telefono]")
     come(ALTRO)

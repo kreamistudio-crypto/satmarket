@@ -824,3 +824,9 @@ frase: Negli avvisi dei nuovi ordini P2P Barattozon è diventato un metodo di pa
 dove: P2P → la campanella 🔔 (o Profilo → «🔔 Avvisi») → «Avvisami dei nuovi ordini P2P»: «Tipo di ordini» ha «Compra BTC» e «Vendi BTC», e «Barattozon» è la prima pillola di «Metodo di pagamento».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · push-attive
+frase: Con più account sullo stesso telefono, la voce «📲 Notifiche sul telefono» ti dice per quale account arrivano: sugli altri trovi «Attiva qui», che le sposta su quello.
+dove: Profilo → «🔔 Avvisi» → «📲 Notifiche sul telefono», su un account diverso da quello che riceve le notifiche: la nota «Su questo telefono ora arrivano le notifiche di un altro tuo account…» e il tasto «Attiva qui».
+leva: WEB_PUSH_ATTIVO (accesa di serie)
+pubblico: sì

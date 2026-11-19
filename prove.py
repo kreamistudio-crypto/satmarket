@@ -202876,6 +202876,23 @@ def prove_notifiche_telefono():
            "cambiaAccount(id, true);\n}" in pagina[
                pagina.find("function passaAlContoDellaNotifica"):]])
 
+    # (19 nov 2026, cantiere push-attive) la riga chiede al server PER CHI
+    # suona il telefono: prima diceva «Attive» su tutti gli account aperti
+    agg = pagina[pagina.find("async function aggiornaStatoPush"):]
+    agg = agg[:agg.find("\n}\n")]
+    riga = pagina[pagina.find("const rigaPushTelefono = "):]
+    riga = riga[:riga.find("\n};\n")]
+    prova("«ATTIVE» SOLO SULL'ACCOUNT DEL TELEFONO: lo stato chiede al server "
+          "(`/push/stato`), un altro account vede «Attiva qui» e la sua nota; "
+          "senza risposta vale «si'» come ieri",
+          [True, True, True, True, True],
+          ["pushDiQuestoConto(s) ? 'si' : 'altro'" in agg,
+           "altro ? 'Attiva qui'" in riga,
+           "notifiche di un altro tuo account" in riga,
+           "/push/stato" in pagina,
+           "if (!r.ok) return true;" in pagina[
+               pagina.find("async function pushDiQuestoConto"):][:700]])
+
     # --- 6) ISCRIZIONI E TIMBRO, su un database vero ------------------------
     cartella = _tf.mkdtemp(prefix="prove-push-")
     percorso = os.path.join(cartella, "p.db")
