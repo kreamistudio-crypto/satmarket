@@ -332,6 +332,24 @@ async def giro_intero():
            "anche se hai già pagato" in testi[1], [x[0] for x in sca]]
           if len(testi) == 2 else testi)
 
+    # IL CONTO ALLA ROVESCIA NEL BOT (19 nov 2026, regole-sulla-card): nasce
+    # insieme ai promemoria, con la stessa fine, e il giro lo manda
+    con = banco.con_db()
+    conto = con.execute("SELECT tg_id, fine, messaggio FROM p2p_conto_rovescia WHERE "
+                        "chiave LIKE ?", (f"ln:{UNA}:%",)).fetchall()
+    con.close()
+    prova("col recapito nasce anche il conto alla rovescia di chi compra, con la stessa "
+          "fine, non ancora mandato", [(PRENDE, t + 60 + 3600, 0)],
+          [tuple(x) for x in conto])
+    await SRV._giro_conto_p2p()
+    con = banco.con_db()
+    conto = con.execute("SELECT messaggio, detto, finito FROM p2p_conto_rovescia WHERE "
+                        "chiave LIKE ?", (f"ln:{UNA}:%",)).fetchone()
+    con.close()
+    prova("...il giro lo manda (un id salvato) col tempo che resta, e corre ancora",
+          (True, True, 0), (bool(conto and conto[0]), bool(conto) and "Tempo per pagare: "
+                            "mancano" in conto[1], conto[2] if conto else -1))
+
     print("\n5) il tempo finisce col recapito detto presto (il nodo di ieri, che annulla)")
     # passa l'ora (la rotta vuole eventi di adesso: si sposta la cronaca)
     indietro(UNA, 3600)

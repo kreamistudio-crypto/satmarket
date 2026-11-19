@@ -770,3 +770,21 @@ frase: Il wallet on-chain nasce sia dal sito sia dalla Mini App, ed è sempre un
 dove: Nato sul sito: apri Barattolo dentro Telegram una volta, poi riapri il sito, poi di nuovo la Mini App: le parole ci sono, senza incollarle. Con Nostr collegato: entra nel sito con la tua chiave Nostr e le parole arrivano anche lì.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · regole-sulla-card
+frase: Nel P2P, quando apri un ordine col tempo per pagare, la prima cosa che leggi è quanto tempo avrai e di toccare subito «Ho inviato gli euro» dopo aver pagato, anche sugli ordini on-chain. E se prendi un ordine, il bot ti manda un messaggio col tempo che resta che si aggiorna da solo ogni minuto, senza suonare ogni volta.
+dove: P2P → tocca una card col tempo per pagare: la riga «⏱ Se lo prendi hai …» in cima al foglio (on-chain: in cima a «Compra»). Dopo la presa, nel bot, il messaggio «⏳ Tempo per pagare: mancano …» con «Apri lo scambio».
+leva: P2P_CONTO_ALLA_ROVESCIA (accesa di serie) per il messaggio del bot; la riga nel foglio nessuna
+pubblico: sì
+
+## 2026-11-19 · riprendi-scaduto
+frase: Negli scambi P2P on-chain, se chi ha preso il tuo ordine non tocca «Ho inviato gli euro» entro il tempo per pagare, puoi riprenderti i sats con un tocco su «↩️ Riprendi i sats»: Barattolo firma il rimborso senza aspettare un moderatore, tu metti la seconda firma, e l'ordine torna nel libro.
+dove: P2P → «I miei scambi» → uno scambio on-chain col deposito fatto e il tempo per pagare finito: il bottone «↩️ Riprendi i sats», poi «✍️ Metti la seconda firma».
+leva: P2P_ONCHAIN_RIPRENDI_SCADUTO (accesa di serie) con P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN chiusa di serie, cioè solo per i moderatori: «pubblico» diventa sì quando si apre a tutti
+pubblico: no
+
+## 2026-11-19 · cauzione-tornata
+frase: Negli scambi P2P on-chain con la cauzione, quando la cauzione ti torna il bot te lo dice: «La cauzione è tornata nel tuo wallet», con i sats.
+dove: Il bot di Barattolo, dopo uno scambio on-chain chiuso in cui avevi bloccato la cauzione: il messaggio «🔐 La cauzione è tornata nel tuo wallet» con «Apri lo scambio».
+leva: P2P_ONCHAIN_CAUZIONE spenta di serie (in produzione accesa solo per i moderatori)
+pubblico: no

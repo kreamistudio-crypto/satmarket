@@ -1841,12 +1841,21 @@ def main():
     con.execute("UPDATE p2p_onchain_ordini SET stato='rimborsato' WHERE id=?", (c1,))
     con.commit()
     con.close()
+    banco.DETTO.clear()
     conto = asyncio.run(SRV.p2p_onchain_cauzioni_passata())
     r1 = riga_cauz(c1)
     prova("a scambio chiuso il giro la rimanda indietro: cancel su LND, «tornata», col perche'",
           (1, "CANCELED", "tornata", "scambio chiuso", "tornata"),
           (conto["tornate"], LND["fatture"][riga1["hash"]]["state"], r1["stato"], r1["perche"],
            (uno(999, c1).get("cauzione") or {}).get("stato")))
+    # (19 nov 2026, Andrea dopo la prova in produzione) ...e chi l'aveva messa lo sa
+    prova("...e a chi l'aveva bloccata arriva «La cauzione è tornata nel tuo wallet» coi "
+          "sats; all'altra parte niente; un giro dopo nessun doppione",
+          (True, True, False, False),
+          (detto_a(999, "La cauzione è tornata nel tuo wallet"), detto_a(999, "3.000 sats"),
+           detto_a(888, "La cauzione è tornata"),
+           (banco.DETTO.clear(), asyncio.run(SRV.p2p_onchain_cauzioni_passata()),
+            detto_a(999, "La cauzione è tornata"))[2]))
     # -- le cauzioni che non arrivano alla presa
     c2 = pubblica(888, metodi=["Contanti"], recapito="", zona="Milano centro",
                   sats=20000, euro_cent=1800).json().get("id")
@@ -2107,6 +2116,14 @@ def main():
           ("tenuta", "tenuta", "tenuta", n_s),
           (riga_cauz(k2)["stato"], riga_cauz(k3)["stato"], riga_cauz(k4)["stato"],
            len(saldate())))
+    # (19 nov 2026, Andrea alla prova) il foglio di «Rinuncio» dice PRIMA la
+    # cauzione che si perde: il numero lo da' la pagina, a chi l'ha messa
+    prova("a deposito confermato la pagina dice a chi ha preso la cauzione che perderebbe "
+          "rinunciando; a chi vende niente; con l'annullo chiesto da chi vende niente",
+          (3000, None, None),
+          (uno(999, k2).get("cauzione_rinuncia"), uno(888, k2).get("cauzione_rinuncia"),
+           (metti(k3, annullo_chiesto_il=ora), uno(999, k3).get("cauzione_rinuncia"),
+            metti(k3, annullo_chiesto_il=0))[1]))
     metti(k2, pagamento_scaduto_il=ora)                       # tempo finito, niente «Ho inviato»
     metti(k3, pagamento_scaduto_il=ora, euro_inviati_il=ora)  # tempo finito ma «Ho inviato» c'era
     metti(k4, stato="rimborsato", mancato_perche="onchain-rinuncia", chiuso_il=ora)
@@ -2265,6 +2282,143 @@ def main():
           "rimette la reputazione", (200, "rimborsato", ""),
           (r.status_code, r.json()["stato"],
            uno(999, o3["id"]).get("non_completato") or ""))
+
+    # «RIPRENDI I SATS» COL TEMPO FINITO (19 nov 2026, cantiere
+    # riprendi-scaduto; Andrea: «nell'on-chain non si può far tornare da
+    # solo?», poi «facciamo così»)
+    print("\n[riprendi i sats: il tempo per pagare finito senza «Ho inviato»]")
+    o5r = pubblica(999).json()
+    gesto(888, o5r["id"], "prendi")
+    paga(uno(999, o5r["id"]))
+    gesto(999, o5r["id"], "controlla")
+    r = gesto(999, o5r["id"], "riprendi-scaduto")
+    prova("a tempo che corre no: 409, e la pagina non mostra il bottone",
+          (409, True, False), (r.status_code, "non è ancora finito" in r.json()["detail"],
+                               uno(999, o5r["id"])["riprendi_scaduto"]))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=? WHERE id=?",
+                (int(time.time()) - 25 * 3600, int(time.time()) - 26 * 3600, o5r["id"]))
+    con.commit()
+    con.close()
+    prova("a tempo finito il bottone lo vede solo chi ha depositato", (True, False),
+          (uno(999, o5r["id"])["riprendi_scaduto"], uno(888, o5r["id"])["riprendi_scaduto"]))
+    prova("chi compra bitcoin non riprende i sats dell'altro: 403", 403,
+          gesto(888, o5r["id"], "riprendi-scaduto").status_code)
+    prova("...a porticina chiusa, un non moderatore non lo vede nemmeno: 404", 404,
+          (lambda vecchio: (setattr(SRV, "e_admin", lambda t: False),
+                            gesto(999, o5r["id"], "riprendi-scaduto").status_code,
+                            setattr(SRV, "e_admin", vecchio))[1])(SRV.e_admin))
+    banco.DETTO.clear()
+    r = gesto(999, o5r["id"], "riprendi-scaduto")
+    d = r.json()
+    prova("tempo finito senza «Ho inviato»: annullato, e Barattolo ha firmato il "
+          "rimborso senza moderatore",
+          (200, "annullato", "compratore", "tempo-scaduto", "tempo-scaduto"),
+          (r.status_code, d["stato"], (d.get("proposta") or {}).get("verso"),
+           (d.get("proposta") or {}).get("barattolo"), d.get("chiuso_perche")))
+    prova("...chi compra sa che e' chiuso e di non mandare niente, chi vende di aprire l'app",
+          (True, True, True), (detto_a(888, "Il tempo per pagare è finito"),
+                               detto_a(888, "non mandare niente"),
+                               detto_a(999, "Barattolo ha firmato il rimborso")))
+    uscite = PSBT.from_string(d["proposta"]["psbt"]).tx.vout
+    prova("...un'uscita sola, verso il wallet di chi ha depositato", (1, d["rimborso"]),
+          (len(uscite), script.Script(uscite[0].script_pubkey.data).address(N)))
+    prova("...una seconda volta: 409; e «Ho inviato» adesso non passa piu'", (409, 409),
+          (gesto(999, o5r["id"], "riprendi-scaduto").status_code,
+           gesto(888, o5r["id"], "euro-inviati").status_code))
+    r = gesto(999, o5r["id"], "firma", tx=cofirma(999, uno(999, o5r["id"])))
+    con = SRV.db()
+    figlio = con.execute("SELECT id FROM p2p_onchain_ordini WHERE rinato_da=?",
+                         (o5r["id"],)).fetchone()
+    con.close()
+    prova("la seconda firma: rimborsato, a chi non ha pagato il «non completato», e "
+          "l'ordine torna nel libro",
+          (200, "rimborsato", "altro", True),
+          (r.status_code, r.json()["stato"], uno(999, o5r["id"]).get("non_completato") or "",
+           figlio is not None))
+    if figlio:
+        gesto(999, figlio["id"], "annulla")
+    o5s = pubblica(999).json()
+    gesto(888, o5s["id"], "prendi")
+    paga(uno(999, o5s["id"]))
+    gesto(999, o5s["id"], "controlla")
+    gesto(888, o5s["id"], "euro-inviati")
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=? WHERE id=?",
+                (int(time.time()) - 25 * 3600, int(time.time()) - 26 * 3600, o5s["id"]))
+    con.commit()
+    con.close()
+    r = gesto(999, o5s["id"], "riprendi-scaduto")
+    prova("dopo «Ho inviato gli euro» non si riprende niente: 409, si va in disputa",
+          (409, True, False), (r.status_code, "disputa" in r.json()["detail"],
+                               uno(999, o5s["id"])["riprendi_scaduto"]))
+
+    print("\n[il conto alla rovescia nel bot: un messaggio solo, riscritto]")
+    # (19 nov 2026, regole-sulla-card) chi deve pagare riceve UN messaggio che
+    # si riscrive ogni minuto: qui il giro si chiama a mano e il bot si ascolta
+    chiamate = []
+    vecchio_bot = SRV.bot_api
+
+    async def bot_finto(metodo, dati):
+        chiamate.append((metodo, dati))
+        return {"ok": True, "result": {"message_id": dati.get("message_id") or 4242}}
+    SRV.bot_api = bot_finto
+    try:
+        # il giro guarda TUTTI gli scambi vivi del banco (quelli delle sezioni
+        # di prima compresi): qui si contano solo le chiamate di questo
+        asyncio.run(SRV._giro_conto_p2p())
+        o5c = pubblica(999).json()
+        mie = lambda: [c for c in chiamate if o5c["ordine"] in json.dumps(c[1])]
+        gesto(888, o5c["id"], "prendi")
+        asyncio.run(SRV._giro_conto_p2p())
+        prova("prima del deposito il tempo non corre: nessun messaggio", [], mie())
+        paga(uno(999, o5c["id"]))
+        gesto(999, o5c["id"], "controlla")
+        asyncio.run(SRV._giro_conto_p2p())
+        con = SRV.db()
+        riga = con.execute("SELECT * FROM p2p_conto_rovescia WHERE chiave=?",
+                           (f"oc:{o5c['id']}",)).fetchone()
+        con.close()
+        prova("deposito confermato: a chi deve pagare (888) UN messaggio col tempo che "
+              "resta e il bottone dello scambio, e il suo id salvato",
+              (1, "sendMessage", 888, True, True, 4242),
+              (len(mie()), mie()[0][0], mie()[0][1]["chat_id"],
+               "Tempo per pagare: mancano" in mie()[0][1]["text"],
+               "?scambio=bar-onchain-" in json.dumps(mie()[0][1].get("reply_markup")),
+               riga["messaggio"] if riga else 0))
+        asyncio.run(SRV._giro_conto_p2p())
+        prova("un giro subito dopo, stesso minuto: niente di nuovo (non si riscrive "
+              "un testo uguale)", 1, len(mie()))
+        asyncio.run(SRV._giro_conto_p2p(int(time.time()) + 600))
+        prova("dieci minuti dopo: lo STESSO messaggio riscritto (editMessageText, "
+              "che non suona), mai un messaggio nuovo",
+              (2, "editMessageText", 4242, True),
+              (len(mie()), mie()[-1][0], mie()[-1][1].get("message_id"),
+               "reply_markup" in mie()[-1][1]))
+        gesto(888, o5c["id"], "euro-inviati")
+        asyncio.run(SRV._giro_conto_p2p())
+        con = SRV.db()
+        riga = con.execute("SELECT * FROM p2p_conto_rovescia WHERE chiave=?",
+                           (f"oc:{o5c['id']}",)).fetchone()
+        con.close()
+        prova("«Ho inviato gli euro»: il messaggio dice che il tempo si e' fermato, e "
+              "il conto e' chiuso", (3, True, True),
+              (len(mie()), "si è fermato" in mie()[-1][1]["text"],
+               int(riga["finito"]) > 0))
+        asyncio.run(SRV._giro_conto_p2p(int(time.time()) + 1200))
+        prova("...e dopo non si tocca piu'", 3, len(mie()))
+        SRV.P2P_CONTO_ALLA_ROVESCIA = False
+        prima = len(chiamate)
+        o5d = pubblica(999).json()
+        gesto(888, o5d["id"], "prendi")
+        paga(uno(999, o5d["id"]))
+        gesto(999, o5d["id"], "controlla")
+        asyncio.run(SRV._giro_conto_p2p())
+        prova("a leva spenta nessun messaggio", prima, len(chiamate))
+        gesto(999, o5d["id"], "chiedi-annullo")
+    finally:
+        SRV.bot_api = vecchio_bot
+        SRV.P2P_CONTO_ALLA_ROVESCIA = True
 
     print("\n[chiedi di annullare: chi ha depositato lo chiede, chi compra decide]")
     o4 = pubblica(999).json()

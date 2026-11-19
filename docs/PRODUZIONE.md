@@ -4107,6 +4107,41 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   riga. La forma giusta, per la prossima immagine, sono due domande:
   `git -C ~/nodo/mostro-src rev-parse --abbrev-ref HEAD && git -C
   ~/nodo/mostro-src rev-parse HEAD^{tree}`.
+- LA `-bar11`: L'ORDINE CHE TORNA NEL LIBRO (patch 0014), immagine
+  `mostro:v0.20.2-bar11`, IN SERVIZIO dal 19 nov 2026, 11:52 UTC (cantiere
+  `ritorno-nel-libro`; il perché e il disegno: NODO-MOSTRO, «LA 0014», e
+  il README del fork). Nessun segreto, nessuna riga nel config: cambia
+  solo l'immagine. Il rollback: `cp -p docker-compose.yml.prima-bar11
+  docker-compose.yml && docker compose up -d mostro` (la colonna
+  `started_at` in più la `-bar10` la ignora).
+  COM'È ANDATA SUL NODO (19 nov 2026, thread «Rimettere nel libro l'ordine
+  scaduto», tutto incollato da Andrea). Passo 1 con le due domande
+  separate (la lezione della `-bar10`): `-bar10`, sorgente pulito,
+  `barattolo/v0.20.2`, albero `bdad9c34`. Le patch da `git archive` sul
+  PC, `git am` della `0014-*.patch` → albero
+  `b45281d5ac2ffd5920713c898829ff229a11e5de`, lo stesso del cloud; test
+  `744 passed; 0 failed; 1 ignored` e `90 passed`; build, e
+  `payment-window-republished` nel binario (1). Il compose `.bar11` con
+  UNA riga cambiata, `compose-ok`; copia `docker-compose.yml.prima-bar11`.
+  IL COMANDO DEL CAMBIO SI È FERMATO DA SOLO su uno scambio aperto: non lo
+  scambio abbandonato da 362.235 sats (chiuso in disputa da Andrea alle
+  10:48 UTC, annullamento concordato), ma `9f2b98c6`, di un utente, in
+  `settled-hold-invoice`: chi vendeva aveva rilasciato alle 09:12 UTC, il
+  pagamento di 152.744 sats a chi compra è fallito tre volte
+  (`FailureReasonNoRoute`) e alle 09:15 il nodo gli ha chiesto una fattura
+  nuova (il server gli ha detto «dai una fattura nuova», `payout_fallito`).
+  I sats restano fermi nel nodo per lui; Andrea: niente sollecito. Il
+  cambio d'immagine non tocca uno scambio in quello stato, e il comando
+  è stato rilanciato contando tutti gli stati tranne
+  `settled-hold-invoice`: 0, 11:52:10 → 11:52:22 UTC, libro fermo dodici
+  secondi. Poi `mostro:v0.20.2-bar11`, «Settings correctly loaded!»,
+  `barattolo_fee` e `barattolo_eventi` di sempre, nessuna riga
+  «barattolo_finestra: … not set»; il 403 di `blockchain.info` è quello
+  di sempre. NON ANCORA PROVATO dal vivo: il ritorno nel libro allo
+  scadere (la prova da 15 minuti fra i due account di Andrea, DOPO la
+  promozione: `docs/DA-FARE-ANDREA.md`, voce 26). Fino alla promozione il
+  server di produzione chiama «annullato» lo scambio tornato nel libro:
+  solo il testo, i sats tornano giusti.
 - LA SALITA ALLA 0.20.2, immagine `mostro:v0.20.2-bar9` (preparata il 29
   ott 2026, cantiere `mostro-0202`, decisione di Andrea: «fork intero
   sulla 0.20.2»; ✅ FATTA SUL NODO il 30 ott 2026, in servizio dalle

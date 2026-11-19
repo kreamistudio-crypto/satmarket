@@ -37916,3 +37916,32 @@ mai il kind 0 di nessuno: regola ferrea 2).
   la leva (`tempoPagare` nella busta) E il 38385 del nodo
   (`barattolo_payment_windows` = `900-86400`) dicono di sì
   (`tempoPagareAttivoP2P`; sull'on-chain basta la leva).
+- IL CONTO ALLA ROVESCIA NEL BOT (19 nov 2026, cantiere regole-sulla-card):
+  a chi deve pagare UN messaggio Telegram «⏳ Tempo per pagare: mancano …»
+  che il server riscrive ogni minuto (`editMessageText`, che non suona)
+  fino a «Ho inviato», alla chiusura o alla fine. La tabella
+  `p2p_conto_rovescia` (chiave `ln:<ordine>:<giro>` o `oc:<id>`, l'id del
+  messaggio, l'ultimo testo, `finito`) regge i deploy a metà tempo. Il
+  Lightning nasce dentro `_attese_tempo_pagare_p2p` (stesso inizio e
+  stessa fine dei promemoria), l'on-chain dalla riga dello scambio a ogni
+  giro (`stato_conto_oc_p2p` sopra `p2p_onchain_paga_entro`). Il battito
+  è `orologio_conto_p2p` (60 s, avviato all'accensione), il giro
+  `_giro_conto_p2p`: riscrive solo se il testo è cambiato, chiude in
+  silenzio un conto mai partito, si ferma se il messaggio non c'è più
+  (400/403). Solo Telegram: chi ha scelto i soli DM Nostr non lo riceve.
+  Leva `P2P_CONTO_ALLA_ROVESCIA`, accesa di serie.
+- «↩️ RIPRENDI I SATS» ON-CHAIN A TEMPO FINITO (19 nov 2026, stesso
+  cantiere): `POST /api/p2p/onchain/{oid}/riprendi-scaduto`, solo chi ha
+  depositato, col giudice puro `p2p_onchain_riprendi_scaduto_perche`
+  (stato 'depositato', niente «Ho inviato», nessuna firma già data, sats
+  confermati, tempo partito e finito, indirizzo di ritorno). Barattolo
+  firma la proposta verso chi ha depositato (`_onchain_psbt_barattolo`,
+  il precedente di `/riprendi` del deposito incompleto), lo stato va ad
+  'annullato' con `chiuso_perche`/`decisione_perche` = 'tempo-scaduto'
+  in UN `UPDATE` con le condizioni nel `WHERE`; la seconda firma di chi
+  ha depositato (`/firma`) chiude come «rimborsato», e
+  `_p2p_onchain_mancato` dà il «non completato» a chi non ha pagato
+  (`onchain-non-pagato`) e la rinascita nel libro. Le leve
+  `P2P_ONCHAIN_RIPRENDI_SCADUTO` (accesa) e
+  `P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN` (chiusa: solo i moderatori),
+  il flag `riprendi_scaduto` nella pagina dello scambio.

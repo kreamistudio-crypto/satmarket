@@ -607,7 +607,7 @@ chiusa con l'annullo di chi aveva preso); la disputa automatica a ~92
 ore; il ritorno alla `-bar7` (i due file `.prima-bar8` e `up -d`).
 
 LA 0.20.2 IN SERVIZIO DAL 30 OTT 2026, immagine `mostro:v0.20.2-bar9`
-(dal 19 nov la `-bar10`, sotto, «LA 0013»; preparata il 29 ott, cantiere `mostro-0202`; la liturgia in PRODUZIONE,
+(dal 19 nov la `-bar10`, sotto, «LA 0013», e dalle 11:52 UTC dello stesso giorno la `-bar11`, «LA 0014»; preparata il 29 ott, cantiere `mostro-0202`; la liturgia in PRODUZIONE,
 «LA SALITA ALLA 0.20.2», il perché in CANTIERI, «Mostro 0.20.2»; com'è
 andata sul nodo in fondo a questa voce). Upstream ha fatto sei versioni
 dalla nostra 0.19.0 (la `v0.20.2` è del 28 ott). Il fork è stato
@@ -693,8 +693,9 @@ pagare: è nato prima). NON PROVATI: l'annullo allo scadere (la prova da
 `-bar10`», «COM'È ANDATA SUL NODO».
 
 LA 0014, L'ORDINE CHE TORNA NEL LIBRO (preparata il 19 nov 2026, cantiere
-`ritorno-nel-libro`; NON ANCORA SUL NODO: `docs/DA-FARE-ANDREA.md`, voce
-26, immagine `-bar11`). Andrea: «No, perché sparisce, scusa? Non dovrebbe
+`ritorno-nel-libro`; IN SERVIZIO dal 19 nov 2026, 11:52 UTC, immagine
+`-bar11`: PRODUZIONE, «LA `-bar11`»; la prova dal vivo dopo la
+promozione, `docs/DA-FARE-ANDREA.md`, voce 26). Andrea: «No, perché sparisce, scusa? Non dovrebbe
 tornare nel libro». Allo scadere del tempo per pagare senza «Ho inviato»
 il nodo non chiude più lo scambio: fa il ramo che mostrod fa già per chi
 prende e non manda la fattura (taker-timeout) — annulla la hold invoice,

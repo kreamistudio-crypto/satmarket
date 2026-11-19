@@ -1,6 +1,7 @@
 # IL FORK DI MOSTRO — le dodici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
-**Dal 19 novembre 2026 c'è la 0014, PREPARATA E NON ANCORA SUL NODO**
+**Dal 19 novembre 2026 la 0014 È SUL NODO** (immagine `mostro:v0.20.2-bar11`,
+11:52 UTC; PRODUZIONE, «LA `-bar11`»)
 (cantiere `ritorno-nel-libro`, sotto, «LA 0014»): allo scadere del tempo
 per pagare l'ordine TORNA NEL LIBRO invece di chiudersi, e il tempo parte
 quando il server risponde un numero, cioè dopo che chi vende ha detto dove
@@ -9,10 +10,11 @@ la sorgente (tocca solo `barattolo_finestra.rs`, che è nostro, e il giro
 in `scheduler.rs`); `barattolo_finestra.rs` accanto resta quello della
 0013, che il patcher della 0013 copia. `git am` delle tredici `.patch` su
 un clone pulito della `v0.20.2` dà l'albero `b45281d5`, e `cargo test`
-dice 2005 verdi, 0 rosse, 4 ignorate. L'immagine nuova sarà la `-bar11`.
+dice 2005 verdi, 0 rosse, 4 ignorate. Sul nodo lo stesso albero, 744 + 90
+verdi.
 
 **Dal 19 novembre 2026 la 0013 È SUL NODO** (immagine `mostro:v0.20.2-bar10`,
-08:28 UTC; sotto, «IN SERVIZIO»): il tempo per pagare scelto da chi
+08:28 UTC, poi dentro la `-bar11` dalle 11:52; sotto, «IN SERVIZIO»): il tempo per pagare scelto da chi
 pubblica (cantiere `tempo-pagamento`, sotto, «LA 0013»). Sta sopra la
 0012, ha il suo patcher e il suo modulo (`barattolo_finestra.rs`), ed è
 stata COMPILATA E PROVATA nel cloud prima del nodo: `git am` delle dodici

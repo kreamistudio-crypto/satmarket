@@ -228,6 +228,18 @@ P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
 # on-chain puo' chiederla a chiunque lo prenda, con qualunque metodo.
 # Accesa di serie; vale solo con la cauzione on-chain accesa qui sopra.
 P2P_ONCHAIN_CAUZIONE_A_SCELTA = True
+# «↩️ Riprendi i sats» (19 nov 2026, cantiere regole-sulla-card): finito il
+# tempo per pagare senza «Ho inviato gli euro», chi ha depositato si
+# riprende i sats con la firma di Barattolo, senza moderatore, e l'ordine
+# torna nel libro. Accesa di serie...
+P2P_ONCHAIN_RIPRENDI_SCADUTO = True
+# ...e la porticina: True (di serie) = il bottone lo vede SOLO un moderatore
+# (ADMIN_IDS) per la prova in produzione. Si apre a tutti scrivendo False.
+P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = True
+# Il conto alla rovescia nel bot (19 nov 2026): a chi deve pagare un
+# messaggio che si riscrive ogni minuto col tempo che resta (Lightning e
+# on-chain). Accesa di serie; False la spegne.
+P2P_CONTO_ALLA_ROVESCIA = True
 
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)

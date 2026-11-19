@@ -3639,6 +3639,7 @@
   .p2p-anello .fondo{stroke:currentColor;opacity:.16}
   .p2p-anello .pieno{stroke:var(--sats);stroke-linecap:round;transition:stroke-dashoffset .35s}
   .p2p-box.p2p-tempo-pagare,.p2p-box.p2p-tempo-dett{display:flex;align-items:center;gap:10px}
+  .p2p-tempo-icona{flex:0 0 auto;font-size:26px;line-height:1}
   .p2p-box.p2p-tempo-pagare.scaduto .p2p-anello .pieno{stroke:var(--ink-soft)}
   .p2p-orologio{display:flex;align-items:center;gap:12px}
   .p2p-orologio .p2p-anello{width:44px;height:44px}
@@ -74477,6 +74478,10 @@ function apriOnchainP2P(id, modo){
     via: conTasti ? '' : 'via on-chain',
     testata: (conTasti ? '<div id="p2pOcPresaRete" style="margin-bottom:12px">'
         + reteOcPresaHtmlP2P(o, vendeLui) + '</div>' : '')
+      /* IL TEMPO PER PAGARE IN CIMA, come nel dettaglio Lightning (19 nov
+         2026, regole-sulla-card; Andrea: «quando io clicco sulla card, deve
+         essere informato subito chi la prende»): a chi compra */
+      + (vendeLui && typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, false, true) : '')
       /* BARATTOZON IN «COMPRA BTC» COME IL DETTAGLIO DI LIGHTNING (18 nov
          2026, cantiere barattozon-oc-carta, Andrea: «deve essere uguale al
          lighting»): in cima l'insegna del metodo, la cifra la dice il
@@ -76263,6 +76268,16 @@ async function renderP2POnchain(){
 
 /* la proposta che aspetta la MIA seconda firma: dell'altra parte o di
    Barattolo, verso di me, su uno scambio ancora aperto */
+/* LA RINUNCIA IN CORSO (19 nov 2026, Andrea alla prova: «perché c'è il
+   bottone ricevuti libera i sats, scusa?»): chi compra ha toccato
+   «Rinuncio» e ha firmato il rimborso, lo scambio e' ancora 'depositato'
+   e manca solo la seconda firma di chi ha depositato. In quel momento
+   pagare, liberare, il tempo che scorre e «Dove vuoi gli euro» non hanno
+   piu' senso: resta la firma. PURA. */
+function rinunciaInCorsoOcP2P(o){
+  return !!o && o.stato === 'depositato' && !!o.proposta
+    && o.proposta.verso === 'compratore' && !o.proposta.barattolo;
+}
 function daFirmareOnchainP2P(o){
   return !!(o.proposta && !o.proposta.mia && o.proposta.verso === o.ruolo
     && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') || cambioDaFirmareOnchainP2P(o);
@@ -76992,6 +77007,10 @@ function schedaOnchainP2P(o){
          scritta, mai il `cosa` del gesto */
       gesti = (ricevo ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : bott('orange', `liberaOnchainP2P(this, ${o.id})`, '🔓 Ricevuti: libera i sats'))
         + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
+        /* (19 nov 2026, riprendi-scaduto) il tempo per pagare finito senza
+           «Ho inviato»: chi ha depositato si riprende i sats, senza
+           moderatore. Il «si'» lo dice il server (leva e giudice) */
+        + (deposito && o.riprendi_scaduto ? g('riprendi-scaduto', '↩️ Riprendi i sats') : '')
         + g('disputa', '⚖️ Apri una disputa');
       break;
     case 'euro_inviati':
@@ -77051,12 +77070,16 @@ function schedaOnchainP2P(o){
         ? '🪂 Annullato dal paracadute' + (haParacaduteP2P(versiParacaduteOcP2P(o)) ? ' (' + etichettaParacaduteP2P(versiParacaduteOcP2P(o)) + ')' : '') + ': BTC si è mosso oltre la soglia da quando l\'hai pubblicato. Puoi ripubblicarlo al prezzo nuovo.'
         : o.proposta && o.proposta.barattolo === 'deposito-incompleto'
         ? 'Annullato da chi vende: il deposito non era completo. Barattolo ha firmato il rimborso e i sats tornano a chi li aveva depositati.'
+        /* (19 nov 2026, riprendi-scaduto) */
+        : o.chiuso_perche === 'tempo-scaduto'
+        ? '⏰ Il tempo per pagare è finito senza «Ho inviato gli euro»: chi vende si è ripreso i sats. Barattolo ha firmato il rimborso.'
         : o.chiuso_perche === 'deposito-scaduto'
         ? 'Annullato: il tempo per il deposito è finito senza sats.'
         : 'Annullato prima del deposito.')
         /* (19 nov 2026, ritorno-nel-libro) l'ordine rinato nel libro */
         + (o.rinato_in ? ' 🔁 L\'ordine è tornato nel libro.' : '')
         + (o.ricevuti_sats && !(o.proposta && o.proposta.barattolo === 'deposito-incompleto')
+           && o.chiuso_perche !== 'tempo-scaduto'
            ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
     case 'scaduto': testo = 'Scaduto nel libro senza essere preso.'; break;
   }
@@ -77097,9 +77120,20 @@ function schedaOnchainP2P(o){
       '✍️ Metti la seconda firma' + (o.proposta.barattolo ? ' (Barattolo ha firmato)' : '')) + gesti;
     testo += '<br><b>' + (cambioDaFirmareOnchainP2P(o) ? 'Chi compra ha fatto lo swap in Lightning'
         : o.proposta.verso === 'venditore' ? 'I sats stanno per arrivare sul tuo wallet' : 'Il rimborso sta per tornare a te')
-      + ':</b> manca solo la tua firma, che il telefono mette da solo.';
+      + ':</b> manca solo la tua firma: tocca «✍️ Metti la seconda firma».';
   } else if (o.proposta && o.proposta.mia && o.stato !== 'rilasciato' && o.stato !== 'rimborsato') {
-    testo += '<br>Hai firmato: si aspetta la seconda firma dell\'altra parte (il suo telefono la mette quando apre l\'app).';
+    testo += '<br>Hai firmato: si aspetta la seconda firma dell\'altra parte (la mette quando apre lo scambio).';
+  }
+  /* (19 nov 2026) la rinuncia in corso: resta solo la firma, detta chiara */
+  const rinunciaOc = !mod && typeof rinunciaInCorsoOcP2P === 'function' && rinunciaInCorsoOcP2P(o);
+  if (rinunciaOc && deposito) {
+    testo = '<b>↩️ Chi compra ha rinunciato</b> 👉 tocca a te<br>Ha già firmato il rimborso: '
+      + 'tocca «✍️ Metti la seconda firma» e i sats tornano al tuo wallet (meno la commissione di rete).';
+    gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`, '✍️ Metti la seconda firma');
+  } else if (rinunciaOc && ricevo) {
+    testo = '<b>↩️ Hai rinunciato</b><br>Hai firmato il rimborso: i sats tornano a chi vende '
+      + 'quando mette la seconda firma. Non mandare soldi.';
+    gesti = '';
   }
   /* (18 nov 2026, chiedi-annullo) CHIEDI DI ANNULLARE: chi ha depositato
      lo chiede a chi compra, che decide con «Rinuncio». Solo prima di «Ho
@@ -77212,7 +77246,7 @@ function schedaOnchainP2P(o){
       + (tocca ? '<span class="p2p-tocca">👉 tocca a te</span>' : (finito || mod ? '' : '<span class="p2p-aspetta">✋ Aspetta</span>'))
       + '<br>' + testo + '</span></div>'
     /* il tempo per pagare, sotto la nota (17 nov 2026) */
-    + (typeof tempoPagareRigaOcP2P === 'function' ? tempoPagareRigaOcP2P(o) : '')
+    + (typeof tempoPagareRigaOcP2P === 'function' && !rinunciaOc ? tempoPagareRigaOcP2P(o) : '')
     /* chi e' l'altra parte (17 nov 2026), come nel Lightning */
     + (typeof controparteOcP2P === 'function' ? controparteOcP2P(o, mod) : '')
     /* chi compra senza un posto dove ricevere lo scrive qui (thread del
@@ -77223,7 +77257,7 @@ function schedaOnchainP2P(o){
     + (typeof rimborsoMancanteOnchainP2P === 'function' && !rimborsoPrimaDelDepositoOnchainP2P(o)
        ? rimborsoMancanteOnchainP2P(o) : '')
     + incassoLnOnchainP2P(o)
-    + recapitoBox
+    + (rinunciaOc ? '' : recapitoBox)
     + (gesti.includes('usdtInviatiOcP2P') ? campoTxidOcP2P(o) : '')
     + (gesti.includes('coinInviatiOcP2P') && typeof campoTxidCoinOcP2P === 'function' ? campoTxidCoinOcP2P(o) : '')
     + (typeof txCoinOcP2P === 'function' ? txCoinOcP2P(o) : '')
@@ -78378,6 +78412,15 @@ function gestoOnchainP2P(btn, id, cosa){
         + 'i sats tornano a te, meno la commissione di rete.',
       poi: () => eseguiGestoOnchainP2P(id, 'riprendi', {})});
   }
+  if (cosa === 'riprendi-scaduto') {
+    return chiediConferma({titolo: '↩️ Ti riprendi i sats?', etichetta: 'Riprendi i sats',
+      vestito: 'allarme',
+      corpo: 'Il tempo per pagare è finito e chi compra non ha toccato «Ho inviato gli euro». '
+        + 'Prima controlla il conto: se gli euro sono arrivati, libera i sats invece. '
+        + 'Se non ci sono, Barattolo firma il rimborso verso il tuo wallet, il tuo telefono mette la seconda firma, '
+        + 'i sats tornano a te (meno la commissione di rete) e l\'ordine torna nel libro.',
+      poi: () => eseguiGestoOnchainP2P(id, 'riprendi-scaduto', {})});
+  }
   if (cosa === 'disputa') {
     const motivo = String((el('p2pOcMotivo') || {}).value || '').trim().slice(0, 500);
     return chiediConferma({titolo: '⚖️ Apri una disputa?', etichetta: 'Apri la disputa',
@@ -78407,6 +78450,7 @@ async function eseguiGestoOnchainP2P(id, cosa, corpo, btn){
     else if (cosa === 'chiedi-annullo') toast(d.avvisato ? '🙏 Chiesto a chi compra: ti avvisiamo quando risponde'
       : '🙏 L\'hai già chiesto da poco: si può di nuovo fra un\'ora', 6000);
     else if (cosa === 'riprendi') toast('↩️ Annullato: Barattolo ha firmato il rimborso. Tocca «✍️ Metti la seconda firma»', 7000);
+    else if (cosa === 'riprendi-scaduto') toast('↩️ Barattolo ha firmato il rimborso. Tocca «✍️ Metti la seconda firma»', 7000);
     else toast('₿ Fatto', 3000);
   } catch(e) { toast('₿ ' + (e.message || 'errore'), 6000); }
   finally { rip(); }
@@ -78519,7 +78563,12 @@ function rinunciaOnchainP2P(btn, id){
   haptic();
   chiediConferma({titolo: '↩️ Rinunci allo scambio?', etichetta: 'Rinuncio', vestito: 'allarme',
     corpo: (o => o ? paroleOc(o, 'I sats tornano a chi li ha depositati, meno la commissione di rete. Se hai già mandato gli euro, apri una disputa invece.'
-        + (typeof avvisoRinunciaContaOcP2P === 'function' ? avvisoRinunciaContaOcP2P(o) : ''))
+        + (typeof avvisoRinunciaContaOcP2P === 'function' ? avvisoRinunciaContaOcP2P(o) : '')
+        /* (19 nov 2026, Andrea alla prova) la cauzione che si perde, detta
+           PRIMA: il numero lo da' il server, col giudice della perdita */
+        + (Number(o.cauzione_rinuncia) > 0
+           ? '<br><br>🔐 <b>Perdi la cauzione che hai bloccato (' + fmt(Number(o.cauzione_rinuncia))
+             + ' sats):</b> metà va a chi vende.' : ''))
       : 'I sats tornano a chi li ha depositati, meno la commissione di rete. Se hai già mandato gli euro, apri una disputa invece.')(p2pOnchainMiei.find(x => x.id === id)),
     poi: () => firmaOnchainP2P(id, 'compratore')});
 }
@@ -92523,6 +92572,10 @@ function renderDettaglioP2P(){
   box.innerHTML =
     reteTasti +
     (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
+    /* il tempo per pagare, a chi prende PRIMA di premere e sul mio (18 nov
+       2026): IN CIMA, la prima cosa che si legge (19 nov 2026,
+       regole-sulla-card; Andrea: «deve essere informato subito») */
+    (typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '') +
     metodiDettP2P(o) +
     /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026).
        SOLO SCEGLIENDO «CONTANTI» (12 ott 2026, cantiere contanti-solo-scelti,
@@ -92545,8 +92598,6 @@ function renderDettaglioP2P(){
     repRiquadroP2P(p2pFacce[o.id], o.id) +
     /* il filtro di chi ha pubblicato, a chi guarda (10 ott 2026) */
     (tuo || typeof rigaFiltroDettP2P !== 'function' ? '' : rigaFiltroDettP2P(o.id)) +
-    /* il tempo per pagare, a chi prende PRIMA di premere e sul mio (18 nov 2026) */
-    (typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '') +
     /* la mia pausa, sul MIO ordine (12 ott 2026, tempo-di-chi-pubblica) */
     (tuo && typeof segnoPausaP2P === 'function' ? segnoPausaP2P(o) : '') +
     /* ...e il mio paracadute (13 ott 2026) */
@@ -98669,26 +98720,45 @@ function bollinoTempoPagareP2P(min){
     + minutiPagareCortiP2P(m) + '</span>';
 }
 /* la riga del dettaglio, PRIMA della presa (e sul mio ordine): chi prende
-   sa a cosa si impegna */
-function rigaTempoPagareDettP2P(o, tuo){
-  const min = minutiPagareOrdineP2P(o);
+   sa a cosa si impegna. IN CIMA AL FOGLIO, Lightning e on-chain (19 nov
+   2026, cantiere regole-sulla-card; Andrea: «quando io clicco sulla card,
+   deve essere informato subito chi la prende»): `oc` = la presa on-chain,
+   dove il tempo parte dal deposito e allo scadere c'e' la disputa */
+function rigaTempoPagareDettP2P(o, tuo, oc){
+  const min = oc ? minutiPagareSceltaP2P(Number(o && o.minuti_pagamento) || 0)
+    : minutiPagareOrdineP2P(o);
   if (!min) return '';
+  /* UN'ICONA FERMA, NON L'ANELLO (19 nov 2026, Andrea: «perché prima ancora
+     di prendere l'ordine vedo il timer già che sta per scadere?»): l'anello
+     diceva la parte di 24 ore, e mezz'ora sembrava un tempo quasi finito.
+     Prima della presa niente scorre: ⏱ e basta.
+     E LE PAROLE DELLA VALUTA DELL'ORDINE: «gli USDT», «i franchi», «gli
+     ETH», coi traduttori della pagina dello scambio (euro: lettera per lettera) */
+  const icona = '<span class="p2p-tempo-icona" aria-hidden="true">⏱</span>';
+  if (oc) {
+    const t = 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro, da quando i sats '
+      + 'sono nel deposito e chi vende ti dice dove mandarli: poi chi vende può aprire una disputa.'
+      + '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO_OC + '</span>';
+    return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">' + icona + '<span>'
+      + (typeof paroleOcP2P === 'function' ? paroleOcP2P(o, t) : t) + '</span></div>';
+  }
   /* (19 nov 2026, cantiere ritorno-nel-libro) il tempo parte dal recapito,
      e allo scadere l'ordine torna nel libro; a chi prende, sotto, la riga
      che non deve sfuggire (Andrea: «uno magari non capisce e perde i
      soldi») */
-  return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">'
-    + anelloTempoP2P(quotaTempoP2P(min)) + '<span>'
-    + (tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro, da quando gli dici dove mandarli'
-           : 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro, da quando chi vende ti dice dove mandarli')
+  const t = (tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro, da quando gli dici dove mandarli'
+                 : 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro, da quando chi vende ti dice dove mandarli')
     + ': poi lo scambio scade e l\'ordine torna nel libro.'
-    + (tuo ? '' : '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO + '</span>')
-    + '</span></div>';
+    + (tuo ? '' : '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO + '</span>');
+  return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">' + icona + '<span>'
+    + (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P(o, t) : t) + '</span></div>';
 }
 /* LA RIGA CHE NON DEVE SFUGGIRE (19 nov 2026, Andrea: «deve essere chiara
    questa roba qua, perché altrimenti uno magari non capisce e perde i
    soldi»): accanto al timer, sulla card prima della presa e nel banner */
 const P2P_AVVISO_BOTTONE_PAGATO = '⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone lo scambio scade anche se hai pagato.';
+/* ...e sull'on-chain, dove allo scadere non scade niente da solo */
+const P2P_AVVISO_BOTTONE_PAGATO_OC = '⚠️ Se hai pagato, tocca subito «Ho inviato gli euro»: senza il bottone, a tempo finito chi vende può aprire una disputa e riavere i sats anche se hai pagato.';
 /* PURA: IL BANNER DELLA PRESA (19 nov 2026, Andrea: «quando uno prende
    l'ordine esce fuori un banner dove gli si informa di come funziona
    questo ordine»): i tre passi, coi minuti dell'ordine. `oc` = on-chain,

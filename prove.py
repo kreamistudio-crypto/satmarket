@@ -47676,7 +47676,9 @@ def prove_fogli_di_casa():
     # e riprendi i sats?» di chi ha depositato meno del dovuto.
     # CENTOVENTINOVE (18 nov 2026, cantiere chiedi-annullo): «🙏 Chiedi di
     # annullare?» di chi ha depositato, a chi compra.
-    prova("i gesti che passano dalla domanda unica sono centotrentuno (dal 30 ott "
+    # CENTOTRENTADUE (19 nov 2026, cantiere regole-sulla-card): «↩️ Ti
+    # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
+    prova("i gesti che passano dalla domanda unica sono centotrentadue (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47696,8 +47698,9 @@ def prove_fogli_di_casa():
           "tuo PayCode Amazon» di Barattozon on-chain in «Compra BTC»; «Annulli "
           "e riprendi i sats?» del deposito on-chain incompleto; «Chiedi di "
           "annullare?» a chi compra on-chain; dal 19 nov il riquadro «⏱ Hai "
-          "… per pagare» alla presa, Lightning e on-chain)",
-          131, solo_codice(mini).count("chiediConferma({"))
+          "… per pagare» alla presa, Lightning e on-chain; «Ti riprendi i "
+          "sats?» on-chain a tempo finito)",
+          132, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -60739,12 +60742,16 @@ def prove_link_dentro_telegram():
     # screenshot che arriva agli admin nel bot (`_foto_al_bot`)
     # (18 nov 2026, apri-ordine-notifica) il sesto: il link di OGNI ordine
     # dell'avviso dei nuovi ordini, e «🫙 Apri l'ordine» quando e' uno solo
-    prova("la traduzione ha SEI chiamanti: il bottone del ramo Telegram, lo "
+    # (19 nov 2026, regole-sulla-card) il settimo: il bottone del messaggio
+    # del conto alla rovescia, che si riscrive col suo bottone ogni minuto
+    prova("la traduzione ha SETTE chiamanti: il bottone del ramo Telegram, lo "
           "stesso bottone nel gruppo degli admin (12 ott 2026), il link di testo "
           "dell'avviso dei nuovi ordini, il link di ogni suo ordine, il bottone di "
-          "«chiedi al venditore» e quello sotto lo screenshot dell'assistenza",
-          [6, True, True, True, True, True],
+          "«chiedi al venditore», quello sotto lo screenshot dell'assistenza e "
+          "quello del conto alla rovescia",
+          [7, True, True, True, True, True, True],
           [codice(src).count("_link_dentro_telegram(") - 1,
+           '"url": _link_dentro_telegram(bottone[1])' in pezzo("_conto_scrivi_p2p"),
            'return _link_dentro_telegram(f"{URL_PUBBLICO}/p2p?ordine={oid}")'
            in pezzo("_link_ordine_avviso_p2p"),
            '"url": _link_dentro_telegram(bottone[1])' in pezzo("_foto_al_bot"),
@@ -185096,8 +185103,10 @@ def prove_canale_admin():
           # venditore senza etichetta: nelle dispute (decide il «Rimborso»)
           # (18 nov 2026, ammanco-p2p-onchain) «Annulla e riprendi i sats»:
           # Barattolo ha firmato un rimborso da solo, nella moderazione
+          # (19 nov 2026, regole-sulla-card) «↩️ Riprendi i sats» a tempo
+          # finito: un'altra firma di Barattolo da sola, nella moderazione
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 36,
-           "liquidita": 5, "moderazione": 25, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 26, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -185132,7 +185141,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "115 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "116 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -185154,7 +185163,8 @@ def prove_canale_admin():
           "a disputa aperta; e la cauzione on-chain bruciata con la sua "
           "meta' mandata; dal 18 nov il reso a spese del venditore senza "
           "etichetta, e la firma di Barattolo sul deposito incompleto "
-          "annullato; e la cauzione on-chain chiesta da chi vende, persa da sola)", 115,
+          "annullato; e la cauzione on-chain chiesta da chi vende, persa da sola; "
+          "dal 19 nov «Riprendi i sats» on-chain a tempo finito)", 116,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -214517,12 +214527,14 @@ def prove_tempo_pagare_p2p():
           [True, True], ['"payment-window-republished": "tornato"' in pezzo("_momento_evento_p2p"),
                          'momento == "tornato" and scadenza == "payment-window-republished"'
                          in pezzo("_esiti_dopo_garanzia_p2p")])
-    prova("...e il README del fork la mette in tabella, DA-FARE ha la -bar11 con l'albero "
-          "e i numeri del cloud", [True, True, True],
+    # (19 nov 2026, 11:52 UTC) la -bar11 e' sul nodo: i passi sono usciti da
+    # DA-FARE (resta la prova dal vivo) e il verbale sta in PRODUZIONE
+    prova("...e il README del fork la mette in tabella, PRODUZIONE ha la -bar11 con l'albero "
+          "e i numeri del nodo", [True, True, True],
           ["| 0014 | nessuno: la `.patch` è la sorgente |"
            in open(os.path.join(cartella, "README.md"), encoding="utf-8").read(),
-           "b45281d5ac2ffd5920713c898829ff229a11e5de" in open("docs/DA-FARE-ANDREA.md", encoding="utf-8").read(),
-           "744 passed; 0 failed; 1 ignored" in open("docs/DA-FARE-ANDREA.md", encoding="utf-8").read()])
+           "b45281d5ac2ffd5920713c898829ff229a11e5de" in open("docs/PRODUZIONE.md", encoding="utf-8").read(),
+           "744 passed; 0 failed; 1 ignored" in open("docs/PRODUZIONE.md", encoding="utf-8").read()])
 
     # --- 2) I GIUDICI PURI DEL SERVER --------------------------------------
     import sqlite3
@@ -214718,7 +214730,7 @@ def prove_tempo_pagare_p2p():
                 "const P2P_METODI_VELOCI = ",
                 "let p2pMinutiPagare = ", "let p2pNuovoMinutiPagare = ",
                 "const P2P_TABACCHINO = ", "const P2P_CONTANTI = ", "const P2P_POSTA = ",
-                "const P2P_AVVISO_BOTTONE_PAGATO = "))
+                "const P2P_AVVISO_BOTTONE_PAGATO = ", "const P2P_AVVISO_BOTTONE_PAGATO_OC = "))
            + pezzo_js(mini, "const P2P_MINUTI_PAGARE_FERMI = ", "\n})();\n") + "\n})();\n"
            + "".join(_fn_js(mini, f) for f in (
                "function idMostroVero(id){", "function traQuantoP2P(sec){",
@@ -214738,7 +214750,7 @@ def prove_tempo_pagare_p2p():
                "function anelloTempoP2P(quota, id){",
                "function prendiMinutiPagareP2P(m){", "function minutiPagareOrdineP2P(o){",
                "function bollinoTempoPagareP2P(min){",
-               "function rigaTempoPagareDettP2P(o, tuo){",
+               "function rigaTempoPagareDettP2P(o, tuo, oc){",
                "function bannerTempoPagareP2P(min, oc){",
                "function rigaTempoPagareScambioP2P(o, adesso){")))
 
@@ -214748,6 +214760,9 @@ const esc = s => String(s), tabacchinoP2P = m => (m || []).some(x => /^Contanti 
 var MIE = {};
 const ordiniP2P = () => MIE;
 const p2pCoord = () => null;
+/* i due traduttori della valuta, finti: qui conta che la riga li chiami */
+const paroleUsdtP2P = (o, t) => o && o.usdt ? t.split('gli euro').join('gli USDT') : t;
+const paroleOcP2P = (o, t) => o && o.usdt ? t.split('gli euro').join('gli USDT') : t;
 """ + js + r"""
 const T = finestrePagareDaTagP2P('900-86400');
 const ID = '7e3a0000-0000-4a2b-9c3d-000000000001', ID2 = '7e3a0000-0000-4a2b-9c3d-000000000002';
@@ -214796,7 +214811,12 @@ out.ordine = [minutiPagareOrdineP2P({id: ID}), minutiPagareOrdineP2P({id: ID2}),
   minutiPagareOrdineP2P({id: ID2, metodi: ['Revolut', 'SEPA']}), minutiPagareOrdineP2P({})];
 out.bollino = [bollinoTempoPagareP2P(30), bollinoTempoPagareP2P(90), bollinoTempoPagareP2P(1440), bollinoTempoPagareP2P(0)];
 out.dett = [rigaTempoPagareDettP2P({id: ID}, false), rigaTempoPagareDettP2P({id: ID2}, true),
-  rigaTempoPagareDettP2P({id: 'x'}, false)];
+  rigaTempoPagareDettP2P({id: 'x'}, false),
+  rigaTempoPagareDettP2P({id: 9, minuti_pagamento: 15}, false, true),
+  rigaTempoPagareDettP2P({id: 9, minuti_pagamento: 7}, false, true),
+  rigaTempoPagareDettP2P({id: 9}, false, true),
+  rigaTempoPagareDettP2P({id: ID, usdt: true}, false),
+  rigaTempoPagareDettP2P({id: 9, minuti_pagamento: 30, usdt: true}, false, true)];
 const s = (stato, lato, entro, min) => rigaTempoPagareScambioP2P({stato, lato, pagaEntro: entro, minutiPagare: min}, 1000);
 out.scambio = [s('attivo', 'compro', 1000 + 3000, 60), s('attivo', 'vendo', 1000 + 600, 60),
   s('attivo', 'compro', 999, 60), s('euro_inviati', 'compro', 5000, 60), s('attivo', 'compro', 0, 60),
@@ -214870,10 +214890,26 @@ console.log(JSON.stringify(out));
            o["bollino"][2], o["bollino"][3]])
     prova("la riga del dettaglio: a chi prende «Se lo prendi hai 4 ore», a chi ha pubblicato "
           "«Chi lo prende ha 30 minuti», con l'anello; senza tempo niente",
-          [True, True, True, ""],
+          [True, True, True, False, ""],
           ["Se lo prendi hai <b>4 ore</b> per inviare gli euro" in o["dett"][0],
            "Chi lo prende ha <b>30 minuti</b> per inviarti gli euro" in o["dett"][1],
-           'class="p2p-anello"' in o["dett"][0], o["dett"][2]])
+           # (19 nov 2026, Andrea: «perché prima ancora di prendere l'ordine vedo
+           # il timer già che sta per scadere?») un'icona ferma, non l'anello
+           'class="p2p-tempo-icona"' in o["dett"][0], 'p2p-anello' in o["dett"][0], o["dett"][2]])
+    # (19 nov 2026, regole-sulla-card; Andrea: «quando io clicco sulla card,
+    # deve essere informato subito chi la prende») la stessa riga sull'on-chain
+    prova("...e sull'on-chain: i minuti dalla riga del libro, il deposito e la disputa, la "
+          "riga del bottone sua; minuti storti o mancanti, niente",
+          [True, True, True, True, "", ""],
+          ["Se lo prendi hai <b>15 minuti</b> per inviare gli euro, da quando i sats sono nel deposito"
+           in o["dett"][3], "chi vende può aprire una disputa." in o["dett"][3],
+           "riavere i sats anche se hai pagato" in o["dett"][3],
+           'class="p2p-tempo-icona"' in o["dett"][3], o["dett"][4], o["dett"][5]])
+    prova("...e le parole della valuta dell'ordine passano dai traduttori (Lightning e "
+          "on-chain): in USDT «gli USDT», anche nel nome del bottone",
+          [True, True, False, True],
+          ["per inviare gli USDT" in o["dett"][6], "«Ho inviato gli USDT»" in o["dett"][6],
+           "gli euro" in o["dett"][6], "per inviare gli USDT" in o["dett"][7]])
     sc = o["scambio"]
     prova("IL TIMER: a chi compra il tempo che resta, a chi vende lo stesso (vicino alla "
           "fine si scalda); l'ANELLO porta la parte che resta; finito dice che lo scambio "
@@ -214928,6 +214964,18 @@ console.log(JSON.stringify(out));
            mini.count("if (typeof battitoTempoPagareP2P === 'function') battitoTempoPagareP2P();")])
     prova("...e le tre risposte del server che portano i tempi li prendono", 3,
           mini.count("prendiMinutiPagareP2P(d && d.minuti_pagare)"))
+    # IN CIMA (19 nov 2026, regole-sulla-card): la riga e' la prima cosa del
+    # foglio dell'ordine, prima dei metodi; sull'on-chain sta nella testata
+    # della presa, subito dopo i tasti della rete, solo a chi compra
+    rd = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    ao = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
+    prova("LA RIGA IN CIMA: nel dettaglio Lightning prima dei metodi, nella presa on-chain "
+          "subito dopo i tasti della rete e prima del riassunto, a chi compra",
+          [True, True, 1],
+          [-1 < rd.find("rigaTempoPagareDettP2P(o, tuo)") < rd.find("metodiDettP2P(o) +"),
+           -1 < ao.find("reteOcPresaHtmlP2P(o, vendeLui)")
+              < ao.find("rigaTempoPagareDettP2P(o, false, true)") < ao.find("p2p-onchain-riass"),
+           ao.count("(vendeLui && typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, false, true) : '')")])
     prova("IL BOLLINO sta sulle due card del libro (Lightning e on-chain), e l'on-chain "
           "manda la scelta quando pubblica", [2, True, True],
           [mini.count("typeof bollinoTempoPagareP2P"),
@@ -214979,6 +215027,211 @@ console.log(JSON.stringify(out));
            "Mancano 5 minuti: hai già mandato gli euro?" in t30[1] and "disputa" in t30[1],
            "annulla" in t30[1], len(tp(oc(0, ["SEPA"]))),
            tp(oc(0, ["SEPA"]))[4].startswith("🟠 ⏰ Mancano dieci minuti")])
+
+
+def prove_riprendi_scaduto_onchain():
+    """«↩️ RIPRENDI I SATS» COL TEMPO PER PAGARE FINITO (19 nov 2026, cantiere
+    riprendi-scaduto; Andrea: «nell'on-chain non si può far tornare da
+    solo?», poi «facciamo così» senza ora d'attesa, e «proviamolo
+    direttamente in produzione, con una leva accesa solo per me ed Alan»).
+    Chi ha depositato, a tempo finito senza «Ho inviato», si riprende i sats:
+    Barattolo firma il rimborso senza moderatore, il suo telefono la
+    seconda, l'ordine rinasce nel libro e a chi non ha pagato conta il
+    «non completato».
+
+    Quel che qui si rompe in silenzio: il bottone prima della fine del
+    tempo, o dopo «Ho inviato» (chi ha pagato perderebbe gli euro), una
+    seconda firma di Barattolo sopra una gia' data, la porticina dei
+    moderatori aperta per sbaglio, il «non completato» che non arriva."""
+    print("\n[«Riprendi i sats» on-chain col tempo per pagare finito]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"time": time, "e_admin": lambda t: int(t) in (999,)}
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_ha_dove_pagare", "_p2p_onchain_annullo_chiesto",
+              "_p2p_onchain_mancato", "p2p_onchain_riprendi_scaduto_perche",
+              "p2p_onchain_riprendi_scaduto_per"):
+        exec(pezzo(f), amb)
+    amb["p2p_onchain_paga_entro"] = lambda o: int(o.get("entro", 0))
+    P = amb["p2p_onchain_riprendi_scaduto_perche"]
+    base = {"stato": "depositato", "euro_inviati_il": 0, "proposta_psbt": "", "decisione_da": 0,
+            "ricevuti_sats": 50000, "entro": 1000, "rimborso": "tb1qritorno", "recapito": "IBAN"}
+    casi = [base, dict(base, entro=1001), dict(base, entro=0), dict(base, stato="euro_inviati",
+            euro_inviati_il=900), dict(base, proposta_psbt="cHNidP8"), dict(base, decisione_da=777),
+            dict(base, ricevuti_sats=0), dict(base, rimborso=""), dict(base, stato="disputa")]
+    fuori = [P(c, 1000) for c in casi]
+    prova("IL GIUDICE: a tempo finito si'; un secondo prima no; tempo non partito no; dopo "
+          "«Ho inviato» no (e dice la disputa); con una firma gia' data no; senza sats "
+          "confermati no; senza l'indirizzo di ritorno no (e dice dove scriverlo); in disputa no",
+          ["", True, True, True, True, True, True, True, True],
+          [fuori[0], "non è ancora finito" in fuori[1], "non è ancora partito" in fuori[2],
+           "disputa" in fuori[3], "c'è già una firma" in fuori[4], "c'è già una firma" in fuori[5],
+           "non ci sono sats" in fuori[6], "Dove tornano i sats?" in fuori[7], bool(fuori[8])])
+    M = amb["_p2p_onchain_mancato"]
+    chiuso = {"stato": "annullato", "ricevente_id": 222, "depositante_id": 111, "depositato_il": 500,
+              "recapito": "IBAN", "decisione_da": 111, "decisione_perche": "tempo-scaduto",
+              "euro_inviati_il": 0, "pagamento_scaduto_il": 0}
+    prova("IL NON COMPLETATO: chi non ha pagato se lo vede contare alla seconda firma "
+          "(«onchain-non-pagato», come dopo la disputa decisa); senza recapito di chi vende "
+          "no; dopo «Ho inviato» no; un rimborso per il deposito incompleto no",
+          [(222, "onchain-non-pagato"), (0, ""), (0, ""), (0, "")],
+          [M(chiuso, "rimborsato"), M(dict(chiuso, recapito=""), "rimborsato"),
+           M(dict(chiuso, euro_inviati_il=900), "rimborsato"),
+           M(dict(chiuso, decisione_perche="deposito-incompleto"), "rimborsato")])
+    # la leva e la porticina
+    L = amb["p2p_onchain_riprendi_scaduto_per"]
+    fuori = []
+    for leva, porta in ((True, True), (True, False), (False, False)):
+        amb["P2P_ONCHAIN_RIPRENDI_SCADUTO"], amb["P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN"] = leva, porta
+        fuori.append([L(999), L(222), L(0)])
+    prova("LA LEVA: a porticina chiusa solo un moderatore; aperta tutti (non un ospite "
+          "senza nome... che non ha un deposito); spenta nessuno",
+          [[True, False, False], [True, True, True], [False, False, False]], fuori)
+    prova("...e di serie la leva e' accesa e la porticina chiusa, e tutte e due sono nel "
+          "pannello «Stato delle leve»",
+          [True, True, True, True],
+          ["except ImportError:\n    P2P_ONCHAIN_RIPRENDI_SCADUTO = True" in src,
+           "except ImportError:\n    P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = True" in src,
+           '"P2P_ONCHAIN_RIPRENDI_SCADUTO", P2P_ONCHAIN_RIPRENDI_SCADUTO,' in src,
+           '"P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN",' in src])
+    rotta = src[src.index('@app.post("/api/p2p/onchain/{oid}/riprendi-scaduto")'):]
+    rotta = rotta[:rotta.index("\n\n\ndef ")]
+    prova("LA ROTTA: la leva per chi tocca (404 se no), solo chi ha depositato, il giudice, "
+          "la firma di Barattolo verso chi ha depositato, lo stato cambiato UNA volta sola "
+          "(senza «Ho inviato» e senza firme gia' date), i due avvisi e quello ai moderatori",
+          [True] * 7,
+          ["if not p2p_onchain_riprendi_scaduto_per(user[\"id\"]):\n        raise HTTPException(404" in rotta,
+           '!= "compratore":\n            raise HTTPException(403' in rotta,
+           "perche = p2p_onchain_riprendi_scaduto_perche(o, adesso)" in rotta,
+           'psbt = _onchain_psbt_barattolo(con, o, "compratore")' in rotta,
+           " WHERE id=? AND stato='depositato' AND COALESCE(euro_inviati_il, 0)=0\"\n"
+           "            \" AND proposta_psbt='' AND decisione_da=0\"" in rotta,
+           rotta.count("await _notifica_p2p_onchain(") == 2,
+           "await notifica_admin(" in rotta])
+    prova("LA PAGINA: il bottone solo a chi ha depositato e col si' del server, la conferma "
+          "che dice di guardare prima il conto, e il testo dello scambio chiuso",
+          [1, True, True, True],
+          [mini.count("(deposito && o.riprendi_scaduto ? g('riprendi-scaduto', '↩️ Riprendi i sats') : '')"),
+           "if (cosa === 'riprendi-scaduto') {" in mini and "Prima controlla il conto" in mini,
+           "o.chiuso_perche === 'tempo-scaduto'" in mini,
+           '"riprendi_scaduto": (tg_id == int(o["depositante_id"] or 0)' in src])
+    # (19 nov 2026, stesso cantiere; Andrea alla prova della cauzione: «quando
+    # clicco su rinunci allo scambio, non mi viene informato che perderò…»)
+    per = pezzo("_p2p_onchain_per")
+    rin = pezzo_js(mini, "function rinunciaOnchainP2P(btn, id){")
+    prova("LA CAUZIONE DETTA PRIMA DI «RINUNCIO»: il server la calcola col giudice della "
+          "perdita da sola sullo scambio come sarebbe dopo, la pagina la scrive coi sats",
+          [True, True, True],
+          ['d["cauzione_rinuncia"] = int(cz_mia["sats"] or 0)' in per,
+           'stato="rimborsato", mancato_perche="onchain-rinuncia"' in per,
+           "Perdi la cauzione che hai bloccato (" in rin and "o.cauzione_rinuncia" in rin])
+    # (19 nov 2026, Andrea alla prova B: «perché c'è il bottone ricevuti libera i
+    # sats, scusa?») LA RINUNCIA IN CORSO: resta solo la seconda firma
+    amb_js = {}
+    giudice = pezzo_js(mini, "function rinunciaInCorsoOcP2P(o){")
+    sch = pezzo_js(mini, "function schedaOnchainP2P(o){", "\n}\n")
+    prova("LA RINUNCIA IN CORSO: il giudice (depositato + proposta verso chi ha depositato, "
+          "non di Barattolo), a chi ha depositato SOLO «Metti la seconda firma» con la frase "
+          "chiara, a chi ha rinunciato nessun gesto; via il tempo e «Dove vuoi gli euro»; e "
+          "nessun testo dice piu' che il telefono firma da solo",
+          [True, True, True, True, True, True, 0, 0],
+          ["o.stato === 'depositato' && !!o.proposta" in giudice
+           and "o.proposta.verso === 'compratore' && !o.proposta.barattolo" in giudice,
+           "testo = '<b>↩️ Chi compra ha rinunciato</b> 👉 tocca a te" in sch,
+           "gesti = bott('orange', `cofirmaOnchainP2P(this, ${o.id})`, '✍️ Metti la seconda firma');" in sch,
+           "} else if (rinunciaOc && ricevo) {" in sch and "gesti = '';" in sch,
+           "&& !rinunciaOc ? tempoPagareRigaOcP2P(o) : '')" in sch,
+           "+ (rinunciaOc ? '' : recapitoBox)" in sch,
+           mini.count("che il telefono mette da solo"),
+           5 - src.count("Apri lo scambio e tocca «✍️ Metti la seconda firma»")])
+
+
+def prove_conto_alla_rovescia_p2p():
+    """IL CONTO ALLA ROVESCIA NEL BOT (19 nov 2026, cantiere regole-sulla-card;
+    Andrea: «una notifica con un timer che scorre», poi «Ah, ok, allora va
+    bene così» al messaggio unico che si riscrive). Chi deve pagare riceve
+    UN messaggio col tempo che resta, riscritto ogni minuto fino a «Ho
+    inviato» o alla fine.
+
+    Quel che qui si rompe in silenzio: il conto che continua dopo «Ho
+    inviato» (chi ha pagato vedrebbe ancora «mancano...»), il conto di un
+    giro vecchio fermato da un evento di prima, un messaggio nuovo a ogni
+    giro invece della riscrittura (un telefono che suona ogni minuto), il
+    gancio del Lightning perso, la leva fuori dal pannello."""
+    print("\n[il conto alla rovescia nel bot, per chi deve pagare]")
+    src = _SORGENTE
+    amb = {"time": time, "P2P_MOMENTI_FINALI": ("rilasciato", "concluso", "annullato",
+                                                "tornato", "scaduto")}
+    for f in ("_durata_detta_p2p", "_p2p_onchain_campo", "testo_conto_p2p",
+              "stato_conto_ln_p2p", "stato_conto_oc_p2p"):
+        exec(pezzo(f), amb)
+    amb["p2p_onchain_paga_entro"] = lambda o: int(o.get("entro", 0))
+    T = amb["testo_conto_p2p"]
+    prova("IL TESTO: per eccesso al minuto («mancano 15 minuti» appena parte), «manca 1 "
+          "minuto», «meno di un minuto», le ore; dice il bottone e che si aggiorna da solo",
+          [True, True, True, True, True, True],
+          ["mancano 15 minuti" in T("corre", 900), "mancano 15 minuti" in T("corre", 841),
+           "mancano 2 minuti" in T("corre", 61),
+           "manca 1 minuto" in T("corre", 60), "meno di un minuto" in T("corre", 30),
+           "mancano 2 ore e 5 minuti" in T("corre", 7500)])
+    prova("...e il testo che corre dice il bottone e l'aggiornamento; i tre finali no",
+          [True, True, False, False, False],
+          ["«Ho inviato gli euro»" in T("corre", 600) and "si aggiorna da solo" in T("corre", 600),
+           "si è fermato" in T("pagato"), "si aggiorna" in T("pagato"),
+           "si aggiorna" in T("scaduto"), "si aggiorna" in T("chiuso")])
+    S = amb["stato_conto_ln_p2p"]
+    m = lambda nome, q, g=1: {"momento": nome, "quando": q, "giro": g}
+    prova("IL LIGHTNING: corre; il «pagato» lo ferma; disputa e chiusure lo chiudono; l'ora "
+          "passata lo fa scadere; un evento di un ALTRO giro o di PRIMA dell'inizio non conta; "
+          "col pagato e poi la chiusura vince il pagato",
+          ["corre", "pagato", "chiuso", "chiuso", "scaduto", "corre", "corre", "pagato"],
+          [S([m("recapito", 100)], 1, 100, 1000, 500),
+           S([m("fiat", 300)], 1, 100, 1000, 500),
+           S([m("disputa", 300)], 1, 100, 1000, 500),
+           S([m("tornato", 300)], 1, 100, 1000, 500),
+           S([], 1, 100, 1000, 1000),
+           S([m("fiat", 300, 2), m("annullato", 300, 2)], 1, 100, 1000, 500),
+           S([m("annullato", 50)], 1, 100, 1000, 500),
+           S([m("fiat", 300), m("concluso", 400)], 1, 100, 1000, 500)])
+    O = amb["stato_conto_oc_p2p"]
+    base = {"stato": "depositato", "euro_inviati_il": 0, "entro": 1000}
+    prova("L'ON-CHAIN: corre con la fine del giudice di sempre; «Ho inviato» lo ferma; uno "
+          "stato diverso lo chiude; il tempo non partito lo chiude; a fine tempo scade; una "
+          "firma gia' data (la rinuncia di chi compra) lo chiude",
+          [("corre", 1000), ("pagato", 0), ("chiuso", 0), ("chiuso", 0), ("scaduto", 1000),
+           ("chiuso", 0)],
+          [O(base, 500), O(dict(base, stato="euro_inviati", euro_inviati_il=600), 500),
+           O(dict(base, stato="annullato"), 500), O(dict(base, entro=0), 500), O(base, 1000),
+           O(dict(base, proposta_psbt="cHNidP8"), 500)])
+    giro = src[src.index("async def _giro_conto_p2p("):]
+    giro = giro[:giro.index("\n\n\nasync def orologio_conto_p2p")]
+    scrivi = src[src.index("async def _conto_scrivi_p2p("):]
+    scrivi = scrivi[:scrivi.index("\n\n\nasync def _giro_conto_p2p")]
+    prova("UN MESSAGGIO SOLO: la prima volta sendMessage, poi sempre editMessageText sullo "
+          "stesso id (che non suona); si riscrive solo se il testo e' cambiato; un conto mai "
+          "partito che finisce non manda niente; il bottone resta a ogni riscrittura",
+          [True, True, True, True, True],
+          ['bot_api("sendMessage", dati)' in scrivi and "if not mid:" in scrivi,
+           'bot_api("editMessageText", dict(dati, message_id=mid))' in scrivi,
+           'elif testo == (r["detto"] or ""):' in giro,
+           "if finale and not int(r[\"messaggio\"] or 0):" in giro,
+           'dati["reply_markup"] = tastiera' in scrivi])
+    att = src[src.index("def _attese_tempo_pagare_p2p("):]
+    att = att[:att.index("\n\n\ndef ")]
+    prova("I GANCI: il Lightning nasce dove nascono i promemoria del tempo (stessa fine), "
+          "l'on-chain dalla riga dello scambio a ogni giro; il battito ogni minuto, avviato "
+          "all'accensione; la tabella esiste",
+          [True, True, True, True, True],
+          ['_nasce(con, f"ln:{ordine}:{int(giro or 0)}", ordine, giro, compra,\n'
+           "                   dal + int(minuti) * 60, dal)" in att,
+           "_conto_nasce_p2p(con, f\"oc:{o['id']}\"" in giro,
+           "await asyncio.sleep(60)" in src[src.index("async def orologio_conto_p2p"):][:400],
+           "asyncio.create_task(orologio_conto_p2p())" in src,
+           "CREATE TABLE IF NOT EXISTS p2p_conto_rovescia(" in src])
+    prova("LA LEVA: accesa di serie, nel pannello; chi ha scelto i soli DM Nostr non lo riceve",
+          [True, True, True],
+          ["except ImportError:\n    P2P_CONTO_ALLA_ROVESCIA = True" in src,
+           '"P2P_CONTO_ALLA_ROVESCIA", P2P_CONTO_ALLA_ROVESCIA,' in src,
+           'str(r[0] or "") == "nostr"' in src])
 
 
 def prove_ritorno_nel_libro_onchain():
@@ -215773,6 +216026,8 @@ CATEGORIE = {
     filtro_libro_ricordato
     tempo_pagare_p2p
     ritorno_nel_libro_onchain
+    riprendi_scaduto_onchain
+    conto_alla_rovescia_p2p
     """.split(),
     "mercatino": """
     guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio
@@ -217026,6 +217281,8 @@ def main():
               prove_filtro_libro_ricordato,
               prove_tempo_pagare_p2p,
               prove_ritorno_nel_libro_onchain,
+              prove_riprendi_scaduto_onchain,
+              prove_conto_alla_rovescia_p2p,
               prove_avvisi_barattolo,
               prove_serie_giorni,
               prove_serie_classifica,
