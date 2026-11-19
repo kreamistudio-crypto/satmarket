@@ -90304,7 +90304,8 @@ def prove_p2p_card_scambio():
     prova("in testa va quel che si riceve, e sotto quel che si invia",
           True,
           "'<div class=\"p2p-scambio-lato\">Vuoi ricevere '" in rs
-          and "'<div class=\"p2p-scambio-euro\">inviando '" in rs
+          # (19 nov 2026) anche la riga viva segue il tabacchino: «inviando»
+          # lo guarda il banco qui sotto, sul testo (`apertoVendo`)
           and "(tab ? 'pagando ' : 'inviando ')" in rs
           and "(ricevoSats ? cifraSats : cifraEuro)" in rs
           and "(ricevoSats ? cifraEuro : cifraSats)" in rs)
@@ -90703,6 +90704,12 @@ out.conclusoTabCompro = rigaScambioP2P(riga({lato: 'compro', stato: 'concluso',
 out.conclusoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'concluso',
                                             sats: 31209, ultimaMossa: ORA,
                                             metodi: [PM]}));
+/* (19 nov 2026) Barattozon ANCORA APERTO e annullato, dai due lati */
+out.apertoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo', sats: 31209, metodi: [PM]}));
+out.apertoTabCompro = rigaScambioP2P(riga({lato: 'compro', stato: 'attivo', sats: 31209, metodi: [PM]}));
+out.annullatoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'annullato', ultimaMossa: ORA,
+                                             sats: 31209, metodi: [PM]}));
+out.apertoVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo', sats: 31209}));
 /* il tabacchino SCELTO da chi ha preso fra due metodi: la coda «al
    tabacchino» segue la scelta, non l'elenco */
 out.conclusoTabScelto = rigaScambioP2P(riga({lato: 'compro', stato: 'concluso',
@@ -91095,6 +91102,26 @@ console.log(JSON.stringify(out));
     # nove. La sentinella guarda anche che la frase lunga non resti in
     # giro: mezza riga vecchia in un ramo e' il modo in cui due card
     # dicono la stessa cosa in due lingue.
+    # BARATTOZON PRIMA DELLA FINE (19 nov 2026, Andrea: «Non ricevo euro
+    # ma mi pagano l'ordine»): le stesse parole del concluso
+    prova("Barattozon aperto, chi fa pagare il suo ordine: «Amazon da pagare: X» / «per Y», "
+          "niente «Vuoi ricevere» ne' «inviando»",
+          [True, True, False, False],
+          ['Amazon da pagare: <span class="p2p-euro">5,00 €</span>' in o["apertoTabVendo"],
+           'per <span class="p2p-sats invia">' in o["apertoTabVendo"],
+           "Vuoi ricevere" in o["apertoTabVendo"], "inviando" in o["apertoTabVendo"]])
+    prova("...chi paga il PayCode: «Vuoi ricevere … sats» / «pagando … al tabacchino»",
+          [True, True],
+          ['Vuoi ricevere <span class="p2p-sats riceve">' in o["apertoTabCompro"],
+           re.search(r'pagando <span class="p2p-euro">[^<]*</span> al tabacchino</div>',
+                     o["apertoTabCompro"]) is not None])
+    prova("...annullato: «Amazon X · per Y», non «Invia … · Ricevi …»",
+          [True, False],
+          ['Amazon <span class="p2p-euro">5,00 €</span> · per <span class="p2p-sats invia">'
+           in o["annullatoTabVendo"], "Ricevi" in o["annullatoTabVendo"]])
+    prova("...e senza Barattozon resta «Vuoi ricevere … inviando …»", [True, True],
+          ['Vuoi ricevere <span class="p2p-euro">5,00 €</span>' in o["apertoVendo"],
+           'inviando <span class="p2p-sats invia">' in o["apertoVendo"]])
     prova("...e chi l'ha fatto pagare lo dice in due parole", True,
           'Amazon pagato: <span class="p2p-euro">5,00 €</span>'
           in o["conclusoTabVendo"]
@@ -165620,7 +165647,11 @@ console.log(JSON.stringify(casi.map(depositoVistoOnchainP2P)));
                  "function statoOnchainCardP2P(o){", "function tintaOnchainP2P(o){",
                  "function segnoReteCardP2P(rete){", "function pagaReteCardP2P(paga, rete){",
                  "function rigaScambioOnchainP2P(o){",
-                 "function righeOnchainMieiP2P(){"))
+                 "function righeOnchainMieiP2P(){",
+                 # (19 nov 2026) Barattozon, coi giudici veri del tabacchino
+                 "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){"))
+             + re.search(r"const P2P_TABACCHINO = [^\n]*;", mini).group(0) + "\n"
+             + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0) + "\n"
              + r"""
 const esc = x => String(x), fmt = n => String(n), fmtEur = n => String(n);
 const dataBreveP2P = t => t ? 'D' + t : '';
@@ -165648,8 +165679,15 @@ const out = casi.map(o => [gruppoOnchainP2P(o), toccaAMeOnchainP2P(o), statoOnch
 const card = casi.map(rigaScambioOnchainP2P);
 let p2pOnchainMiei = [Object.assign({id: 4}, casi[3]), Object.assign({}, casi[1], {id: 5, ruolo: 'moderatore'})];
 const righe = righeOnchainMieiP2P();
+/* (19 nov 2026, Andrea: «Non ricevo euro ma mi pagano l'ordine») Barattozon:
+   chi fa pagare il suo ordine (parte vendo) e chi paga il PayCode (compro) */
+const BZ = ['Contanti al tabacchino 9.00'];
+const bzCard = [{stato: 'pending', ruolo: 'maker'}, {stato: 'rilasciato', chiuso_il: 7},
+                {stato: 'scaduto'}, {stato: 'preso', parte: 'compro'},
+                {stato: 'rilasciato', chiuso_il: 7, parte: 'compro'}]
+  .map(x => rigaScambioOnchainP2P(Object.assign({}, b, {metodi: BZ}, x)).replace(/<[^>]*>/g, ''));
 myP2POnchain = false;
-console.log(JSON.stringify({out,
+console.log(JSON.stringify({out, bzCard,
   manina: card.map(c => c.includes('👉')),
   segno: card.every(c => c.includes('🟠') && c.includes('apriScambioOnchainMioP2P(this.dataset.id)')),
   passato: [card[11].includes('Hai ricevuto'), card[12].includes('Rimborsato il D7'), card[1].includes('Vuoi ricevere')],
@@ -165677,6 +165715,17 @@ console.log(JSON.stringify({out,
               ([False, True, False, True, False, True, False, True, True, False, False,
                 False, False, False], True, [True, True, True], [True, True]),
               (x.get("manina"), x.get("segno"), x.get("passato"), x.get("verso")))
+        bzc = x.get("bzCard") or ["", "", "", "", ""]
+        prova("BARATTOZON IN «I MIEI SCAMBI» ON-CHAIN (19 nov 2026): «Amazon da pagare» / "
+              "«Amazon pagato» / annullato «Amazon … · per …» per chi fa pagare il suo "
+              "ordine; «pagando … al tabacchino» per chi paga il PayCode",
+              [True, True, True, True, True, False],
+              ["Amazon da pagare: 9 €per 10000 sats" in bzc[0],
+               "Amazon pagato: 9 €per 10000 sats" in bzc[1],
+               "Amazon 9 € · per 10000 sats" in bzc[2],
+               "Vuoi ricevere 10000 satspagando 9 € al tabacchino" in bzc[3],
+               "Hai ricevuto 10000 satspagando 9 € al tabacchino" in bzc[4],
+               any("inviando" in c for c in bzc)])
         prova("...e le righe della lista: id e stato col prefisso «oc-» (nessuna lista "
               "di stati del Lightning le scambia per sue), il verso dalla parte, il "
               "moderatore fuori; a cancello chiuso nessuna",

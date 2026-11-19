@@ -76231,16 +76231,28 @@ function rigaScambioOnchainP2P(o){
   const g = gruppoOnchainP2P(o);
   const chiuso = g === 'fatti', annullato = g === 'morti';
   const data = (chiuso || annullato) ? dataBreveP2P(o.chiuso_il || o.scade || o.creato) : '';
+  /* BARATTOZON COME SU LIGHTNING (19 nov 2026, Andrea: «Non ricevo euro
+     ma mi pagano l'ordine»): chi fa pagare il suo ordine Amazon legge
+     «Amazon da pagare / pagato: …» e «per …», chi paga il PayCode
+     «pagando … al tabacchino» — le frasi di `rigaScambioP2P` */
+  const tab = typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi || []);
+  const amazon = tab && !ricevoSats;
   const righe = annullato
     ? '<div class="p2p-scambio-lato">' + (o.stato === 'rimborsato' ? 'Rimborsato' : 'Annullato')
       + (data ? ' il ' + esc(data) : '') + '</div>'
-      + '<div class="p2p-scambio-euro p2p-scambio-cifre">Invia '
-      + (ricevoSats ? cifraEuro : cifraSats) + ' · Ricevi ' + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+      + '<div class="p2p-scambio-euro p2p-scambio-cifre">'
+      + (amazon ? 'Amazon ' + cifraEuro + ' · per ' + cifraSats
+         : 'Invia ' + (ricevoSats ? cifraEuro : cifraSats) + ' · Ricevi ' + (ricevoSats ? cifraSats : cifraEuro)) + '</div>'
+    : amazon
+      ? '<div class="p2p-scambio-lato">Amazon ' + (chiuso ? 'pagato' : 'da pagare') + ': ' + cifraEuro + '</div>'
+        + '<div class="p2p-scambio-euro">per ' + cifraSats + '</div>'
     : chiuso
       ? '<div class="p2p-scambio-lato">Hai ricevuto ' + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
-        + '<div class="p2p-scambio-euro">inviando ' + (ricevoSats ? cifraEuro : cifraSats) + '</div>'
+        + '<div class="p2p-scambio-euro">' + (tab ? 'pagando ' : 'inviando ')
+        + (ricevoSats ? cifraEuro : cifraSats) + (tab ? ' al tabacchino' : '') + '</div>'
       : '<div class="p2p-scambio-lato">Vuoi ricevere ' + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
-        + '<div class="p2p-scambio-euro">inviando ' + (ricevoSats ? cifraEuro : cifraSats) + '</div>';
+        + '<div class="p2p-scambio-euro">' + (tab ? 'pagando ' : 'inviando ')
+        + (ricevoSats ? cifraEuro : cifraSats) + (tab ? ' al tabacchino' : '') + '</div>';
   /* in USDT le stesse caselle, dette per gli USDT (2 nov 2026) */
   const st0 = statoOnchainCardP2P(o);
   const st = {t: paroleOc(o, st0.t), d: paroleOc(o, st0.d)};
@@ -108190,11 +108202,20 @@ function rigaScambioP2P(o){
      in piedi, c'e' un conto da non inventare. */
   const euA = Number(o.euro) > 0 ? cifraEuro : '<span class="p2p-euro">—</span>';
   const saA = sats ? cifraSats : '<span class="p2p-sats">—</span>';
+  /* BARATTOZON ANCHE PRIMA DELLA FINE (19 nov 2026, Andrea, con lo scatto
+     del suo ordine: «Non ricevo euro ma mi pagano l'ordine»): la frase
+     del concluso, «Amazon pagato», valeva solo a scambio finito, e prima
+     la card diceva «Vuoi ricevere 74,39 € inviando ≈ … sats». Adesso chi
+     fa pagare il suo ordine legge «Amazon da pagare: …» / «per …», e da
+     annullato «Amazon … · per …»; chi paga il PayCode di un altro
+     (Barattozon in «Compra BTC») «Vuoi ricevere … sats» / «pagando … al
+     tabacchino», come nel suo concluso. */
   const righe = annullato
     ? '<div class="p2p-scambio-lato">Annullato'
       + (dataChiusa ? ' il ' + esc(dataChiusa) : '') + '</div>'
-      + '<div class="p2p-scambio-euro p2p-scambio-cifre">Invia '
-      + (ricevoSats ? euA : saA) + ' · Ricevi ' + (ricevoSats ? saA : euA) + '</div>'
+      + '<div class="p2p-scambio-euro p2p-scambio-cifre">'
+      + (tab && !ricevoSats ? 'Amazon ' + euA + ' · per ' + saA
+         : 'Invia ' + (ricevoSats ? euA : saA) + ' · Ricevi ' + (ricevoSats ? saA : euA)) + '</div>'
     : chiuso
       ? (tab && !ricevoSats
           ? '<div class="p2p-scambio-lato">Amazon pagato: '
@@ -108205,10 +108226,13 @@ function rigaScambioP2P(o){
             + '<div class="p2p-scambio-euro">' + (tab ? 'pagando ' : 'inviando ')
             + (ricevoSats ? cifraEuro : cifraSats)
             + (tab ? ' al tabacchino' : '') + '</div>')
-      : '<div class="p2p-scambio-lato">Vuoi ricevere '
-        + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
-        + '<div class="p2p-scambio-euro">inviando '
-        + (ricevoSats ? cifraEuro : cifraSats) + '</div>';
+      : tab && !ricevoSats
+        ? '<div class="p2p-scambio-lato">Amazon da pagare: ' + cifraEuro + '</div>'
+          + '<div class="p2p-scambio-euro">per ' + cifraSats + '</div>'
+        : '<div class="p2p-scambio-lato">Vuoi ricevere '
+          + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+          + '<div class="p2p-scambio-euro">' + (tab ? 'pagando ' : 'inviando ')
+          + (ricevoSats ? cifraEuro : cifraSats) + (tab ? ' al tabacchino' : '') + '</div>';
   /* ---- L'INSEGNA DI BARATTOZON SI SPEGNE COI FINALI (22 set 2026,
      richiesta di Andrea) ----
      Finito lo scambio il metodo non chiama piu' nessuno: resta un dato,

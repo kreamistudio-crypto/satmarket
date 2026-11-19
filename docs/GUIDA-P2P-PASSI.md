@@ -1159,7 +1159,8 @@ disputa.»
    🧑 Libera: «Liberi i sats?» — «Fallo solo se su Amazon il tuo ordine da
    25,47 € risulta pagato davvero. I sats partono verso chi compra e non
    tornano indietro.» In «I miei scambi» resta «Amazon pagato: 25,47 € per
-   <N> sats».
+   <N> sats» (finché è aperto, dal 19 nov 2026: «Amazon da pagare: 25,47 €
+   per ≈ <N> sats»; annullato: «Amazon 25,47 € · per <N> sats»).
 
 ### 7b. Chi prende (compra sats pagando il PayCode)
 
