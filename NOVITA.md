@@ -728,3 +728,9 @@ frase: I prodotti dei negozi WooCommerce con una scelta che non cambia il prezzo
 dove: la scheda di un prodotto importato da WooCommerce con tendine «Qualsiasi» (per esempio la Box Natale di Uhmami): le tendine sotto il prezzo, e di nuovo alla cassa in «🎁 Le tue scelte» (anche nel carrello). Il venditore la legge nella nota dell'ordine.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · filtri-p2p-ricordati
+frase: Il Filtro del P2P ora si ricorda: valute, metodi, premio, reputazione e Lightning/on-chain restano come li hai lasciati anche quando esci e rientri.
+dove: P2P → la pillola «Filtro» sopra il libro: scegli, tocca «Applica», esci e rientra. «Azzera» lo toglie. Vale su quel telefono o browser.
+leva: nessuna
+pubblico: sì

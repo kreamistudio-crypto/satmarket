@@ -80969,6 +80969,58 @@ function noMoneteRicordateP2P(){
   const letto = k => { try { return localStorage.getItem(k) === '1'; } catch(e){ return false; } };
   return {soloBtc: letto(P2P_BTC_ONLY_CHIAVE), noStable: letto(P2P_NO_STABLE_CHIAVE)};
 }
+/* ...e la memoria del RESTO DEL FILTRO DEL LIBRO (19 nov 2026, cantiere
+   filtri-p2p-ricordati; un utente via Andrea: «le impostazioni del filtro
+   si resettano ad ogni uscita da barattolo»): valute, metodi, premio,
+   reputazione e rete. Qui fuori per la stessa ragione delle sorelle.
+   PER DISPOSITIVO, come l'ordinamento e le due pillole: una chiave sola,
+   scritta da «Applica», tolta da «Azzera», riletta da `avvia()`.
+   ⚠️ LE DUE PILLOLE NON CI ENTRANO: hanno le loro chiavi e la loro leva,
+   e due memorie della stessa scelta finirebbero per dire due cose. Alla
+   rilettura si uniscono, cosi' chi aveva «No altcoin» PIU' un metodo li
+   ritrova tutt'e due (senza, `/api/me` le lascerebbe fuori: rimette le
+   pillole solo dove il filtro non c'e').
+   UN RICORDO SPORCO NON PUO' SVUOTARE IL LIBRO: ogni campo si rilegge
+   nella sua forma (testi corti, numeri dentro la fascia del cursore, una
+   rete del catalogo), un capo rovesciato torna al suo bordo, e se non
+   resta niente di acceso il ricordo non c'e'. */
+const P2P_FILTRO_LIBRO_CHIAVE = 'barattolo_p2p_filtro_libro';
+function ricordaFiltroLibroP2P(f){
+  try {
+    const resto = f ? Object.assign({}, f, {soloBtc: false, noStable: false}) : null;
+    if (resto && filtroAccesoP2P(resto))
+      localStorage.setItem(P2P_FILTRO_LIBRO_CHIAVE, JSON.stringify({
+        valute: resto.valute, metodi: resto.metodi,
+        premioDa: resto.premioDa, premioA: resto.premioA,
+        repDa: resto.repDa, repA: resto.repA, rete: resto.rete || ''}));
+    else localStorage.removeItem(P2P_FILTRO_LIBRO_CHIAVE);
+  } catch(e){}
+}
+function filtroLibroRicordatoP2P(){
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem(P2P_FILTRO_LIBRO_CHIAVE) || 'null'); }
+  catch(e){ return null; }
+  if (!g || typeof g !== 'object' || Array.isArray(g)) return null;
+  const v = filtroVuotoP2P();
+  const testi = a => !Array.isArray(a) ? [] : a.filter((x, i) =>
+    typeof x === 'string' && x.trim() && x.length <= 60 && a.indexOf(x) === i).slice(0, 30);
+  const num = (x, min, max, ripiego) => {
+    const n = typeof x === 'number' ? x : NaN;
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : ripiego;
+  };
+  const f = Object.assign(v, {
+    valute: testi(g.valute), metodi: testi(g.metodi),
+    premioDa: num(g.premioDa, v.premioDa, v.premioA, v.premioDa),
+    premioA: num(g.premioA, v.premioDa, v.premioA, v.premioA),
+    repDa: num(g.repDa, v.repDa, v.repA, v.repDa),
+    repA: num(g.repA, v.repDa, v.repA, v.repA),
+    rete: (g.rete === 'onchain' || g.rete === 'ln') ? g.rete : ''});
+  const vuoto = filtroVuotoP2P();
+  if (f.premioDa > f.premioA) { f.premioDa = vuoto.premioDa; f.premioA = vuoto.premioA; }
+  if (f.repDa > f.repA) { f.repDa = vuoto.repDa; f.repA = vuoto.repA; }
+  if (!filtroAccesoP2P(f)) return null;
+  return Object.assign(f, noMoneteRicordateP2P());
+}
 /* ...e la memoria della CAUZIONE CHIESTA nel foglio «Pubblica» (18 nov
    2026, cantiere cursore-tempo; Andrea: «questa opzione rimanga salvata
    per le volte dopo»), qui fuori per la stessa ragione. Una chiave per
@@ -83896,6 +83948,8 @@ function azzeraFiltroP2P(){
   /* ...anche «No altcoin» e «No stablecoin», che il telefono dimentica
      (18 nov 2026: pillole normali) */
   if (typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P()) ricordaNoMoneteP2P(null);
+  /* ...e il resto del filtro ricordato (19 nov 2026) */
+  ricordaFiltroLibroP2P(null);
   if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();
   vestiBannerScambiP2P();
   if (el('p2pFiltroSheet').classList.contains('open'))
@@ -83911,6 +83965,8 @@ function applicaFiltroP2P(){
        (18 nov 2026), e la fila della home li segue subito */
     if (typeof bitcoinOnlyOffertoP2P === 'function' && bitcoinOnlyOffertoP2P())
       ricordaNoMoneteP2P(p2pFiltro);
+    /* ...e il resto del filtro, su questo telefono (19 nov 2026) */
+    ricordaFiltroLibroP2P(p2pFiltro);
     if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();
     vestiBannerScambiP2P();
   }
@@ -118191,6 +118247,12 @@ async function avvia(){
   apriSicurezzaDaUrl();
   apriPrivacyDaUrl();
   avvisoAccessoNegato();
+  /* IL FILTRO DEL LIBRO P2P RICORDATO su questo telefono (19 nov 2026,
+     cantiere filtri-p2p-ricordati): prima di ogni fetch, cosi' il libro e
+     la fila della home nascono gia' filtrati. Solo se nella sessione non
+     ce n'e' gia' uno: `setCollaudo` rilancia avvia() e non deve
+     riscrivere quel che uno ha appena scelto. */
+  if (!p2pFiltro) p2pFiltro = filtroLibroRicordatoP2P();
   /* PRIMA di ogni fetch: se si atterra su /categoria/{slug}, la prima
      pagina dev'essere gia' quella del reparto — una richiesta sola
      invece di una vetrina intera scaricata per buttarla via. */

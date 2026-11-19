@@ -211554,6 +211554,129 @@ console.log(JSON.stringify(out));
                           open("config_esempio.py", encoding="utf-8").read()))))
 
 
+def prove_filtro_libro_ricordato():
+    """IL FILTRO DEL LIBRO P2P SI RICORDA (19 nov 2026, cantiere
+    filtri-p2p-ricordati; un utente via Andrea: «le impostazioni del filtro
+    si resettano ad ogni uscita da barattolo»). Valute, metodi, premio,
+    reputazione e rete in UNA chiave del telefono, scritta da «Applica»,
+    tolta da «Azzera», riletta da avvia() prima di ogni fetch; le due
+    pillole «No altcoin»/«No stablecoin» restano nelle loro chiavi e alla
+    rilettura si uniscono. Il banco gira le due funzioni pure su un
+    localStorage di cartone (anche sporco e anche muto); la controprova
+    toglie la pulizia e guarda il ricordo sporco passare."""
+    print("\n[Il filtro del libro P2P si ricorda su questo telefono]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    fns = (_riga_js(mini, "const P2P_PREMIO_MAX = ")
+           + _riga_js(mini, "const P2P_BTC_ONLY_CHIAVE = ")
+           + _riga_js(mini, "const P2P_NO_STABLE_CHIAVE = ")
+           + _riga_js(mini, "const P2P_FILTRO_LIBRO_CHIAVE = ")
+           + "".join(_fn_js(mini, f) for f in (
+               "function ricordaNoMoneteP2P(f){", "function noMoneteRicordateP2P(){",
+               "function ricordaFiltroLibroP2P(f){", "function filtroLibroRicordatoP2P(){",
+               "function filtroVuotoP2P(){", "function filtroAccesoP2P(f){")))
+
+    def banco(js):
+        return (r"""
+var magazzino = {}, MUTO = false;
+const localStorage = {
+  getItem: k => { if (MUTO) throw new Error('muto'); return k in magazzino ? magazzino[k] : null; },
+  setItem: (k, v) => { if (MUTO) throw new Error('muto'); magazzino[k] = String(v); },
+  removeItem: k => { if (MUTO) throw new Error('muto'); delete magazzino[k]; }};
+var LEVA = true;
+const soloBtcVivoP2P = f => !!(f && f.soloBtc) && LEVA;
+const noStableVivoP2P = f => !!(f && f.noStable) && LEVA;
+""" + js + r"""
+const f = x => Object.assign(filtroVuotoP2P(), x);
+const out = {};
+out.nulla = filtroLibroRicordatoP2P();
+const scelto = f({valute: ['EUR', 'CHF'], metodi: ['SEPA', 'Contanti'], premioDa: -3, premioA: 5,
+  repDa: 2, repA: 5, rete: 'ln'});
+ricordaFiltroLibroP2P(scelto);
+out.giro = filtroLibroRicordatoP2P();
+/* le pillole non entrano nella chiave... */
+ricordaFiltroLibroP2P(f({metodi: ['SEPA'], soloBtc: true, noStable: true}));
+out.senzaPillole = JSON.parse(magazzino.barattolo_p2p_filtro_libro);
+/* ...ma alla rilettura si uniscono dalle loro chiavi */
+ricordaNoMoneteP2P(f({soloBtc: true}));
+const unito = filtroLibroRicordatoP2P();
+out.unito = [unito.metodi, unito.soloBtc, unito.noStable];
+ricordaNoMoneteP2P(null);
+/* solo le pillole, o un filtro spento: nessun ricordo (le pillole hanno le loro chiavi) */
+ricordaFiltroLibroP2P(f({soloBtc: true}));
+out.soloPillole = 'barattolo_p2p_filtro_libro' in magazzino;
+ricordaFiltroLibroP2P(scelto);
+ricordaFiltroLibroP2P(null);
+out.cancella = ['barattolo_p2p_filtro_libro' in magazzino, filtroLibroRicordatoP2P()];
+/* un ricordo sporco non svuota il libro */
+const sporco = v => { magazzino.barattolo_p2p_filtro_libro = v; return filtroLibroRicordatoP2P(); };
+out.rotto = [sporco('{non e json'), sporco('[1,2]'), sporco('"SEPA"'), sporco('{}')];
+const s = sporco(JSON.stringify({valute: ['EUR', 7, '', 'EUR', 'x'.repeat(61)], metodi: 'SEPA',
+  premioDa: -99, premioA: '5', repDa: 4, repA: 1, rete: 'altrove'}));
+out.pulito = s;
+out.rovescio = sporco(JSON.stringify({premioDa: 8, premioA: -8}));
+/* un telefono che non ricorda non rompe niente */
+MUTO = true;
+let esploso = false;
+try { ricordaFiltroLibroP2P(scelto); out.muto = filtroLibroRicordatoP2P(); } catch(e){ esploso = true; }
+out.esploso = esploso;
+console.log(JSON.stringify(out));
+""")
+    o = _node_banco(banco(fns))
+    if o is None:
+        salta("il banco del filtro ricordato", "node assente")
+        return
+    if "giro" not in o:
+        prova("il banco del filtro ricordato gira", True, False)
+        return
+    pieno = {"valute": ["EUR", "CHF"], "metodi": ["SEPA", "Contanti"], "premioDa": -3,
+             "premioA": 5, "repDa": 2, "repA": 5, "rete": "ln", "soloBtc": False,
+             "noStable": False}
+    prova("un telefono nuovo non ricorda niente: il filtro resta spento", None, o["nulla"])
+    prova("«Applica» e poi rientro: valute, metodi, premio, reputazione e rete tornano "
+          "tutti com'erano", pieno, o["giro"])
+    prova("le due pillole NON entrano nella chiave del filtro (hanno le loro)", True,
+          "soloBtc" not in o["senzaPillole"] and "noStable" not in o["senzaPillole"]
+          and o["senzaPillole"].get("metodi") == ["SEPA"])
+    prova("...ma alla rilettura si uniscono: metodo E «No altcoin» insieme",
+          [["SEPA"], True, False], o["unito"])
+    prova("solo le pillole accese: nessun ricordo del resto", False, o["soloPillole"])
+    prova("«Azzera» lo toglie dalla memoria", [False, None], o["cancella"])
+    prova("un ricordo rotto (non JSON, una lista, un testo, un oggetto vuoto) vale "
+          "«niente filtro»", [None, None, None, None], o["rotto"])
+    prova("un ricordo sporco si rilegge pulito: testi veri e unici, numeri dentro la "
+          "fascia, un capo rovesciato al suo bordo, una rete sconosciuta tolta",
+          {"valute": ["EUR"], "metodi": [], "premioDa": -20, "premioA": 20, "repDa": 0,
+           "repA": 5, "rete": "", "soloBtc": False, "noStable": False}, o["pulito"])
+    prova("...e se dopo la pulizia non resta niente di acceso, il ricordo non c'e'", None,
+          o["rovescio"])
+    prova("un telefono che non ricorda (localStorage muto) non rompe niente", [False, None],
+          [o["esploso"], o.get("muto")])
+    rotto = fns.replace("    rete: (g.rete === 'onchain' || g.rete === 'ln') ? g.rete : ''});",
+                        "    rete: g.rete});", 1)
+    rotto = rotto.replace("  if (f.premioDa > f.premioA) {", "  if (false) {", 1)
+    prova("controprova: il banco rotto si e' davvero rotto", True, rotto != fns
+          and "if (false) {" in rotto and "rete: g.rete});" in rotto)
+    x = _node_banco(banco(rotto)) or {}
+    prova("controprova: senza la pulizia la rete sconosciuta e il premio rovesciato passano",
+          True, (x.get("pulito") or {}).get("rete") == "altrove"
+          and (x.get("rovescio") or {}).get("premioDa") == 8)
+    # --- i fili della pagina ---
+    azz = _fn_js(mini, "function azzeraFiltroP2P(){")
+    app = _fn_js(mini, "function applicaFiltroP2P(){")
+    prova("I FILI: «Applica» ricorda il filtro vivo, «Azzera» lo dimentica", [True, True],
+          ["ricordaFiltroLibroP2P(p2pFiltro);" in app, "ricordaFiltroLibroP2P(null);" in azz])
+    av = _fn_js(mini, "async function avvia(){")
+    prova("...e avvia() lo rilegge PRIMA della strada senza backend e del primo fetch, senza "
+          "riscrivere quello della sessione",
+          True, "  if (!p2pFiltro) p2pFiltro = filtroLibroRicordatoP2P();\n" in av
+          and av.index("filtroLibroRicordatoP2P()") < av.index("  if (!API_BASE) {"))
+    prova("la memoria vive FUORI dal blocco della lettura (che non nomina localStorage)", True,
+          mini.index("function filtroLibroRicordatoP2P(){")
+          < mini.index("LO SCAMBIO P2P: BARATTOLO COME CLIENT DI MOSTRO"))
+    prova("e' del LIBRO: il filtro dei propri scambi non la tocca", False,
+          "ricordaFiltroLibroP2P" in _fn_js(mini, "function applicaFiltroMieiP2P(){"))
+
+
 def prove_avvisi_barattolo():
     """GLI AVVISI DEL BARATTOLO (17 nov 2026, cantiere avvisi-barattolo,
     voce #99 del Todo). Chi mette un articolo nel barattolo sceglie cosa
@@ -214357,6 +214480,7 @@ CATEGORIE = {
     ripubblica_p2p
     filtro_onchain_tutto
     bitcoin_only_p2p
+    filtro_libro_ricordato
     tempo_pagare_p2p
     """.split(),
     "mercatino": """
@@ -215607,6 +215731,7 @@ def main():
               prove_negozi_su_nostr,
               prove_filtro_onchain_tutto,
               prove_bitcoin_only_p2p,
+              prove_filtro_libro_ricordato,
               prove_tempo_pagare_p2p,
               prove_avvisi_barattolo,
               prove_serie_giorni,
