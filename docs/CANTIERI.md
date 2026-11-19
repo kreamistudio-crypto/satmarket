@@ -92386,3 +92386,74 @@ RESTA DA GUARDARE. Dal vivo: Andrea incolla le parole del sito nella Mini
 App (una volta) e firma; poi la Mini App non le chiede più. Un account
 Telegram che usa SOLO il sito ora deve aprire la Mini App una volta per
 avere il wallet on-chain.
+
+## Il wallet nasce dal sito e dalla Mini App, e le parole arrivano da sole alla loro casa (19 nov 2026, cantiere cassetta-telegram; Andrea: «da entrambi devono nascere», poi: «non può avere due chiavi l'account [...] dalla mini app di Telegram, se fa anche il login con Nostr, la stessa chiave verrà backuppata su tutti i relay»)
+
+IL ROVESCIO DI PAROLE-CASA, LO STESSO GIORNO. Il cantiere di stamattina
+fermava la nascita del wallet sul sito per un account Telegram (il sito non
+scrive il cloud di Telegram, e le parole restavano chiuse in un browser).
+Andrea l'ha rovesciato: il wallet deve nascere da tutti e due i posti, e
+restare UNO per account. Il cancello `walletNasceQui` è tolto; resta tutto
+il resto di parole-casa (il server sa i NOMI delle case, le frasi «dove
+riprenderle»).
+
+LA DECISIONE: LE CASSETTE. Il problema vero non era dove nasce, ma come le
+parole arrivano alla casa che segue l'account senza mai passare in chiaro
+dal server (regola ferrea 2). Verso Telegram: la Mini App si fa una chiave
+a caso che vive SOLO nel cloud di Telegram e dice al server la pubblica; il
+sito chiude le parole verso di lei (NIP-44 con una chiave usa-e-getta) e
+lascia la busta; la Mini App la apre da sola, mette le parole nel cloud e
+la fa buttare. Verso Nostr (la seconda richiesta di Andrea, stesso
+pomeriggio): per un account con Telegram e Nostr collegati la pubblica c'è
+già, la `npub_accesso`; chi ha le parole e non ha scritto i relay (di
+solito la Mini App, dove il firmatario Nostr non c'è) le chiude verso di
+lei; il sito entrato con quella chiave apre la busta col firmatario,
+scrive la copia sui relay e la fa buttare. Da lì ogni login Nostr le
+ritrova sui relay. Il server tiene buste che non sa aprire, come un relay
+la sua copia cifrata.
+
+I PERCHÉ DEI DETTAGLI. La pubblica della cassetta Telegram la prende SOLO
+con l'initData (col cookie: 403): una sessione del sito rubata non deve
+poter mettere la sua chiave e farsi consegnare le parole. La npub d'accesso
+la scrive solo un login firmato, e una busta chiusa verso una npub che non
+è più quella non si mostra. La busta vale solo per il principale di
+`wallet_unico`, e si apre solo se le parole sono valide e hanno la loro
+impronta. Mai sopra parole diverse (qui o nel cloud): lì decide il
+Profilo. Un cloud muto non è un cloud vuoto (nessuna cassetta nasce sopra
+una casa che non risponde, né sopra una casa con dentro qualcosa di
+storto). L'apertura costa una GET leggera finché non c'è una busta: niente
+librerie, e il firmatario Nostr si sveglia solo se c'è una busta da aprire;
+al boot e nel Profilo solo con la nsec salvata (un bunker chiederebbe l'ok
+a ogni apertura); quando il wallet serve davvero, anche col bunker. La
+busta verso Nostr si butta solo quando i relay hanno la copia.
+LA SECONDA CHIAVE NON NASCE: c'era già (`wallet_unico`, 2 nov) — chi non
+trova le parole e ha un principale registrato riceve «altrove» con la frase
+di dove riprenderle, mai un `generateMnemonic`.
+
+STRADE SCARTATE. Le parole cifrate col seme del server (`semeContoP2P`,
+come le chiavi Lightning e la copia del moderatore): il server le saprebbe
+aprire, cioè custodia — la trappola della tappa 1c. Tenere il cancello di
+stamattina: Andrea vuole che nasca ovunque. Pubblicare la busta sui relay
+firmata da una chiave usa-e-getta: la lettura sui relay cerca gli eventi
+DELL'autore, e una busta sul server si butta a consegna fatta.
+
+COSA È PROVATO. `prove_cassetta_telegram` (29, col bundle vero: NIP-44,
+BIP-39): prima apertura, consegna senza niente in chiaro, apertura con
+copia segnata e busta buttata, GET leggera, parole diverse qui o nel
+cloud, busta manomessa o di un'altra chiave, cloud muto, casa storta,
+Nostr nativo e Mini App che non consegnano verso Telegram, la seconda
+cassetta (consegna, apertura col firmatario, relay giù, firmatario di
+un'altra chiave, silenzioso senza nsec, nativo), nessuna fuga nei log. I
+banchi di nascita e di parole uniche (la ronda consegna nei due versi).
+`collaudo_wallet_unico` (83) sul server vero: la porta dell'initData, il
+declassamento al cookie, forme, 409, la npub che cambia, le colonne.
+Controprove: tolti uno per uno la porta dell'initData, il controllo della
+pubblica sulla busta Nostr, il silenzioso, l'attesa dei relay, la guardia
+delle parole diverse, l'impronta della busta, la guardia del cloud muto →
+rosso ognuno.
+
+RESTA DA GUARDARE. Dal vivo dopo la promozione: Andrea apre la Mini App,
+poi il sito (dove il wallet è nato), poi di nuovo la Mini App: le parole
+ci sono e la firma va. Con Nostr collegato: login Nostr dal sito su un
+browser pulito, le parole arrivano e vanno sui relay. Limite noto: la
+consegna parte solo dopo che la Mini App è stata aperta almeno una volta.

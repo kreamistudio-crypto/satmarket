@@ -155736,7 +155736,7 @@ def prove_freni():
            "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
            # il wallet unico (2 nov 2026 sera): registrare l'impronta 20
            # all'ora, prenotare il numero di un cambio 120 all'ora
-           "wallet_unico": (20, 3600), "wallet_casa": (20, 3600), "wallet_numero": (120, 3600),
+           "wallet_unico": (20, 3600), "wallet_casa": (20, 3600), "wallet_cassetta": (30, 3600), "wallet_numero": (120, 3600),
            # la tappa 3 (23 ott 2026): «controlla adesso» 60 all'ora,
            # proposte e co-firme 30 all'ora
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
@@ -160780,9 +160780,8 @@ def prove_chiave_che_nasce_da_sola():
     for firma in ("function eventoCopiaOnchain(cifrato, adesso){",
                   "async function onchainImpronta(parole){",
                   "function walletAltrove(impronta){",
-                  # (19 nov 2026, parole-casa) dove puo' nascere, e dove stanno
+                  # (19 nov 2026, parole-casa) dove stanno
                   "function walletCaseLista(x){", "function walletDoveStanno(){",
-                  "function walletNasceQui(){", "function walletNasceInTelegram(){",
                   "async function onchainSemeAssicurato(opz){"):
         pezzi.append(pezzo_js(mini, firma, "\n}\n") + "\n}")
     banco = """
@@ -160809,6 +160808,13 @@ const onchainDaiRelay = async () => RELAY;
    Nostr (i relay sono la sua casa anche fuori da Telegram) */
 let myTgId = -7, walletUnicoStato = null;
 const BOT_TG = 'ilbarattolobot';
+/* (19 nov 2026, cassetta-telegram) la cassetta della Mini App: il banco
+   decide se dentro c'erano parole consegnate dal sito */
+let CASSETTA = '';
+async function walletDallaCassetta(){
+  if (CASSETTA) { memoria = CASSETTA; onchainNato = 'cassetta'; }
+  return CASSETTA;
+}
 /* (wallet-unico) il server: l'impronta che ha, o muto; le registrazioni */
 const walletImpronte = new Map();
 let SERVER = {impronta: ''}, MUTO = false, REGISTRATE = [];
@@ -160828,7 +160834,7 @@ __PEZZI__
     IN_TELEGRAM = !!st.inTelegram;
     RELAY = st.relay || '';
     SERVER = st.server || {impronta: ''}; MUTO = !!st.muto; REGISTRATE = [];
-    myTgId = st.conto || -7;
+    myTgId = st.conto || -7; CASSETTA = st.cassetta || '';
     onchainNato = '';
     try { const p = await onchainSemeAssicurato(st.opz);
           return {nato: onchainNato, parole: p, registrate: REGISTRATE, memoria: memoria}; }
@@ -160853,13 +160859,14 @@ __PEZZI__
   /* 6) ...ma FUORI da Telegram il cloud non esiste: la' nasce un account
         Nostr (la sua casa sono i relay) */
   out.fuori = await giro({cloud: {ok: false, testo: ''}});
-  /* 6b) (19 nov 2026, parole-casa) un account TELEGRAM fuori da Telegram
-        (il sito) non fa nascere niente: le parole non avrebbero casa */
+  /* 6b) (19 nov 2026, cassetta-telegram: «da entrambi devono nascere») un
+        account TELEGRAM nasce anche dal sito; dentro Telegram pure */
   out.sitoTg = await giro({cloud: {ok: false, testo: ''}, conto: 5});
-  out.sitoTgNuovo = await giro({cloud: {ok: false, testo: ''}, conto: 5,
-                                server: {impronta: 'abcd1234'}, opz: {nuovoPrincipale: true}});
-  /* ...e dentro Telegram, col cloud vuoto, lo stesso account nasce */
   out.dentroTg = await giro({cloud: {ok: true, testo: ''}, inTelegram: true, conto: 5});
+  /* ...e dentro Telegram, col cloud vuoto, le parole consegnate nella
+        cassetta vincono sulla nascita: niente secondo wallet */
+  out.cassetta = await giro({cloud: {ok: true, testo: ''}, inTelegram: true, conto: 5,
+                             server: {impronta: 'abcd1234'}, cassetta: PAROLE});
   /* (wallet-unico) l'impronta: la master fingerprint del BIP-32 (il
      vettore noto delle dodici «abandon … about») */
   out.impronta = await onchainImpronta('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about');
@@ -160916,18 +160923,16 @@ __PEZZI__
            "non risponde" in (o["muta"].get("errore") or "")])
     prova("...ma fuori da Telegram il cloud non esiste, e la' nasce un account Nostr (i relay)",
           "nuovo", o["fuori"]["nato"])
-    prova("(parole-casa) un account Telegram dal sito NON fa nascere il wallet, nemmeno "
-          "«ho perso quelle parole»: niente scritto, niente registrato, e si dice di aprire Telegram",
-          [["telegram", "", 0, True], ["telegram", "", 0]],
-          [[o["sitoTg"].get("tipo"), o["sitoTg"].get("memoria"), len(o["sitoTg"].get("registrate") or []),
-            "nasce dentro Telegram" in (o["sitoTg"].get("errore") or "")],
-           [o["sitoTgNuovo"].get("tipo"), o["sitoTgNuovo"].get("memoria"),
-            len(o["sitoTgNuovo"].get("registrate") or [])]])
-    prova("(parole-casa) ...e dentro Telegram, col cloud vuoto, lo stesso account nasce",
-          "nuovo", o["dentroTg"].get("nato"))
-    prova("(parole-casa) la nascita si ferma DOPO la domanda al server e PRIMA delle parole", True,
-          corpo.index("walletUnicoLeggi()") < corpo.index("if (!walletNasceQui()) throw walletNasceInTelegram();")
-          < corpo.index("generateMnemonic"))
+    prova("(cassetta-telegram) un account Telegram fa nascere il wallet dal sito e dentro Telegram",
+          ["nuovo", "nuovo"], [o["sitoTg"].get("nato"), o["dentroTg"].get("nato")])
+    prova("(cassetta-telegram) ...ma dentro Telegram le parole della cassetta vengono prima: "
+          "le riprende, non chiede di incollarle e non ne fa nascere altre",
+          ["cassetta", True, 0],
+          [o["cassetta"].get("nato"), o["cassetta"].get("parole") == o["nuvola"]["parole"],
+           len(o["cassetta"].get("registrate") or [])])
+    prova("(cassetta-telegram) la cassetta si guarda dopo cloud e relay e PRIMA del server e della nascita", True,
+          corpo.index("onchainDaiRelay") < corpo.index("await walletDallaCassetta()")
+          < corpo.index("walletUnicoLeggi()") < corpo.index("generateMnemonic"))
     prova("(wallet-unico) l'impronta e' la master fingerprint del BIP-32 "
           "(le dodici «abandon … about» danno 73c5da0a)", "73c5da0a", o["impronta"])
     prova("(wallet-unico) il wallet che nasce si registra con la sua impronta, "
@@ -160952,6 +160957,263 @@ __PEZZI__
           [30078, "barattolo/onchain/v1", "xyz"],
           [o["evento"]["kind"], o["evento"]["d"], o["evento"]["contenuto"]])
 
+
+BANCO_CASSETTA_TELEGRAM = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const B = new Function(fs.readFileSync(process.argv[3], 'utf8') + '; return BarattoloBTC;')();
+const V = JSON.parse(fs.readFileSync(process.argv[4], 'utf8'));
+const A = V.bip39_english[0].parole, C = V.bip39_english[1].parole;
+const diario = [];
+for (const m of ['log', 'warn', 'error', 'info']) console[m] = (...a) => diario.push(a.map(String).join(' '));
+const FORMA_HEX64 = /^[0-9a-f]{64}$/;
+const ONCHAIN_CLOUD = 'barattolo_onchain';
+const API_BASE = '/api';
+const authHdr = () => 'x';
+let TG = true, myTgId = 5, CLOUD = {}, CLOUD_MUTO = false, LS = '', onchainNato = '', onchainCase = {};
+let STRUMENTI = 0, SEGNATE = [], CHIAMATE = [], SRV = {pub: '', consegna: null, impronta: '', npub: '', nconsegna: null};
+let myNpubAccesso = '', FIRMA = null, NSEC_QUI = false, FIRMATARI = 0;
+/* il firmatario Nostr finto: una chiave vera, cifra/decifra NIP-44 come il vero */
+const firmatarioNsecSalvata = async () => (NSEC_QUI ? {chiudi(){}} : null);
+const firmatarioCifranteP2P = async () => {
+  FIRMATARI++;
+  if (!FIRMA) return null;
+  const sk = FIRMA;
+  return {f: {pubkey: async () => NT.getPublicKey(sk),
+              decifra44: async (da, t) => NT.nip44.decrypt(t, NT.nip44.getConversationKey(sk, da)),
+              chiudi(){}}, chiudi: true};
+};
+const cloudTelegram = () => (TG ? {} : null);
+const cloudLeggiEsito = async (k) => (CLOUD_MUTO ? {ok: false, testo: ''} : {ok: true, testo: CLOUD[k] || ''});
+const cloudScrivi = async (k, v) => { CLOUD[k] = v; return true; };
+const caricaNostrTools = async () => { STRUMENTI++; };
+const caricaBitcoin = async () => B;
+const onchainSemeLocale = () => LS;
+const onchainScriviLocale = (p) => { LS = p; return true; };
+let RELAY_OK = true, SUI_RELAY = [];
+const onchainMettiAlSicuro = async (p) => {
+  if (TG) { CLOUD[ONCHAIN_CLOUD] = JSON.stringify({parole: p}); onchainCase = {nuvola: true}; }
+  else { SUI_RELAY.push(p); onchainCase = {relay: RELAY_OK}; }
+};
+const walletSegnaCopia = (imp, dove) => SEGNATE.push([imp, dove]);
+const walletImpronte = new Map();
+async function onchainImpronta(parole){
+  const madre = B.HDKey.fromMasterSeed(B.mnemonicToSeedSync(String(parole).trim(), ''));
+  return (Number(madre.fingerprint) >>> 0).toString(16).padStart(8, '0');
+}
+/* il server finto: le stesse regole delle rotte vere */
+async function fetch(url, o){
+  const corpo = o && o.body ? JSON.parse(o.body) : null;
+  CHIAMATE.push([url, o && o.method || 'GET', o && o.body || '']);
+  const risp = (ok, d, status) => ({ok, status: status || (ok ? 200 : 409), json: async () => d});
+  if (url === '/api/wallet/cassetta' && !corpo) return risp(true, {pub: SRV.pub, consegna: SRV.consegna,
+    nostr: {pub: SRV.npub, consegna: SRV.npub ? SRV.nconsegna : null}});
+  if (url === '/api/wallet/cassetta/consegna' && corpo.verso === 'nostr') {
+    if (!SRV.npub) return risp(false, {motivo: 'nessuna'});
+    if (corpo.impronta !== SRV.impronta) return risp(false, {motivo: 'altro'});
+    SRV.nconsegna = {da: corpo.da, busta: corpo.busta, impronta: corpo.impronta}; return risp(true, {ok: true}); }
+  if (url === '/api/wallet/cassetta/ritirata' && corpo.verso === 'nostr') { SRV.nconsegna = null; return risp(true, {ok: true}); }
+  if (url === '/api/wallet/cassetta') { if (corpo.pub !== SRV.pub) { SRV.pub = corpo.pub; SRV.consegna = null; } return risp(true, {ok: true}); }
+  if (url === '/api/wallet/cassetta/consegna') {
+    if (!SRV.pub) return risp(false, {motivo: 'nessuna'});
+    if (corpo.impronta !== SRV.impronta) return risp(false, {motivo: 'altro'});
+    SRV.consegna = {da: corpo.da, busta: corpo.busta, impronta: corpo.impronta}; return risp(true, {ok: true}); }
+  if (url === '/api/wallet/cassetta/ritirata') { SRV.consegna = null; return risp(true, {ok: true}); }
+  return risp(false, {}, 404);
+}
+__PEZZI__
+const sessione = () => { cassettaGiro = null; STRUMENTI = 0; SEGNATE = []; CHIAMATE = []; onchainNato = ''; onchainCase = {}; };
+(async () => {
+  const out = {};
+  const iA = await onchainImpronta(A);
+  SRV.impronta = iA;
+  /* a) la Mini App la prima volta: nasce la cassetta nel cloud, la pubblica va al server */
+  sessione(); TG = true; CLOUD = {};
+  out.prima = [await cassettaRitira(), !!CLOUD[CASSETTA_CLOUD], FORMA_HEX64.test(SRV.pub),
+               CHIAMATE.filter(c => c[1] === 'POST').length];
+  const skCassetta = JSON.parse(CLOUD[CASSETTA_CLOUD]).sk;
+  const cloudMiniApp = Object.assign({}, CLOUD);
+  /* b) il sito fa nascere il wallet e consegna */
+  sessione(); TG = false; CLOUD = {};
+  const okConsegna = await cassettaConsegna(A);
+  const busta = SRV.consegna ? SRV.consegna.busta : '';
+  out.consegna = [okConsegna, !!SRV.consegna, SRV.consegna && SRV.consegna.impronta === iA,
+                  CHIAMATE.some(c => c[2].includes(A.split(' ')[0] + ' ' + A.split(' ')[1])),
+                  CHIAMATE.some(c => c[2].includes(skCassetta))];
+  /* ...una seconda volta con la busta gia' li': nessuna POST */
+  sessione(); out.consegnaDoppia = [await cassettaConsegna(A), CHIAMATE.filter(c => c[1] === 'POST').length];
+  /* c) la Mini App alla sessione dopo: apre la busta, mette le parole qui e nel cloud, la fa buttare */
+  sessione(); TG = true; CLOUD = Object.assign({}, cloudMiniApp); LS = '';
+  out.ritira = [await walletDallaCassetta() === A, LS === A, JSON.parse(CLOUD[ONCHAIN_CLOUD]).parole === A,
+                SRV.consegna, SEGNATE, onchainNato];
+  /* d) con la cassetta registrata e nessuna busta: una GET sola, niente librerie */
+  sessione(); LS = '';
+  out.leggera = [await cassettaRitira(), CHIAMATE.length, STRUMENTI];
+  /* e) parole diverse qui, o nel cloud: niente si tocca, la busta resta */
+  const conBusta = async () => { TG = false; cassettaGiro = null; await cassettaConsegna(A); TG = true; sessione(); };
+  await conBusta(); LS = C; CLOUD = Object.assign({}, cloudMiniApp);
+  out.diverseQui = [await walletDallaCassetta(), LS === C, !!SRV.consegna];
+  await conBusta(); LS = ''; CLOUD = Object.assign({}, cloudMiniApp, {[ONCHAIN_CLOUD]: JSON.stringify({parole: C})});
+  out.diverseNelCloud = [await walletDallaCassetta(), LS, JSON.parse(CLOUD[ONCHAIN_CLOUD]).parole === C, !!SRV.consegna];
+  /* f) una busta manomessa (altra impronta dichiarata) o chiusa verso un'altra chiave: niente */
+  await conBusta(); LS = ''; CLOUD = Object.assign({}, cloudMiniApp); SRV.consegna.impronta = 'deadbeef';
+  out.manomessa = [await walletDallaCassetta(), LS];
+  const altra = NT.generateSecretKey(), usa = NT.generateSecretKey();
+  SRV.consegna = {da: NT.getPublicKey(usa), impronta: iA,
+                  busta: NT.nip44.encrypt(JSON.stringify({parole: A}), NT.nip44.getConversationKey(usa, NT.getPublicKey(altra)))};
+  sessione(); LS = '';
+  out.altraChiave = [await walletDallaCassetta(), LS];
+  /* g) il cloud muto: nessuna cassetta nasce, niente al server */
+  sessione(); CLOUD_MUTO = true; SRV.pub = '';
+  out.muto = [await cassettaRitira(), SRV.pub, CHIAMATE.filter(c => c[1] === 'POST').length];
+  CLOUD_MUTO = false;
+  /* ...e una casa con dentro qualcosa di storto non si sovrascrive */
+  sessione(); CLOUD = {[CASSETTA_CLOUD]: '{"sk":"storta"}'};
+  out.storta = [await cassettaRitira(), CLOUD[CASSETTA_CLOUD], SRV.pub];
+  /* h) il sito senza cassetta: false, niente consegnato; un account Nostr o la Mini App non consegnano */
+  sessione(); TG = false; SRV.pub = ''; SRV.consegna = null;
+  out.senzaCassetta = [await cassettaConsegna(A), SRV.consegna];
+  SRV.pub = NT.getPublicKey(NT.utils.hexToBytes(skCassetta));
+  sessione(); TG = false; myTgId = -4;
+  out.nostr = [await cassettaConsegna(A), await cassettaRitira(), CHIAMATE.length];
+  myTgId = 5; sessione(); TG = true;
+  out.daMiniApp = [await cassettaConsegna(A), CHIAMATE.length];
+  /* i) un'impronta che non e' il principale: il server dice no */
+  sessione(); TG = false; SRV.impronta = 'abcd0000';
+  out.nonPrincipale = [await cassettaConsegna(A), SRV.consegna];
+  /* LA SECONDA CASSETTA, VERSO NOSTR: la chiave d'accesso dell'account */
+  SRV.impronta = iA;
+  const U = NT.generateSecretKey(), Uhex = NT.getPublicKey(U);
+  const W = NT.generateSecretKey();
+  const poste = () => CHIAMATE.filter(c => c[1] === 'POST');
+  /* j) senza chiave d'accesso collegata: niente busta */
+  sessione(); TG = true; myNpubAccesso = ''; SRV.npub = '';
+  out.nSenza = [await cassettaConsegnaNostr(A), CHIAMATE.length];
+  /* k) la Mini App consegna verso la chiave d'accesso */
+  sessione(); myNpubAccesso = NT.nip19.npubEncode(Uhex); SRV.npub = Uhex;
+  out.nConsegna = [await cassettaConsegnaNostr(A), !!SRV.nconsegna, SRV.nconsegna && SRV.nconsegna.impronta === iA,
+                   CHIAMATE.some(c => c[2].includes(A.split(' ').slice(0, 2).join(' '))),
+                   JSON.parse(poste()[0][2]).verso];
+  sessione(); out.nDoppia = [await cassettaConsegnaNostr(A), poste().length];
+  /* l) il sito con la chiave d'accesso: apre, scrive i relay, fa buttare */
+  sessione(); TG = false; LS = ''; FIRMA = U; SUI_RELAY = []; RELAY_OK = true;
+  out.nApre = [await walletDallaBustaNostr() === A, LS === A, SUI_RELAY.length === 1 && SUI_RELAY[0] === A,
+               SRV.nconsegna, onchainNato];
+  /* m) i relay non rispondono: le parole restano qui, la busta resta */
+  await cassettaConsegnaNostr(A); sessione(); LS = ''; RELAY_OK = false;
+  out.nRelayGiu = [await walletDallaBustaNostr() === A, LS === A, !!SRV.nconsegna];
+  RELAY_OK = true;
+  /* n) un firmatario di un'altra chiave, o parole diverse qui: niente */
+  sessione(); LS = ''; FIRMA = W;
+  out.nAltraChiave = [await walletDallaBustaNostr(), LS];
+  sessione(); LS = C; FIRMA = U;
+  out.nDiverseQui = [await walletDallaBustaNostr(), LS === C, !!SRV.nconsegna];
+  /* o) silenzioso senza la nsec salvata: il firmatario non si sveglia */
+  sessione(); LS = ''; NSEC_QUI = false; FIRMATARI = 0;
+  out.nSilenzioso = [await walletDallaBustaNostr({silenzioso: true}), FIRMATARI, LS];
+  NSEC_QUI = true;
+  out.nSilenziosoNsec = [await walletDallaBustaNostr({silenzioso: true}) === A, LS === A];
+  /* p) nessuna busta: una GET, nessun firmatario */
+  sessione(); LS = ''; SRV.nconsegna = null; FIRMATARI = 0;
+  out.nLeggera = [await walletDallaBustaNostr(), CHIAMATE.length, FIRMATARI];
+  /* q) un account Nostr nativo non ha la seconda cassetta */
+  await cassettaConsegnaNostr(A); sessione(); myTgId = -4;
+  out.nNativo = [await walletDallaBustaNostr(), await cassettaConsegnaNostr(A), CHIAMATE.length];
+  myTgId = 5;
+  out.diario = diario.some(r => r.includes(skCassetta) || r.includes(A));
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => process.stdout.write(JSON.stringify({errore: String(e && e.stack || e)})));
+"""
+
+
+def prove_cassetta_telegram():
+    """LA CASSETTA DELLA MINI APP (19 nov 2026, cantiere cassetta-telegram;
+    Andrea: «da entrambi devono nascere»). Il wallet on-chain nasce anche
+    dal sito col login Telegram; il sito chiude le parole nella cassetta
+    della Mini App (la cui chiave sta solo nel cloud di Telegram) e la
+    Mini App le apre da sola. QUEL CHE SI ROMPE IN SILENZIO, e qui si fa
+    girare col bundle vero: le parole o la chiave della cassetta che
+    escono in chiaro; una busta aperta sopra parole diverse (qui o nel
+    cloud); una busta manomessa o di un'altra chiave che scrive; un cloud
+    muto preso per vuoto; l'apertura che carica le librerie a ogni giro;
+    il sito che consegna senza cassetta, o la Mini App e i Nostr che
+    consegnano. La porta del server (la pubblica solo con l'initData) la
+    gira `collaudo_wallet_unico`."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    print("\n[la cassetta della Mini App: il wallet nato sul sito arriva da solo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    i0 = mini.index("/* LA CASSETTA DELLA MINI APP (19 nov 2026")
+    i1 = mini.index("/* IL NUMERO DI UN CAMBIO, dal pavimento del server:", i0)
+    blocco = mini[i0:i1]
+    nudo = re.sub(r"/\*[\s\S]*?\*/", "", blocco)
+    prova("la busta e' NIP-44 con una chiave usa-e-getta verso la pubblica della cassetta", True,
+          "const usa = NT.generateSecretKey();" in nudo
+          and "NT.nip44.encrypt(JSON.stringify({parole}), NT.nip44.getConversationKey(usa, st.d.pub))" in nudo)
+    prova("...la chiave della cassetta sta SOLO nel cloud di Telegram: niente localStorage nel blocco", 0,
+          nudo.count("localStorage"))
+    prova("...si apre solo se valida e con la sua impronta", True,
+          "if (!B.validateMnemonic(parole, B.wordlist) || await onchainImpronta(parole) !== c.impronta) return '';" in nudo)
+    prova("il server prende la pubblica SOLO con l'initData (mai col cookie del sito)", True,
+          'if not x_tg_init_data:\n        raise HTTPException(403' in src[src.index("async def wallet_cassetta_chiave("):src.index("def _wallet_cassetta_chiave(")])
+    prova("la cassetta se ne va con l'account cancellato", True, '("wallet_cassetta", "tg_id"),' in src)
+    prova("al boot della Mini App la cassetta si prepara, prima della ronda", True,
+          0 < mini.index("setTimeout(() => { walletDallaCassetta().catch(() => {}); }, 5500);")
+          < mini.index("setTimeout(() => { walletBackupRonda().catch(() => {}); }, 6000);"))
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della cassetta", "node non c'e'")
+        return
+    cart = _tf.mkdtemp(prefix="cassetta_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_CASSETTA_TELEGRAM.replace("__PEZZI__", blocco))
+    r = _sp.run([node, pb, "vendor/nostr.bundle.js", _os.path.join(QUI, "vendor", "btc.bundle.js"),
+                 _os.path.join(QUI, "vendor", "vettori-bip.json")],
+                capture_output=True, text=True, timeout=120, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco della cassetta gira", "", (r.stderr or "")[-900:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    prova("banco: nessun errore", None, o.get("errore"))
+    if o.get("errore"):
+        return
+    prova("LA PRIMA VOLTA nella Mini App: nasce la cassetta nel cloud e la pubblica va al server",
+          ["", True, True, 1], o["prima"])
+    prova("IL SITO consegna: la busta e' sul server con l'impronta, e ne' le parole ne' la chiave della cassetta escono in chiaro",
+          [True, True, True, False, False], o["consegna"])
+    prova("...una seconda volta, con la busta gia' li': niente da rifare", [True, 0], o["consegnaDoppia"])
+    prova("LA MINI APP apre la busta: parole qui e nel cloud, copia segnata, busta buttata",
+          [True, True, True, None, "cassetta"],
+          [o["ritira"][0], o["ritira"][1], o["ritira"][2], o["ritira"][3], o["ritira"][5]])
+    prova("...e la copia segnata e' quella del cloud", "nuvola", (o["ritira"][4] or [[None, None]])[0][1])
+    prova("con la cassetta registrata e nessuna busta: una GET sola, nessuna libreria", ["", 1, 0], o["leggera"])
+    prova("parole DIVERSE qui o nel cloud: niente si tocca, la busta resta",
+          [["", True, True], ["", "", True, True]], [o["diverseQui"], o["diverseNelCloud"]])
+    prova("una busta manomessa o chiusa verso un'altra chiave non scrive niente",
+          [["", ""], ["", ""]], [o["manomessa"], o["altraChiave"]])
+    prova("un cloud MUTO non fa nascere la cassetta, e una casa storta non si sovrascrive",
+          [["", "", 0], ["", '{"sk":"storta"}', ""]], [o["muto"], o["storta"]])
+    prova("il sito senza cassetta non consegna; un account Nostr e la Mini App non consegnano",
+          [[False, None], [False, "", 0], [False, 0]], [o["senzaCassetta"], o["nostr"], o["daMiniApp"]])
+    prova("un'impronta che non e' il principale: il server dice no", [False, None], o["nonPrincipale"])
+    print("  -- la seconda cassetta, verso la chiave Nostr d'accesso --")
+    prova("senza chiave Nostr collegata la Mini App non consegna", [False, 0], o["nSenza"])
+    prova("LA MINI APP consegna verso la chiave d'accesso: busta con l'impronta, niente in chiaro",
+          [True, True, True, False, "nostr"], o["nConsegna"])
+    prova("...una seconda volta, niente da rifare", [True, 0], o["nDoppia"])
+    prova("IL SITO con quella chiave apre la busta, scrive i relay, la fa buttare",
+          [True, True, True, None, "cassetta"], o["nApre"])
+    prova("...con i relay giu' le parole restano qui e la busta aspetta", [True, True, True], o["nRelayGiu"])
+    prova("un firmatario di un'altra chiave, o parole diverse qui: niente si tocca",
+          [["", ""], ["", True, True]], [o["nAltraChiave"], o["nDiverseQui"]])
+    prova("silenzioso senza nsec salvata il firmatario non si sveglia; con la nsec apre",
+          [["", 0, ""], [True, True]], [o["nSilenzioso"], o["nSilenziosoNsec"]])
+    prova("nessuna busta: una GET e nessun firmatario", ["", 1, 0], o["nLeggera"])
+    prova("un account Nostr nativo non usa la seconda cassetta", ["", False, 0], o["nNativo"])
+    prova("NESSUNA FUGA nei log: ne' le parole ne' la chiave della cassetta", False, o["diario"])
 
 def prove_banco_chiavi_onchain():
     """IL BANCO DELLE CHIAVI ON-CHAIN (16 ott 2026, cantiere
@@ -169683,6 +169945,11 @@ const walletUnicoRegistra = async (imp, sost) => {
 const BOT_TG = 'ilbarattolobot', API_BASE = '/api';
 const authHdr = () => 'x';
 let CASE_DETTE = [];
+/* (19 nov 2026, cassetta-telegram) la consegna dal sito: si contano */
+let CONSEGNE = [];
+const cassettaConsegna = async (p, imp) => { CONSEGNE.push(imp); return true; };
+let NCONSEGNE = [];
+const cassettaConsegnaNostr = async (p, imp) => { NCONSEGNE.push(imp); return true; };
 const fetch = async (u, o) => { const c = JSON.parse(o.body); CASE_DETTE.push([u, c.impronta, c.casa]);
   const k = (SERVER.case || []).concat(SERVER.impronta === c.impronta ? [c.casa] : []);
   if (SERVER.impronta === c.impronta) SERVER.case = k;
@@ -169691,7 +169958,7 @@ const fetch = async (u, o) => { const c = JSON.parse(o.body); CASE_DETTE.push([u
 const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = false; NUVOLA = {}; NUVOLA_ROTTA = false; TG = false; SICURO = [];
   NSEC = false; RELAY_OK = false; TOAST = []; RELAY_SCRITTI = 0; walletRondaFatta = false; walletRondaAvvisata = false;
   RELAY_TARDI = 0; VELO = []; TESTO_VELO = {}; ONCHAIN_FIRMATARIO_MS = 60000; ONCHAIN_COPIA_DOPO_MS = 6000;
-  CASE_DETTE = []; walletUnicoStato = null; };
+  CASE_DETTE = []; walletUnicoStato = null; CONSEGNE = []; NCONSEGNE = []; myTgId = 5; };
 (async () => {
   const out = {};
   const iA = await onchainImpronta(A), iC = await onchainImpronta(C);
@@ -169812,6 +170079,25 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
               frase(false, ['relay']).includes('copia cifrata sui relay Nostr'),
               frase(false, []).startsWith('le trovi sul dispositivo dove è nato'),
               frase(true, ['nuvola']).startsWith('le trovi sul dispositivo dove è nato')];
+  /* 11) (cassetta-telegram) la ronda del sito consegna nella cassetta; se la
+         Mini App le ha gia' messe nel cloud il server lo sa e basta quello */
+  pulito(); LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); out.consegnaSito = CONSEGNE;
+  pulito(); LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: ['nuvola']};
+  await walletBackupRonda(); out.consegnaGiaNelCloud = [CONSEGNE.length, !!walletCopieLette(iA).nuvola, TOAST.includes('pillola')];
+  pulito(); TG = true; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); out.consegnaMiniApp = CONSEGNE.length;
+  pulito(); myTgId = -3; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); out.consegnaNostr = CONSEGNE.length;
+  pulito(); LS.seme = C; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); out.consegnaNonPrincipale = CONSEGNE.length;
+  /* 12) (cassetta-telegram) ...e verso la chiave Nostr d'accesso, finche' i relay non le hanno */
+  pulito(); TG = true; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); out.nostrMiniApp = NCONSEGNE;
+  pulito(); TG = true; LS.seme = A; SERVER = {impronta: iA, prossimo: 0, case: ['relay']};
+  await walletBackupRonda(); out.nostrGiaSuiRelay = NCONSEGNE.length;
+  pulito(); TG = true; LS.seme = C; SERVER = {impronta: iA, prossimo: 0, case: []};
+  await walletBackupRonda(); out.nostrNonPrincipale = NCONSEGNE.length;
   TG = false; walletUnicoStato = {impronta: iA, case: ['nuvola']};
   out.doveRiquadro = walletUnicoBlocco({stato: 'altrove', principale: iA}).includes('stanno nel cloud di Telegram');
   console.log(JSON.stringify(out));
@@ -169841,6 +170127,15 @@ const pulito = () => { LS = {}; SERVER = {impronta: '', prossimo: 0}; MUTO = fal
               "fuori con la nuvola Telegram, i relay, la frase di sempre",
               [True, True, True, True, True], r.get("dove"))
         prova("(parole-casa) ...e il riquadro «altrove» del Profilo la usa", True, r.get("doveRiquadro"))
+        prova("(cassetta-telegram) la ronda del sito consegna le parole del principale nella cassetta",
+              [r.get("iA")], r.get("consegnaSito"))
+        prova("(cassetta-telegram) ...se la Mini App le ha gia' nel cloud non consegna, segna la copia e niente avviso",
+              [0, True, False], r.get("consegnaGiaNelCloud"))
+        prova("(cassetta-telegram) ...e non consegna dalla Mini App, da un account Nostr, ne' parole non principali",
+              [0, 0, 0], [r.get("consegnaMiniApp"), r.get("consegnaNostr"), r.get("consegnaNonPrincipale")])
+        prova("(cassetta-telegram) la ronda della Mini App consegna verso la chiave Nostr d'accesso; "
+              "non se i relay le hanno gia', ne' parole non principali",
+              [[r.get("iA")], 0, 0], [r.get("nostrMiniApp"), r.get("nostrGiaSuiRelay"), r.get("nostrNonPrincipale")])
         g = r.get("giuste") or []
         prova("(wallet-unico) incollare: storte e sbagliate non toccano niente; le "
               "giuste (maiuscole e spazi a caso) entrano, quelle di prima restano "
@@ -215587,7 +215882,7 @@ CATEGORIE = {
     """.split(),
     "onchain": """
     cancello_onchain banco_chiavi_onchain indirizzo_ordine_onchain
-    ordine_onchain ripristino_visibile chiave_che_nasce_da_sola
+    ordine_onchain ripristino_visibile chiave_che_nasce_da_sola cassetta_telegram
     checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
     onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto onchain_consigliato payjoin
@@ -216519,6 +216814,7 @@ def main():
     prove_onchain_tetto,
     prove_onchain_consigliato,
     prove_chiave_che_nasce_da_sola,
+    prove_cassetta_telegram,
     prove_checksum_descrittore,
     prove_leva_rgb,
     prove_annuncio_identita,

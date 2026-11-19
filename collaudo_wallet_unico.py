@@ -172,6 +172,88 @@ def main():
                  "casa": "nuvola"}).status_code in (401, 403))
     prova("su un account senza wallet: 409", 409, casa("73c5da0a", "nuvola", ALTRO).status_code)
 
+    print("\n[5c. la cassetta della Mini App: il server tiene solo una busta chiusa (19 nov 2026, cassetta-telegram)]")
+    P1, P2, DA = "a" * 64, "b" * 64, "c" * 64
+    BUSTA = "QWxhZGRpbjpvcGVuIHNlc2FtZQ" * 3
+    cas = lambda tg=ALAN: c.get("/api/wallet/cassetta", headers=h(tg)).json()
+    chiave = lambda pub, tg=ALAN: c.post("/api/wallet/cassetta", headers=h(tg), json={"pub": pub})
+    consegna = lambda imp="73c5da0a", da=DA, busta=BUSTA, tg=ALAN, verso=None: c.post(
+        "/api/wallet/cassetta/consegna", headers=h(tg),
+        json=dict({"da": da, "busta": busta, "impronta": imp}, **({"verso": verso} if verso else {})))
+    prova("all'inizio non c'e' cassetta", {"pub": "", "consegna": None,
+                                           "nostr": {"pub": "", "consegna": None}}, cas())
+    prova("senza identita' non si legge", True, c.get("/api/wallet/cassetta").status_code in (401, 403))
+    prova("il sito consegna prima che la cassetta esista: 409 «nessuna»", (409, "nessuna"),
+          (consegna().status_code, consegna().json().get("motivo")))
+    # LA PORTA: la pubblica la dice solo la Mini App, mai una sessione del sito
+    sito = TestClient(SRV.app)
+    sito.cookies.set("barattolo_sessione", SRV.crea_sessione(ALAN))
+    prova("col solo cookie del sito la pubblica NON si mette: 403", 403,
+          sito.post("/api/wallet/cassetta", json={"pub": P1}).status_code)
+    prova("...e non resta scritta", "", cas()["pub"])
+    prova("...un initData finto non declassa al cookie: 401", 401,
+          sito.post("/api/wallet/cassetta", headers={"X-Tg-Init-Data": "query_id=x&hash=y"},
+                    json={"pub": P1}).status_code)
+    r = chiave(P1.upper())
+    prova("dalla Mini App la pubblica si mette (in minuscolo)", (200, True, P1),
+          (r.status_code, r.json().get("nuova"), cas()["pub"]))
+    prova("...la stessa due volte non e' nuova", False, chiave(P1).json().get("nuova"))
+    for pub in ("", "z" * 64, "a" * 63, None, ["a" * 64], 7):
+        prova(f"pubblica {str(pub)[:12]!r}: 400", 400, chiave(pub).status_code)
+    prova("un account senza wallet puo' preparare la cassetta", 200, chiave(P2, ALTRO).status_code)
+    r = consegna("deadbeef")
+    prova("una busta per un'impronta che non e' il principale: 409 «altro»", (409, "altro", None),
+          (r.status_code, r.json().get("motivo"), cas()["consegna"]))
+    prova("...e all'account senza wallet: 409", 409, consegna(tg=ALTRO).status_code)
+    for nome, kw in (("da storto", {"da": "x" * 64}), ("busta corta", {"busta": "QUJD"}),
+                     ("busta non base64", {"busta": "<script>" * 10}), ("busta lunga", {"busta": "A" * 4100}),
+                     ("impronta storta", {"imp": "zz"}), ("busta assente", {"busta": None})):
+        prova(f"consegna con {nome}: 400", 400, consegna(**kw).status_code)
+    r = sito.post("/api/wallet/cassetta/consegna", json={"da": DA, "busta": BUSTA, "impronta": "73C5DA0A"})
+    prova("IL SITO consegna col suo cookie: 200", 200, r.status_code)
+    st = sito.get("/api/wallet/cassetta").json()
+    prova("...la busta e' li', identica, con l'impronta", (P1, DA, BUSTA, "73c5da0a", True),
+          (st["pub"], st["consegna"]["da"], st["consegna"]["busta"], st["consegna"]["impronta"],
+           st["consegna"]["quando"] > 0))
+    prova("...l'altro account non la vede", None, cas(ALTRO)["consegna"])
+    r = c.post("/api/wallet/cassetta/ritirata", headers=h(ALAN), json={"verso": "tg"})
+    prova("la Mini App l'ha ritirata: la busta si butta, la cassetta resta", (200, P1, None),
+          (r.status_code, cas()["pub"], cas()["consegna"]))
+    consegna()
+    chiave(P2)
+    prova("una pubblica NUOVA butta la busta chiusa verso la vecchia", (P2, None),
+          (cas()["pub"], cas()["consegna"]))
+
+    print("\n[5d. la seconda cassetta, verso la chiave Nostr d'accesso]")
+    nb = lambda tg=ALAN: cas(tg)["nostr"]
+    prova("senza npub d'accesso: nessuna pubblica, e la consegna dice «nessuna»", ("", 409, "nessuna"),
+          (nb()["pub"], consegna(verso="nostr").status_code, consegna(verso="nostr").json().get("motivo")))
+    U1, U2 = "1" * 63 + "2", "3" * 63 + "4"
+    con = SRV.db()
+    con.execute("UPDATE utenti SET npub_accesso=? WHERE tg_id=?", (SRV.hex_to_npub(U1), ALAN))
+    con.commit()
+    con.close()
+    prova("con la npub d'accesso la pubblica e' lei, in esadecimale", (U1, None), (nb()["pub"], nb()["consegna"]))
+    prova("un verso sconosciuto: 400", 400, consegna(verso="carta").status_code)
+    prova("...un'impronta che non e' il principale: 409", 409, consegna("deadbeef", verso="nostr").status_code)
+    r = consegna(verso="nostr")
+    prova("LA MINI APP consegna verso Nostr: 200, e la busta e' li'", (200, DA, BUSTA, "73c5da0a"),
+          (r.status_code, nb()["consegna"]["da"], nb()["consegna"]["busta"], nb()["consegna"]["impronta"]))
+    prova("...la busta verso Telegram non si tocca", None, cas()["consegna"])
+    con = SRV.db()
+    con.execute("UPDATE utenti SET npub_accesso=? WHERE tg_id=?", (SRV.hex_to_npub(U2), ALAN))
+    con.commit()
+    con.close()
+    prova("la npub d'accesso cambia: la busta chiusa verso la vecchia non si mostra", (U2, None),
+          (nb()["pub"], nb()["consegna"]))
+    consegna(verso="nostr")
+    r = sito.post("/api/wallet/cassetta/ritirata", json={"verso": "nostr"})
+    prova("il sito l'ha ritirata (i relay ce l'hanno): via", (200, None), (r.status_code, nb()["consegna"]))
+    prova("ritirata con un verso sconosciuto, o senza corpo: 400", [400, 400],
+          [c.post("/api/wallet/cassetta/ritirata", headers=h(ALAN), json={"verso": "x"}).status_code,
+           c.post("/api/wallet/cassetta/ritirata", headers=h(ALAN)).status_code])
+    prova("l'altro account non vede la busta di Alan", {"pub": "", "consegna": None}, nb(ALTRO))
+
     print("\n[6. sostituire il principale non abbassa il pavimento]")
     r = c.post("/api/wallet/unico", headers=h(ALAN, "Alan"),
                json={"impronta": "deadbeef", "sostituisci": True})
@@ -202,10 +284,14 @@ def main():
     print("\n[8. nel database solo quel che si dice]")
     con = SRV.db()
     colonne = [x[1] for x in con.execute("PRAGMA table_info(wallet_unico)")]
+    colonne_cassetta = [x[1] for x in con.execute("PRAGMA table_info(wallet_cassetta)")]
     con.close()
     # (19 nov 2026, parole-casa) `case_copie`: solo nomi di case
     prova("le colonne", ["tg_id", "impronta", "prossimo", "creato",
                          "aggiornato", "case_copie"], colonne)
+    # (19 nov 2026, cassetta-telegram) la pubblica e la busta chiusa: mai parole
+    prova("le colonne della cassetta", ["tg_id", "verso", "pub", "da", "busta", "impronta",
+                                        "consegnata", "aggiornato"], colonne_cassetta)
 
     print(f"\n{PASSATE} passate, {FALLITE} fallite")
     return 1 if FALLITE else 0

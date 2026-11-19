@@ -69795,6 +69795,14 @@ async function walletUnicoControlla(){
       }
     } catch(e){}
   }
+  /* (19 nov 2026, cassetta-telegram) ...e la cassetta, dentro Telegram */
+  if (!parole && st.impronta && cloudTelegram() && typeof walletDallaCassetta === 'function') {
+    try { parole = await walletDallaCassetta(); } catch(e){ parole = ''; }
+  }
+  /* ...e la busta verso Nostr, senza chiedere niente al firmatario */
+  if (!parole && st.impronta && typeof walletDallaBustaNostr === 'function') {
+    try { parole = await walletDallaBustaNostr({silenzioso: true}); } catch(e){ parole = ''; }
+  }
   if (!parole) return {stato: st.impronta ? 'altrove' : 'nessuno', principale: st.impronta};
   const mia = await onchainImpronta(parole);
   if (!st.impronta) {
@@ -69947,6 +69955,20 @@ async function walletBackupRonda(){
       try { if (await onchainSuiRelay(corpo) === true) walletSegnaCopia(imp, 'relay'); } catch(e){}
     }
   }
+  /* (19 nov 2026, cassetta-telegram) dal sito, per un account Telegram: se
+     la Mini App ha gia' messo le parole nel cloud il server lo sa; sennò
+     le parole vanno nella sua cassetta */
+  if (!walletCopieLette(imp).nuvola && !cloudTelegram() && Number(myTgId) > 0) {
+    if (walletCaseLista(st.case).includes('nuvola')) walletSegnaCopia(imp, 'nuvola');
+    else if (typeof cassettaConsegna === 'function') {
+      try { await cassettaConsegna(parole, imp); } catch(e){}
+    }
+  }
+  /* ...e verso la chiave Nostr d'accesso, finche' i relay non le hanno */
+  if (!walletCopieLette(imp).relay && !walletCaseLista(st.case).includes('relay')
+      && typeof cassettaConsegnaNostr === 'function') {
+    try { await cassettaConsegnaNostr(parole, imp); } catch(e){}
+  }
   const dopo = walletCopieLette(imp);
   /* le ricevute che c'erano gia', e che il server non sa (19 nov 2026) */
   for (const casa of ['nuvola', 'relay'])
@@ -69993,13 +70015,19 @@ async function onchainSemeAssicurato(opz){
   /* 2) la cassetta sui relay, per chi ha una chiave Nostr */
   parole = await onchainDaiRelay();
   if (parole) { onchainScriviLocale(parole); onchainNato = 'relay'; return parole; }
+  /* 2b) (19 nov 2026, cassetta-telegram) dentro Telegram: le parole nate
+     sul sito e consegnate nella cassetta */
+  parole = typeof walletDallaCassetta === 'function' ? await walletDallaCassetta() : '';
+  if (parole) return parole;
+  /* 2c) ...e fuori, con la chiave Nostr d'accesso: le parole consegnate
+     dalla Mini App (seconda cassetta, verso Nostr) */
+  parole = typeof walletDallaBustaNostr === 'function' ? await walletDallaBustaNostr() : '';
+  if (parole) return parole;
   /* 3) (wallet-unico) PRIMA DI FARNE NASCERE UNO si chiede al server se
      questo account ne ha gia' uno: se si', non nasce un secondo wallet —
      le sue parole si incollano dal Profilo. Il server muto ferma tutto */
   const st = await walletUnicoLeggi();
   if (st.impronta && !opz.nuovoPrincipale) throw walletAltrove(st.impronta);
-  /* 3b) (19 nov 2026, parole-casa) nasce solo dove le parole hanno una casa */
-  if (!walletNasceQui()) throw walletNasceInTelegram();
   /* 4) nasce adesso, random, qui dentro */
   parole = B.generateMnemonic(B.wordlist, 128);
   if (!B.validateMnemonic(parole, B.wordlist)) {
@@ -70025,6 +70053,14 @@ async function onchainMettiAlSicuro(parole){
   catch(e){ onchainCase.nuvola = false; }
   try { onchainCase.relay = await onchainSuiRelayAtteso(corpo); }
   catch(e){ onchainCase.relay = false; }
+  /* (19 nov 2026, cassetta-telegram) dal sito: nella cassetta della Mini App */
+  if (typeof cassettaConsegna === 'function' && !cloudTelegram() && Number(myTgId) > 0) {
+    try { onchainCase.cassetta = await cassettaConsegna(parole); } catch(e){ onchainCase.cassetta = false; }
+  }
+  /* ...e se i relay non li ha scritti nessuno: la busta verso la chiave Nostr d'accesso */
+  if (typeof cassettaConsegnaNostr === 'function' && onchainCase.relay !== true) {
+    try { onchainCase.cassettaNostr = await cassettaConsegnaNostr(parole); } catch(e){ onchainCase.cassettaNostr = false; }
+  }
   /* (wallet-unico) la ricevuta delle copie riuscite: la ronda e l'avviso
      del Profilo la leggono */
   try {
@@ -70605,33 +70641,177 @@ function walletDoveStanno(){
   const relay = k.includes('relay')
     ? ' Ce n\'è anche una copia cifrata sui relay Nostr: «👁 Mostra le 12 parole» la riprende da sola, se entri con la tua chiave Nostr.' : '';
   if (cloudTelegram() && !k.includes('nuvola'))
-    return 'non sono nel cloud di Telegram, sono rimaste nel browser dove il wallet è nato (Barattolo dal sito): aprile là, '
-      + 'Profilo → «On-chain» → «Mostra le 12 parole», e incollale qui una volta. Da qui la copia va nel cloud di Telegram '
-      + 'e non te le chiediamo più.' + relay;
+    return 'non sono ancora nel cloud di Telegram, sono rimaste nel browser dove il wallet è nato (Barattolo dal sito): '
+      + 'riapri Barattolo là e poi torna qui, e arrivano da sole. Oppure leggile là in Profilo → «On-chain» → '
+      + '«Mostra le 12 parole» e incollale qui una volta: da qui la copia va nel cloud di Telegram.' + relay;
   if (!cloudTelegram() && k.includes('nuvola'))
     return 'stanno nel cloud di Telegram: apri Barattolo dentro Telegram (@' + BOT_TG + '), Profilo → «On-chain» → '
       + '«Mostra le 12 parole», e incollale qui.' + relay;
   return 'le trovi sul dispositivo dove è nato, in Profilo → «On-chain» → «Mostra le 12 parole».' + relay;
 }
-/* DOVE PUO' NASCERE IL WALLET (19 nov 2026, cantiere parole-casa; Alan:
-   «ogni profilo genera 12 parole in automatico e le manda sul cloud di
-   telegram o sui relay nostr in base a dove ha fatto il login»). Solo
-   dove le parole hanno una casa che segue l'account: DENTRO TELEGRAM (il
-   cloud) o con un ACCOUNT NOSTR (i relay). Il sito con un account
-   Telegram non ne ha nessuna — il cloud di Telegram si legge e si scrive
-   solo dalla Mini App — e le parole nate li' restavano chiuse in un
-   browser: la Mini App vedeva il wallet e non la chiave (19 nov, la
-   seconda firma di Andrea). Un wallet che c'e' gia' li' si usa e si
-   incolla come prima: qui si ferma solo la NASCITA. */
-function walletNasceQui(){
-  return !!cloudTelegram() || Number(myTgId) < 0;
+/* LA CASSETTA DELLA MINI APP (19 nov 2026, cantiere cassetta-telegram;
+   Andrea: «da entrambi devono nascere»). Il wallet nasce anche dal sito
+   col login Telegram, ma il sito non scrive il cloud di Telegram: le
+   parole restavano chiuse in un browser. Ora la Mini App si fa una
+   CASSETTA — una chiave a caso che vive SOLO nel cloud di Telegram
+   (`barattolo_cassetta`), di cui il server conosce la sola pubblica — e il
+   sito ci chiude dentro le parole (NIP-44, con una chiave usa-e-getta) e
+   lascia la busta sul server. La Mini App la apre da sola alla prima
+   apertura, mette le parole nel cloud e la fa buttare. Barattolo tiene
+   solo una busta che non sa aprire, come i relay Nostr la loro copia:
+   la regola ferrea 2 regge. LA PUBBLICA LA DICE SOLO LA MINI APP (il
+   server la prende solo con l'initData di Telegram): una sessione del
+   sito rubata non puo' mettere la sua chiave al posto di quella vera.
+   Se la Mini App non e' mai stata aperta la cassetta non c'e' ancora, e
+   la consegna parte dalla ronda del sito alla prima apertura dopo. */
+const CASSETTA_CLOUD = 'barattolo_cassetta';
+let cassettaGiro = null;   // una lettura per sessione
+function cassettaApi(percorso, corpo){
+  return fetch(`${API_BASE}/wallet/cassetta${percorso}`, corpo === undefined
+    ? {headers: {'X-Tg-Init-Data': authHdr()}}
+    : {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+       body: JSON.stringify(corpo)})
+    .then(async r => ({ok: r.ok, status: r.status, d: await r.json().catch(() => null)}));
 }
-function walletNasceInTelegram(){
-  const e = new Error('Il tuo wallet on-chain nasce dentro Telegram, dove le 12 parole hanno il loro backup: '
-    + 'apri Barattolo da @' + BOT_TG + ', crealo da lì, e poi per usarlo anche qui incolla le sue 12 parole '
-    + 'in Profilo → «On-chain».');
-  e.tipo = 'telegram';
-  return e;
+/* la chiave della cassetta: dentro Telegram, per un account Telegram.
+   Una casa muta o con dentro qualcosa di storto non si sovrascrive */
+async function cassettaChiaveTg(){
+  if (!cloudTelegram() || !(Number(myTgId) > 0)) return null;
+  const r = await cloudLeggiEsito(CASSETTA_CLOUD);
+  if (!r.ok) return null;
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  let sk = '';
+  try { sk = String(JSON.parse(r.testo || '{}').sk || '').toLowerCase(); } catch(e){ sk = ''; }
+  if (!FORMA_HEX64.test(sk)) {
+    if (r.testo) return null;
+    sk = NT.utils.bytesToHex(NT.generateSecretKey());
+    if (!(await cloudScrivi(CASSETTA_CLOUD, JSON.stringify({sk})))) return null;
+  }
+  return {sk, pub: NT.getPublicKey(NT.utils.hexToBytes(sk))};
+}
+/* MINI APP: la cassetta si registra, e se c'e' una busta la si apre.
+   Torna le parole consegnate (controllate: valide e con la loro impronta), o '' */
+function cassettaRitira(){
+  if (!cassettaGiro) cassettaGiro = (async () => {
+    if (!cloudTelegram() || !(Number(myTgId) > 0)) return '';
+    /* PRIMA LA DOMANDA LEGGERA: con la cassetta gia' registrata e nessuna
+       busta, l'apertura costa una GET e basta (niente librerie) */
+    const st = await cassettaApi('');
+    if (!st.ok || !st.d) return '';
+    if (st.d.pub && !st.d.consegna) return '';
+    const k = await cassettaChiaveTg();
+    if (!k) return '';
+    if (st.d.pub !== k.pub) { await cassettaApi('', {pub: k.pub}); return ''; }
+    const c = st.d.consegna;
+    if (!c || !FORMA_HEX64.test(String(c.da || ''))) return '';
+    const NT = window.NostrTools;
+    let parole = '';
+    try {
+      const conv = NT.nip44.getConversationKey(NT.utils.hexToBytes(k.sk), c.da);
+      parole = String(JSON.parse(NT.nip44.decrypt(c.busta, conv)).parole || '').trim();
+    } catch(e){ return ''; }
+    const B = await caricaBitcoin();
+    if (!B.validateMnemonic(parole, B.wordlist) || await onchainImpronta(parole) !== c.impronta) return '';
+    return parole;
+  })().catch(() => '');
+  return cassettaGiro;
+}
+/* MINI APP: le parole della cassetta diventano quelle di qui e del cloud.
+   Mai sopra parole diverse (qui o nel cloud): li' decide il Profilo. La
+   busta si butta solo quando la copia del cloud c'e' */
+async function walletDallaCassetta(){
+  const parole = await cassettaRitira();
+  if (!parole) return '';
+  const qui = onchainSemeLocale();
+  if (qui && qui !== parole) return '';
+  const r = await cloudLeggiEsito(ONCHAIN_CLOUD);
+  if (!r.ok) return '';
+  let nel = '';
+  try { nel = String(JSON.parse(r.testo || '{}').parole || '').trim(); } catch(e){ nel = ''; }
+  if (nel && nel !== parole) return '';
+  if (!qui && !onchainScriviLocale(parole)) return '';
+  onchainNato = onchainNato || 'cassetta';
+  if (nel !== parole) await onchainMettiAlSicuro(parole);
+  if (nel === parole || onchainCase.nuvola === true) {
+    walletSegnaCopia(await onchainImpronta(parole), 'nuvola');
+    cassettaApi('/ritirata', {verso: 'tg'}).catch(() => {});
+  }
+  return parole;
+}
+/* SITO, account Telegram: le parole nella cassetta della Mini App. true se
+   la busta e' sul server (o c'era gia' per queste parole) */
+async function cassettaConsegna(parole, imp){
+  if (cloudTelegram() || !(Number(myTgId) > 0) || !parole) return false;
+  imp = imp || await onchainImpronta(parole);
+  const st = await cassettaApi('');
+  if (!st.ok || !st.d || !FORMA_HEX64.test(String(st.d.pub || ''))) return false;
+  if (st.d.consegna && st.d.consegna.impronta === imp) return true;
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const usa = NT.generateSecretKey();
+  const busta = NT.nip44.encrypt(JSON.stringify({parole}), NT.nip44.getConversationKey(usa, st.d.pub));
+  const r = await cassettaApi('/consegna', {da: NT.getPublicKey(usa), busta, impronta: imp});
+  return !!r.ok;
+}
+/* LA SECONDA CASSETTA, VERSO NOSTR (stesso giorno, Andrea: «se fa il
+   login anche sul sito ed entra con Nostr [...] non viene generata una
+   nuova chiave, ma deve prima recuperarla dalla mini app di Telegram»).
+   Un account con Telegram e Nostr collegati ha gia' la sua pubblica: la
+   chiave Nostr d'accesso. Chi ha le parole e non riesce a scriverle sui
+   relay (la Mini App, di solito: li' il firmatario Nostr non c'e') le
+   chiude verso di lei e lascia la busta; il sito entrato con quella
+   chiave la apre col firmatario, scrive la copia sui relay e la fa
+   buttare. Da li' in poi ogni login Nostr le ritrova sui relay. */
+async function cassettaConsegnaNostr(parole, imp){
+  if (!(Number(myTgId) > 0) || !myNpubAccesso || !parole) return false;
+  imp = imp || await onchainImpronta(parole);
+  const st = await cassettaApi('');
+  const n = st.ok && st.d && st.d.nostr;
+  if (!n || !FORMA_HEX64.test(String(n.pub || ''))) return false;
+  if (n.consegna && n.consegna.impronta === imp) return true;
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  const usa = NT.generateSecretKey();
+  const busta = NT.nip44.encrypt(JSON.stringify({parole}), NT.nip44.getConversationKey(usa, n.pub));
+  const r = await cassettaApi('/consegna', {verso: 'nostr', da: NT.getPublicKey(usa), busta, impronta: imp});
+  return !!r.ok;
+}
+/* IL SITO (o dove c'e' il firmatario della chiave d'accesso): apre la
+   busta verso Nostr. `silenzioso`: solo con la nsec salvata qui, che non
+   chiede niente a nessuno (un bunker o un'estensione chiederebbero l'ok
+   a ogni apertura). Mai sopra parole diverse; la busta si butta solo
+   quando la copia sui relay c'e'. Torna le parole, o '' */
+async function walletDallaBustaNostr(opz){
+  opz = opz || {};
+  if (!(Number(myTgId) > 0) || !myNpubAccesso || typeof firmatarioCifranteP2P !== 'function') return '';
+  const st = await cassettaApi('');
+  const n = st.ok && st.d && st.d.nostr;
+  const c = n && n.consegna;
+  if (!c || !FORMA_HEX64.test(String(c.da || '')) || !FORMA_HEX64.test(String(n.pub || ''))) return '';
+  if (opz.silenzioso) {
+    let nsec = null;
+    try { nsec = typeof firmatarioNsecSalvata === 'function' ? await firmatarioNsecSalvata() : null; } catch(e){ nsec = null; }
+    if (!nsec) return '';
+    try { if (typeof nsec.chiudi === 'function') nsec.chiudi(); } catch(e){}
+  }
+  const auto = await firmatarioCifranteP2P();
+  if (!auto) return '';
+  let parole = '';
+  try {
+    if (String(await auto.f.pubkey() || '').toLowerCase() !== n.pub) return '';
+    parole = String(JSON.parse(await auto.f.decifra44(c.da, c.busta) || '{}').parole || '').trim();
+  } catch(e){ return ''; }
+  finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
+  const B = await caricaBitcoin();
+  if (!B.validateMnemonic(parole, B.wordlist) || await onchainImpronta(parole) !== c.impronta) return '';
+  const qui = onchainSemeLocale();
+  if (qui && qui !== parole) return '';
+  if (!qui && !onchainScriviLocale(parole)) return '';
+  onchainNato = onchainNato || 'cassetta';
+  await onchainMettiAlSicuro(parole);
+  if (onchainCase.relay === true) cassettaApi('/ritirata', {verso: 'nostr'}).catch(() => {});
+  return parole;
 }
 /* IL NUMERO DI UN CAMBIO, dal pavimento del server: le stesse parole su
    due dispositivi non danno mai la stessa chiave a due cambi. `minimo` e'
@@ -71389,7 +71569,7 @@ function walletBloccoBackup(c){
     <div class="hint">Le 12 parole stanno solo su questo dispositivo: se lo perdi,
       perdi il wallet. ${puo
       ? `Tocca «Salva il backup»: la copia va ${dove}${c.nostr ? ' (il tuo firmatario Nostr può chiederti di approvare)' : ''}.`
-      : 'Qui non si può fare una copia da sola: apri Barattolo dentro Telegram e incolla lì le 12 parole (Profilo → «On-chain»): da lì la copia va nel cloud di Telegram. Oppure scrivile su carta con «👁 Mostra le 12 parole».'}</div>
+      : 'Qui non si può fare una copia da sola: apri Barattolo dentro Telegram (@' + BOT_TG + ') una volta, poi torna qui: le parole ci arrivano da sole, chiuse (Barattolo non le legge), e finiscono nel cloud di Telegram. Oppure scrivile su carta con «👁 Mostra le 12 parole».'}</div>
     ${puo ? '<button class="btn orange" onclick="walletSalvaBackup(this)">Salva il backup</button>' : ''}
     <button class="btn link" onclick="walletParoleSuCarta()">Le ho scritte su carta</button></div>`;
 }
@@ -118694,6 +118874,10 @@ async function avvia(){
     /* ...e il seme unico dopo un'unione di account (5 nov 2026): prima
        della ronda del backup, che cosi' copre le parole gia' spostate */
     setTimeout(() => { walletUnioneRonda().catch(() => {}); }, 5000);
+    /* (19 nov 2026, cassetta-telegram) dentro Telegram la cassetta si
+       prepara, e le parole nate sul sito arrivano: prima della ronda */
+    if (cloudTelegram() && Number(myTgId) > 0) setTimeout(() => { walletDallaCassetta().catch(() => {}); }, 5500);
+    else if (Number(myTgId) > 0 && myNpubAccesso && !onchainSemeLocale()) setTimeout(() => { walletDallaBustaNostr({silenzioso: true}).catch(() => {}); }, 5500);
     setTimeout(() => { walletBackupRonda().catch(() => {}); }, 6000);
     allineaContoP2P();   // il P2P sul dispositivo si lega a QUESTO conto (vedi «IL CONTO SUL DISPOSITIVO»)
     aggiornaAdmDot(me.in_revisione || 0);   // il pallino dei moderatori

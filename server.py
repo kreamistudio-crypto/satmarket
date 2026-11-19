@@ -3157,6 +3157,7 @@ FRENI = {
     # un numero si prenota a ogni cambio
     "wallet_unico": (20, 3600),       # registrare l'impronta del wallet, per persona
     "wallet_casa": (20, 3600),        # dire dove sta una copia delle parole (19 nov 2026)
+    "wallet_cassetta": (30, 3600),    # la cassetta della Mini App: chiave, busta, ritiro (19 nov 2026)
     "wallet_numero": (120, 3600),     # il numero di un cambio, per persona
     "onchain_indirizzo": (20, 3600),  # un indirizzo di prova fra due ammessi, per persona
     # la tappa 3 (23 ott 2026): il «controlla adesso» chiede a mempool,
@@ -124473,6 +124474,192 @@ def _wallet_casa(tg_id: int, impronta: str, casa: str, adesso: int):
         con.close()
 
 
+# LA CASSETTA DELLA MINI APP (19 nov 2026, cantiere cassetta-telegram;
+# Andrea: «da entrambi devono nascere»). Il wallet on-chain nasce anche dal
+# sito col login Telegram, che non scrive il cloud di Telegram. La Mini App
+# tiene nel cloud una chiave a caso e qui dice la sola PUBBLICA; il sito
+# chiude le 12 parole verso quella pubblica (NIP-44, con una chiave
+# usa-e-getta: `da`) e lascia qui la BUSTA; la Mini App la apre, mette le
+# parole nel cloud e la fa buttare. Il server tiene una busta che non sa
+# aprire, come un relay la sua copia: la regola ferrea 2 regge.
+# LA PUBBLICA LA DICE SOLO LA MINI APP: con l'initData di Telegram e per il
+# conto Telegram stesso, mai col cookie del sito — una sessione rubata non
+# puo' mettere la sua chiave al posto di quella vera e farsi consegnare le
+# parole. Una pubblica nuova butta la busta chiusa verso la vecchia.
+# La busta vale solo per il wallet REGISTRATO (`wallet_unico`).
+# LA SECONDA CASSETTA, VERSO NOSTR (stesso giorno, Andrea: «se fa il login
+# anche sul sito ed entra con Nostr [...] non viene generata una nuova
+# chiave, ma deve prima recuperarla dalla mini app di Telegram»). Per un
+# account con Telegram e Nostr collegati la pubblica c'e' gia': e' la
+# `npub_accesso`, che solo un login firmato scrive. La Mini App chiude le
+# parole verso di lei; il sito entrato con quella chiave Nostr apre la busta
+# col suo firmatario, scrive la copia sui relay e la fa buttare. Una busta
+# chiusa verso una npub che non e' piu' quella d'accesso non si mostra.
+_WALLET_CASSETTA_BUSTA = re.compile(r"^[A-Za-z0-9+/]{40,4000}={0,2}$")
+_WALLET_CASSETTA_CHIAVE = re.compile(r"^[0-9a-f]{64}$")
+_WALLET_CASSETTA_VERSI = ("tg", "nostr")
+
+
+def _wallet_cassetta_db():
+    con = _wallet_db()
+    con.execute("""CREATE TABLE IF NOT EXISTS wallet_cassetta(
+        tg_id INTEGER NOT NULL,
+        verso TEXT NOT NULL DEFAULT 'tg',
+        pub TEXT DEFAULT '',
+        da TEXT DEFAULT '',
+        busta TEXT DEFAULT '',
+        impronta TEXT DEFAULT '',
+        consegnata INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0,
+        PRIMARY KEY(tg_id, verso))""")
+    return con
+
+
+def _wallet_cassetta_npub_hex(con, tg_id: int) -> str:
+    """La pubblica della cassetta verso Nostr: la `npub_accesso` del conto
+    Telegram, in esadecimale. '' se non c'e' (o non si legge)."""
+    if int(tg_id) <= 0:
+        return ""
+    r = con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=?", (int(tg_id),)).fetchone()
+    try:
+        return _npub_in_hex(r["npub_accesso"]) if r and r["npub_accesso"] else ""
+    except ValueError:
+        return ""
+
+
+def _wallet_cassetta_stato(con, tg_id: int) -> dict:
+    righe = {r["verso"]: r for r in con.execute(
+        "SELECT * FROM wallet_cassetta WHERE tg_id=?", (int(tg_id),))}
+
+    def busta(r, pub):
+        if not r or not r["busta"] or r["pub"] != pub:
+            return None
+        return {"da": r["da"], "busta": r["busta"], "impronta": r["impronta"],
+                "quando": int(r["consegnata"] or 0)}
+    tg = righe.get("tg")
+    pub_tg = tg["pub"] if tg else ""
+    pub_n = _wallet_cassetta_npub_hex(con, tg_id)
+    return {"pub": pub_tg, "consegna": busta(tg, pub_tg),
+            "nostr": {"pub": pub_n, "consegna": busta(righe.get("nostr"), pub_n) if pub_n else None}}
+
+
+def _wallet_cassetta_verso(d) -> str:
+    v = d.get("verso", "tg") if isinstance(d, dict) else "tg"
+    if v not in _WALLET_CASSETTA_VERSI:
+        raise HTTPException(400, "Richiesta non valida")
+    return v
+
+
+@app.get("/api/wallet/cassetta")
+async def wallet_cassetta_leggi(x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """Le pubbliche delle due cassette e le buste che aspettano, se ci sono."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = _wallet_cassetta_db()
+    try:
+        return _wallet_cassetta_stato(con, user["id"])
+    finally:
+        con.close()
+
+
+@app.post("/api/wallet/cassetta")
+async def wallet_cassetta_chiave(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """LA MINI APP dice la pubblica della sua cassetta. Il giudice e'
+    `_wallet_cassetta_chiave`; qui la porta: solo con l'initData di Telegram."""
+    if not x_tg_init_data:
+        raise HTTPException(403, "La cassetta si prepara solo dalla Mini App di Telegram")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_cassetta", user["id"])
+    d = await leggi_json(req)
+    async with _lucchetto_wallet:
+        return _wallet_cassetta_chiave(int(user["id"]), d.get("pub"), int(time.time()))
+
+
+def _wallet_cassetta_chiave(tg_id: int, pub, adesso: int):
+    pub = pub.strip().lower() if isinstance(pub, str) else ""
+    if tg_id <= 0:
+        raise HTTPException(403, "La cassetta è dei conti Telegram")
+    if not _WALLET_CASSETTA_CHIAVE.match(pub):
+        raise HTTPException(400, "Chiave non valida")
+    con = _wallet_cassetta_db()
+    try:
+        if _wallet_cassetta_stato(con, tg_id)["pub"] == pub:
+            return {"ok": True, "nuova": False}
+        # una pubblica nuova: la busta chiusa verso la vecchia non si apre piu'
+        con.execute("INSERT INTO wallet_cassetta(tg_id, verso, pub, aggiornato) VALUES(?,'tg',?,?) "
+                    "ON CONFLICT(tg_id, verso) DO UPDATE SET pub=excluded.pub, da='', busta='', "
+                    "impronta='', consegnata=0, aggiornato=excluded.aggiornato",
+                    (tg_id, pub, adesso))
+        con.commit()
+        return {"ok": True, "nuova": True}
+    finally:
+        con.close()
+
+
+@app.post("/api/wallet/cassetta/consegna")
+async def wallet_cassetta_consegna(req: Request, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """Chi ha le parole lascia la busta chiusa: il sito verso la Mini App
+    (`verso` "tg"), o la Mini App verso la chiave Nostr d'accesso ("nostr").
+    Il giudice e' `_wallet_cassetta_consegna`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_cassetta", user["id"])
+    d = await leggi_json(req)
+    verso = _wallet_cassetta_verso(d)
+    async with _lucchetto_wallet:
+        return _wallet_cassetta_consegna(int(user["id"]), d.get("da"), d.get("busta"),
+                                  d.get("impronta"), int(time.time()), verso)
+
+
+def _wallet_cassetta_consegna(tg_id: int, da, busta, impronta, adesso: int, verso: str = "tg"):
+    da = da.strip().lower() if isinstance(da, str) else ""
+    busta = busta.strip() if isinstance(busta, str) else ""
+    impronta = impronta.strip().lower() if isinstance(impronta, str) else ""
+    if (verso not in _WALLET_CASSETTA_VERSI or not _WALLET_CASSETTA_CHIAVE.match(da)
+            or not _WALLET_CASSETTA_BUSTA.match(busta) or not _WALLET_IMPRONTA_FORMA.match(impronta)):
+        raise HTTPException(400, "Richiesta non valida")
+    con = _wallet_cassetta_db()
+    try:
+        st = _wallet_cassetta_stato(con, tg_id)
+        pub = st["pub"] if verso == "tg" else st["nostr"]["pub"]
+        if not pub:
+            return JSONResponse(status_code=409, content={"ok": False, "motivo": "nessuna"})
+        if _wallet_riga(con, tg_id)["impronta"] != impronta:
+            return JSONResponse(status_code=409, content={"ok": False, "motivo": "altro"})
+        # la busta ricorda verso QUALE pubblica e' chiusa: se la pubblica
+        # cambia, `_wallet_cassetta_stato` non la mostra piu'
+        con.execute("INSERT INTO wallet_cassetta(tg_id, verso, pub, da, busta, impronta, "
+                    "consegnata, aggiornato) VALUES(?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(tg_id, verso) DO UPDATE SET pub=excluded.pub, da=excluded.da, "
+                    "busta=excluded.busta, impronta=excluded.impronta, "
+                    "consegnata=excluded.consegnata, aggiornato=excluded.aggiornato",
+                    (tg_id, verso, pub, da, busta, impronta, adesso, adesso))
+        con.commit()
+        return {"ok": True}
+    finally:
+        con.close()
+
+
+@app.post("/api/wallet/cassetta/ritirata")
+async def wallet_cassetta_ritirata(req: Request, x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """Le parole sono arrivate nella loro casa (il cloud, o i relay): la
+    busta si butta."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    _frena("wallet_cassetta", user["id"])
+    verso = _wallet_cassetta_verso(await leggi_json(req))
+    con = _wallet_cassetta_db()
+    try:
+        con.execute("UPDATE wallet_cassetta SET da='', busta='', impronta='', consegnata=0, "
+                    "aggiornato=? WHERE tg_id=? AND verso=?",
+                    (int(time.time()), int(user["id"]), verso))
+        con.commit()
+        return {"ok": True}
+    finally:
+        con.close()
+
+
 @app.post("/api/wallet/unico/numero")
 async def wallet_unico_numero(req: Request, x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
@@ -124929,6 +125116,8 @@ CANCELLA_TOGLI = (
     # nominava: l'impronta del wallet, la preferenza dello swap e il
     # registro delle unioni coi semi (npub e xpub dei conti fusi)
     ("wallet_unico", "tg_id"), ("swap_auto_preferenze", "tg_id"),
+    # (19 nov 2026) la cassetta della Mini App: la pubblica e la busta chiusa
+    ("wallet_cassetta", "tg_id"),
     ("unioni_semi", "tg_id"), ("unioni_semi", "da_id"),
     ("unioni_registro", "tg_id"), ("unioni_registro", "da_id"),
     # la serie dei giorni 🔥 (17 nov 2026): era sua, se ne va con lui

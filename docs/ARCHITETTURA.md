@@ -35769,11 +35769,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `swapParoleDi` guarda per primo.
   DOVE NASCE E DOVE STA (19 nov 2026, cantiere parole-casa; perché in
   CANTIERI, «Il wallet on-chain nasce solo dove le parole hanno casa»).
-  `walletNasceQui()` (dentro Telegram, `cloudTelegram()`, o account Nostr,
-  `myTgId < 0`) ferma la NASCITA in `onchainSemeAssicurato` dopo la
-  domanda al server e prima di `generateMnemonic`, anche con
-  `nuovoPrincipale`: dal sito un account Telegram riceve
-  `walletNasceInTelegram()` (`tipo: 'telegram'`). Il server tiene il NOME
+  Il cancello della nascita (`walletNasceQui`) è stato TOLTO lo stesso
+  giorno (cantiere cassetta-telegram, Andrea: «da entrambi devono
+  nascere»): il wallet nasce ovunque, e le parole arrivano alla loro casa
+  con LE CASSETTE (sotto). Il server tiene il NOME
   delle case dove una copia è riuscita, colonna `case_copie` («nuvola»,
   «relay»), rotta `POST /api/wallet/unico/casa` (`_wallet_casa`: 400 sulla
   forma, 409 se l'impronta non è la registrata; freno `wallet_casa`), la
@@ -35781,6 +35780,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `walletDiciCasa` (da `walletSegnaCopia` e, per le ricevute di prima, da
   `walletBackupRonda`) e `walletDoveStanno()`, la frase di dove riprenderle
   che usano `walletAltrove`, il riquadro «altrove» e il foglio del P2P.
+  LE CASSETTE (19 nov 2026, cantiere cassetta-telegram; perché in
+  CANTIERI, «Il wallet nasce dal sito e dalla Mini App»). Tabella
+  `wallet_cassetta(tg_id, verso, pub, da, busta, impronta, consegnata,
+  aggiornato)`, chiave (tg_id, verso), solo buste NIP-44 che il server non
+  sa aprire. Verso "tg": la Mini App tiene nel cloud di Telegram
+  (`barattolo_cassetta`) una chiave a caso e ne dice la pubblica con
+  `POST /api/wallet/cassetta` (SOLO con l'initData: col cookie 403; conto
+  ≤ 0 403; una pubblica nuova butta la busta). Verso "nostr": la pubblica
+  è la `npub_accesso` del conto, letta dal server (`_wallet_cassetta_npub_hex`);
+  una busta chiusa verso una npub che non è più quella non si mostra.
+  `GET /api/wallet/cassetta` → `{pub, consegna, nostr: {pub, consegna}}`;
+  `POST /api/wallet/cassetta/consegna` (`_wallet_cassetta_consegna`: 400 sulle
+  forme, 409 «nessuna» senza pubblica, 409 «altro» se l'impronta non è il
+  principale di `wallet_unico`); `POST /api/wallet/cassetta/ritirata`
+  `{verso}`. Freno `wallet_cassetta` (30/ora); la cancellazione
+  dell'account la toglie. Nel telefono: `cassettaChiaveTg`,
+  `cassettaRitira` (prima una GET leggera; memo `cassettaGiro`),
+  `walletDallaCassetta` (Mini App; al boot a 5,5 s, in
+  `onchainSemeAssicurato` passo 2b e in `walletUnicoControlla`),
+  `cassettaConsegna` (sito → "tg": da `onchainMettiAlSicuro` e dalla
+  ronda), `cassettaConsegnaNostr` (chi non ha scritto i relay → "nostr":
+  da `onchainMettiAlSicuro` e dalla ronda, finché `case` non dice
+  «relay»), `walletDallaBustaNostr` (col firmatario della chiave d'accesso:
+  passo 2c, e `{silenzioso: true}` — solo con la nsec salvata — al boot
+  del sito e in `walletUnicoControlla`; scrive i relay con
+  `onchainMettiAlSicuro` e butta la busta solo se `onchainCase.relay`).
+  Mai sopra parole diverse, qui o nel cloud. Prove:
+  `prove_cassetta_telegram`; porta del server: `collaudo_wallet_unico`.
   I PASSI (`swapPassi[ordine]`): `preventivo` → `parole` (solo con le
   parole non ancora `copiata`) → `creo`; il passo `indirizzo` non c'è
   più. Il campo dell'indirizzo (`campoIndirizzoSwap`: `#swapIndirizzo_<n>`,

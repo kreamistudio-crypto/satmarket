@@ -760,7 +760,13 @@ leva: nessuna
 pubblico: no
 
 ## 2026-11-19 · parole-casa
-frase: Il wallet on-chain nasce solo dove le sue 12 parole hanno subito un backup: dentro Telegram o entrando con Nostr. E quando Barattolo te le chiede, ti dice da dove riprenderle.
-dove: Profilo → «₿ On-chain». Dal sito col login Telegram, se il wallet non c'è ancora, il messaggio dice di crearlo da @ilbarattolobot; nel foglio «🔑 Serve la chiave del tuo wallet» e nel riquadro «Il tuo wallet è su un altro dispositivo» la frase dice dove stanno le parole (cloud di Telegram, browser del sito, relay Nostr).
+frase: Quando Barattolo ti chiede le 12 parole del wallet on-chain, ti dice da dove riprenderle: cloud di Telegram, browser del sito o relay Nostr.
+dove: Profilo → «₿ On-chain»; nel foglio «🔑 Serve la chiave del tuo wallet» e nel riquadro «Il tuo wallet è su un altro dispositivo» la frase dice dove stanno le parole (cloud di Telegram, browser del sito, relay Nostr).
+leva: nessuna
+pubblico: sì
+
+## 2026-11-19 · cassetta-telegram
+frase: Il wallet on-chain nasce sia dal sito sia dalla Mini App, ed è sempre uno solo. Le 12 parole raggiungono da sole il cloud di Telegram e, se hai Nostr collegato, i relay: Barattolo le porta chiuse e non le può leggere.
+dove: Nato sul sito: apri Barattolo dentro Telegram una volta, poi riapri il sito, poi di nuovo la Mini App: le parole ci sono, senza incollarle. Con Nostr collegato: entra nel sito con la tua chiave Nostr e le parole arrivano anche lì.
 leva: nessuna
 pubblico: sì

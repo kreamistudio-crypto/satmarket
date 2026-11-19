@@ -432,7 +432,7 @@ Oltre a Lightning, alcune funzioni usano i bitcoin «on-chain», cioè sulla ret
 <!-- pezzo libro-044 | libro -->
 ## Libro · Bitcoin on-chain (3/3)
 
-- Dove nasce il wallet on-chain (dal 19 novembre 2026): solo dove le 12 parole hanno subito una copia che segue l'account, cioè dentro Telegram (la Mini App, copia nel cloud di Telegram) o entrando con Nostr (copia cifrata sui relay). Chi entra nel sito col login Telegram non lo fa nascere lì: apre Barattolo dentro Telegram (@ilbarattolobot), lo crea da lì, e sul sito incolla le 12 parole in Profilo → «₿ On-chain». Barattolo sa solo DOVE sta la copia, mai le parole, e quando le chiede dice da dove riprenderle. Chi ha un wallet nato sul sito: lo apre là (Profilo → «₿ On-chain» → «Mostra le 12 parole») e incolla le parole una volta nella Mini App; da lì la copia va nel cloud di Telegram e non vengono più chieste.
+- Dove nasce il wallet on-chain (dal 19 novembre 2026): ovunque, dal sito come dalla Mini App; il wallet resta UNO solo per account (se c'è già, Barattolo non ne fa nascere un secondo). Le 12 parole raggiungono da sole la loro copia: se il wallet nasce sul sito col login Telegram, basta aprire una volta Barattolo dentro Telegram (@ilbarattolobot) e poi di nuovo il sito: le parole arrivano chiuse nella Mini App (Barattolo non le può leggere) e finiscono nel cloud di Telegram. Se l'account ha anche la chiave Nostr collegata, le parole arrivano allo stesso modo al sito quando si entra con quella chiave, e da lì vanno sui relay Nostr: poi ogni login Nostr le ritrova. Barattolo sa solo DOVE sta la copia, mai le parole, e quando le chiede dice da dove riprenderle. Se arrivano parole diverse da quelle già sul dispositivo, non si sovrascrive niente: decide l'utente dal Profilo («₿ On-chain»).
 - Se non hai ancora scelto dove ricevere, la consegna dei bitcoin a te aspetta: l'app ti manda a Profilo → «₿ On-chain» per sceglierlo.
 - La seconda firma: i sats on-chain escono con due firme su tre. Di solito il tuo telefono mette la sua da solo quando apri Barattolo; nell'ordine c'è anche il tasto «✍️ Metti la seconda firma», che mostra l'anello mentre firma e poi dice com'è andata, o perché non ha firmato (per esempio: la tua chiave sta solo sul telefono con cui hai pagato o venduto). Quando i sats sono partiti l'ordine lo dice, con il link «Vedi la transazione», e il tasto sparisce.
 
@@ -2487,7 +2487,15 @@ pubblico: no
 <!-- pezzo novita-121 | novita -->
 ## Novità · 2026-11-19 · parole-casa
 
-frase: Il wallet on-chain nasce solo dove le sue 12 parole hanno subito un backup: dentro Telegram o entrando con Nostr. E quando Barattolo te le chiede, ti dice da dove riprenderle.
-dove: Profilo → «₿ On-chain». Dal sito col login Telegram, se il wallet non c'è ancora, il messaggio dice di crearlo da @ilbarattolobot; nel foglio «🔑 Serve la chiave del tuo wallet» e nel riquadro «Il tuo wallet è su un altro dispositivo» la frase dice dove stanno le parole (cloud di Telegram, browser del sito, relay Nostr).
+frase: Quando Barattolo ti chiede le 12 parole del wallet on-chain, ti dice da dove riprenderle: cloud di Telegram, browser del sito o relay Nostr.
+dove: Profilo → «₿ On-chain»; nel foglio «🔑 Serve la chiave del tuo wallet» e nel riquadro «Il tuo wallet è su un altro dispositivo» la frase dice dove stanno le parole (cloud di Telegram, browser del sito, relay Nostr).
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-122 | novita -->
+## Novità · 2026-11-19 · cassetta-telegram
+
+frase: Il wallet on-chain nasce sia dal sito sia dalla Mini App, ed è sempre uno solo. Le 12 parole raggiungono da sole il cloud di Telegram e, se hai Nostr collegato, i relay: Barattolo le porta chiuse e non le può leggere.
+dove: Nato sul sito: apri Barattolo dentro Telegram una volta, poi riapri il sito, poi di nuovo la Mini App: le parole ci sono, senza incollarle. Con Nostr collegato: entra nel sito con la tua chiave Nostr e le parole arrivano anche lì.
 leva: nessuna
 pubblico: sì
