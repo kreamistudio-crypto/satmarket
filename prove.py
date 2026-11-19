@@ -166281,6 +166281,124 @@ console.log(JSON.stringify(out));
            ".p2p-oc-novita.appeso ~ .p2p-oc-novita.p2p-coin-novita.appeso .p2p-oc-faccia{top:0}" in mini))
 
 
+def prove_novita_45_giorni():
+    """I «NOVITÀ» VIVONO 45 GIORNI (19 nov 2026, cantiere novita-45-giorni,
+    Andrea: «i banner novità, quelle che stanno nel peer-to-peer, dopo 45
+    giorni spariscono. Quindi qualsiasi altro banner novità, fallo sparire
+    in automatico dopo 45 giorni»). Una regola sola, `novitaFresca`, con
+    l'orologio FINTO (mai la data di oggi: una prova che il 31 dicembre
+    diventa rossa da sola non protegge niente): il giorno 44 si', il 45° a
+    mezzanotte no, una chiave sconosciuta gia' vecchia; i tre rettangoli
+    veri (on-chain, stablecoin, ETH e Monero) che spariscono davvero; e la
+    sentinella: ogni «Novità» della pagina passa dalla regola."""
+    print("\n[i «Novità» vivono 45 giorni]")
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    try:
+        regola = pezzo_js(mini, "function novitaFresca(chiave, ora){", "\n}\n") + "\n}\n"
+    except ValueError:
+        prova("la regola `novitaFresca` c'e'", True, False)
+        return
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+    pezzi = "".join(fn(f) for f in (
+        "function novitaUsdtVistaP2P(){", "function novitaUsdeVistaP2P(){",
+        "function novitaStableVistaP2P(){", "function novitaUsdtAppesaP2P(){",
+        "function facciaStableP2P(usdt, usde){", "function novitaUsdtLibroP2P(){",
+        "function novitaCoinVistaP2P(){", "function trioCoinP2P(){",
+        "function novitaCoinLibroP2P(){", "function carteOnchainLibroP2P(k, sotto, senzaCarte){"))
+    banco = regola + """
+const LOG = [];
+const testaAltaP2P = () => LOG.push('testa');
+let DEMO = false, VETRINA = false, myP2POnchain = true, p2pFiltro = null;
+let tutorialOcLato = null, p2pOcTutorialTimer = null, tutorialUsdtLato = null, p2pUsdtTutorialTimer = null;
+let tutorialCoinLato = null, p2pCoinTutorialTimer = null;
+let p2pOnchainLibro = {eventi: []};
+const usdtVistoP2P = () => true, coinVistoP2P = () => true, rigaOnchainP2P = () => '<oc>';
+const P2P_USDT_MONETA = '<t>', P2P_USDT_LOGO_TRIO = '<t>', P2P_OC_MONETA = '<oc-moneta>';
+const P2P_LOGHI_COIN = {eth: '<eth>', xmr: '<xmr>', usde: '<usde>'};
+""" + pezzi + """
+const il = (a, m, g, h, mi) => new Date(a, m - 1, g, h || 0, mi || 0).getTime();
+const VERO = Date.now;
+const a = (t, f) => { Date.now = () => t; try { return f(); } finally { Date.now = VERO; } };
+const out = {};
+out.confini = [
+  novitaFresca('usdt', il(2026, 11, 12)), novitaFresca('usdt', il(2026, 12, 26, 23, 59)),
+  novitaFresca('usdt', il(2026, 12, 27)), novitaFresca('onchain', il(2026, 12, 30, 23, 59)),
+  novitaFresca('onchain', il(2026, 12, 31)), novitaFresca('coin', il(2026, 12, 30, 23, 59)),
+  novitaFresca('coin', il(2026, 12, 31)), novitaFresca('usdt', il(2027, 3, 1))];
+out.sconosciuta = [novitaFresca('nuova', il(2026, 11, 19)), novitaFresca('', il(2026, 11, 19)),
+                   novitaFresca(undefined, il(2026, 11, 19))];
+out.adesso = novitaFresca('usdt') === novitaFresca('usdt', VERO());
+const giro = t => a(t, () => { LOG.length = 0;
+  const oc = carteOnchainLibroP2P('sell', '<U>'), u = novitaUsdtLibroP2P();
+  return [/p2pUsdtNovita/.test(u), /USDT/.test(u) + '|' + /USDe/.test(u),
+          /p2pCoinNovita/.test(novitaCoinLibroP2P()), /p2pOcNovita/.test(oc), oc.indexOf('<U>') >= 0,
+          LOG.filter(x => x === 'testa').length]; });
+out.dic26 = giro(il(2026, 12, 26, 12));
+out.dic28 = giro(il(2026, 12, 28, 12));
+out.gen1 = giro(il(2027, 1, 1, 12));
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30,
+                           env={**os.environ, "TZ": "Europe/Rome"})
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco dei «Novità» a 45 giorni", "node assente")
+        out = False
+    if out is None:
+        prova("il banco dei «Novità» a 45 giorni gira", "", (r.stderr or "")[-600:])
+    elif out:
+        prova("i confini: dal giorno della nascita al 44° si', dal 45° a mezzanotte no "
+              "(USDT nato il 12 nov: fino al 26 dic; on-chain ed ETH/XMR/USDe nati il 16 "
+              "nov: fino al 30 dic), e a marzo niente",
+              [True, True, False, True, False, True, False, False], out["confini"])
+        prova("una chiave che la regola non conosce e' gia' vecchia (chi aggiunge un "
+              "«Novità» senza la sua data lo vede subito spento)", [False] * 3, out["sconosciuta"])
+        prova("senza `ora` la regola legge l'orologio di adesso", True, out["adesso"])
+        prova("il 26 dicembre ci sono tutti e tre (verde con USDe, blu, arancio), e "
+              "ognuno misura la testata",
+              [True, "true|true", True, True, True, 3], out["dic26"])
+        prova("il 28 dicembre gli USDT sono vecchi: il verde resta per USDe soltanto, "
+              "blu e arancio ancora su",
+              [True, "false|true", True, True, True, 3], out["dic28"])
+        prova("dal 31 dicembre nessun «Novità»: niente rettangoli e niente testata alta, "
+              "ma il libro on-chain sotto resta (le card e quel che viaggia con lui)",
+              [False, "false|false", False, False, True, 0], out["gen1"])
+    # LA SENTINELLA: ogni «Novità» scritto nella pagina sta in una funzione
+    # che chiede alla regola, da sola o con una funzione che chiama. Fa
+    # eccezione la faccia unica della pila, che rimonta solo i banner gia'
+    # disegnati (e quindi gia' passati dalla regola).
+    def funzione_di(i):
+        k = mini.rfind("\nfunction ", 0, i) + 1
+        nome = re.match(r"function (\w+)", mini[k:]).group(1)
+        return nome, mini[k:mini.index("\n}\n", k)]
+    def chiede(corpo):
+        if "novitaFresca(" in corpo:
+            return True
+        for chiamata in set(re.findall(r"\b(\w+)\(", corpo)):
+            m = re.search(r"\nfunction " + chiamata + r"\(", mini)
+            if m and "novitaFresca(" in mini[m.start():mini.index("\n}\n", m.start())]:
+                return True
+        return False
+    novita = [m.start() for m in re.finditer(r">Novità<", mini)]
+    sordi = sorted({nome for nome, corpo in map(funzione_di, novita)
+                    if nome != "segnaPilaNovitaP2P" and not chiede(corpo)})
+    prova("la sentinella trova i quattro «Novità» della pagina (tre rettangoli e la "
+          "faccia unica della pila)", True, len(novita) >= 4)
+    prova("...e ognuno chiede alla regola dei 45 giorni", [], sordi)
+    corpo = regola
+    nate = dict(re.findall(r"^\s+(\w+): '([^']*)'", corpo, re.M))
+    chieste = set(re.findall(r"novitaFresca\('(\w+)'\)", mini))
+    prova("ogni chiave chiesta nella pagina ha la sua data, scritta giusta",
+          ([], []), (sorted(chieste - set(nate)),
+                     [k for k, v in nate.items() if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v)]))
+    prova("...e le date sono quelle del giorno in cui la cosa e' arrivata a tutti",
+          {"onchain": "2026-11-16", "usdt": "2026-11-12", "coin": "2026-11-16"}, nate)
+    prova("45 giorni, scritto dentro la funzione (niente const in cima: «before "
+          "initialization»)", True, "const giorni = 45;" in corpo)
+
+
 def prove_p2p_onchain_commissione():
     """LA COMMISSIONE DEL P2P ON-CHAIN, DAL LATO DEL TELEFONO (16 nov 2026,
     cantiere p2p-onchain-commissione, Andrea: «Deve essere uguale, come
@@ -216109,7 +216227,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -217121,6 +217239,7 @@ def main():
     prove_grafica_p2p_onchain,
     prove_novita_usdt_p2p,
     prove_novita_coin_p2p,
+    prove_novita_45_giorni,
     prove_p2p_monete_valute,
     prove_icone_valute_filtro,
     prove_p2p_onchain_commissione,

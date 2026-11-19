@@ -73433,9 +73433,12 @@ function carteOnchainLibroP2P(k, sotto, senzaCarte){
   /* APPESO SEMPRE (12 nov 2026, sera, Andrea: «stessa cosa quando
      accenderemo onchain, quel banner deve stare incollato»): non piu'
      finche' non lo apri, ma sempre, come quello degli USDT */
-  const appeso = !!myP2POnchain;
+  /* ...finche' e' una novita': 45 giorni (vedi «I «NOVITÀ» VIVONO 45
+     GIORNI»); dopo, il libro on-chain resta, il rettangolo no */
+  const fresca = typeof novitaFresca !== 'function' || novitaFresca('onchain');
+  const appeso = !!myP2POnchain && fresca;
   if (appeso) testaAltaP2P();
-  const porta = myP2POnchain
+  const porta = myP2POnchain && fresca
     ? '<div class="p2p-oc-novita' + (appeso ? ' appeso' : '')
       + (tutorialOcLato !== null || p2pOcTutorialTimer ? ' acceso' : '') + '" id="p2pOcNovita">'
       + '<button type="button" class="p2p-oc-faccia" onclick="apriNovitaOnchainP2P()">'
@@ -73461,6 +73464,35 @@ function vistaOrdinamentoOcP2P(o){
           premioOc: o.mercato ? (Number(o.premio) || 0) : null,
           /* in moneta l'importo e' il controvalore in euro (`euroNodo`) */
           creato: Number(o.creato) || 0, euro: Number(o.euroNodo || o.euro) || 0, euroMax: 0};
+}
+
+
+/* ============ I «NOVITÀ» VIVONO 45 GIORNI (19 nov 2026) ============
+   Cantiere novita-45-giorni. Andrea: «i banner novità, quelle che stanno
+   nel peer-to-peer, dopo 45 giorni spariscono. Quindi qualsiasi altro
+   banner novità, fallo sparire in automatico dopo 45 giorni». UNA REGOLA
+   SOLA, non una data per banner sparsa nel codice: ogni «Novità» ha qui il
+   suo giorno di nascita (il giorno in cui la cosa e' arrivata a TUTTI in
+   produzione), e si vede dal giorno 0 al 44; dal 45° a mezzanotte (ora del
+   telefono) non si disegna piu', e col banner se ne va il suo tutorial.
+   Un «Novità» NUOVO aggiunge la sua riga qui e passa da `novitaFresca`:
+   una chiave che qui non c'e' e' gia' vecchia (false), cosi' chi se ne
+   scorda se ne accorge subito, e la sentinella di prove.py
+   (`prove_novita_45_giorni`) boccia un «Novità» che non chiede qui.
+   Date e giorni dentro la funzione, non in un const in cima: niente «before
+   initialization» se un banner si disegna presto (la lezione del 16 nov).
+   `ora` (millisecondi) serve alle prove; senza, e' adesso. */
+function novitaFresca(chiave, ora){
+  const giorni = 45;
+  const nate = {
+    onchain: '2026-11-16',   // P2P on-chain aperto a tutti (16 nov, ONCHAIN_SOLO_ADMIN spenta)
+    usdt: '2026-11-12',      // USDT nel P2P (12 nov)
+    coin: '2026-11-16',      // ETH, Monero e USDe (16 nov)
+  };
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(nate[chiave] || '');
+  if (!d) return false;
+  const fine = new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]) + giorni).getTime();
+  return (ora == null ? Date.now() : Number(ora)) < fine;
 }
 
 
@@ -73678,7 +73710,9 @@ function ridisegnaPrezzoP2P(chi){
 const P2P_USDT_MONETA = '<span class="cambio-moneta usdt p2p-oc-moneta" aria-hidden="true">'
   + '<svg class="cambio-svg" viewBox="4 4 24 24"><path d="M17.922 17.383v-.002c-.11.008-.677.042-1.942.042-1.01 0-1.721-.03-1.971-.042v.003c-3.888-.171-6.79-.848-6.79-1.658 0-.809 2.902-1.486 6.79-1.66v2.644c.254.018.982.061 1.988.061 1.207 0 1.812-.05 1.925-.06v-2.643c3.88.173 6.775.85 6.775 1.658 0 .81-2.895 1.485-6.775 1.657m0-3.59v-2.366h5.414V7.819H8.595v3.608h5.414v2.365c-4.4.202-7.709 1.074-7.709 2.118 0 1.044 3.309 1.915 7.709 2.118v7.582h3.913v-7.584c4.393-.202 7.694-1.073 7.694-2.116 0-1.043-3.301-1.914-7.694-2.117"/></svg></span>';
 function novitaUsdtVistaP2P(){
-  return typeof usdtVistoP2P === 'function' && usdtVistoP2P() && !DEMO && !VETRINA;
+  return typeof usdtVistoP2P === 'function' && usdtVistoP2P() && !DEMO && !VETRINA
+    /* 45 giorni e basta (19 nov 2026, vedi «I «NOVITÀ» VIVONO 45 GIORNI») */
+    && (typeof novitaFresca !== 'function' || novitaFresca('usdt'));
 }
 /* LE STABLECOIN INSIEME (16 nov 2026, cantiere ricevi-mercato, Andrea:
    «mettimi insieme USDT e USDE in un unico banner, dato che sono
@@ -73893,7 +73927,10 @@ function trioCoinP2P(){
     + P2P_LOGHI_COIN.eth + P2P_LOGHI_COIN.xmr + '</span>';
 }
 function novitaCoinVistaP2P(){
-  return typeof coinVistoP2P === 'function' && coinVistoP2P() && !DEMO && !VETRINA;
+  return typeof coinVistoP2P === 'function' && coinVistoP2P() && !DEMO && !VETRINA
+    /* 45 giorni e basta (19 nov 2026, vedi «I «NOVITÀ» VIVONO 45 GIORNI»):
+       USDe e' nato con ETH e Monero, e lo segue (`novitaUsdeVistaP2P`) */
+    && (typeof novitaFresca !== 'function' || novitaFresca('coin'));
 }
 let tutorialCoinLato = null;   // il lato da rimettere alla fine; null = nessun tutorial
 let p2pCoinTutorialTimer = null;
