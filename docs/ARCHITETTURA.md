@@ -1360,6 +1360,17 @@
   6 ott 2026 veste anche il foglio del P2P (`p2pHoldSheet`, garanzia e
   cauzione: `orologioHoldP2P`, l'ora da `scadenzaFoglioP2P`); CANTIERI,
   «Apri nel wallet anche sulle fatture del P2P».
+  IL CONTO DELLA FATTURA RIFATTA (19 nov 2026, cantiere
+  fattura-rifatta-conto): ogni risposta di `nuova_fattura_ordine` con
+  una fattura porta `conto`, da `_conto_fattura_ordine` (pura: le righe
+  FOTOGRAFATE dall'ordine, l'articolo per differenza come
+  `_righe_ordine`, l'accordo nella sua riga; e quanto manca alla
+  spedizione gratis del negozio, con la misura di compra(), solo a casa,
+  in euro col cambio di adesso e muta senza). La regola del negozio e
+  il cambio li legge `_conto_fattura_letto`, PRIMA del conio. Nel
+  client `contoFattura` la rende con `contoScomposto` più le righe
+  della spedizione regalata e dell'invito; «Paga ora» non chiama il
+  server e resta senza conto.
   COME SI APRE IL WALLET (10 ott 2026, «apri-nel-wallet»): la porta
   aggancia il tocco ad `apriNelWallet`: su ogni strada il link
   `lightning:` nudo parte dal tocco, nativo (`stradaWallet`, pura, dice

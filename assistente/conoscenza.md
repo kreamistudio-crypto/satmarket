@@ -69,7 +69,7 @@ Per pagare e per incassare serve un wallet Lightning tuo. Ne esistono tanti, gra
 
 1. Trovi l'annuncio: dalla vetrina (Esplora), dalla ricerca, dalle categorie. Toccando una categoria in «Esplora per categorie» vedi subito tutti i suoi annunci, e sotto la fila compare una seconda riga di card con le sue sottocategorie (per esempio Bitcoin → Hardware wallet e firma, Cappellini, Spille e adesivi…), ognuna col numero di annunci; le altre categorie in alto diventano grigie. Tocchi la sottocategoria che ti interessa; ritoccandola torni a tutta la categoria. Compaiono solo le sottocategorie che hanno annunci. Per uscire: ritocca la categoria accesa (ha una piccola ✕), o la card «Tutto». Puoi salvare i preferiti e farti avvisare quando arriva quello che cerchi.
 2. Scegli come riceverlo, fra quelli che il venditore offre: spedizione a un indirizzo, spedizione a un punto di ritiro o a un locker, ritiro a mano in zona, oppure consegna dentro Barattolo se è un codice o un buono digitale. Se il venditore non spedisce ai locker, la riga del locker è spenta e c'è il tasto «Chiedi al venditore se spedisce con InPost o Poste»: lui riceve un avviso (senza sapere chi ha chiesto) e, se aggiunge InPost, Poste Italiane o SDA nel Profilo, Barattolo ti avvisa. Una richiesta per venditore ogni 7 giorni.
-3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento.
+3. Paghi con «🔒 Compra in sicurezza»: arriva una fattura Lightning da pagare col wallet. La fattura dura pochi minuti (vedi i NUMERI DI OGGI): se scade non è successo niente, se ne fa un'altra al cambio del momento. Se la rigeneri dall'ordine («⚡ Genera una nuova fattura», stesso importo), il foglio ti rimostra il conto: articolo, spedizione, protezione e totale in sats, e quanto ti manca per la spedizione gratis del negozio.
 4. I sats entrano nel deposito di garanzia. Il venditore viene avvisato, sa di essere pagato, ma i sats non sono ancora suoi.
 5. Il venditore spedisce e segna il corriere col tracciamento, oppure vi accordate per il ritiro, oppure ti consegna il codice dentro l'ordine.
 6. Quando l'oggetto è arrivato ed è come promesso, lo confermi dall'ordine, nella scheda «Ordini». Solo in quel momento i sats passano al venditore.
@@ -2439,5 +2439,13 @@ pubblico: sì
 
 frase: Il Filtro del P2P ora si ricorda: valute, metodi, premio, reputazione e Lightning/on-chain restano come li hai lasciati anche quando esci e rientri.
 dove: P2P → la pillola «Filtro» sopra il libro: scegli, tocca «Applica», esci e rientra. «Azzera» lo toglie. Vale su quel telefono o browser.
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-117 | novita -->
+## Novità · 2026-11-19 · fattura-rifatta-conto
+
+frase: Se la fattura Lightning ti scade e la rigeneri dall'ordine, ora il foglio del pagamento ti rimostra il conto intero (articolo, spedizione, protezione e totale in sats) e, se il negozio regala la spedizione sopra una soglia, quanto ti manca per arrivarci.
+dove: Ordini → un ordine «Da pagare» con la fattura scaduta → «⚡ Genera una nuova fattura»: le righe sotto il titolo del foglio, e la riga «🚚 Ti mancano … per la spedizione gratis».
 leva: nessuna
 pubblico: sì

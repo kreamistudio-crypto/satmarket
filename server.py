@@ -48660,6 +48660,93 @@ def scadenza_fattura_ordine(invoice: str, creato: int) -> int:
     return int(creato or 0) + INVOICE_EXPIRY
 
 
+def _conto_fattura_ordine(o, soglia: int, valuta: str,
+                          cambio: float) -> dict:
+    """IL CONTO DELLA FATTURA RIFATTA (19 nov 2026, dal campo: «se la
+    fattura scade e va rigenerata, il checkout mostra di nuovo soglia e
+    spese prima di pagare?»). Il foglio della fattura nuova mostrava il
+    solo totale: qui si rimettono in fila le righe che l'ordine ha
+    FOTOGRAFATO alla nascita — articolo, sconto, accordo, spedizione,
+    protezione — e, dove la spedizione si paga e il negozio la regala
+    sopra una soglia, quanto manca per arrivarci.
+
+    LE RIGHE SONO DELLA RIGA, NON RICALCOLATE: la fattura rifatta ha lo
+    STESSO importo di quella morta, quindi il conto che la spiega e'
+    quello di allora. L'articolo si ricava per differenza (la ricetta
+    di `_righe_ordine`), cosi' la somma delle righe E' il totale per
+    costruzione — mai un sat di scarto fra il conto e la fattura.
+
+    LA MISURA DELLA SOGLIA E' QUELLA DI compra(): gli articoli dopo
+    l'accordo e prima dello sconto (prezzo − spedizione − protezione +
+    sconto), confrontati nell'unita' che il venditore ha dichiarato. In
+    euro col cambio di ADESSO: e' un invito, non un conto, e senza
+    cambio tace (fail-closed come `_sped_gratis`). Vale solo a casa,
+    come la promessa. Un ordine gia' fatto non si allarga: la riga dice
+    quanto mancava, e chi vuole aggiungere ricompra dal negozio.
+
+    Prende la riga e i numeri gia' letti, niente database e niente
+    rete: la prova la tortura in memoria."""
+    sped = int(_campo(o, "spedizione_sats", 0))
+    prot = int(_campo(o, "protezione_sats", 0))
+    sconto = int(_campo(o, "sconto_sats", 0))
+    accordo = int(_campo(o, "accordo_sats", 0))
+    misura = max(0, int(o["prezzo_sats"] or 0) - sped - prot + sconto)
+    manca = 0
+    if (soglia > 0 and sped > 0
+            and _campo(o, "consegna_scelta", "") == "spedizione"
+            and (_campo(o, "zona_sped", "") or "dom") == "dom"):
+        m = misura if valuta == "sats" else (
+            _eur_interi(misura, cambio) if valuta == "eur" else None)
+        if m is not None:
+            manca = max(0, soglia - m)
+    return {"articolo_lordo_sats": misura + accordo,
+            "sconto_sats": sconto,
+            "sconto_percento": int(_campo(o, "sconto_percento", 0)),
+            # l'id del codice si scrive SOLO quando il codice ha vinto:
+            # e' l'origine del primo foglio, «Sconto codice» come allora
+            "sconto_origine": ("codice" if _campo(o, "codice_sconto_id", 0)
+                               else ("negozio" if sconto else "")),
+            "accordo_sats": accordo,
+            "spedizione_sats": sped, "protezione_sats": prot,
+            # i set dicono «Articolo» secco, come al primo foglio
+            "quantita": (int(_campo(o, "quantita", 1))
+                         if _campo(o, "annuncio_id", 0) else 1),
+            "sped_gratis_sats": int(_campo(o, "sped_gratis_sats", 0)),
+            # la regola d'oro di _sped_gratis_pubblico: il numero solo
+            # nella sua unita', l'altra a zero
+            "sped_gratis_valuta": valuta if manca else "",
+            "mancano_sped_sats": manca if valuta == "sats" else 0,
+            "mancano_sped_eur": manca if valuta == "eur" else 0}
+
+
+async def _conto_fattura_letto(o) -> dict:
+    """Il conto della fattura rifatta con la regola del NEGOZIO letta
+    adesso (la soglia e' sua, non dell'ordine) e il cambio solo se la
+    soglia e' in euro. Mai un errore: senza regola o senza cambio
+    restano le righe, e l'invito tace."""
+    soglia, valuta, cambio = 0, "", 0.0
+    if (_campo(o, "consegna_scelta", "") == "spedizione"
+            and _campo(o, "spedizione_sats", 0)):
+        con = db()
+        try:
+            v = con.execute("SELECT sped_gratis_soglia, "
+                            "sped_gratis_soglia_eur, sped_gratis_valuta "
+                            "FROM utenti WHERE tg_id=?",
+                            (o["venditore_id"],)).fetchone()
+        finally:
+            con.close()
+        if v:
+            soglia, valuta = _regola_sped_gratis(
+                v["sped_gratis_soglia"], v["sped_gratis_soglia_eur"],
+                v["sped_gratis_valuta"])
+        if soglia and valuta == "eur":
+            try:
+                cambio = await cambio_btc_eur()
+            except Exception:
+                cambio = 0.0
+    return _conto_fattura_ordine(o, soglia, valuta, cambio)
+
+
 @app.post("/api/orders/{ordine_id}/nuova-fattura")
 async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
@@ -48729,12 +48816,16 @@ async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Questo ordine non aspetta più un "
                                  "pagamento: se l'oggetto ti interessa "
                                  "ancora, ricompralo dall'annuncio")
+    # il conto che il foglio rimette in fila (19 nov 2026): l'importo
+    # non cambia mai qui dentro, quindi vale per tutte le risposte con
+    # una fattura — e si legge PRIMA del conio, mai fra il conio e il CAS
+    conto = await _conto_fattura_letto(o)
     adesso = int(time.time())
     scade = scadenza_fattura_ordine(o["invoice"], o["creato"])
     if o["invoice"] and scade > adesso:
         return {"ordine_id": ordine_id, "invoice": o["invoice"],
                 "scade_il": scade, "prezzo_sats": o["prezzo_sats"],
-                "nuova": False}
+                "nuova": False, "conto": conto}
     if _campo(o, "fattura_rinnovata_il", 0):
         raise HTTPException(400, "La fattura di quest'ordine è già stata "
                                  "rigenerata una volta: se l'oggetto ti "
@@ -48812,7 +48903,7 @@ async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
             if scade > adesso:
                 return {"ordine_id": ordine_id, "invoice": r["invoice"],
                         "scade_il": scade, "prezzo_sats": r["prezzo_sats"],
-                        "nuova": False}
+                        "nuova": False, "conto": conto}
         if r and r["stato"] == "annullato":
             raise HTTPException(400, "Questo ordine non aspetta più un "
                                      "pagamento: se l'oggetto ti "
@@ -48828,7 +48919,7 @@ async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
             "scade_il": scadenza_fattura_ordine(inv["payment_request"],
                                                 adesso),
-            "prezzo_sats": o["prezzo_sats"], "nuova": True}
+            "prezzo_sats": o["prezzo_sats"], "nuova": True, "conto": conto}
 
 
 # --------------- LA RICEVUTA DEL COMPRATORE (ago 2026) ---------------

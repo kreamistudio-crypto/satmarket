@@ -26311,9 +26311,10 @@ def prove_valuta_soglia():
     # frasi lunghe, le due etichette corte, i due inviti del carrello e
     # i QUATTRO siti della pagina Paga (le due sospese e i due «quanto
     # manca», 12 ago 2026 — i verdi non portano cifra) — dieci
-    # chiamate piu' la definizione
+    # chiamate piu' la definizione; dal 19 nov 2026 undici, con
+    # l'invito del foglio della fattura rifatta (contoFattura)
     prova("...e tutte le superfici della promessa passano da cifraSoglia",
-          11, mini.count("cifraSoglia("))
+          12, mini.count("cifraSoglia("))
     # IL CONFRONTO DEL CARRELLO non converte piu' a soglia in SATS:
     # li' e' sats contro sats, esatto, e la riga compare anche a
     # cambio muto. E' il guadagno della scelta. Dal 13 ago 2026 il
@@ -31664,8 +31665,10 @@ def prove_pagina_acquisto():
     _chiamate = [_chiamata(_pulito, m.start())
                  for m in re.finditer(r"(?<!function )contoScomposto\(",
                                       _pulito)]
+    # SETTE dal 19 nov 2026: la settima e' contoFattura, il foglio della
+    # fattura rifatta, con percentuale e origine dalla riga dell'ordine
     prova("...e OGNI chiamata le passa la percentuale",
-          (6, []), (len(_chiamate),
+          (7, []), (len(_chiamate),
                     [c[:40] for c in _chiamate if "_percento" not in c]))
     #    E L'ORIGINE, che e' la gemella nata coi codici sconto: le sei
     #    chiamate si dividono TRE dal preventivo e TRE dalla risposta di
@@ -31674,7 +31677,7 @@ def prove_pagina_acquisto():
     #    istante dopo, sullo stesso schermo. Chi ne aggiunge una settima
     #    e la dimentica lascia l'etichetta nuda, che non alza niente.
     prova("...e OGNI chiamata le passa anche l'ORIGINE",
-          (6, []), (len(_chiamate),
+          (7, []), (len(_chiamate),
                     [c[:40] for c in _chiamate if "sconto_origine" not in c]))
     prova("...e porta la percentuale, dal server e mai dedotta", True,
           '<span class="sconto-tag">−${c.scontoPct}%</span>' in _cr
@@ -143448,9 +143451,12 @@ def prove_paga_ora():
             super().__init__(detail)
             self.status_code, self.detail = codice, detail
 
+    async def _cambio_finto():
+        return 100_000.0     # 1 BTC = 100.000 €: 1.000 sats = 1 €
+
     def mondo(stato="creato", invoice=MORTA, creato=ADESSO - 1000,
               rinnovata=0, annuncio="attivo", ferie=0, pagata=False,
-              muto=False, pausa=False):
+              muto=False, pausa=False, conto_riga=None, negozio=None):
         vero = sqlite3.connect(":memory:")
         vero.row_factory = sqlite3.Row
         vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
@@ -143472,6 +143478,21 @@ def prove_paga_ora():
         vero.execute("INSERT INTO annunci VALUES(7,?,'Pesto genovese')",
                      (annuncio,))
         vero.execute("INSERT INTO utenti VALUES(222,?)", (ferie,))
+        # IL CONTO DELLA FATTURA RIFATTA (19 nov 2026): le colonne che il
+        # conto legge, e la regola del negozio
+        for c in ("consegna_scelta TEXT DEFAULT ''", "zona_sped TEXT "
+                  "DEFAULT ''", "accordo_sats INT DEFAULT 0",
+                  "sconto_percento INT DEFAULT 0",
+                  "sped_gratis_sats INT DEFAULT 0"):
+            vero.execute("ALTER TABLE ordini ADD COLUMN " + c)
+        for c in ("sped_gratis_soglia INT DEFAULT 0",
+                  "sped_gratis_soglia_eur INT DEFAULT 0",
+                  "sped_gratis_valuta TEXT DEFAULT ''"):
+            vero.execute("ALTER TABLE utenti ADD COLUMN " + c)
+        for k, v in (conto_riga or {}).items():
+            vero.execute(f"UPDATE ordini SET {k}=? WHERE id=196", (v,))
+        for k, v in (negozio or {}).items():
+            vero.execute(f"UPDATE utenti SET {k}=? WHERE tg_id=222", (v,))
         vero.commit()
 
         class Con:
@@ -143518,12 +143539,18 @@ def prove_paga_ora():
                "_incassa_ordine": _incassa,
                "cassaforte_nuova": lambda: "nodo",
                "_fmt_sats": lambda n: str(n),
-               "data_ferie": lambda ts: "domani"}
+               "data_ferie": lambda ts: "domani",
+               "cambio_btc_eur": _cambio_finto}
         for nome in ("_BECH32_ALFABETO", "_BECH32_GEN", "INVOICE_EXPIRY"):
             exec(re.search(rf"^{nome} = .*$", _SORGENTE, re.M).group(0), amb)
         for nome in ("leggi_bolt11", "scadenza_fattura_ordine", "_campo",
-                     "_righe_ordine", "in_ferie", "guardia_ferie"):
+                     "_righe_ordine", "in_ferie", "guardia_ferie",
+                     "_eur_interi", "_conto_fattura_ordine"):
             exec(pezzo(nome), amb)
+        amb["_regola_sped_gratis"] = lambda s, e, v: (
+            (int(s), "sats") if v == "sats" and s else
+            (int(e), "eur") if v == "eur" and e else (0, ""))
+        exec("async " + pezzo("_conto_fattura_letto"), amb)
         exec("async " + pezzo("nuova_fattura_ordine"), amb)
         return amb["nuova_fattura_ordine"], vero, conii, chieste, incassati
 
@@ -143632,6 +143659,116 @@ def prove_paga_ora():
           and "COALESCE(fattura_rinnovata_il, 0)=0" in nf)
     prova("...e la domanda a LNbits viene PRIMA del conio", True,
           -1 < nf.find("invoice_pagata(") < nf.find("crea_invoice_escrow("))
+
+    # ---- 2b) IL CONTO DELLA FATTURA RIFATTA (19 nov 2026) -------------
+    # Dal campo: «se la fattura scade e va rigenerata, il checkout mostra
+    # di nuovo soglia e spese prima di pagare?». No, mostrava il solo
+    # totale. Adesso la risposta porta le righe fotografate dall'ordine
+    # e quanto manca alla spedizione gratis del negozio.
+    cfo = {}
+    exec(pezzo("_campo"), cfo)
+    exec(pezzo("_eur_interi"), cfo)
+    exec(pezzo("_conto_fattura_ordine"), cfo)
+    cfo = cfo["_conto_fattura_ordine"]
+
+    def ordine(art=20000, sped=3000, prot_pct=2, sconto=0, accordo=0,
+               consegna="spedizione", zona="", annuncio=7, qta=1,
+               regalata=0):
+        netto = art - sconto - accordo
+        prot = netto * prot_pct // 100
+        return {"prezzo_sats": netto + sped + prot, "spedizione_sats": sped,
+                "protezione_sats": prot, "sconto_sats": sconto,
+                "accordo_sats": accordo, "consegna_scelta": consegna,
+                "zona_sped": zona, "annuncio_id": annuncio, "quantita": qta,
+                "sconto_percento": 10 if sconto else 0,
+                "sped_gratis_sats": regalata}
+
+    def somma(c, o):
+        return (c["articolo_lordo_sats"] - c["sconto_sats"]
+                - c["accordo_sats"] + c["spedizione_sats"]
+                + c["protezione_sats"]) == o["prezzo_sats"]
+
+    o = ordine()
+    c = cfo(o, 30000, "sats", 0)
+    prova("conto rifatto: le righe dell'ordine (articolo, spedizione, "
+          "protezione)", (20000, 3000, 400, True),
+          (c["articolo_lordo_sats"], c["spedizione_sats"],
+           c["protezione_sats"], somma(c, o)))
+    prova("...e a soglia in sats quanto manca, nella SUA unita'",
+          ("sats", 10000, 0),
+          (c["sped_gratis_valuta"], c["mancano_sped_sats"],
+           c["mancano_sped_eur"]))
+    c = cfo(o, 50, "eur", 100_000.0)
+    prova("a soglia in euro: 20.000 sats = 20 €, a 50 ne mancano 30",
+          ("eur", 30, 0), (c["sped_gratis_valuta"], c["mancano_sped_eur"],
+                           c["mancano_sped_sats"]))
+    prova("...e senza cambio l'invito tace (le righe restano)",
+          ("", 0, 3000), (lambda c: (c["sped_gratis_valuta"],
+                                     c["mancano_sped_eur"],
+                                     c["spedizione_sats"]))(
+              cfo(o, 50, "eur", 0)))
+    o = ordine(sconto=2000, accordo=0)
+    c = cfo(o, 21000, "sats", 0)
+    prova("la soglia misura gli articoli PRIMA dello sconto (come "
+          "compra): 20.000 su 21.000, mancano 1.000", (1000, True),
+          (c["mancano_sped_sats"], somma(c, o)))
+    o = ordine(accordo=5000)
+    c = cfo(o, 21000, "sats", 0)
+    prova("...e DOPO l'accordo, che torna in riga sua: la somma quadra",
+          (20000, 5000, 6000, True),
+          (c["articolo_lordo_sats"], c["accordo_sats"],
+           c["mancano_sped_sats"], somma(c, o)))
+    prova("niente invito fuori casa, sul ritiro, a spedizione gia' "
+          "gratis o gia' sopra soglia", [0, 0, 0, 0],
+          [cfo(ordine(zona="eu"), 30000, "sats", 0)["mancano_sped_sats"],
+           cfo(ordine(consegna="ritiro", sped=0), 30000, "sats",
+               0)["mancano_sped_sats"],
+           cfo(ordine(sped=0, regalata=3000), 30000, "sats",
+               0)["mancano_sped_sats"],
+           cfo(ordine(art=40000), 30000, "sats", 0)["mancano_sped_sats"]])
+    prova("la spedizione regalata viaggia, per la riga che lo dice", 3000,
+          cfo(ordine(sped=0, regalata=3000), 0, "", 0)["sped_gratis_sats"])
+    o = ordine(sconto=2000)
+    prova("l'origine dello sconto: «codice» solo col codice che ha vinto",
+          ("negozio", "codice", ""),
+          (cfo(o, 0, "", 0)["sconto_origine"],
+           cfo(dict(o, codice_sconto_id=4), 0, "", 0)["sconto_origine"],
+           cfo(ordine(), 0, "", 0)["sconto_origine"]))
+    prova("il set dice «Articolo» secco, il mono i suoi pezzi", (1, 3),
+          (cfo(ordine(annuncio=0, qta=3), 0, "", 0)["quantita"],
+           cfo(ordine(qta=3), 0, "", 0)["quantita"]))
+    import random as _random
+    _rnd = _random.Random(19112026)   # seme fisso: due giri, stessi casi
+    storte = 0
+    for _ in range(300):
+        o = ordine(art=_rnd.randint(1000, 900000),
+                   sped=_rnd.choice((0, 2500, 4999)),
+                   prot_pct=_rnd.choice((0, 2, 3)),
+                   sconto=_rnd.choice((0, 0, 777)),
+                   accordo=_rnd.choice((0, 0, 333)))
+        storte += not somma(cfo(o, 0, "", 0), o)
+    prova("300 ordini a caso: le righe sommano SEMPRE al totale della "
+          "fattura", 0, storte)
+
+    # la rotta: il conto viaggia in tutte le risposte con una fattura
+    f, vero, conii, _, _ = mondo(
+        conto_riga={"prezzo_sats": 23400, "spedizione_sats": 3000,
+                    "protezione_sats": 400, "consegna_scelta": "spedizione"},
+        negozio={"sped_gratis_soglia_eur": 50, "sped_gratis_valuta": "eur"})
+    d = chiama(f)
+    prova("rotta, fattura nuova: il conto c'e', con la soglia del "
+          "NEGOZIO letta adesso", (True, 20000, 3000, "eur", 30),
+          (d.get("nuova"), (d.get("conto") or {}).get("articolo_lordo_sats"),
+           (d.get("conto") or {}).get("spedizione_sats"),
+           (d.get("conto") or {}).get("sped_gratis_valuta"),
+           (d.get("conto") or {}).get("mancano_sped_eur")))
+    f, vero, conii, _, _ = mondo(invoice=VIVA, creato=ADESSO - 60)
+    d = chiama(f)
+    prova("...e anche quando ripresenta quella viva", (False, 25000),
+          (d.get("nuova"), (d.get("conto") or {}).get("articolo_lordo_sats")))
+    prova("...e il conto si legge PRIMA del conio, mai fra conio e CAS",
+          True, -1 < nf.find("_conto_fattura_letto(")
+          < nf.find("crea_invoice_escrow("))
 
     # ---- 3) l'orologio non annulla la fattura appena nata -----------
     # La corsa vera: controlla_abbandonati chiede a LNbits della
@@ -143892,6 +144029,63 @@ console.log(JSON.stringify(esiti));
                             e["illeggibile col ripiego"])))
     prova("senza fattura, e in demo, la riga non c'e'", ("none", "none"),
           (e["senza fattura"], e["in demo"]))
+
+    # 4b-bis) IL CONTO DELLA FATTURA RIFATTA (19 nov 2026): il foglio
+    #     rende le righe del server con quelle di sempre, e l'invito
+    nf_js = pezzo_js(mini, "async function nuovaFatturaOrdine(btn, oid){",
+                     "\n}\n")
+    prova("la fattura rifatta passa il conto del server al foglio", True,
+          "'La fattura di prima vale ancora: eccola.', d.conto);" in nf_js)
+    prova("...e il foglio lo rende (senza conto resta vuoto, come a «Paga "
+          "ora»)", True, "el('payScomposto').innerHTML = contoFattura(conto, "
+          "sats);" in af)
+    banco = base + "\n" + "\n".join([
+        fetta("function contoScomposto(c){"),
+        fetta("function unitaSoglia(valuta){"),
+        fetta("function cifraSoglia(quanto, valuta){"),
+        fetta("function cifraConUnita(numero, valuta){"),
+        fetta("function contoFattura(c, tot){")]) + """
+const piano = h => h.replace(/<[^>]+>/g, '');
+dice('eur', piano(contoFattura({articolo_lordo_sats: 20000,
+  spedizione_sats: 3000, protezione_sats: 400, quantita: 1,
+  sped_gratis_valuta: 'eur', mancano_sped_eur: 30}, 23400)));
+dice('sats', piano(contoFattura({articolo_lordo_sats: 20000,
+  spedizione_sats: 3000, protezione_sats: 400, quantita: 1,
+  sped_gratis_valuta: 'sats', mancano_sped_sats: 10000,
+  mancano_sped_eur: 99}, 23400)));
+dice('regalata', piano(contoFattura({articolo_lordo_sats: 20000,
+  spedizione_sats: 0, protezione_sats: 400, sped_gratis_sats: 3000}, 20400)));
+dice('accordo', piano(contoFattura({articolo_lordo_sats: 20000,
+  accordo_sats: 5000, spedizione_sats: 3000, protezione_sats: 300}, 18300)));
+dice('senza', contoFattura(null, 23400) + '|' + contoFattura(undefined, 1));
+console.log(JSON.stringify(esiti));
+"""
+    p = os.path.join(cart, "conto_rifatto.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco del conto rifatto gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    # le migliaia senza punto: il fmt del banco (toLocaleString di node)
+    # non raggruppa le quattro cifre, quello vero si'
+    e = {k: v.replace(".", "") if k != "senza" else v
+         for k, v in json.loads(r.stdout).items()}
+    prova("foglio rifatto: articolo, spedizione, protezione e totale",
+          True, all(t in e["eur"] for t in (
+              "Articolo20000 sats", "Spedizione3000 sats",
+              "Protezione acquisti400 sats", "Totale23400 sats")))
+    prova("...e quanto manca alla spedizione gratis, in euro",
+          True, "Ti mancano 30€ di articoli per la spedizione gratis"
+          in e["eur"] and "la spedizione resta" in e["eur"])
+    prova("...o in sats, mai l'altra unita'", (True, False),
+          ("Ti mancano 10000 sats di articoli" in e["sats"],
+           "99" in e["sats"]))
+    prova("la spedizione regalata dal negozio si dice", True,
+          "Spedizione gratis: il venditore ti offre 3000 sats" in
+          e["regalata"] and "Ti mancano" not in e["regalata"])
+    prova("l'accordo torna nella sua riga", True,
+          "🤝 Accordo−5000 sats" in e["accordo"])
+    prova("senza conto il foglio resta vuoto", "|", e["senza"])
 
     # 4c) LA LINEA DEL TEMPO: openOrder fatto girare davvero. Tutto cio'
     #     che non e' di questo cantiere risponde vuoto (un Proxy dietro

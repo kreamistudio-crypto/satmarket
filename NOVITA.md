@@ -734,3 +734,9 @@ frase: Il Filtro del P2P ora si ricorda: valute, metodi, premio, reputazione e L
 dove: P2P → la pillola «Filtro» sopra il libro: scegli, tocca «Applica», esci e rientra. «Azzera» lo toglie. Vale su quel telefono o browser.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · fattura-rifatta-conto
+frase: Se la fattura Lightning ti scade e la rigeneri dall'ordine, ora il foglio del pagamento ti rimostra il conto intero (articolo, spedizione, protezione e totale in sats) e, se il negozio regala la spedizione sopra una soglia, quanto ti manca per arrivarci.
+dove: Ordini → un ordine «Da pagare» con la fattura scaduta → «⚡ Genera una nuova fattura»: le righe sotto il titolo del foglio, e la riga «🚚 Ti mancano … per la spedizione gratis».
+leva: nessuna
+pubblico: sì

@@ -38059,16 +38059,16 @@ function avviaOrologioOrdine(o){
    variabili-modalita' si azzerano come all'ingresso di startBuy —
    l'«Annulla» del foglio deve colpire QUESTO ordine e nessun altro —
    e il poll riparte come dopo una fattura appena coniata. Il conto
-   scomposto resta vuoto: la sua pagina e' l'ordine, due dita sotto il
-   foglio, e le sue righe non si ricostruiscono fedeli dalla riga
-   (supplementi e accordi non ci sono). La cifra si scrive PRIMA di
-   mostraQr, che veste il titolo conservandola. */
-function apriFoglioFattura(oid, invoice, sats, scade, nota){
+   scomposto arriva col sesto argomento, dal server (19 nov 2026, vedi
+   contoFattura qui sotto): senza, resta vuoto come a «Paga ora». La
+   cifra si scrive PRIMA di mostraQr, che veste il titolo
+   conservandola. */
+function apriFoglioFattura(oid, invoice, sats, scade, nota, conto){
   rilancioCorrente = null;
   pagamentoCorrente = null;
   currentOrderId = oid;
   el('payAmount').textContent = fmt(sats);
-  el('payScomposto').innerHTML = '';
+  el('payScomposto').innerHTML = contoFattura(conto, sats);
   el('payEurNota').style.display = nota ? 'block' : 'none';
   el('payEurNota').textContent = nota || '';
   el('payInvoice').textContent = invoice;
@@ -38078,6 +38078,40 @@ function apriFoglioFattura(oid, invoice, sats, scade, nota){
   aggiornaPayHint();
   if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
   pollTimer = setInterval(()=>verificaOrdine(oid), 4000);
+}
+/* IL CONTO DELLA FATTURA RIFATTA (19 nov 2026, domanda dal campo: «se
+   la fattura scade e va rigenerata, il checkout mostra di nuovo soglia
+   e spese prima di pagare?»). Prima il foglio rigenerato diceva il
+   solo totale, perche' le righe non si ricostruivano fedeli dalla riga
+   dell'ordine. Adesso le rimette in fila il SERVER, dalle cifre che
+   l'ordine ha fotografato alla nascita (`_conto_fattura_ordine`, con
+   l'accordo che al client non arriva): qui solo si rendono, con le
+   righe di sempre (contoScomposto) — stessa somma, stesso totale.
+   Sotto, due righe che il primo foglio non aveva bisogno di dire
+   perche' le diceva la pagina Paga: la spedizione regalata dal
+   negozio, e quanto manca alla soglia della spedizione gratis. Questa
+   e' un INVITO e non un conto: la fattura non cambia, e la frase lo
+   dice. La cifra arriva gia' nella sua unita' (la regola d'oro di
+   _sped_gratis_pubblico): qui non si converte niente. */
+function contoFattura(c, tot){
+  if (!c) return '';
+  const sped = c.spedizione_sats || 0;
+  const righe = contoScomposto({art: c.articolo_lordo_sats || tot,
+    sped, prot: c.protezione_sats || 0, tot, qta: c.quantita || 1,
+    sconto: c.sconto_sats || 0, accordo: c.accordo_sats || 0,
+    scontoPct: c.sconto_percento || 0,
+    scontoOrigine: c.sconto_origine || ''});
+  const val = c.sped_gratis_valuta;
+  const manca = val === 'eur' ? (c.mancano_sped_eur || 0)
+              : val === 'sats' ? (c.mancano_sped_sats || 0) : 0;
+  const note = [
+    (!sped && (c.sped_gratis_sats || 0) > 0)
+      ? `🚚 Spedizione <b>gratis</b>: il venditore ti offre ${fmt(c.sped_gratis_sats)} sats di spedizione` : '',
+    manca > 0
+      ? `🚚 Ti mancano ${cifraSoglia(manca, val)} di articoli per la spedizione gratis del negozio: in questa fattura la spedizione resta.` : ''
+  ].filter(Boolean)
+   .map(t => `<div class="eur-hint" style="margin:6px 0 0">${t}</div>`).join('');
+  return righe + note;
 }
 /* «⚡ Paga ora»: la STESSA fattura, dall'ordine. Nessuna chiamata al
    server — e' la ripresa del foglio chiuso per sbaglio, non un
@@ -38127,7 +38161,7 @@ async function nuovaFatturaOrdine(btn, oid){
     }
     apriFoglioFattura(oid, d.invoice, d.prezzo_sats, d.scade_il,
       d.nuova ? 'Fattura nuova, stesso importo: quella di prima era scaduta.'
-              : 'La fattura di prima vale ancora: eccola.');
+              : 'La fattura di prima vale ancora: eccola.', d.conto);
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
 }
