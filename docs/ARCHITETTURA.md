@@ -37698,6 +37698,21 @@ mai il kind 0 di nessuno: regola ferrea 2).
      gesti lo usa tranne per `take-*`/`new-order`, che nascono col vivo.
   3) UN SEME DI RIPIEGO NON SCALZA un mazzo delle parole (`giudicaMazzoP2P`).
   Eccezione: la strada sovrana (`origine 'mia'`).
+  LE CHIAVI PARCHEGGIATE E IL SEME (19 nov 2026, sera, cantiere
+  chiavi-parcheggiate; perché in CANTIERI, «L'ordine nato col seme e il
+  profilo vecchio timbrato conto»). `identitaMieP2P` chiede SEMPRE il seme
+  del conto (memorizzato da `semeContoP2P`, scritto in `p2pSemeNoto`),
+  anche col mazzo vivo 'conto': quando è lui la lista non raddoppia.
+  `adottaScambiServerP2P` cerca la chiave dello scambio nel vivo, poi in
+  pensione, poi con `chiaveDalParcheggioP2P(id, s)`: i candidati sono
+  `mazziParcheggiatiP2P()` (la mensola `barattolo_mostro@altrui:*`, il
+  nome di prima del conto `barattolo_mostro`, il vivo di un altro conto
+  `barattolo_mostro@<id>`; mai il vivo né la pensione) più il seme se non
+  è il vivo. La prova è `chiaveScambioDaServerP2P` (la `chiave_mia` del
+  server riderivata, o l'indice della restore di quell'identità); chi la
+  dà va in pensione (`mandaInPensioneP2P`) e da lì `mazzoRigaP2P` firma.
+  La restore chiede i parcheggiati senza timbro o col mio conto. Prove:
+  `prove_chiavi_parcheggiate`.
   ⚠️ SPENTA DAL 19 NOV 2026 (cantiere chiavi-dal-conto, scelta di
   Andrea: «Io devo aprire un ordine della web app e poi devo poterlo
   continuare anche nella mini app, punto»). La costante

@@ -92519,3 +92519,46 @@ DA GUARDARE. Il 27 dicembre il verde in Telegram con la sola scritta «USDe»; d
 ## Contanti on-chain coi passi del Lightning, e l'avviso a cinque minuti (19 nov 2026, cantiere contanti-oc)
 COSA. Due ritocchi chiesti da Andrea prima della promozione. 1) Lo scambio on-chain in contanti di persona va come quello Lightning (Andrea: «ha senso renderlo uguale a Lightning, vero?»): a deposito confermato chi vende NON vede più «Ricevuti: libera i sats»; chi compra consegna i contanti e tocca «💵 Ho consegnato i contanti», e solo allora (stato euro_inviati) a chi vende compare «Ricevuti», da toccare lì davanti dopo averli contati. Gli avvisi del deposito confermato (`_p2p_onchain_testi_deposito_contanti`) e il testo della pagina lo dicono in quest'ordine. La regola breve dei contanti («consegna i contanti solo quando chi vende preme Libera davanti a te») è la stessa del Lightning e non è stata toccata: i due gesti avvengono allo stesso incontro. 2) Un promemoria in più a CINQUE minuti dalla fine del tempo per pagare, da un'ora in su (Andrea: «voglio anche un avviso quando mancano 5 minuti alla fine»), Lightning e on-chain. Sotto l'ora c'era già solo quello a cinque. I promemoria con dieci minuti o meno rimasti hanno tutti le parole dell'ultimo («hai già mandato gli euro? … anche se hai già pagato»): il giudice dei testi guarda il tempo che resta, non la posizione nella lista. On-chain col giorno intero, il quinto promemoria «Mancano cinque minuti».
 PROVATO. `prove_tempo_pagare_p2p` (i momenti: un giorno a 1, 12, 20 ore, 23:50 e 23:55; un'ora a 20, 50, 55 minuti; le parole del quinto), `prove_riprendi_scaduto_onchain` (nessun «libera» in tutto lo stato depositato, contanti compresi), `prove_onchain_contanti_scambio`; `collaudo_tempo_pagare` (tre attese, l'ultima a 55 minuti), `collaudo_p2p_onchain` (le parole del deposito in contanti), suite intera e collaudi della CI. Da guardare dal vivo: uno scambio on-chain in contanti di persona fino a «Ricevuti».
+
+## L'ordine nato col seme e il profilo vecchio timbrato «conto»: la Mini App non chiedeva le chiavi dell'account (19 nov 2026, sera, cantiere chiavi-parcheggiate; Andrea, ordine Barattozon ff3855c0 preso da KabuCamel: «Di nuovo lo stesso errore stavolta il dispositivo è sempre lo stesso», «Avevo fatto tutto da qui eppure da errore»)
+
+IL CASO DAL VIVO, in produzione la sera della promozione (main 2e105d89).
+Ordine «Vendi BTC» Barattozon pubblicato un'ora dopo la promozione, dal
+telefono di Andrea; preso; al passo «Blocca i sats» la Mini App diceva «Le
+chiavi di questo scambio non sono in questo browser». Le due diagnosi:
+Mini App «profilo e9416d84 indice 6, restore 0 ordini, identita' chieste
+1», la riga solo dal server, senza chiave; Chrome sullo stesso telefono
+«stesso profilo e9416d84, restore: identita' chieste 2, ff3855c0 indice 1
+ALTRA IDENTITA». L'ordine era nato col SEME del conto (indice 1), e tutti e
+due i posti tenevano come vivo un profilo diverso (e9416d84). Chrome lo
+vedeva perché il suo e9416d84 non era timbrato «conto» e la restore
+chiedeva anche il seme; la Mini App no: `identitaMieP2P` usciva prima della
+domanda del seme con un mazzo vivo `origine 'conto'` («un mazzo 'conto' E'
+gia' il seme»). Un profilo timbrato «conto» di ieri (un seme che oggi non
+si rifà, o una copia ripresa) non è il seme di oggi.
+
+LA CURA (stretta, per la sera): il seme si chiede SEMPRE (la domanda è
+memorizzata; quando è lui la restore resta una), e l'archivio del server
+cerca la chiave anche nel seme e nei profili parcheggiati di questo
+telefono (`chiaveDalParcheggioP2P`): chi la rideriva (prova crittografica:
+la `chiave_mia` del server, o l'indice della restore di quella identità)
+va in pensione e la riga torna governabile — Mini App, sito e PC. Rovescia
+la regola del 13 set «un mazzo 'conto' resta UNA domanda»: le due
+sentinelle che la tenevano dicono ora la regola nuova.
+
+STRADE SCARTATE PER STASERA. Rimettere come vivo il seme al posto del
+profilo vecchio (`giudicaMazzoP2P` lo tiene, «tenuto», perché ha una
+storia): giusto, ma tocca il giudice di tutti i telefoni la sera stessa
+della promozione; da guardare a mente fresca. Gli ordini nuovi pubblicati
+dal profilo vecchio restano governabili dove quel profilo c'è.
+
+COSA È PROVATO. `prove_chiavi_parcheggiate` (11, col caso di Andrea: il
+seme che non è il vivo, la mensola, il nome di prima del conto, il vivo di
+un altro conto, senza prova niente, la restore che chiede i parcheggiati
+solo senza timbro o col mio conto); `prove_p2p_motore` e `prove_p2p_server`
+con la regola nuova. Suite severa 30.681/0, collaudi 161/0.
+
+RESTA DA GUARDARE. Dal vivo dopo il cherry-pick: la Mini App di Andrea
+apre ff3855c0 senza la riga «chiavi», e «Libera i sats» parte (Andrea ha
+già bloccato i sats da Chrome: il pagamento della garanzia non vuole
+firme). Poi: perché il vivo e9416d84 non è il seme, e il giudice.
