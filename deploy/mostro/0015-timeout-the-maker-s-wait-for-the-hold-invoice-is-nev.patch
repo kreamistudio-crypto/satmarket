@@ -1,4 +1,4 @@
-From 1e54a6dde5245e65d30cfece8b8bd7345d524831 Mon Sep 17 00:00:00 2001
+From c2d8f3fca97dcbfbb9d4581e66854f4e02a9f08a Mon Sep 17 00:00:00 2001
 From: Barattolo <barattolo@barattolo.store>
 Date: Thu, 19 Nov 2026 21:00:00 +0000
 Subject: [PATCH] timeout: the maker's wait for the hold invoice is never
@@ -28,18 +28,26 @@ A server without the table, an id it leaves out, or an unreadable side
 table all mean "no choice": the maker keeps his own window. The info
 event carries `barattolo_maker_payment_window = 1` next to
 `barattolo_payment_windows`.
+
+The seller's second step follows the same time: once the trade is
+`active` he must tell the buyer where to send the fiat within it. The
+server names the trades whose seller let that lapse in a third table of
+the same answer, `{"senza_recapito": {id: true}}`, and the daemon gives
+them a window already over: the payment-window path of patch 0014 puts
+the order back in the book and returns the escrow. No table means no
+lapse.
 ---
- src/barattolo_finestra.rs | 290 +++++++++++++++++++++++++++++++++++++-
- src/barattolo_tempo.rs    |  78 ++++++++++
- src/db.rs                 |  20 ++-
+ src/barattolo_finestra.rs | 417 +++++++++++++++++++++++++++++++++++++-
+ src/barattolo_tempo.rs    |  78 +++++++
+ src/db.rs                 |  20 +-
  src/scheduler.rs          |   7 +-
- 4 files changed, 386 insertions(+), 9 deletions(-)
+ 4 files changed, 508 insertions(+), 14 deletions(-)
 
 diff --git a/src/barattolo_finestra.rs b/src/barattolo_finestra.rs
-index 0cf15bd..2eab64a 100644
+index 0cf15bd..ce6985b 100644
 --- a/src/barattolo_finestra.rs
 +++ b/src/barattolo_finestra.rs
-@@ -72,6 +72,28 @@
+@@ -72,6 +72,37 @@
  //! `barattolo_fees` and `barattolo_maker_lapses`: rolling back to an image
  //! without this patch needs nothing.
  //!
@@ -65,10 +73,19 @@ index 0cf15bd..2eab64a 100644
 +//! the migrations like the others, and dropped once the order has left
 +//! the book and the waiting states.
 +//!
++//! The same patch, the seller's second step («ogni passo deve durare 15
++//! minuti», Andrea): once the trade is `active` the seller must tell the
++//! buyer where to send the fiat within that same time, or the buyer's
++//! clock never starts. The server names those trades in a third table of
++//! the same answer, `{"senza_recapito": {id: true}}` ([`parse_missed`]),
++//! and the daemon gives them a window already over ([`store_missed`]): the
++//! payment-window path of patch 0014 puts the order back in the book and
++//! returns the escrow to the seller. Fail open: no table, no lapse.
++//!
  //! Without `BARATTOLO_FINESTRA_URL` and `BARATTOLO_FINESTRA_SEGRETO` this
  //! module is inert: no request, no row, no tag in the info event.
  
-@@ -128,10 +150,12 @@ pub fn enabled() -> bool {
+@@ -128,10 +159,12 @@ pub fn enabled() -> bool {
      endpoint().is_some()
  }
  
@@ -83,7 +100,7 @@ index 0cf15bd..2eab64a 100644
  pub fn info_pairs() -> Vec<(&'static str, String)> {
      info_pairs_when(enabled())
  }
-@@ -141,7 +165,10 @@ pub fn info_pairs_when(on: bool) -> Vec<(&'static str, String)> {
+@@ -141,7 +174,10 @@ pub fn info_pairs_when(on: bool) -> Vec<(&'static str, String)> {
      if !on {
          return Vec::new();
      }
@@ -95,12 +112,75 @@ index 0cf15bd..2eab64a 100644
  }
  
  /// PURE: a value of the server's answer as a window in seconds, or 0. Only
-@@ -339,6 +366,13 @@ pub async fn due_orders(pool: &SqlitePool, now: i64) -> Result<Vec<Order>, sqlx:
+@@ -309,6 +345,55 @@ pub async fn mark_asked(pool: &SqlitePool, ids: &[String], now: i64) -> Result<(
+     Ok(())
  }
  
- async fn ask_server(ids: &[String]) -> Result<HashMap<String, i64>, String> {
++/// PURE (patch 0015, «ogni passo deve durare 15 minuti»): the trades the
++/// server names in `senza_recapito` — the seller chose a time to pay, the
++/// trade has been `active` for that long, and he has NOT told the buyer
++/// where to send the fiat. Only ids asked and only `true` count; anything
++/// else (no table, a bad body, another value) is nothing: fail open, the
++/// trade keeps waiting as before.
++pub fn parse_missed(body: &str, asked: &[String]) -> Vec<String> {
++    let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
++        return Vec::new();
++    };
++    let Some(table) = value.get("senza_recapito").and_then(|t| t.as_object()) else {
++        return Vec::new();
++    };
++    asked
++        .iter()
++        .filter(|id| table.get(id.as_str()).and_then(|v| v.as_bool()) == Some(true))
++        .cloned()
++        .collect()
++}
++
++/// Patch 0015: a trade whose seller let his own time lapse gets a window
++/// that is already over (one second, started a second ago), so the same
++/// tick's `due_orders` puts it back in the book through the payment-window
++/// path of patch 0014: escrow returned to the seller, the buyer told. Only
++/// a row still without a window: one the server already answered is never
++/// rewritten.
++pub async fn store_missed(pool: &SqlitePool, ids: &[String], now: i64) -> Result<(), sqlx::Error> {
++    ensure_table(pool).await?;
++    for order_id in ids {
++        let Ok(id) = uuid::Uuid::parse_str(order_id) else {
++            continue;
++        };
++        let done = sqlx::query(
++            "UPDATE barattolo_payment_windows SET seconds = 1, asked_at = ?2, started_at = ?2 - 1
++             WHERE order_id = ?1 AND seconds IS NULL",
++        )
++        .bind(id)
++        .bind(now)
++        .execute(pool)
++        .await?;
++        if done.rows_affected() > 0 {
++            info!(
++                "barattolo_finestra: order {order_id}: the seller did not say where to send the fiat in his own time: back in the book"
++            );
++        }
++    }
++    Ok(())
++}
++
+ /// Patch 0014: an order put back in the book forgets its window, so the
+ /// next take starts from nothing. `record_seen` sweeps the same rows every
+ /// tick, in case this one fails.
+@@ -338,7 +423,19 @@ pub async fn due_orders(pool: &SqlitePool, now: i64) -> Result<Vec<Order>, sqlx:
+     .await
+ }
+ 
+-async fn ask_server(ids: &[String]) -> Result<HashMap<String, i64>, String> {
++/// Patch 0015: the windows (`parse_answer`) and, from the same body, the
++/// trades whose seller let his time lapse (`parse_missed`).
++async fn ask_server_with_missed(
++    ids: &[String],
++) -> Result<(HashMap<String, i64>, Vec<String>), String> {
 +    let raw = ask_raw(ids).await?;
-+    parse_answer(&raw, ids).ok_or_else(|| "unreadable answer".to_string())
++    let windows = parse_answer(&raw, ids).ok_or_else(|| "unreadable answer".to_string())?;
++    Ok((windows, parse_missed(&raw, ids)))
 +}
 +
 +/// The POST itself, shared by the buyer's windows and (patch 0015) the
@@ -109,7 +189,7 @@ index 0cf15bd..2eab64a 100644
      let (url, secret) = endpoint().ok_or_else(|| "not configured".to_string())?;
      let response = crate::barattolo_fee::http()
          .post(&url)
-@@ -366,8 +400,7 @@ async fn ask_server(ids: &[String]) -> Result<HashMap<String, i64>, String> {
+@@ -366,8 +463,7 @@ async fn ask_server(ids: &[String]) -> Result<HashMap<String, i64>, String> {
          }
          raw.extend_from_slice(&chunk);
      }
@@ -119,7 +199,47 @@ index 0cf15bd..2eab64a 100644
  }
  
  /// One refresh: stamp the trades newly active, ask the server the windows
-@@ -421,6 +454,169 @@ pub async fn refresh(pool: &SqlitePool, now: i64) {
+@@ -388,8 +484,10 @@ pub async fn refresh(pool: &SqlitePool, now: i64) {
+             return;
+         }
+     };
+-    let answer = match tokio::time::timeout(LOOKUP_BUDGET, ask_server(&ids)).await {
+-        Ok(Ok(windows)) => Some(windows),
++    // patch 0015: one request, two tables (the windows, and the sellers
++    // who let their own time lapse)
++    let answer = match tokio::time::timeout(LOOKUP_BUDGET, ask_server_with_missed(&ids)).await {
++        Ok(Ok(both)) => Some(both),
+         Ok(Err(reason)) => {
+             if WAS_OK.swap(false, Ordering::Relaxed) {
+                 warn!("barattolo_finestra: windows NOT known ({reason}): those trades have no time to pay until the server answers");
+@@ -403,16 +501,24 @@ pub async fn refresh(pool: &SqlitePool, now: i64) {
+             None
+         }
+     };
+-    if let Some(windows) = answer {
++    if let Some((windows, missed)) = answer {
+         if !WAS_OK.swap(true, Ordering::Relaxed) {
+             info!("barattolo_finestra: marketplace server answering again");
+         }
+         if let Err(e) = store_windows(pool, &windows, now).await {
+             warn!("barattolo_finestra: could not write the windows ({e}): asking again next tick");
+         }
++        // a window the server gave wins over a lapse in the same answer
++        let missed: Vec<String> = missed
++            .into_iter()
++            .filter(|id| !windows.contains_key(id.as_str()))
++            .collect();
++        if let Err(e) = store_missed(pool, &missed, now).await {
++            warn!("barattolo_finestra: could not write the lapsed trades ({e}): asking again next tick");
++        }
+         let waiting: Vec<String> = ids
+             .iter()
+-            .filter(|id| !windows.contains_key(id.as_str()))
++            .filter(|id| !windows.contains_key(id.as_str()) && !missed.contains(id))
+             .cloned()
+             .collect();
+         if let Err(e) = mark_asked(pool, &waiting, now).await {
+@@ -421,6 +527,169 @@ pub async fn refresh(pool: &SqlitePool, now: i64) {
      }
  }
  
@@ -289,7 +409,7 @@ index 0cf15bd..2eab64a 100644
  #[cfg(test)]
  mod tests {
      use super::*;
-@@ -498,10 +694,92 @@ mod tests {
+@@ -498,10 +767,92 @@ mod tests {
          assert!(info_pairs_when(false).is_empty());
          assert_eq!(
              info_pairs_when(true),
@@ -383,6 +503,55 @@ index 0cf15bd..2eab64a 100644
      async fn insert(pool: &SqlitePool, status: &str, held_at: i64) -> String {
          use mostro_core::db::Crud;
          let order = Order {
+@@ -658,4 +1009,48 @@ mod tests {
+             .unwrap();
+         assert!(due_orders(&pool, 10_000_000).await.unwrap().is_empty());
+     }
++
++    #[test]
++    fn only_asked_ids_marked_true_have_lapsed() {
++        let asked = vec!["a".to_string(), "b".to_string(), "c".to_string()];
++        let got = parse_missed(
++            r#"{"finestre": {"a": null}, "senza_recapito": {"a": true, "b": 1, "d": true}}"#,
++            &asked,
++        );
++        assert_eq!(got, vec!["a".to_string()]);
++        // a server of before (no table), a bad table or a bad body: nothing
++        assert!(parse_missed(r#"{"finestre": {"a": null}}"#, &asked).is_empty());
++        assert!(parse_missed(r#"{"senza_recapito": ["a"]}"#, &asked).is_empty());
++        assert!(parse_missed("not json", &asked).is_empty());
++    }
++
++    #[tokio::test]
++    async fn a_lapsed_seller_is_due_at_once_and_a_known_window_is_never_rewritten() {
++        let pool = pool().await;
++        let lapsed = insert(&pool, "active", 500).await;
++        let answered = insert(&pool, "active", 500).await;
++        record_seen(&pool, 1000).await.unwrap();
++        let mut answer = HashMap::new();
++        answer.insert(answered.clone(), 3600);
++        store_windows(&pool, &answer, 1000).await.unwrap();
++        store_missed(&pool, &[lapsed.clone(), answered.clone()], 2000)
++            .await
++            .unwrap();
++        let due: Vec<String> = due_orders(&pool, 2000)
++            .await
++            .unwrap()
++            .into_iter()
++            .map(|o| o.id.to_string())
++            .collect();
++        // the lapsed one now; the answered one keeps its hour (due at 4600)
++        assert_eq!(due, vec![lapsed.clone()]);
++        assert!(unknown_windows(&pool).await.unwrap().is_empty());
++        let later: Vec<String> = due_orders(&pool, 4600)
++            .await
++            .unwrap()
++            .into_iter()
++            .map(|o| o.id.to_string())
++            .collect();
++        assert!(later.contains(&answered));
++    }
+ }
 diff --git a/src/barattolo_tempo.rs b/src/barattolo_tempo.rs
 index 8eb7e6d..571c609 100644
 --- a/src/barattolo_tempo.rs

@@ -1247,6 +1247,13 @@ P2P_RIPUBBLICA = True
 # la annuncia.
 # Solo False spegne: niente scelta e niente risposta al nodo.
 P2P_TEMPO_PER_PAGARE = True
+# OGNI PASSO NEL TEMPO SCELTO (19 nov 2026): ACCESA di serie. Anche
+# «dove vuoi gli euro» sta nel tempo per pagare: chi vende riceve i
+# promemoria nella valuta dell'ordine, e allo scadere senza recapito il
+# nodo rimette l'ordine nel libro (patch 0015, tabella `senza_recapito`
+# di /api/p2p/finestre) e sull'on-chain Barattolo firma il rimborso a
+# chi ha depositato. Solo False spegne: il recapito torna senza tempo.
+P2P_RECAPITO_NEL_TEMPO = True
 # LA CHAT NELLO SCAMBIO (12 ott 2026): ACCESA di serie. Dentro ogni
 # scambio preso le due parti si scrivono; i messaggi passano dal server
 # gia' chiusi dal telefono, stanno in un file a parte (`chat-scambi.db`,

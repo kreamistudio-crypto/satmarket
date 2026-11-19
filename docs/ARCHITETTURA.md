@@ -37980,7 +37980,26 @@ mai il kind 0 di nessuno: regola ferrea 2).
   rete che vede la transazione, `visti_sats`, non la conferma); passato,
   la ronda annulla lo scambio (`_p2p_onchain_chiudi_invii_mancati`,
   `chiuso_perche='invio-scaduto'`) e l'ordine non rinasce. Leva
-  `P2P_ONCHAIN_DEPOSITO_COL_TEMPO`. Allo scadere senza
+  `P2P_ONCHAIN_DEPOSITO_COL_TEMPO`. OGNI PASSO NEL TEMPO SCELTO (19 nov
+  2026 sera, cantiere recapito-nel-tempo): anche «dove vuoi gli euro» ha
+  quel tempo, dall'attivo (Lightning) o dal deposito confermato (on-chain).
+  Sul Lightning la risposta al nodo porta `senza_recapito`, `{id: true}`
+  (`_senza_recapito_per_nodo_p2p`, giudice del «detto» `_recapito_detto_p2p`:
+  la dichiarazione o un avviso `recapito%` partito), e il nodo rimette
+  l'ordine nel libro per la strada della 0014; la frase del ritorno lo
+  dice (`dati["senza_recapito"]`) e a chi compra non si conta niente. I
+  promemoria a chi vende partono all'attivo coi momenti di
+  `_intervalli_recapito_p2p` (fino a 4 ore a meta' e a cinque minuti dalla
+  fine, oltre a un'ora, a sei e un'ora prima) al posto di quelli di
+  sempre. Sull'on-chain `p2p_onchain_recapito_entro` (colonna
+  `recapito_promemoria`: il livello mandato, -1 = scambio depositato prima
+  della colonna, senza limite), promemoria dalla ronda
+  (`_p2p_onchain_passata_recapito`) e allo scadere
+  `_p2p_onchain_chiudi_recapiti_mancati`: Barattolo firma il rimborso
+  verso chi ha depositato (`chiuso_perche='recapito-scaduto'`), l'ordine
+  non rinasce, nessun «non completato». L'archivio e la scheda portano
+  `recapito_entro`, la pagina ci disegna il conto. Leva
+  `P2P_RECAPITO_NEL_TEMPO`. Allo scadere senza
   «Ho inviato» annulla lui, e racconta `expired` / `payment-window`: il
   motivo dell'annullo è `tempo_pagare_scaduto`, e il «non completato» a
   chi compra segue la regola della garanzia scaduta più una

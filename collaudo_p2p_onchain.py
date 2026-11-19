@@ -2494,6 +2494,66 @@ def main():
           (409, True, False), (r.status_code, "disputa" in r.json()["detail"],
                                uno(999, o5s["id"])["riprendi_scaduto"]))
 
+    # OGNI PASSO NEL TEMPO SCELTO (19 nov 2026, cantiere recapito-nel-tempo;
+    # Andrea: «ogni passo deve durare 15 minuti», «stessa cosa nell'onchain»)
+    print("\n[«dove vuoi gli euro» nel tempo scelto: promemoria, poi il rimborso]")
+    prima_tempo = SRV.P2P_TEMPO_PER_PAGARE
+    SRV.P2P_TEMPO_PER_PAGARE = True
+    o5t = pubblica(999, metodi=["Revolut"], recapito="", minuti_pagare=30).json()
+    gesto(888, o5t["id"], "prendi")
+    paga(uno(999, o5t["id"]))
+    gesto(999, o5t["id"], "controlla")
+    ot = uno(999, o5t["id"])
+    prova("deposito confermato senza recapito: chi ha depositato e chi compra leggono "
+          "entro quando va scritto (30 minuti dal deposito)",
+          ("depositato", ot["depositato_il"] + 1800, ot["depositato_il"] + 1800),
+          (ot["stato"], ot.get("recapito_entro"), uno(888, o5t["id"]).get("recapito_entro")))
+
+    def indietro_oc(oid, secondi):
+        con = SRV.db()
+        con.execute("UPDATE p2p_onchain_ordini SET depositato_il=depositato_il-?,"
+                    " preso_il=preso_il-? WHERE id=?", (secondi, secondi, oid))
+        con.commit()
+        con.close()
+    indietro_oc(o5t["id"], 16 * 60)
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("a meta' tempo il promemoria a chi ha depositato, col tempo che resta; a chi "
+          "compra niente", (True, False),
+          (detto_a(999, "Hai ancora 14 minuti per scrivere dove vuoi gli euro"),
+           detto_a(888, "Hai ancora")))
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("...la ronda dopo non lo ripete", False, detto_a(999, "Hai ancora"))
+    indietro_oc(o5t["id"], 15 * 60)
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    ot = uno(999, o5t["id"])
+    prova("finito il tempo senza recapito: annullato, e Barattolo ha firmato il rimborso "
+          "verso chi ha depositato, detto a tutt'e due",
+          ("annullato", "recapito-scaduto", "compratore", True, True, True),
+          (ot["stato"], ot.get("chiuso_perche"), (ot.get("proposta") or {}).get("verso"),
+           bool((ot.get("proposta") or {}).get("psbt")),
+           detto_a(999, "Non hai scritto in tempo dove vuoi gli euro"),
+           detto_a(888, "Non mandare niente")))
+    uscite = PSBT.from_string(ot["proposta"]["psbt"]).tx.vout
+    prova("...un'uscita sola, verso il wallet di chi ha depositato", (1, ot["rimborso"]),
+          (len(uscite), script.Script(uscite[0].script_pubkey.data).address(N)))
+    prova("...e «Ho inviato» o un recapito adesso non passano piu'", (409, True),
+          (gesto(888, o5t["id"], "euro-inviati").status_code,
+           gesto(999, o5t["id"], "recapito", recapito="IBAN tardi").status_code >= 400))
+    r = gesto(999, o5t["id"], "firma", tx=cofirma(999, uno(999, o5t["id"])))
+    con = SRV.db()
+    figlio_t = con.execute("SELECT id FROM p2p_onchain_ordini WHERE rinato_da=?",
+                           (o5t["id"],)).fetchone()
+    con.close()
+    prova("la seconda firma: rimborsato, a NESSUNO il «non completato» (chi compra non "
+          "sapeva dove pagare), e l'ordine NON torna nel libro",
+          (200, "rimborsato", "", "", None),
+          (r.status_code, r.json()["stato"], uno(999, o5t["id"]).get("non_completato") or "",
+           uno(888, o5t["id"]).get("non_completato") or "", figlio_t))
+    SRV.P2P_TEMPO_PER_PAGARE = prima_tempo
+
     print("\n[il conto alla rovescia nel bot: un messaggio solo, riscritto]")
     # (19 nov 2026, regole-sulla-card) chi deve pagare riceve UN messaggio che
     # si riscrive ogni minuto: qui il giro si chiama a mano e il bot si ascolta

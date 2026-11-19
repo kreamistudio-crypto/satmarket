@@ -38172,6 +38172,14 @@ def _leve_stato():
                   spento="nessuna scelta nel foglio e nessuna risposta al "
                          "nodo: gli scambi hanno il solo tempo della garanzia "
                          "(~92 ore)"),
+            # OGNI PASSO NEL TEMPO SCELTO (19 nov 2026): accesa di serie
+            _leva("«Dove vuoi gli euro» nel tempo per pagare",
+                  "P2P_RECAPITO_NEL_TEMPO",
+                  globals().get("P2P_RECAPITO_NEL_TEMPO", True),
+                  acceso="chi vende, a sats bloccati, ha il tempo per pagare "
+                         "che ha scelto per dire dove vuole gli euro; sennò lo "
+                         "scambio finisce e i sats tornano a lui",
+                  spento="il passo «dove vuoi gli euro» non ha un limite"),
             # LA CHAT NELLO SCAMBIO (12 ott 2026): accesa di serie
             _leva("Chat nello scambio P2P", "P2P_CHAT_SCAMBIO",
                   P2P_CHAT_SCAMBIO,
@@ -61579,6 +61587,19 @@ try:
         P2P_TEMPO_PER_PAGARE = True
 except ImportError:
     P2P_TEMPO_PER_PAGARE = True
+# OGNI PASSO NEL TEMPO SCELTO (19 nov 2026, sera, cantiere recapito-nel-
+# tempo; Andrea: «ogni passo deve durare 15 minuti», «stessa cosa
+# nell'onchain», «se io pretendo 15 minuti anche io devo poterlo fare in 15
+# minuti»): chi vende, dopo aver bloccato i sats (on-chain: dal deposito
+# confermato), ha lo stesso tempo per dire dove vuole gli euro. Sennò lo
+# scambio finisce e i sats tornano a lui: su Lightning lo fa il nodo (patch
+# 0015, la tabella `senza_recapito`), on-chain la ronda con la firma di
+# Barattolo. Accesa di serie; False = il passo resta senza limite.
+try:
+    from config import P2P_RECAPITO_NEL_TEMPO
+    P2P_RECAPITO_NEL_TEMPO = P2P_RECAPITO_NEL_TEMPO is not False
+except ImportError:
+    P2P_RECAPITO_NEL_TEMPO = True
 # UN OROLOGIO, NON TRE SOGLIE (18 nov 2026, stesso cantiere, Andrea: «non
 # a soglie che decidiamo noi mentre tipo un orologio con un timer che
 # decidi tu quanto farlo scorrere»). In MINUTI, a passi di un quarto
@@ -62716,11 +62737,16 @@ async def finestre_p2p(req: Request):
         adesso = int(time.time())
         finestre = _finestre_per_nodo_p2p(con, (d or {}).get("ordini"), adesso)
         pubblica = _pubblica_per_nodo_p2p(con, (d or {}).get("ordini"), adesso)
+        # (19 nov 2026, recapito-nel-tempo) chi vende non ha detto dove
+        # ricevere gli euro nel suo tempo: il nodo rimette l'ordine nel libro
+        senza_recapito = (globals().get("_senza_recapito_per_nodo_p2p")
+                          or (lambda *_a: {}))(con, (d or {}).get("ordini"), adesso)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return JSONResponse({"ok": True, "finestre": finestre, "pubblica": pubblica},
+    return JSONResponse({"ok": True, "finestre": finestre, "pubblica": pubblica,
+                         "senza_recapito": senza_recapito},
                         headers={"Cache-Control": "no-store"})
 
 
@@ -65756,6 +65782,69 @@ def _pubblica_per_nodo_p2p(con, ordini, adesso: int = 0) -> dict:
                 fuori[o] = 0
                 continue
         fuori[o] = minuti * 60
+    return fuori
+
+
+def _recapito_detto_p2p(con, ordine: str, momenti, giro=None) -> bool:
+    """Chi vende ha detto dove ricevere gli euro nel giro (dell'ultimo, se
+    non detto)? La dichiarazione del suo telefono, o, senza, un avviso del
+    recapito partito (lo stesso «detto» della reputazione)."""
+    if _recapito_dal_p2p(momenti, giro):
+        return True
+    noti = [m for m in (momenti or []) if isinstance(m, dict)]
+    if giro is None:
+        giro = max([int(m.get("giro") or 0) for m in noti] or [0])
+    try:
+        return con.execute(
+            "SELECT 1 FROM p2p_avvisi WHERE ordine=? AND giro=? AND momento LIKE "
+            "'recapito%' LIMIT 1", (ordine, int(giro or 0))).fetchone() is not None
+    except sqlite3.OperationalError:
+        return False
+
+
+def _recapito_entro_p2p(momenti, minuti: int, giro=None) -> int:
+    """PURA: l'epoch entro cui chi vende dice dove vuole gli euro (19 nov
+    2026, cantiere recapito-nel-tempo): dall'attivo, coi minuti del tempo
+    per pagare. 0 = nessun tempo, non ancora attivo, o il recapito c'e'
+    gia' (allora corre il tempo di chi compra)."""
+    minuti = _minuti_pagare_scelta_p2p(minuti)
+    if not minuti or _recapito_dal_p2p(momenti, giro):
+        return 0
+    attivo = _attivo_dal_p2p(momenti, giro)
+    return attivo + minuti * 60 if attivo else 0
+
+
+def _senza_recapito_per_nodo_p2p(con, ordini, adesso: int) -> dict:
+    """OGNI PASSO NEL TEMPO SCELTO (19 nov 2026, patch 0015; Andrea: «ogni
+    passo deve durare 15 minuti»): `{ordine: True}` per gli ordini chiesti
+    il cui scambio e' attivo da piu' del tempo per pagare scelto e chi vende
+    NON ha ancora detto dove ricevere gli euro. Il nodo li rimette nel libro
+    per la strada della finestra (patch 0014): la garanzia torna a chi vende,
+    e a chi compra non si conta niente (`_esiti_dopo_garanzia_p2p`: «chi
+    vende non aveva detto dove ricevere gli euro»). Un ordine che non c'e' =
+    niente, come prima. Leva `P2P_RECAPITO_NEL_TEMPO`."""
+    if not globals().get("P2P_RECAPITO_NEL_TEMPO", False):
+        return {}
+    pulite = _ordini_puliti_p2p(ordini)
+    tempi = _minuti_pagare_righe_p2p(con, pulite)
+    fuori = {}
+    for o in pulite:
+        minuti = tempi.get(o, 0)
+        if not minuti:
+            continue
+        try:
+            momenti = [dict(m) for m in con.execute(
+                "SELECT momento, quando, dettaglio, giro FROM p2p_momenti "
+                "WHERE ordine=?", (o,))]
+        except sqlite3.OperationalError:
+            continue
+        entro = _recapito_entro_p2p(momenti, minuti)
+        if not entro or int(adesso) < entro or _recapito_detto_p2p(con, o, momenti):
+            continue
+        print(f"· Tempo per pagare: {o[:8]} chi vende non ha detto dove ricevere "
+              f"gli euro in {_durata_detta_p2p(minuti * 60)}: il nodo lo rimette "
+              "nel libro", flush=True)
+        fuori[o] = True
     return fuori
 
 
@@ -72185,6 +72274,44 @@ SOLLECITO_RECAPITO_CORTO_TESTO = (
     "euro».")
 
 
+# ...e dal 19 nov 2026 (cantiere recapito-nel-tempo, «ogni passo deve
+# durare 15 minuti») quel passo HA un limite: il tempo per pagare scelto,
+# dall'attivo. I promemoria a chi vende col tempo che resta: fino a 4 ore a
+# meta' e a cinque minuti dalla fine; oltre, a un'ora, a sei e un'ora prima
+# della fine (`_intervalli_recapito_p2p`). Le parole sono per gli euro: il
+# battito le traduce nella valuta dell'ordine, come tutti i solleciti.
+SOLLECITO_RECAPITO_TEMPO_TESTO = (
+    "📍 Hai ancora {resto} per dire a chi compra dove mandarti gli euro: apri "
+    "la pagina dello scambio e tocca «💶 Indica dove ricevere gli euro». Se "
+    "allo scadere non l'hai fatto, lo scambio finisce e i sats tornano a te.")
+
+
+def _intervalli_recapito_p2p(minuti: int) -> tuple:
+    """PURA: i secondi dall'ATTIVO dei promemoria a chi vende che non ha
+    ancora detto dove ricevere gli euro, col tempo per pagare di `minuti`
+    (19 nov 2026, recapito-nel-tempo). `()` senza un tempo."""
+    m = _minuti_pagare_scelta_p2p(minuti)
+    if not m:
+        return ()
+    t = m * 60
+    cand = ((t // 2, t - 5 * 60) if m <= P2P_MINUTI_RECAPITO_CORTO
+            else (3600, 6 * 3600, t - 3600))
+    fuori = []
+    for x in sorted(set(cand)):
+        if 0 < x < t and (not fuori or x - fuori[-1] >= 60):
+            fuori.append(x)
+    return tuple(fuori)
+
+
+def _testi_recapito_p2p(minuti: int) -> tuple:
+    """PURA: `(intervalli, testi)` dei promemoria del recapito col tempo
+    che resta gia' scritto; `((), {})` senza un tempo."""
+    m = _minuti_pagare_scelta_p2p(minuti)
+    intervalli = _intervalli_recapito_p2p(m)
+    return intervalli, {i: SOLLECITO_RECAPITO_TEMPO_TESTO.format(
+        resto=_durata_detta_p2p(m * 60 - fra)) for i, fra in enumerate(intervalli, 1)}
+
+
 def _durata_detta_p2p(secondi: int) -> str:
     """PURA: «45 minuti», «1 ora», «3 ore», «2 ore e 30 minuti»."""
     s = max(0, int(secondi or 0))
@@ -72753,7 +72880,15 @@ def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     det = str(ev.get("dettaglio") or "")
     diventa_attivo = ((momento == "garanzia_pagata" and det in ("", "active"))
                       or (momento == "fattura_data" and det == "active"))
-    if momento == "garanzia_pagata" and vende and compra:
+    # (19 nov 2026, recapito-nel-tempo) col passo a tempo i promemoria del
+    # recapito partono dall'attivo, col tempo che resta: quelli di sempre no
+    recapito_a_tempo = bool(minuti_tempo and globals().get("P2P_RECAPITO_NEL_TEMPO", False)
+                            and globals().get("_testi_recapito_p2p"))
+    if recapito_a_tempo and diventa_attivo and vende:
+        _int_r, _testi_r = _testi_recapito_p2p(minuti_tempo)
+        if _int_r:
+            in_attesa("sollecito_recapito", vende, _testi_r, _int_r, "sollecito_recapito")
+    if momento == "garanzia_pagata" and vende and compra and not recapito_a_tempo:
         dati_v = _dati_frase_p2p(con, ordine)
         if _recapito_corto_s_p2p(minuti_tempo):
             in_attesa("sollecito_recapito", vende,
@@ -78019,6 +78154,18 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         # che alla prossima presa la garanzia si blocca di nuovo; a chi
         # compra la strada se gli euro erano partiti davvero, e la riga del
         # conto se c'e'
+        if dati.get("senza_recapito"):
+            # (19 nov 2026, recapito-nel-tempo) era chi vende a dover dire
+            # dove ricevere gli euro, e non l'ha detto nel suo tempo
+            if vende:
+                return ("⏰ <b>Non hai detto in tempo dove ricevere gli euro: il "
+                        "tuo ordine è tornato nel libro.</b>"
+                        + (tornati or " I sats tornano a te.")
+                        + " Alla prossima presa la garanzia si blocca di nuovo. "
+                        "Se non lo vuoi più nel libro, apri l'ordine e ritiralo.")
+            return ("⏰ <b>Chi vende non ha detto in tempo dove mandare gli "
+                    "euro:</b> lo scambio è annullato e l'ordine è tornato nel "
+                    "libro. Non devi mandare niente, e non ti viene contato niente.")
         if vende:
             return ("⏰ <b>Il tempo per pagare è finito senza gli euro "
                     "segnati: il tuo ordine è tornato nel libro.</b>"
@@ -78339,6 +78486,16 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # il tempo per pagare (18 nov 2026), per la frase della garanzia
     if momento == "garanzia_pagata":
         dati["minuti_pagare"] = _minuti_pagare_ordine_p2p(con, ordine)
+    # (19 nov 2026, recapito-nel-tempo) il ritorno nel libro perche' chi
+    # vende non ha detto dove ricevere gli euro nel suo tempo: altre frasi
+    if momento == "tornato" and ev.get("dettaglio") == "payment-window-republished":
+        try:
+            _det = globals().get("_recapito_detto_p2p")
+            dati["senza_recapito"] = bool(_det) and not _det(con, ordine, [dict(m) for m in con.execute(
+                "SELECT momento, quando, dettaglio, giro FROM p2p_momenti WHERE ordine=?",
+                (ordine,))], giro)
+        except Exception:
+            dati["senza_recapito"] = False
     if (((momento == "annullato"
             and ev.get("dettaglio") in ("escrow-deadline", "payment-window"))
             or (momento == "tornato"
@@ -81207,6 +81364,12 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             # la pagina dello scambio ci disegna il timer. 0 = nessun tempo
             "minuti_pagare": minuti_pagare.get(ordine, 0),
             "paga_entro": _paga_entro_p2p(momenti, minuti_pagare.get(ordine, 0)),
+            # (19 nov 2026, recapito-nel-tempo) entro quando chi vende dice
+            # dove vuole gli euro: dall'attivo, coi minuti scelti. 0 = nessun
+            # limite (leva spenta, nessun tempo, o il recapito c'e' gia')
+            "recapito_entro": (globals().get("_recapito_entro_p2p", lambda *_a: 0)(
+                momenti, minuti_pagare.get(ordine, 0))
+                if globals().get("P2P_RECAPITO_NEL_TEMPO", False) else 0),
             # LA RIGA DEL CONTO NELL'APP (10 ott 2026, l'avviso del blocco):
             # se QUESTO giro mi e' stato contato come non completato, la
             # stessa frase del Telegram — la pagina dello scambio tornato
@@ -112417,6 +112580,28 @@ def p2p_onchain_paga_entro(o) -> int:
     return min(entro, tab_scade) if tab_scade else entro
 
 
+def p2p_onchain_recapito_entro(o) -> int:
+    """PURA: l'epoch entro cui chi vende scrive dove vuole gli euro (19 nov
+    2026, cantiere recapito-nel-tempo; Andrea: «ogni passo deve durare 15
+    minuti», «stessa cosa nell'onchain»): dal deposito confermato, coi
+    minuti del tempo per pagare. 0 = nessun limite: leva spenta, deposito
+    non confermato, recapito gia' scritto, PayCode, contanti di persona."""
+    if not globals().get("P2P_RECAPITO_NEL_TEMPO", False):
+        return 0
+    if str(_p2p_onchain_campo(o, "stato", "") or "") != "depositato":
+        return 0
+    dal = int(_p2p_onchain_campo(o, "depositato_il", 0) or 0)
+    if dal <= 0 or _p2p_onchain_ha_dove_pagare(o):
+        return 0
+    # -1 = gia' depositato prima del limite (la migrazione): nessun limite
+    if int(_p2p_onchain_campo(o, "recapito_promemoria", 0) or 0) < 0:
+        return 0
+    if globals().get("_p2p_onchain_contanti", lambda x: False)(o):
+        return 0
+    minuti = int(_p2p_onchain_minuti(o) or 0)
+    return dal + minuti * 60 if minuti > 0 else 0
+
+
 def p2p_onchain_ore_bonifico(o) -> int:
     """PURA: le ore che chi vende ha per VEDERE ARRIVARE i soldi, da «Ho
     inviato» (17 nov 2026 sera): 48 per euro e franchi che viaggiano in
@@ -112862,6 +113047,9 @@ def _p2p_onchain_prepara(con):
                       # pagare scelto da chi pubblica, in minuti, come nel
                       # Lightning (0 = non scelto: le ore di sempre)
                       ("minuti_pagare", "INTEGER DEFAULT 0"),
+                      # (19 nov 2026, recapito-nel-tempo) i promemoria del
+                      # recapito a chi vende, il livello gia' mandato
+                      ("recapito_promemoria", "INTEGER DEFAULT 0"),
                       # 18 nov 2026: chi pubblica chiede la cauzione a
                       # chiunque prenda, con qualunque metodo (1 = si')
                       ("cauzione_chiesta", "INTEGER DEFAULT 0"),
@@ -112877,6 +113065,12 @@ def _p2p_onchain_prepara(con):
                       ("rinato_da", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+    # (19 nov 2026, recapito-nel-tempo) gli scambi gia' depositati senza
+    # recapito il giorno che la colonna nasce restano SENZA limite (-1): un
+    # limite che nessun promemoria ha annunciato non annulla nessuno
+    if "recapito_promemoria" not in gia:
+        con.execute("UPDATE p2p_onchain_ordini SET recapito_promemoria=-1"
+                    " WHERE stato='depositato' AND COALESCE(recapito,'')=''")
     # LE CAUZIONI DEL CONTANTI ON-CHAIN (17 nov 2026 sera): una riga per
     # ogni hold invoice chiesta a LND. `preimage` resta qui perche' la
     # cauzione la tiene Barattolo (decisione di Andrea): senza, non si
@@ -113538,6 +113732,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "depositato_il": int(o["depositato_il"] or 0),
         # (17 nov 2026) il tempo per pagare: la card e la pagina lo contano
         "paga_entro": p2p_onchain_paga_entro(o),
+        # (19 nov 2026, recapito-nel-tempo) entro quando chi vende scrive
+        # dove vuole gli euro; 0 = nessun limite
+        "recapito_entro": globals().get("p2p_onchain_recapito_entro", lambda x: 0)(o),
         # (19 nov 2026, ritorno-nel-libro) ...e da quando corre: dal
         # deposito, ma non prima del recapito (0 = non corre ancora)
         "pagare_dal": p2p_onchain_inizio_pagare(o),
@@ -118845,6 +119042,148 @@ async def _p2p_onchain_chiudi_invii_mancati(adesso: int) -> int:
     return fatti
 
 
+
+# OGNI PASSO NEL TEMPO SCELTO, ON-CHAIN (19 nov 2026, cantiere recapito-nel-
+# tempo; Andrea: «stessa cosa nell'onchain»): dal deposito confermato chi
+# vende ha il tempo per pagare per scrivere dove vuole gli euro
+# (`p2p_onchain_recapito_entro`). Intanto i promemoria col tempo che resta
+# (gli stessi momenti del Lightning, `_intervalli_recapito_p2p`); passato,
+# la ronda chiude lo scambio e BARATTOLO FIRMA IL RIMBORSO verso il wallet
+# di chi ha depositato, come in «Annulla e riprendi i sats»: chi compra non
+# e' mai stato invitato a pagare (non sapeva dove), quindi non perde niente,
+# e i sats vanno solo all'indirizzo che il seme di chi li ha messi ha
+# firmato. La seconda firma la mette il suo telefono. L'ordine non rinasce,
+# a chi compra non si conta niente, e la sua cauzione torna (senza un
+# recapito non si perde mai: `p2p_onchain_cauzione_persa_da_sola`).
+SOLLECITO_RECAPITO_OC_TESTO = (
+    "📍 Hai ancora {resto} per scrivere dove vuoi gli euro: apri lo scambio. "
+    "Se allo scadere non l'hai fatto, lo scambio si annulla e i sats tornano "
+    "a te.")
+
+
+def p2p_onchain_promemoria_recapito_dovuto(o, adesso: int):
+    """PURA: `(livello, testo)` del promemoria del recapito da mandare
+    adesso a chi ha depositato, o None. Solo l'ULTIMO livello passato e non
+    ancora mandato (una ronda in ritardo non ne manda due)."""
+    entro = p2p_onchain_recapito_entro(o)
+    if not entro:
+        return None
+    dal = int(_p2p_onchain_campo(o, "depositato_il", 0) or 0)
+    minuti = (entro - dal) // 60
+    intervalli = _intervalli_recapito_p2p(minuti) if minuti > 0 else ()
+    passati = [i for i, fra in enumerate(intervalli, 1) if int(adesso) >= dal + fra]
+    if not passati:
+        return None
+    n = passati[-1]
+    if int(_p2p_onchain_campo(o, "recapito_promemoria", 0) or 0) >= n:
+        return None
+    return n, SOLLECITO_RECAPITO_OC_TESTO.format(
+        resto=_durata_detta_p2p(max(60, entro - int(adesso))))
+
+
+def _p2p_onchain_passata_recapito(con, adesso: int) -> list:
+    """I promemoria del recapito dovuti adesso: timbra il livello PRIMA
+    dell'invio e torna `[(riga, tg_id, testo)]`."""
+    fuori = []
+    for o in con.execute(
+            "SELECT * FROM p2p_onchain_ordini WHERE stato='depositato'"
+            " AND COALESCE(recapito,'')='' AND COALESCE(euro_inviati_il,0)=0"
+            " AND COALESCE(proposta_psbt,'')='' AND COALESCE(decisione_da,0)=0"
+            " AND COALESCE(ricevuti_sats,0)>0 ORDER BY id LIMIT 200").fetchall():
+        dovuto = p2p_onchain_promemoria_recapito_dovuto(o, adesso)
+        if not dovuto:
+            continue
+        n, testo = dovuto
+        cur = con.execute(
+            "UPDATE p2p_onchain_ordini SET recapito_promemoria=? WHERE id=?"
+            " AND stato='depositato' AND COALESCE(recapito_promemoria,0)<?",
+            (n, o["id"], n))
+        if cur.rowcount:
+            fuori.append((o, int(o["depositante_id"]), testo))
+    con.commit()
+    return fuori
+
+
+def _p2p_onchain_recapiti_mancati(con, adesso: int) -> list:
+    """Gli scambi col tempo del recapito finito, senza recapito, senza
+    firme e senza «Ho inviato»: le righe."""
+    return [o for o in con.execute(
+        "SELECT * FROM p2p_onchain_ordini WHERE stato='depositato'"
+        " AND COALESCE(recapito,'')='' AND COALESCE(euro_inviati_il,0)=0"
+        " AND COALESCE(proposta_psbt,'')='' AND COALESCE(decisione_da,0)=0"
+        " AND COALESCE(ricevuti_sats,0)>0 ORDER BY id LIMIT 20").fetchall()
+        if 0 < p2p_onchain_recapito_entro(o) <= int(adesso)]
+
+
+async def _p2p_onchain_chiudi_recapiti_mancati(adesso: int) -> int:
+    """Chiude gli scambi di `_p2p_onchain_recapiti_mancati` con la firma di
+    Barattolo verso chi ha depositato. Senza un indirizzo di ritorno non si
+    firma: resta com'e' (la disputa) e lo dice il journal. Torna quanti."""
+    con = _p2p_onchain_db()
+    try:
+        righe = _p2p_onchain_recapiti_mancati(con, adesso)
+    finally:
+        con.close()
+    fatti = 0
+    for o in righe:
+        oid = int(o["id"])
+        try:
+            if not o["rimborso"]:
+                print(f"· P2P on-chain: scambio {oid}, recapito non scritto in tempo "
+                      "ma senza indirizzo di ritorno: resta alla disputa", flush=True)
+                continue
+            con = _p2p_onchain_db()
+            try:
+                o = _p2p_onchain_carica(con, oid)
+                if not (0 < p2p_onchain_recapito_entro(o) <= int(adesso)):
+                    continue
+                psbt = _onchain_psbt_barattolo(con, o, "compratore")
+                cur = con.execute(
+                    "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+                    " chiuso_perche='recapito-scaduto',"
+                    " proposta_verso='compratore', proposta_psbt=?, proposta_da=0,"
+                    " proposta_il=?, decisione_da=?, decisione_il=?,"
+                    " decisione_perche='recapito-scaduto', aggiornato=?"
+                    " WHERE id=? AND stato='depositato' AND COALESCE(recapito,'')=''"
+                    " AND COALESCE(euro_inviati_il,0)=0 AND COALESCE(proposta_psbt,'')=''"
+                    " AND COALESCE(decisione_da,0)=0",
+                    # `decisione_da` = chi ha depositato, come «Annulla e
+                    # riprendi i sats»: la pagina dice che ha firmato Barattolo
+                    (int(adesso), psbt, int(adesso), int(o["depositante_id"]),
+                     int(adesso), int(adesso), oid))
+                con.commit()
+                if not cur.rowcount:
+                    continue
+                o = _p2p_onchain_carica(con, oid)
+            finally:
+                con.close()
+            fatti += 1
+            _p2p_onchain_rifai_foto()
+            asyncio.create_task(_p2p_onchain_pubblica(oid))
+            print(f"⏰ P2P on-chain: scambio {oid}, chi vende non ha scritto dove "
+                  "vuole gli euro in tempo: annullato, Barattolo ha firmato il "
+                  "rimborso", flush=True)
+            await _notifica_p2p_onchain(
+                o, int(o["depositante_id"]),
+                "⏰ <b>Non hai scritto in tempo dove vuoi gli euro</b> e lo scambio "
+                f"on-chain di {_p2p_onchain_quanto(o)} è annullato.\n\n"
+                "Barattolo ha firmato il rimborso: apri lo scambio e tocca «✍️ Metti "
+                "la seconda firma», i sats tornano al tuo wallet (meno la "
+                "commissione di rete).", _p2p_onchain_bottone(o))
+            await _notifica_p2p_onchain(
+                o, int(o["ricevente_id"]),
+                "⏰ <b>Chi vende non ha scritto in tempo dove mandare gli euro</b> e "
+                f"lo scambio on-chain di {_p2p_onchain_quanto(o)} è annullato.\n\n"
+                "Non mandare niente: non ti viene contato niente"
+                + (" e la cauzione ti torna nel wallet." if int(_p2p_onchain_campo(
+                    o, "cauzione_chiesta", 0) or 0) else "."),
+                _p2p_onchain_bottone(o))
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: recapito mancato dello scambio {oid} "
+                  f"non chiuso: {e}", flush=True)
+    return fatti
+
+
 async def _p2p_onchain_ronda() -> None:
     """Il battito del libro on-chain, dentro `orologio_onchain` (ogni due
     minuti): gli scambi presi si guardano su mempool; gli ordini nel
@@ -118884,6 +119223,9 @@ async def _p2p_onchain_ronda() -> None:
         # I PROMEMORIA (17 nov 2026, dopo il tempo finito: chi l'ha appena
         # avuto non riceve anche il terzo)
         promemoria = _p2p_onchain_passata_solleciti(con, adesso)
+        # (19 nov 2026, recapito-nel-tempo) i promemoria del recapito
+        promemoria += (globals().get("_p2p_onchain_passata_recapito")
+                       or (lambda *_a: []))(con, adesso)
     finally:
         con.close()
     for o, chi, testo in promemoria:
@@ -118965,6 +119307,12 @@ async def _p2p_onchain_ronda() -> None:
         await _p2p_onchain_chiudi_invii_mancati(adesso)
     except Exception as e:
         print(f"⚠️ P2P on-chain: invii mancati non guardati: {e}", flush=True)
+    # (19 nov 2026, recapito-nel-tempo) chi vende non ha scritto dove vuole
+    # gli euro nel suo tempo: Barattolo firma il rimborso
+    try:
+        await _p2p_onchain_chiudi_recapiti_mancati(adesso)
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: recapiti mancati non guardati: {e}", flush=True)
 
 
 @app.get("/vendor/btc.js")

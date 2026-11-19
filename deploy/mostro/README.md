@@ -6,9 +6,13 @@ su una vendita col tempo per pagare scelto, chi pubblica ha al massimo
 quel tempo per pagare la garanzia (al posto delle sue tre ore), chiesto al
 server con la domanda della 0013. Come la 0014 non ha un patcher: la
 `.patch` è la sorgente (tocca `barattolo_finestra.rs`, `barattolo_tempo.rs`,
-e le due chiamate in `db.rs` e `scheduler.rs`). `git am` delle quattordici
-`.patch` su un clone pulito della `v0.20.2` dà l'albero `de96252a`, e
-`cargo test` dice 2009 verdi, 0 rosse, 4 ignorate. Il perché: NODO-MOSTRO,
+e le due chiamate in `db.rs` e `scheduler.rs`). Dalla sera (cantiere
+`recapito-nel-tempo`) la stessa risposta porta anche `senza_recapito`
+(`{id: true}`): lo scambio attivo dove chi vende non ha detto dove
+ricevere gli euro nel tempo scelto scade subito per la strada della 0014
+(l'ordine torna nel libro, la garanzia torna). `git am` delle quindici
+`.patch` su un clone pulito della `v0.20.2` dà l'albero `deb731c3`, e
+`cargo test` dice 2011 verdi, 0 rosse, 5 ignorate. Il perché: NODO-MOSTRO,
 «LA 0015».
 
 **Dal 19 novembre 2026 la 0014 È SUL NODO** (immagine `mostro:v0.20.2-bar11`,

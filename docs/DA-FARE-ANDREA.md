@@ -976,7 +976,11 @@ la presa (`maker_expiration_seconds`), anche se a chi compra ha dato 30
 minuti per pagare. Con la `-bar12` (patch 0015) su una vendita col tempo
 per pagare scelto, chi pubblica ha AL MASSIMO quel tempo (30 minuti → 30
 minuti; 24 ore → restano le 3 ore). Se non blocca in tempo l'ordine torna
-nel libro, come oggi. Niente segreti nuovi, niente righe nel config:
+nel libro, come oggi. E dalla sera del 19 nov (cantiere recapito-nel-tempo,
+«ogni passo deve durare 15 minuti») lo stesso tempo vale per «dove vuoi
+gli euro»: se a garanzia bloccata chi vende non lo dice entro il tempo
+scelto, il server lo segnala (`senza_recapito`) e il nodo rimette l'ordine
+nel libro ridando la garanzia. Niente segreti nuovi, niente righe nel config:
 cambia solo l'immagine. Promozione e `-bar12` in qualunque ordine: col
 server di prima il nodo non sa le scelte e tiene le 3 ore; con l'app di
 prima il tag nuovo si ignora.
@@ -1008,7 +1012,7 @@ mkdir -p ~/nodo/patch-bar12 && tar xf ~/mostro-bar12.tar -C ~/nodo/patch-bar12 -
 ```
 cd ~/nodo/mostro-src && git am ~/nodo/patch-bar12/0015-*.patch && git rev-parse HEAD^{tree}
 ```
-Atteso `de96252a20faf3b5c4be805ca52880b8438aae69` (lo stesso del cloud).
+Atteso `deb731c3e17a18427a0eca4c27064dd8cde54646` (lo stesso del cloud).
 Se `git am` si ferma: `git am --abort` e si incolla a Claude.
 
 4) I test prima della build (due lanci):
@@ -1018,7 +1022,7 @@ docker build -f docker/Dockerfile --target builder -t mostro-test:bar12 .
 ```
 docker run --rm mostro-test:bar12 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods barattolo_tempo nip33 find_order_by_seconds a_dispute_the_daemon_opens barattolo_finestra payment_window
 ```
-Atteso `748 passed; 0 failed; 1 ignored`.
+Atteso `750 passed; 0 failed; 1 ignored`.
 ```
 docker run --rm mostro-test:bar12 cargo test --release -- util::tests::
 ```
@@ -1067,6 +1071,12 @@ minuti. Dall'altro account la prendi: la pagina dello scambio deve dire
 pagare la garanzia: dopo 15 minuti (entro un minuto in più) l'ordine torna
 nel libro e arriva «tornato nel libro». Nel journal del nodo:
 `docker compose logs mostro --since 30m | grep "at most 15 minutes"`.
+Seconda prova, «dove vuoi gli euro»: stessa vendita a 15 minuti, la
+prendi, dal primo account paghi la garanzia ma NON tocchi «Indica dove
+ricevere gli euro». Arrivano i due promemoria (a 7 minuti e mezzo e a 5
+dalla fine); dopo 15 minuti dall'attivo (entro un minuto in più)
+l'ordine torna nel libro, arriva «Non hai detto in tempo dove ricevere
+gli euro» e la garanzia torna.
 
 ROLLBACK (solo se la `-bar12` non regge): `cd ~/nodo && cp -p docker-compose.yml.prima-bar12 docker-compose.yml && docker compose up -d mostro`
 → `-bar11`; il database resta quello (la tabella in più la `-bar11` la

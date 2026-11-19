@@ -842,3 +842,9 @@ frase: Negli scambi P2P on-chain chi vende con un tempo per pagare corto ha lo s
 dove: P2P → «Pubblica» → «Vendi BTC» on-chain → «Tempo per pagare» (il cursore parte da 30 minuti, e la nota sotto lo dice); nello scambio, il foglio «🔒 Blocca i sats»: «⏱ Basta che il deposito parta entro le …».
 leva: P2P_ONCHAIN_DEPOSITO_COL_TEMPO (accesa di serie)
 pubblico: sì
+
+## 2026-11-19 · recapito-nel-tempo
+frase: Negli scambi P2P col tempo per pagare, anche chi vende ha quel tempo per dire dove vuole gli euro (o gli USDT): riceve i promemoria e vede quanto resta. Se non lo dice in tempo, su Lightning l'ordine torna nel libro, on-chain lo scambio si annulla e i sats tornano a lui; chi compra non deve mandare niente e non gli si conta niente.
+dove: P2P → «I miei scambi» → lo scambio preso, sotto lo stato: «Hai ancora … per toccare «Indica dove ricevere gli euro»» (a chi compra: «Chi vende ha ancora …»); nel riquadro della presa, il primo passo dice anche il tempo di chi vende.
+leva: P2P_RECAPITO_NEL_TEMPO (accesa di serie)
+pubblico: sì

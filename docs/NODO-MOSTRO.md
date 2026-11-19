@@ -730,6 +730,18 @@ manca o la tabella illeggibile = nessuna scelta, valgono le tre ore. Nel
 38385 il tag `barattolo_maker_payment_window = 1`: l'app conta il tempo
 corto SOLO se lo vede. Quel che un server compromesso ottiene in più:
 accorciare a 15 minuti l'attesa di chi pubblica, e l'ordine torna nel
-libro; nessun sats si muove. Compilata e provata nel cloud: albero
-`de96252a`, 2009 prove `cargo` verdi, 4 ignorate (il giro filtrato del nodo:
-748 + 90).
+libro; nessun sats si muove.
+OGNI PASSO NEL TEMPO SCELTO (stessa sera, cantiere `recapito-nel-tempo`;
+Andrea: «ogni passo deve durare 15 minuti»): la risposta porta anche
+`senza_recapito` (`{id: true}`), gli scambi attivi da piu' del tempo
+scelto dove chi vende non ha ancora detto dove ricevere gli euro. Il nodo
+li scrive nella tabella della 0014 con `seconds = 1` e `started_at = adesso
+- 1` (`store_missed`, solo dove `seconds` e' ancora NULL: una finestra
+vera non si riscrive mai), e `due_orders` li prende al giro stesso: la
+strada di sempre della 0014, `payment-window-republished`, garanzia
+restituita, ordine nel libro. Solo gli id CHIESTI e marcati `true` valgono
+(`parse_missed`), e uno che ha anche una finestra resta alla finestra. Un
+server compromesso ottiene in piu': rimettere nel libro uno scambio attivo
+senza recapito, cioe' dove chi compra non ha ancora mandato niente;
+nessun sats si muove. Compilata e provata nel cloud: albero `deb731c3`,
+2011 prove `cargo` verdi, 5 ignorate (il giro filtrato del nodo: 750 + 90).
