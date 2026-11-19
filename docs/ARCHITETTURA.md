@@ -4809,7 +4809,13 @@
   (setCat ricarica dal server e la risposta arriva mezzo secondo dopo:
   senza, si atterra vedendo per un attimo gli annunci della categoria
   di prima, che è la cosa più sbagliata da mostrare a chi ne ha appena
-  scelta un'altra); e il tasto Esplora della barra passa da
+  scelta un'altra — LO SCAFFALE della seconda riga invece non svuota,
+  dal 19 nov 2026: `attenuaGrigliaFerma` lascia le card di prima
+  spente e non toccabili, un «sto caricando» dichiarato e non la
+  risposta, finché `grigliaArrivata` in renderGrid le riaccende coi
+  nuovi; e lo scaffale arriva su «N risultati», la categoria sulla
+  riga: Cantieri, «La riga delle sottocategorie che scivola»); e il
+  tasto Esplora della barra passa da
   `vaiEsplora()`, che riporta ad activeCat='Tutto' — NON è go('esplora'),
   che serve anche a tornare da una scheda e lì il filtro deve restare.
   Chi tocca il nome del tab si aspetta tutto il mercatino, non la

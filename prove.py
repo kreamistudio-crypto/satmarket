@@ -1604,6 +1604,12 @@ def prove_sottocategorie_vetrina():
            "if (effettiRidotti()) return;" in pezzo_js(
                mini, "function entraSottoRiga(wrap, riga){", "\n}\n"),
            ".sotto-entra .cat-cella{animation:sottoMolla" in mini))
+    # (19 nov 2026, Andrea: «non mi piace che fa questo scattino di
+    # colpo») la riga SCIVOLA allo scaffale acceso: lo stesso giudice
+    # del centro, col suo ramo liscio
+    prova("...e scivola allo scaffale acceso, invece di saltare", True,
+          "centraNellaFila(riga, riga.querySelector('.cat-cella.attiva'), true)"
+          in rr)
     prova("...e la disegna la striscia a ogni giro (con la sua firma)", 1,
           pezzo_js(mini, "function renderStriscia(){", "\n}\n")
           .count("renderSottoRiga();"))
@@ -52177,11 +52183,44 @@ def prove_scoprire():
     # griglia tiene l'altezza vecchia come pavimento fino a dopo l'arrivo.
     _ac2 = pezzo_js(mini, "function apriCategoria(c){", "\n}")
     _sc2 = pezzo_js(mini, "function scegliSottoRiga(sid){", "\n}\n")
-    prova("categoria e scaffale svuotano la griglia tenendone l'altezza",
-          (True, True, 0, 0),
+    # (19 nov 2026, Andrea: «deve muoversi in maniera fluida») lo
+    # SCAFFALE non svuota piu': spegne i prodotti di prima, che restano
+    # fino ai nuovi — la categoria svuota come prima.
+    prova("la categoria svuota la griglia tenendone l'altezza, lo "
+          "scaffale la spegne (sempre col pavimento)",
+          (True, False, True, 0, 0),
           ("svuotaGrigliaFerma();" in _ac2, "svuotaGrigliaFerma();" in _sc2,
+           "attenuaGrigliaFerma();" in _sc2,
            _ac2.count("el('grid').innerHTML = '';"),
            _sc2.count("el('grid').innerHTML = '';")))
+    _at = pezzo_js(mini, "function attenuaGrigliaFerma(){", "\n}\n")
+    prova("...spenta e non toccabile, col pavimento, e mai svuotata",
+          (True, True, True, False),
+          ("g.style.minHeight = g.offsetHeight + 'px';" in _at,
+           "g.classList.add('in-attesa');" in _at,
+           "#grid.in-attesa{opacity:.35;pointer-events:none}" in mini,
+           "innerHTML" in _at))
+    _ga = pezzo_js(mini, "function grigliaArrivata(){", "\n}\n")
+    _rgx = pezzo_js(mini, "function renderGrid(items){", "\n}\n")
+    # una TRANSIZIONE e non un'animazione da .35: coi nuovi arrivati
+    # subito la griglia e' appena a .9, e ripartire da .35 era un lampo
+    prova("...renderGrid la riaccende appena disegnati i nuovi, che "
+          "risalgono in dissolvenza da dove era arrivata",
+          (True, True, True, False),
+          ("el('grid').innerHTML = data.map(cardHTML).join('');\n"
+           "  grigliaArrivata();" in _rgx,
+           "el('grid').classList.remove('in-attesa');" in _ga,
+           "#grid{transition:opacity .25s}" in mini,
+           "@keyframes grigliaEntra" in mini))
+    # lo scaffale arriva sulla MERCE («l'inquadratura scenda un po'
+    # verso i prodotti»), la categoria sulla riga degli scaffali
+    _sr3 = pezzo_js(mini, "function scorriAlReparto(){", "\n}")
+    prova("lo scaffale arriva su «N risultati», la categoria sulla riga",
+          (True, True, True, True),
+          ("armaScrollReparto(true);" in _sc2,
+           "armaScrollReparto();" in _ac2,
+           "repartoSullaMerce = false;" in _sr3,
+           "!merce && riga && riga.style.display !== 'none'" in _sr3))
     prova("...restando in Esplora la pagina non torna in cima", True,
           "const yPrima = window.scrollY;\n  go('esplora');\n"
           "  if (restiamoQui) window.scrollTo(0, yPrima);" in _ac2)
@@ -52192,6 +52231,17 @@ def prove_scoprire():
           ("g.style.minHeight = g.offsetHeight + 'px';" in _sv,
            "liberaGrigliaFerma(800);" in _rg,
            "} else if (el('grid').style.minHeight) liberaGrigliaFerma(0);" in _rg))
+    # (19 nov 2026) togliendolo nudo, uno scaffale di due prodotti
+    # accorcerebbe la pagina sotto i piedi: lo scroll si schiaccerebbe
+    # sul fondo nuovo — lo scatto di ieri, in ritardo
+    _lg = pezzo_js(mini, "function liberaGrigliaFerma(dopo){", "\n}\n")
+    prova("...e togliendolo non tira su la pagina: resta quel che manca, "
+          "misurato con la y di prima e rimessa nello stesso frame",
+          (True, True, True),
+          ("const g = el('grid'), y = window.scrollY;" in _lg,
+           "const manca = y + window.innerHeight" in _lg,
+           "g.style.minHeight = (g.offsetHeight + manca) + 'px';\n"
+           "      window.scrollTo(0, y);" in _lg))
     # apriCategoria ARMA dopo go() (che chiude col suo scrollTo della
     # vista: prima, lo scroll verrebbe riportato in cima un rigo
     # dopo); il RITOCCO che spegne passa da tornaATutto, che non
@@ -52215,7 +52265,7 @@ def prove_scoprire():
     # zero) — coi dati vivi si arma una bandierina che renderGrid
     # consuma al primo render; in DEMO setCat ha gia' renderizzato in
     # sincrono e si scorre subito.
-    _ar = pezzo_js(mini, "function armaScrollReparto(){", "\n}")
+    _ar = pezzo_js(mini, "function armaScrollReparto(sullaMerce){", "\n}")
     prova("in DEMO si scorre subito, coi dati vivi si arma",
           (True, True),
           ("if (DEMO) { scorriAlReparto(); return; }" in _ar,
@@ -61871,6 +61921,23 @@ const larga = fila(300, L, 8); larga.sinistra = 380;   // #app centrato
 centraNellaFila(larga, larga.voci[4]);
 att('fila spostata a destra: stesso centro', 105,
     larga.voci[4].getBoundingClientRect().left - larga.getBoundingClientRect().left);
+/* IL RAMO LISCIO (19 nov 2026, la seconda riga): stesso conto, ma
+   passa da scrollTo smooth — e secco con gli effetti ridotti */
+let ridotti = false;
+function tourRidotto(){ return ridotti; }
+function conScrollTo(f){ f.chieste = []; f.scrollTo = o => { f.chieste.push(o); f.scrollLeft = o.left; }; return f; }
+const liscia = conScrollTo(fila(300, L, 8)); centraNellaFila(liscia, liscia.voci[4], true);
+att('liscia: una sola scivolata', 1, liscia.chieste.length);
+att('...smooth', 1, liscia.chieste[0] && liscia.chieste[0].behavior === 'smooth' ? 1 : 0);
+att('...allo stesso centro', 300 / 2,
+    liscia.voci[4].getBoundingClientRect().left - liscia.getBoundingClientRect().left + 90 / 2);
+const secca = conScrollTo(fila(300, L, 8)); centraNellaFila(secca, secca.voci[4]);
+att('senza liscio: niente scrollTo', 0, secca.chieste.length);
+ridotti = true;
+const ridotta = conScrollTo(fila(300, L, 8)); centraNellaFila(ridotta, ridotta.voci[4], true);
+att('effetti ridotti: secca', 1, ridotta.chieste[0] && ridotta.chieste[0].behavior === 'auto' ? 1 : 0);
+att('...ma centrata', 300 / 2,
+    ridotta.voci[4].getBoundingClientRect().left - ridotta.getBoundingClientRect().left + 90 / 2);
 console.log(JSON.stringify(rosse));
 """
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,

@@ -1206,6 +1206,15 @@
      figura (come nelle card del Lavoro), la prima card porta il disegno
      della categoria. Una riga sottile la separa dalla fila sopra. */
   #sottoRigaWrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+  /* CAMBIO DI SCAFFALE SENZA BUCO (19 nov 2026, Andrea: «deve muoversi
+     in maniera fluida»): i prodotti di prima restano, spenti e non
+     toccabili, finche' arrivano i nuovi, che salgono in dissolvenza.
+     Una TRANSIZIONE e non un'animazione da .35: con la rete veloce i
+     nuovi arrivano quando la griglia e' scesa appena a .9, e partire
+     da .35 farebbe un lampo (misurato nel giro) — cosi' risale da dove
+     e' arrivata. */
+  #grid{transition:opacity .25s}
+  #grid.in-attesa{opacity:.35;pointer-events:none}
   .sotto-riga .cat-cella{width:72px}
   .sotto-riga .cat-quad .cat-emoji{font-size:28px}
   /* i nomi degli scaffali sono lunghi («Abbigliamento e gadget»): a
@@ -25300,10 +25309,18 @@ function contaCategorie(){
    A fila non ancora impaginata (vista nascosta, clientWidth 0) non si
    centra niente: non c'e' niente da misurare, e un conto su un zero
    scriverebbe una posizione a caso. */
-function centraNellaFila(fila, voce){
+function centraNellaFila(fila, voce, liscio){
   if (!fila || !voce || !fila.clientWidth) return;
   const f = fila.getBoundingClientRect(), v = voce.getBoundingClientRect();
-  fila.scrollLeft += (v.left - f.left) - (fila.clientWidth - v.width) / 2;
+  const dx = (v.left - f.left) - (fila.clientWidth - v.width) / 2;
+  /* LISCIO (19 nov 2026, la seconda riga: «non mi piace che fa questo
+     scattino di colpo»): stesso conto, ma la fila scivola. Il clamp ai
+     bordi lo fa il browser anche qui; secco con gli effetti ridotti
+     (tourRidotto, il giudice di ogni scorsa: lo censisce la prova). */
+  if (liscio && fila.scrollTo)
+    fila.scrollTo({left: fila.scrollLeft + dx,
+                   behavior: tourRidotto() ? 'auto' : 'smooth'});
+  else fila.scrollLeft += dx;
 }
 /* IL TERZO GESTO DELLA CARD: IL TOCCO LUNGO (ago 2026, decisione di
    Andrea che ROVESCIA il bottone «Condividi la categoria» del giro
@@ -26921,20 +26938,61 @@ function svuotaGrigliaFerma(){
   g.innerHTML = '';
   el('gridEmpty').style.display = 'none';
 }
+/* IL PAVIMENTO SI TOGLIE SENZA TIRARE SU (19 nov 2026): uno scaffale
+   con due prodotti fa la pagina piu' corta di dove si e' arrivati, e
+   togliendo il pavimento nudo il browser schiaccerebbe lo scroll sul
+   fondo nuovo — lo stesso scatto di ieri, solo in ritardo. Si toglie e
+   si rimisura nello stesso frame: se manca pagina sotto, il pavimento
+   resta di quel che manca (lo ritocca il prossimo renderGrid). */
 function liberaGrigliaFerma(dopo){
   clearTimeout(grigliaFermaTimer);
-  grigliaFermaTimer = setTimeout(() => { el('grid').style.minHeight = ''; }, dopo);
+  grigliaFermaTimer = setTimeout(() => {
+    const g = el('grid'), y = window.scrollY;
+    g.style.minHeight = '';
+    /* la y di PRIMA: leggere l'altezza impagina, e impaginando il
+       browser ha gia' schiacciato lo scroll (misurato: 491 → 276) */
+    const manca = y + window.innerHeight
+                - document.documentElement.scrollHeight;
+    if (manca > 0) {
+      g.style.minHeight = (g.offsetHeight + manca) + 'px';
+      window.scrollTo(0, y);   /* stesso frame: il salto non si dipinge */
+    }
+  }, dopo);
 }
+/* Lo scaffale non svuota: spegne. I prodotti di prima restano sotto
+   gli occhi (spenti, non toccabili: un tocco li' aprirebbe un annuncio
+   dello scaffale vecchio) e renderGrid li sostituisce coi nuovi. Il
+   pavimento resta come per la categoria. */
+function attenuaGrigliaFerma(){
+  const g = el('grid');
+  clearTimeout(grigliaFermaTimer);
+  g.style.minHeight = g.offsetHeight + 'px';
+  g.classList.add('in-attesa');
+  el('gridEmpty').style.display = 'none';
+}
+/* i nuovi sono in griglia: la transizione la riporta piena */
+function grigliaArrivata(){
+  el('grid').classList.remove('in-attesa');
+}
+/* LO SCAFFALE ARRIVA SULLA MERCE (19 nov 2026, Andrea: «appena clicco
+   l'inquadratura scenda un po' verso i prodotti»): la riga degli
+   scaffali l'ha appena toccata, quindi l'ha gia' vista — l'arrivo e'
+   «N risultati» sotto l'header, coi prodotti interi in vista. La
+   categoria resta com'e': arriva sulla riga, che e' la cosa nuova. */
+let repartoSullaMerce = false;
 function scorriAlReparto(){
   /* CON LA SECONDA RIGA L'ARRIVO SALE (18 nov 2026): la riga degli
      scaffali e' la cosa da vedere appena toccata la categoria («mi si
      apre una seconda riga», Andrea), e arrivando su «N oggetti» finiva
      sotto l'header. Si arriva su di lei: sotto c'e' gia' la merce. */
   const riga = el('sottoRigaWrap');
-  scorriSottoHeader(riga && riga.style.display !== 'none'
+  const merce = repartoSullaMerce;
+  repartoSullaMerce = false;
+  scorriSottoHeader(!merce && riga && riga.style.display !== 'none'
     ? riga : document.querySelector('.strumenti'));
 }
-function armaScrollReparto(){
+function armaScrollReparto(sullaMerce){
+  repartoSullaMerce = !!sullaMerce;
   if (DEMO) { scorriAlReparto(); return; }
   scrollRepartoInAttesa = true;
 }
@@ -27234,6 +27292,7 @@ function renderGrid(items){
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
+  grigliaArrivata();
   /* le card P2P in vetrina: la fila si accende o si spegne con la vista */
   renderVetrinaP2P();
   armaViste();
@@ -27252,6 +27311,7 @@ function renderGrid(items){
   if (scrollRepartoInAttesa) {
     scrollRepartoInAttesa = false;
     if (el('view-esplora').classList.contains('active')) scorriAlReparto();
+    repartoSullaMerce = false;   /* buttata senza scorrere: non resta per dopo */
     /* il pavimento resta per la discesa (liscia, ~mezzo secondo) */
     liberaGrigliaFerma(800);
   } else if (el('grid').style.minHeight) liberaGrigliaFerma(0);
@@ -27562,7 +27622,7 @@ function renderSottoRiga(){
   if (sez) sez.classList.add('con-sotto');
   if (entra) entraSottoRiga(wrap, riga);
   aggiornaFrecce('sottoRiga');
-  setTimeout(() => centraNellaFila(riga, riga.querySelector('.cat-cella.attiva')), 0);
+  setTimeout(() => centraNellaFila(riga, riga.querySelector('.cat-cella.attiva'), true), 0);
 }
 function scegliSottoRiga(sid){
   const c = activeCat;
@@ -27574,10 +27634,10 @@ function scegliSottoRiga(sid){
      (ricarica la prima pagina, rifa' pillole e righe) e la entry della
      cronologia si SOSTITUISCE, come per ogni cambio di filtro */
   haptic();
-  svuotaGrigliaFerma();
+  attenuaGrigliaFerma();
   sottoChiesto = sid;
   setCat(c);
-  armaScrollReparto();
+  armaScrollReparto(true);
 }
 
 /* La card della striscia: toccarla e' una DISCESA verso il reparto,
