@@ -752,3 +752,9 @@ frase: Uno scambio P2P preso dal sito si porta avanti anche dalla Mini App, e vi
 dove: P2P → «I miei scambi»: prendi un ordine dal sito, poi tocca «⚡ Apri lo scambio» nel bot. Nella Mini App i bottoni del passo ci sono, senza «Le chiavi di questo scambio non sono in questo browser».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · chiave-moderatore-dal-conto
+frase: Per i moderatori: la chiave di moderatore ora segue l'account. Il dispositivo che ce l'ha ne lascia una copia chiusa col conto, e sul PC, sul sito o su un altro telefono arriva da sola alla prima apertura delle dispute.
+dove: Pannello 👑 → «⚖️ Moderazione P2P»: aprila una volta dal dispositivo che ha la chiave, poi dall'altro; compare «🔑 La tua chiave di moderatore è arrivata anche qui» e i bottoni per prendere e decidere ci sono.
+leva: nessuna
+pubblico: no

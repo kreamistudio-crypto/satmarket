@@ -32677,6 +32677,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   perché i nudi sono di nip04) e due gemelle asincrone che cedono il
   passo ogni 10 ms. `prove_chiave_moderatore_portatile` lo pretende sul
   vettore di prova della NIP.
+  LA COPIA DELLA CHIAVE DI MODERATORE (19 nov 2026, perché in CANTIERI,
+  «La chiave di moderatore segue l'account»). ⚠️ ROVESCIA la riga qui
+  sopra «il server non vede né la chiave né la password» per la sola
+  copia del conto: il dispositivo che ha la chiave REGISTRATA ne lascia
+  sul server una copia NIP-44 (`moderazione/chiave/copia`, colonna
+  `copia` di `p2p_moderatori`) chiusa con
+  HMAC-SHA256(seme del conto, `barattolo/moderatore/copia/1`), dove il
+  seme è quello di `semeContoP2P` (lo stesso delle chiavi degli scambi
+  dal 19 nov: Mini App e sito danno lo stesso). Un altro dispositivo
+  dello stesso account, alla prima apertura delle dispute
+  (`chiediModerazioneP2P` → `copiaChiaveModP2P`), la riapre e la scrive
+  SOLO se la pubblica che ne esce è quella registrata. Il server: forma
+  base64 (`FORMA_COPIA_MOD_P2P`), 409 se la chiave non è la registrata
+  (`_copia_chiave_moderatore_p2p`), una chiave nuova porta via la copia
+  della vecchia, e l'elenco la dà solo al suo moderatore. Una copia che
+  il seme di oggi non apre la rifà chi ha la chiave. Il nodo non cambia
+  (stessa chiave, già solver). IL PREZZO, detto ad Andrea: chi tiene il
+  server sa rifare il seme, quindi potrebbe aprirla. L'export con la
+  password resta, per chi vuole una copia fuori. Prove:
+  `prove_chiave_moderatore_dal_conto` e la sezione del server in
+  `prove_moderazione_p2p`.
 
 - IL CONTANTI DI PERSONA NEL P2P (30 set 2026, perché in CANTIERI, «Il
   contanti di persona nel P2P: tetto, regola, prova d'incontro,

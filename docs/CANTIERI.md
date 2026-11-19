@@ -92282,3 +92282,51 @@ COSA SI È FATTO. Due famiglie nuove fra le letture innocenti di «avorio», con
 SCARTATO. Togliere «avorio» dalla lista o mandarlo in revisione (già scartate il 25 ott, coi perché); scrivere a mano le 108 coppie di colori (una tupla generata da una lista è la stessa regola, e la controprova la toglie intera).
 PROVATO. `prove_filtro_avorio`: 5 veri nuovi fermi, 10 innocenti nuovi che passano, controprove nuove (i colori in fila tolti, «oro» infilato fra i colori, cinque frasi del gioiello una per volta) tutte rosse: la sezione 97/0. `collaudo_filtro_avorio` sulle rotte vere ha il passo 1-bis, la collana «colori beige e avorio, perline avorio, filo avorio» nasce e il registro resta vuoto; con il `server.py` di develop senza la cura lo stesso collaudo cade su 4 righe, e la prima è la collana fermata. Sull'albero di develop `4a5050a6` più la cura, nel venv senza coincurve: `PROVE_SEVERE=1 python prove.py` 30.528 passate, 0 fallite, 2 saltate (nostr-tools assente; rigirate le due sezioni con nostr-tools@2.25.2 come la CI: 0 saltate, 0 fallite); collaudi della CI senza proxy 161 verdi, 0 rossi. Ribasato su `46412fe1` (chiavi-dal-conto, nessun simbolo in comune, controllato per nome): rigirati `prove_filtro_avorio` e `collaudo_filtro_avorio`.
 RESTA DA GUARDARE. L'annuncio NON torna da solo: non è mai nato. Dopo la promozione chi vende lo ripubblica uguale (oppure, subito, lo riscrive senza «avorio», es. «panna»). Se la frase vera era un'altra ancora, si aggiunge col suo caso nelle prove.
+
+## La chiave di moderatore segue l'account: una copia chiusa col conto, e sul PC arriva da sola (19 nov 2026, cantiere chiavi-dal-conto; Andrea, aperta una disputa dal PC: «mi dice la tua chiave di moderatore sta su un altro dispositivo. Che palle» — «No, correggi anche questo, per favore»)
+
+IL PROBLEMA. La chiave di moderatore nasceva sul telefono e non ne
+usciva (patto del 28 set); dal 1 ott si poteva esportare cifrata con una
+password (NIP-49) e importare a mano. Andrea, dal PC, trovava «la tua
+chiave sta su un altro dispositivo» e doveva tornare al telefono: lo
+stesso fastidio delle chiavi degli scambi, risolto la mattina col punto 2.
+
+LA DECISIONE (stessa regola del punto 2, «semplicità prima di tutto»):
+la chiave segue l'ACCOUNT. Il dispositivo che ha la chiave REGISTRATA
+ne lascia sul server una copia NIP-44 chiusa con
+HMAC-SHA256(seme del conto, `barattolo/moderatore/copia/1`): il seme è
+quello di `semeContoP2P`, lo stesso nella Mini App e sul sito. Un altro
+dispositivo dello stesso account, alla prima apertura delle dispute,
+la riapre e la scrive solo se la pubblica che ne esce è quella
+registrata. IL NODO NON CAMBIA: è la stessa chiave, già solver.
+Il server (`/api/p2p/moderazione/chiave/copia`, solo moderatori):
+forma base64, 409 se la chiave non è la registrata, la colonna `copia`
+di `p2p_moderatori` (nella CREATE e con l'ALTER per i database vecchi),
+una chiave nuova porta via la copia della vecchia, e l'elenco la dà
+solo al suo moderatore.
+
+IL PREZZO, detto ad Andrea prima del codice: chi tiene il server sa
+rifare il seme e quindi potrebbe aprirla. Rovescia per scelta la riga del
+1 ott «il server non vede né la chiave né la password» (Architettura,
+«LA COPIA DELLA CHIAVE DI MODERATORE»). L'export con la password resta.
+
+STRADE SCARTATE. Ricavare la chiave dal seme (niente copia): avrebbe
+cambiato la chiave, cioè un nuovo `admin-add-solver` sul nodo durante la
+prova dal vivo. La copia sui relay o nel cloud di Telegram: il sito non
+scrive il cloud di Telegram (la causa del problema di stamattina).
+
+LE PROVE. `prove_chiave_moderatore_dal_conto` (sentinelle e banco in node
+col bundle vero: chi ha la chiave la lascia senza mai la privata in
+chiaro; un altro dispositivo la riprende senza parlare al server; un
+altro conto, una copia di un'altra chiave, una copia storta, nessun seme
+non scrivono niente; una chiave vecchia non si copia; una copia che il
+seme di oggi non apre si rifà; una volta per sessione); la parte del
+server in `prove_moderazione_p2p` (le otto rotte, 400/409, solo al suo
+moderatore, la chiave nuova porta via la copia). Controprove: tolto il
+controllo della pubblica, il controllo della chiave vecchia, la
+ricontrollata della copia buona, il memo di sessione, il 409 e la
+pulizia al cambio chiave → rosso ognuna.
+
+RESTA DA GUARDARE. Non provato dal vivo: dopo la promozione, aprire
+«⚖️ Moderazione P2P» dal telefono che ha la chiave, poi dal PC: deve
+comparire «🔑 La tua chiave di moderatore è arrivata anche qui».

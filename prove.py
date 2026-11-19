@@ -90185,8 +90185,9 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
           mini.count("p2pSemeGiro = semeProfiloP2P();"))
     # tre: le mie identita', il giudizio del profilo di dispositivo e
     # il gesto del foglio — i tre posti che il seme lo vogliono mentre
-    # una sessione e' gia' aperta
-    prova("...e chi lo vuole a giro aperto passa da lui", 3,
+    # una sessione e' gia' aperta. QUATTRO dal 19 nov 2026: la copia
+    # della chiave di moderatore (`chiaveCopiaModP2P`, chiavi-dal-conto)
+    prova("...e chi lo vuole a giro aperto passa da lui", 4,
           mini.count("await semeContoP2P()"))
     # --- LA GAMBA DELL'APP, i suoi confini -------------------------
     ad = pezzo_js(mini, "function adottaProfiloContoP2P(){", "\n}\n")
@@ -149563,8 +149564,10 @@ def prove_moderazione_p2p():
     # (`moderazione/chiave`, la stessa rotta della creazione). DIECI
     # dall'11 ott 2026: la ripresa di una disputa gia' presa sul
     # coordinatore registra il solo secondo tempo (`prendi`, `fatto`)
-    prova("il banco chiama il server in dieci punti", 10, len(chiamate_server))
-    prova("...e in NESSUNO passa la chiave privata", [],
+    # UNDICI dal 19 nov 2026 (chiavi-dal-conto): la copia CIFRATA della
+    # chiave (`moderazione/chiave/copia`), che segue l'account
+    prova("il banco chiama il server in undici punti", 11, len(chiamate_server))
+    prova("...e in NESSUNO passa la chiave privata in chiaro", [],
           [c for c in chiamate_server if ".sk" in c or "sk:" in c])
     prova("la chiave nasce a caso su questo dispositivo, e al server va la pubblica", True,
           "const sk = NT.generateSecretKey();" in modulo
@@ -149626,8 +149629,9 @@ def prove_moderazione_p2p():
     for spia in ("nsec", "privata", "decrypt", "firma(", "sign("):
         prova(f"nel blocco del server non c'e' posto per «{spia}»", False, spia in cod.lower())
     rotte = re.findall(r'@app\.post\("(/api/p2p/(?:moderazione[^"]*|disputa))"\)', blocco)
-    prova("le sette rotte", ["/api/p2p/disputa", "/api/p2p/moderazione", "/api/p2p/moderazione/chiave",
-                             "/api/p2p/moderazione/decisione", "/api/p2p/moderazione/esito",
+    # OTTO dal 19 nov 2026: la copia cifrata della chiave (chiavi-dal-conto)
+    prova("le otto rotte", ["/api/p2p/disputa", "/api/p2p/moderazione", "/api/p2p/moderazione/chiave",
+                             "/api/p2p/moderazione/chiave/copia", "/api/p2p/moderazione/decisione", "/api/p2p/moderazione/esito",
                              "/api/p2p/moderazione/lascia", "/api/p2p/moderazione/prendi"], sorted(rotte))
     for r in rotte:
         corpo_r = blocco[blocco.index(f'@app.post("{r}")'):].split("\n\n\n")[0]
@@ -149654,7 +149658,7 @@ def prove_moderazione_p2p():
                       "ALTER TABLE utenti ADD COLUMN username TEXT DEFAULT '';")
     amb.update(ADMIN_IDS=[500, 501, 111], MODALITA_COLLAUDO=False)
     for riga in ("P2P_DISPUTA_STORICO_GIORNI = ", "P2P_MOTIVO_MIN = ", "P2P_MOTIVO_MAX = ",
-                 "FORMA_CHIAVE_P2P = "):
+                 "FORMA_CHIAVE_P2P = ", "FORMA_COPIA_MOD_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)], amb)
     # (16 ott 2026, orari-passi) la riga del moderatore porta l'ora di
@@ -149676,6 +149680,8 @@ def prove_moderazione_p2p():
               "_cauzione_di_p2p",
               "_dichiara_disputa_p2p", "_orari_passi_p2p", "_passo_euro_p2p",
               "_riga_disputa_p2p",
+              # la copia cifrata della chiave (19 nov 2026, chiavi-dal-conto)
+              "_copia_moderatore_p2p", "_copia_chiave_moderatore_p2p",
               "_dispute_per_moderatore_p2p",
               "_prendi_disputa_p2p", "_lascia_disputa_p2p", "_decisione_disputa_p2p",
               "_esito_gesto_disputa_p2p"):
@@ -149724,6 +149730,28 @@ def prove_moderazione_p2p():
     prova("...e la stessa chiave non puo' essere di due persone", 409, chiave(con, 501, KM, ORA)[0])
     chiave(con, 501, KN, ORA)
     chiave(con, 111, "e" * 64, ORA)
+
+    # LA COPIA CIFRATA DELLA CHIAVE (19 nov 2026, chiavi-dal-conto): la
+    # lascia solo la chiave REGISTRATA, la riceve solo il suo moderatore,
+    # e una chiave nuova la porta via
+    copia, la_copia = amb["_copia_chiave_moderatore_p2p"], amb["_copia_moderatore_p2p"]
+    CP = "Ag" + "A0b+/" * 20 + "=="
+    prova("la copia: una forma base64 lunga, sennò 400; di una chiave non registrata, 409",
+          [400, 400, 400, 409, 409, ""],
+          [copia(con, 500, KM, "x" * 30, ORA)[0], copia(con, 500, KM, CP + "<b>", ORA)[0],
+           copia(con, 500, "npub1xxx", CP, ORA)[0], copia(con, 500, KN, CP, ORA)[0],
+           copia(con, 500, "f" * 64, CP, ORA)[0], la_copia(con, 500)])
+    prova("...quella buona si scrive, e la vede SOLO il suo moderatore",
+          [(200, {"ok": True}), CP, "", CP, ""],
+          [copia(con, 500, KM.upper(), CP, ORA), la_copia(con, 500), la_copia(con, 501),
+           elenco(con, 500, ORA)["copia"], elenco(con, 501, ORA)["copia"]])
+    copia(con, 111, "e" * 64, CP, ORA)
+    prova("...registrare di nuovo la STESSA chiave la tiene, una chiave NUOVA la porta via",
+          [False, CP, True, "", 409],
+          [chiave(con, 111, "e" * 64, ORA)[1]["nuova"], la_copia(con, 111),
+           chiave(con, 111, "f" * 64, ORA)[1]["nuova"], la_copia(con, 111),
+           copia(con, 111, "e" * 64, CP, ORA)[0]])
+    chiave(con, 111, "e" * 64, ORA)     # le prove qui sotto la vogliono com'era
 
     prova("l'id della disputa lo dichiara una PARTE: chi non lo e' riceve un si' e non scrive niente",
           [(200, {"ok": True}), ""], [dich(con, 500, ORD, DISP, ORA), riga()["disputa"]])
@@ -152744,6 +152772,206 @@ def prove_chiave_moderatore_portatile():
     prova("NESSUNA FUGA: la privata e la password non escono in nessun log ne' in nessun fetch; la pubblica si'",
           {"privata": False, "password": False, "righeDiario": 0, "pubblicaNelFetch": True, "chiamate": 1}, o["fuga"])
 
+
+BANCO_CHIAVE_MOD_DAL_CONTO = r"""
+const fs = require('fs'), vm = require('vm');
+vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
+const NT = NostrTools;
+const window = {NostrTools: NT};
+const {bytesToHex} = NT.utils;
+const out = {};
+const diario = [];
+for (const m of ['log', 'warn', 'error', 'info']) console[m] = (...a) => diario.push(a.map(String).join(' '));
+let DEMO = false, VETRINA = false, isAdmin = true, myTgId = 999;
+const API_BASE = '/api';
+function authHdr(){ return 'collaudo'; }
+let fetches = [], risposta = {ok: true, status: 200, corpo: {ok: true}};
+async function fetch(url, opz){ fetches.push({url, body: String((opz && opz.body) || '')});
+  return {ok: risposta.ok, status: risposta.status, json: async () => risposta.corpo}; }
+let magazzino = {};
+const localStorage = {getItem: k => (k in magazzino ? magazzino[k] : null),
+                      setItem: (k, v) => { magazzino[k] = String(v); }};
+function chiaveP2P(base){ return base + '@' + myTgId; }
+async function caricaNostrTools(){}
+let seme = null;
+let semeChiamate = 0;
+function semeContoP2P(){ semeChiamate++; return Promise.resolve(seme); }
+let p2pMod = null;
+function moderatoreP2P(){ return !!isAdmin && !DEMO && !VETRINA && !!myTgId; }
+__PEZZI__
+
+(async () => {
+  const nuovaChiave = () => { const sk = NT.generateSecretKey(); return {sk: bytesToHex(sk), pub: NT.getPublicKey(sk), creata: 7}; };
+  const k = nuovaChiave(), altra = nuovaChiave();
+  const SEME = bytesToHex(NT.generateSecretKey()), ALTRO_SEME = bytesToHex(NT.generateSecretKey());
+  const letta = () => JSON.parse(magazzino[chiaveP2P(MOD_CHIAVE_P2P)] || 'null');
+  // un dispositivo nuovo: magazzino vuoto, sessione nuova, stesso account
+  const dispositivo = (chiave, s) => { magazzino = {}; modCopiaGiro = ''; fetches = [];
+    seme = s === undefined ? {sk: SEME, versione: 1} : s;
+    if (chiave) magazzino[chiaveP2P(MOD_CHIAVE_P2P)] = JSON.stringify(chiave); };
+
+  // A) il dispositivo che HA la chiave registrata, copia assente: la lascia
+  dispositivo(k); p2pMod = {chiave: k.pub, copia: ''};
+  const a = await copiaChiaveModP2P();
+  const corpo = fetches.length ? JSON.parse(fetches[0].body) : {};
+  out.lascia = {torna: a, chiamate: fetches.length, url: fetches[0] && fetches[0].url,
+    chiavi: Object.keys(corpo).sort().join(','), pubGiusta: corpo.chiave === k.pub,
+    privataInChiaro: fetches.some(f => f.body.includes(k.sk)), forma: /^[A-Za-z0-9+/]{40,4000}={0,2}$/.test(corpo.copia || ''),
+    tenuta: p2pMod.copia === corpo.copia};
+  const C = corpo.copia;
+  fetches = [];
+  out.secondoGiro = [await copiaChiaveModP2P(), fetches.length];
+
+  // B) un altro dispositivo dello stesso account, senza chiave: la riprende da solo, senza parlare al server
+  dispositivo(null); p2pMod = {chiave: k.pub, copia: C};
+  out.riprende = {torna: await copiaChiaveModP2P(), chiamate: fetches.length,
+                  scritta: letta() && letta().sk === k.sk && letta().pub === k.pub && letta().creata === 7};
+  // ...e una volta ripresa, la copia c'e' ed e' buona: niente da rifare
+  modCopiaGiro = ''; fetches = [];
+  out.ripresaPoi = [await copiaChiaveModP2P(), fetches.length];
+
+  // C) un altro account (un altro seme): non si apre, niente scritto
+  dispositivo(null, {sk: ALTRO_SEME, versione: 1}); p2pMod = {chiave: k.pub, copia: C};
+  out.altroConto = [await copiaChiaveModP2P(), letta(), fetches.length];
+  // D) la copia non e' della chiave registrata: niente scritto
+  dispositivo(null); p2pMod = {chiave: altra.pub, copia: C};
+  out.altraPub = [await copiaChiaveModP2P(), letta()];
+  // E) una copia storta
+  dispositivo(null); p2pMod = {chiave: k.pub, copia: 'A'.repeat(80)};
+  out.storta = [await copiaChiaveModP2P(), letta()];
+  // ...e allo stesso elenco non si riprova: una volta per sessione
+  semeChiamate = 0;
+  out.unaVolta = [await copiaChiaveModP2P(), await copiaChiaveModP2P(), semeChiamate];
+  // F) senza seme del conto (vetrina, conto muto): niente, e niente al server
+  dispositivo(null, null); p2pMod = {chiave: k.pub, copia: C};
+  out.senzaSeme = [await copiaChiaveModP2P(), letta(), fetches.length];
+  dispositivo(k, null); p2pMod = {chiave: k.pub, copia: ''};
+  out.senzaSemeConChiave = [await copiaChiaveModP2P(), fetches.length];
+  // G) una chiave VECCHIA qui (la registrata e' un'altra): non si copia e non si tocca
+  dispositivo(altra); p2pMod = {chiave: k.pub, copia: C};
+  out.vecchia = [await copiaChiaveModP2P(), fetches.length, letta().pub === altra.pub];
+  // H) chi ha la chiave e trova una copia che il seme di oggi non apre: la rifa'
+  dispositivo(k); p2pMod = {chiave: k.pub, copia: C};
+  seme = {sk: ALTRO_SEME, versione: 2};
+  out.rifatta = [await copiaChiaveModP2P(), fetches.length,
+                 fetches.length === 1 && JSON.parse(fetches[0].body).copia !== C];
+  dispositivo(k); p2pMod = {chiave: k.pub, copia: C};
+  out.buona = [await copiaChiaveModP2P(), fetches.length];
+  // I) non moderatore, o nessuna chiave registrata: niente
+  dispositivo(null); isAdmin = false; p2pMod = {chiave: k.pub, copia: C};
+  out.nonMod = [await copiaChiaveModP2P(), letta()];
+  isAdmin = true;
+  dispositivo(k); p2pMod = {chiave: '', copia: ''};
+  out.nessunaRegistrata = [await copiaChiaveModP2P(), fetches.length];
+  // L) il server dice di no: l'errore sale (lo raccoglie chi chiama), niente segnato come fatto
+  dispositivo(k); p2pMod = {chiave: k.pub, copia: ''};
+  risposta = {ok: false, status: 409, corpo: {detail: 'Non è la tua chiave di moderatore registrata'}};
+  let errore = '';
+  try { await copiaChiaveModP2P(); } catch(e) { errore = e.message; }
+  out.rifiutata = [errore, p2pMod.copia];
+  risposta = {ok: true, status: 200, corpo: {ok: true}};
+
+  out.fuga = {privata: diario.some(r => r.includes(k.sk)) || diario.some(r => r.includes(SEME)),
+              righe: diario.length};
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stdout.write(JSON.stringify({errore: String(e && e.stack || e)})); });
+"""
+
+
+def prove_chiave_moderatore_dal_conto():
+    """LA CHIAVE DI MODERATORE SEGUE L'ACCOUNT (19 nov 2026, cantiere
+    chiavi-dal-conto; Andrea, aperta una disputa dal PC: «mi dice la tua
+    chiave di moderatore sta su un altro dispositivo. Che palle» —
+    «correggi anche questo»). Il dispositivo che ha la chiave registrata
+    ne lascia sul server una copia NIP-44 chiusa con una chiave ricavata
+    dal seme del conto; un altro dispositivo dello stesso account la
+    riapre da solo. QUEL CHE SI ROMPE IN SILENZIO, e qui si fa girare: la
+    privata che esce in chiaro; una copia che si riapre con un altro
+    conto, o che scrive una chiave diversa da quella registrata; una
+    chiave vecchia che si copia sopra la buona; una copia che il seme di
+    oggi non apre e che nessuno rifa'; il giro ripetuto a ogni elenco."""
+    import json as _json, shutil as _sh, subprocess as _sp, tempfile as _tf, os as _os
+    print("\n[la chiave di moderatore segue l'account: la copia chiusa col conto]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    arch = open("docs/ARCHITETTURA.md", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    i0 = mini.index("/* ---- la copia sul server, chiusa con la chiave del conto (19 nov 2026) ----")
+    i1 = mini.index("/* ---- la chiave ---- */", i0)
+    blocco = mini[i0:i1]
+    codice = nudo(blocco)
+
+    # --- 1) LE SENTINELLE ---------------------------------------------------
+    prova("la copia si chiude con NIP-44 e una chiave HMAC del seme del conto, con la sua etichetta", True,
+          "const MOD_COPIA_INFO = 'barattolo/moderatore/copia/1';" in blocco
+          and "const s = await semeContoP2P();" in codice
+          and "NT.hmac(NT.sha256, NT.utils.hexToBytes(s.sk), new TextEncoder().encode(MOD_COPIA_INFO))" in codice
+          and "NT.nip44.encrypt(JSON.stringify({sk: k.sk, creata: k.creata | 0}), conv)" in codice
+          and "NT.nip44.decrypt(copia, conv)" in codice)
+    prova("...si riapre SOLO se la pubblica che ne esce e' quella registrata", True,
+          "NT.getPublicKey(NT.utils.hexToBytes(sk)) !== pub) return null;" in codice
+          and "apriCopiaModP2P(conv, copia, p2pMod.chiave)" in codice)
+    prova("...al server una chiamata sola, con la pubblica e la copia chiusa", [0, 1, True],
+          [codice.count("fetch("), codice.count("modFetch("),
+           "await modFetch('moderazione/chiave/copia', {chiave: k.pub, copia: chiusa});" in codice])
+    chiedi = nudo(fn("function chiediModerazioneP2P(forza){"))
+    prova("si guarda a ogni elenco arrivato, DOPO l'adozione, e senza bloccarlo", True,
+          0 < chiedi.find("adottaChiaviModP2P();") < chiedi.find("copiaChiaveModP2P().then(qui => {")
+          < chiedi.find("return d;"))
+    pag = nudo(fn("function renderModerazioneP2P(){"))
+    crea = nudo(fn("async function creaChiaveModeratoreP2P(){"))
+    prova("i testi dicono che la chiave arriva da sola, non piu' «solo da una copia esportata»", [True, True, False, False],
+          ["apri le dispute una volta da lì, e poi arriva da sola anche qui." in pag,
+           "arriva da sola sugli altri dove entri col tuo account." in crea,
+           "copia esportata" in pag, "non lo lascia mai" in crea])
+    prova("il cambio di regola e' scritto in Architettura", True,
+          "LA COPIA DELLA CHIAVE DI MODERATORE (19 nov 2026" in arch)
+
+    # --- 2) IL BANCO: le funzioni vere e il bundle vero, in node -----------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della chiave dal conto", "node non c'e'")
+        return
+    pezzi = "\n".join([
+        "const MOD_CHIAVE_P2P = 'barattolo_p2p_moderatore';",
+        "const FORMA_HEX64 = /^[0-9a-f]{64}$/;",
+        fn("function chiaveModeratoreP2P(){"),
+        fn("async function modFetch(percorso, corpo){"),
+        blocco])
+    cart = _tf.mkdtemp(prefix="chiave_mod_conto_")
+    pb = _os.path.join(cart, "banco.js")
+    open(pb, "w", encoding="utf-8").write(BANCO_CHIAVE_MOD_DAL_CONTO.replace("__PEZZI__", pezzi))
+    r = _sp.run([node, pb, "vendor/nostr.bundle.js"], capture_output=True, text=True,
+                timeout=120, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco della chiave dal conto gira", "", (r.stderr or "")[-900:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    prova("banco: nessun errore", None, o.get("errore"))
+    if o.get("errore"):
+        return
+    prova("CHI HA LA CHIAVE la lascia: una chiamata, la pubblica giusta, la copia chiusa, mai la privata",
+          {"torna": False, "chiamate": 1, "url": "/api/p2p/moderazione/chiave/copia", "chiavi": "chiave,copia",
+           "pubGiusta": True, "privataInChiaro": False, "forma": True, "tenuta": True}, o["lascia"])
+    prova("...e non la rimanda al giro dopo", [False, 0], o["secondoGiro"])
+    prova("UN ALTRO DISPOSITIVO dello stesso account la riprende da solo, senza parlare al server",
+          {"torna": True, "chiamate": 0, "scritta": True}, o["riprende"])
+    prova("...e poi la trova buona: niente da rifare", [False, 0], o["ripresaPoi"])
+    prova("un altro conto non la apre, e non scrive niente", [False, None, 0], o["altroConto"])
+    prova("una copia di una chiave che non e' quella registrata non scrive niente", [False, None], o["altraPub"])
+    prova("una copia storta non scrive niente", [False, None], o["storta"])
+    prova("...e allo stesso elenco non si riprova (il seme non si richiede)", [False, False, 0], o["unaVolta"])
+    prova("senza il seme del conto niente, in nessuno dei due versi", [[False, None, 0], [False, 0]],
+          [o["senzaSeme"], o["senzaSemeConChiave"]])
+    prova("una chiave VECCHIA qui non si copia, e resta com'era", [False, 0, True], o["vecchia"])
+    prova("una copia che il seme di oggi non apre si RIFA' da chi ha la chiave; una buona no",
+          [[False, 1, True], [False, 0]], [o["rifatta"], o["buona"]])
+    prova("chi non e' moderatore, o non ha una chiave registrata: niente", [[False, None], [False, 0]],
+          [o["nonMod"], o["nessunaRegistrata"]])
+    prova("il server che dice di no: l'errore sale, e la copia non risulta fatta",
+          ["Non è la tua chiave di moderatore registrata", ""], o["rifiutata"])
+    prova("NESSUNA FUGA: ne' la privata ne' il seme nei log", False, o["fuga"]["privata"])
 
 def prove_tocco_scheda_p2p():
     # IL TOCCO SU «COMPRA BTC» / «VENDI BTC» NON ASPETTA NIENTE (1 ott
@@ -215120,7 +215348,7 @@ CATEGORIE = {
     volto_card_ascolto volto_unico schermo_segue_mostro
     annulla_riallinea annullo_chiave_maker annullati_ritocchi
     orari_passi passi_dati_disputa card_annullati annullo_in_disputa
-    dispute_p2p_moderatori moderazione_p2p chiave_moderatore_portatile
+    dispute_p2p_moderatori moderazione_p2p chiave_moderatore_portatile chiave_moderatore_dal_conto
     tocco_scheda_p2p statistiche_p2p dispute_cruscotto_p2p
     recupero_cambi scoprire_p2p p2p_in_arrivo condividi_ordine_p2p
     apri_wallet_p2p foglio_pagato_p2p conto_intervallo p2p_sconto
@@ -215948,7 +216176,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     tutte = (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_chiave_moderatore_dal_conto, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

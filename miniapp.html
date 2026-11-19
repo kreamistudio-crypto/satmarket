@@ -113239,6 +113239,10 @@ async function togliScambioServerP2P(ordine){
    firmare verso il coordinatore e' questo telefono. Non si ricava dal
    conto e non ha una copia: un telefono perso vuol dire una chiave
    nuova, aggiunta al nodo al posto della vecchia.
+   ⚠️ CAMBIATO IL 19 NOV 2026 (Andrea, «correggi anche questo»): la
+   chiave nasce ancora qui, a caso, ma ne resta sul server una copia
+   chiusa con la chiave del conto, e segue l'account sugli altri
+   dispositivi (`copiaChiaveModP2P`, piu' sotto, coi perche').
    I CONTROLLI: la sezione non si disegna a chi non e' moderatore (e le
    rotte gli rispondono 403); chi e' una delle due parti non prende e
    non decide (lo ferma il server); ogni decisione vuole il MOTIVO
@@ -113321,6 +113325,14 @@ function chiediModerazioneP2P(forza){
     renderStrisciaModP2P();
     if (vistaAttivaP2P() === 'view-p2pmod') renderModerazioneP2P();
     ascoltaChatModP2P().catch(() => {});
+    /* la chiave segue l'account (19 nov 2026): la copia si lascia o si riprende */
+    copiaChiaveModP2P().then(qui => {
+      if (!qui) return;
+      toast('🔑 La tua chiave di moderatore è arrivata anche qui');
+      renderStrisciaModP2P();
+      if (vistaAttivaP2P() === 'view-p2pmod') renderModerazioneP2P();
+      ascoltaChatModP2P().catch(() => {});
+    }).catch(e => console.log('⚖️ [p2p] moderazione: copia della chiave (' + (e && e.message || e) + ')'));
     return d;
   }).catch(e => {
     console.log('⚖️ [p2p] moderazione: l\'elenco non arriva (' + (e && e.message || e) + ')');
@@ -113346,6 +113358,73 @@ function adottaChiaviModP2P(){
   if (mosso) scriviArchivioModP2P(a);
 }
 
+/* ---- la copia sul server, chiusa con la chiave del conto (19 nov 2026) ----
+   Cantiere chiavi-dal-conto; Andrea, aperta una disputa dal PC: «mi dice
+   la tua chiave di moderatore sta su un altro dispositivo. Che palle» —
+   «correggi anche questo». Come le chiavi degli scambi dal 19 nov, la
+   chiave di moderatore segue l'ACCOUNT: il dispositivo che ce l'ha ne
+   lascia sul server una copia CIFRATA (NIP-44) con una chiave ricavata
+   dal profilo del conto (`semeContoP2P`, lo stesso seme per la Mini App
+   e per il sito), e un altro dispositivo dello stesso account la riapre
+   da solo alla prima apertura delle dispute. Il nodo non cambia: e' la
+   stessa chiave, gia' fra i solver.
+   IL PREZZO, detto ad Andrea: chi tiene il server sa rifare il seme e
+   quindi potrebbe aprirla (la regola del 1 ott, «la privata non passa
+   mai dal server, nemmeno cifrata», e' rovesciata per scelta: Architettura,
+   «LA COPIA DELLA CHIAVE DI MODERATORE»). L'export con la password resta.
+   I CONTROLLI: si riapre SOLO se la pubblica che ne esce e' quella
+   registrata (una copia storta o di un'altra chiave non scrive niente);
+   si lascia SOLO dalla chiave registrata (il server rifiuta le altre,
+   e una chiave nuova porta via la copia della vecchia); una copia che il
+   seme di oggi non riapre si rifa' da chi ha la chiave. Una volta per
+   sessione per verso: non e' un giro da fare a ogni elenco. */
+const MOD_COPIA_INFO = 'barattolo/moderatore/copia/1';
+let modCopiaGiro = '';   // la copia gia' guardata in questa sessione
+async function chiaveCopiaModP2P(){
+  const s = await semeContoP2P();
+  if (!s || !FORMA_HEX64.test(String(s.sk || ''))) return null;
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  return NT.hmac(NT.sha256, NT.utils.hexToBytes(s.sk), new TextEncoder().encode(MOD_COPIA_INFO));
+}
+function apriCopiaModP2P(conv, copia, pub){
+  try {
+    const NT = window.NostrTools;
+    const d = JSON.parse(NT.nip44.decrypt(copia, conv));
+    const sk = String((d && d.sk) || '').toLowerCase();
+    if (!FORMA_HEX64.test(sk) || NT.getPublicKey(NT.utils.hexToBytes(sk)) !== pub) return null;
+    return {sk, pub, creata: (d.creata | 0) || Math.floor(Date.now() / 1000)};
+  } catch(e) { return null; }
+}
+/* true quando ha PORTATO QUI la chiave (la pagina va ridisegnata) */
+async function copiaChiaveModP2P(){
+  if (!moderatoreP2P() || !p2pMod || !p2pMod.chiave) return false;
+  const k = chiaveModeratoreP2P();
+  const copia = String(p2pMod.copia || '');
+  const giro = p2pMod.chiave + '|' + copia + '|' + (k ? k.pub : '');
+  if (modCopiaGiro === giro) return false;
+  modCopiaGiro = giro;
+  if (k && k.pub !== p2pMod.chiave) return false;    // una chiave vecchia: niente copia
+  if (!k && !copia) return false;                    // la copia non c'e' ancora
+  const conv = await chiaveCopiaModP2P();
+  if (!conv) return false;
+  if (!k) {
+    const nuova = apriCopiaModP2P(conv, copia, p2pMod.chiave);
+    if (!nuova) { console.log('⚖️ [p2p] moderazione: la copia della chiave non si riapre qui'); return false; }
+    localStorage.setItem(chiaveP2P(MOD_CHIAVE_P2P), JSON.stringify(nuova));
+    console.log('⚖️ [p2p] moderazione: la chiave di moderatore e\' arrivata su questo dispositivo');
+    return true;
+  }
+  if (copia && apriCopiaModP2P(conv, copia, k.pub)) return false;   // c'e' ed e' buona
+  const NT = window.NostrTools;
+  const chiusa = NT.nip44.encrypt(JSON.stringify({sk: k.sk, creata: k.creata | 0}), conv);
+  await modFetch('moderazione/chiave/copia', {chiave: k.pub, copia: chiusa});
+  p2pMod.copia = chiusa;
+  modCopiaGiro = p2pMod.chiave + '|' + chiusa + '|' + k.pub;
+  console.log('⚖️ [p2p] moderazione: la copia della chiave e\' sul server, chiusa col conto');
+  return false;
+}
+
 /* ---- la chiave ---- */
 async function creaChiaveModeratoreP2P(){
   if (!moderatoreP2P()) return;
@@ -113354,10 +113433,10 @@ async function creaChiaveModeratoreP2P(){
   chiediConferma({
     titolo: altrove ? 'Creare una chiave nuova qui?' : 'Creare la tua chiave di moderatore?',
     corpo: (altrove
-      ? 'La tua chiave di moderatore sta su un altro dispositivo. Creandone una qui, quella smette di essere la tua: '
-      : 'La chiave nasce su questo dispositivo e non lo lascia mai. ')
+      ? 'La tua chiave di moderatore sta su un altro dispositivo: se ce l\'hai ancora, apri le dispute una volta da lì e arriva da sola qui. Creandone una nuova qui, quella smette di essere la tua: '
+      : 'La chiave nasce su questo dispositivo e arriva da sola sugli altri dove entri col tuo account. ')
       + 'La chiave nuova va aggiunta al nodo prima di poter prendere una disputa. '
-      + 'Se perdi questo dispositivo la ritrovi solo da una copia esportata; sennò se ne crea un\'altra.',
+      + 'Se perdi questo dispositivo la ritrovi entrando col tuo account da un altro.',
     etichetta: 'Sì, creala',
     poi: async () => {
       const rip = attesaP2P('Creo la chiave…');
@@ -114371,8 +114450,8 @@ function renderModerazioneP2P(){
   if (!ho) {
     testa += '<div class="trust-note"><span>🔑</span><span>'
       + (p2pMod.chiave
-         ? 'La tua chiave di moderatore sta su un altro dispositivo: da qui guardi, per prendere e decidere usa quello — o portala qui da una copia esportata.'
-         : 'Per prendere una disputa ti serve una chiave di moderatore. Nasce su questo dispositivo, e ne esce solo cifrata con una password tua.')
+         ? 'La tua chiave di moderatore sta su un altro dispositivo e non è ancora arrivata qui: apri le dispute una volta da lì, e poi arriva da sola anche qui.'
+         : 'Per prendere una disputa ti serve una chiave di moderatore. Nasce su questo dispositivo e poi ti segue sugli altri dove entri col tuo account.')
       + '</span></div><button class="btn ghost" onclick="creaChiaveModeratoreP2P()">'
       + (p2pMod.chiave ? 'Crea una chiave nuova qui' : '🔑 Crea la mia chiave di moderatore') + '</button>'
       + '<button class="btn ghost" onclick="apriChiaveModP2P(\'importa\')">📥 Importa una chiave</button>';

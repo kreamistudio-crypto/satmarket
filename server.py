@@ -8527,11 +8527,14 @@ def init_db():
     CREATE TABLE IF NOT EXISTS p2p_moderatori(
         -- LE CHIAVI PUBBLICHE DEI MODERATORI P2P (28 set 2026): una per
         -- persona, dichiarata dal suo telefono, dove vive la privata —
-        -- che di qui non passa e non ha una colonna. E' la chiave che
-        -- Andrea aggiunge al nodo (`admin-add-solver`).
+        -- che di qui non passa IN CHIARO. E' la chiave che Andrea
+        -- aggiunge al nodo (`admin-add-solver`). `copia` (19 nov 2026):
+        -- la privata CIFRATA dal client con una chiave del conto, perche'
+        -- segua l'account sugli altri dispositivi (`_copia_chiave_moderatore_p2p`).
         tg_id INTEGER PRIMARY KEY,
         chiave TEXT NOT NULL,
-        creata INTEGER DEFAULT 0
+        creata INTEGER DEFAULT 0,
+        copia TEXT DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS p2p_presenze(
         -- LA PROVA D'INCONTRO DEL CONTANTI DI PERSONA (30 set 2026): i
@@ -10214,6 +10217,13 @@ def init_db():
     # libro-vuoto): vedi lo schema di `p2p_pause`
     try:
         con.execute("ALTER TABLE p2p_pause ADD COLUMN salta_fino INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    # la copia della chiave di moderatore (19 nov 2026, cantiere
+    # chiavi-dal-conto), per i database nati prima: vedi
+    # `_copia_chiave_moderatore_p2p`
+    try:
+        con.execute("ALTER TABLE p2p_moderatori ADD COLUMN copia TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
     # il paracadute diviso fra salita e discesa (17 nov 2026, cantiere
@@ -78394,14 +78404,52 @@ def _registra_chiave_moderatore_p2p(con, io: int, chiave, adesso: int) -> tuple:
     prima = _chiave_moderatore_p2p(con, io)
     if prima == chiave:
         return (200, {"ok": True, "nuova": False})
-    con.execute("INSERT INTO p2p_moderatori(tg_id, chiave, creata) VALUES(?,?,?) "
+    # una chiave nuova porta via la copia della vecchia: la lascia il
+    # dispositivo che ha la nuova (`_copia_chiave_moderatore_p2p`)
+    con.execute("INSERT INTO p2p_moderatori(tg_id, chiave, creata, copia) VALUES(?,?,?,'') "
                 "ON CONFLICT(tg_id) DO UPDATE SET chiave=excluded.chiave, "
-                "creata=excluded.creata", (int(io), chiave, adesso))
+                "creata=excluded.creata, copia=''", (int(io), chiave, adesso))
     _registro_disputa_p2p(con, "", "chiave", io, adesso,
                           motivo=("cambiata" if prima else "registrata"),
                           chiave=chiave)
     con.commit()
     return (200, {"ok": True, "nuova": True, "cambiata": bool(prima)})
+
+
+# LA COPIA DELLA CHIAVE DI MODERATORE (19 nov 2026, cantiere
+# chiavi-dal-conto; Andrea, aperta una disputa dal PC: «mi dice la tua
+# chiave di moderatore sta su un altro dispositivo. Che palle» — «correggi
+# anche questo»). Fino a ieri la privata nasceva sul telefono e non ne
+# usciva se non cifrata con una password, a mano (esporta/importa). Ora il
+# dispositivo che ce l'ha lascia qui una copia CIFRATA con una chiave che
+# il client ricava dal profilo del CONTO (`/api/p2p/seme`, la stessa del
+# punto 2 delle chiavi degli scambi), e un altro dispositivo dello stesso
+# account la riapre da solo. Il nodo non cambia: e' la stessa chiave.
+# IL PREZZO, detto ad Andrea: chi tiene il server sa rifare il seme, e
+# quindi potrebbe aprirla — come le chiavi degli scambi dal 19 nov.
+# La copia vale solo per la chiave REGISTRATA (una nuova la porta via) e
+# solo il suo moderatore la riceve, nell'elenco della sezione.
+FORMA_COPIA_MOD_P2P = re.compile(r"[A-Za-z0-9+/]{40,4000}={0,2}")
+
+
+def _copia_chiave_moderatore_p2p(con, io: int, chiave, copia, adesso: int) -> tuple:
+    chiave = str(chiave or "").strip().lower()
+    copia = str(copia or "").strip()
+    if not FORMA_CHIAVE_P2P.fullmatch(chiave) or not FORMA_COPIA_MOD_P2P.fullmatch(copia):
+        return (400, "Richiesta non valida")
+    if _chiave_moderatore_p2p(con, io) != chiave:
+        return (409, "Non è la tua chiave di moderatore registrata")
+    con.execute("UPDATE p2p_moderatori SET copia=? WHERE tg_id=? AND chiave=?",
+                (copia, int(io), chiave))
+    con.commit()
+    return (200, {"ok": True})
+
+
+def _copia_moderatore_p2p(con, tg_id: int) -> str:
+    """La copia cifrata della chiave registrata da questa persona, o ''."""
+    r = con.execute("SELECT copia FROM p2p_moderatori WHERE tg_id=?",
+                    (int(tg_id or 0),)).fetchone()
+    return (r["copia"] if r else "") or ""
 
 
 def _dichiara_disputa_p2p(con, io: int, ordine, disputa, adesso: int) -> tuple:
@@ -78566,6 +78614,8 @@ def _dispute_per_moderatore_p2p(con, io: int, adesso: int) -> dict:
     return {"dispute": [_riga_disputa_p2p(con, r, io) for r in list(vive) + list(chiuse)],
             "aperte": len(vive),
             "chiave": _chiave_moderatore_p2p(con, io),
+            # la copia cifrata della MIA chiave (19 nov 2026): solo a me
+            "copia": _copia_moderatore_p2p(con, io),
             "moderatori": moderatori,
             # l'ora del server, per «oggi» e «ieri» anche su un telefono
             # con l'orologio sbagliato (16 ott 2026, orari-passi)
@@ -78807,6 +78857,22 @@ async def moderazione_chiave_p2p(req: Request, x_tg_init_data: str = Header(""),
                         "(PRODUZIONE, «LE DISPUTE P2P»).", user["id"])
                 except Exception:
                     pass
+    return _risposta_moderazione(codice, corpo)
+
+
+@app.post("/api/p2p/moderazione/chiave/copia")
+async def moderazione_chiave_copia_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                       barattolo_sessione: str = Cookie("")):
+    """SOLO MODERATORI: la copia CIFRATA della propria chiave di
+    moderatore (19 nov 2026). Il giudice e' `_copia_chiave_moderatore_p2p`."""
+    user = _moderatore_o_403(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        codice, corpo = _copia_chiave_moderatore_p2p(
+            con, user["id"], d.get("chiave"), d.get("copia"), int(time.time()))
+    finally:
+        con.close()
     return _risposta_moderazione(codice, corpo)
 
 
