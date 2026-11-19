@@ -88939,11 +88939,25 @@ async function identitaMieP2P(mz){
   if (mz && (mz.indice | 0)) mie.push(mz.sk);
   /* ...e quelle in pensione (17 nov 2026), in coda e senza doppioni */
   if (typeof conPensioneP2P === 'function') conPensioneP2P(mie);
-  if (mz && mz.origine === 'conto') return mie;
-  const s = await semeContoP2P();
+  /* ...e quelle parcheggiate su questo telefono (19 nov 2026, sera): la
+     restore e' la prova che un ordine aperto e' loro. Solo quelle senza
+     timbro o col MIO: una col timbro di un altro conto e' di un altro, e
+     torna solo con la prova della chiave (`chiaveDalParcheggioP2P`) */
+  if (typeof mazziParcheggiatiP2P === 'function')
+    for (const d of mazziParcheggiatiP2P())
+      if (mie.indexOf(d.sk) < 0 && (!d.conto || numeroConto(d.conto) === numeroConto(myTgId))) mie.push(d.sk);
+  /* (19 nov 2026, sera) ANCHE CON UN MAZZO 'conto' SI CHIEDE IL SEME: un
+     profilo timbrato «conto» che non e' il seme di oggi (ripreso dal cloud
+     di Telegram dopo una memoria svuotata) teneva fuori dalla restore il
+     profilo vero, quello con cui gli ordini di oggi sono nati. La domanda
+     e' memorizzata (`semeContoP2P`): quando e' lo stesso non costa niente */
+  let s = null;
+  try { s = await semeContoP2P(); } catch(e){ s = null; }
+  p2pSemeNoto = (s && s.sk) ? s : null;
   if (s && s.sk && mie.indexOf(s.sk) < 0) mie.push(s.sk);
   return mie;
 }
+let p2pSemeNoto = null;   /* il seme del conto, quando la restore l'ha gia' chiesto */
 /* ...e quelle in pensione (17 nov 2026): i loro ordini restano MIEI
    finche' ne hanno, e la restore lo deve sapere */
 function conPensioneP2P(mie){
@@ -109068,6 +109082,66 @@ function chiaveScambioDaServerP2P(mz, id, s){
   if (s.chiave_mia && tk.pub !== s.chiave_mia) return null;
   return {sk: tk.sk, pub: tk.pub, indice: indice};
 }
+/* LE CHIAVI PARCHEGGIATE (19 nov 2026, sera, cantiere chiavi-parcheggiate;
+   Andrea, ordine Barattozon pubblicato e preso dallo STESSO telefono:
+   «Avevo fatto tutto da qui eppure da errore»). Dopo la promozione il
+   telefono e' passato a un altro profilo di scambio e quello con cui
+   l'ordine era nato e' finito sulla mensola (`@altrui:`), righe comprese:
+   tornava solo la riga del server, senza chiavi, «di un altro profilo».
+   Qui, se il server dice che lo scambio e' MIO e un profilo parcheggiato
+   su questo telefono (o rimasto sotto il nome di prima del conto) ne
+   rideriva ESATTAMENTE la trade key (`chiaveScambioDaServerP2P` vuole la
+   `chiave_mia` del server: e' la prova crittografica), quel profilo va in
+   pensione — finisce i suoi scambi — e la riga torna governabile. L'altra
+   prova e' la restore: le identita' parcheggiate si chiedono a Mostro
+   (`identitaMieP2P`), e un ordine che il coordinatore dice di LORO porta
+   l'indice. Senza nessuna delle due non si prende niente. L'archivio del
+   server e' gia' solo del mio account. */
+function mazziParcheggiatiP2P(){
+  const vivo = (typeof mazzoMostro === 'function' && mazzoMostro()) || null;
+  const visti = new Set(vivo && vivo.sk ? [vivo.sk] : []);
+  if (typeof mazziPensioneP2P === 'function') for (const d of mazziPensioneP2P()) visti.add(d.sk);
+  const fuori = [];
+  let nomi = [];
+  try { for (let i = 0; i < localStorage.length; i++) nomi.push(localStorage.key(i)); } catch(e){ nomi = []; }
+  for (const k of nomi) {
+    /* la mensola, il nome di prima del conto, e il profilo vivo di un ALTRO
+       conto di questo telefono (vale solo con la prova della chiave) */
+    if (!k || (k !== MOSTRO_CHIAVE && k.indexOf(MOSTRO_CHIAVE + '@altrui:') !== 0
+               && !/^barattolo_mostro@-?[0-9]+$/.test(k))) continue;
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(k)); } catch(e){ d = null; }
+    if (!d || !FORMA_HEX64.test(String(d.sk || '')) || visti.has(d.sk)) continue;
+    let pub = String(d.pub || '');
+    try { if (!FORMA_HEX64.test(pub)) pub = window.NostrTools.getPublicKey(window.NostrTools.utils.hexToBytes(d.sk)); } catch(e){ continue; }
+    visti.add(d.sk);
+    fuori.push(Object.assign({}, d, {pub: pub, dove: k}));
+  }
+  return fuori;
+}
+function chiaveDalParcheggioP2P(id, s){
+  if (!s || typeof mandaInPensioneP2P !== 'function') return null;
+  /* ...e il seme del conto, se non e' il vivo (vedi `identitaMieP2P`) */
+  const candidati = mazziParcheggiatiP2P();
+  const seme = typeof p2pSemeNoto !== 'undefined' ? p2pSemeNoto : null;
+  const vivo = (typeof mazzoMostro === 'function' && mazzoMostro()) || null;
+  if (seme && (!vivo || vivo.sk !== seme.sk) && !candidati.some(d => d.sk === seme.sk)
+      && !(typeof inPensioneP2P === 'function' && inPensioneP2P(seme.sk))) {
+    try {
+      candidati.push({sk: seme.sk, pub: window.NostrTools.getPublicKey(window.NostrTools.utils.hexToBytes(seme.sk)),
+                      indice: seme.indice | 0, origine: 'conto', conto: myTgId, dove: 'seme'});
+    } catch(e){}
+  }
+  for (const d of candidati) {
+    const tk = chiaveScambioDaServerP2P(d, id, s);
+    if (!tk) continue;
+    mandaInPensioneP2P(d);
+    diarioP2P('chiave ' + String(id).slice(0, 8) + ': ritrovata nel profilo parcheggiato '
+              + String(d.pub).slice(0, 8) + ' (indice ' + tk.indice + '): va in pensione e finisce i suoi scambi');
+    return tk;
+  }
+  return null;
+}
 function adottaScambiServerP2P(locali){
   if (!p2pScambiServer) return 0;
   const mz = mazzoMostro();
@@ -109085,7 +109159,8 @@ function adottaScambiServerP2P(locali){
        2026, chiavi-dalle-parole): sono suoi gli scambi che deve finire */
     const tk = chiaveScambioDaServerP2P(mz, id, s)
       || (typeof mazziPensioneP2P === 'function' ? mazziPensioneP2P() : [])
-           .map(d => chiaveScambioDaServerP2P(d, id, s)).find(Boolean) || null;
+           .map(d => chiaveScambioDaServerP2P(d, id, s)).find(Boolean)
+      || (typeof chiaveDalParcheggioP2P === 'function' ? chiaveDalParcheggioP2P(id, s) : null) || null;
     /* LO STESSO ID, UN GIRO NUOVO (7 ott 2026): vedi `giroNuovoP2P` */
     const segno = gia && typeof giroNuovoP2P === 'function' ? giroNuovoP2P(gia, s, tk) : '';
     if (segno && !gia.mio && typeof archiviaGiroCadutoP2P === 'function') {

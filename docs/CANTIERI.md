@@ -92559,3 +92559,46 @@ Andrea, con lo scatto del suo ordine Barattozon aperto («Vuoi ricevere 74,39 �
 DECISO. Le parole del concluso («Amazon pagato: X» / «per Y», 22 set 2026) valgono anche prima: chi fa pagare il suo ordine Amazon (tabacchino, parte `vendo`) legge da aperto «Amazon da pagare: X» / «per ≈ Y sats», da annullato «Amazon X · per Y» al posto di «Invia … · Ricevi …»; chi paga il PayCode di un altro (Barattozon in «Compra BTC») legge «Vuoi ricevere … sats» / «pagando … al tabacchino», come nel suo concluso. Sulla card on-chain (`rigaScambioOnchainP2P`) le stesse frasi, concluso compreso, che lì non aveva il ramo del tabacchino; il giudice è `tabacchinoP2P(o.metodi)`, col typeof per i banchi che ritagliano la card da sola. «X% più conveniente per te» resta: sul proprio ordine a sats fissi è vero (si danno meno sats del mercato).
 PROVATO. `prove_p2p_card_scambio`: Barattozon aperto dai due lati, annullato, e l'ordine normale ancora «Vuoi ricevere … inviando …» (emendata la sentinella sul sorgente della riga viva). `prove_p2p_onchain`: nel banco i giudici veri del tabacchino e cinque card Barattozon (aperto, concluso, scaduto, preso e concluso di chi paga il PayCode), nessun «inviando». Controprova: spenti i due rami, due rosse. GUIDA-P2P-PASSI aggiornata (§7a).
 DA GUARDARE. Sul telefono di Andrea, dopo la promozione: lo stesso ordine Barattozon in «I miei scambi». Il dettaglio dell'ordine e il conto non sono stati toccati.
+
+## L'ordine nato col seme e il profilo vecchio timbrato «conto»: la Mini App non chiedeva le chiavi dell'account (19 nov 2026, sera, cantiere chiavi-parcheggiate; Andrea, ordine Barattozon ff3855c0 preso da KabuCamel: «Di nuovo lo stesso errore stavolta il dispositivo è sempre lo stesso», «Avevo fatto tutto da qui eppure da errore»)
+
+IL CASO DAL VIVO, in produzione la sera della promozione (main 2e105d89).
+Ordine «Vendi BTC» Barattozon pubblicato un'ora dopo la promozione, dal
+telefono di Andrea; preso; al passo «Blocca i sats» la Mini App diceva «Le
+chiavi di questo scambio non sono in questo browser». Le due diagnosi:
+Mini App «profilo e9416d84 indice 6, restore 0 ordini, identita' chieste
+1», la riga solo dal server, senza chiave; Chrome sullo stesso telefono
+«stesso profilo e9416d84, restore: identita' chieste 2, ff3855c0 indice 1
+ALTRA IDENTITA». L'ordine era nato col SEME del conto (indice 1), e tutti e
+due i posti tenevano come vivo un profilo diverso (e9416d84). Chrome lo
+vedeva perché il suo e9416d84 non era timbrato «conto» e la restore
+chiedeva anche il seme; la Mini App no: `identitaMieP2P` usciva prima della
+domanda del seme con un mazzo vivo `origine 'conto'` («un mazzo 'conto' E'
+gia' il seme»). Un profilo timbrato «conto» di ieri (un seme che oggi non
+si rifà, o una copia ripresa) non è il seme di oggi.
+
+LA CURA (stretta, per la sera): il seme si chiede SEMPRE (la domanda è
+memorizzata; quando è lui la restore resta una), e l'archivio del server
+cerca la chiave anche nel seme e nei profili parcheggiati di questo
+telefono (`chiaveDalParcheggioP2P`): chi la rideriva (prova crittografica:
+la `chiave_mia` del server, o l'indice della restore di quella identità)
+va in pensione e la riga torna governabile — Mini App, sito e PC. Rovescia
+la regola del 13 set «un mazzo 'conto' resta UNA domanda»: le due
+sentinelle che la tenevano dicono ora la regola nuova.
+
+STRADE SCARTATE PER STASERA. Rimettere come vivo il seme al posto del
+profilo vecchio (`giudicaMazzoP2P` lo tiene, «tenuto», perché ha una
+storia): giusto, ma tocca il giudice di tutti i telefoni la sera stessa
+della promozione; da guardare a mente fresca. Gli ordini nuovi pubblicati
+dal profilo vecchio restano governabili dove quel profilo c'è.
+
+COSA È PROVATO. `prove_chiavi_parcheggiate` (11, col caso di Andrea: il
+seme che non è il vivo, la mensola, il nome di prima del conto, il vivo di
+un altro conto, senza prova niente, la restore che chiede i parcheggiati
+solo senza timbro o col mio conto); `prove_p2p_motore` e `prove_p2p_server`
+con la regola nuova. Suite severa 30.681/0, collaudi 161/0.
+
+RESTA DA GUARDARE. Dal vivo dopo il cherry-pick: la Mini App di Andrea
+apre ff3855c0 senza la riga «chiavi», e «Libera i sats» parte (Andrea ha
+già bloccato i sats da Chrome: il pagamento della garanzia non vuole
+firme). Poi: perché il vivo e9416d84 non è il seme, e il giudice.

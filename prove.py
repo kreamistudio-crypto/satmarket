@@ -81055,7 +81055,10 @@ function reset(){
   out.contoUnaDomanda = !!(uno && uno['ord-del-conto'])
     && ricevuti.slice(quanti2).filter(
          x => String(x.msgJson || '').indexOf('restore-session') >= 0).length === 1
-    && semeDomandato === 0;
+    /* (19 nov 2026, sera, chiavi-parcheggiate) il seme SI chiede anche a un
+       mazzo 'conto' — uno di ieri puo' non essere il seme di oggi — ma una
+       volta per sessione, e quando e' lui la restore resta una */
+    && semeDomandato <= 1;
 
   /* ---- 10) L'ORDINE ADOTTATO SI RITIRA, con la chiave riderivata --
      Il caso dal campo («non posso piu' annullare»): la riga locale
@@ -81703,7 +81706,7 @@ function reset(){
         "dueProveIdentita": "...ognuna con la sua prova d'identita'",
         "leDueIdentitaGiuste": "...e sono proprio le due identita' che ho",
         "dueIdentitaUnite": "...e le due liste si UNISCONO: l'ordine e' mio anche da qui",
-        "contoUnaDomanda": "un mazzo 'conto' resta UNA domanda, e il seme non si chiede",
+        "contoUnaDomanda": "un mazzo 'conto' resta UNA domanda alla restore (il seme si chiede una volta sola)",
         "adozioneVera": "l'ordine della restore si adotta: riga vera, chiave vera",
         "ritiroFirmatoDallaSuaChiave": "...e il ritiro parte firmato con la chiave riderivata",
         "ritiroConProvaIdentita": "...con la prova d'identita' del profilo",
@@ -89627,10 +89630,12 @@ console.log(JSON.stringify(out));
     # `allineaContoP2P`, che per un mazzo non 'conto' nessuno rilegge),
     # e la restore chiedeva per quello solo: lista vuota VERA, e
     # l'ordine proprio letto da estraneo.
-    prova("il seme non si chiede a un mazzo che E' gia' lui", True,
-          "if (mz && mz.origine === 'conto') return mie;" in im)
-    prova("...e a un profilo di dispositivo si chiede anche il conto",
-          True, "const s = await semeContoP2P();" in im
+    # (19 nov 2026, sera, chiavi-parcheggiate) un mazzo 'conto' di ieri puo'
+    # non essere il seme di oggi (l'ordine ff3855c0 di Andrea): il seme si
+    # chiede SEMPRE, e quando e' lui la riga di sotto non lo raddoppia
+    prova("il seme si chiede anche a un mazzo 'conto', senza raddoppiare la domanda", True,
+          "if (mz && mz.origine === 'conto') return mie;" not in im
+          and "s = await semeContoP2P();" in im
           and "if (s && s.sk && mie.indexOf(s.sk) < 0) mie.push(s.sk);" in im)
     # LE DUE DOMANDE PARTONO INSIEME, o un'attesa muta costerebbe
     # P2P_ATTESA_MS due volte proprio a chi questo giro serve. Si puo'
@@ -89997,13 +90002,16 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
   out.ripresaPura = ['giroMorto' in riprendiDaRestoreP2P(vecchia, 'active'),
                      vecchia.stato, vecchia.giroMorto];
   out.passiTutti = Object.keys(P2P_RIPRESA_PASSO).sort();
-  // j) LE MIE IDENTITA': un mazzo 'conto' E' gia' il seme, e la
-  //    seconda domanda non parte nemmeno — nemmeno la POST
+  // j) LE MIE IDENTITA' (19 nov 2026, sera, chiavi-parcheggiate: l'ordine
+  //    ff3855c0): un mazzo 'conto' di ieri puo' non essere il seme di oggi,
+  //    e il seme si chiede lo stesso; quando E' lui la lista resta una
   const SK_SEME = 'cd'.repeat(32);
   SEME = {sk: SK_SEME}; semeChiesto = 0;
   out.contoNonChiedeIlSeme = JSON.stringify(await identitaMieP2P(
-      {sk: 'aa', pub: 'AA', indice: 3, origine: 'conto'})) === '["aa"]'
-    && semeChiesto === 0;
+      {sk: 'aa', pub: 'AA', indice: 3, origine: 'conto'})) === JSON.stringify(['aa', SK_SEME])
+    && semeChiesto <= 1
+    && JSON.stringify(await identitaMieP2P(
+      {sk: SK_SEME, pub: 'CD', indice: 3, origine: 'conto'})) === JSON.stringify([SK_SEME]);
   // k) un profilo DI DISPOSITIVO ne ha due, e il mazzo viene per primo
   out.dispositivoDue = JSON.stringify(await identitaMieP2P(
       {sk: 'aa', pub: 'AA', indice: 3, origine: ''}))
@@ -90132,7 +90140,7 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
                   [], [s for s in _arr if s not in _stati])
             # LE MIE IDENTITA' (13 set 2026, il PC di Andrea): il
             # giudice gira davvero, coi sei rami che contano.
-            prova("a un mazzo 'conto' il seme non si chiede: E' lui",
+            prova("a un mazzo 'conto' che non e' il seme di oggi si chiede anche il seme; quando e' lui resta uno",
                   True, out5["contoNonChiedeIlSeme"])
             prova("...e un profilo di dispositivo ne ha DUE, il mazzo per primo",
                   True, out5["dispositivoDue"])
@@ -103643,6 +103651,122 @@ console.log(JSON.stringify({
            "🔒 <b>Bruno ha bloccato i sats in garanzia e ti ha già indicato dove inviare 39,99 €:</b> tocca a te."],
           [testo("garanzia_pagata", "active", "compra", dict(dati, tabacchino=False), nome="Bruno"),
            testo("garanzia_pagata", "active", "compra", dict(dati, tabacchino=False, recapito_detto=True), nome="Bruno")])
+
+
+def prove_chiavi_parcheggiate():
+    """LE CHIAVI PARCHEGGIATE (19 nov 2026, sera, cantiere chiavi-parcheggiate;
+    Andrea, ordine Barattozon pubblicato e preso dallo stesso telefono:
+    «Avevo fatto tutto da qui eppure da errore»). Dopo la promozione il
+    telefono era passato a un altro profilo e quello dell'ordine stava sulla
+    mensola (`@altrui:`): la riga del server tornava senza chiavi. Qui: il
+    profilo parcheggiato che rideriva la `chiave_mia` del server (o che la
+    restore dice padrone dell'ordine) va in pensione e la riga si governa;
+    senza prova niente; il vivo e la pensione non contano come
+    parcheggiati; le altre chiavi della mensola non sono mazzi; la restore
+    chiede i parcheggiati senza timbro o col mio, non quelli di un altro."""
+    print("\n[le chiavi parcheggiate: lo scambio nato col profilo di prima torna governabile]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    ad = pezzo_js(mini, "function adottaScambiServerP2P(locali){", "\n}\n")
+    prova("l'archivio del server cerca anche nella mensola, dopo vivo e pensione", True,
+          ad.index("chiaveScambioDaServerP2P(mz, id, s)") < ad.index("mazziPensioneP2P()")
+          < ad.index("chiaveDalParcheggioP2P(id, s)"))
+    pezzi = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function numeroConto(x){", "function mazziParcheggiatiP2P(){",
+        "function chiaveDalParcheggioP2P(id, s){", "function indiceDaChiaveP2P(mz, pub, max){",
+        "function chiaveScambioDaServerP2P(mz, id, s){", "async function identitaMieP2P(mz){",
+        "function conPensioneP2P(mie){"))
+    js = r"""
+const MOSTRO_CHIAVE = 'barattolo_mostro';
+const FORMA_HEX64 = /^[0-9a-f]{64}$/;
+const P2P_INDICE_CERCA_MAX = 500, P2P_INDICE_CERCA_MIN = 50;
+const MEM = {};
+const localStorage = {get length(){ return Object.keys(MEM).length; }, key: i => Object.keys(MEM)[i],
+  getItem: k => (k in MEM ? MEM[k] : null), setItem: (k, v) => { MEM[k] = String(v); }, removeItem: k => { delete MEM[k]; }};
+const window = {NostrTools: {getPublicKey: b => 'pub-di-' + b, utils: {hexToBytes: h => h.slice(0, 4)}}};
+const chiaveScambio = (sk, i) => ({sk: sk.slice(0, 2) + ':sk:' + i, pub: sk.slice(0, 2) + ':' + i});
+let PENSIONE = [], DIARIO = [], myTgId = 5, p2pMieiOrdini = null, p2pSemeNoto = null;
+const mazziPensioneP2P = () => PENSIONE;
+const mandaInPensioneP2P = m => { PENSIONE.push({sk: m.sk, pub: m.pub, indice: m.indice | 0}); };
+const inPensioneP2P = sk => PENSIONE.some(d => d.sk === sk);
+const diarioP2P = r => DIARIO.push(r);
+let SEME = null;
+const semeContoP2P = async () => SEME;
+const H = c => c.repeat(64);
+const PB = H('8'), PD = H('7'), PA = H('6'), P1 = H('5'), P2 = H('4'), P3 = H('9');
+let VIVO = {sk: H('e'), pub: 'P-VIVO', indice: 6, origine: 'conto'};
+const mazzoMostro = () => VIVO;
+""" + pezzi + r"""
+(async () => {
+  const out = {};
+  const pulisci = () => { for (const k of Object.keys(MEM)) delete MEM[k]; PENSIONE = []; DIARIO = []; p2pMieiOrdini = null; };
+  /* a) il profilo di prima sulla mensola, la chiave del server viene da lui */
+  pulisci();
+  MEM['barattolo_mostro@altrui:bae6aaaa'] = JSON.stringify({sk: H('b'), pub: PB, indice: 164, conto: 5});
+  MEM['barattolo_mostro_ordini@altrui:bae6aaaa'] = JSON.stringify({x: {sk: H('c')}});
+  MEM['barattolo_mostro@5'] = JSON.stringify(VIVO);
+  out.lista = mazziParcheggiatiP2P().map(d => [d.pub, d.dove]);
+  const tk = chiaveDalParcheggioP2P('ff3855c0', {mio: true, chiave_mia: 'bb:120'});
+  out.trovata = [tk && tk.indice, tk && tk.pub, PENSIONE.map(d => d.pub), DIARIO.some(r => r.includes('ff3855c0') && r.includes('parcheggiato'))];
+  out.dopoNonParcheggiato = mazziParcheggiatiP2P().length;
+  /* b) senza prova (niente chiave del server, niente restore): niente */
+  pulisci();
+  MEM['barattolo_mostro@altrui:bae6aaaa'] = JSON.stringify({sk: H('b'), pub: PB, indice: 164});
+  out.senzaProva = [chiaveDalParcheggioP2P('o1', {mio: true, chiave_mia: ''}), PENSIONE.length];
+  /* c) una chiave del server che nessun parcheggiato rideriva: niente */
+  out.altraChiave = [chiaveDalParcheggioP2P('o1', {mio: true, chiave_mia: 'zz:3'}), PENSIONE.length];
+  /* d) la restore del parcheggiato porta l'indice (senza chiave del server) */
+  p2pMieiOrdini = {o2: {indice: 9, identita: PB}};
+  const tk2 = chiaveDalParcheggioP2P('o2', {mio: true, chiave_mia: ''});
+  out.dallaRestore = [tk2 && tk2.indice, PENSIONE.length];
+  /* e) il vivo, la pensione e il nome di prima del conto */
+  pulisci();
+  MEM['barattolo_mostro@altrui:eeee0000'] = JSON.stringify(VIVO);
+  MEM['barattolo_mostro@altrui:dddd0000'] = JSON.stringify({sk: H('d'), pub: PD});
+  PENSIONE = [{sk: H('d'), pub: PD}];
+  MEM['barattolo_mostro'] = JSON.stringify({sk: H('a'), pub: PA, indice: 3});
+  MEM['barattolo_mostro@altrui:storto'] = '{rotto';
+  MEM['barattolo_mostro@altrui:senzapub'] = JSON.stringify({sk: H('f')});
+  MEM['barattolo_mostro@5'] = JSON.stringify(VIVO);
+  MEM['barattolo_mostro@888'] = JSON.stringify({sk: H('3'), pub: P3, conto: 888});
+  MEM['barattolo_mostro_ordini@888'] = JSON.stringify({});
+  out.esclusi = mazziParcheggiatiP2P().map(d => d.pub).sort();
+  /* f) la restore chiede i parcheggiati senza timbro o col mio, non quelli di un altro */
+  pulisci(); VIVO = {sk: H('e'), pub: 'P-VIVO', indice: 6, origine: 'conto'};
+  MEM['barattolo_mostro@altrui:11110000'] = JSON.stringify({sk: H('1'), pub: P1, conto: 5});
+  MEM['barattolo_mostro@altrui:22220000'] = JSON.stringify({sk: H('2'), pub: P2});
+  MEM['barattolo_mostro@altrui:33330000'] = JSON.stringify({sk: H('3'), pub: P3, conto: 777});
+  out.identita = (await identitaMieP2P(VIVO)).map(x => x[0]);
+  /* ...ma con la prova della chiave anche quello di un altro timbro torna (l'archivio e' del mio account) */
+  out.timbroAltroConChiave = (chiaveDalParcheggioP2P('o3', {chiave_mia: '33:4'}) || {}).indice;
+  /* g) il seme del conto, se il vivo non e' lui: la chiave dell'ordine nato col seme */
+  pulisci(); VIVO = {sk: H('e'), pub: 'P-VIVO', indice: 6, origine: 'conto'};
+  p2pSemeNoto = {sk: H('c'), indice: 40};
+  const tk3 = chiaveDalParcheggioP2P('ff3855c0', {chiave_mia: 'cc:33'});
+  out.dalSeme = [tk3 && tk3.indice, PENSIONE.map(d => d.sk[0])];
+  /* ...ma il seme che E' il vivo non si pensiona */
+  pulisci(); p2pSemeNoto = {sk: H('e'), indice: 6};
+  out.semeVivo = [chiaveDalParcheggioP2P('o9', {chiave_mia: 'ee:3'}), PENSIONE.length];
+  console.log(JSON.stringify(out));
+})();
+"""
+    r = _node_banco(js)
+    if r is None:
+        salta("il banco delle chiavi parcheggiate", "node non c'e'")
+        return
+    prova("la mensola si legge: il mazzo parcheggiato si', le sue righe no", [["8" * 64, "barattolo_mostro@altrui:bae6aaaa"]], r.get("lista"))
+    prova("LO SCAMBIO DI ANDREA: la chiave del server rideriva dal parcheggiato, che va in pensione e lo dice",
+          [120, "bb:120", ["8" * 64], True], r.get("trovata"))
+    prova("...e da pensionato non conta piu' come parcheggiato", 0, r.get("dopoNonParcheggiato"))
+    prova("senza prova non si prende niente; una chiave che nessuno rideriva neppure",
+          [[None, 0], [None, 0]], [r.get("senzaProva"), r.get("altraChiave")])
+    prova("...la restore del parcheggiato e' una prova", [9, 1], r.get("dallaRestore"))
+    prova("il vivo e la pensione non sono parcheggiati; il nome di prima del conto e il vivo di un altro conto si'; i rotti no",
+          sorted(["6" * 64, "pub-di-ffff", "9" * 64]), r.get("esclusi"))
+    prova("la restore chiede i parcheggiati senza timbro o col mio, non quello di un altro conto",
+          ["e", "1", "2"], r.get("identita"))
+    prova("...che torna solo con la prova della chiave", 4, r.get("timbroAltroConChiave"))
+    prova("IL SEME DEL CONTO che non e' il vivo: l'ordine nato con lui torna governabile", [33, ["c"]], r.get("dalSeme"))
+    prova("...e il seme che e' gia' il vivo non si tocca", [None, 0], r.get("semeVivo"))
 
 
 def prove_scambi_ovunque():
@@ -216403,7 +216527,7 @@ CATEGORIE = {
     vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
-    autocomplete_comuni scambi_p2p_vecchi scambi_ovunque
+    autocomplete_comuni scambi_p2p_vecchi scambi_ovunque chiavi_parcheggiate
     disputa_per_sbaglio tor_chiavi_scambio chi_e_l_altro
     voto_dopo_concluso giro_nuovo_stesso_id ritocchi_flusso_p2p
     volto_card_ascolto volto_unico schermo_segue_mostro
@@ -217240,7 +217364,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     tutte = (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_chiave_moderatore_dal_conto, prove_tocco_scheda_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_chiavi_parcheggiate, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_chiave_moderatore_dal_conto, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
