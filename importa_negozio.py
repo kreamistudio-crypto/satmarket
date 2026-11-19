@@ -617,14 +617,29 @@ def esplodi_woo(p: dict) -> list:
         return [p]
     pid = p.get("id")
     figli = []
+    # LE SCELTE «QUALSIASI» (19 nov 2026, il negozio Uhmami): vedi
+    # `scelte_aperte_woo` — chi ne lascia aperte, con le stesse fisse di
+    # una sorella gia' vista, e' un doppione e non nasce
+    viste = set()
     for n, v in enumerate(variazioni, 1):
         if not isinstance(v, dict):
             continue
         vid = v.get("id")
         attributi = [a for a in (v.get("attributes") or [])
                      if isinstance(a, dict) and a.get("option")]
+        scelte = scelte_aperte_woo(p, attributi)
+        if scelte:
+            fisse = tuple(_chiave_attributo(a) + (str(a.get("option"))
+                                                  .strip().casefold(),)
+                          for a in attributi)
+            if fisse in viste:
+                continue
+            viste.add(fisse)
         opzioni = ", ".join(str(a.get("option")).strip() for a in attributi)
-        nome = opzioni or str(v.get("sku") or "").strip() or f"variante {n}"
+        # il codice articolo come nome solo se non c'e' altro da dire: con
+        # le scelte aperte la variante si distingue da quelle (le tendine)
+        nome = opzioni or ("" if scelte else
+                           str(v.get("sku") or "").strip() or f"variante {n}")
         gestito, scorte = v.get("manage_stock"), v.get("stock_quantity")
         if gestito == "parent" or gestito is None:
             gestito, scorte = p.get("manage_stock"), p.get("stock_quantity")
@@ -652,9 +667,69 @@ def esplodi_woo(p: dict) -> list:
                              or bool(p.get("downloadable"))),
             "_opzioni": [[str(a.get("name") or "").strip() or "Variante",
                           str(a.get("option")).strip()]
-                         for a in attributi] or [["Variante", nome]],
+                         for a in attributi]
+                        or ([["Variante", nome]] if nome else []),
+            "_scelte": scelte,
         })
     return figli or [p]
+
+
+# --- LE SCELTE «QUALSIASI» (19 nov 2026) --------------------------------
+# Il difetto dal campo: il negozio Uhmami vende una box con due tendine
+# (il gusto della pallina, la composta), e su WooCommerce le sue sei
+# variazioni sono TUTTE «Qualsiasi pallina / Qualsiasi composta», stesso
+# prezzo, stessa giacenza, stesso codice articolo «025». Woo, per un
+# attributo lasciato su «Qualsiasi», non lo scrive nella variazione: il
+# cliente lo sceglie con la tendina e il negozio lo legge nell'ordine.
+# Qui arrivavano sei variazioni senza attributi, cioe' sei annunci
+# «Box — 025», uguali, col codice articolo come nome.
+# LA FORMA GIUSTA: le tendine stanno sul PADRE (`attributes`, quelli con
+# `variation: true`, coi loro `options`); quelle che la variazione NON
+# fissa sono una SCELTA del compratore, non un annuncio a parte — prezzo
+# e giacenza non cambiano, e moltiplicare gli annunci moltiplicherebbe
+# anche le scorte (dieci box, ma dieci per ogni combinazione in vetrina).
+# Le variazioni con le stesse fisse e scelte aperte sono DOPPIONI: Woo
+# vende sempre la prima che combacia, e noi teniamo quella (la lettura e'
+# in ordine di id). La scelta del compratore viaggia con l'ordine, nella
+# nota al venditore (`scelte_da_payload` in server.py).
+
+MAX_SCELTE = 3            # le tendine di una riga (Woo non ha un tetto)
+MAX_VALORI_SCELTA = 40    # le voci di una tendina
+MAX_TESTO_SCELTA = 60     # il nome di una tendina, o una sua voce
+
+
+def _chiave_attributo(a: dict) -> tuple:
+    """Come si riconosce lo stesso attributo sul padre e sulla
+    variazione: l'id per quelli globali (Prodotti → Attributi), il nome
+    per quelli scritti nel prodotto (id 0)."""
+    try:
+        aid = int(a.get("id") or 0)
+    except (TypeError, ValueError):
+        aid = 0
+    return ("id", aid) if aid else (
+        "nome", str(a.get("name") or "").strip().casefold())
+
+
+def scelte_aperte_woo(padre: dict, fissi: list) -> list:
+    """[[nome, [voci...]], ...]: gli attributi da variazione del padre
+    che la variazione lascia su «Qualsiasi». Lista vuota = niente da
+    scegliere, il mondo di ieri. Pura."""
+    prese = {_chiave_attributo(a) for a in fissi}
+    scelte = []
+    for a in padre.get("attributes") or []:
+        if not isinstance(a, dict) or not a.get("variation"):
+            continue
+        if _chiave_attributo(a) in prese:
+            continue
+        nome = " ".join(str(a.get("name") or "").split())[:MAX_TESTO_SCELTA]
+        voci = []
+        for o in a.get("options") or []:
+            o = " ".join(str(o or "").split())[:MAX_TESTO_SCELTA]
+            if o and o not in voci:
+                voci.append(o)
+        if nome and voci:
+            scelte.append([nome, voci[:MAX_VALORI_SCELTA]])
+    return scelte[:MAX_SCELTE]
 
 
 ESPLOSIONI = {"shopify": esplodi_shopify, "woo": esplodi_woo}
@@ -682,6 +757,7 @@ def traduci(prodotti: list, fonte: str, cambio: dict) -> list:
             riga["_padre"] = str(p.get("id") or "")
             riga["_titolo_padre"] = titolo_padre
             riga["_opzioni"] = figlio.get("_opzioni") or []
+            riga["scelte"] = figlio.get("_scelte") or []
             righe.append(riga)
     assegna_famiglie(righe)
     return righe
@@ -1494,7 +1570,8 @@ def _riga_locale(con, connettore_id: int, chiave: str):
     return con.execute(
         "SELECT id, stato, foto, origine_foto, quantita, quantita_max, "
         "origine_stock_visto, consegna, titolo, descrizione, prezzo_eur, "
-        "valuta, famiglia, famiglia_titolo, opzioni, categoria FROM annunci "
+        "valuta, famiglia, famiglia_titolo, opzioni, scelte, categoria "
+        "FROM annunci "
         "WHERE connettore_id=? AND origine_chiave=?",
         (connettore_id, chiave)).fetchone()
 
@@ -1509,15 +1586,26 @@ def _valori_famiglia(connettore_id: int, r: dict) -> tuple:
             if fam else "")
 
 
+def _valore_scelte(r: dict) -> str:
+    """Le scelte «Qualsiasi» della riga come si scrivono in colonna
+    (19 nov 2026): '' = nessuna tendina. Un posto solo per chi scrive e
+    per chi confronta, come `_valori_famiglia`."""
+    return json.dumps(r["scelte"], ensure_ascii=False) \
+        if r.get("scelte") else ""
+
+
 def _scrivi_famiglia(con, annuncio_id: int, connettore_id: int, r: dict):
     """La famiglia della riga, a OGNI giro e su ogni stato (anche in
     revisione e venduto): la decide il catalogo letto oggi, e una
     famiglia che si scioglie torna vuota qui. La chiave porta il
     collegamento davanti, cosi' due negozi non si mescolano mai.
-    Niente `modificato`: non e' un cambio del testo dell'annuncio."""
+    Niente `modificato`: non e' un cambio del testo dell'annuncio.
+    (19 nov 2026) Con la famiglia viaggiano le SCELTE «Qualsiasi»: sono
+    della stessa natura (le dice il catalogo, a ogni giro)."""
     con.execute(
-        "UPDATE annunci SET famiglia=?, famiglia_titolo=?, opzioni=? "
-        "WHERE id=?", (*_valori_famiglia(connettore_id, r), annuncio_id))
+        "UPDATE annunci SET famiglia=?, famiglia_titolo=?, opzioni=?, "
+        "scelte=? WHERE id=?", (*_valori_famiglia(connettore_id, r),
+                                _valore_scelte(r), annuncio_id))
 
 
 def consegna_riga(connettore: dict, digitale: bool) -> dict:
@@ -2007,9 +2095,9 @@ def _aggiorna(con, gia, r: dict, connettore: dict, foto: str, marchio,
         con.execute("UPDATE annunci SET quantita=?, "
                     "quantita_max=MAX(quantita_max,?) WHERE id=?",
                     (quantita, quantita, gia["id"]))
-    if _valori_famiglia(connettore["id"], r) != (
+    if (*_valori_famiglia(connettore["id"], r), _valore_scelte(r)) != (
             gia["famiglia"] or "", gia["famiglia_titolo"] or "",
-            gia["opzioni"] or ""):
+            gia["opzioni"] or "", gia["scelte"] or ""):
         _scrivi_famiglia(con, gia["id"], connettore["id"], r)
     # --- la categoria (16 nov 2026) -----------------------------------
     # SI RIEMPIE SOLO LA CASELLA VUOTA: una riga in «Altro» (cioe' nata

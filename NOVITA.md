@@ -722,3 +722,9 @@ frase: Uno scambio P2P preso dalla web app ora si porta avanti anche dalla Mini 
 dove: P2P → «I miei scambi» e il tasto «⚡ Apri lo scambio» degli avvisi del bot.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · scelte-negozio
+frase: I prodotti dei negozi WooCommerce con una scelta che non cambia il prezzo (il gusto, il colore del nastro…) ora entrano come un annuncio solo, col titolo giusto e le sue tendine: chi compra sceglie prima di pagare, e la scelta arriva al venditore con l'ordine.
+dove: la scheda di un prodotto importato da WooCommerce con tendine «Qualsiasi» (per esempio la Box Natale di Uhmami): le tendine sotto il prezzo, e di nuovo alla cassa in «🎁 Le tue scelte» (anche nel carrello). Il venditore la legge nella nota dell'ordine.
+leva: nessuna
+pubblico: sì

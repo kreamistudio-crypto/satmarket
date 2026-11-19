@@ -9917,6 +9917,11 @@
   .field .dom-azioni{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
   .field .dom-azioni .btn{flex:1 1 auto;width:auto}
   .dom-cassa select, .dom-cassa input{width:100%}
+  /* LE SCELTE «QUALSIASI» NELLA SCHEDA (19 nov 2026): le tendine col
+     vestito dei campi di casa, il nome sopra come nella famiglia */
+  .scelte-scheda{gap:4px;margin-bottom:0}
+  .scelte-scheda select{min-height:44px;margin-bottom:8px}
+  .scelte-scheda .hint{font-size:13px;font-weight:600;color:var(--ink-soft)}
   /* L'ETICHETTA DEGLI ALIMENTI (17 nov 2026): nel form la scatola delle
      domande (stesse regole rimesse a mano), nella scheda una tabella
      uguale per tutti, come quella sulla confezione. */
@@ -20532,7 +20537,11 @@ function mapListing(a){
     famiglia:a.famiglia||'', famigliaTitolo:a.famiglia_titolo||'',
     opzioni:(Array.isArray(a.opzioni) && a.opzioni) || [],
     famigliaN:a.famiglia_n||0, famigliaVaria:a.famiglia_varia===true,
-    sorelle:(Array.isArray(a.famiglia_varianti) && a.famiglia_varianti) || null};
+    sorelle:(Array.isArray(a.famiglia_varianti) && a.famiglia_varianti) || null,
+    /* LE SCELTE «QUALSIASI» (19 nov 2026, il negozio Uhmami): le
+       tendine che sul negozio non cambiano prezzo ne' giacenza, come
+       [[nome, [voci]]]. Lista vuota = niente da scegliere. */
+    scelte:(Array.isArray(a.scelte) && a.scelte) || []};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -34389,7 +34398,7 @@ function renderAcquisto(){
      interpolato, le partenze riunite) vive nei ferri condivisi
      barreCattura/barreCorri, qui sopra */
   const barraDa = barreCattura(box);
-  box.innerHTML = `${articoli}${accQta}${fila}${tornaCarrello}${vie}${note}${cassettoDomandeAcquisto(d)}${cassettoNota}${cassettoCodice}
+  box.innerHTML = `${articoli}${accQta}${cassettoScelteAcquisto(d)}${fila}${tornaCarrello}${vie}${note}${cassettoDomandeAcquisto(d)}${cassettoNota}${cassettoCodice}
     <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
@@ -35013,7 +35022,10 @@ function corpoConsegna(){
      sparirebbe IN SILENZIO solo a chi paga col wallet collegato.
      Chiave assente quando e' vuota: il patto dello stock. */
   const nota = (acqDati?.nota || '').trim().slice(0, MAX_NOTA);
-  const extra = nota ? {nota_compratore: nota} : {};
+  /* le scelte «Qualsiasi» (19 nov 2026) appartengono all'ORDINE come la
+     nota, e viaggiano con lei su tutte le uscite e i tre varchi */
+  const extra = {...(nota ? {nota_compratore: nota} : {}),
+                 ...corpoScelte(acqDati)};
   if (!v) return extra;
   /* il servizio esce di qui con le due vie che non hanno niente da
      aggiungere: nessun punto, nessun indirizzo, nessuna tariffa */
@@ -35126,6 +35138,58 @@ function puntoDiCasaMancante(d){
   return d?.via === 'punto' && !!casa && !d.puntoBarattolo;
 }
 
+/* ---- LE SCELTE «QUALSIASI», ALLA CASSA (19 nov 2026) ----
+   Le manda il PREVENTIVO, come le domande: una lista per l'acquisto
+   singolo, una mappa per id (col titolo) nel carrello, dove ogni pezzo
+   ha le sue. Le voci gia' scelte nella scheda tornano qui scelte. */
+function scelteCassa(d){
+  const p = d && d.preventivo;
+  if (!p || !p.scelte) return [];
+  if (d.tipo === 'set')
+    return (Array.isArray(p.scelte) ? [] : Object.entries(p.scelte))
+      .map(([aid, x]) => ({aid: Number(aid), titolo: (x && x.titolo) || '',
+                           scelte: (x && Array.isArray(x.scelte)) ? x.scelte : []}))
+      .filter(x => x.aid && x.scelte.length);
+  return Array.isArray(p.scelte) && p.scelte.length
+    ? [{aid: d.annuncioId, titolo: '', scelte: p.scelte}] : [];
+}
+function cassettoScelteAcquisto(d){
+  const g = scelteCassa(d);
+  if (!g.length) return '';
+  return `<div class="cassetto-cassa field dom-cassa" id="acqScelte">
+    <div class="section-label">🎁 Le tue scelte</div>
+    ${g.map(x => (x.titolo ? `<div class="acq-nota"><b>${esc(x.titolo)}</b></div>` : '')
+                 + tendineScelte(x.aid, x.scelte, 'acqSc')).join('')}
+    <div class="acq-nota">Arrivano al venditore con l'ordine, nella nota.</div>
+  </div>`;
+}
+/* la guardia di «Paga», gemella di mancanoRisposte: fuoco sulla prima
+   tendina vuota, e il toast che dice quale */
+function mancanoScelte(d){
+  for (const x of scelteCassa(d))
+    for (let i = 0; i < x.scelte.length; i++){
+      const nome = x.scelte[i][0];
+      if ((scelteFatte[x.aid] || {})[nome]) continue;
+      const c = el(`acqSc_${x.aid}_${i}`);
+      if (c){ c.scrollIntoView({block:'center'}); c.focus({preventScroll:true}); }
+      toast(`Scegli «${nome}» prima di pagare`);
+      return true;
+    }
+  return false;
+}
+/* le chiavi del corpo: `scelte` sul singolo, `scelte_righe` per id nel
+   carrello. Assenti se non c'e' niente da scegliere (il patto della nota). */
+function corpoScelte(d){
+  const g = scelteCassa(d);
+  if (!g.length) return {};
+  if (d.tipo === 'set'){
+    const o = {};
+    g.forEach(x => { o[x.aid] = {...(scelteFatte[x.aid] || {})}; });
+    return {scelte_righe: o};
+  }
+  return {scelte: {...(scelteFatte[d.annuncioId] || {})}};
+}
+
 /* ---- LE DOMANDE DEL VENDITORE, ALLA CASSA (6 nov 2026) ----
    Le manda il PREVENTIVO (`domande`), cioe' il server: la cassa non
    deve fidarsi di una scheda in cache. Solo sull'acquisto singolo e
@@ -35218,6 +35282,9 @@ function ctaAcquisto(){
   /* la cintura del bottone spento: una via senza conto non si paga */
   const stC = statoCassa(d.preventivo, d.via);
   if (!stC.viaOk){ toast(stC.chiuso); return; }
+  /* le scelte «Qualsiasi» (19 nov 2026), una voce per tendina: PRIMA
+     di tutto il resto perche' il cassetto sta in cima alla cassa */
+  if (mancanoScelte(d)) return;
   /* il corriere PRIMA del punto: e' l'ordine in cui si decide — la
      mappa da aprire dipende dalla rete — ed e' anche l'ordine in cui
      il cassetto disegna le due cose */
@@ -36591,6 +36658,7 @@ function openDetail(id){
               nuovo, e la fila resta una fila di fatti. */
            : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:'')))}
       ${famigliaScheda(l)}
+      ${scelteScheda(l)}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
       ${etichettaScheda(l)}
@@ -36907,6 +36975,45 @@ async function caricaFamiglia(l){
     if (box) box.innerHTML = htmlVarianti(l, m.sorelle);
   } catch(e) {}
 }
+/* ============ LE SCELTE «QUALSIASI» (19 nov 2026, Uhmami) =============
+   Il negozio vende una box con due tendine — il gusto della pallina, la
+   composta — che non cambiano prezzo ne' giacenza: su WooCommerce sono
+   attributi lasciati su «Qualsiasi». Non sono varianti (niente annuncio
+   a parte, niente bottoncini che aprono un'altra scheda): sono una
+   SCELTA di chi compra, come la taglia scritta nella nota, ma fatta con
+   le tendine del negozio. Si sceglie nella scheda o alla cassa (lo
+   stesso posto in memoria, `scelteFatte`), «Paga» non parte finche'
+   ne manca una (`mancanoScelte`, il server ripete il no) e la scelta
+   arriva al venditore nella nota dell'ordine. */
+const scelteFatte = {};   // annuncio_id -> {nome tendina: voce scelta}
+const sceltePer = {};     // annuncio_id -> [[nome, [voci]]], per l'onchange
+function tendineScelte(aid, scelte, pref, classeNome){
+  sceltePer[aid] = scelte;
+  const mie = scelteFatte[aid] || {};
+  return scelte.map(([nome, voci], i) => {
+    const id = `${pref}_${aid}_${i}`;
+    return `<label${classeNome ? ` class="${classeNome}"` : ''} for="${id}">${esc(nome)}</label>
+      <select id="${id}" onchange="scegliVoce(${aid}, ${i}, this.value)">
+        <option value="">Scegli…</option>
+        ${(voci || []).map(v => `<option value="${esc(v)}"${mie[nome] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}
+      </select>`;
+  }).join('');
+}
+function scegliVoce(aid, i, v){
+  const sc = (sceltePer[aid] || [])[i];
+  if (!sc) return;
+  const mie = {...(scelteFatte[aid] || {})};
+  if (v) mie[sc[0]] = v; else delete mie[sc[0]];
+  scelteFatte[aid] = mie;
+}
+function scelteScheda(l){
+  if (!l.scelte || !l.scelte.length) return '';
+  return `<div class="varianti scelte-scheda field" id="scelteScheda">
+    ${tendineScelte(l.id, l.scelte, 'schSc', 'var-nome')}
+    <div class="hint">Scegli prima di pagare: la tua scelta arriva al venditore con l'ordine.</div>
+  </div>`;
+}
+
 /* Il tocco su un bottoncino: si apre la scheda della sorella AL POSTO
    di questa — nella cronologia sostituisce, non impila: tornare
    indietro riporta da dove si era arrivati, non attraverso ogni taglia
@@ -38242,6 +38349,7 @@ function compraSubito(){
      collegato la casella la spunta come tutti */
   if (mancaConfermaIndirizzo(acqDati)) return;
   if (mancanoRisposte(acqDati)) return;   /* le domande del venditore */
+  if (mancanoScelte(acqDati)) return;     /* le scelte «Qualsiasi» */
   const circaS = (p.stima || via.stima) ? '≈ ' : '';
   el('nwcConfermaSats').textContent = circaS + fmt(via.totale_sats);
   el('nwcScomposto').innerHTML = contoScomposto({

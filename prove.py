@@ -49675,7 +49675,8 @@ def prove_promesse_badge():
     # ...e i cassetti la portano TUTTI: il quarto di domani mette la
     # classe e ha finito — se se la dimentica, si ricompra lo zero
     # (6 nov 2026) il terzo: le domande del venditore a chi compra
-    prova("...e i cassetti della cassa la portano tutti", 3,
+    # (19 nov 2026) il quarto: le scelte «Qualsiasi» dei negozi
+    prova("...e i cassetti della cassa la portano tutti", 4,
           mini.count('class="cassetto-cassa '))
     # 2) «APPLICA» NON COMPETE CON «PAGA»: a tutta larghezza e arancio
     # era IDENTICO al bottone che paga due dita sotto — stessa misura
@@ -113675,7 +113676,7 @@ def prove_connettori_ingresso():
               origine_foto TEXT, origine_stock_visto INT,
               -- (set 2026) la famiglia la scrive il connettore
               famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
-              opzioni TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '', scelte TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -114309,7 +114310,7 @@ def prove_connettori_varianti():
               origine_foto TEXT, origine_stock_visto INT,
               -- (set 2026) la famiglia la scrive il connettore
               famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
-              opzioni TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '', scelte TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -119149,7 +119150,7 @@ def prove_connettori_categoria():
               fonte TEXT, connettore_id INT, origine_chiave TEXT,
               origine_foto TEXT, origine_stock_visto INT,
               famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
-              opzioni TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '', scelte TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -119270,6 +119271,249 @@ def prove_connettori_categoria():
     mod_js = pezzo_js(mini, "function modificaConnettore(id){", "\n}\n")
     prova("...e la modifica riparte da quella salvata", True,
           "categoria: c.categoria || ''" in mod_js)
+
+
+def prove_scelte_negozio():
+    """LE SCELTE «QUALSIASI» DEI NEGOZI COLLEGATI (19 nov 2026, cantiere
+    scelte-negozio). Il difetto dal campo: il negozio Uhmami (WooCommerce)
+    vende una box con due tendine — il gusto della pallina, la composta —
+    e le sue sei variazioni sono tutte «Qualsiasi / Qualsiasi», stesso
+    prezzo, stessa giacenza, codice articolo «025». Entravano sei annunci
+    «Box — 025», col codice come nome e le tendine perse.
+
+    LE COSE CHE QUI POSSONO ROMPERSI IN SILENZIO: i doppioni che tornano
+    (sei annunci uguali); le scorte moltiplicate da un'esplosione per
+    combinazione; il codice articolo di nuovo nel titolo; una variazione
+    con le tendine tutte fissate che si mette a chiedere una scelta; la
+    scelta che non arriva al venditore; un ordine che nasce senza gusto.
+    Le pure dell'import e i giudici del server GIRANO, la cassa si legge
+    per forma (e i suoi pezzi puri girano in node). Il giro col server
+    vero sta in collaudo_scelte_negozio."""
+    print("\n[i negozi collegati: le scelte «Qualsiasi»]")
+    import json as _json
+    import sqlite3
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    m = {}
+    exec(compile(src, "importa_negozio.py", "exec"), m)
+    traduci, esplodi_w = m["traduci"], m["esplodi_woo"]
+    CAMBIO = {"EUR": 100_000.0}          # 1000 sats = 1 €
+    PALLINE = ["peperoncino", "curry - sesamo", "rosmarino-zenzero"]
+    COMPOSTE = ["Arancia", "Fragola", "Pera"]
+
+    def box(variazioni, **kw):
+        b = {"id": 1600, "name": "Box Natale La Sfiziosa (pre-ordine)",
+             "type": "variable", "status": "publish",
+             "description": "<p>Un'idea regalo</p>",
+             "manage_stock": True, "stock_quantity": 10,
+             "images": [{"src": "https://cdn/box.jpg"}],
+             "attributes": [
+                 {"id": 0, "name": "Palline Uhmami", "variation": True,
+                  "options": PALLINE},
+                 {"id": 0, "name": "Composta di Frutta", "variation": True,
+                  "options": COMPOSTE},
+                 # un attributo SOLO descrittivo non e' una tendina
+                 {"id": 0, "name": "Peso", "variation": False,
+                  "options": ["500 g"]}],
+             "_variazioni": variazioni}
+        b.update(kw)
+        return b
+
+    def var(vid, attributi=(), **kw):
+        v = {"id": vid, "sku": "025", "price": "17.00",
+             "regular_price": "17.00", "manage_stock": "parent",
+             "stock_status": "instock", "status": "publish",
+             "attributes": [{"id": 0, "name": n, "option": o}
+                            for n, o in attributi]}
+        v.update(kw)
+        return v
+
+    # --- il caso vero: sei variazioni tutte «Qualsiasi» --------------
+    sei = [var(1623 + i) for i in range(6)]
+    righe = traduci([box(sei)], "woo", CAMBIO)
+    prova("Uhmami: sei «Qualsiasi» uguali fanno UNA riga, non sei",
+          1, len(righe))
+    r = righe[0]
+    prova("...la prima per id (quella che il negozio venderebbe)",
+          "1600:1623", r["origine_chiave"])
+    prova("...col titolo del prodotto, SENZA il codice articolo",
+          "Box Natale La Sfiziosa (pre-ordine)", r["titolo"])
+    prova("...le due tendine del padre, nell'ordine del negozio "
+          "(«Peso» non e' una tendina)",
+          [["Palline Uhmami", PALLINE], ["Composta di Frutta", COMPOSTE]],
+          r["scelte"])
+    prova("...giacenza e prezzo una volta sola: 10 box, non 10 per "
+          "combinazione", (17.0, 10), (r["prezzo_eur"], r["quantita"]))
+    prova("...e nessuna famiglia, nessun bottoncino «025»",
+          ("", []), (r["famiglia"], r["opzioni"]))
+
+    # --- una tendina fissata, l'altra aperta -------------------------
+    tre = [var(10 + i, [("Palline Uhmami", p)]) for i, p in
+           enumerate(PALLINE)]
+    tre.append(var(20, [("Palline Uhmami", "peperoncino")]))  # doppione
+    righe = traduci([box(tre)], "woo", CAMBIO)
+    prova("una fissata e una aperta: una riga per gusto, il doppione "
+          "fuori", ["1600:10", "1600:11", "1600:12"],
+          [x["origine_chiave"] for x in righe])
+    prova("...il gusto e' una variante (famiglia, bottoncini)",
+          [[["Palline Uhmami", p]] for p in PALLINE],
+          [x["opzioni"] for x in righe])
+    prova("...e la composta resta una scelta su ognuna",
+          [[["Composta di Frutta", COMPOSTE]]] * 3,
+          [x["scelte"] for x in righe])
+    prova("...nel titolo il gusto, non il codice",
+          "Box Natale La Sfiziosa (pre-ordine) — peperoncino",
+          righe[0]["titolo"])
+
+    # --- la regressione: tutto fissato = il mondo di ieri ------------
+    nove = [var(100 + 3 * i + j, [("Palline Uhmami", p),
+                                  ("Composta di Frutta", c)])
+            for i, p in enumerate(PALLINE) for j, c in enumerate(COMPOSTE)]
+    righe = traduci([box(nove)], "woo", CAMBIO)
+    prova("tutte le tendine fissate: nove righe, nessuna scelta",
+          (9, [[]] * 9), (len(righe), [x["scelte"] for x in righe]))
+    prova("...col titolo composto di sempre",
+          "Box Natale La Sfiziosa (pre-ordine) — peperoncino, Arancia",
+          righe[0]["titolo"])
+    # un padre senza tendine dichiarate e variazioni senza attributi: il
+    # codice articolo resta l'unico nome che c'e', come ieri
+    righe = traduci([box([var(7), var(8, sku="026")], attributes=[])],
+                    "woo", CAMBIO)
+    prova("senza tendine sul padre il codice articolo resta il nome "
+          "(il mondo di ieri)", (["Box Natale La Sfiziosa (pre-ordine) "
+                                  "— 025", "Box Natale La Sfiziosa "
+                                  "(pre-ordine) — 026"], [[], []]),
+          ([x["titolo"] for x in righe], [x["scelte"] for x in righe]))
+    prova("l'attributo globale si riconosce per id, non per nome",
+          [], m["scelte_aperte_woo"](
+              {"attributes": [{"id": 4, "name": "Gusto", "variation": True,
+                               "options": ["a", "b"]}]},
+              [{"id": 4, "name": "gusto", "option": "a"}]))
+
+    # --- la scrittura: con la famiglia, a ogni giro ------------------
+    corpo = pezzo_src(src, "def _scrivi_famiglia(")
+    prova("le scelte si scrivono con la famiglia (nascita E giro)", True,
+          "scelte=?" in corpo and "_valore_scelte(r)" in corpo)
+    agg = pezzo_src(src, "def _aggiorna(")
+    prova("...e il giro le confronta, o un cambio sul negozio non "
+          "arriverebbe mai", True, '_valore_scelte(r)' in agg
+          and 'gia["scelte"]' in agg)
+    prova("...leggendole dalla riga locale", True,
+          "scelte" in pezzo_src(src, "def _riga_locale("))
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, famiglia TEXT,"
+                " famiglia_titolo TEXT, opzioni TEXT, scelte TEXT)")
+    con.execute("INSERT INTO annunci(id) VALUES(1)")
+    r0 = traduci([box(sei)], "woo", CAMBIO)[0]
+    m["_scrivi_famiglia"](con, 1, 4, r0)
+    prova("...in colonna come JSON [[nome, [voci]]]",
+          r0["scelte"], _json.loads(con.execute(
+              "SELECT scelte FROM annunci").fetchone()[0]))
+    m["_scrivi_famiglia"](con, 1, 4, dict(r0, scelte=[]))
+    prova("...e una tendina che sparisce dal negozio torna vuota", "",
+          con.execute("SELECT scelte FROM annunci").fetchone()[0])
+
+    # --- il server: la colonna, la scheda, il preventivo -------------
+    srv = _SORGENTE
+    prova("annunci.scelte nasce additiva", True,
+          "\"scelte TEXT DEFAULT ''\"" in srv)
+    prova("...esce nella scheda pubblica e si legge come lista", True,
+          '"a.scelte, "' in srv
+          and 'r["scelte"] = scelte_lette(r["scelte"])' in srv)
+    prova("il preventivo la manda alla cassa: singolo e carrello", True,
+          '"scelte": scelte_lette(a["scelte"])' in pezzo("preventivo_ordine")
+          and '"scelte": {str(aid)' in pezzo("_preventivo_set"))
+
+    class _No(Exception):
+        def __init__(self, codice, testo=""):
+            super().__init__(testo)
+            self.status_code, self.detail = codice, testo
+
+    amb = {"json": _json, "HTTPException": _No, "MAX_NOTA": 200}
+    for nome in ("scelte_lette", "scelte_da_payload", "nota_con_scelte"):
+        exec(pezzo(nome), amb)
+    sl, sp, nc = (amb["scelte_lette"], amb["scelte_da_payload"],
+                  amb["nota_con_scelte"])
+    SC = [["Palline Uhmami", PALLINE], ["Composta di Frutta", COMPOSTE]]
+
+    def no(fn, *a):
+        try:
+            fn(*a)
+        except _No as e:
+            return e.status_code, e.detail
+        return None
+
+    prova("la colonna storta e' «nessuna scelta», mai un 500", [[], [], []],
+          [sl(""), sl("{rotto"), sl('[["x", []]]')])
+    prova("senza scelte sull'annuncio non si chiede niente", "",
+          sp([], None))
+    prova("l'app vecchia (niente chiave) si sente dire di aggiornare",
+          (400, True), (lambda e: (e[0], "aggiorna" in e[1]))(
+              no(sp, SC, None)))
+    prova("una tendina vuota e' un 400 che dice quale",
+          (400, "Scegli «Composta di Frutta» prima di pagare"),
+          no(sp, SC, {"Palline Uhmami": "peperoncino"}))
+    prova("una voce fuori elenco e' un 400", 400,
+          (no(sp, SC, {"Palline Uhmami": "aglio",
+                       "Composta di Frutta": "Pera"}) or (0,))[0])
+    scelta = sp(SC, {"Palline Uhmami": " peperoncino ",
+                     "Composta di Frutta": "Arancia"})
+    prova("la scelta buona diventa testo leggibile per il venditore",
+          "Palline Uhmami: peperoncino, Composta di Frutta: Arancia",
+          scelta)
+    prova("...davanti alla nota del compratore",
+          "Palline Uhmami: peperoncino, Composta di Frutta: Arancia · "
+          "senza glutine", nc(scelta, "senza glutine"))
+    prova("...da sola se la nota e' vuota, e la nota sola se non ci "
+          "sono scelte", (scelta, "taglia L"), (nc(scelta, ""),
+                                                nc("", "taglia L")))
+    prova("...e oltre il tetto si chiede di accorciare, MAI troncare",
+          400, (no(nc, scelta, "x" * 190) or (0,))[0])
+    # i due varchi che fanno nascere un ordine
+    mono = codice(pezzo("compra", "\n@app."))
+    prova("compra(): la scelta entra nella nota, PRIMA della invoice",
+          True, "nota_con_scelte(" in mono and mono.index(
+              "nota_con_scelte(") < mono.index("crea_invoice_escrow("))
+    insieme = codice(pezzo("_compra_set"))
+    prova("_compra_set(): pezzo per pezzo, col titolo davanti", True,
+          "nota_con_scelte(" in insieme and 'd.get("scelte_righe")'
+          in insieme and insieme.index("nota_con_scelte(")
+          < insieme.index("crea_invoice_escrow("))
+
+    # --- la cassa: le tendine, la guardia, il corpo ------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la scheda disegna le tendine sotto la famiglia", True,
+          "${famigliaScheda(l)}\n      ${scelteScheda(l)}" in mini)
+    prova("la cassa le ridisegna (anche nel carrello), sotto i pezzi",
+          True, "${accQta}${cassettoScelteAcquisto(d)}${fila}" in mini)
+    prova("le due strade che pagano le esigono (bottone e wallet ⚡)", 2,
+          mini.count("if (mancanoScelte("))
+    cc = pezzo_js(mini, "function corpoConsegna(){", "\n}\n")
+    prova("...e viaggiano dalla fabbrica del corpo, con la nota (i tre "
+          "varchi)", True, "...corpoScelte(acqDati)" in cc)
+    banco = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function scelteCassa(d){", "function corpoScelte(d){"))
+    js = ("const scelteFatte = {5: {'Palline Uhmami': 'Pera'}, 9: {}};\n"
+          + banco + "\n"
+          "const sc = [['Palline Uhmami', ['Pera']]];\n"
+          "const mono = {tipo:'mono', annuncioId:5, preventivo:{scelte:sc}};\n"
+          "const set = {tipo:'set', preventivo:{scelte:{'5': {titolo:'Box',"
+          " scelte:sc}}}};\n"
+          "const nulla = {tipo:'mono', annuncioId:5, preventivo:{scelte:[]}};\n"
+          "console.log(JSON.stringify([corpoScelte(mono), corpoScelte(set),"
+          " corpoScelte(nulla), scelteCassa(set).map(x => x.aid)]));")
+    import subprocess
+    try:
+        out = subprocess.run(["node", "-e", js], capture_output=True,
+                             text=True, timeout=30)
+        avuto = _json.loads(out.stdout or "null")
+    except (OSError, ValueError):
+        avuto = None
+    prova("corpoScelte: «scelte» sul singolo, «scelte_righe» per id nel "
+          "carrello, niente chiave se non c'e' da scegliere",
+          [{"scelte": {"Palline Uhmami": "Pera"}},
+           {"scelte_righe": {"5": {"Palline Uhmami": "Pera"}}}, {}, [5]],
+          avuto)
 
 
 def prove_slug_negozio():
@@ -155007,7 +155251,7 @@ def prove_db_contesa_negozi():
               fonte TEXT, connettore_id INT, origine_chiave TEXT,
               origine_foto TEXT, origine_stock_visto INT,
               famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
-              opzioni TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '', scelte TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -155302,7 +155546,7 @@ def prove_negozi_grandi():
               fonte TEXT, connettore_id INT, origine_chiave TEXT,
               origine_foto TEXT, origine_stock_visto INT,
               famiglia TEXT DEFAULT '', famiglia_titolo TEXT DEFAULT '',
-              opzioni TEXT DEFAULT '',
+              opzioni TEXT DEFAULT '', scelte TEXT DEFAULT '',
               creato INT, modificato INT, stato TEXT);
             CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
               stato TEXT, aggiornato INT);
@@ -213873,7 +214117,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
-    famiglie connettori_cassetto connettori_categoria negozi_su_nostr avvisi_barattolo serie_giorni serie_classifica serie_brace finestra ordini_prova tutorial
+    famiglie connettori_cassetto connettori_categoria scelte_negozio negozi_su_nostr avvisi_barattolo serie_giorni serie_classifica serie_brace finestra ordini_prova tutorial
     caccia_a_tappo
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
@@ -215060,6 +215304,7 @@ def main():
               prove_audit_tornata_tutto,
               prove_ripubblica_p2p,
               prove_connettori_categoria,
+              prove_scelte_negozio,
               prove_negozi_su_nostr,
               prove_filtro_onchain_tutto,
               prove_bitcoin_only_p2p,

@@ -27254,6 +27254,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   primi `MAX_ENTRATI_REPORT`), la notifica li elenca e il cassetto li
   mostra (`riepilogoGiroConnettore`). Il perché in CANTIERI, «Varianti
   e prodotti digitali dai negozi collegati».
+- LE SCELTE «QUALSIASI» DEI NEGOZI WOO (19 nov 2026, il negozio
+  Uhmami): un attributo che la variazione lascia su «Qualsiasi» non
+  compare nei suoi `attributes`; le tendine stanno sul padre
+  (`attributes` con `variation: true` e i loro `options`). Quelle non
+  fissate dalla variazione sono una SCELTA di chi compra, non un
+  annuncio: `scelte_aperte_woo` le legge (globale per id, del prodotto
+  per nome; tetti `MAX_SCELTE`, `MAX_VALORI_SCELTA`), `esplodi_woo` le
+  porta come `_scelte` e scarta i doppioni (stesse fisse con scelte
+  aperte: resta la prima per id, quella che Woo venderebbe), e il
+  codice articolo fa da nome solo se non ci sono tendine. Colonna
+  additiva `annunci.scelte` (JSON `[[nome, [voci]]]`, '' = nessuna),
+  scritta da `_scrivi_famiglia` e confrontata da `_aggiorna`, pubblica
+  nella scheda (`scelte_lette`) e nel preventivo (lista sul singolo,
+  mappa per id col titolo nel carrello). Alla cassa la guardia
+  `mancanoScelte` (bottone e wallet) e il giudice `scelte_da_payload`
+  in `compra`/`_compra_set` PRIMA della invoice; la scelta entra nella
+  NOTA del compratore (`nota_con_scelte`, tetto `MAX_NOTA`, mai
+  troncata), che arriva già al venditore e al moderatore. Corpo:
+  `scelte` sul singolo, `scelte_righe` per id nel carrello, dalla
+  fabbrica `corpoConsegna`. Il perché in CANTIERI, «Le tendine
+  "Qualsiasi" dei negozi collegati».
 - LE FAMIGLIE DI VARIANTI (30 set 2026, il negozio AGORA): l'esplosione
   resta — un annuncio per variante, col suo prezzo, la sua giacenza, i
   suoi ordini e il suo deposito di garanzia — e SOPRA ci si scrive la

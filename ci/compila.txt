@@ -115,6 +115,7 @@ collaudo_modifica_massiva.py
 collaudo_catalogo_esterno.py
 collaudo_categoria_negozio.py
 collaudo_negozi_su_nostr.py
+collaudo_scelte_negozio.py
 collaudo_nuova_fattura.py
 collaudo_quantita_servizi.py
 collaudo_pionieri.py

@@ -10584,6 +10584,14 @@ def init_db():
                     "famiglia TEXT DEFAULT ''",
                     "famiglia_titolo TEXT DEFAULT ''",
                     "opzioni TEXT DEFAULT ''",
+                    # LE SCELTE «QUALSIASI» (19 nov 2026, il negozio
+                    # Uhmami): le tendine che sul negozio non cambiano
+                    # prezzo ne' giacenza — il gusto, la composta —, in
+                    # JSON [[nome, [voci...]], ...]. '' = nessuna. Le
+                    # scrive SOLO il connettore, come la famiglia; chi
+                    # compra ne sceglie una voce per tendina alla cassa
+                    # e la scelta arriva al venditore nella nota.
+                    "scelte TEXT DEFAULT ''",
                     # IL CONTEGGIO DELLE VISUALIZZAZIONI (set 2026):
                     # privato, lo vede solo il proprietario (e gli
                     # admin) — vedi la CREATE TABLE qui sopra per il
@@ -19615,6 +19623,21 @@ SQL_CAPOFILA = ("(a.famiglia='' OR a.id=(SELECT b.id FROM annunci b "
 # famiglia con anche una sola variante disponibile e' GIA' in vetrina
 # (non si ripete fra gli esauriti), e una famiglia finita tutta ci va
 # una volta sola.
+def scelte_lette(grezzo) -> list:
+    """Le scelte «Qualsiasi» di un annuncio dalla colonna JSON (19 nov
+    2026): [[nome, [voci...]], ...], e una lista vuota per tutto cio'
+    che non ha quella forma — mai un 500 per un JSON rovinato."""
+    try:
+        v = json.loads(grezzo or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(v, list):
+        return []
+    return [[str(o[0]), [str(x) for x in o[1]]] for o in v
+            if isinstance(o, list) and len(o) == 2 and o[0]
+            and isinstance(o[1], list) and o[1]]
+
+
 def _opzioni_lista(grezzo) -> list:
     """Le opzioni di una variante dalla colonna JSON: [[nome, valore]],
     e una lista vuota per tutto cio' che non ha quella forma."""
@@ -29222,6 +29245,9 @@ CAMPI_VETRINA = (
     # nei bottoncini. I numeri della famiglia (quante, da quanto) li
     # aggiunge arricchisci_righe_vetrina.
     "a.famiglia, a.famiglia_titolo, a.opzioni, "
+    # LE SCELTE «QUALSIASI» (19 nov 2026): le tendine della scheda,
+    # pubbliche come le opzioni (le dice il negozio a tutti)
+    "a.scelte, "
     # il massimo mai dichiarato NON esce da qui: lo legge
     # arricchisci_righe_vetrina per decidere il flag `ultimo`, e poi lo
     # butta via — grezzo racconterebbe «ne ha venduti N», che e' un dato
@@ -29439,6 +29465,8 @@ def arricchisci_righe_vetrina(righe):
     for r in righe:
         if "opzioni" in r:
             r["opzioni"] = _opzioni_lista(r["opzioni"])
+        if "scelte" in r:
+            r["scelte"] = scelte_lette(r["scelte"])
     fam = sorted({r["famiglia"] for r in righe if r.get("famiglia")})
     if fam:
         con = db()
@@ -40862,6 +40890,53 @@ def _nota_da_payload(d) -> str:
     return testo
 
 
+def scelte_da_payload(scelte: list, grezze) -> str:
+    """La scelta del compratore fra le tendine «Qualsiasi» di un
+    annuncio (19 nov 2026, il negozio Uhmami): «Nome: voce, Nome: voce»,
+    o '' se l'annuncio non ne ha.
+
+    IL SERVER E' IL GIUDICE, come per le domande del venditore: ogni
+    tendina vuole una voce, e la voce dev'essere una di quelle del
+    negozio. Chi ha l'app vecchia in cache non manda niente, e si sente
+    dire di aggiornarla invece di far nascere un ordine senza il gusto.
+    PERCHE' NELLA NOTA e non in una colonna sua: la nota arriva gia' al
+    venditore su ogni strada, nell'avviso «Hai venduto» e nell'ordine,
+    e la legge anche il moderatore in una lite («avevo scelto
+    peperoncino») — e' esattamente la cosa che il compratore avrebbe
+    scritto li' a mano."""
+    if not scelte:
+        return ""
+    if not isinstance(grezze, dict) or not grezze:
+        raise HTTPException(400, f"Scegli «{scelte[0][0]}» prima di "
+                                 f"pagare (se non vedi la scelta, "
+                                 f"aggiorna l'app)")
+    coppie = []
+    for nome, voci in scelte:
+        v = " ".join(str(grezze.get(nome) or "").split())
+        if not v:
+            raise HTTPException(400, f"Scegli «{nome}» prima di pagare")
+        if v not in voci:
+            raise HTTPException(400, f"«{nome}»: scegli una delle voci "
+                                     f"dell'elenco")
+        coppie.append(f"{nome}: {v}")
+    return ", ".join(coppie)
+
+
+def nota_con_scelte(scelte: str, nota: str) -> str:
+    """La nota che si scrive nell'ordine: prima le scelte, poi quel che
+    il compratore ha scritto. Il tetto e' quello della nota, e oltre si
+    dice di accorciare — mai troncare la scelta o la prosa (la regola
+    del 400 di `_nota_da_payload`)."""
+    if not scelte:
+        return nota
+    tutto = f"{scelte} · {nota}" if nota else scelte
+    if len(tutto) > MAX_NOTA:
+        raise HTTPException(400, f"La nota è troppo lunga: con le tue "
+                                 f"scelte supera i {MAX_NOTA} caratteri. "
+                                 f"Accorciala e riprova")
+    return tutto
+
+
 def _coda_nota(prima: bool, dopo: bool) -> str:
     """Cosa dire al venditore quando la nota cambia. Puro, come
     _coda_ricevuta: prende due BOOL e non il testo, quindi nel
@@ -45730,6 +45805,24 @@ async def _compra_set(user: dict, d: dict) -> dict:
     except HTTPException:
         con.close()
         raise
+    # LE SCELTE «QUALSIASI» (19 nov 2026), pezzo per pezzo e col nome
+    # del pezzo davanti: nel carrello la nota e' una sola. Davanti alla
+    # nota, col suo stesso patto: prima della invoice, con.close() sul
+    # rifiuto.
+    try:
+        grezze_sc = d.get("scelte_righe")
+        if not isinstance(grezze_sc, dict):
+            grezze_sc = {}
+        fatte = []
+        for aid in richieste:
+            sc = scelte_da_payload(scelte_lette(tutti[aid]["scelte"]),
+                                   grezze_sc.get(str(aid)))
+            if sc:
+                fatte.append(f"«{tutti[aid]['titolo'][:40]}» {sc}")
+        nota = nota_con_scelte(" · ".join(fatte), nota)
+    except HTTPException:
+        con.close()
+        raise
 
     # L'EMAIL PER IL CORRIERE, col patto del gemello nel mono: solo
     # sulla via punto (la specularita' dell'indirizzo, che sta sul
@@ -46777,6 +46870,9 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # le domande del venditore (6 nov 2026): la cassa le chiede
             # sulla sola via digitale, e il giudice in compra() le esige
             "domande": domande_lette(a["domande"]),
+            # le scelte «Qualsiasi» (19 nov 2026): la cassa ne disegna
+            # le tendine, e il giudice in compra() le esige
+            "scelte": scelte_lette(a["scelte"]),
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
             "sconto_sats": sconto,
@@ -47273,6 +47369,14 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # Il lordo e lo sconto sono chiavi IN PIU', e le tre si sommano da
     # sole: lordo − sconto = netto, senza fidarsi di nessuno.
     return {"set": True, "quantita": pezzi,
+            # le scelte «Qualsiasi» delle righe che ne hanno (19 nov
+            # 2026), per id: la cassa del carrello le chiede pezzo per
+            # pezzo, e _compra_set le esige
+            "scelte": {str(aid): {"titolo": tutti[aid]["titolo"],
+                                  "scelte": scelte_lette(
+                                      tutti[aid]["scelte"])}
+                       for aid in richieste
+                       if scelte_lette(tutti[aid]["scelte"])},
             "articolo_sats": conto["netto"],
             "articolo_lordo_sats": articolo,
             # l'accordo sul carrello, accanto allo sconto: il netto
@@ -47665,6 +47769,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # connessione e' gia' aperta.
     try:
         nota = _nota_da_payload(d)
+    except HTTPException:
+        con.close()
+        raise
+    # LE SCELTE «QUALSIASI» (19 nov 2026): davanti alla nota, e col suo
+    # stesso patto — prima della invoice, con.close() sul rifiuto
+    try:
+        nota = nota_con_scelte(
+            scelte_da_payload(scelte_lette(a["scelte"]), d.get("scelte")),
+            nota)
     except HTTPException:
         con.close()
         raise
