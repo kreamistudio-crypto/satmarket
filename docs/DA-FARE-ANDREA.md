@@ -988,6 +988,11 @@ prima il tag nuovo si ignora.
 **SUL NODO** (`ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`),
 un comando alla volta, il cambio a libro fermo.
 
+**FATTO 19 nov 2026, 23:14 Rome: passi 1-7** (albero `deb731c3`, test 750 e
+90, immagine `mostro:v0.20.2-bar12` costruita, `docker-compose.yml.bar12`
+e la copia `.prima-bar12` pronti). Il passo 8 si è fermato da solo su uno
+scambio aperto (`ff3855c0`, attivo): si RIPARTE DAL PASSO 8 quando chiude.
+
 1) Sola lettura: l'immagine e il sorgente.
 ```
 docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && git -C ~/nodo/mostro-src status --short | wc -l && git -C ~/nodo/mostro-src rev-parse --abbrev-ref HEAD && git -C ~/nodo/mostro-src rev-parse HEAD^{tree} && df -h / | tail -1

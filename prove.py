@@ -67,6 +67,12 @@ def salta(nome, perche):
     print(f"  · SALTATA: {nome} — {perche}")
 
 
+# I NOMI FINTI DEGLI ORDINI NEI BANCHI (19 nov 2026): un contatore, non
+# l'orologio in nanosecondi — su Windows ha passi larghi e due ordini di
+# fila prendevano lo stesso nome (UNIQUE fallita, verde solo su Linux)
+_NOMI_FINTI = __import__("itertools").count(1)
+
+
 def pezzo(nome, fine="\n\n\n"):
     """Estrae una funzione da server.py senza importarlo tutto (che
     vorrebbe config.py, anthropic e mezzo mondo). La parentesi nel
@@ -215697,7 +215703,7 @@ def prove_onchain_tempo_deposito():
         con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
     def ordine(**k):
-        d = {"ordine": "bar-onchain-" + str(time.time_ns()), "lato": "sell",
+        d = {"ordine": "bar-onchain-" + str(next(_NOMI_FINTI)), "lato": "sell",
              "maker_id": 111, "taker_id": 222, "depositante_id": 111, "ricevente_id": 222,
              "prezzo_sats": 120000, "euro_cent": 7500, "metodi": '["Revolut"]',
              "stato": "preso", "scade": 10, "creato": 1, "aggiornato": 1,
@@ -215931,7 +215937,7 @@ def prove_recapito_nel_tempo():
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
 
     def ordine(**k):
-        d = {"ordine": "bar-onchain-" + str(time.time_ns()), "lato": "sell",
+        d = {"ordine": "bar-onchain-" + str(next(_NOMI_FINTI)), "lato": "sell",
              "maker_id": 111, "taker_id": 222, "depositante_id": 111, "ricevente_id": 222,
              "prezzo_sats": 120000, "euro_cent": 7500, "metodi": '["Revolut"]',
              "stato": "depositato", "scade": 10, "creato": 1, "aggiornato": 1,
@@ -216416,7 +216422,7 @@ def prove_ritorno_nel_libro_onchain():
     con.execute("INSERT INTO onchain_xpub VALUES(333)")
 
     def ordine(**k):
-        d = {"ordine": "bar-onchain-vecchio" + str(len(k)) + str(time.time_ns()), "lato": "sell",
+        d = {"ordine": "bar-onchain-vecchio" + str(len(k)) + "-" + str(next(_NOMI_FINTI)), "lato": "sell",
              "maker_id": 111, "taker_id": 222, "depositante_id": 111, "ricevente_id": 222,
              "prezzo_sats": 120000, "euro_cent": 7500, "metodi": '["Revolut"]',
              "recapito": "IT60 X054", "stato": "rimborsato", "scade": 10, "creato": 1,
