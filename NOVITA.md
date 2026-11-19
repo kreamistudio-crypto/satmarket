@@ -806,3 +806,9 @@ frase: Negli scambi P2P on-chain in contanti di persona i passi sono quelli del 
 dove: P2P → «I miei scambi» → uno scambio on-chain in contanti; il bot di Barattolo, promemoria «⏰ Mancano 5 minuti: hai già mandato gli euro?».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · bollini-home
+frase: Le card «Scambi P2P» della home mostrano gli stessi bollini del libro: «⏱ 30 min» quando chi vende ha scelto un tempo per pagare sotto le 24 ore, e «🔐 Cauzione» quando chi pubblica un ordine on-chain la chiede a chi lo prende.
+dove: Home (Esplora) → la fila «Scambi P2P»: i bollini sotto i metodi di pagamento.
+leva: P2P_ONCHAIN_CAUZIONE per il solo «🔐 Cauzione» (in produzione solo per i moderatori); il «⏱» non ha leva
+pubblico: sì

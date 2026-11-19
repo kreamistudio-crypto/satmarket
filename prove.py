@@ -214874,6 +214874,7 @@ def prove_tempo_pagare_p2p():
                "function anelloTempoP2P(quota, id){",
                "function prendiMinutiPagareP2P(m){", "function minutiPagareOrdineP2P(o){",
                "function bollinoTempoPagareP2P(min){",
+               "function bolliniVetrinaP2P(o, oc){",
                "function rigaTempoPagareDettP2P(o, tuo, oc){",
                "function bannerTempoPagareP2P(min, oc, o){",
                "function rigaTempoPagareScambioP2P(o, adesso){")))
@@ -214884,6 +214885,8 @@ const esc = s => String(s), tabacchinoP2P = m => (m || []).some(x => /^Contanti 
 var MIE = {};
 const ordiniP2P = () => MIE;
 const p2pCoord = () => null;
+/* la leva della cauzione on-chain come la manda il server: spenta */
+var p2pOnchainLibro = {cauzione: null};
 /* i due traduttori della valuta, finti: qui conta che la riga li chiami */
 const paroleUsdtP2P = (o, t) => o && o.usdt ? t.split('gli euro').join('gli USDT') : t;
 const paroleOcP2P = (o, t) => o && o.usdt ? t.split('gli euro').join('gli USDT') : t;
@@ -214934,6 +214937,16 @@ MIE = {[ID2]: {mio: true, minutiPagare: 30, metodi: ['Revolut']}};
 out.ordine = [minutiPagareOrdineP2P({id: ID}), minutiPagareOrdineP2P({id: ID2}),
   minutiPagareOrdineP2P({id: ID2, metodi: ['Revolut', 'SEPA']}), minutiPagareOrdineP2P({})];
 out.bollino = [bollinoTempoPagareP2P(30), bollinoTempoPagareP2P(90), bollinoTempoPagareP2P(1440), bollinoTempoPagareP2P(0)];
+/* la card della fila della home (19 nov 2026, cantiere bollini-home) */
+{ const oc = (lato, min, cauz) => ({id: 'oc-9', lato, minuti_pagamento: min, cauzione_chiesta: cauz});
+  const spenta = [bolliniVetrinaP2P({id: ID}, false), bolliniVetrinaP2P({id: 'x'}, false),
+    bolliniVetrinaP2P(oc('sell', 30, true), true), bolliniVetrinaP2P(oc('buy', 30, false), true),
+    bolliniVetrinaP2P(oc('sell', 1440, false), true), bolliniVetrinaP2P(null, true)];
+  p2pOnchainLibro = {cauzione: {accesa: true}};
+  out.vetrina = spenta.concat([bolliniVetrinaP2P(oc('sell', 30, true), true),
+    bolliniVetrinaP2P(oc('sell', 1440, true), true), bolliniVetrinaP2P(oc('sell', 30, 'si'), true),
+    bolliniVetrinaP2P({id: ID, cauzione_chiesta: true}, false)]);
+  p2pOnchainLibro = {cauzione: null}; }
 out.dett = [rigaTempoPagareDettP2P({id: ID}, false), rigaTempoPagareDettP2P({id: ID2}, true),
   rigaTempoPagareDettP2P({id: 'x'}, false),
   rigaTempoPagareDettP2P({id: 9, minuti_pagamento: 15}, false, true),
@@ -215013,6 +215026,15 @@ console.log(JSON.stringify(out));
           [True, True, "", ""],
           ["⏱ 30 min" in o["bollino"][0], "⏱ 1 h 30" in o["bollino"][1],
            o["bollino"][2], o["bollino"][3]])
+    V = o.get("vetrina") or [""] * 10
+    prova("LA CARD DELLA FILA DELLA HOME (Andrea: «mostra le icone tempo per pagare e "
+          "cauzione anche nelle card nella home»): Lightning col tempo del server; "
+          "on-chain il ⏱ solo su «Compra BTC» e sotto le 24 ore; la 🔐 solo se "
+          "chiesta E con la leva che il server manda a chi guarda; senza niente, vuota",
+          [True, False, "", True, False, "", "", "", True, True, False, True, False, False, True],
+          ["⏱ 4 h" in V[0], "🔐" in V[0], V[1], "⏱ 30 min" in V[2], "🔐" in V[2],
+           V[3], V[4], V[5], "⏱ 30 min" in V[6], "🔐 Cauzione" in V[6],
+           "⏱" in V[7], "🔐 Cauzione" in V[7], "🔐" in V[8], "🔐" in V[9], "⏱ 4 h" in V[9]])
     prova("la riga del dettaglio: a chi prende «Se lo prendi hai 4 ore», a chi ha pubblicato "
           "«Chi lo prende ha 30 minuti», con l'anello; senza tempo niente",
           [True, True, True, False, ""],
@@ -215110,8 +215132,9 @@ console.log(JSON.stringify(out));
            -1 < ao.find("reteOcPresaHtmlP2P(o, vendeLui)")
               < ao.find("rigaTempoPagareDettP2P(o, false, true)") < ao.find("p2p-onchain-riass"),
            ao.count("(vendeLui && typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, false, true) : '')")])
-    prova("IL BOLLINO sta sulle due card del libro (Lightning e on-chain), e l'on-chain "
-          "manda la scelta quando pubblica", [2, True, True],
+    prova("IL BOLLINO sta sulle due card del libro (Lightning e on-chain) e su quella "
+          "della fila della home (`bolliniVetrinaP2P`), e l'on-chain "
+          "manda la scelta quando pubblica", [3, True, True],
           [mini.count("typeof bollinoTempoPagareP2P"),
            "if (minOc) corpo.minuti_pagare = minOc;" in mini,
            '"minuti_pagamento": _p2p_onchain_minuti(o),' in pezzo("_p2p_onchain_per")])

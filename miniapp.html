@@ -2276,6 +2276,9 @@
      della pagina Cambio, piccola, che non si schiaccia mai; il cartellino
      del premio le lascia il suo posto */
   .card-p2p .p2p-vt-premio{gap:6px;align-items:center}
+  /* i bollini del libro sulla card della fila (19 nov 2026): vanno a capo
+     fra loro, mai fuori dalla card */
+  .card-p2p .p2p-vt-regole{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-start}
   .card-p2p .p2p-vt-rete{margin-left:auto;flex:0 0 auto;display:inline-flex}
   .card-p2p .p2p-vt-rete .cambio-moneta.p2p-oc-moneta{width:22px;height:22px}
   .card-p2p .p2p-vt-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:13px;height:13px}
@@ -111019,6 +111022,8 @@ function cardVetrinaP2P(o, opz){
      intero nell'etichetta che si legge ad alta voce */
   const zona = typeof zonaOrdineP2P === 'function' ? zonaOrdineP2P(o) : '';
   const premio = affaroneP2P(o) || badgePremioP2P(o);
+  /* il tempo per pagare e la cauzione, come nel libro (19 nov 2026) */
+  const regole = typeof bolliniVetrinaP2P === 'function' ? bolliniVetrinaP2P(o, z.rete === 'btc') : '';
   const lato = compro ? 'Compra BTC' : 'Vendi BTC';
   /* L'ETICHETTA DICE ANCHE L'ANGOLO DEL VOLTO (7 ott 2026, richiesta di
      Andrea): la card e' un bottone, e di un bottone il lettore legge
@@ -111044,9 +111049,30 @@ function cardVetrinaP2P(o, opz){
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>
         ${zona ? `<div class="meta p2p-vt-zona" title="Zona di scambio indicativa"><span class="luogo">📍 ${esc(zona)}</span></div>` : ''}
+        ${regole ? `<div class="meta p2p-vt-regole">${regole}</div>` : ''}
         <div class="meta p2p-vt-premio">${premio}${typeof reteVetrinaP2P === 'function' ? reteVetrinaP2P(z.rete === 'btc' ? 'btc' : 'ln') : ''}</div>
       </div>
     </div>`;
+}
+/* I BOLLINI DEL LIBRO ANCHE SULLA CARD DELLA FILA (19 nov 2026, cantiere
+   bollini-home, Andrea: «mostra le icone tempo per pagare e cauzione anche
+   nelle card nella home»): «⏱ 30 min» e «🔐 Cauzione», gli STESSI giudici
+   delle card del libro, perche' la stessa domanda con due giudici diverge
+   al primo ritocco. Lightning: il tempo che ha detto il server
+   (`minutiPagareOrdineP2P`). On-chain (`oc`): il tempo solo dove chi guarda
+   manda gli euro («Compra BTC»), e la cauzione solo se chi pubblica l'ha
+   chiesta E la leva e' accesa per chi guarda (`p2pOnchainLibro.cauzione`:
+   il server la manda solo a chi la puo' usare — oggi i moderatori).
+   Senza bollini, niente riga: la card resta quella di prima. PURA. */
+function bolliniVetrinaP2P(o, oc){
+  if (!o || typeof bollinoTempoPagareP2P !== 'function') return '';
+  const tempo = oc
+    ? (o.lato === 'sell' ? bollinoTempoPagareP2P(Number(o.minuti_pagamento) || 0) : '')
+    : bollinoTempoPagareP2P(typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P(o) : 0);
+  const cauz = oc && o.cauzione_chiesta === true && typeof p2pOnchainLibro !== 'undefined'
+      && p2pOnchainLibro.cauzione
+    ? '<span class="p2p-bollino-tempo p2p-bollino-cauz" title="Chi prende blocca una cauzione in Lightning">🔐 Cauzione</span>' : '';
+  return tempo + cauz;
 }
 /* LA FILA: una striscia sua sopra la griglia, «Scambi P2P», con le card
    larghe come quelle della griglia e «Vedi tutti» che porta al libro.
