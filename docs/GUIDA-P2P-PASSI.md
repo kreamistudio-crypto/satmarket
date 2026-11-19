@@ -688,7 +688,7 @@ computer: la pillola «Pubblica» in alto).
 le sezioni in quest'ordine:
 
 1. «Seleziona la valuta con cui invierai» / «…riceverai»: «🇪🇺 EUR»
-   (l'unica).
+   (l'unica). Con Barattozon questo riquadro non c'è (§7).
 2. «Come vuoi inviare — puoi sceglierne più di uno» / «Come vuoi
    ricevere — puoi sceglierne più di uno»: la tendina «Seleziona metodi
    di pagamento», con le voci da spuntare (✓). Barattozon c'è solo
@@ -1014,9 +1014,11 @@ disputa.»
    tre modi: tocca la linguetta col logo Barattozon sotto il +; tiene
    premuto il + e lo **trascina giù** sul logo (la linguetta si illumina,
    si lascia lì sopra); oppure apre il + e sceglie «Contanti al
-   tabacchino» fra i metodi (gli altri metodi si spengono: «— col
-   tabacchino, uno solo»).
-   📱 Il titolo del foglio diventa il logo Barattozon. Prima il «Tipo di
+   tabacchino» fra i metodi (gli altri metodi si spengono).
+   📱 Il titolo del foglio diventa il logo Barattozon. Il riquadro della
+   valuta sparisce (il PayCode è sempre in euro) e quello dei metodi si
+   chiama «Chi prende paga il tuo ordine Amazon» (in «Compra BTC»: «Paghi
+   in contanti l'ordine Amazon di chi vende»), dal 19 nov 2026. Poi il «Tipo di
    prezzo», con la nota: a mercato «A prezzo di mercato i sats si
    calcolano quando qualcuno prende l'ordine, col premio del passo 4. Per
    quel calcolo l'importo è arrotondato per eccesso all'euro intero: la

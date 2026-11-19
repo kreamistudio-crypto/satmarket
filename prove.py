@@ -97093,7 +97093,9 @@ def prove_pubblica_metodo_prima():
             "P2P_PREMIO_MAX", "P2P_POLLICE", "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_VITA_S",
             "P2P_TABACCHINO_MARGINE_S", "P2P_MARGINE_HOLD_BLOCCHI", "P2P_SEC_PER_BLOCCO", "P2P_CAMPO_TAPPA_TAB", "P2P_SPIA_ATTESA_MS", "p2pSpiaTab",
-            "p2pCoord", "LOGO_BZ_HTML", "MARCHIO_TITOLO_P2P")) + "\n"
+            "p2pCoord", "LOGO_BZ_HTML", "MARCHIO_TITOLO_P2P",
+            # (19 nov 2026) Barattozon in compra, nel banco anche lui
+            "NOTA_FASCIA_BZ_COMPRO")) + "\n"
         + re.search(r"let p2pTitoloMarchio = [^\n]*;", mini).group(0) + "\n"
         + _blocco("const P2P_VESTE_METODI = {", "\n};") + "\n"
         + _blocco("const P2P_TAPPE_TAB = [", "\n];") + "\n"
@@ -97158,6 +97160,12 @@ const CASI = {
   compro(){ apri('compro'); return titoli(); },
   vendo(){ apri('vendo'); return titoli(); },
   tab(){ apri('vendo'); scegliMetodoP2P(T); return titoli(); },
+  /* (19 nov 2026) Barattozon anche in compra, e il tasto della valuta
+     che con Barattozon non c'e' (lato vendo, lato compro) */
+  tabCompro(){ apri('compro'); scegliMetodoP2P(T); return titoli(); },
+  tabValuta(){ apri('vendo'); scegliMetodoP2P(T); const v = HTML.includes('id="p2pNuovoValutaBtn"');
+    apri('compro'); scegliMetodoP2P(T); const c = HTML.includes('id="p2pNuovoValutaBtn"');
+    apri('vendo'); return [v, c, HTML.includes('id="p2pNuovoValutaBtn"')]; },
   /* coi nodi veri, e la tendina APERTA: le voci stanno sopra il campo */
   idCompro(){ apri('compro'); p2pNuovoAperta = true; renderNuovoOrdineP2P(); return ordineId(); },
   idVendo(){ apri('vendo'); p2pNuovoAperta = true; renderNuovoOrdineP2P(); return ordineId(); },
@@ -97267,11 +97275,19 @@ console.log(JSON.stringify(R));
            "Tipo di prezzo", "Premio (%)", _LIM], out["vendo"])
     # (30 set 2026) e fra i metodi e il percorso c'e' la LEVA del prezzo,
     # che Barattozon ha come ogni altro ordine
-    prova("...e con Barattozon i metodi stanno sopra la leva del prezzo e il percorso, col nome di chi vende",
-          ["Seleziona la valuta con cui riceverai",
-           "Come vuoi ricevere — col tabacchino, uno solo", "Tipo di prezzo",
+    # EMENDATA (19 nov 2026, Andrea: «perche' c'e' scritto seleziona la
+    # valuta con cui riceverai? In euro poi...»): con Barattozon la valuta
+    # non si sceglie (il PayCode e' in euro) e il titolo dei metodi dice
+    # che chi prende paga l'ordine Amazon, non «Come vuoi ricevere»
+    prova("...e con Barattozon i metodi stanno sopra la leva del prezzo e il percorso, senza valuta e col titolo dell'ordine Amazon",
+          ["Chi prende paga il tuo ordine Amazon", "Tipo di prezzo",
            "Il PayCode", "L'importo esatto, in EUR", "Quando scade il PayCode",
            "Il premio", _LIM], out["tab"])
+    prova("...e in «Compra BTC» con Barattozon: niente valuta, «Paghi in contanti l'ordine Amazon di chi vende»",
+          "Paghi in contanti l'ordine Amazon di chi vende",
+          out["tabCompro"][0] if isinstance(out["tabCompro"], list) else out["tabCompro"])
+    prova("...e il tasto della valuta con Barattozon non c'e' (vendi, compra), senza Barattozon si'",
+          [False, False, True], out["tabValuta"])
     # sui nodi, con la tendina aperta: valuta, bottone dei metodi, le
     # voci, il campo dell'importo, il bottone che pubblica — in fila
     for lato in ("Compro", "Vendo"):

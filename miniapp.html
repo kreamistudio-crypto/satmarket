@@ -14216,7 +14216,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'edfe3936a7';
+const LINGUA_VER = '0e8d85eaf6';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -103026,7 +103026,13 @@ function renderNuovoOrdineP2P(){
      e Taglia nel form del venditore. Le voci sono bandierina + sigla:
      con una valuta sola e' una tendina che si apre e si richiude, ma
      e' gia' la strada giusta per la seconda. */
-  const valuta = sezioneNuovoP2P({
+  /* CON BARATTOZON LA VALUTA NON SI SCEGLIE (19 nov 2026, Andrea: «perche'
+     c'e' scritto seleziona la valuta con cui riceverai? In euro poi...»):
+     il PayCode di Amazon e' sempre in euro, e l'euro lo dice gia' il
+     passo 2 («L'importo esatto, in EUR»). La tendina restava, e scegliere
+     un'altra valuta portava fuori da Barattozon senza dirlo: il tabacchino
+     c'e' solo fra i metodi dell'euro (`metodiPubblicabiliP2P`). */
+  const valuta = tabMetodo ? '' : sezioneNuovoP2P({
     ico: 'valuta',
     titolo: 'Seleziona la valuta con cui ' + (compro ? 'invierai' : 'riceverai'),
     corpo: '<button type="button" class="p2p-tendina" id="p2pNuovoValutaBtn" ' +
@@ -103118,8 +103124,15 @@ function renderNuovoOrdineP2P(){
     ico: usdtRete ? 'rete' : 'metodi',
     /* il nome segue il verso (`nomeMetodiP2P`); la coda dopo il
        trattino resta quella di prima, parola per parola */
-    titolo: nomeMetodiP2P(p2pLato) + (tabMetodo ? ' — col tabacchino, uno solo'
-                                          : ' — puoi sceglierne più di uno'),
+    /* ...e con Barattozon il titolo dice chi paga cosa (19 nov 2026,
+       Andrea): era «Come vuoi ricevere — col tabacchino, uno solo», e chi
+       pubblica in «Vendi BTC» non riceve euro: si fa pagare l'ordine
+       Amazon; in «Compra BTC» e' lui a pagarlo. Il tasto sotto resta, e
+       da li' si esce scegliendo un altro metodo. Scritto qui e non in una
+       funzione sua: i banchi che prendono questo foglio da solo lo leggono */
+    titolo: tabMetodo
+      ? (compro ? 'Paghi in contanti l\'ordine Amazon di chi vende' : 'Chi prende paga il tuo ordine Amazon')
+      : nomeMetodiP2P(p2pLato) + ' — puoi sceglierne più di uno',
     /* l'id serve all'avviso, che deve poter far vedere ANCHE questo
        campo: un metodo non si «scrive», si sceglie, ma il posto dove
        si sceglie e' un campo come gli altri */

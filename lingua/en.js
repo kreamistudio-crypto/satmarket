@@ -8169,6 +8169,8 @@
   "A prezzo fisso l'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.": "At a fixed price the amount is a single one: a range order cannot fix the quantity of sats.",
   "💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo": "💡 Tap the second field only if you want to create a range order",
   "— col tabacchino, uno solo": "— with the tobacconist, a single one",
+  "Chi prende paga il tuo ordine Amazon": "Whoever takes it pays your Amazon order",
+  "Paghi in contanti l'ordine Amazon di chi vende": "You pay the seller's Amazon order in cash",
   "— puoi sceglierne più di uno": "— you can choose more than one",
   "Altri metodi ▾": "Other methods ▾",
   "Tipo di prezzo": "Price type",
