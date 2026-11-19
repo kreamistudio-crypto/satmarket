@@ -1,5 +1,16 @@
 # IL FORK DI MOSTRO — le dodici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
+**Dal 19 novembre 2026 c'è la 0014, PREPARATA E NON ANCORA SUL NODO**
+(cantiere `ritorno-nel-libro`, sotto, «LA 0014»): allo scadere del tempo
+per pagare l'ordine TORNA NEL LIBRO invece di chiudersi, e il tempo parte
+quando il server risponde un numero, cioè dopo che chi vende ha detto dove
+ricevere gli euro. Sta sopra la 0013 e NON ha un patcher: la `.patch` è
+la sorgente (tocca solo `barattolo_finestra.rs`, che è nostro, e il giro
+in `scheduler.rs`); `barattolo_finestra.rs` accanto resta quello della
+0013, che il patcher della 0013 copia. `git am` delle tredici `.patch` su
+un clone pulito della `v0.20.2` dà l'albero `b45281d5`, e `cargo test`
+dice 2005 verdi, 0 rosse, 4 ignorate. L'immagine nuova sarà la `-bar11`.
+
 **Dal 19 novembre 2026 la 0013 È SUL NODO** (immagine `mostro:v0.20.2-bar10`,
 08:28 UTC; sotto, «IN SERVIZIO»): il tempo per pagare scelto da chi
 pubblica (cantiere `tempo-pagamento`, sotto, «LA 0013»). Sta sopra la
@@ -679,6 +690,44 @@ PRIMA IL SERVER, POI IL NODO, come per la 0011 e la 0012: il server di
 ieri non ha la rotta (404, e il nodo si comporta come oggi) e leggerebbe
 `payment-window` come un annullo qualunque.
 
+## LA 0014: L'ORDINE TORNA NEL LIBRO, E IL TEMPO PARTE DAL RECAPITO (19 nov 2026)
+
+Preparata il 19 nov 2026 (cantiere `ritorno-nel-libro`; Andrea: «No,
+perché sparisce, scusa? Non dovrebbe tornare nel libro», e «fai partire
+il timer al momento giusto, cioè nel momento in cui io ho indicato dove
+ricevere gli euro, non prima»). Sopra la 0013.
+
+COSA CAMBIA NEL GIRO. Allo scadere senza «Ho inviato» la 0013 annullava
+lo scambio (`canceled`, l'ordine spariva). La 0014 fa quel che mostrod fa
+già quando chi prende non manda la fattura in tempo (il ramo del
+taker-timeout): annulla la hold invoice, rimette l'ordine `pending` con
+`update_order_to_initial_state` e `edit_pubkeys_order`, ripubblica il
+38383 `pending`, avvisa le due parti (`Canceled` a chi aveva preso,
+`NewOrder` a chi l'aveva pubblicato), libera la cauzione di chi aveva
+preso (`release_taker_bonds_for_order_or_warn`) e lo racconta con la
+0007: `expired` / `payment-window-republished` (il server lo legge come
+`tornato`). Un ordine a mercato torna senza importo: si riprezza alla
+presa dopo. La dev fee torna a 0, come nel ramo di mostrod.
+
+QUANDO PARTE IL TEMPO. Il server risponde `null` finché chi vende non ha
+detto dove ricevere gli euro («non ancora»: il nodo lo richiede al minuto
+dopo, DIETRO agli altri, `asked_at`), e il numero dopo. La tabella ha una
+colonna nuova, `started_at`, timbrata quando il numero arriva: il tempo
+conta da lì (al più un minuto dopo il recapito, mai prima di quel che
+legge chi compra). Le righe della 0013 senza `started_at` contano da
+`seen_active_at`, come prima. Un ordine tornato `pending` perde la sua
+riga (`record_seen` la cancella), così la presa dopo chiede di nuovo.
+
+COMPATIBILITÀ. Una `-bar10` (la 0013) legge `null` come 0: nessun tempo,
+mai un annullo prima del dovuto. Una `-bar11` col server di prima riceve
+il numero subito e conta dall'attivo, come la 0013, ma rimette nel libro.
+Il ritorno alla `-bar10` è sicuro: la colonna in più la ignora.
+
+NIENTE PATCHER, apposta: tocca il modulo nostro e UNA funzione nostra in
+`scheduler.rs` (il giro della 0013), e un patcher di ancore su codice
+nostro sarebbe un secondo posto da tenere uguale. La `.patch` si prende
+con `git am`, come le altre.
+
 ## GLI OTTO PATCHER (più il decimo)
 
 Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
@@ -703,6 +752,7 @@ fermano («porta gia' questa modifica»).
 | 0011 | `patch-0011-tempo-di-chi-pubblica.py` + `barattolo_tempo.rs` | 13 agganci in 7 file (`main.rs`, `config/types.rs`, `settings.tpl.toml`, `db.rs`, `scheduler.rs`, `barattolo_eventi.rs`, `nip33.rs`), coi test dentro il modulo (12 ott 2026); pretende la 0007; uno riagganciato sulla 0.20.2 il 29 ott 2026 (`nip33.rs`) |
 | 0012 | `patch-0012-disputa-automatica.py` | 3 agganci in 2 file (`scheduler.rs`: l'evento nel ramo `fiat-sent` del guardiano; `barattolo_eventi.rs`: la riga del vocabolario e una prova pura) (12 ott 2026); pretende la 0011 |
 | 0013 | `patch-0013-tempo-per-pagare.py` + `barattolo_finestra.rs` | 7 agganci in 4 file (`main.rs`, `scheduler.rs`: il job, il giro e tre prove; `barattolo_eventi.rs`: la riga del vocabolario e una prova; `nip33.rs`: il tag nel 38385) (18 nov 2026); pretende la 0011 e la 0012 |
+| 0014 | nessuno: la `.patch` è la sorgente | `barattolo_finestra.rs` (`started_at`, «non ancora», le righe dimenticate) e il giro in `scheduler.rs` (torna nel libro), con tre prove nuove nel modulo e due nel giro (19 nov 2026); pretende la 0013 |
 
 I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
 esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha

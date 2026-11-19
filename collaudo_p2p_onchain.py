@@ -472,7 +472,19 @@ def main():
           "deposito (niente in rete): annullato, e chi vende avvisato",
           (200, "annullato", True),
           (r.status_code, uno(999, ox["id"])["stato"],
-           detto_a(999, "annullato lo scambio")))
+           detto_a(999, "Il tuo ordine è tornato nel libro")))
+    # (19 nov 2026, ritorno-nel-libro) l'ordine non sparisce: ne rinasce uno
+    # uguale nel libro, e lo scambio chiuso dice il suo nome
+    con = SRV.db()
+    figlio = con.execute("SELECT id, ordine, stato, prezzo_sats, recapito FROM p2p_onchain_ordini"
+                         " WHERE rinato_da=?", (ox["id"],)).fetchone()
+    con.close()
+    prova("...e l'ordine torna nel libro: uno nuovo, uguale, che lo scambio chiuso nomina",
+          ("pending", 100000, "IT00 X 1234", True),
+          (figlio["stato"], figlio["prezzo_sats"], figlio["recapito"],
+           uno(999, ox["id"]).get("rinato_in") == figlio["ordine"]))
+    prova("...e chi l'ha pubblicato lo ritira con un tocco («Non ripubblicarlo»)", 200,
+          gesto(999, figlio["id"], "annulla").status_code)
     prova("niente sull'indirizzo: resta preso", "preso",
           gesto(999, oid, "controlla").json()["stato"])
     paga(oa, confermata=False)
@@ -796,6 +808,12 @@ def main():
     prova("rinunciare dopo la finestra del deposito, senza sats: si puo'",
           (200, "annullato"),
           (gesto(888, o6["id"], "annulla").status_code, uno(999, o6["id"])["stato"]))
+    con = SRV.db()
+    figlio = con.execute("SELECT id FROM p2p_onchain_ordini WHERE rinato_da=?",
+                         (o6["id"],)).fetchone()
+    con.close()
+    prova("...e anche questo torna nel libro, e chi l'ha pubblicato lo ritira", (True, 200),
+          (figlio is not None, gesto(999, figlio["id"], "annulla").status_code if figlio else 0))
 
     # ---- 9) la scadenza nel libro e la ronda ------------------------------
     print("\n[la ronda: la scadenza nel libro]")
@@ -819,8 +837,8 @@ def main():
     paga(uno(999, o8["id"]))
     gesto(999, o8["id"], "controlla")
     con = SRV.db()
-    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=? WHERE id=?",
-                (int(time.time()) - 25 * 3600, o8["id"]))
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=? WHERE id=?",
+                (int(time.time()) - 25 * 3600, int(time.time()) - 26 * 3600, o8["id"]))
     con.commit()
     con.close()
     banco.DETTO.clear()
@@ -843,8 +861,8 @@ def main():
     paga(uno(999, o9["id"]))
     gesto(999, o9["id"], "controlla")
     con = SRV.db()
-    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=? WHERE id=?",
-                (int(time.time()) - 2 * 3600, o9["id"]))
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=? WHERE id=?",
+                (int(time.time()) - 2 * 3600, int(time.time()) - 3 * 3600, o9["id"]))
     con.commit()
     con.close()
     banco.DETTO.clear()
@@ -2290,7 +2308,8 @@ def main():
     # (17 nov 2026) l'avviso della recensione ricevuta e' quello di sempre,
     # del mercatino e di Lightning: non e' un avviso dello scambio
     nudi = [t[:60] for chi, t, b in BOTTONI
-            if chi in (999, 888) and not (b and b[0] == "🟠 Apri lo scambio"
+            if chi in (999, 888) and not (b and b[0] in ("🟠 Apri lo scambio",
+                                                         "🚫 Non ripubblicarlo")
                                           and "?scambio=bar-onchain-" in b[1])
             and "Hai ricevuto una recensione" not in t]
     prova("in tutto il giro nessun avviso alle parti parte senza il bottone, "

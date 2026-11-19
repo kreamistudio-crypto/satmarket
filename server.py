@@ -61425,10 +61425,18 @@ P2P_MINUTI_PAGARE_DI_SERIE = 24 * 60
 # scegliere proprio quello. Wise e' fuori perche' verso una banca puo'
 # metterci un giorno.
 P2P_METODI_VELOCI = ("SEPA Instant", "Revolut", "Satispay", "PayPal")
-# quanto puo' tardare la domanda del nodo dall'attivo (vedi
-# `_finestre_per_nodo_p2p`): lui chiede ogni minuto, quindi un quarto d'ora
-# vuol dire che la porta era chiusa
+# quanto puo' tardare la domanda del nodo dall'INIZIO del tempo (dal 19 nov
+# 2026 il recapito detto: vedi `_finestre_per_nodo_p2p`): lui chiede ogni
+# minuto, quindi un quarto d'ora vuol dire che la porta era chiusa
 P2P_FINESTRA_RITARDO_MAX_S = 15 * 60
+# LA PAROLA DEL NODO PER IL RITORNO NEL LIBRO allo scadere del tempo per
+# pagare (19 nov 2026, patch 0014, cantiere ritorno-nel-libro; Andrea: «Non
+# dovrebbe tornare nel libro?»): fino alla 0013 il nodo annullava e diceva
+# `payment-window`; dalla 0014 rimette l'ordine `pending`, come per il
+# timeout di chi prende, e lo dice con `payment-window-republished`
+# (`_momento_evento_p2p` ne fa un «tornato»). Scritta per esteso dove serve,
+# come le altre parole del nodo: i banchi delle prove montano le funzioni
+# da sole
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026, richiesta di Andrea):
 # chi lo chiede riceve un messaggio quando nel libro P2P compaiono
 # ordini nuovi — raggruppati, al piu' uno ogni P2P_AVVISI_NUOVI_MINUTI
@@ -64928,7 +64936,11 @@ def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
       nella PRIMA META' del tempo: chi vende che lo dice al cinquantanovesimo
       minuto di un'ora non puo' far contare a chi compra un pagamento che
       non aveva dove mandare. Senza l'ora del recapito (lo sa solo
-      l'anti-doppione dell'avviso) vale la sua ora d'invio."""
+      l'anti-doppione dell'avviso) vale la sua ora d'invio.
+    • DAL 19 NOV 2026 (patch 0014) lo stesso fatto arriva come RITORNO NEL
+      LIBRO (`tornato` / `payment-window-republished`) e il tempo parte
+      dal recapito: la regola della prima meta' non serve piu' (il tempo
+      intero e' dopo il recapito), il resto vale uguale."""
     righe = []
     ordine, giro = ev["ordine"], int(fatto.get("giro") or 0)
     momento, ts = str(fatto.get("momento") or ""), int(ev["ts"])
@@ -64950,7 +64962,8 @@ def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
             righe.append(f"⚖️ Reputazione P2P: a {tg} si segna una disputa persa "
                          f"({corto}, giro {giro}: lo ha deciso il moderatore, a registro)")
     scadenza = str(ev.get("dettaglio") or "")
-    if momento == "annullato" and scadenza in ("escrow-deadline", "payment-window"):
+    if ((momento == "annullato" and scadenza in ("escrow-deadline", "payment-window"))
+            or (momento == "tornato" and scadenza == "payment-window-republished")):
         nomi = {r[0] for r in con.execute(
             "SELECT DISTINCT momento FROM p2p_momenti WHERE ordine=? AND giro=?",
             (ordine, giro))}
@@ -64970,7 +64983,8 @@ def _esiti_dopo_garanzia_p2p(con, ev: dict, fatto: dict) -> list:
                       "passata piu' di meta' del tempo per pagare")
         else:
             perche = ""
-        fatto_q = ("tempo per pagare finito" if scadenza == "payment-window"
+        fatto_q = ("tempo per pagare finito" if scadenza in ("payment-window",
+                                                             "payment-window-republished")
                    else "garanzia arrivata a scadenza")
         if perche:
             righe.append(f"· Reputazione P2P: {corto} {fatto_q}, "
@@ -65450,31 +65464,50 @@ def _minuti_pagare_p2p(con, ordini) -> dict:
 
 
 def _finestre_per_nodo_p2p(con, ordini, adesso: int = 0) -> dict:
-    """LA RISPOSTA AL NODO (patch 0013): `{ordine: secondi}` per gli
-    ordini chiesti che hanno un tempo per pagare — gli altri non ci sono,
-    e per il nodo «non c'e'» vuol dire «nessun tempo», per sempre. Sono gli
-    stessi minuti della card, in secondi: il nodo accetta solo i minuti
-    interi da 900 a 86400.
-    LA DOMANDA TARDIVA NON HA TEMPO (`adesso`): il nodo chiede nel minuto
-    in cui vede lo scambio attivo, e conta da li'. Se chiede molto dopo
-    che lo scambio e' diventato attivo per la cronaca — la porta era
-    chiusa (leva spenta, server giu') e si riapre — il tempo sarebbe gia'
-    finito o quasi, e lo scambio si annullerebbe sotto gli occhi di chi
-    non aveva visto nessun timer. Allora niente tempo: vale la garanzia."""
+    """LA RISPOSTA AL NODO: `{ordine: secondi | 0 | None}` per OGNI ordine
+    chiesto (dal 19 nov 2026, patch 0014, cantiere ritorno-nel-libro).
+    • i SECONDI quando il tempo per pagare c'e' E chi vende ha gia' detto
+      dove ricevere gli euro (Andrea: «fai partire il timer nel momento in
+      cui io ho indicato dove ricevere gli euro, non prima»): il nodo
+      conta da quando riceve il numero, cioe' al piu' un minuto dopo il
+      recapito — mai prima di quel che legge chi compra;
+    • `None` (null) quando il tempo c'e' ma il recapito non ancora: «non
+      ancora», e il nodo richiede al minuto dopo;
+    • 0 quando un tempo non c'e' (nessuna scelta, un acquisto, il
+      PayCode, i contanti, un ordine che non e' dei nostri): il nodo non
+      chiede piu'.
+    Gli stessi minuti della card, in secondi: il nodo accetta solo i minuti
+    interi da 900 a 86400. UNA `-bar10` (la 0013) legge null come 0: con
+    lei uno scambio chiesto prima del recapito resta senza tempo — mai un
+    annullo prima del dovuto.
+    LA DOMANDA TARDIVA NON HA TEMPO (`adesso`): se il nodo chiede molto
+    dopo l'inizio del tempo — la porta era chiusa (leva spenta, server
+    giu') e si riapre — il tempo sarebbe gia' finito o quasi, e lo scambio
+    tornerebbe nel libro sotto gli occhi di chi non aveva visto nessun
+    timer. Allora 0, niente tempo: vale la garanzia."""
+    pulite = _ordini_puliti_p2p(ordini)
+    tempi = _minuti_pagare_righe_p2p(con, pulite)
     fuori = {}
-    for o, minuti in _minuti_pagare_righe_p2p(con, ordini).items():
-        if adesso:
-            try:
-                dal = _attivo_dal_p2p([dict(m) for m in con.execute(
-                    "SELECT momento, quando, dettaglio, giro FROM p2p_momenti "
-                    "WHERE ordine=?", (o,))])
-            except sqlite3.OperationalError:
-                dal = 0
-            if dal and int(adesso) - dal > P2P_FINESTRA_RITARDO_MAX_S:
-                print(f"· Tempo per pagare: {o[:8]} chiesto dal nodo "
-                      f"{(int(adesso) - dal) // 60} minuti dopo l'attivo: "
-                      "nessun tempo, vale la garanzia", flush=True)
-                continue
+    for o in pulite:
+        minuti = tempi.get(o, 0)
+        if not minuti:
+            fuori[o] = 0
+            continue
+        try:
+            dal = _inizio_tempo_pagare_p2p([dict(m) for m in con.execute(
+                "SELECT momento, quando, dettaglio, giro FROM p2p_momenti "
+                "WHERE ordine=?", (o,))])
+        except sqlite3.OperationalError:
+            dal = 0
+        if not dal:
+            fuori[o] = None
+            continue
+        if adesso and int(adesso) - dal > P2P_FINESTRA_RITARDO_MAX_S:
+            print(f"· Tempo per pagare: {o[:8]} chiesto dal nodo "
+                  f"{(int(adesso) - dal) // 60} minuti dopo il recapito: "
+                  "nessun tempo, vale la garanzia", flush=True)
+            fuori[o] = 0
+            continue
         fuori[o] = minuti * 60
     return fuori
 
@@ -65500,14 +65533,45 @@ def _attivo_dal_p2p(momenti, giro=None) -> int:
     return min(ore) if ore else 0
 
 
+def _recapito_dal_p2p(momenti, giro=None) -> int:
+    """PURA: QUANDO chi vende ha detto dove ricevere gli euro nel giro
+    (dell'ultimo, se non detto): la prima dichiarazione del suo telefono
+    (`momento` = 'recapito', scritta da `_avviso_recapito_p2p` prima di
+    ogni avviso). 0 = non ancora."""
+    noti = [m for m in (momenti or []) if isinstance(m, dict)]
+    if giro is None:
+        giro = max([int(m.get("giro") or 0) for m in noti] or [0])
+    ore = [int(m.get("quando") or 0) for m in noti
+           if str(m.get("momento") or "") == "recapito"
+           and int(m.get("giro") or 0) == int(giro or 0)
+           and int(m.get("quando") or 0) > 0]
+    return min(ore) if ore else 0
+
+
+def _inizio_tempo_pagare_p2p(momenti, giro=None) -> int:
+    """PURA: DA QUANDO corre il tempo per pagare (19 nov 2026, cantiere
+    ritorno-nel-libro; Andrea: «fai partire il timer nel momento in cui io
+    ho indicato dove ricevere gli euro, non prima»): dal recapito detto, e
+    mai prima che lo scambio sia attivo — un recapito dato presto (prima
+    della fattura di chi compra) aspetta l'attivo, che e' quando il nodo
+    comincia a chiedere. Senza recapito, o senza lo scambio attivo, 0: il
+    tempo non corre."""
+    rec = _recapito_dal_p2p(momenti, giro)
+    attivo = _attivo_dal_p2p(momenti, giro) if rec else 0
+    if not (rec and attivo):
+        return 0
+    return max(rec, attivo)
+
+
 def _paga_entro_p2p(momenti, minuti: int, giro=None) -> int:
     """PURA: l'epoch entro cui chi compra manda gli euro, o 0 (nessun
-    tempo scelto, o lo scambio non e' ancora attivo). Il nodo conta dal
-    minuto in cui LUI vede lo scambio attivo, quindi annulla un poco DOPO
-    quest'ora, mai prima: chi compra non perde un secondo di quel che
-    legge."""
+    tempo scelto, o il tempo non e' ancora partito: dal 19 nov 2026 parte
+    dal recapito, `_inizio_tempo_pagare_p2p`). Il nodo conta da quando
+    riceve il numero, al piu' un minuto dopo, quindi rimette l'ordine nel
+    libro un poco DOPO quest'ora, mai prima: chi compra non perde un
+    secondo di quel che legge."""
     minuti = _minuti_pagare_scelta_p2p(minuti)
-    dal = _attivo_dal_p2p(momenti, giro)
+    dal = _inizio_tempo_pagare_p2p(momenti, giro)
     return dal + minuti * 60 if minuti and dal else 0
 
 
@@ -67620,6 +67684,22 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
     # andato bene non lascia righe «non parte» nel journal
     con.execute("DELETE FROM p2p_attese WHERE ordine=? AND "
                 "fonte='sollecito_recapito'", (ordine,))
+    # ...E IL TEMPO PER PAGARE PARTE DA QUI (19 nov 2026, cantiere
+    # ritorno-nel-libro): i promemoria a chi compra si contano da adesso.
+    # Senza tempo, o senza lo scambio attivo, non mette niente (e allora
+    # li mettera' l'evento dell'attivo, col recapito gia' in cronaca).
+    # Fail-open: un intoppo qui non ferma l'avviso del recapito
+    try:
+        if _attivo_dal_p2p([dict(m) for m in con.execute(
+                "SELECT momento, quando, dettaglio, giro FROM p2p_momenti "
+                "WHERE ordine=?", (ordine,))], giro):
+            riga_t = _attese_tempo_pagare_p2p(
+                con, ordine, giro, compra, _minuti_pagare_ordine_p2p(con, ordine))
+            if "promemoria del tempo" in riga_t:
+                print(riga_t, flush=True)
+    except Exception as e:
+        print(f"⚠️ Solleciti P2P: {ordine[:8]} i promemoria del tempo per "
+              f"pagare non messi ({type(e).__name__}: {e})", flush=True)
     con.commit()
     garanzia = con.execute(
         "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND fonte='mostro' "
@@ -71823,33 +71903,37 @@ SOLLECITO_EURO_TESTI = {
 # COL TEMPO PER PAGARE (18 nov 2026, cantiere tempo-pagamento) i tre
 # promemoria di sopra non bastano e in parte mentono: «è passato un
 # giorno» a chi aveva un'ora, «chi vende può aprire una disputa» quando lo
-# scambio si annulla da solo. Al loro posto questi, contati da quando lo
-# scambio e' diventato attivo, col tempo che RESTA scritto dentro: l'ultimo
-# dice chiaro che senza «Ho inviato» si annulla anche se si e' pagato.
+# scambio scade da solo. Al loro posto questi, contati da quando il tempo
+# PARTE — dal 19 nov 2026 il recapito detto (`_inizio_tempo_pagare_p2p`) —
+# col tempo che RESTA scritto dentro: l'ultimo dice chiaro che senza «Ho
+# inviato» lo scambio scade anche se si e' pagato.
 # I minuti sono quelli che chi vende ha scelto sull'orologio, e i momenti
-# dei promemoria si contano da loro (`_intervalli_tempo_pagare_p2p`): con
-# 24 ore come i tre di sempre (un'ora, dodici, venti), con un'ora a 20 e a
-# 45 minuti, con un quarto d'ora uno solo, a 10 minuti.
+# dei promemoria si contano da loro (`_intervalli_tempo_pagare_p2p`).
+# L'ULTIMO CADE DIECI MINUTI PRIMA DELLA FINE, cinque coi tempi sotto
+# l'ora (19 nov 2026, Andrea: «deve essere chiara questa roba qua, perché
+# altrimenti uno magari non capisce e perde i soldi»).
 SOLLECITO_TEMPO_PAGARE_PRIMI = (
     "💶 Promemoria: i sats sono in garanzia e aspettano i tuoi euro. Hai "
     "ancora {resto} per inviarli al recapito che trovi nella pagina dello "
-    "scambio e toccare «Ho inviato gli euro»: allo scadere lo scambio si "
-    "annulla da solo.")
+    "scambio e toccare «Ho inviato gli euro»: allo scadere lo scambio "
+    "scade e l'ordine torna nel libro.")
 SOLLECITO_TEMPO_PAGARE_ULTIMO = (
-    "⏰ Mancano {resto}: invia gli euro e tocca subito «Ho inviato gli "
-    "euro». Se allo scadere non l'hai toccato, lo scambio si annulla da solo "
+    "⏰ Mancano {resto}: hai già mandato gli euro? Tocca subito «Ho "
+    "inviato gli euro». Se allo scadere non l'hai toccato, lo scambio scade "
     "e i sats tornano a chi vende, anche se hai già pagato.")
 # ...e a chi VENDE, se chi compra ha poco tempo (fino a 4 ore) e il
 # recapito non e' ancora partito: un promemoria a dieci minuti, al posto di
-# quello a un'ora, che con un'ora sarebbe gia' la fine — e prima, a un
-# quarto del tempo, quando il tempo e' sotto i 40 minuti
-# (`_recapito_corto_s_p2p`)
+# quello a un'ora — e prima, a un quarto del tempo, quando il tempo e'
+# sotto i 40 minuti (`_recapito_corto_s_p2p`). Dal 19 nov 2026 il tempo
+# di chi compra parte dal recapito: la frase dice che e' lui a fermare
+# tutto, non che il tempo corre
 P2P_MINUTI_RECAPITO_CORTO = 4 * 60
 SOLLECITI_RECAPITO_CORTO_S = (10 * 60,)
 SOLLECITO_RECAPITO_CORTO_TESTO = (
-    "📍 Chi compra ha {ore} per pagarti e non sa ancora dove mandarti gli "
-    "euro: il suo tempo sta già correndo. Apri la pagina dello scambio e "
-    "tocca «💶 Indica dove ricevere gli euro».")
+    "📍 Chi compra ha {ore} per pagarti, da quando gli dici dove mandarti "
+    "gli euro: finché non lo fai, lo scambio e i tuoi sats restano fermi. "
+    "Apri la pagina dello scambio e tocca «💶 Indica dove ricevere gli "
+    "euro».")
 
 
 def _durata_detta_p2p(secondi: int) -> str:
@@ -71865,14 +71949,18 @@ def _durata_detta_p2p(secondi: int) -> str:
 
 
 def _intervalli_tempo_pagare_p2p(minuti: int) -> tuple:
-    """PURA: i secondi dall'attivo a cui partono i promemoria a chi
-    compra, per un tempo di `minuti`; `()` senza un tempo. L'ultimo e'
-    sempre quello che dice «si annulla anche se hai pagato».
+    """PURA: i secondi dall'INIZIO del tempo (il recapito, dal 19 nov 2026)
+    a cui partono i promemoria a chi compra, per un tempo di `minuti`; `()`
+    senza un tempo. L'ultimo e' sempre quello che dice «scade anche se hai
+    pagato», e cade DIECI MINUTI PRIMA DELLA FINE — cinque sotto l'ora
+    (19 nov 2026, Andrea: «uno magari non capisce e perde i soldi»).
+    Prima di lui:
     • da 12 ore in su: un'ora, a meta', e quattro ore prima della fine;
     • da 4 a 12 ore: un'ora, e a tre quarti;
-    • da un'ora a 4: a un terzo e a tre quarti (un'ora: 20 e 45 minuti);
-    • sotto l'ora: uno solo, a due terzi (un quarto d'ora: a 10 minuti).
-    A minuti interi, arrotondati per difetto."""
+    • da un'ora a 4: a un terzo e a tre quarti;
+    • sotto l'ora: nessuno (un quarto d'ora: il solo ultimo, a 10 minuti).
+    Un promemoria a meno di dieci minuti dall'ultimo cade (un'ora: a 20 e a
+    50 minuti). A minuti interi, arrotondati per difetto."""
     m = _minuti_pagare_scelta_p2p(minuti)
     if not m:
         return ()
@@ -71883,8 +71971,9 @@ def _intervalli_tempo_pagare_p2p(minuti: int) -> tuple:
     elif m >= 60:
         punti = (m // 3, m * 3 // 4)
     else:
-        punti = (m * 2 // 3,)
-    return tuple(p * 60 for p in punti)
+        punti = ()
+    ultimo = m - (10 if m >= 60 else 5)
+    return tuple(p * 60 for p in punti if p <= ultimo - 10) + (ultimo * 60,)
 
 
 def _recapito_corto_s_p2p(minuti: int) -> tuple:
@@ -72277,6 +72366,45 @@ def _sollecito_recapito_p2p_fermo(con, r) -> str:
     return ""
 
 
+def _attese_tempo_pagare_p2p(con, ordine: str, giro: int, compra: int,
+                             minuti: int) -> str:
+    """I PROMEMORIA DEL TEMPO PER PAGARE A CHI COMPRA, contati dall'INIZIO
+    del tempo (19 nov 2026, cantiere ritorno-nel-libro): il recapito detto,
+    mai prima dell'attivo (`_inizio_tempo_pagare_p2p`). Due strade ci
+    arrivano — lo scambio che diventa attivo (`_solleciti_evento_p2p`) e
+    la dichiarazione del recapito (`_avviso_recapito_p2p`) — e parte quella
+    che trova tutt'e due le cose: senza recapito o senza garanzia non mette
+    niente. Rifatta, sposta le stesse righe (stessa scadenza: l'inizio e'
+    il PRIMO recapito), non ne aggiunge. Torna la riga di journal; NON
+    COMMITTA. Il giudice alla scadenza resta `_sollecito_euro_p2p_fermo`."""
+    corto = ordine[:8]
+    if not (compra and minuti):
+        return f"· Solleciti P2P: {corto} senza tempo per pagare o senza chi compra"
+    momenti = [dict(m) for m in con.execute(
+        "SELECT momento, quando, dettaglio, giro FROM p2p_momenti WHERE ordine=?",
+        (ordine,))]
+    if not _attivo_dal_p2p(momenti, giro):
+        return (f"· Solleciti P2P: {corto} il tempo per pagare aspetta lo "
+                "scambio attivo")
+    dal = _inizio_tempo_pagare_p2p(momenti, giro)
+    if not dal:
+        return (f"· Solleciti P2P: {corto} ha un tempo per pagare di "
+                f"{_durata_detta_p2p(minuti * 60)}: i promemoria partono col "
+                "recapito di chi vende")
+    intervalli, testi = _testi_tempo_pagare_p2p(minuti)
+    con.execute("DELETE FROM p2p_attese WHERE ordine=? AND giro=? AND "
+                "tg_id=? AND fonte='sollecito_euro'", (ordine, giro, compra))
+    for livello, fra in enumerate(intervalli, 1):
+        con.execute(
+            "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+            "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'sollecito_euro')",
+            (ordine, f"euro_tempo{livello}", giro, compra, testi[livello],
+             dal, dal + int(fra)))
+    return (f"· Solleciti P2P: {corto} {len(intervalli)} promemoria del tempo "
+            f"per pagare a {compra}, dal recapito (l'ultimo "
+            f"{(minuti * 60 - intervalli[-1]) // 60} minuti prima della fine)")
+
+
 def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     """I SOLLECITI CHE NASCONO (E MUOIONO) DA UN EVENTO NUOVO di mostrod
     (10 ott 2026, «I SOLLECITI PER TUTTI I METODI»). `fatto` e' quel che
@@ -72367,12 +72495,12 @@ def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                       else SOLLECITO_RECAPITO_TESTI,
                       SOLLECITI_RECAPITO_S, "sollecito_recapito")
     if minuti_tempo and diventa_attivo:
-        # al posto dei tre di sempre, i promemoria col tempo che resta: il
-        # giudice alla scadenza e' lo stesso (`_sollecito_euro_p2p_fermo`)
-        intervalli, testi = _testi_tempo_pagare_p2p(minuti_tempo)
-        con.execute("DELETE FROM p2p_attese WHERE ordine=? AND giro=? AND "
-                    "tg_id=? AND fonte='sollecito_euro'", (ordine, giro, compra))
-        in_attesa("euro_tempo", compra, testi, intervalli, "sollecito_euro")
+        # al posto dei tre di sempre, i promemoria col tempo che resta,
+        # contati da quando il tempo PARTE (19 nov 2026): il recapito. Se
+        # chi vende l'ha gia' detto partono adesso; se no li mette in
+        # attesa la sua dichiarazione (`_avviso_recapito_p2p`)
+        righe.append(_attese_tempo_pagare_p2p(con, ordine, giro, compra,
+                                              minuti_tempo))
     elif momento == "garanzia_pagata" and compra and minuti_tempo:
         righe.append(f"· Solleciti P2P: {corto} ha un tempo per pagare di "
                      f"{_durata_detta_p2p(minuti_tempo * 60)}: i promemoria "
@@ -72764,7 +72892,7 @@ def _motivo_annullo_p2p(attore: str, dettaglio: str, visti) -> str:
         return "garanzia_non_pagata"
     if dettaglio == "escrow-deadline":
         return "garanzia_scaduta"
-    if dettaglio == "payment-window":
+    if dettaglio in ("payment-window", "payment-window-republished"):
         return "tempo_pagare_scaduto"
     if "fattura_chiesta" in visti and "fattura_data" not in visti:
         return "fattura_non_data"
@@ -76554,9 +76682,12 @@ def _momento_evento_p2p(azione: str, dettaglio: str) -> str:
     if azione == "canceled":
         return "tornato" if dettaglio == "republished" else "annullato"
     if azione == "expired":
+        # (19 nov 2026, patch 0014) e il tempo per pagare finito rimette
+        # l'ordine nel libro: chi aveva preso non ha pagato
         return {"book": "scaduto",
                 "taker-timeout": "tornato",
-                "maker-republished": "tornato"}.get(dettaglio, "annullato")
+                "maker-republished": "tornato",
+                "payment-window-republished": "tornato"}.get(dettaglio, "annullato")
     return {"taken": "preso",
             "hold-invoice-requested": "garanzia_chiesta",
             "hold-invoice-paid": "garanzia_pagata",
@@ -77248,6 +77379,28 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                     "all'assistenza dall'app."
                     + ("\n\n" + conto if conto else ""))
         return f"❌ <b>{altro} ha annullato lo scambio.</b>{coda}"
+    if momento == "tornato" and dettaglio == "payment-window-republished":
+        # IL TEMPO PER PAGARE FINITO, CON L'ORDINE NEL LIBRO (19 nov 2026,
+        # patch 0014, cantiere ritorno-nel-libro): il nodo ha ridato la
+        # garanzia a chi vende e rimesso l'ordine `pending`. A chi vende
+        # che alla prossima presa la garanzia si blocca di nuovo; a chi
+        # compra la strada se gli euro erano partiti davvero, e la riga del
+        # conto se c'e'
+        if vende:
+            return ("⏰ <b>Il tempo per pagare è finito senza gli euro "
+                    "segnati: il tuo ordine è tornato nel libro.</b>"
+                    + (tornati or " I sats tornano a te.")
+                    + " Alla prossima presa la garanzia si blocca di nuovo."
+                    " Se gli euro ti arrivano lo stesso, rimandali a chi "
+                    "li ha inviati. Se non lo vuoi più nel libro, apri "
+                    "l'ordine e ritiralo.")
+        conto = str(dati.get("conto_compra") or "")
+        return ("⏰ <b>Il tempo per pagare è finito: lo scambio è "
+                "scaduto e l'ordine è tornato nel libro.</b> Gli euro non "
+                "risultano inviati e i sats sono tornati a chi vende. Se li "
+                "avevi già mandati senza toccare «Ho inviato gli euro», "
+                "scrivi subito all'assistenza dall'app."
+                + ("\n\n" + conto if conto else ""))
     if momento == "tornato" and dettaglio == "maker-republished":
         # IL RITORNO PER COLPA DI CHI HA PUBBLICATO (12 ott 2026, patch
         # 0011 del fork): l'ordine torna nel libro, e le due frasi sono
@@ -77553,13 +77706,16 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
     # il tempo per pagare (18 nov 2026), per la frase della garanzia
     if momento == "garanzia_pagata":
         dati["minuti_pagare"] = _minuti_pagare_ordine_p2p(con, ordine)
-    if (momento == "annullato"
-            and ev.get("dettaglio") in ("escrow-deadline", "payment-window")
+    if (((momento == "annullato"
+            and ev.get("dettaglio") in ("escrow-deadline", "payment-window"))
+            or (momento == "tornato"
+                and ev.get("dettaglio") == "payment-window-republished"))
             and fatto["compratore"]):
         try:
             c = _conto_esito_p2p(con, fatto["compratore"], ordine, giro, adesso)
             # (col tempo per pagare la frase lo dice gia' da sola)
-            davanti = ("" if ev.get("dettaglio") == "payment-window"
+            davanti = ("" if ev.get("dettaglio") in ("payment-window",
+                                                     "payment-window-republished")
                        else "Gli euro non risultano inviati. ")
             dati["conto_compra"] = (davanti + c["riga"] if c["contato"] else "")
         except Exception:
@@ -111385,11 +111541,31 @@ def _p2p_onchain_minuti(o) -> int:
     return int(g(o)) if g else p2p_onchain_ore_pagamento(o) * 60
 
 
-def p2p_onchain_paga_entro(o) -> int:
-    """PURA: l'epoch entro cui chi compra paga (0 = il deposito non e'
-    ancora confermato, e il tempo non e' partito). Col PayCode mai oltre
-    la sua scadenza (17 nov 2026)."""
+def p2p_onchain_inizio_pagare(o) -> int:
+    """PURA: da quando corre il tempo per pagare (0 = non corre ancora).
+    Dal deposito confermato, e dal 19 nov 2026 (cantiere ritorno-nel-
+    libro, Andrea: «fai partire il timer nel momento in cui io ho indicato
+    dove ricevere gli euro, non prima») non prima del recapito: senza un
+    recapito chi compra non sa dove pagare, e il suo tempo non parte. Col
+    PayCode di un Barattozon il recapito E' il PayCode: dal deposito, come
+    sempre. Una riga di prima, col recapito e senza il suo momento, conta
+    dal deposito."""
     dal = int(_p2p_onchain_campo(o, "depositato_il", 0) or 0)
+    if dal <= 0:
+        return 0
+    if globals().get("p2p_onchain_tab_scade", lambda x: 0)(o):
+        return dal
+    if not str(_p2p_onchain_campo(o, "recapito", "") or "").strip():
+        return 0
+    return max(dal, int(_p2p_onchain_campo(o, "recapito_il", 0) or 0))
+
+
+def p2p_onchain_paga_entro(o) -> int:
+    """PURA: l'epoch entro cui chi compra paga (0 = il tempo non e'
+    partito: deposito non ancora confermato, o recapito non ancora
+    scritto, `p2p_onchain_inizio_pagare`). Col PayCode mai oltre la sua
+    scadenza (17 nov 2026)."""
+    dal = p2p_onchain_inizio_pagare(o)
     if dal <= 0:
         return 0
     entro = dal + _p2p_onchain_minuti(o) * 60
@@ -111844,7 +112020,17 @@ def _p2p_onchain_prepara(con):
                       ("minuti_pagare", "INTEGER DEFAULT 0"),
                       # 18 nov 2026: chi pubblica chiede la cauzione a
                       # chiunque prenda, con qualunque metodo (1 = si')
-                      ("cauzione_chiesta", "INTEGER DEFAULT 0")):
+                      ("cauzione_chiesta", "INTEGER DEFAULT 0"),
+                      # 19 nov 2026, cantiere ritorno-nel-libro: quando chi
+                      # vende ha scritto per la prima volta dove vuole gli
+                      # euro (0 = non ancora, o riga di prima: allora vale il
+                      # deposito). Il tempo per pagare parte da qui
+                      ("recapito_il", "INTEGER DEFAULT 0"),
+                      # ...e l'ordine da cui questo e' RINATO nel libro dopo
+                      # uno scambio mancato per colpa di chi aveva preso
+                      # (0 = pubblicato a mano). Fa anche l'idempotenza:
+                      # uno scambio rinasce una volta sola
+                      ("rinato_da", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
     # LE CAUZIONI DEL CONTANTI ON-CHAIN (17 nov 2026 sera): una riga per
@@ -112388,6 +112574,20 @@ def _p2p_onchain_chat_vista(stato, parte: bool, moderatore: bool, accesa: bool) 
     return "moderazione" if moderatore and stato == "disputa" else ""
 
 
+def _p2p_onchain_rinato_in(con, o) -> str:
+    """Il nome dell'ordine rinato nel libro da questo scambio chiuso, o ''
+    (19 nov 2026, ritorno-nel-libro). Solo per gli scambi chiusi: uno vivo
+    non ha figli."""
+    if str(o["stato"] or "") not in ("annullato", "rimborsato"):
+        return ""
+    try:
+        r = con.execute("SELECT ordine FROM p2p_onchain_ordini WHERE rinato_da=?",
+                        (int(o["id"]),)).fetchone()
+    except Exception:
+        return ""
+    return str(r["ordine"]) if r else ""
+
+
 def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     """Un ordine come lo vede UNA parte (o un moderatore): la forma di
     `_onchain_ordine_per`, con gli stessi nomi, perche' il codice delle
@@ -112472,6 +112672,12 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "depositato_il": int(o["depositato_il"] or 0),
         # (17 nov 2026) il tempo per pagare: la card e la pagina lo contano
         "paga_entro": p2p_onchain_paga_entro(o),
+        # (19 nov 2026, ritorno-nel-libro) ...e da quando corre: dal
+        # deposito, ma non prima del recapito (0 = non corre ancora)
+        "pagare_dal": p2p_onchain_inizio_pagare(o),
+        # (19 nov 2026, ritorno-nel-libro) l'ordine nuovo nato nel libro da
+        # questo scambio mancato ('' = nessuno): la pagina lo dice
+        "rinato_in": _p2p_onchain_rinato_in(con, o),
         "ore_pagamento": p2p_onchain_ore_pagamento(o),
         # (18 nov 2026) ...e quello scelto da chi pubblica, in minuti: il
         # bollino del libro e l'anello della pagina lo leggono da qui
@@ -113078,8 +113284,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
             " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
-            " tab_min_cent, minuti_pagare, cauzione_chiesta)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -113088,7 +113294,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              para, para_da, para_letto,
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
              json.dumps(tab) if tab else "", zona, para_su, para_giu,
-             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta))
+             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,
+             adesso if recapito else 0))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -113175,7 +113382,12 @@ async def p2p_onchain_annulla(oid: int, x_tg_init_data: str = Header(""),
         con.close()
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
-    if altro and o["stato"] == "preso":
+    # (19 nov 2026, ritorno-nel-libro) chi aveva PRESO annulla prima del
+    # deposito: l'ordine di chi l'aveva pubblicato torna nel libro, e
+    # l'avviso a lui e' quello della rinascita (uno solo, non due)
+    rinato = await _p2p_onchain_rinasci_e_di(
+        o, p2p_onchain_rinasce_perche(o, "annullato", int(user["id"]), adesso=adesso))
+    if altro and o["stato"] == "preso" and not (rinato and altro == int(o["maker_id"])):
         await _notifica_p2p_onchain(o, altro, "❌ <b>L'altra parte ha annullato lo scambio on-chain.</b> "
                               f"Era {_p2p_onchain_quanto(o)}.\n\nNessun sats si è mosso.",
                        _p2p_onchain_bottone(o))
@@ -114388,13 +114600,20 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             " preso_il=?, deposito_entro=?, aggiornato=?, prezzo_sats=?,"
             " cambio_presa=?, rimborso_tipo=?, rimborso_valore=?,"
             " rimborso_firma=?, rimborso_indice=?, quota_sats=?,"
-            " quota_indirizzo=?, quota_ricevente_sats=?, metodo_scelto=?"
+            " quota_indirizzo=?, quota_ricevente_sats=?, metodo_scelto=?,"
+            " recapito_il=?"
             " WHERE id=? AND stato='pending'",
             (user["id"], dep, ric, ind_id, margine, prezzo + margine + q_dep,
              incasso, i_tipo, i_val, i_firma, i_ind, rimborso, rec, adesso,
              adesso + P2P_ONCHAIN_ORE_DEPOSITO * 3600, adesso, prezzo,
              cambio_presa, r_tipo, r_valore, r_firma, r_indice, quota,
-             quota_dove, q_ric, scelto if piu_metodi else "", oid))
+             quota_dove, q_ric, scelto if piu_metodi else "",
+             # (19 nov 2026, ritorno-nel-libro) quando e' nato il recapito:
+             # quello del libro tiene il suo momento, uno scritto adesso da
+             # chi prende parte adesso, nessun recapito = nessun momento
+             (int(_p2p_onchain_campo(o, "recapito_il", 0) or 0) or adesso
+              if rec and rec == (o["recapito"] or "") else adesso if rec else 0),
+             oid))
         if cur.rowcount and tab_presa:
             # nella stessa scrittura della presa: l'importo e' quello del
             # PayCode, e il PayCode sta nella sua colonna
@@ -114505,6 +114724,9 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                 ore = p2p_onchain_ore_pagamento(o)
                 # (18 nov 2026) il tempo scelto da chi pubblica, detto
                 tempo_detto = _durata_detta_p2p(_p2p_onchain_minuti(o) * 60)
+                # (19 nov 2026, ritorno-nel-libro) senza recapito il tempo
+                # di chi compra non parte: lo si dice a tutti e due
+                senza_recapito = not str(o["recapito"] or "").strip()
                 avvisi = _p2p_onchain_testi_deposito_tab(o, euro) or (
                     _p2p_onchain_testi_deposito_contanti(o, euro, ore)
                     if _p2p_onchain_contanti(o) else None) or [
@@ -114512,12 +114734,22 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                      f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
                      f"Apri Barattolo: ora manda <b>{euro} €</b> a chi vende, poi tocca "
                      "«Ho inviato gli euro». Il recapito è nello scambio."
-                     f"\n\n⏳ <b>Hai {tempo_detto}</b>, poi chi vende può aprire una disputa."),
+                     f"\n\n⏳ <b>Hai {tempo_detto}</b>, poi chi vende può aprire una disputa."
+                     if senza_recapito is False else
+                     f"Chi vende non ha ancora scritto dove vuole i <b>{euro} €</b>: "
+                     "te lo dice nello scambio, e ti avviso io."
+                     f"\n\n⏳ Avrai <b>{tempo_detto}</b> per pagare, da quando lo scrive."),
                     (o["depositante_id"], "🔒 <b>Deposito confermato ✓:</b> aspetta gli euro. "
                      f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
                      f"Chi compra sta per mandarti {euro} €: quando li vedi sul tuo "
                      "conto, apri lo scambio e tocca «Ricevuti: libera i sats». Mai prima."
-                     f"\n\n⏳ Chi compra ha <b>{ore} ore</b> per pagare.")]
+                     f"\n\n⏳ Chi compra ha <b>{tempo_detto}</b> per pagare."
+                     if senza_recapito is False else
+                     "🔒 <b>Deposito confermato ✓.</b> "
+                     f"Vendi {_p2p_onchain_quanto(o)}.\n\n"
+                     "Ora apri lo scambio e scrivi <b>dove vuoi gli euro</b>: chi compra "
+                     f"ha {tempo_detto} per pagarti, da quando lo scrivi. Finché non lo "
+                     "fai, lo scambio e i tuoi sats restano fermi.")]
                 ammanco = int(o["importo_sats"]) - ricevuti
                 if ammanco > 0:
                     avvisi = [(chi, testo + _p2p_onchain_testo_ammanco(ammanco)
@@ -114890,8 +115122,14 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
                 con, o, user["id"], d.get("appuntamento"), int(time.time()))
             if perche:
                 raise HTTPException(400, perche)
-        con.execute("UPDATE p2p_onchain_ordini SET recapito=?, aggiornato=? WHERE id=?",
-                    (testo, int(time.time()), oid))
+        # (19 nov 2026, ritorno-nel-libro) IL PRIMO RECAPITO fa partire il
+        # tempo per pagare (`p2p_onchain_paga_entro`): si timbra una volta,
+        # e cambiarlo dopo non lo rifa' partire; cancellarlo lo ferma
+        con.execute("UPDATE p2p_onchain_ordini SET recapito=?, aggiornato=?,"
+                    " recapito_il=CASE WHEN ?='' THEN 0"
+                    " WHEN COALESCE(recapito_il, 0)>0 THEN recapito_il ELSE ? END"
+                    " WHERE id=?",
+                    (testo, int(time.time()), testo, int(time.time()), oid))
         con.commit()
     finally:
         con.close()
@@ -114906,7 +115144,13 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
             o, o["ricevente_id"],
             ("📍 <b>Chi vende ha scritto dove vedervi.</b>\n\nL'appuntamento è nello scambio."
              if contanti else
-             "💶 <b>Chi vende ha scritto dove vuole gli euro.</b>\n\nLo trovi nello scambio."),
+             "💶 <b>Chi vende ha scritto dove vuole gli euro.</b>\n\nLo trovi nello scambio.")
+            # (19 nov 2026, ritorno-nel-libro) il PRIMO recapito dopo il
+            # deposito fa partire il tempo per pagare: lo si dice qui
+            + (f"\n\n⏳ Da adesso hai <b>{_durata_detta_p2p(_p2p_onchain_minuti(o) * 60)}</b>"
+               " per pagare e toccare «Ho inviato gli euro»."
+               if (o["stato"] == "depositato" and not prima.strip() and testo
+                   and not contanti) else ""),
             _p2p_onchain_bottone(o))
     return {"ok": True}
 
@@ -115435,6 +115679,162 @@ def _p2p_onchain_mancato(o, stato) -> tuple:
     return 0, ""
 
 
+# L'ORDINE CHE RINASCE NEL LIBRO (19 nov 2026, cantiere ritorno-nel-libro;
+# Andrea: «No, perché sparisce, scusa? Non dovrebbe tornare nel libro», e
+# l'«ok» ai punti 14-16). Quando uno scambio on-chain manca PER COLPA DI CHI
+# HA PRESO — annulla prima del deposito, non deposita nel suo tempo, si
+# ritira dopo il deposito, o un moderatore da' i sats indietro perche' non
+# ha pagato — l'ordine di chi l'aveva pubblicato torna nel libro.
+# NON SI RIAPRE LO SCAMBIO VECCHIO, si CLONA l'ordine: quello vecchio si
+# chiude come prima (la sua chat, gli appuntamenti, la cauzione, le
+# presenze del giro 0 restano suoi), e ne nasce uno nuovo uguale, con un
+# nome nuovo — come la ripubblica. Riaprire il vecchio era la strada
+# scartata: l'indirizzo 2-di-3 contiene la chiave di chi ha preso e non si
+# riusa con un'altra persona, e ogni tabella legata allo scambio avrebbe
+# dovuto imparare un «secondo giro». Col PayCode di un Barattozon non
+# rinasce niente: alla presa l'importo diventa quello del codice di chi
+# prende, e l'ordine di prima non c'e' piu' da copiare.
+P2P_ONCHAIN_RINASCE_PERCHE = {
+    "annullato": "Chi l'aveva preso ha annullato prima del deposito",
+    "deposito": "Chi l'aveva preso non ha depositato in tempo",
+    "onchain-rinuncia": "Chi l'aveva preso si è ritirato, e i sats sono tornati a chi li aveva depositati",
+    "onchain-non-pagato": "Chi l'aveva preso non ha pagato in tempo, e un moderatore ha rimandato indietro i sats",
+}
+
+
+def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
+                               mancato_a: int = 0, mancato_perche: str = "",
+                               adesso: int = 0) -> str:
+    """PURA: la chiave di `P2P_ONCHAIN_RINASCE_PERCHE` se lo scambio `o`
+    (la riga PRIMA della chiusura) che si chiude in `stato_nuovo` fa
+    rinascere l'ordine nel libro, sennò ''. `chi_chiude` e' chi ha toccato
+    «Annulla» (0 = la ronda, a tempo del deposito finito); `mancato_a` e
+    `mancato_perche` sono quelli di `_p2p_onchain_mancato`. Chi ha
+    pubblicato e aspetta il deposito di chi ha preso, a tempo del deposito
+    finito (`adesso`), tocca «Rinuncia: il deposito non è arrivato»: e' lo
+    stesso «sparisce» della ronda, e l'ordine rinasce uguale."""
+    taker = int(_p2p_onchain_campo(o, "taker_id", 0) or 0)
+    if not taker or not int(_p2p_onchain_campo(o, "maker_id", 0) or 0):
+        return ""
+    if (str(_p2p_onchain_campo(o, "paycode", "") or "")
+            or int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0)):
+        return ""
+    prima = str(_p2p_onchain_campo(o, "stato", "") or "")
+    if stato_nuovo == "annullato" and prima == "preso":
+        if chi_chiude and int(chi_chiude) == taker:
+            return "annullato"
+        dep_taker = int(_p2p_onchain_campo(o, "depositante_id", 0) or 0) == taker
+        entro = int(_p2p_onchain_campo(o, "deposito_entro", 0) or 0)
+        if not chi_chiude and dep_taker:
+            return "deposito"
+        if (chi_chiude and dep_taker and entro and adesso and int(adesso) >= entro
+                and int(chi_chiude) == int(_p2p_onchain_campo(o, "maker_id", 0) or 0)):
+            return "deposito"
+        return ""
+    if (stato_nuovo == "rimborsato" and int(mancato_a or 0) == taker
+            and mancato_perche in P2P_ONCHAIN_RINASCE_PERCHE):
+        return mancato_perche
+    return ""
+
+
+def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
+    """Fa rinascere nel libro l'ordine dello scambio `o`: un ordine nuovo
+    con un nome nuovo e gli stessi patti di quando era stato pubblicato
+    (lato, prezzo o premio, cifra, metodi, filtro, paracadute ripartito
+    dal cambio di adesso, ripubblica, zona, tempo per pagare, cauzione) e
+    la vita nel libro di nuovo intera. Il recapito torna solo se l'aveva
+    scritto chi pubblica (ordine di vendita). Torna l'id nuovo, o 0 se
+    l'ordine era gia' rinato o chi l'aveva pubblicato non ha piu' la sua
+    chiave on-chain. Committa."""
+    vecchio = int(o["id"])
+    if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE rinato_da=?",
+                   (vecchio,)).fetchone():
+        return 0
+    maker = int(o["maker_id"])
+    if 2 ** 52 <= maker < 2 ** 53:     # un account cancellato (FANTASMA_BASE)
+        return 0
+    if not con.execute("SELECT 1 FROM onchain_xpub WHERE tg_id=?",
+                       (maker,)).fetchone():
+        return 0
+    mercato = _p2p_onchain_mercato(o)
+    lato = str(o["lato"])
+    recapito = str(o["recapito"] or "") if lato == "sell" else ""
+    para = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
+    para_da = cambio_noto_ora() if para else 0.0
+    para_da = para_da if para_da > 0 else 0.0
+    para_letto = int(_cambio_cache["quando"] or 0) if para_da else 0
+    ordine = P2P_ONCHAIN_PREFISSO + secrets.token_hex(8)
+    cur = con.execute(
+        "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
+        " euro_cent, metodi, recapito, scade, creato, aggiornato,"
+        " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
+        " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
+        " tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il, rinato_da)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (ordine, lato, maker, 0 if mercato else int(o["prezzo_sats"]),
+         int(o["euro_cent"]), o["metodi"], recapito,
+         p2p_onchain_scade_libro(adesso, 0), adesso, adesso,
+         "mercato" if mercato else "fisso",
+         int(_p2p_onchain_campo(o, "premio", 0) or 0) if mercato else 0,
+         int(_p2p_onchain_campo(o, "filtro", 0) or 0),
+         para if para_da else 0, para_da, para_letto,
+         int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0),
+         int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0),
+         str(_p2p_onchain_campo(o, "fiat", "") or ""), "",
+         str(_p2p_onchain_campo(o, "zona", "") or ""),
+         int(_p2p_onchain_campo(o, "para_su", -1)),
+         int(_p2p_onchain_campo(o, "para_giu", -1)), 0,
+         int(_p2p_onchain_campo(o, "minuti_pagare", 0) or 0),
+         int(_p2p_onchain_campo(o, "cauzione_chiesta", 0) or 0),
+         adesso if recapito else 0, vecchio))
+    con.commit()
+    return int(cur.lastrowid)
+
+
+def p2p_onchain_testo_rinato(perche: str) -> str:
+    """PURA: l'avviso a chi aveva pubblicato: il suo ordine e' di nuovo
+    nel libro, e perche'."""
+    return (f"{P2P_ONCHAIN_SEGNO} 🔁 <b>Il tuo ordine è tornato nel libro.</b> "
+            f"{P2P_ONCHAIN_RINASCE_PERCHE.get(perche, 'Lo scambio non è andato in porto')}"
+            ": l'ordine è di nuovo nel libro uguale, stesso prezzo, stessi metodi, "
+            "stesso tempo per pagare.\n\nSe non lo vuoi più, tocca «🚫 Non "
+            "ripubblicarlo»: si apre l'ordine, e lì lo ritiri con un tocco.")
+
+
+async def _p2p_onchain_rinasci_e_di(o, perche: str) -> int:
+    """La rinascita con le sue conseguenze: l'ordine nuovo nel libro, la
+    foto del libro rifatta, l'evento ai relay e l'avviso a chi aveva
+    pubblicato. Fail-open: uno scambio chiuso resta chiuso anche se qui
+    qualcosa va storto (lo dice il journal). Torna l'id nuovo, o 0."""
+    if not perche:
+        return 0
+    try:
+        con = _p2p_onchain_db()
+        try:
+            nuovo = _p2p_onchain_rinasci(con, o, int(time.time()))
+            riga = _p2p_onchain_carica(con, nuovo) if nuovo else None
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: l'ordine dello scambio {o['id']} non è "
+              f"rinato nel libro ({type(e).__name__}: {e})", flush=True)
+        return 0
+    if not nuovo:
+        return 0
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(nuovo))
+    print(f"🔁 P2P on-chain: lo scambio {o['id']} è mancato ({perche}): "
+          f"l'ordine di {o['maker_id']} è rinato nel libro come {nuovo}", flush=True)
+    try:
+        await _notifica_p2p_onchain(riga, int(o["maker_id"]), p2p_onchain_testo_rinato(perche),
+                                    ("🚫 Non ripubblicarlo",
+                                     f"{LINK_LIBRO_P2P}?scambio={riga['ordine']}"))
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: avviso dell'ordine rinato {nuovo} saltato: {e}",
+              flush=True)
+    return nuovo
+
+
 def _p2p_onchain_segna_esiti(o, stato, adesso: int):
     """Scrive gli esiti di `_p2p_onchain_esiti` nella tabella di
     sempre, giro 0, dettaglio «onchain». La PK fa l'idempotenza, come
@@ -115657,6 +116057,13 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     for chi, testo in testi.items():
         await _notifica_p2p_onchain(o, chi, testo + tx + invito + code.get(int(chi or 0), ""),
                                     _p2p_onchain_bottone(o))
+    # (19 nov 2026, ritorno-nel-libro) chi aveva PRESO si e' ritirato dopo
+    # il deposito, o non ha pagato e un moderatore ha rimborsato: l'ordine
+    # di chi l'aveva pubblicato torna nel libro (un deposito nuovo alla
+    # prossima presa: il 2-di-3 di questo scambio ha la chiave di chi se
+    # n'e' andato)
+    await _p2p_onchain_rinasci_e_di(
+        o, p2p_onchain_rinasce_perche(o, stato, 0, mancato_a, mancato_perche))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 
@@ -116845,8 +117252,11 @@ def _p2p_onchain_intervalli_pagare(o) -> tuple:
     minuti = _p2p_onchain_minuti(o)
     if minuti < 24 * 60:
         return _intervalli_tempo_pagare_p2p(minuti)
+    # (19 nov 2026, ritorno-nel-libro) ...e l'ultimo dieci minuti prima
+    # della fine, come nel Lightning: «hai gia' mandato gli euro?»
     return (3600, 6 * 3600,
-            minuti * 60 - P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S)
+            minuti * 60 - P2P_ONCHAIN_SOLLECITI_PAGARE_PRIMA_S,
+            minuti * 60 - 10 * 60)
 
 
 def _p2p_onchain_testi_pagare(o) -> dict:
@@ -116863,9 +117273,9 @@ def _p2p_onchain_testi_pagare(o) -> dict:
         for i, fra in enumerate(punti, 1):
             resto = _durata_detta_p2p(minuti * 60 - fra)
             fuori[i] = (
-                f"{S} ⏰ Mancano {resto}: invia gli euro e tocca subito «Ho "
-                "inviato gli euro». Dopo, chi vende può aprire una disputa e a "
-                "decidere sarà un moderatore." if i == len(punti) else
+                f"{S} ⏰ Mancano {resto}: hai già mandato gli euro? Tocca subito «Ho "
+                "inviato gli euro». Senza il bottone, allo scadere chi vende può "
+                "aprire una disputa anche se hai già pagato." if i == len(punti) else
                 f"{S} 💶 Promemoria: i sats sono nel 2-di-3 e aspettano i tuoi "
                 f"euro. Hai ancora {resto} per inviarli al recapito che trovi "
                 "nella pagina dello scambio e toccare «Ho inviato gli euro».")
@@ -116882,6 +117292,9 @@ def _p2p_onchain_testi_pagare(o) -> dict:
         3: (f"{S} ⏰ Mancano quattro ore alla fine del tempo per pagare. Invia gli "
             "euro e tocca «Ho inviato gli euro»: dopo, chi vende può aprire una "
             "disputa e a decidere sarà un moderatore."),
+        4: (f"{S} ⏰ Mancano dieci minuti: hai già mandato gli euro? Tocca subito "
+            "«Ho inviato gli euro». Senza il bottone, allo scadere chi vende può "
+            "aprire una disputa anche se hai già pagato."),
     }
 
 
@@ -116967,7 +117380,8 @@ def _p2p_onchain_sollecito_dovuto(o, adesso: int):
             return None
         if "Contanti" in _metodi_libro(_p2p_onchain_metodi(o)):
             return None
-        n = livello(int(o["depositato_il"] or 0), _p2p_onchain_intervalli_pagare(o),
+        # (19 nov 2026) dal momento in cui il tempo e' partito davvero
+        n = livello(p2p_onchain_inizio_pagare(o), _p2p_onchain_intervalli_pagare(o),
                     _p2p_onchain_campo(o, "sollecito_pagare", 0))
         if n:
             return ("sollecito_pagare", n, int(o["ricevente_id"]),
@@ -117004,6 +117418,80 @@ def _p2p_onchain_passata_solleciti(con, adesso: int) -> list:
             fuori.append((o, chi, testo))
     con.commit()
     return fuori
+
+
+# CHI HA PRESO E NON DEPOSITA (19 nov 2026, cantiere ritorno-nel-libro,
+# punto 14: «chi ha preso annulla, o sparisce, prima del deposito: l'ordine
+# torna nel libro»). Chi prende un ordine d'ACQUISTO deposita lui, e ha
+# `P2P_ONCHAIN_ORE_DEPOSITO`; passate quelle (piu' un margine, per una
+# transazione appena partita) senza un sats visto in rete, la ronda chiude
+# lo scambio e l'ordine rinasce. Prima si guarda la rete (la ronda chiama
+# gia' `_p2p_onchain_controlla` sugli scambi presi) e lo swap del deposito
+# in Lightning: un deposito che sta arrivando non si annulla. Mai col
+# PayCode (la' non rinasce niente, e l'annullo resta a mano).
+P2P_ONCHAIN_DEPOSITO_MARGINE_S = 15 * 60
+
+
+def _p2p_onchain_depositi_mancati(con, adesso: int) -> list:
+    """Gli scambi presi da chi deposita, col suo tempo finito e niente in
+    rete: le righe, senza toccarle (lo swap si chiede fuori, async)."""
+    return [o for o in con.execute(
+        "SELECT * FROM p2p_onchain_ordini WHERE stato='preso' AND deposito_entro>0"
+        " AND deposito_entro<=? AND COALESCE(visti_sats,0)=0"
+        " AND COALESCE(ricevuti_sats,0)=0 AND depositante_id=taker_id"
+        " AND COALESCE(proposta_psbt,'')='' AND COALESCE(decisione_da,0)=0"
+        " ORDER BY id LIMIT 20", (int(adesso) - P2P_ONCHAIN_DEPOSITO_MARGINE_S,)).fetchall()
+        if p2p_onchain_rinasce_perche(o, "annullato") == "deposito"]
+
+
+async def _p2p_onchain_chiudi_depositi_mancati(adesso: int) -> int:
+    """Chiude gli scambi di `_p2p_onchain_depositi_mancati` e fa rinascere
+    i loro ordini. Torna quanti."""
+    con = _p2p_onchain_db()
+    try:
+        righe = _p2p_onchain_depositi_mancati(con, adesso)
+    finally:
+        con.close()
+    fatti = 0
+    for o in righe:
+        try:
+            # mai alla cieca, come «Annulla»: la rete guardata ADESSO (se
+            # mempool tace, l'eccezione lo lascia alla prossima ronda)...
+            if await _p2p_onchain_controlla(int(o["id"])) != "preso":
+                continue
+            # ...e lo swap del deposito: sta arrivando, o tace -> alla prossima
+            if await p2p_onchain_deposito_ln_in_volo(int(o["id"])) is not False:
+                continue
+            con = _p2p_onchain_db()
+            try:
+                cur = con.execute(
+                    "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+                    " chiuso_perche='deposito-scaduto', aggiornato=? WHERE id=?"
+                    " AND stato='preso' AND COALESCE(visti_sats,0)=0"
+                    " AND COALESCE(ricevuti_sats,0)=0",
+                    (int(adesso), int(adesso), int(o["id"])))
+                con.commit()
+            finally:
+                con.close()
+            if not cur.rowcount:
+                continue
+            fatti += 1
+            _p2p_onchain_rifai_foto()
+            asyncio.create_task(_p2p_onchain_pubblica(int(o["id"])))
+            print(f"⏰ P2P on-chain: scambio {o['id']}, il tempo del deposito è "
+                  "finito senza sats: annullato", flush=True)
+            await _notifica_p2p_onchain(
+                o, int(o["taker_id"]),
+                f"{P2P_ONCHAIN_SEGNO} ❌ <b>Il tempo per il deposito è finito</b> e "
+                f"lo scambio on-chain è annullato. Era {_p2p_onchain_quanto(o)}."
+                "\n\nNessun sats si è mosso. Se li mandi adesso all'indirizzo di "
+                "prima, un moderatore te li deve rimandare indietro: non farlo.",
+                _p2p_onchain_bottone(o))
+            await _p2p_onchain_rinasci_e_di(o, "deposito")
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: deposito mancato dello scambio {o['id']} "
+                  f"non chiuso: {e}", flush=True)
+    return fatti
 
 
 async def _p2p_onchain_ronda() -> None:
@@ -117114,6 +117602,12 @@ async def _p2p_onchain_ronda() -> None:
             await _p2p_onchain_controlla(oid)
         except Exception as e:
             print(f"⚠️ P2P on-chain: scambio {oid} non controllato: {e}", flush=True)
+    # (19 nov 2026, ritorno-nel-libro) DOPO lo sguardo alla rete: chi ha
+    # preso e non ha depositato nel suo tempo, e l'ordine che rinasce
+    try:
+        await _p2p_onchain_chiudi_depositi_mancati(adesso)
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: depositi mancati non guardati: {e}", flush=True)
 
 
 @app.get("/vendor/btc.js")

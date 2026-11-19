@@ -22,16 +22,23 @@ suo bearer, gli eventi di mostrod (`/api/p2p/evento`), l'archivio
      col contanti di persona o su un acquisto, solo i minuti dell'orologio,
      la prima resta, e col bonifico ordinario l'ora chiesta vale 24 ore;
   3. LA PORTA DEL NODO: 404 senza segreto, 403 col segreto sbagliato, 400
-     su un corpo storto, e i secondi dei soli ordini che ce l'hanno;
+     su un corpo storto, e una risposta per ogni ordine chiesto (dal 19
+     nov 2026, la 0014: null = «non ancora», 0 = «mai»);
   4. LO SCAMBIO DI UN'ORA diventa attivo: chi compra lo legge nella frase
-     della garanzia, l'archivio da' a tutt'e due lo stesso termine, i
-     promemoria sono quelli col tempo che resta (e non i tre di sempre),
-     e chi vende ha il suo a dieci minuti;
-  5. IL TEMPO FINISCE col recapito detto presto: un «non completato» a
-     chi compra, e i due messaggi del nodo che annulla;
-  6. IL RECAPITO DETTO TARDI (piu' di meta' del tempo), e la domanda tardiva
-     del nodo (nessun tempo): non si conta a
-     nessuno, e il journal dice perche';
+     della garanzia, ma il tempo PARTE DAL RECAPITO (19 nov 2026): prima
+     il termine e' 0 e il nodo legge null; col recapito l'archivio da' a
+     tutt'e due lo stesso termine, i promemoria sono quelli col tempo che
+     resta (l'ultimo a dieci minuti dalla fine), e chi vende ha il suo a
+     dieci minuti;
+  5. IL TEMPO FINISCE col recapito detto presto (il nodo di ieri, la
+     0013): un «non completato» a chi compra, e i due messaggi del nodo
+     che annulla;
+  6. IL RECAPITO DETTO TARDI (piu' di meta' del tempo, col nodo di ieri),
+     e la domanda tardiva del nodo (16 minuti dopo il recapito: nessun
+     tempo): non si conta a nessuno, e il journal dice perche';
+  6b. LA 0014: il tempo finisce e l'ordine TORNA NEL LIBRO
+     (`payment-window-republished`): il «non completato» a chi compra, e
+     i due messaggi del ritorno nel libro;
   7. la leva spenta CHIUDE ANCHE LA PORTA DEL NODO: l'interruttore
      d'emergenza vale per lui.
 
@@ -63,6 +70,7 @@ CONT = "7e3a0000-0d0d-4a2b-9c3d-00000000000d"   # vendita SEPA + Contanti di 111
 COMPRO = "7e3a0000-0e0e-4a2b-9c3d-00000000000e"  # acquisto di 111: mai
 ALTRUI = "7e3a0000-0f0f-4a2b-9c3d-00000000000f"  # vendita di 333: non e' di chi dichiara
 STORTO = "7e3a0000-1010-4a2b-9c3d-000000000010"  # vendita di 111, «20 minuti»: fuori dall'orologio
+TORNA = "7e3a0000-1212-4a2b-9c3d-000000000012"  # vendita Revolut di 111, 1 ora: torna nel libro (0014)
 _TAG = re.compile(r"</?[bi]>")
 
 
@@ -209,7 +217,7 @@ def semina_ordini():
             (BZ, PUBBLICA, "sell", ["Contanti al tabacchino 23.47"]),
             (CONT, PUBBLICA, "sell", ["SEPA", "Contanti"]),
             (COMPRO, PUBBLICA, "buy", ["SEPA"]), (ALTRUI, PASSA, "sell", ["SEPA"]),
-            (STORTO, PUBBLICA, "sell", ["SEPA"])):
+            (STORTO, PUBBLICA, "sell", ["SEPA"]), (TORNA, PUBBLICA, "sell", ["Revolut"])):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,maker,sats,euro,"
                     "metodi) VALUES(?,?,?,'pending',?,1,50000,'50,00 €',?)",
                     (ordine, chi, adesso, lato, json.dumps(metodi)))
@@ -250,7 +258,7 @@ async def giro_intero():
           (SRV._p2p_leve()["tempoPagare"], lim["min"], lim["max"], lim["passo"],
            lim["veloci"], SRV._p2p_leve()["minutiPagareDiSerie"]))
     await intesta(PUBBLICA, {UNA: 60, QUATTRO: 240, LENTO: 60, BZ: 60, CONT: 60, COMPRO: 60,
-                             ALTRUI: 60, STORTO: 20})
+                             ALTRUI: 60, STORTO: 20, TORNA: 60})
     prova("si scrive sulle sue vendite; «20 minuti» e' fuori dall'orologio e quella di un "
           "altro non entra", (60, 240, 60, 0, 0),
           (ore(UNA), ore(QUATTRO), ore(LENTO), ore(ALTRUI), ore(STORTO)))
@@ -276,9 +284,11 @@ async def giro_intero():
           codice_di(await finestre({"ordini": [UNA]}, SEGRETO)))
     prova("un corpo storto: 400", 400, codice_di(await finestre({"ordini": "tutti"})))
     r = await finestre({"ordini": [UNA, QUATTRO, LENTO, BZ, CONT, COMPRO, ALTRUI, STORTO]})
-    prova("col segreto giusto: i SECONDI dei soli ordini che hanno un tempo — gli altri "
-          "non ci sono, e per il nodo vuol dire «nessun tempo»",
-          {UNA: 3600, QUATTRO: 14400, LENTO: 86400}, r.get("finestre"))
+    prova("col segreto giusto (dal 19 nov 2026, la 0014): OGNI ordine chiesto ha la sua "
+          "risposta — chi ha un tempo ma nessuno scambio col recapito detto ha null («non "
+          "ancora», il nodo richiede), chi non ha un tempo 0 («mai»)",
+          {UNA: None, QUATTRO: None, LENTO: None, BZ: 0, CONT: 0, COMPRO: 0, ALTRUI: 0,
+           STORTO: 0}, r.get("finestre"))
     prova("...e nient'altro esce: ne' chi ha pubblicato ne' chi ha preso", ["finestre", "ok"],
           sorted(r))
 
@@ -290,24 +300,39 @@ async def giro_intero():
           "⏱ Hai 1 ora per inviarli e toccare «Ho inviato gli euro»"
           in detto(PRENDE, "ha bloccato i sats in garanzia", prima))
     sc, sv = await scambio(PRENDE, UNA), await scambio(PUBBLICA, UNA)
-    prova("l'archivio da' a tutt'e due i minuti e lo STESSO termine, un'ora dalla garanzia",
-          (60, t + 30 + 3600, 60, t + 30 + 3600),
+    prova("IL TEMPO NON PARTE SENZA IL RECAPITO (19 nov 2026, Andrea: «nel momento in cui io "
+          "ho indicato dove ricevere gli euro, non prima»): l'archivio da' i minuti, e il "
+          "termine 0 a tutt'e due", (60, 0, 60, 0),
           (sc.get("minuti_pagare"), sc.get("paga_entro"), sv.get("minuti_pagare"),
            sv.get("paga_entro")))
-    prova("a chi compra i promemoria col tempo che resta, e NON i tre di sempre",
+    prova("...a chi compra ancora nessun promemoria (ne' quelli del tempo ne' i tre di "
+          "sempre), e il nodo legge «non ancora»", ([], {UNA: None}),
+          (attese(UNA, PRENDE), (await finestre({"ordini": [UNA]})).get("finestre")))
+    v = scadenze(UNA, PUBBLICA, "sollecito_recapito")
+    prova("a chi vende UN promemoria del recapito, a dieci minuti, che dice che il tempo di "
+          "chi compra parte da lui", (1, True),
+          (len(v), bool(v) and "Chi compra ha 1 ora per pagarti, da quando gli dici dove "
+           "mandarti gli euro" in v[0][1]))
+    recapito(UNA, t + 60)
+    sc, sv = await scambio(PRENDE, UNA), await scambio(PUBBLICA, UNA)
+    prova("COL RECAPITO il tempo parte: lo STESSO termine a tutt'e due, un'ora dal recapito, "
+          "e il nodo riceve i secondi", (t + 60 + 3600, t + 60 + 3600, {UNA: 3600}),
+          (sc.get("paga_entro"), sv.get("paga_entro"),
+           (await finestre({"ordini": [UNA]})).get("finestre")))
+    prova("a chi compra i promemoria col tempo che resta, dal recapito, e NON i tre di sempre",
           [("euro_tempo1", "sollecito_euro"), ("euro_tempo2", "sollecito_euro")],
           attese(UNA, PRENDE))
-    testi = [x[1] for x in scadenze(UNA, PRENDE, "sollecito_euro")]
-    prova("...il primo dice i 40 minuti che restano, l'ultimo i 15 e che si annulla "
-          "anche se ha pagato", [True, True, True],
-          ["Hai ancora 40 minuti" in testi[0], testi[1].startswith("⏰ Mancano 15 minuti"),
-           "anche se hai già pagato" in testi[1]] if len(testi) == 2 else testi)
-    v = scadenze(UNA, PUBBLICA, "sollecito_recapito")
-    prova("a chi vende UN promemoria del recapito, a dieci minuti, che dice l'ora che corre",
-          (1, True), (len(v), bool(v) and "Chi compra ha 1 ora per pagarti" in v[0][1]))
+    sca = scadenze(UNA, PRENDE, "sollecito_euro")
+    testi = [x[1] for x in sca]
+    prova("...il primo dice i 40 minuti che restano, l'ULTIMO a dieci minuti dalla fine chiede "
+          "«hai già mandato gli euro?» e dice che scade anche se ha pagato",
+          [True, True, True, [t + 60 + 1200, t + 60 + 3000]],
+          ["Hai ancora 40 minuti" in testi[0],
+           testi[1].startswith("⏰ Mancano 10 minuti: hai già mandato gli euro?"),
+           "anche se hai già pagato" in testi[1], [x[0] for x in sca]]
+          if len(testi) == 2 else testi)
 
-    print("\n5) il tempo finisce col recapito detto presto")
-    recapito(UNA, t + 60)
+    print("\n5) il tempo finisce col recapito detto presto (il nodo di ieri, che annulla)")
     # passa l'ora (la rotta vuole eventi di adesso: si sposta la cronaca)
     indietro(UNA, 3600)
     prima = len(banco.DETTO)
@@ -337,16 +362,21 @@ async def giro_intero():
     t4 = int(time.time()) - 120
     await attivo(QUATTRO, t4)
     sq = await scambio(PRENDE, QUATTRO)
-    prova("lo scambio di quattro ore: il termine e' a quattro ore dalla garanzia",
-          t4 + 30 + 4 * 3600, sq.get("paga_entro"))
+    prova("lo scambio di quattro ore, senza recapito: i minuti si', il termine non ancora",
+          (240, 0), (sq.get("minuti_pagare"), sq.get("paga_entro")))
     prova("...e anche a quattro ore chi vende ha il promemoria del recapito a dieci "
           "minuti, al posto di quelli a una e a sei ore", 1,
           len(scadenze(QUATTRO, PUBBLICA, "sollecito_recapito")))
     indietro(QUATTRO, 2 * 3600 + 600)    # la garanzia e' di 2 ore e 10 minuti fa
-    prova("LA DOMANDA TARDIVA NON HA TEMPO: il nodo che chiede due ore dopo l'attivo (la "
-          "porta era chiusa) non riceve niente, e lo scambio non gli si annulla in mano", {},
-          (await finestre({"ordini": [QUATTRO]})).get("finestre"))
+    prova("due ore dopo l'attivo, senza recapito, il nodo legge ancora «non ancora»",
+          {QUATTRO: None}, (await finestre({"ordini": [QUATTRO]})).get("finestre"))
     recapito(QUATTRO, int(time.time()))
+    prova("...il recapito detto adesso: i secondi interi, dal recapito", {QUATTRO: 14400},
+          (await finestre({"ordini": [QUATTRO]})).get("finestre"))
+    indietro(QUATTRO, 960)
+    prova("LA DOMANDA TARDIVA NON HA TEMPO: il nodo che chiede 16 minuti dopo il recapito (la "
+          "porta era chiusa) riceve 0, e lo scambio non gli torna nel libro in mano",
+          {QUATTRO: 0}, (await finestre({"ordini": [QUATTRO]})).get("finestre"))
     r, journal = await posta(QUATTRO, "expired", int(time.time()) - 5, "mostro",
                              "payment-window")
     prova("la rotta prende anche questo annullo", True, isinstance(r, dict) and r.get("ok") is True)
@@ -354,6 +384,37 @@ async def giro_intero():
           ([], []), (esiti(PRENDE, QUATTRO), esiti(PUBBLICA, QUATTRO)))
     prova("...e il journal dice perche'", True,
           "passata piu' di meta' del tempo per pagare" in journal)
+
+    print("\n6b) LA 0014: il tempo finisce e l'ordine TORNA NEL LIBRO")
+    t5 = int(time.time()) - 120
+    await attivo(TORNA, t5)
+    recapito(TORNA, t5 + 40)
+    indietro(TORNA, 3600)
+    prima = len(banco.DETTO)
+    r, journal = await posta(TORNA, "expired", int(time.time()) - 5, "mostro",
+                             "payment-window-republished")
+    prova("il nodo racconta il ritorno nel libro, e la rotta lo prende", True,
+          isinstance(r, dict) and r.get("ok") is True)
+    prova("un «non completato» a chi compra, col dettaglio del ritorno nel libro, e a chi "
+          "vende niente", ([("mancato", "payment-window-republished")], []),
+          (esiti(PRENDE, TORNA), esiti(PUBBLICA, TORNA)))
+    c = detto(PRENDE, "Il tempo per pagare è finito", prima)
+    prova("a chi compra: scaduto e tornato nel libro, la strada se aveva pagato, la riga del "
+          "conto", [True, True, True],
+          [c.startswith("⏰ Il tempo per pagare è finito: lo scambio è scaduto e l'ordine è "
+                        "tornato nel libro."),
+           "scrivi subito all'assistenza dall'app" in c, "non completat" in c.split("\n\n")[-1]])
+    vv = detto(PUBBLICA, "Il tempo per pagare è finito", prima)
+    prova("a chi vende: l'ordine e' tornato nel libro, la garanzia si blocca alla presa dopo, "
+          "gli euro tardivi si rimandano, e come ritirarlo",
+          [True, True, True, True, False],
+          [vv.startswith("⏰ Il tempo per pagare è finito senza gli euro segnati: il tuo "
+                         "ordine è tornato nel libro."),
+           "Alla prossima presa la garanzia si blocca di nuovo" in vv,
+           "rimandali a chi li ha inviati" in vv, "apri l'ordine e ritiralo" in vv,
+           "non completat" in vv])
+    prova("lo scambio finito non ha piu' promemoria", ([], []),
+          (attese(TORNA, PRENDE), attese(TORNA, PUBBLICA)))
 
     print("\n7) la leva spenta chiude anche la porta del nodo")
     SRV.P2P_TEMPO_PER_PAGARE = False

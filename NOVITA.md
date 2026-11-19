@@ -740,3 +740,9 @@ frase: Se la fattura Lightning ti scade e la rigeneri dall'ordine, ora il foglio
 dove: Ordini → un ordine «Da pagare» con la fattura scaduta → «⚡ Genera una nuova fattura»: le righe sotto il titolo del foglio, e la riga «🚚 Ti mancano … per la spedizione gratis».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-19 · ritorno-nel-libro
+frase: Nel P2P, se chi prende il tuo ordine non paga in tempo, l'ordine non sparisce più: torna nel libro uguale, e la garanzia torna a te. E il tempo per pagare parte solo quando dici dove vuoi gli euro, non prima. Sull'on-chain l'ordine rinasce nel libro anche quando chi l'ha preso annulla, non deposita o si ritira.
+dove: P2P, uno scambio col tempo per pagare: alla presa il riquadro «⏱ Hai … per pagare» coi tre passi; nella pagina dello scambio l'anello che parte da «Indica dove ricevere gli euro» e la riga rossa negli ultimi dieci minuti; il bot avvisa dieci minuti prima della fine. Sull'on-chain l'avviso «🔁 Il tuo ordine è tornato nel libro» con «🚫 Non ripubblicarlo». Sul Lightning il ritorno nel libro arriva con l'aggiornamento del nodo.
+leva: nessuna
+pubblico: sì

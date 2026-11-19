@@ -923,3 +923,109 @@ risolvili adesso»). Si vedono nella tendina con la promozione che porta
 l'albero nuovo. Restano senza sottocategoria solo 14 annunci di prova
 («Prova», «Test», «Balu», «Tastiera»).
 
+## 26. L'ordine scaduto che torna nel libro: la `-bar11` sul nodo (19 nov 2026, cantiere ritorno-nel-libro; Andrea: «ok» ai punti 1-17)
+
+**Perché.** Con la `-bar10`, allo scadere del tempo per pagare senza «Ho
+inviato» lo scambio si annulla e l'ordine sparisce. Con la `-bar11` (patch
+0014) l'ordine TORNA NEL LIBRO, la garanzia torna a chi vende, e il tempo
+parte solo quando chi vende tocca «Indica dove ricevere gli euro». Niente
+segreti nuovi, niente variabili nuove, nessuna riga nel config: cambia
+solo l'immagine. Promozione e `-bar11` vanno in qualunque ordine (con la
+`-bar10` e il server nuovo, prima del recapito il nodo non conta niente:
+mai un annullo prima del dovuto). La `-bar10` è in servizio dal 19 nov
+(08:28 UTC), quindi si parte da lì.
+
+**SUL NODO** (`ssh -i $env:USERPROFILE\.ssh\lnvps debian@vm-1937.lnvps.cloud`),
+un comando alla volta, il cambio a libro fermo.
+
+1) Sola lettura: l'immagine e il sorgente.
+```
+docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && git -C ~/nodo/mostro-src status --short | wc -l && git -C ~/nodo/mostro-src rev-parse --abbrev-ref HEAD && git -C ~/nodo/mostro-src rev-parse HEAD^{tree} && df -h / | tail -1
+```
+Atteso `mostro:v0.20.2-bar10`, `0`, `barattolo/v0.20.2`,
+`bdad9c3479602556e2db1ddbeefc8cc2dd809d7d`, e almeno 6 GB liberi.
+
+2) Sul PC (PowerShell, nel repo, su `develop` dopo il `git pull`, o su
+`main` dopo la promozione), le patch prese da git:
+```
+git archive HEAD deploy/mostro --format=tar -o $env:TEMP\mostro-bar11.tar
+```
+```
+scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\mostro-bar11.tar debian@vm-1937.lnvps.cloud:
+```
+Sul nodo:
+```
+mkdir -p ~/nodo/patch-bar11 && tar xf ~/mostro-bar11.tar -C ~/nodo/patch-bar11 --strip-components=2 && ls ~/nodo/patch-bar11/0014-*.patch
+```
+
+3) La patch e l'albero:
+```
+cd ~/nodo/mostro-src && git am ~/nodo/patch-bar11/0014-*.patch && git rev-parse HEAD^{tree}
+```
+Atteso `b45281d5ac2ffd5920713c898829ff229a11e5de` (lo stesso del cloud).
+Se `git am` si ferma: `git am --abort` e si incolla a Claude.
+
+4) I test prima della build (due lanci):
+```
+docker build -f docker/Dockerfile --target builder -t mostro-test:bar11 .
+```
+```
+docker run --rm mostro-test:bar11 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle publish spam_gate barattolo_bond toml_only_payment_methods barattolo_tempo nip33 find_order_by_seconds a_dispute_the_daemon_opens barattolo_finestra payment_window
+```
+Atteso `744 passed; 0 failed; 1 ignored`.
+```
+docker run --rm mostro-test:bar11 cargo test --release -- util::tests::
+```
+Atteso `90 passed; 0 failed`. Numeri diversi: si incolla a Claude, e il
+sorgente torna con `git reset --hard HEAD~1`.
+
+5) La build vera e il controllo del binario:
+```
+docker build -f docker/Dockerfile -t mostro:v0.20.2-bar11 .
+```
+```
+docker run --rm --entrypoint sh mostro:v0.20.2-bar11 -c "grep -c payment-window-republished /usr/local/bin/mostrod"
+```
+Atteso un numero sopra zero.
+
+6) Il compose nuovo (cambia solo l'immagine), preparato e letto PRIMA del cambio:
+```
+cd ~/nodo && sed 's#mostro:v0.20.2-bar10#mostro:v0.20.2-bar11#' docker-compose.yml > docker-compose.yml.bar11 && diff docker-compose.yml docker-compose.yml.bar11 | sed 's/SEGRETO=.*/SEGRETO=(nascosto)/'; docker compose -f docker-compose.yml.bar11 config -q && echo compose-ok
+```
+Atteso: UNA riga cambiata (l'immagine) e `compose-ok`.
+
+7) La copia di riserva del compose:
+```
+cp -p ~/nodo/docker-compose.yml ~/nodo/docker-compose.yml.prima-bar11
+```
+
+8) IL CAMBIO, UN COMANDO: se c'è uno scambio aperto non tocca niente.
+```
+cd ~/nodo && n=$(sudo python3 -c "import sqlite3; c=sqlite3.connect('file:/home/debian/nodo/mostro/mostro.db?mode=ro', uri=True); print(c.execute(\"SELECT COUNT(*) FROM orders WHERE status IN ('waiting-payment','waiting-buyer-invoice','waiting-taker-bond','active','fiat-sent','settled-hold-invoice','in-progress','dispute')\").fetchone()[0])") && echo "scambi aperti: $n" && [ "$n" = 0 ] && date -u && cp -p docker-compose.yml.bar11 docker-compose.yml && docker compose up -d mostro && date -u
+```
+Lo scambio Lightning abbandonato del 19 nov (362.235 sats) conta come
+aperto finché il guardiano non lo annulla (verso dom 22): fino ad allora
+il comando si ferma da solo, ed è giusto così.
+
+9) Il controllo, subito:
+```
+docker inspect --format '{{.Config.Image}}' nodo-mostro-1 && docker compose logs mostro --since 3m | grep -i -E "barattolo_|Settings correctly|error|panic" | head -30
+```
+Atteso `mostro:v0.20.2-bar11`, «Settings correctly loaded!», le righe di
+`barattolo_fee` e `barattolo_eventi` di sempre, e NESSUNA riga
+«barattolo_finestra: … not set».
+
+10) La prova dal vivo coi tuoi due account (DOPO la promozione: il server
+deve sapere che il tempo parte dal recapito): una vendita col solo SEPA
+Instant e il cursore a 15 minuti, presa dall'altro, garanzia pagata.
+Prima di «Indica dove ricevere gli euro» l'anello di chi compra dice che
+il tempo non è partito; chi vende lo tocca, e da lì partono i 15 minuti.
+NON toccare «Ho inviato gli euro». Dopo il quarto d'ora (entro un minuto
+in più) lo scambio scade, la garanzia torna, l'ordine è di nuovo nel
+libro, e arrivano i due messaggi «⏰ Il tempo per pagare è finito…».
+
+ROLLBACK (solo se la `-bar11` non regge): `cd ~/nodo && cp -p docker-compose.yml.prima-bar11 docker-compose.yml && docker compose up -d mostro`
+→ `-bar10`; il database resta quello (la colonna in più la `-bar10` la
+ignora), e il sorgente torna con `git -C ~/nodo/mostro-src reset --hard HEAD~1`.
+Fatta, questa voce si cancella e il README del fork, NODO-MOSTRO e la
+riga dell'immagine in `CLAUDE.md` (`-bar10` → `-bar11`) si chiedono a Claude.

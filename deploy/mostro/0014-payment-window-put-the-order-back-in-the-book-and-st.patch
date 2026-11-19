@@ -1,0 +1,610 @@
+From 771c379249a9fa2856a4a5e87dbcaeefed43fe88 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Thu, 19 Nov 2026 10:30:00 +0000
+Subject: [PATCH] payment window: put the order back in the book, and start the
+ time when the seller says where to send the fiat
+
+Patch 0013 canceled an `active` trade whose buyer's time to pay ended with
+no fiat sent. The fault is the same as upstream's taker-timeout (the taker
+took the order and did not do his part), so the order now ends the same
+way: the hold invoice is canceled (the seller's sats come back), the order
+is reset to `pending` with the taker's keys cleared and republished, the
+maker is told NewOrder and the taker Canceled, and the server hears
+expired / payment-window-republished. A taker bond, if any, is released.
+
+The window now starts when the marketplace says so: the server leaves an
+order out of its answer (or says null) until the seller has told the buyer
+where to send the fiat, and the daemon counts from the moment it receives
+the number (`started_at`). An explicit 0 is "no window"; ids still waiting
+are asked least-recently-asked first. Rows answered by a 0013 daemon keep
+their old start. A row of an order back in the book is forgotten, so the
+next take asks again.
+---
+ src/barattolo_finestra.rs | 254 ++++++++++++++++++++++++++++++++------
+ src/scheduler.rs          | 136 +++++++++++++++++---
+ 2 files changed, 334 insertions(+), 56 deletions(-)
+
+diff --git a/src/barattolo_finestra.rs b/src/barattolo_finestra.rs
+index 493e9cb..0cf15bd 100644
+--- a/src/barattolo_finestra.rs
++++ b/src/barattolo_finestra.rs
+@@ -13,7 +13,17 @@
+ //! the order still `active` (no `fiat-sent`, no dispute) this daemon cancels
+ //! the hold invoice exactly as the escrow guardian does for an `active`
+ //! order — the seller's sats come back — and tells the marketplace server
+-//! (`expired` / `payment-window`, patch 0007's channel).
++//! (patch 0007's channel).
++//!
++//! PATCH 0014: BACK TO THE BOOK, NOT CANCELED (Andrea, 19 Nov 2026: «Non
++//! dovrebbe tornare nel libro?»). A buyer who took the order and never
++//! paid is the same fault as a buyer who took it and never gave his
++//! invoice — upstream's `taker-timeout` — so the order now ends the same
++//! way: the hold invoice is canceled (the seller's sats come back: that
++//! escrow belongs to this take, and at market price the next take has
++//! another amount), the order is reset to `pending` and republished, and
++//! the seller pays a new hold invoice at the next take. The server hears
++//! `expired` / `payment-window-republished`.
+ //!
+ //! WHERE THE CHOICE COMES FROM. `mostro-core`'s `SmallOrder` has no field
+ //! for it, and touching the wire format would break every other client. So,
+@@ -25,26 +35,37 @@
+ //! WHAT A COMPROMISED SERVER CAN DO, and why it is acceptable: only a
+ //! window between [`MIN_WINDOW`] and [`MAX_WINDOW`], in whole minutes, is
+ //! accepted (anything else is "no window"),
+-//! the window is counted from the moment THIS daemon saw the trade become
+-//! active, and only `active` orders are ever touched. At worst a lying
+-//! server cancels an active trade 15 minutes after it started and the seller
+-//! gets his sats back — it can never move sats to anyone else, never touch a
++//! the window is counted from the moment THIS daemon learned it, and only
++//! `active` orders are ever touched. At worst a lying server puts an active
++//! trade back in the book 15 minutes after it started and the seller gets
++//! his sats back — it can never move sats to anyone else, never touch a
+ //! trade whose buyer claimed the fiat moved (`fiat-sent`), never one in
+ //! dispute.
+ //!
+-//! WHEN THE WINDOW STARTS: the first scheduler tick that sees the order
+-//! `active` writes that time in the side table (`seen_active_at`). Upstream
+-//! keeps no "active since" stamp — `invoice_held_at` can be up to
+-//! `expiration_seconds` earlier, when the seller paid before the buyer gave
+-//! his invoice — and a tick is 60 seconds, so the buyer is never shortened:
+-//! the marketplace shows a deadline a little EARLIER than the one enforced
+-//! here.
++//! WHEN THE WINDOW STARTS (patch 0014): when the seller has told the buyer
++//! where to send the fiat (Andrea, 19 Nov 2026: «fai partire il timer nel
++//! momento in cui io ho indicato dove ricevere gli euro, non prima»).
++//! Only the marketplace knows that moment — the seller's phone tells it —
++//! so the server leaves an order OUT of its answer (or says `null`) until
++//! then, and the daemon keeps asking every minute. The window is counted
++//! from the moment the daemon RECEIVES the number (`started_at`), never
++//! from a time the server writes: the server shows the buyer a deadline
++//! counted from the seller's gesture, and the daemon enforces one up to a
++//! tick later, so the buyer is never shortened. Before patch 0014 the
++//! start was the first tick that saw the order `active`
++//! (`seen_active_at`): rows answered by a 0013 daemon keep that start.
++//!
++//! WHAT `0` MEANS NOW: an explicit `0` (or anything outside the range) is
++//! "this order has no time to pay", written once and never asked again; a
++//! missing id or `null` is "not yet". The ids still waiting are asked
++//! least-recently-asked first (`asked_at`), so fifty orders that will never
++//! get an answer cannot starve the fifty-first.
+ //!
+ //! Fail OPEN, everywhere: no endpoint configured, a dead server, a non-200,
+-//! malformed JSON, an order missing from the answer — each one means "no
+-//! window", which is upstream's behaviour (the escrow guardian still ends
+-//! the trade at the escrow's horizon). A window is enforced only when the
+-//! server said it, inside the range, and the row was written.
++//! malformed JSON — each one means "no window yet", which is upstream's
++//! behaviour (the escrow guardian still ends the trade at the escrow's
++//! horizon). A window is enforced only when the server said it, inside the
++//! range, and the row was written.
+ //!
+ //! THE SIDE TABLE, `barattolo_payment_windows`, is created with
+ //! `CREATE TABLE IF NOT EXISTS` and kept OUT of the sqlx migrations, like
+@@ -137,10 +158,12 @@ pub fn window_from(value: &serde_json::Value) -> i64 {
+     }
+ }
+ 
+-/// PURE: the server's answer for the orders asked. Every id asked gets an
+-/// entry — 0 when the answer does not name it or names something outside
+-/// the range — so it is not asked again. `None` for an unreadable answer:
+-/// then nothing is written and the next tick asks again.
++/// PURE: the server's answer for the orders asked (patch 0014). An id the
++/// answer names with a value gets an entry — the window, or 0 for anything
++/// outside the range — and is not asked again; an id the answer leaves out,
++/// or names with `null`, gets NO entry: "not yet" (the seller has not told
++/// the buyer where to send the fiat), asked again next tick. `None` for an
++/// unreadable answer: then nothing is written and the next tick asks again.
+ pub fn parse_answer(body: &str, asked: &[String]) -> Option<HashMap<String, i64>> {
+     let value: serde_json::Value = serde_json::from_str(body).ok()?;
+     let table = value.get("finestre")?;
+@@ -150,12 +173,15 @@ pub fn parse_answer(body: &str, asked: &[String]) -> Option<HashMap<String, i64>
+     Some(
+         asked
+             .iter()
+-            .map(|id| (id.clone(), window_from(&table[id.as_str()])))
++            .filter_map(|id| match table.get(id.as_str()) {
++                None | Some(serde_json::Value::Null) => None,
++                Some(v) => Some((id.clone(), window_from(v))),
++            })
+             .collect(),
+     )
+ }
+ 
+-/// PURE: has the window of a trade seen active at `seen_at` ended at `now`?
++/// PURE: has the window of a trade started at `seen_at` ended at `now`?
+ /// A zero or negative window never ends (it is "no window").
+ pub fn window_over(seen_at: i64, seconds: i64, now: i64) -> bool {
+     seconds > 0 && seen_at > 0 && now >= seen_at.saturating_add(seconds)
+@@ -167,19 +193,40 @@ pub async fn ensure_table(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+             order_id TEXT PRIMARY KEY,
+             seen_active_at INTEGER NOT NULL,
+             seconds INTEGER,
+-            asked_at INTEGER NOT NULL DEFAULT 0
++            asked_at INTEGER NOT NULL DEFAULT 0,
++            started_at INTEGER
+         )",
+     )
+     .execute(pool)
+-    .await
+-    .map(|_| ())
++    .await?;
++    // Patch 0014: a table born under 0013 has no `started_at`. Added here,
++    // once, and harmless to a 0013 image (it never reads the column).
++    let has_started: Option<(i64,)> = sqlx::query_as(
++        "SELECT 1 FROM pragma_table_info('barattolo_payment_windows') WHERE name = 'started_at'",
++    )
++    .fetch_optional(pool)
++    .await?;
++    if has_started.is_none() {
++        sqlx::query("ALTER TABLE barattolo_payment_windows ADD COLUMN started_at INTEGER")
++            .execute(pool)
++            .await?;
++    }
++    Ok(())
+ }
+ 
+ /// Stamps the first time each `active` trade is seen. Idempotent: a row
+ /// already there keeps its stamp, so a restart or a retried tick never
+-/// moves the start of a window.
++/// moves the start of a window. Patch 0014: an order back in the book
++/// (`pending`) loses its row first, so its NEXT take asks the server again
++/// and never inherits the window of the take that lapsed.
+ pub async fn record_seen(pool: &SqlitePool, now: i64) -> Result<u64, sqlx::Error> {
+     ensure_table(pool).await?;
++    sqlx::query(
++        "DELETE FROM barattolo_payment_windows
++         WHERE order_id IN (SELECT id FROM orders WHERE status = 'pending')",
++    )
++    .execute(pool)
++    .await?;
+     sqlx::query(
+         "INSERT OR IGNORE INTO barattolo_payment_windows (order_id, seen_active_at)
+          SELECT id, ?1 FROM orders
+@@ -191,8 +238,9 @@ pub async fn record_seen(pool: &SqlitePool, now: i64) -> Result<u64, sqlx::Error
+     .map(|r| r.rows_affected())
+ }
+ 
+-/// The trades whose window the server has not told yet, oldest first, as
+-/// the hyphenated ids the server knows them by. The id column is read with
++/// The trades whose window the server has not told yet, least recently
++/// asked first (patch 0014: a "not yet" is asked again, and must not starve
++/// the others), as the hyphenated ids the server knows them by. The id column is read with
+ /// the type the daemon wrote it with (`Uuid`), whatever its encoding.
+ pub async fn unknown_windows(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Error> {
+     ensure_table(pool).await?;
+@@ -200,7 +248,7 @@ pub async fn unknown_windows(pool: &SqlitePool) -> Result<Vec<String>, sqlx::Err
+         "SELECT w.order_id FROM barattolo_payment_windows w
+          JOIN orders o ON o.id = w.order_id
+          WHERE w.seconds IS NULL AND o.status = 'active'
+-         ORDER BY w.seen_active_at LIMIT ?1",
++         ORDER BY w.asked_at, w.seen_active_at LIMIT ?1",
+     )
+     .bind(MAX_PER_REQUEST as i64)
+     .fetch_all(pool)
+@@ -221,8 +269,9 @@ pub async fn store_windows(
+         let Ok(id) = uuid::Uuid::parse_str(order_id) else {
+             continue;
+         };
++        // patch 0014: the window starts NOW, when this daemon learns it
+         sqlx::query(
+-            "UPDATE barattolo_payment_windows SET seconds = ?2, asked_at = ?3
++            "UPDATE barattolo_payment_windows SET seconds = ?2, asked_at = ?3, started_at = ?3
+              WHERE order_id = ?1 AND seconds IS NULL",
+         )
+         .bind(id)
+@@ -240,14 +289,49 @@ pub async fn store_windows(
+     Ok(())
+ }
+ 
+-/// The `active` trades whose window has ended at `now`.
++/// Patch 0014: the ids asked and still "not yet" go to the back of the
++/// queue (`asked_at`), so the next request asks the others first.
++pub async fn mark_asked(pool: &SqlitePool, ids: &[String], now: i64) -> Result<(), sqlx::Error> {
++    ensure_table(pool).await?;
++    for order_id in ids {
++        let Ok(id) = uuid::Uuid::parse_str(order_id) else {
++            continue;
++        };
++        sqlx::query(
++            "UPDATE barattolo_payment_windows SET asked_at = ?2
++             WHERE order_id = ?1 AND seconds IS NULL",
++        )
++        .bind(id)
++        .bind(now)
++        .execute(pool)
++        .await?;
++    }
++    Ok(())
++}
++
++/// Patch 0014: an order put back in the book forgets its window, so the
++/// next take starts from nothing. `record_seen` sweeps the same rows every
++/// tick, in case this one fails.
++pub async fn forget(pool: &SqlitePool, order_id: uuid::Uuid) -> Result<(), sqlx::Error> {
++    ensure_table(pool).await?;
++    sqlx::query("DELETE FROM barattolo_payment_windows WHERE order_id = ?1")
++        .bind(order_id)
++        .execute(pool)
++        .await
++        .map(|_| ())
++}
++
++/// The `active` trades whose window has ended at `now`: counted from
++/// `started_at` (patch 0014), or from `seen_active_at` for the rows a 0013
++/// daemon answered.
+ pub async fn due_orders(pool: &SqlitePool, now: i64) -> Result<Vec<Order>, sqlx::Error> {
+     ensure_table(pool).await?;
+     sqlx::query_as::<_, Order>(
+         "SELECT o.* FROM orders o
+          JOIN barattolo_payment_windows w ON w.order_id = o.id
+          WHERE o.status = 'active' AND o.hash IS NOT NULL
+-           AND w.seconds > 0 AND w.seen_active_at + w.seconds <= ?1",
++           AND w.seconds > 0
++           AND COALESCE(w.started_at, w.seen_active_at) + w.seconds <= ?1",
+     )
+     .bind(now)
+     .fetch_all(pool)
+@@ -326,6 +410,14 @@ pub async fn refresh(pool: &SqlitePool, now: i64) {
+         if let Err(e) = store_windows(pool, &windows, now).await {
+             warn!("barattolo_finestra: could not write the windows ({e}): asking again next tick");
+         }
++        let waiting: Vec<String> = ids
++            .iter()
++            .filter(|id| !windows.contains_key(id.as_str()))
++            .cloned()
++            .collect();
++        if let Err(e) = mark_asked(pool, &waiting, now).await {
++            warn!("barattolo_finestra: could not queue the trades still waiting ({e})");
++        }
+     }
+ }
+ 
+@@ -371,9 +463,14 @@ mod tests {
+         let got = parse_answer(r#"{"finestre": {"a": 3600, "c": 7}}"#, &asked).unwrap();
+         // "c": 7 seconds is below the range
+         assert_eq!(got["a"], 3600);
+-        assert_eq!(got["b"], 0, "missing from the answer = no window, not asked again");
++        assert!(!got.contains_key("b"), "missing from the answer = not yet, asked again (0014)");
+         assert_eq!(got["c"], 0, "outside the range = no window");
+-        assert_eq!(got.len(), 3);
++        assert_eq!(got.len(), 2);
++        // patch 0014: `null` is "not yet" too, an explicit 0 is "no window"
++        let got = parse_answer(r#"{"finestre": {"a": null, "b": 0}}"#, &asked).unwrap();
++        assert!(!got.contains_key("a"));
++        assert_eq!(got["b"], 0);
++        assert_eq!(got.len(), 1);
+         // ids the daemon did not ask are ignored
+         let got = parse_answer(r#"{"finestre": {"zzz": 3600}}"#, &asked).unwrap();
+         assert!(!got.contains_key("zzz"));
+@@ -437,19 +534,100 @@ mod tests {
+         assert_eq!(ids, vec![active.clone()]);
+         assert!(!ids.contains(&sent) && !ids.contains(&not_held));
+ 
++        // patch 0014: the window starts when the daemon LEARNS it (1500),
++        // not when it first saw the trade active (1000)
+         let mut answer = HashMap::new();
+         answer.insert(active.clone(), 3600);
+-        store_windows(&pool, &answer, 1000).await.unwrap();
++        store_windows(&pool, &answer, 1500).await.unwrap();
+         assert!(unknown_windows(&pool).await.unwrap().is_empty());
+         // an answered row is never rewritten
+         answer.insert(active.clone(), 86400);
+-        store_windows(&pool, &answer, 1100).await.unwrap();
+-        assert!(due_orders(&pool, 4599).await.unwrap().is_empty());
+-        let due = due_orders(&pool, 4600).await.unwrap();
++        store_windows(&pool, &answer, 1600).await.unwrap();
++        assert!(due_orders(&pool, 5099).await.unwrap().is_empty());
++        let due = due_orders(&pool, 5100).await.unwrap();
+         assert_eq!(due.len(), 1);
+         assert_eq!(due[0].id.to_string(), active);
+     }
+ 
++    #[tokio::test]
++    async fn a_0013_row_keeps_its_start_and_the_column_is_added_once() {
++        let pool = pool().await;
++        // the table as a 0013 daemon made it, with one answered row
++        sqlx::query(
++            "CREATE TABLE barattolo_payment_windows (
++                order_id TEXT PRIMARY KEY,
++                seen_active_at INTEGER NOT NULL,
++                seconds INTEGER,
++                asked_at INTEGER NOT NULL DEFAULT 0
++            )",
++        )
++        .execute(&pool)
++        .await
++        .unwrap();
++        let old = insert(&pool, "active", 500).await;
++        sqlx::query(
++            "INSERT INTO barattolo_payment_windows (order_id, seen_active_at, seconds, asked_at)
++             VALUES (?1, 1000, 3600, 1000)",
++        )
++        .bind(uuid::Uuid::parse_str(&old).unwrap())
++        .execute(&pool)
++        .await
++        .unwrap();
++        ensure_table(&pool).await.unwrap();
++        ensure_table(&pool).await.unwrap();
++        assert!(due_orders(&pool, 4599).await.unwrap().is_empty());
++        assert_eq!(due_orders(&pool, 4600).await.unwrap().len(), 1);
++    }
++
++    #[tokio::test]
++    async fn not_yet_is_asked_again_behind_the_others() {
++        let pool = pool().await;
++        let first = insert(&pool, "active", 500).await;
++        record_seen(&pool, 1000).await.unwrap();
++        let second = insert(&pool, "active", 500).await;
++        record_seen(&pool, 1060).await.unwrap();
++        assert_eq!(unknown_windows(&pool).await.unwrap(), vec![first.clone(), second.clone()]);
++        // the server said nothing about `first` yet: it goes to the back
++        mark_asked(&pool, &[first.clone()], 1100).await.unwrap();
++        assert_eq!(unknown_windows(&pool).await.unwrap(), vec![second.clone(), first.clone()]);
++        // nothing is due while the window is unknown
++        assert!(due_orders(&pool, 10_000_000).await.unwrap().is_empty());
++    }
++
++    #[tokio::test]
++    async fn an_order_back_in_the_book_forgets_its_window() {
++        let pool = pool().await;
++        let id = insert(&pool, "active", 500).await;
++        record_seen(&pool, 1000).await.unwrap();
++        let mut answer = HashMap::new();
++        answer.insert(id.clone(), 900);
++        store_windows(&pool, &answer, 1000).await.unwrap();
++        let uid = uuid::Uuid::parse_str(&id).unwrap();
++        // back in the book, then taken again
++        sqlx::query("UPDATE orders SET status = 'pending' WHERE id = ?1")
++            .bind(uid)
++            .execute(&pool)
++            .await
++            .unwrap();
++        record_seen(&pool, 5000).await.unwrap();
++        sqlx::query("UPDATE orders SET status = 'active' WHERE id = ?1")
++            .bind(uid)
++            .execute(&pool)
++            .await
++            .unwrap();
++        record_seen(&pool, 6000).await.unwrap();
++        // the old 900 s window is gone: not due, and asked again
++        assert!(due_orders(&pool, 10_000_000).await.unwrap().is_empty());
++        assert_eq!(unknown_windows(&pool).await.unwrap(), vec![id.clone()]);
++        // and `forget` drops it on the spot
++        forget(&pool, uid).await.unwrap();
++        let left: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM barattolo_payment_windows")
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++        assert_eq!(left.0, 0);
++    }
++
+     #[tokio::test]
+     async fn no_window_and_other_states_are_never_due() {
+         let pool = pool().await;
+diff --git a/src/scheduler.rs b/src/scheduler.rs
+index 63bf66f..99145dd 100644
+--- a/src/scheduler.rs
++++ b/src/scheduler.rs
+@@ -1017,9 +1017,9 @@ async fn job_cancel_orders(ctx: AppContext) {
+ 
+ /// Barattolo fork (patch 0013): the time to pay, chosen by the maker (see
+ /// `barattolo_finestra`). Every minute, OUTSIDE the serial message loop:
+-/// learn the windows of the trades newly active, then cancel the `active`
+-/// trades whose window has ended — the same steps as the escrow guardian's
+-/// `active` branch below. Inert without its two variables.
++/// learn the windows of the trades newly active, then put back in the book
++/// the `active` trades whose window has ended (patch 0014; under 0013 they
++/// were canceled). Inert without its two variables.
+ async fn job_barattolo_payment_window(ctx: AppContext) {
+     if !crate::barattolo_finestra::enabled() {
+         info!("barattolo_finestra: BARATTOLO_FINESTRA_URL / BARATTOLO_FINESTRA_SEGRETO not set: no time to pay, as upstream");
+@@ -1044,7 +1044,13 @@ async fn job_barattolo_payment_window(ctx: AppContext) {
+ }
+ 
+ /// One tick of [`job_barattolo_payment_window`] after the refresh, split
+-/// out for testing: cancel the trades whose window ended at `now`.
++/// out for testing: put back in the book the trades whose window ended at
++/// `now` (patch 0014). The same steps as upstream's `taker-timeout`
++/// republish in `job_cancel_orders` — the hold invoice canceled (the
++/// seller's sats come back), the order reset to `pending` with the taker's
++/// keys cleared, a new `pending` event, the maker told `NewOrder` with the
++/// order and the taker `Canceled` — because the fault is the same: the
++/// taker took the order and did not do his part.
+ async fn barattolo_payment_window_pass(
+     ctx: &AppContext,
+     escrow: &mut dyn EscrowBackend,
+@@ -1086,11 +1092,48 @@ async fn barattolo_payment_window_pass(
+             }
+         }
+ 
+-        let updated = match update_order_event(&keys, Status::Canceled, &order).await {
++        // Back to the initial state, as upstream's taker-timeout republish:
++        // the dev fee always reset, amount and fee too for a market price
++        // order (the next take prices it again).
++        let mut fresh = order.clone();
++        fresh.dev_fee = 0;
++        if fresh.price_from_api {
++            fresh.amount = 0;
++            fresh.fee = 0;
++        }
++        if let Err(e) = update_order_to_initial_state(
++            pool,
++            fresh.id,
++            fresh.amount,
++            fresh.fee,
++            fresh.dev_fee,
++        )
++        .await
++        {
++            // The hold invoice is gone and the order still says `active`:
++            // the next tick finds it due again, the cancel answers
++            // "already canceled", and this step is retried.
++            warn!(
++                "payment_window: could not reset order {} ({e}); retrying next tick",
++                order.id
++            );
++            continue;
++        }
++        let edited = match edit_pubkeys_order(pool, &order).await {
++            Ok(edited) => edited,
++            Err(e) => {
++                warn!(
++                    "payment_window: could not clear the taker of order {} ({e})",
++                    order.id
++                );
++                continue;
++            }
++        };
++        let updated = match update_order_event(&keys, Status::Pending, &edited).await {
+             Ok(updated) => updated,
+             Err(e) => {
+                 warn!(
+-                    "payment_window: could not publish cancel for order {} ({e}); retrying next tick",
++                    "payment_window: could not publish order {} back in the book ({e})",
+                     order.id
+                 );
+                 continue;
+@@ -1100,25 +1143,34 @@ async fn barattolo_payment_window_pass(
+             Ok(updated) => updated,
+             Err(e) => {
+                 warn!(
+-                    "payment_window: persist failed for order {} ({e}); retrying next tick",
++                    "payment_window: persist failed for order {} ({e})",
+                     order.id
+                 );
+                 continue;
+             }
+         };
+         info!(
+-            "payment_window: order {} canceled — the buyer's time to pay ended with no fiat sent",
++            "payment_window: order {} back in the book — the buyer's time to pay ended with no fiat sent; the seller's escrow was returned",
+             order.id
+         );
++        // The next take asks the server again (`record_seen` sweeps it too).
++        if let Err(e) = crate::barattolo_finestra::forget(pool, order.id).await {
++            warn!("payment_window: could not forget the window of order {} ({e})", order.id);
++        }
+         // Barattolo fork (patch 0007's channel): tell the marketplace server.
++        // `order` is the snapshot before the reset: buyer and seller intact.
+         crate::barattolo_eventi::emit_detail(
+             "expired",
+             &order,
+             "mostro",
+-            "payment-window",
++            "payment-window-republished",
+         );
+-        notify_users_canceled_order(&updated, &order, Some(Action::Canceled)).await;
+-        bond::resolve_range_maker_bond_at_close_or_warn(pool, &order, "payment_window").await;
++        notify_users_canceled_order(&updated, &order, Some(Action::NewOrder)).await;
++        // A taker bond, if one was ever asked for this take, goes back: the
++        // payment window never applies to the method that asks for one
++        // (cash), and a republish keeps the maker committed — so no
++        // range-maker close here, as upstream's republish branch.
++        bond::release_taker_bonds_for_order_or_warn(pool, order.id, "payment_window").await;
+     }
+     Ok(())
+ }
+@@ -2621,13 +2673,18 @@ mod tests {
+     }
+ 
+     #[tokio::test]
+-    async fn payment_window_cancels_an_active_trade_when_its_time_ends() {
++    async fn payment_window_puts_an_active_trade_back_in_the_book_when_its_time_ends() {
+         let ctx = escrow_guardian_ctx(576, 24).await;
+         let now = Utc::now().timestamp();
+-        let order = escrow_backed_order(Status::Active, now - 4_000)
+-            .create(ctx.pool())
+-            .await
+-            .unwrap();
++        // The `pending` event of the republish reads the maker's rating
++        // through the global pool: pin identity == trade key, so the lookup
++        // falls back to (0, 0, 0) whichever test's pool won the race (the
++        // pattern of `app::cancel`'s republish tests).
++        let _ = crate::config::DB_POOL.set(std::sync::Arc::new(ctx.pool().clone()));
++        let mut order = escrow_backed_order(Status::Active, now - 4_000);
++        order.master_seller_pubkey = order.seller_pubkey.clone();
++        order.master_buyer_pubkey = order.buyer_pubkey.clone();
++        let order = order.create(ctx.pool()).await.unwrap();
+         window_row(&ctx, &order, now - 3_600, 3_600).await;
+         let mut escrow = StubEscrow::ok();
+ 
+@@ -2643,11 +2700,54 @@ mod tests {
+             .await
+             .unwrap();
+         let updated = Order::by_id(ctx.pool(), order.id).await.unwrap().unwrap();
+-        assert_eq!(updated.status, Status::Canceled.to_string());
++        // patch 0014: back in the book, not canceled
++        assert_eq!(updated.status, Status::Pending.to_string());
++        assert!(updated.hash.is_none(), "the next take gets a new hold invoice");
++        assert_eq!(updated.taken_at, 0);
++        assert_eq!(updated.invoice_held_at, 0);
++        assert!(updated.buyer_pubkey.is_none(), "the taker who vanished is gone");
+         assert_eq!(escrow.canceled(), vec![order.hash.clone().unwrap()]);
+         let actions = queued_actions_for(order.id).await;
+         assert_eq!(actions.len(), 2, "both parties must be told: {actions:?}");
+-        assert!(actions.iter().all(|a| *a == Action::Canceled));
++        assert!(actions.contains(&Action::NewOrder), "the maker gets his order back: {actions:?}");
++        assert!(actions.contains(&Action::Canceled), "the taker is told: {actions:?}");
++        // the window is forgotten: the next take asks the server again
++        let left: (i64,) = sqlx::query_as(
++            "SELECT COUNT(*) FROM barattolo_payment_windows WHERE order_id = ?1",
++        )
++        .bind(order.id)
++        .fetch_one(ctx.pool())
++        .await
++        .unwrap();
++        assert_eq!(left.0, 0);
++        // and a second tick does nothing more
++        barattolo_payment_window_pass(&ctx, &mut escrow, now + 60)
++            .await
++            .unwrap();
++        assert_eq!(escrow.canceled().len(), 1);
++    }
++
++    #[tokio::test]
++    async fn payment_window_reprices_a_market_order_at_the_next_take() {
++        let ctx = escrow_guardian_ctx(576, 24).await;
++        let now = Utc::now().timestamp();
++        let mut market = escrow_backed_order(Status::Active, now - 4_000);
++        market.price_from_api = true;
++        let _ = crate::config::DB_POOL.set(std::sync::Arc::new(ctx.pool().clone()));
++        market.master_seller_pubkey = market.seller_pubkey.clone();
++        market.master_buyer_pubkey = market.buyer_pubkey.clone();
++        let market = market.create(ctx.pool()).await.unwrap();
++        window_row(&ctx, &market, now - 900, 900).await;
++        let mut escrow = StubEscrow::ok();
++
++        barattolo_payment_window_pass(&ctx, &mut escrow, now)
++            .await
++            .unwrap();
++        let updated = Order::by_id(ctx.pool(), market.id).await.unwrap().unwrap();
++        assert_eq!(updated.status, Status::Pending.to_string());
++        assert_eq!(updated.amount, 0);
++        assert_eq!(updated.fee, 0);
++        assert_eq!(updated.dev_fee, 0);
+     }
+ 
+     #[tokio::test]
+-- 
+2.43.0
+

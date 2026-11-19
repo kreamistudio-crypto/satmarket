@@ -3625,6 +3625,11 @@
   .p2p-box.p2p-tempo-pagare .mono{font-weight:800;font-variant-numeric:tabular-nums}
   .p2p-box.p2p-tempo-pagare.vicino{box-shadow:inset 3px 0 0 var(--sats)}
   .p2p-box.p2p-tempo-pagare.scaduto{background:var(--chip-bg);color:var(--ink-soft)}
+  .p2p-box.p2p-tempo-pagare.fermo{background:var(--chip-bg);color:var(--ink);font-weight:600}
+  /* (19 nov 2026) la riga che non deve sfuggire, rossa negli ultimi 10 minuti */
+  .p2p-tempo-avviso{display:block;margin-top:6px;font-size:12px;font-weight:700;line-height:1.4}
+  .p2p-box.p2p-tempo-pagare.rosso{background:rgba(220,38,38,.12);color:#b91c1c;box-shadow:inset 3px 0 0 #dc2626}
+  .p2p-box.p2p-tempo-pagare.rosso .p2p-tempo-avviso{color:#b91c1c}
   /* L'OROLOGIO DEL TEMPO PER PAGARE (18 nov 2026, «un orologio con un
      timer che decidi tu»): un anello arancio di casa che dice quanto del
      giorno e' concesso — pieno a 24 ore, uno spicchio a un quarto d'ora —
@@ -74963,6 +74968,21 @@ async function prendiOnchainP2P(id, extra){
     toast('Scegli prima come paghi: tocca un metodo', 4000);
     return apriOnchainP2P(id);
   }
+  /* IL BANNER DEL TEMPO PER PAGARE anche sull'on-chain (19 nov 2026), a
+     chi prende COMPRANDO, una volta per ordine: le sue parole dicono la
+     disputa, perche' qui allo scadere non scade niente da solo */
+  const minOcB = riga && riga.lato === 'sell' ? Number(riga.minuti_pagamento) || 0 : 0;
+  const bannerOc = minOcB && !conCauzione && p2pBannerTempoVisto !== 'oc' + id
+    && typeof bannerTempoPagareP2P === 'function' ? bannerTempoPagareP2P(minOcB, true) : null;
+  if (bannerOc) {
+    /* a foglio chiuso e col bottone gia' rimesso: si arriva qui dal
+       «Compra» del foglio di casa (`eseguiConferma`), lo stesso foglio */
+    setTimeout(() => chiediConferma({titolo: bannerOc.titolo, corpo: bannerOc.corpo,
+      etichetta: 'Ho capito, prendo', indietro: 'Non ora',
+      poi: () => { p2pBannerTempoVisto = 'oc' + id; prendiOnchainP2P(id, extra); }}), 350);
+    return;
+  }
+  p2pBannerTempoVisto = '';
   try {
     /* la chiave sul dispositivo e la sua meta' pubblica al server, come
        all'apertura: senza non c'e' niente con cui firmare */
@@ -75672,10 +75692,15 @@ function statoOnchainCardP2P(o){
       if (typeof contantiOcP2P === 'function' && contantiOcP2P(o))
         return ricevo ? {t: 'Consegna i contanti', d: 'Quando vi vedete, poi tocca «Ho consegnato i contanti»'}
           : {t: 'Sats depositati', d: 'Quando vi vedete, chi compra ti consegna i contanti'};
-      if (ricevo) return {t: 'Manda gli euro', d: !tp ? 'Poi tocca «Ho inviato gli euro»'
+      /* (19 nov 2026, ritorno-nel-libro) senza il recapito il tempo di
+         chi compra non parte: lo si dice, a chi aspetta e a chi lo deve scrivere */
+      const fermo = !tp && typeof tempoPagareFermoOcP2P === 'function' && tempoPagareFermoOcP2P(o);
+      if (ricevo) return fermo ? {t: 'Aspetta il recapito', d: 'Il tempo per pagare parte quando chi vende scrive dove vuole gli euro'}
+        : {t: 'Manda gli euro', d: !tp ? 'Poi tocca «Ho inviato gli euro»'
         : tp.finito ? 'Tempo per pagare finito: chi vende può aprire una disputa'
         : 'Hai ancora ' + tp.quanto + ', poi tocca «Ho inviato gli euro»'};
-      return {t: 'Sats depositati', d: !tp ? 'Chi compra ti manda gli euro'
+      return fermo ? {t: 'Scrivi dove vuoi gli euro', d: 'Il tempo di chi compra parte da lì'}
+        : {t: 'Sats depositati', d: !tp ? 'Chi compra ti manda gli euro'
         : tp.finito ? 'Tempo per pagare finito: puoi aprire una disputa'
         : 'Chi compra ha ancora ' + tp.quanto + ' per pagare'};
     }
@@ -75729,10 +75754,28 @@ function tempoBonificoOcP2P(o, adesso){
    titolo suo e la PROPORZIONE delle vite corte (`barraScadenzaP2P`): 24
    ore non nascono rosse. Batte col battito di sempre
    (`battitoAnelloneP2P`, che legge `data-scala`). PURA. */
+/* (19 nov 2026, cantiere ritorno-nel-libro) IL TEMPO FERMO: deposito
+   confermato, ma chi vende non ha ancora scritto dove vuole gli euro, e
+   il tempo di chi compra non e' partito (`paga_entro` 0 dal server). Mai
+   col PayCode (il suo tempo e' quello del codice) ne' coi contanti di
+   persona (li' si parla dell'incontro). PURA. */
+function tempoPagareFermoOcP2P(o){
+  return !!o && o.stato === 'depositato' && !(Number(o.paga_entro) > 0)
+    && !String(o.recapito || '').trim() && !o.tabacchino
+    && !(typeof contantiOcP2P === 'function' && contantiOcP2P(o));
+}
 function tempoPagareRigaOcP2P(o, adesso){
   const ora = adesso || Math.floor(Date.now() / 1000);
+  if (tempoPagareFermoOcP2P(o)) {
+    const min = Number(o.minuti_pagamento) || (Number(o.ore_pagamento) || 0) * 60;
+    const detto = min && typeof minutiPagareDetteP2P === 'function' ? minutiPagareDetteP2P(min) : '';
+    return '<div class="p2p-box p2p-tempo-pagare fermo"><span>' + (o.ruolo === 'venditore'
+      ? 'Avrai ' + (detto ? '<b>' + esc(detto) + '</b>' : 'il tuo tempo') + ' per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.'
+      : 'Chi compra ha ' + (detto ? '<b>' + esc(detto) + '</b>' : 'il suo tempo') + ' per pagarti, da quando scrivi dove vuoi gli euro: finché non lo fai, il suo tempo non parte e i tuoi sats restano fermi.')
+      + '</span></div>';
+  }
   if (!tempoPagareOcP2P(o, ora) || typeof contoRimastoP2P !== 'function') return '';
-  const fine = Number(o.paga_entro), inizio = Number(o.depositato_il) || 0;
+  const fine = Number(o.paga_entro), inizio = Number(o.pagare_dal) || Number(o.depositato_il) || 0;
   const vita = fine - inizio;
   const scala = vita > 0 && vita < P2P_VITA_SOGLIE_S ? P2P_VITA_SOGLIE_S / vita : 1;
   const manca = Math.max(0, fine - ora);
@@ -75743,7 +75786,13 @@ function tempoPagareRigaOcP2P(o, adesso){
     + '<div class="p2p-anellone p2p-tempo-barra ' + statoAnelloP2P(manca * scala) + '" data-fine="' + fine
       + '" data-inizio="' + inizio + '" data-scala="' + scala.toFixed(3) + '" role="img" aria-label="'
       + esc((scadeTestoP2P(fine) || '') + ' (' + (Number(o.ore_pagamento) || 0) + ' ore per pagare)')
-      + '"><i style="width:' + larghezzaTempoP2P(Math.max(0, resta)) + '"></i></div></div>';
+      + '"><i style="width:' + larghezzaTempoP2P(Math.max(0, resta)) + '"></i></div>'
+    /* (19 nov 2026, ritorno-nel-libro) la riga chiara a chi paga, rossa
+       negli ultimi dieci minuti: senza il bottone, «ho pagato» non lo sa nessuno */
+    + (o.ruolo === 'venditore' && !o.tabacchino
+       ? '<span class="p2p-tempo-avviso' + (manca <= 600 ? ' rosso' : '') + '">'
+         + '⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone, allo scadere chi vende può aprire una disputa anche se hai pagato.</span>' : '')
+    + '</div>';
 }
 /* la tinta della casella, nella tavolozza del Lightning (`P2P_TINTA_STATO`):
    arancio il gesto mio, viola l'attesa, rosso la disputa */
@@ -75850,7 +75899,7 @@ function rigaScambioOnchainP2P(o){
     /* il tempo per pagare come bordo di sotto, la barra delle card del
        libro (17 nov 2026): solo a deposito confermato */
     + (o.stato === 'depositato' && Number(o.paga_entro) > 0 && typeof barraScadenzaP2P === 'function'
-       ? barraScadenzaP2P({scade: Number(o.paga_entro), creato: Number(o.depositato_il) || 0}) : '')
+       ? barraScadenzaP2P({scade: Number(o.paga_entro), creato: Number(o.pagare_dal) || Number(o.depositato_il) || 0}) : '')
     + '</div>';
 }
 /* LA CONVENIENZA SULLA CARD ON-CHAIN DI «I MIEI SCAMBI» (17 nov 2026,
@@ -76739,12 +76788,17 @@ function schedaOnchainP2P(o){
         /* (17 nov 2026 sera, onchain-ritiro) il «non completato» di chi
            si e' ritirato dopo il deposito, detto a tutti e due */
         + (o.non_completato === 'io' ? ' Ti è stato contato come <b>scambio non completato</b>: i sats di chi vendeva erano già bloccati.'
-           : o.non_completato === 'altro' ? ' A chi comprava è stato contato come <b>scambio non completato</b>.' : ''); break;
+           : o.non_completato === 'altro' ? ' A chi comprava è stato contato come <b>scambio non completato</b>.' : '')
+        + (o.rinato_in ? ' 🔁 L\'ordine è tornato nel libro.' : ''); break;
     case 'annullato': testo = (o.chiuso_perche === 'paracadute'
         ? '🪂 Annullato dal paracadute' + (haParacaduteP2P(versiParacaduteOcP2P(o)) ? ' (' + etichettaParacaduteP2P(versiParacaduteOcP2P(o)) + ')' : '') + ': BTC si è mosso oltre la soglia da quando l\'hai pubblicato. Puoi ripubblicarlo al prezzo nuovo.'
         : o.proposta && o.proposta.barattolo === 'deposito-incompleto'
         ? 'Annullato da chi vende: il deposito non era completo. Barattolo ha firmato il rimborso e i sats tornano a chi li aveva depositati.'
+        : o.chiuso_perche === 'deposito-scaduto'
+        ? 'Annullato: il tempo per il deposito è finito senza sats.'
         : 'Annullato prima del deposito.')
+        /* (19 nov 2026, ritorno-nel-libro) l'ordine rinato nel libro */
+        + (o.rinato_in ? ' 🔁 L\'ordine è tornato nel libro.' : '')
         + (o.ricevuti_sats && !(o.proposta && o.proposta.barattolo === 'deposito-incompleto')
            ? ' <b>Attenzione:</b> dopo l\'annullo sono arrivati sats: un moderatore li rimanda indietro.' : ''); break;
     case 'scaduto': testo = 'Scaduto nel libro senza essere preso.'; break;
@@ -92492,6 +92546,22 @@ function confermaDettaglioP2P(){
   const oltre = typeof giudiceTettoProvaP2P === 'function'
     ? giudiceTettoProvaP2P(g ? g.euro : o.euro, o.fiat) : '';
   if (oltre) { toast(oltre); return; }
+  /* IL BANNER DEL TEMPO PER PAGARE (19 nov 2026, cantiere
+     ritorno-nel-libro; Andrea: «quando uno prende l'ordine esce fuori un
+     banner dove gli si informa di come funziona questo ordine»): a chi
+     prende COMPRANDO un ordine col tempo, prima della presa, una volta per
+     ordine. «Ho capito, prendo» rifa' questo giro da capo, e la presa parte */
+  const minBanner = o.lato === 'sell' && typeof minutiPagareOrdineP2P === 'function'
+    ? minutiPagareOrdineP2P(o) : 0;
+  const banner = minBanner && p2pBannerTempoVisto !== id && typeof bannerTempoPagareP2P === 'function'
+    ? bannerTempoPagareP2P(minBanner, false) : null;
+  if (banner) {
+    chiediConferma({titolo: banner.titolo, corpo: banner.corpo, etichetta: 'Ho capito, prendo',
+                    indietro: 'Non ora',
+                    poi: () => { p2pBannerTempoVisto = id; confermaDettaglioP2P(); }});
+    return;
+  }
+  p2pBannerTempoVisto = '';
   haptic();
   chiudiFoglioP2P('p2pDettSheet');
   /* ⚠️ LA STESSA CHIAMATA DI PRIMA, e quindi lo stesso messaggio a
@@ -98299,35 +98369,79 @@ function bollinoTempoPagareP2P(min){
 function rigaTempoPagareDettP2P(o, tuo){
   const min = minutiPagareOrdineP2P(o);
   if (!min) return '';
+  /* (19 nov 2026, cantiere ritorno-nel-libro) il tempo parte dal recapito,
+     e allo scadere l'ordine torna nel libro; a chi prende, sotto, la riga
+     che non deve sfuggire (Andrea: «uno magari non capisce e perde i
+     soldi») */
   return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">'
     + anelloTempoP2P(quotaTempoP2P(min)) + '<span>'
-    + (tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro'
-           : 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro')
-    + ', da quando i sats sono in garanzia: poi lo scambio si annulla da solo.</span></div>';
+    + (tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro, da quando gli dici dove mandarli'
+           : 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro, da quando chi vende ti dice dove mandarli')
+    + ': poi lo scambio scade e l\'ordine torna nel libro.'
+    + (tuo ? '' : '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO + '</span>')
+    + '</span></div>';
 }
+/* LA RIGA CHE NON DEVE SFUGGIRE (19 nov 2026, Andrea: «deve essere chiara
+   questa roba qua, perché altrimenti uno magari non capisce e perde i
+   soldi»): accanto al timer, sulla card prima della presa e nel banner */
+const P2P_AVVISO_BOTTONE_PAGATO = '⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone lo scambio scade anche se hai pagato.';
+/* PURA: IL BANNER DELLA PRESA (19 nov 2026, Andrea: «quando uno prende
+   l'ordine esce fuori un banner dove gli si informa di come funziona
+   questo ordine»): i tre passi, coi minuti dell'ordine. `oc` = on-chain,
+   dove allo scadere non scade niente da solo: chi vende puo' aprire una
+   disputa. Testo nudo (il foglio lo scrive col textContent). */
+function bannerTempoPagareP2P(min, oc){
+  const m = minutiPagareSceltaP2P(min);
+  if (!m) return null;
+  const dette = minutiPagareDetteP2P(m);
+  return {
+    titolo: '⏱ Hai ' + dette + ' per pagare',
+    corpo: '1) Chi vende ti indica dove mandare gli euro: da quel momento hai ' + dette + '.\n'
+      + '2) Manda gli euro.\n'
+      + '3) Tocca subito «Ho inviato gli euro».\n\n'
+      + (oc ? 'Se il tempo finisce senza il bottone, chi vende può aprire una disputa e far tornare indietro i suoi sats, anche se hai pagato.'
+            : 'Se il tempo finisce senza il bottone, lo scambio scade e i sats tornano a chi vende, anche se hai pagato.')
+  };
+}
+let p2pBannerTempoVisto = '';   // l'ordine del banner gia' letto, per UNA presa
 /* PURA: la riga del tempo che resta nella pagina dello scambio, per chi
    compra e per chi vende. Solo a scambio attivo (garanzia bloccata, niente
    «pagato») e con un termine detto dal server; '' altrimenti. */
 function rigaTempoPagareScambioP2P(o, adesso){
   if (!o || o.stato !== 'attivo') return '';
   const entro = Number(o.pagaEntro) || 0;
-  if (!(entro > 0)) return '';
+  const compro = o.lato === 'compro';
+  /* IL TEMPO CHE NON E' ANCORA PARTITO (19 nov 2026, cantiere
+     ritorno-nel-libro; Andrea: «fai partire il timer nel momento in cui
+     io ho indicato dove ricevere gli euro, non prima»): a scambio attivo
+     ma senza recapito, la riga dice da cosa parte */
+  if (!(entro > 0)) {
+    const min = minutiPagareSceltaP2P(o.minutiPagare);
+    if (!min) return '';
+    return '<div class="p2p-box p2p-tempo-pagare fermo" id="p2pTempoPagare">⏱ <span>' + (compro
+      ? 'Avrai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.'
+      : 'Chi compra ha <b>' + minutiPagareDetteP2P(min) + '</b> per pagarti, da quando tocchi «Indica dove ricevere gli euro»: finché non lo fai, il suo tempo non parte.')
+      + '</span></div>';
+  }
   const ora = adesso || Math.floor(Date.now() / 1000);
   const resta = entro - ora;
-  const compro = o.lato === 'compro';
   if (resta <= 0)
     return '<div class="p2p-box p2p-tempo-pagare scaduto" id="p2pTempoPagare">⏱ '
-      + (compro ? 'Il tempo per pagare è finito: lo scambio si sta annullando.'
-                : 'Il tempo per pagare è finito: lo scambio si sta annullando e i sats tornano a te.')
+      + (compro ? 'Il tempo per pagare è finito: lo scambio scade e l\'ordine torna nel libro.'
+                : 'Il tempo per pagare è finito: lo scambio scade, i sats tornano a te e l\'ordine torna nel libro.')
       + '</div>';
   const quanto = traQuantoP2P(resta);
   /* L'ANELLO CHE SI SVUOTA (Andrea: «graficamente si veda che scorre
      attivamente all'indietro»): pieno all'attivo, vuoto allo scadere */
   const tot = (minutiPagareSceltaP2P(o.minutiPagare) || 0) * 60;
-  return '<div class="p2p-box p2p-tempo-pagare' + (resta <= 900 ? ' vicino' : '') + '" id="p2pTempoPagare" data-entro="'
+  /* ...e a chi compra la riga che non deve sfuggire, rossa negli ultimi
+     dieci minuti (`rosso`, la rimette il battito) */
+  return '<div class="p2p-box p2p-tempo-pagare' + (resta <= 900 ? ' vicino' : '') + (resta <= 600 ? ' rosso' : '')
+    + '" id="p2pTempoPagare" data-entro="'
     + entro + '" data-tot="' + tot + '">' + anelloTempoP2P(tot ? resta / tot : 1) + '<span>' + (compro
-      ? 'Hai ancora <b>' + esc(quanto) + '</b> per inviare gli euro e toccare «Ho inviato gli euro»: poi lo scambio si annulla da solo.'
-      : 'Chi compra ha ancora <b>' + esc(quanto) + '</b> per inviarti gli euro: poi lo scambio si annulla da solo e i sats tornano a te.')
+      ? 'Hai ancora <b>' + esc(quanto) + '</b> per inviare gli euro e toccare «Ho inviato gli euro»: poi lo scambio scade e l\'ordine torna nel libro.'
+        + '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO + '</span>'
+      : 'Chi compra ha ancora <b>' + esc(quanto) + '</b> per inviarti gli euro: poi lo scambio scade, i sats tornano a te e l\'ordine torna nel libro.')
     + '</span></div>';
 }
 /* il termine dello scambio, dall'archivio del server: e' lui a sapere da
@@ -98361,6 +98475,7 @@ function battitoTempoPagareP2P(){
   const b = box.querySelector('b'), q = traQuantoP2P(resta);
   if (b && b.textContent !== q) b.textContent = q;
   box.classList.toggle('vicino', resta <= 900);
+  box.classList.toggle('rosso', resta <= 600);
   const tot = Number(box.dataset.tot) || 0;
   if (tot) quotaAnelloP2P(box.querySelector('.p2p-anello'), resta / tot);
 }

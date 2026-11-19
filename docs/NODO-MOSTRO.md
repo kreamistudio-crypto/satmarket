@@ -691,3 +691,22 @@ pagare: è nato prima). NON PROVATI: l'annullo allo scadere (la prova da
 15 minuti fra due account) e la cauzione col contante per posta (leva
 `P2P_POSTA_ATTIVO` spenta in produzione). I numeri: PRODUZIONE, «LA
 `-bar10`», «COM'È ANDATA SUL NODO».
+
+LA 0014, L'ORDINE CHE TORNA NEL LIBRO (preparata il 19 nov 2026, cantiere
+`ritorno-nel-libro`; NON ANCORA SUL NODO: `docs/DA-FARE-ANDREA.md`, voce
+26, immagine `-bar11`). Andrea: «No, perché sparisce, scusa? Non dovrebbe
+tornare nel libro». Allo scadere del tempo per pagare senza «Ho inviato»
+il nodo non chiude più lo scambio: fa il ramo che mostrod fa già per chi
+prende e non manda la fattura (taker-timeout) — annulla la hold invoice,
+rimette l'ordine `pending` nel libro col suo 38383, libera la cauzione di
+chi aveva preso e lo dice al server con `expired` /
+`payment-window-republished` (per il server è `tornato`). E il tempo parte
+DAL RECAPITO: il server risponde `null` finché chi vende non ha toccato
+«Indica dove ricevere gli euro», e il nodo conta da quando riceve il
+numero (`started_at`, colonna nuova della sua tabella), al più un minuto
+dopo. Quel che un server compromesso ottiene in più rispetto alla 0013:
+niente — rimettere nel libro è più mite che annullare, e i sats tornano
+comunque a chi vende. Nessuna migrazione di mostrod: la colonna la
+aggiunge il modulo, e il ritorno alla `-bar10` è il solo cambio
+d'immagine (la colonna la ignora). Compilata e provata nel cloud: albero
+`b45281d5`, 2005 prove `cargo` verdi, 4 ignorate.
