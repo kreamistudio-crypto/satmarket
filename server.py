@@ -111825,7 +111825,14 @@ def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
          "sats": int(o["prezzo_sats"]), "euro": int(o["euro_cent"]) / 100,
          "metodi": metodi, "scade": int(o["scade"]), "creato": int(o["creato"]),
          "fiat": p2p_onchain_valuta(o),
-         "rete": ONCHAIN_RETE, "onchain": True, **_p2p_onchain_foglio(o, pubblico=True)}
+         "rete": ONCHAIN_RETE, "onchain": True, **_p2p_onchain_foglio(o, pubblico=True),
+         # LE DUE SCELTE DI CHI PUBBLICA ANCHE NEL LIBRO DI CHI PRENDE (19
+         # nov 2026, cantiere cauzione-nel-libro; prova dal vivo con Alan):
+         # fino a oggi le portava solo la sua scheda (`_p2p_onchain_per`), e
+         # la card di chi prende restava senza 🔐 e senza «Blocca la
+         # cauzione» mentre la presa la pretendeva; e senza il bollino ⏱
+         "minuti_pagamento": _p2p_onchain_minuti(o),
+         "cauzione_chiesta": p2p_onchain_cauzione_chiesta(o)}
     if nome:
         r["nome"] = nome
     # LA ZONA DEL CONTANTI ESCE A TUTTI, come quella di Lightning (17 nov

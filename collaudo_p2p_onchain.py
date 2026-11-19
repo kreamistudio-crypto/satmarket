@@ -2022,6 +2022,24 @@ def main():
     SRV._p2p_onchain_rifai_foto()
     prova("...la busta del libro porta la leva per il foglio Pubblica",
           True, busta_oc(999).get("cauzione", {}).get("aScelta"))
+    # LA SCELTA ARRIVA NEL LIBRO DI CHI PRENDE (19 nov 2026, cantiere
+    # cauzione-nel-libro; prova dal vivo con Alan in produzione): fino a
+    # ieri solo la scheda di chi pubblica portava `cauzione_chiesta` e
+    # `minuti_pagamento`, la riga del libro no — e il telefono di chi
+    # prende non mostrava 🔐 ne' «Blocca la cauzione», mentre il server la
+    # pretendeva e rifiutava la presa
+    k60 = pubblica(888, metodi=["Revolut"], minuti_pagare=60, cauzione=True).json()
+    SRV._p2p_onchain_rifai_foto()
+    righe_oc = {int(e["id"]): e for e in busta_oc(999).get("eventi", [])}
+    prova("...e la riga del libro di chi PRENDE porta la cauzione chiesta (si' e no) e i "
+          "minuti per pagare scelti (60 coi metodi veloci, 24 ore coi lenti)",
+          (True, False, True, 1440, 60),
+          (righe_oc.get(int(k1["id"]), {}).get("cauzione_chiesta"),
+           righe_oc.get(int(k0["id"]), {}).get("cauzione_chiesta"),
+           righe_oc.get(int(k60["id"]), {}).get("cauzione_chiesta"),
+           righe_oc.get(int(k1["id"]), {}).get("minuti_pagamento"),
+           righe_oc.get(int(k60["id"]), {}).get("minuti_pagamento")))
+    gesto(888, k60["id"], "annulla")
     prova("...e con «Bonifico» chi prende non prende senza cauzione: 409 con la frase, "
           "e l'ordine resta nel libro",
           (409, True, "pending"),

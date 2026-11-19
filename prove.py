@@ -208623,6 +208623,13 @@ def prove_onchain_cauzione():
           (True, True),
           ('"cauzione_chiesta": p2p_onchain_cauzione_chiesta(o),' in pezzo("_p2p_onchain_per"),
            '"aScelta": P2P_ONCHAIN_CAUZIONE_A_SCELTA is True,' in pezzo("_p2p_onchain_libro")))
+    # (19 nov 2026, cantiere cauzione-nel-libro; prova dal vivo con Alan:
+    # la card di chi prende era senza 🔐 perche' la riga del libro non la
+    # portava) — la prova dal vivo e' in collaudo_p2p_onchain
+    prova("...anche nella riga del libro di chi PRENDE, coi minuti per pagare per il bollino ⏱",
+          (True, True),
+          ('"cauzione_chiesta": p2p_onchain_cauzione_chiesta(o)}' in pezzo("_p2p_onchain_riga_pubblica"),
+           '"minuti_pagamento": _p2p_onchain_minuti(o),' in pezzo("_p2p_onchain_riga_pubblica")))
     C = amb["_p2p_onchain_contanti"]
     prova("il giudice unico del contanti si allarga al metodo scelto: il solo «Contanti», o "
           "«Contanti» scelto su un ordine che ce l'ha; mai su un ordine che non ce l'ha",
