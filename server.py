@@ -99864,6 +99864,34 @@ CONNETTORI_LETTURA_MAX_S = 600
 # sono per l'ultima chiamata (15 s di timeout) e per quel che il
 # lettore fa dopo.
 CONNETTORI_VARIANTI_MAX_S = 480
+# GLI OPERAI SUOI (19 nov 2026, cantiere lettore-negozi-in-tempo; dal
+# campo: SWAG.btc.pub in 'errore' dal 6 ottobre con «la lettura del
+# catalogo ha superato 600 secondi», mentre il sito dal VPS rispondeva
+# in 8 s — 201 prodotti variabili, 2.467 varianti, 2,5 s a prodotto).
+# Gli otto minuti qui sopra partivano quando la lettura veniva CHIESTA,
+# ma il filo la prendeva dal pool comune di `asyncio.to_thread`, che su
+# una macchina da due CPU ha sei operai e li divide con foto, relay,
+# miniature e rotte: in fila, i dieci minuti della scadenza correvano
+# prima ancora di bussare. Adesso la lettura ha due operai SUOI (il
+# giro e' uno alla volta; il secondo e' per «Aggiorna ora» mentre un
+# filo scaduto finisce da solo) e gli otto minuti si contano da quando
+# il filo parte davvero. Due e non uno: un filo che la scadenza ha
+# lasciato indietro non deve far fare la coda al giro dopo.
+_POOL_LETTURA_NEGOZI = None
+
+
+def _pool_lettura_negozi():
+    """Il pool dei lettori dei negozi collegati, nato al primo uso (come
+    quello del P2P). Lo stesso per tutti i giri: un pool nuovo a ogni
+    giro lascerebbe in giro i fili dei vecchi."""
+    global _POOL_LETTURA_NEGOZI
+    if _POOL_LETTURA_NEGOZI is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _POOL_LETTURA_NEGOZI = ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="negozi-lettura")
+    return _POOL_LETTURA_NEGOZI
+
+
 _prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
 
 # Quanti prodotti leggere per connettore per giro. Un catalogo piu'
@@ -100268,6 +100296,15 @@ _APRITORE_API = urllib.request.build_opener(_NienteRedirect)
 # Il tetto sulla risposta: una pagina di catalogo con 250 prodotti sta
 # largamente sotto, e oltre non e' piu' un catalogo.
 TETTO_RISPOSTA_API = 5_000_000
+# IL TETTO DELLA CHIAMATA INTERA (19 nov 2026, cantiere
+# lettore-negozi-in-tempo). Il `timeout=15` di urllib e' per OGNI
+# operazione del socket, non per la chiamata: un negozio che manda
+# qualche byte ogni dieci secondi non lo fa mai scattare, e una
+# chiamata sola poteva mangiarsi i due minuti di scarto fra la lettura
+# a tempo e la scadenza. Trenta secondi sono quattro volte la pagina
+# piu' pesante misurata dal VPS (cento prodotti di SWAG, 4,8 MB, 8 s).
+CHIAMATA_NEGOZIO_MAX_S = 30
+FETTA_RISPOSTA_API = 65_536
 
 
 def chiama_api_negozio(metodo: str, url: str,
@@ -100295,9 +100332,24 @@ def chiama_api_negozio(metodo: str, url: str,
     req = urllib.request.Request(url, method=metodo, headers={
         "User-Agent": "Barattolo/1.0", "Accept": "application/json",
         **(intestazioni or {})})
+    entro = time.monotonic() + CHIAMATA_NEGOZIO_MAX_S
     try:
         with _APRITORE_API.open(req, timeout=15) as r:
-            raw = r.read(TETTO_RISPOSTA_API + 1)
+            # a fette, guardando l'orologio fra l'una e l'altra: il
+            # tetto e' sulla chiamata intera (vedi CHIAMATA_NEGOZIO_MAX_S)
+            fette, letti = [], 0
+            while letti <= TETTO_RISPOSTA_API:
+                if time.monotonic() > entro:
+                    raise RuntimeError(
+                        "il negozio ha impiegato piu' di "
+                        f"{CHIAMATA_NEGOZIO_MAX_S} secondi a rispondere")
+                fetta = r.read(min(FETTA_RISPOSTA_API,
+                                   TETTO_RISPOSTA_API + 1 - letti))
+                if not fetta:
+                    break
+                fette.append(fetta)
+                letti += len(fetta)
+            raw = b"".join(fette)
             testa = dict(r.headers.items())
             stato = r.status
     except urllib.error.HTTPError as e:
@@ -100820,8 +100872,21 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
         # scadenza qui sotto, e quel che ha letto e' un giro buono — e da
         # dove riparte la rotazione delle variazioni. Una busta come le
         # credenziali: ogni lettore ci pesca quel che gli serve.
-        ritmo = {"entro": time.monotonic() + CONNETTORI_VARIANTI_MAX_S,
-                 "segno": {"dopo": _segno_varianti(c)}}
+        # L'ORA DI FERMARSI («entro») la scrive il filo quando PARTE
+        # (19 nov 2026, vedi `_pool_lettura_negozi`): contata da qui,
+        # un'attesa in fila se la mangiava tutta.
+        ritmo = {"segno": {"dopo": _segno_varianti(c)}}
+        tempi = {"chiesta": time.monotonic()}
+
+        def _leggi():
+            tempi["partita"] = time.monotonic()
+            ritmo["entro"] = tempi["partita"] + CONNETTORI_VARIANTI_MAX_S
+            try:
+                return lettore(c["url_negozio"], credenziali,
+                               chiama_api_negozio, MAX_PRODOTTI_CONNETTORE,
+                               ritmo)
+            finally:
+                tempi["finita"] = time.monotonic()
         try:
             # la BUSTA INTERA delle credenziali e non un campo: Shopify ha
             # un token, Woo una chiave e un segreto, e a sapere che forma
@@ -100833,13 +100898,20 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # 500); il thread che leggeva finisce da solo e il suo
             # risultato si butta — era in sola lettura, non scrive niente.
             prodotti, avviso, completo = await asyncio.wait_for(
-                asyncio.to_thread(lettore, c["url_negozio"], credenziali,
-                                  chiama_api_negozio, MAX_PRODOTTI_CONNETTORE,
-                                  ritmo),
+                asyncio.get_running_loop().run_in_executor(
+                    _pool_lettura_negozi(), _leggi),
                 timeout=CONNETTORI_LETTURA_MAX_S)
         except asyncio.TimeoutError:
+            # DOVE si e' perso il tempo, scritto nel motivo: la fila o la
+            # lettura (il 19 nov 2026 mancava proprio questo)
+            if "partita" in tempi:
+                dove = (f"partita dopo "
+                        f"{tempi['partita'] - tempi['chiesta']:.0f} s")
+            else:
+                dove = "non era ancora partita"
             await _connettore_in_errore(
-                c, f"la lettura del catalogo ha superato {CONNETTORI_LETTURA_MAX_S} secondi")
+                c, f"la lettura del catalogo ha superato "
+                   f"{CONNETTORI_LETTURA_MAX_S} secondi ({dove})")
             return
         except Exception as e:
             # LO SPEGNIMENTO NON SI CONTA: contato, ogni deploy durante
@@ -100858,6 +100930,17 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
             # letto per intero proprio mentre si chiude: non si comincia
             # a scrivere adesso, il giro dopo rilegge e riconcilia
             return
+        # LA RIGA DEI TEMPI (19 nov 2026): quanto in fila, quanto a
+        # leggere, quante variazioni — cosi' un negozio che sfora si
+        # vede nel journal PRIMA che diventi un errore
+        segno = ritmo["segno"]
+        print(f"📖 Connettore #{c['id']} ({c['fonte']}): letto in "
+              f"{tempi['finita'] - tempi['partita']:.0f} s (in fila "
+              f"{tempi['partita'] - tempi['chiesta']:.0f} s), "
+              f"{len(prodotti)} prodotti"
+              + (f", varianti di {segno['lette']} prodotti, "
+                 f"{segno['rimaste']} al prossimo giro"
+                 if "lette" in segno else ""), flush=True)
         righe = importa_negozio.traduci(prodotti, c["fonte"], cambio)
         # LA CATEGORIA DI OGNI RIGA (16 nov 2026): quella del cassetto,
         # o quella del negozio quando combacia con una nostra

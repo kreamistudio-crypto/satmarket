@@ -26675,6 +26675,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   traduttore ne fa una riga `_figlie_intatte`, e la riconciliazione non
   spegne le loro figlie `pid:vid` (le sparizioni vere dello stesso giro
   si fanno). Fermo fra le pagine, la lettura è parziale come al tetto.
+  DAL 19 NOV 2026 (cantiere lettore-negozi-in-tempo) la lettura gira
+  nel pool SUO, `_pool_lettura_negozi()` (due operai `negozi-lettura`,
+  non il pool comune di `asyncio.to_thread`), ed `entro` lo scrive il
+  filo quando PARTE: un'attesa in fila non si mangia più gli otto
+  minuti. E `chiama_api_negozio` legge a fette con un tetto sulla
+  chiamata INTERA, `CHIAMATA_NEGOZIO_MAX_S` (30 s), oltre al `timeout=15`
+  di urllib che vale per ogni operazione del socket. Una lettura riuscita
+  scrive nel journal «📖 Connettore #N: letto in X s (in fila Y s)»; una
+  scaduta dice nel motivo se era partita.
   4) GLI SCRIPT A MANO che aprono il database vivo aspettano il
   lucchetto quindici secondi come `db()`; un censimento di `prove.py`
   guarda la cartella.

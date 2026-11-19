@@ -113364,8 +113364,9 @@ def prove_connettori_woo():
     # conoscere le credenziali di ogni piattaforma, che e' la stessa
     # cosa che i traduttori esistono per non far sapere a nessuno.
     unc = codice(pezzo("_un_connettore"))
+    # (19 nov 2026) la chiamata sta nel filo `_leggi`, nel pool suo
     prova("il server passa le credenziali INTERE al lettore", True,
-          "lettore, c[\"url_negozio\"], credenziali," in unc)
+          "lettore(c[\"url_negozio\"], credenziali," in unc)
     prova("...e ogni lettore ci pesca quel che gli serve",
           [True, True],
           ['(credenziali or {}).get("token"' in
@@ -113897,9 +113898,14 @@ def prove_connettore_interrompibile():
         class Risposta:
             status = 200
             headers = {}
+            # (19 nov 2026) il tubo legge a fette fino alla fine, come
+            # una risposta vera: la seconda lettura torna vuota
+            def __init__(self): self.dato = b'{"prodotti": [1]}'
             def __enter__(self): return self
             def __exit__(self, *a): return False
-            def read(self, n): return b'{"prodotti": [1]}'
+            def read(self, n):
+                dato, self.dato = self.dato[:n], self.dato[n:]
+                return dato
 
         class Apritore:
             def open(self, req, timeout=None):
@@ -113947,6 +113953,10 @@ def prove_connettore_interrompibile():
         g.update({"_APRITORE_API": Apritore(),
                   "url_api_ammesso": lambda u: True,
                   "TETTO_RISPOSTA_API": 10**6,
+                  # il tetto della chiamata intera e il pool dei lettori
+                  # (19 nov 2026): qui il pool comune basta
+                  "CHIAMATA_NEGOZIO_MAX_S": 30, "FETTA_RISPOSTA_API": 65_536,
+                  "_pool_lettura_negozi": lambda: None,
                   # la scadenza della lettura (cura 8, ott 2026)
                   "CONNETTORI_LETTURA_MAX_S": 600,
                   "_CONNETTORI_IN_CORSO": set(),
@@ -114078,6 +114088,206 @@ def prove_connettore_interrompibile():
     _aio.run(g["sincronizza_connettori"]())
     prova("...e se arriva a meta' giro, il collegamento dopo non comincia",
           [1], fatti)
+
+
+def prove_lettore_negozi_in_tempo():
+    """LA LETTURA DEI NEGOZI NON SCADE IN FILA (19 nov 2026, cantiere
+    lettore-negozi-in-tempo; dal campo: SWAG.btc.pub in 'errore' dal 6
+    ottobre con «la lettura del catalogo ha superato 600 secondi»,
+    mentre il sito dal VPS rispondeva in 8 s).
+
+    Tre cure, e per ognuna la scena VERA coi pezzi di server.py e la sua
+    controprova: 1) la lettura ha operai SUOI e non aspetta dietro al
+    pool comune pieno (il pool comune pieno, con la scadenza in piccolo,
+    la fa scadere «non ancora partita»); 2) gli otto minuti si contano
+    da quando il filo PARTE, non da quando la lettura e' chiesta; 3) la
+    chiamata al negozio ha un tetto sulla durata INTERA, non solo sul
+    silenzio fra due byte. Piu' la riga dei tempi nel journal."""
+    import asyncio as _aio, json as _json, threading as _th, time as _t
+    import urllib as _ul, urllib.request, urllib.error  # noqa: F401
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    print("\n[la lettura dei negozi: operai suoi, otto minuti dall'avvio, "
+          "tetto alla chiamata]")
+    src = _SORGENTE
+
+    # --- 1) il pool: suo, nato una volta, due operai col loro nome -----
+    g = {}
+    exec(src[src.index("_POOL_LETTURA_NEGOZI = None"):
+             src.index("\n\n\n_prossimo_giro_connettori")], g)
+    p1, p2 = g["_pool_lettura_negozi"](), g["_pool_lettura_negozi"]()
+    prova("il pool dei lettori e' uno solo, nato al primo uso", True,
+          p1 is p2 and isinstance(p1, _TPE))
+    prova("...due operai, col nome che si legge in `ps -L`",
+          (2, "negozi-lettura"), (p1._max_workers, p1._thread_name_prefix))
+    p1.shutdown(wait=False)
+    unc = codice(pezzo("_un_connettore"))
+    prova("il giro legge nel pool suo, non in `asyncio.to_thread`", True,
+          "run_in_executor(\n                    _pool_lettura_negozi(), _leggi)"
+          in unc and "asyncio.to_thread(lettore" not in unc)
+
+    # --- il banco: i pezzi veri, un lettore finto che dice cosa ha visto --
+    def banco(pool, lettura_max=600, varianti_max=480):
+        g = {"asyncio": _aio, "json": _json, "time": _t,
+             "print": lambda *a, **k: stampe.append(" ".join(map(str, a))),
+             "_SI_CHIUDE": _th.Event(), "_CONNETTORI_IN_CORSO": set(),
+             "_decifra_contenuto": lambda x: "{}",
+             "chiama_api_negozio": None, "MAX_PRODOTTI_CONNETTORE": 1000,
+             "CONNETTORI_LETTURA_MAX_S": lettura_max,
+             "CONNETTORI_VARIANTI_MAX_S": varianti_max,
+             "_segno_varianti": lambda c: 0,
+             "_pool_lettura_negozi": lambda: pool}
+        visto = {"errori": [], "entro_fra": None, "chiusi": 0}
+
+        def lettore(url, cred, chiama, tetto, ritmo=None):
+            visto["entro_fra"] = ritmo["entro"] - _t.monotonic()
+            ritmo["segno"].update(dopo=0, lette=3, rimaste=2)
+            return [1, 2, 3], "", True
+
+        async def in_errore(c, e):
+            visto["errori"].append(e)
+
+        async def chiudi(c, esito):
+            visto["chiusi"] += 1
+
+        async def niente_nostr(cid, senza_tetto=False):
+            return {}
+
+        class Con:
+            def close(self): pass
+
+        mod = type("M", (), {})()
+        mod.LETTORI = {"woo": lettore}
+        mod.traduci = lambda prodotti, fonte, cambio: []
+        mod.riconcilia_connettore = lambda *a, **k: {"saltati": []}
+        g.update({"_connettore_in_errore": in_errore,
+                  "_chiudi_giro_connettore": chiudi,
+                  "nostr_del_negozio": niente_nostr,
+                  "_righe_da_giudicare": lambda righe, c, tetto=0: ([], []),
+                  "categorie_righe_negozio": lambda righe, c: None,
+                  "_nuovi_per_giro": lambda c: 30, "db": lambda: Con(),
+                  "MSG_RIGA_NON_GIUDICATA": "x",
+                  "MAX_NUOVI_CONNETTORE_GIRO": 30,
+                  "_salva_foto_connettore": lambda *a: None})
+        exec("async " + pezzo("_un_connettore"), g)
+        c = {"id": 3, "fonte": "woo", "credenziali": "",
+             "url_negozio": "https://negozio.example"}
+        return g, visto, mod, c
+
+    def con_pool_comune_pieno(scena):
+        """Il pool comune con UN operaio, tenuto occupato finche' la
+        scena non finisce: la fila del 6 ottobre, in piccolo."""
+        async def dentro():
+            loop = _aio.get_running_loop()
+            comune = _TPE(max_workers=1)
+            loop.set_default_executor(comune)
+            libera = _th.Event()
+            loop.run_in_executor(None, libera.wait, 10)
+            try:
+                return await scena()
+            finally:
+                libera.set()
+        return _aio.run(dentro())
+
+    # --- 2) la fila: col pool comune pieno, la lettura nel pool suo va ---
+    stampe = []
+    suo = _TPE(max_workers=2, thread_name_prefix="negozi-lettura")
+    g, visto, mod, c = banco(suo, lettura_max=2)
+    con_pool_comune_pieno(lambda: g["_un_connettore"](c, {}, mod))
+    prova("pool comune pieno: la lettura nel pool suo arriva in fondo", ([], 1),
+          (visto["errori"], visto["chiusi"]))
+    riga = [s for s in stampe if str(s).startswith("📖 Connettore #3")]
+    prova("...e il journal dice i tempi: in fila, a leggere, le varianti", True,
+          len(riga) == 1 and "in fila 0 s" in riga[0] and "3 prodotti" in riga[0]
+          and "varianti di 3 prodotti, 2 al prossimo giro" in riga[0])
+    suo.shutdown(wait=True)
+
+    # CONTROPROVA: la stessa scena nel pool comune (com'era fino a ieri)
+    # scade senza aver mai bussato, e il motivo lo dice
+    stampe = []
+    g, visto, mod, c = banco(None, lettura_max=0.5)
+    con_pool_comune_pieno(lambda: g["_un_connettore"](c, {}, mod))
+    prova("controprova, nel pool comune pieno: scade e non era ancora partita",
+          (1, True, None, 0),
+          (len(visto["errori"]), "(non era ancora partita)" in (visto["errori"] or [""])[0],
+           visto["entro_fra"], visto["chiusi"]))
+    prova("...il motivo resta quello di sempre, piu' il dove", True,
+          (visto["errori"] or [""])[0].startswith(
+              "la lettura del catalogo ha superato 0.5 secondi"))
+
+    # --- 3) gli otto minuti dall'avvio vero: in fila 0,4 s, entro intero --
+    stampe = []
+    stretto = _TPE(max_workers=1)
+    occupato = stretto.submit(_t.sleep, 0.4)
+    g, visto, mod, c = banco(stretto, lettura_max=5, varianti_max=1.0)
+    _aio.run(g["_un_connettore"](c, {}, mod))
+    occupato.result()
+    stretto.shutdown(wait=True)
+    prova("in fila 0,4 s: il lettore riceve lo stesso il suo tempo INTERO", True,
+          visto["entro_fra"] is not None and visto["entro_fra"] > 0.9)
+    riga = [s for s in stampe if str(s).startswith("📖 Connettore #3")]
+    prova("...e la riga del journal la fila la conta", True,
+          len(riga) == 1 and "(in fila 0 s)" in riga[0])
+
+    # --- 4) il tetto della chiamata intera -------------------------------
+    def tubo(apritore, tetto_s):
+        g = {"time": _t, "urllib": _ul, "json": _json, "_SI_CHIUDE": _th.Event(),
+             "url_api_ammesso": lambda u: True, "_APRITORE_API": apritore,
+             "TETTO_RISPOSTA_API": 10**6, "CHIAMATA_NEGOZIO_MAX_S": tetto_s,
+             "FETTA_RISPOSTA_API": 4,
+             "SpegnimentoInCorso": type("SpegnimentoInCorso", (Exception,), {})}
+        exec(pezzo("chiama_api_negozio"), g)
+        exec(pezzo("_json_o_niente"), g)
+        return g["chiama_api_negozio"]
+
+    def apritore_goccia(corpo, pausa):
+        class Risposta:
+            status, headers = 200, {}
+            def __init__(self): self.resto = corpo
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n):
+                # una goccia ogni `pausa`: il timeout del socket (15 s fra
+                # due byte) non scatterebbe mai
+                _t.sleep(pausa)
+                fuori, self.resto = self.resto[:n], self.resto[n:]
+                return fuori
+        class Apritore:
+            def open(self, req, timeout=None):
+                return Risposta()
+        return Apritore()
+
+    lungo = b'{"x": "' + b"a" * 400 + b'"}'
+    t0 = _t.monotonic()
+    try:
+        tubo(apritore_goccia(lungo, 0.01), 0.3)("GET", "https://n.example/x", {})
+        esito = "letta"
+    except RuntimeError as e:
+        esito = str(e)
+    durata = _t.monotonic() - t0
+    prova("un negozio che goccia: la chiamata si ferma al suo tetto, e lo dice",
+          (True, True), ("impiegato piu' di 0.3 secondi" in esito, durata < 1.0))
+    stato, corpo, _ = tubo(apritore_goccia(lungo, 0.0005), 30)(
+        "GET", "https://n.example/x", {})
+    prova("controprova: la stessa risposta, senza fretta, arriva INTERA a fette",
+          (200, 400), (stato, len(corpo.get("x", ""))))
+    g4 = {"time": _t, "urllib": _ul, "json": _json, "_SI_CHIUDE": _th.Event(),
+          "url_api_ammesso": lambda u: True,
+          "_APRITORE_API": apritore_goccia(b"a" * 50, 0),
+          "TETTO_RISPOSTA_API": 20, "CHIAMATA_NEGOZIO_MAX_S": 30,
+          "FETTA_RISPOSTA_API": 8,
+          "SpegnimentoInCorso": type("SpegnimentoInCorso", (Exception,), {})}
+    exec(pezzo("chiama_api_negozio"), g4)
+    exec(pezzo("_json_o_niente"), g4)
+    try:
+        g4["chiama_api_negozio"]("GET", "https://n.example/x", {})
+        esito = "letta"
+    except RuntimeError as e:
+        esito = str(e)
+    prova("...e il tetto dei byte regge anche a fette", "risposta troppo grande",
+          esito)
+    i = src.index("CHIAMATA_NEGOZIO_MAX_S = ")
+    prova("il tetto della chiamata: trenta secondi, sotto lo scarto di due minuti",
+          "CHIAMATA_NEGOZIO_MAX_S = 30", src[i:src.index("\n", i)])
 
 
 def prove_connettori_varianti():
@@ -155712,6 +155922,8 @@ def prove_negozi_grandi():
              "_decifra_contenuto": lambda x: "{}", "chiama_api_negozio": None,
              "MAX_PRODOTTI_CONNETTORE": 1000, "CONNETTORI_LETTURA_MAX_S": 600,
              "CONNETTORI_VARIANTI_MAX_S": 480, "MAX_NUOVI_CONNETTORE_GIRO": 30,
+             # il pool dei lettori (19 nov 2026): qui basta quello comune
+             "_pool_lettura_negozi": lambda: None,
              "MAX_NUOVI_CONNETTORE_RODAGGIO": 100, "ORE_RODAGGIO_CONNETTORE": 24,
              "LOTTO_MODERAZIONE": 20, "PARALLELI_MODERAZIONE": 3,
              "controlla_vietato": vietato_finto,
@@ -214117,6 +214329,7 @@ CATEGORIE = {
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
+    lettore_negozi_in_tempo
     famiglie connettori_cassetto connettori_categoria scelte_negozio negozi_su_nostr avvisi_barattolo serie_giorni serie_classifica serie_brace finestra ordini_prova tutorial
     caccia_a_tappo
     timbri_visti effetti_ridotti morfosi_vendi copertura_home
@@ -215161,6 +215374,7 @@ def main():
               prove_titoli_importati,
               prove_connettori_varianti,
               prove_connettore_interrompibile,
+              prove_lettore_negozi_in_tempo,
               prove_famiglie,
               prove_connettori_cassetto,
               prove_finestra,
