@@ -167008,6 +167008,11 @@ out.storta = [onchainQuotaStorta(P()),
   onchainQuotaStorta({prezzo_sats: 7000, quota_sats: 5000}),
   onchainQuotaStorta({prezzo_sats: 7000, quota_sats: 5001}),
   onchainQuotaStorta({prezzo_sats: 7000, quota_sats: 1000, quota_ricevente_sats: 10})];
+/* (20 nov 2026, fee-minima-oc) sugli scambi piccoli la commissione sale a 546:
+   il tetto non scende sotto la polvere, ma le due insieme non la superano */
+out.stortaPiccolo = [onchainQuotaStorta(P({prezzo_sats: 12000, quota_sats: 546, quota_ricevente_sats: 328})),
+  onchainQuotaStorta(P({prezzo_sats: 12000, quota_sats: 700, quota_ricevente_sats: 350})),
+  onchainQuotaStorta(P({prezzo_sats: 12000, quota_sats: 1100, quota_ricevente_sats: 547}))];
 out.uscite = onchainUsciteVersoVenditore(P(), 'qI');
 try { onchainUsciteVersoVenditore(P({quota_ricevente_sats: 3000}), 'qI'); out.troppo = 'passata'; }
 catch (e) { out.troppo = e.message; }
@@ -167090,8 +167095,13 @@ process.stdout.write(JSON.stringify(out));
                ["Sats dello scambio | — sats", "Ricevi | — sats"]],
               [o["mercatoRiceve"][:3], o["mercatoSwap"][:4], o["mercatoDeposita"][:3],
                o["mercatoSenzaStima"][:2]])
-        prova("...sotto la polvere niente commissione, e senza fee viva niente riga",
-              [{"sats": 0, "stima": True}, None], [o["piccolo"], o["senzaFee"]])
+        prova("...sotto la polvere la commissione sale a 546 in proporzione (20 nov 2026, "
+              "Andrea: «Il livello pioniere paga comunque una fee»: 546 x 120/300 = 218), "
+              "e senza fee viva niente riga",
+              [{"sats": 218, "stima": True}, None], [o["piccolo"], o["senzaFee"]])
+        prova("...e il tetto del telefono, sugli scambi piccoli: 546 divisi passa, oltre "
+              "il 5% o i 546 in tutto no, e nessuna meta' sopra i 546",
+              [True, False, False], [x == "" for x in o["stortaPiccolo"]])
     prova("I FILI DEL SERVER: la presa conta le due meta' dalla fee viva (503 se non c'e'), "
           "l'importo porta quella di chi deposita, la riga le scrive; il giudice dei PSBT e "
           "la firma di Barattolo pagano l'incasso netto; il cambio si misura sull'incasso",

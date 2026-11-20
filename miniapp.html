@@ -72713,7 +72713,11 @@ const ONCHAIN_QUOTA_TETTO = 5000;   // come ONCHAIN_QUOTA_TETTO del server
    di chi riceve esce dal suo incasso (`quota_ricevente_sats`). IL TETTO
    CHE IL TELEFONO RILEGGE PRIMA DI FIRMARE: ogni meta' al piu' il 2,5% del
    prezzo (una fee del coordinatore fino al 5%; oggi e' il 3%) — un server
-   manomesso puo' sbagliare la cifra, mai oltre questo. */
+   manomesso puo' sbagliare la cifra, mai oltre questo. SUGLI SCAMBI
+   PICCOLI il tetto non scende sotto la polvere (20 nov 2026, cantiere
+   fee-minima-oc): la commissione sale a 546 sats in tutto, e una meta'
+   puo' superare il 2,5% — ma mai 546, e le due insieme mai oltre il
+   doppio del 2,5% o 546. */
 const P2P_OC_META_MAX = 0.025;
 /* quanto arriva all'incasso di un rilascio: il prezzo, meno la meta' di
    chi riceve (zero nel mercatino). PURA */
@@ -72726,8 +72730,9 @@ function onchainQuotaStorta(o){
   const quota = Number(o.quota_sats) || 0;
   const ric = Number(o.quota_ricevente_sats) || 0;
   if (!o.rotta) return (quota > ONCHAIN_QUOTA_TETTO || ric) ? 'la quota di Barattolo supera il tetto' : '';
-  const tetto = Math.ceil(Number(o.prezzo_sats) * P2P_OC_META_MAX);
-  if (ric < 0 || ric > quota || ric > tetto || quota - ric > tetto)
+  const meta = Math.ceil(Number(o.prezzo_sats) * P2P_OC_META_MAX);
+  const tetto = Math.max(meta, 546);
+  if (ric < 0 || ric > quota || ric > tetto || quota - ric > tetto || quota > Math.max(2 * meta, 546))
     return 'la commissione del P2P supera il tetto';
   return '';
 }
@@ -78061,7 +78066,10 @@ function gestoRecensioneOcP2P(btn, cosa, ordine){
    mette sopra, chi riceve la trova tolta. Prima e' la STIMA del conto di
    Lightning — la fee viva del coordinatore con lo sconto di chi guarda
    (`feeMiaP2P`), meta' sul prezzo — e sotto la polvere (546 sats in tutto)
-   non si prende niente, come dice il server. `deposito` = chi guarda mette
+   il totale sale a 546, diviso in proporzione alle due meta', come dice il
+   server (20 nov 2026, cantiere fee-minima-oc: prima era zero, e il
+   pioniere su 10 € leggeva «0 sats»). L'altra meta' qui e' quella senza
+   sconto: e' una stima, col «≈». `deposito` = chi guarda mette
    i sats. Senza fee viva, null: la riga non si inventa. PURA sulle leve. */
 function commissioneOnchainP2P(o, deposito){
   const quota = Number(o.quota_sats) || 0;
@@ -78073,7 +78081,8 @@ function commissioneOnchainP2P(o, deposito){
   const viva = typeof commissioneVivaP2P === 'function' ? commissioneVivaP2P() : null;
   if (mia === null || viva === null || !(sats > 0)) return null;
   const meta = Math.round(sats * mia / 2);
-  if (meta + Math.round(sats * viva / 2) < 546) return {sats: 0, stima: true};
+  const tutte = meta + Math.round(sats * viva / 2);
+  if (tutte > 0 && tutte < 546) return {sats: Math.round(546 * meta / tutte), stima: true};
   return {sats: meta, stima: true};
 }
 /* PURA: I SATS DELLA CARD ON-CHAIN DI «I MIEI SCAMBI», AL NETTO (17 nov

@@ -114899,11 +114899,18 @@ def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple
     riceve) in sats. Chi deposita mette la sua meta' SOPRA prezzo e
     margine, chi riceve trova la sua tolta dall'incasso: come la hold
     invoice e il payout di Mostro.
-    SOTTO LA POLVERE NON SI PRENDE NIENTE: un'uscita verso Barattolo
-    sotto i 546 sats la rete non la trasmette, e scaricarla sulla
-    commissione di rete la farebbe pagare ai miner; quindi a commissione
-    totale sotto la polvere tutt'e due le meta' sono zero (succede solo
-    sugli scambi piu' piccoli, sotto i ~18.000 sats in beta).
+    SOTTO LA POLVERE SI SALE ALLA POLVERE (20 nov 2026, cantiere
+    fee-minima-oc; Andrea, davanti a «Fee P2P 🌱 Pioniere 0 sats» su uno
+    scambio da 10 €: «Il livello pioniere paga comunque una fee, seppur
+    ridotta», e sulla card ha scelto «Minimo 546 sats in totale»). Un'uscita
+    verso Barattolo sotto i 546 sats la rete non la trasmette: prima, a
+    commissione totale sotto la polvere, tutt'e due le meta' erano ZERO
+    (sugli scambi sotto i ~18.000-27.000 sats nessuno pagava niente). Adesso
+    il totale sale a 546 e si divide IN PROPORZIONE alle due meta' vere,
+    cosi' lo sconto del pioniere resta: chi ha l'1% paga meno di chi ha
+    l'1,5%. Scartate: lasciare lo zero, e chiudere l'on-chain sotto soglia
+    (CANTIERI, «La fee minima del P2P on-chain»). Fee viva zero = zero:
+    il minimo non inventa una commissione che non c'e'.
     `fee` None = il 38385 non si e' letto: ValueError, e la presa non
     parte (meglio un «riprova» che una commissione inventata). PURA sulla
     connessione."""
@@ -114911,8 +114918,9 @@ def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple
         raise ValueError("la commissione del P2P non si legge")
     meta = lambda tg: max(0, round(int(prezzo) * float(_fee_di_p2p(con, int(tg), fee)) / 2))
     fd, fr = meta(dep), meta(ric)
-    if fd + fr < ONCHAIN_POLVERE:
-        return 0, 0
+    if 0 < fd + fr < ONCHAIN_POLVERE:
+        fd2 = round(ONCHAIN_POLVERE * fd / (fd + fr))
+        return fd2, ONCHAIN_POLVERE - fd2
     return fd, fr
 
 

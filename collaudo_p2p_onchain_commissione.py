@@ -365,25 +365,32 @@ def main():
           (r.status_code, r2.json()["stato"],
            sorted((script.Script(v.script_pubkey.data).address(N), v.value) for v in tx.vout)))
 
-    # ---- 6) sotto la polvere niente commissione -----------------------------
-    print("\n[lo scambio piccolo: sotto la polvere niente commissione]")
+    # ---- 6) sotto la polvere si sale alla polvere ---------------------------
+    # (20 nov 2026, cantiere fee-minima-oc; Andrea: «Il livello pioniere
+    # paga comunque una fee, seppur ridotta». Prima qui era tutto zero)
+    print("\n[lo scambio piccolo: sotto la polvere la commissione sale a 546]")
     oid4 = pubblica(999, sats=12000, euro_cent=1100).json()["id"]
     r = gesto(888, oid4, "prendi")
     o4 = r.json()
-    # 12.000 x 1% = 120 + 12.000 x 1,5% = 180: 300 < 546
-    prova("12.000 sats: 120 + 180 = 300 sotto i 546, quindi niente quota, niente "
-          "uscita, l'importo di ieri", (200, 0, 0, "", 13080),
+    # 12.000 x 1% = 120 + 12.000 x 1,5% = 180: 300 < 546, quindi 546 divisi
+    # in proporzione: 546 x 120/300 = 218 al pioniere che deposita, 328
+    # all'altro che riceve
+    prova("12.000 sats: 120 + 180 = 300 sotto i 546, quindi 546 in proporzione "
+          "(218 al pioniere, 328 all'altro), con l'uscita verso Barattolo e la "
+          "meta' di chi deposita nell'importo", (200, 546, 328, True, 12000 + 1080 + 218),
           (r.status_code, o4["quota_sats"], o4["quota_ricevente_sats"],
-           o4["quota_indirizzo"], o4["importo_sats"]))
+           bool(o4["quota_indirizzo"]), o4["importo_sats"]))
 
     # ---- 7) la commissione pura -------------------------------------------
     print("\n[il conto puro delle due meta']")
     con = SRV.db()
     K = SRV._p2p_onchain_commissioni
-    prova("pioniere e no, fee zero, sotto la polvere, fee non letta",
-          [(1000, 1500), (1500, 1000), (0, 0), (0, 0), "x"],
+    prova("pioniere e no, fee zero, sotto la polvere (546 in proporzione, nei due "
+          "versi), fee non letta",
+          [(1000, 1500), (1500, 1000), (0, 0), (218, 328), (328, 218), "x"],
           [K(con, 999, 888, 100000, 0.03), K(con, 888, 999, 100000, 0.03),
-           K(con, 999, 888, 100000, 0.0), K(con, 999, 888, 12000, 0.03), "x"])
+           K(con, 999, 888, 100000, 0.0), K(con, 999, 888, 12000, 0.03),
+           K(con, 888, 999, 12000, 0.03), "x"])
     try:
         K(con, 999, 888, 100000, None)
         senza = "passata"

@@ -36799,7 +36799,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_p2p_onchain_commissioni(con, dep, ric, prezzo, fee)` conta le due
   metà dalla fee VIVA del nodo (`_P2P_INFO["fee"]`, la stessa del conto
   Lightning), ognuna col suo sconto (`_fee_di_p2p`); sotto
-  `ONCHAIN_POLVERE` in tutto niente commissione; fee ignota = 503 (mai
+  `ONCHAIN_POLVERE` in tutto il totale SALE a 546, diviso in proporzione
+  alle due metà (dal 20 nov 2026, cantiere fee-minima-oc: prima era zero;
+  il tetto del telefono, `onchainQuotaStorta`, non scende sotto 546 per
+  metà e tiene il totale entro il doppio del 2,5% o 546); fee ignota = 503 (mai
   una presa a commissione inventata). Chi deposita mette la sua metà
   sopra (`importo_sats = prezzo + margine + q_dep`), `quota_sats` = le
   due metà all'indirizzo di Barattolo (`/1/numero_barattolo` di

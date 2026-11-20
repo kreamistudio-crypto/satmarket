@@ -93111,3 +93111,61 @@ banco diventa rosso.
 DA GUARDARE. Sul telefono (collaudo): la discesa del + dopo il tocco
 sulla rete, col foglio della scelta che si chiude nello stesso momento;
 il ⚡ sul blu del bottone.
+
+## La fee minima del P2P on-chain: sotto i 546 sats si sale a 546 (20 nov 2026, cantiere fee-minima-oc; Andrea, davanti a «Fee P2P 🌱 Pioniere 0 sats» nel dettaglio dell'ordine on-chain 60 da 10 €, a tempo e con la cauzione: «Ma quando mai? Il livello pioniere paga comunque una fee, seppur ridotta»)
+
+IL CASO. Non era la visualizzazione: la fee non era presa davvero. La
+commissione on-chain va a Barattolo come un'uscita sua della transazione,
+e la rete non trasmette uscite sotto la polvere (546 sats). Il cantiere
+p2p-onchain-commissione (16 nov) aveva scelto, in
+`_p2p_onchain_commissioni`, di azzerare tutt'e due le metà quando il
+totale stava sotto 546: sui ~17.400 sats dell'ordine 60 la metà del
+pioniere era 174 (1%), quella dell'altro 261 (1,5%), 435 in tutto, quindi
+zero a tutti e due. Succedeva su ogni on-chain sotto i ~18.000-27.000
+sats (10-15 €). Il tempo e la cauzione non c'entrano: la cauzione è a
+parte, in Lightning. Lightning è a posto: la fee la trattiene Mostro
+nella fattura, senza soglia.
+
+DECISO (card di Andrea, «Minimo 546 sats in totale»). Sotto la polvere il
+totale sale a 546 e si divide IN PROPORZIONE alle due metà vere
+(546 × metà / somma, il resto all'altra), così lo sconto resta: il
+pioniere paga sempre meno di chi non lo è. Fee viva zero resta zero.
+Sul telefono la stima prima della presa (`commissioneOnchainP2P`) fa lo
+stesso conto, con l'altra metà senza sconto (col «≈», come prima). IL
+TETTO DEL TELEFONO (`onchainQuotaStorta`, riletto prima di co-firmare)
+doveva seguire, o uno scambio piccolo si bloccava alla firma: ogni metà
+al più il 2,5% del prezzo o 546 se più grande, e le due insieme al più
+il doppio del 2,5% o 546 — un server manomesso, sugli scambi piccoli, non
+prende più della polvere. È la «commissione minima fissa» del backlog,
+ma solo sul P2P on-chain. Nessun testo nuovo: la riga «Fee P2P» con la
+sua percentuale c'era già, ora dice la cifra vera.
+
+SCARTATO. Lasciare lo zero; chiudere l'on-chain sotto soglia (gli ordini
+piccoli solo in Lightning); mandare la commissione sotto soglia ai miner
+dentro la commissione di rete (la paga l'utente e non arriva a nessuno).
+
+PROVATO. `collaudo_p2p_onchain_commissione` (lo scambio da 12.000 sats:
+546 = 218 al pioniere che deposita + 328 all'altro, l'uscita verso
+Barattolo c'è, l'importo porta i 218; il conto puro nei due versi),
+`prove_p2p_onchain_commissione` (la stima 218, il tetto: 546 divisi
+passa, 700 o una metà da 547 no). Controprove: il server di prima → il
+collaudo rosso; stima e tetto di prima → 2 prove rosse. Vicini verdi:
+`prove_onchain_consigliato`, `prove_convenienza_monete`,
+`prove_premio_conto_onchain`, `prove_mercato_conto_onchain`,
+`collaudo_onchain_verso_lightning`, `collaudo_p2p_onchain` (venv della CI
+senza coincurve). Suite severa intera sull'albero di develop `1b7444b`
+più il cantiere, nel venv delle sole prove della CI: 30.734 passate, 0
+fallite, 2 saltate per nostr-tools, rigirate con nostr-tools@2.25.2
+fuori dal repo (`prove_annuncio_identita`, `prove_relay_di_barattolo`):
+97 passate, 0 saltate. Collaudi della CI nel venv senza coincurve e
+senza proxy: 162 verdi, 0 rossi.
+Poi rebase su develop `8029c399` (quattro commit d'altri:
+tocca-recapito-oc, timer-deposito, sepa-instant, barattozon-testi;
+nessun simbolo in comune, un conflitto solo in coda a CANTIERI, unite):
+sezioni toccate, quelle che leggono i documenti e
+`prove_conoscenza_tappo` 975 passate, 0 fallite, 0 saltate; i tre
+collaudi vicini verdi; `node --check` sul JS della pagina.
+Resta da guardare: gli scambi presi prima della promozione restano col
+loro zero (la quota si scrive alla presa); il primo on-chain piccolo vero
+dopo la promozione deve mostrare la riga col numero e portare l'uscita a
+Barattolo.
