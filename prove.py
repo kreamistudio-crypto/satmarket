@@ -3219,10 +3219,21 @@ def prove_niente_passo_intermedio():
     # primo codice aperto da chi compra e' la stessa rivelazione, la
     # stessa ricevuta. Si conta con lei, e si guarda che la chiami solo
     # la rotta.)
+    # (20 nov 2026, cantiere abbonamento-canale: l'abbonamento a un
+    # canale ha la SUA ricevuta, e resta un fatto di chi compra. Sul
+    # primo mese e' l'INGRESSO nel canale, che lo dice Telegram quando
+    # lui tocca il link — `abbonamento_richiesta_ingresso`, decisione di
+    # Andrea: «entrare chiude l'acquisto». Sul rinnovo di chi e' GIA'
+    # dentro (Telegram lo conferma) e' il pagamento stesso: l'accesso
+    # continua, e non c'e' niente da rivelare — `_abbonamento_dopo_
+    # incasso`. Mai chi vende: quelle due funzioni le chiamano solo il
+    # campanello e l'incasso.)
     prova("`consegnato` lo scrive una rotta sola", 0,
           _SORGENTE.count("consegnato=?")
           - corpo("leggi_contenuto_digitale").count("consegnato=?")
-          - corpo("_leggi_codici").count("consegnato=?"))
+          - corpo("_leggi_codici").count("consegnato=?")
+          - corpo("_abbonamento_dopo_incasso").count("consegnato=?")
+          - corpo("abbonamento_richiesta_ingresso").count("consegnato=?"))
     prova("...e il ramo dei codici lo chiama solo la rotta", 1,
           _SORGENTE.count("await _leggi_codici("))
     prova("...dentro la rotta", True,
@@ -36988,6 +36999,10 @@ def _censimento(acceso, dopo=None):
     amb["p2p_altra_rete_tetto"] = lambda: 775_170 if acceso else 0
     amb["_fmt_sats"] = str
     amb["NIP05_NOMI"] = {"usdb": "a" * 64} if acceso else {}
+    # I CANALI DELL'ABBONAMENTO (20 nov 2026): un dizionario {chi vende:
+    # canale} di cui il pannello dice la sola LUNGHEZZA — e a leve spente
+    # e' vuoto, cioe' «nessun canale collegato»
+    amb["CANALI_ABBONAMENTO"] = {1: -1001, 2: -1002} if acceso else {}
     # IL SEGRETO DEL PROFILO E' UN DIZIONARIO, non una stringa: il
     # config finto darebbe la stringa di _SEGRETI_FINTI e il
     # server la scarterebbe come leva storta — cioe' il ramo
@@ -111689,7 +111704,7 @@ def prove_quantita_servizi():
     # ---- 56-58: il form di vendita ------------------------------------
     prova("il campo «Quantità disponibile» si nasconde anche per "
           "servizio", True,
-          "(asta || serv) ? 'none' : ''" in
+          "(asta || serv || abbo) ? 'none' : ''" in
           pezzo_js(mini, "function aggiornaConsegnaForm(){", "\n}\n"))
     prova("...e il nuovo campo del limite esiste nel form", True,
           'id="sellServLimite"' in mini)
@@ -186240,7 +186255,9 @@ def prove_canale_admin():
           # Barattolo ha firmato un rimborso da solo, nella moderazione
           # (19 nov 2026, regole-sulla-card) «↩️ Riprendi i sats» a tempo
           # finito: un'altra firma di Barattolo da sola, nella moderazione
-          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 37,
+          # (20 nov 2026, abbonamento-canale) il bot dell'abbonamento senza
+          # i permessi nel canale: negli errori
+          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 38,
            "liquidita": 5, "moderazione": 26, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -186276,7 +186293,7 @@ def prove_canale_admin():
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "117 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "118 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -186300,7 +186317,8 @@ def prove_canale_admin():
           "etichetta, e la firma di Barattolo sul deposito incompleto "
           "annullato; e la cauzione on-chain chiesta da chi vende, persa da sola; "
           "dal 19 nov «Riprendi i sats» on-chain a tempo finito, e la meta' "
-          "di una cauzione P2P ferma nel registro)", 117,
+          "di una cauzione P2P ferma nel registro; dal 20 nov il bot "
+          "dell'abbonamento a un canale senza i permessi)", 118,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -205419,7 +205437,7 @@ def prove_incasso_annuncio():
           ("\"incasso TEXT DEFAULT ''\"" in src,
            "    if incasso_da_payload(d):\n        con.execute(\"UPDATE annunci SET incasso=? WHERE id=?\"," in src,
            "    if \"incasso\" in d:\n        con.execute(\"UPDATE annunci SET incasso=? WHERE id=?\"," in src,
-           ", a.stato, a.domande, a.incasso FROM annunci a" in src))
+           "a.stato, a.domande, a.incasso, a.abbonamento \"\n" in src))
     sb = pezzo("_sblocca_sats")
     prova("server: lo sblocco usa il modo dell'ORDINE, e col «Ogni volta» chiede di scegliere",
           (True, True),
@@ -209354,7 +209372,9 @@ def prove_widget_prova():
     col server vero lo fa `collaudo_widget_prova.py`."""
     print("\n[il widget di prova: solo sulla prova, solo agli admin]")
     import zlib
-    amb = {"json": json, "PROVA_SOLO_IDS": set()}
+    amb = {"json": json, "PROVA_SOLO_IDS": set(),
+           # 20 nov 2026: senza canali in abbonamento la lista non cambia
+           "CANALI_ABBONAMENTO": {}, "ABBONAMENTI_CANALE": True}
     src = _SORGENTE
     i = src.index("PASSI_WIDGET_PROVA = (")
     exec(src[i:src.index("\n\n\ndef widget_prova_acceso", i)], amb)

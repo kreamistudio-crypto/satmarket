@@ -16395,6 +16395,12 @@ document.getElementById('cartello')?.remove();</script>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🤝</span>Ritiro in zona</span></label>
         <label class="cons-riga" id="sellConsDigRiga"><input type="checkbox" id="sellConsDig" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">💾</span>Invio del codice online<span class="cons-sub">buono regalo, codice sconto, licenza</span></span></label>
         <div id="sellDigitaleHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Se l'acquirente sceglie il codice, lo consegnerai dentro Barattolo dopo il pagamento: niente chat private, tutto tracciato. 💡 Fai uno screenshot datato del saldo o della validità prima di vendere: in caso di disputa, le prove decidono.</div>
+        <!-- L'ABBONAMENTO A UN CANALE (20 nov 2026, cantiere abbonamento-
+             canale): solo a chi ha un canale collegato (me.abbonamento_
+             canale) e solo col codice online da solo. Il link d'invito
+             lo manda il server: niente da consegnare a mano. -->
+        <label class="cons-riga" id="sellAbboRiga" style="display:none"><input type="checkbox" id="sellAbbo" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🔑</span>Abbonamento al mio canale Telegram<span class="cons-sub">ogni mese: chi paga entra, chi non rinnova esce</span></span></label>
+        <div id="sellAbboHint" style="display:none;margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Dopo il pagamento il link d'invito parte da solo. Quando chi compra entra nel canale l'acquisto è chiuso e i sats ti arrivano.</div>
         <!-- LE DOMANDE A CHI COMPRA (6 nov 2026): solo accanto al codice
              online, le disegna renderDomandeForm -->
         <div id="sellDomandeBox" class="dom-box" style="display:none"></div>
@@ -19937,6 +19943,8 @@ let myTgId = null, isAdmin = false;
    falso anche per i moderatori. */
 let myOnchain = false;
 let myBitpost = false;      // le gift card di Bitpost (20 nov 2026)
+/* (20 nov 2026) chi vede la casella «🔑 Abbonamento al mio canale» */
+let myAbboCanale = false;
 let myOnchainRete = '';     // «signet» o «mainnet», detta da /api/me (30 ott 2026)
 let mySceltaRete = false;   // al «Paga» di un oggetto si sceglie prima la rete (2 nov 2026)
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
@@ -20690,6 +20698,10 @@ function mapListing(a){
        NON e' lo stock — vedi qtaMassimaAnnuncio, che lo usa al posto
        di `quantita` per i servizi */
     servizioLimiteOrdine:a.servizio_limite_ordine||0,
+    /* L'ABBONAMENTO A UN CANALE (20 nov 2026): la riga della scheda col
+       nome del canale, e un mese per acquisto (qtaMassimaAnnuncio) */
+    abbonamento:!!a.abbonamento, abbonamentoNome:a.abbonamento_nome||'',
+    abbonamentoGiorni:a.abbonamento_giorni||30,
     /* la condizione dell'oggetto: '' = mai dichiarata (storici) */
     condizione:a.condizione||'',
     /* lo stato viaggia dove serve — i preferiti, il singolo e lo
@@ -30731,6 +30743,7 @@ let qtaScelta = 1;
    (prodotto/servizio) divergerebbero al primo posto dimenticato. */
 const LIMITE_LIBERO_SERVIZIO = 999999;   // gemello di MAX_QUANTITA_ANNUNCIO
 function qtaMassimaAnnuncio(l){
+  if (l.abbonamento) return 1;   /* un mese per acquisto (20 nov 2026) */
   if (l.consegna === 'servizio')
     return l.servizioLimiteOrdine > 0 ? l.servizioLimiteOrdine : LIMITE_LIBERO_SERVIZIO;
   return l.quantita || 1;
@@ -37106,7 +37119,8 @@ function openDetail(id){
                    protetto». Rosso e non ambra: qui non c'e' un
                    ritardo, c'e' una cosa che si perde e non torna. */''}
              ${l.avvisoWallet ? `<div class="trust-note" id="notaWallet" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span><b>Nessuno può recuperare un wallet senza le tue chiavi.</b> È la truffa più diffusa del bitcoin: chi lo promette prende l'anticipo e sparisce. E se ti chiedono la <b>seed</b> o le <b>chiavi private</b> per farlo, quelle non si danno a nessuno — chi le ha, ha i tuoi fondi. <button type="button" class="scopri-link" onclick="apriSicurezza('sicu-limiti')">Cosa protegge il deposito</button></span></div>` : ''}
-             ${stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
+             ${l.abbonamento ? `<div class="trust-note" id="notaAbbonamento">🔑 <span>Abbonamento di ${l.abbonamentoGiorni} giorni a ${l.abbonamentoNome ? `«${esc(l.abbonamentoNome)}», canale Telegram privato` : 'un canale Telegram privato'}. Dopo il pagamento ricevi il link d'invito: <b>quando entri nel canale l'acquisto è definitivo</b> e non si rimborsa. Per restare rinnovi ogni mese, e ti avvisiamo prima della scadenza.</span></div>` : ''}
+             ${!l.abbonamento && stradeConsegna(l).includes('digitale') ? `<div class="trust-note" id="notaDigitale"${sceltaConsegna(l)==='digitale'?'':' style="display:none"'}>💾 <span><b>Codice online:</b> il venditore consegna il contenuto (buono, codice, licenza) dentro Barattolo e tu lo riveli con un tocco. ⚠️ Un codice, una volta rivelato, non torna indietro: sul digitale il deposito di garanzia non protegge come su un oggetto fisico. Provalo subito — <b>hai ${TEMPI.confermaDig} ore per aprire una disputa</b> se qualcosa non va, poi l'acquisto è definitivo.</span></div>` : ''}
              <!-- Il ⚡ «Compra subito» NWC non vive piu' qui (ago
                   2026): l'ordine nasce SOLO dalla pagina d'acquisto,
                   e il wallet paga da la' -->
@@ -61977,7 +61991,8 @@ function setServDove(v){
 }
 /* Il verso opposto: dai valori salvati alle caselle (precompilazione
    della modifica e reset del form). */
-function impostaConsegnaForm(c, ancheDig, dove, durata, limite){
+function impostaConsegnaForm(c, ancheDig, dove, durata, limite, abbo){
+  if (el('sellAbbo')) el('sellAbbo').checked = !!abbo;
   el('sellConsSped').checked = c==='spedizione' || c==='entrambe';
   el('sellConsRitiro').checked = c==='ritiro' || c==='entrambe';
   el('sellConsDig').checked = c==='digitale' || !!ancheDig;
@@ -62740,9 +62755,20 @@ function aggiornaConsegnaForm(){
      UN SERVIZIO NON LA MOSTRA PIU' (cantiere quantita-servizi): non
      ha piu' uno stock da dichiarare — il suo campo e' quello dentro
      sellServOpzioni qui sopra (il limite per ordine). */
+  /* L'ABBONAMENTO A UN CANALE (20 nov 2026): la casella c'e' solo per
+     chi ha un canale collegato e col codice online da solo; spenta la
+     condizione, si spegne anche lei. Accesa, la quantita' sparisce (un
+     mese non si esaurisce: il server la tiene al sentinel) e il consiglio
+     dello screenshot pure — il link lo manda Barattolo. */
+  const abboOk = myAbboCanale && el('sellConsDig').checked && !sped && !rit
+                 && !asta && !editandoNostr;
+  if (el('sellAbboRiga')) el('sellAbboRiga').style.display = abboOk ? '' : 'none';
+  if (!abboOk && el('sellAbbo')) el('sellAbbo').checked = false;
+  const abbo = !!el('sellAbbo')?.checked;
+  if (el('sellAbboHint')) el('sellAbboHint').style.display = abbo ? '' : 'none';
   if (el('sellQtaField'))
-    el('sellQtaField').style.display = (asta || serv) ? 'none' : '';
-  el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
+    el('sellQtaField').style.display = (asta || serv || abbo) ? 'none' : '';
+  el('sellDigitaleHint').style.display = (el('sellConsDig').checked && !abbo) ? '' : 'none';
   renderDomandeForm();   /* le domande vivono solo accanto al codice */
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
@@ -62872,6 +62898,10 @@ function consegnaPayload(){
      forma del solo-digitale una riga piu' sotto. */
   if (consegna==='servizio')
     return {consegna, servizio_dove, durata_min, servizio_limite_ordine};
+  /* (20 nov 2026) l'abbonamento viaggia solo da chi puo' venderlo: per
+     gli altri la chiave manca, e sul server l'assenza conserva */
+  if (consegna==='digitale' && myAbboCanale)
+    return {consegna, abbonamento: el('sellAbbo')?.checked ? 1 : 0};
   if (consegna==='digitale' || !consegna) return {consegna};
   const out = {consegna, taglia_pacco:el('sellTaglia').value};
   if (anche_digitale) out.anche_digitale = 1;
@@ -62973,7 +63003,8 @@ function riempiFormDa(l){
     ? l.zone : '';
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   impostaConsegnaForm(l.consegna||'', l.ancheDigitale,
-                      l.servDove, l.durataMin, l.servizioLimiteOrdine);
+                      l.servDove, l.durataMin, l.servizioLimiteOrdine,
+                      l.abbonamento);
   caricaDomandeForm(l);
   el('sellTaglia').value = l.taglia||'';
   /* uno storico senza condizione arriva vuoto: publish() la esige,
@@ -120787,6 +120818,7 @@ async function avvia(){
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
     myBitpost = !!me.bitpost;
+    myAbboCanale = !!me.abbonamento_canale;
     myOnchainRete = me.onchain_rete || '';
     /* ...e la scelta della rete al «Paga» (2 nov 2026, MERCATINO_SCELTA_RETE) */
     mySceltaRete = !!me.scelta_rete;

@@ -93884,3 +93884,72 @@ la reputazione del Bitworker, gli avvisi a scadenza (5 giorni, 36 ore).
 COSA. Nel foglio «Pubblica» a passi il piede prende la classe `.a-passi`: tasti alti 46 px invece di 52, con fulmine e moneta più piccoli; al «Rileggi» il bottone dice solo «Pubblica» (la scritta parola di Andrea), con l'icona della rete accanto. «← Indietro» e «Pubblica» ora stanno su una riga anche a 390 px, Lightning e on-chain.
 DECISIONI. Si cambia la sola scritta dentro il bottone (il nodo di testo), così l'icona e il vestito restano quelli di sempre; vale solo nel foglio a passi: Barattozon, che non va a passi, tiene «Rileggi e pubblica» e il suo bottone alto.
 PROVATO. In `prove_pubblica_passi` la scritta «Pubblica» con l'icona e il piede `.a-passi` (controprove: scritta lasciata intera, classe tolta, rosse). Le sezioni che guardano il piede e il bottone del foglio (sedici, 1739 passate). Dal vivo a 390 px: on-chain compro e Lightning vendo al «Rileggi» su una riga, 174×46 ciascuno; «Avanti →» da solo al primo passo, 46 px; Barattozon invariato (52 px, «Rileggi e pubblica»).
+
+## L'abbonamento a un canale Telegram: il negozio AndreAI vende «Bitcoin On» (20 nov 2026, cantiere abbonamento-canale; Andrea: «chi compra il mio abbonamento accede in maniera diretta al canale Telegram e ovviamente pagando mensilmente… al momento in cui non paga, il bot espella in automatico gli utenti»)
+COSA. Un annuncio digitale come gli altri con la casella «🔑 Abbonamento al
+mio canale Telegram» (solo per chi ha il canale in `CANALI_ABBONAMENTO`,
+mappa {tg di chi vende: id del canale} che scrive Andrea sul VPS). Al
+pagamento il server crea un link d'invito PERSONALE con richiesta
+d'ingresso e lo mette come contenuto digitale dell'ordine (rivelazione e
+finestre di sempre); quando chi ha pagato chiede di entrare il bot
+(@ilbarattolobot, già col token sul server: niente bot nuovo, niente
+Tappo) accetta, revoca il link e i sats partono SUBITO; chi è già dentro
+e ripaga ha un mese in più e l'ordine si chiude al pagamento; la ronda
+dell'orologio manda il promemoria 3 giorni prima e il giorno della
+scadenza, e dopo 3 giorni di tolleranza toglie dal canale (ban + unban:
+fuori, ma può rientrare pagando). Il nome del canale nei messaggi è
+quello vero, chiesto a Telegram (`nome_canale`).
+LE DECISIONI DI ANDREA, nell'ordine. 1) Il piano in 10 righe: ok. 2) «I
+sats mi devono arrivare appena entrano nel canale… uno può entrare, dare
+una sbirciata, guardarsi i video riservati e poi dopo 24 ore dire che
+non gli piace»: ENTRARE CHIUDE L'ACQUISTO, niente finestra di 24 ore
+dopo l'ingresso; la disputa resta solo PRIMA di entrare (il link che non
+funziona); chi non entra mai segue le finestre del digitale. 3) «Il link
+è valido solo per lui?»: se chi compra è su Barattolo con Telegram entra
+SOLO il suo account, un altro che bussa viene rifiutato e non consuma il
+link; con la sola Nostr (id negativo) vale il primo che lo usa. 4) «Devono
+essere personalizzati sti messaggi»: il nome del canale al posto di «il
+canale». 5) Le 14 scritte: approvate (con il nome vero).
+STRADE SCARTATE. Il rinnovo automatico: Lightning non preleva da solo, e
+un permesso di spesa NWC salvato sul server è respinto dalla regola
+ferrea 2 — si ricompra lo stesso annuncio, un mese per volta. Più mesi in
+un acquisto (la quantità come mesi): proposto e ritirato subito, «solo
+quello che chiede»; un mese per ordine, la quantità va al sentinel dei
+servizi e l'annuncio non si esaurisce. Il canale scritto dal venditore
+nel form: il bot è amministratore di canali NOSTRI, e un id qualsiasi
+vorrebbe dire inviti ed espulsioni dove non deve — per questo la mappa
+sta nel config. Tappo (n8n) come bot: un secondo sistema da tenere in
+pari, quando il server ha già bot, campanello e ordini. L'on-chain e il
+carrello: rifiutati alla cassa (l'uscita on-chain vuole due firme;
+il giro del link guarda un ordine per volta).
+COME È FATTO (i nomi da cercare in server.py): `canale_abbonamento_di`
+(l'unico giudice di chi vende abbonamenti), `abbonamento_da_payload`
+(la casella in pubblica/modifica), le guardie in `compra` e nei due giri
+del set, `_incassa_ordine` (scrive `ordini.abbonamento_canale`, salta
+lo stock e gli avvisi «spedisci/ordine pagato», chiama
+`_abbonamento_dopo_incasso`), `abbonamento_richiesta_ingresso` (dal
+campanello, `chat_join_request`: chiesto a Telegram solo con un canale
+nella mappa, `aggiornamenti_chiesti`), `ronda_abbonamenti` (nell'orologio,
+giudice puro `scadenze_abbonamenti`), tabelle `abbonamenti_link` e
+`abbonati_canale`. Il bot toglie SOLO chi sta in `abbonati_canale`: chi
+è entrato da YouTube o a mano non lo conosce. La sentinella «`consegnato`
+lo scrive una rotta sola» ora conta anche l'ingresso e il rinnovo, che
+restano fatti di chi compra.
+PROVATO. `collaudo_abbonamento_canale` (49 verdi, nella CI): chi vende,
+la cassa (un mese, niente on-chain né carrello, canale tolto = no), il
+link all'incasso col nome vero e lo stock fermo, il link che chi vende
+non riscrive, l'estraneo rifiutato senza consumare il link, l'ingresso
+che revoca il link e paga subito, il rinnovo senza link e quello di chi
+era uscito, la ronda (due promemoria una volta sola, il bot senza
+permessi = un avviso solo e nessuno fuori, poi ban+unban col numero
+giusto), il guasto al pagamento rifatto dalla ronda, la disputa, la sola
+Nostr, il campanello. Tre controprove rosse (link di chiunque, sats non
+partiti all'ingresso, nessuno che esce). Suite severa: vedi il verbale
+del commit.
+DA GUARDARE. Niente è provato con Telegram vero: la prima prova è di
+Andrea, coi passi in DA-FARE-ANDREA («L'abbonamento a Bitcoin On»). Da
+vedere dal vivo: che la richiesta d'ingresso arrivi al campanello col link
+intero o col nome (il codice regge tutti e due), che il bot amministratore
+possa accettare e togliere, e che chi si è unito alla Barattolo con un
+account fuso abbia l'id Telegram giusto (se no il suo ingresso viene
+rifiutato: la via d'uscita è la disputa prima di entrare).

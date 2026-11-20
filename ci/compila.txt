@@ -232,3 +232,4 @@ collaudo_vetrina_pulita.py
 collaudo_tempo_pagare.py
 collaudo_avvisi_bz_metodo.py
 collaudo_sessioni_attive.py
+collaudo_abbonamento_canale.py

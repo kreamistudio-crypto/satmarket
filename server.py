@@ -1450,6 +1450,44 @@ try:
         CODICI_UNO_ALLA_VOLTA = True
 except ImportError:
     CODICI_UNO_ALLA_VOLTA = True
+# L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026, cantiere abbonamento-
+# canale, idea e ok di Andrea: il negozio AndreAI vende un mese del suo
+# canale privato «Bitcoin On»). Chi paga riceve da solo un link d'invito
+# personale; quando ENTRA nel canale l'acquisto si chiude e i sats vanno a
+# chi vende; chi non rinnova esce, tolto dal bot dopo la tolleranza.
+# La leva e' accesa di serie (regola del 14 nov) ma resta INERTE finche'
+# CANALI_ABBONAMENTO e' vuoto: e' la mappa {tg_id di chi vende: id del
+# canale}, una riga che scrive solo Andrea sul VPS. Un venditore non puo'
+# indicare da se' un canale: il bot e' amministratore di canali NOSTRI, e
+# dargli un id qualsiasi vorrebbe dire inviti e espulsioni dove non deve.
+try:
+    from config import ABBONAMENTI_CANALE
+    if not isinstance(ABBONAMENTI_CANALE, bool):
+        print("[abbonamenti] ABBONAMENTI_CANALE non e' True/False: resta "
+              "acceso")
+        ABBONAMENTI_CANALE = True
+except ImportError:
+    ABBONAMENTI_CANALE = True
+try:
+    from config import CANALI_ABBONAMENTO
+    if not isinstance(CANALI_ABBONAMENTO, dict):
+        print("[abbonamenti] CANALI_ABBONAMENTO non e' un dizionario: "
+              "nessun canale")
+        CANALI_ABBONAMENTO = {}
+except ImportError:
+    CANALI_ABBONAMENTO = {}
+try:
+    from config import ABBONAMENTO_GIORNI
+except ImportError:
+    ABBONAMENTO_GIORNI = 30          # quanto vale un acquisto
+try:
+    from config import ABBONAMENTO_AVVISO_GIORNI
+except ImportError:
+    ABBONAMENTO_AVVISO_GIORNI = 3    # il primo promemoria, prima della scadenza
+try:
+    from config import ABBONAMENTO_TOLLERANZA_GIORNI
+except ImportError:
+    ABBONAMENTO_TOLLERANZA_GIORNI = 3  # dopo la scadenza, poi si esce
 try:
     from config import CHIAVE_CONTENUTI_DIGITALI
 except ImportError:
@@ -10653,7 +10691,12 @@ def init_db():
                     # peso netto e tabella nutrizionale — '' = nessuna.
                     # Si legge solo in «Alimenti e bevande»
                     # (`etichetta_letta`).
-                    "etichetta TEXT DEFAULT ''"):
+                    "etichetta TEXT DEFAULT ''",
+                    # L'ABBONAMENTO A UN CANALE (20 nov 2026): 1 = chi
+                    # compra paga un mese del canale Telegram di chi vende
+                    # (`e_abbonamento`); vale solo col canale in
+                    # CANALI_ABBONAMENTO.
+                    "abbonamento INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -11837,6 +11880,41 @@ def init_db():
                 "correzioni INTEGER DEFAULT 0, "
                 "corretto_il INTEGER DEFAULT 0, "
                 "PRIMARY KEY (ordine_id, n))")
+    # L'ABBONAMENTO A UN CANALE (20 nov 2026, cantiere abbonamento-
+    # canale). Sull'ordine, l'id del canale che ha pagato (0 = non e' un
+    # abbonamento): lo scrive `_incassa_ordine`, e da li' l'ordine si
+    # consegna da solo. Poi due tabelle:
+    # - `abbonamenti_link`: il link d'invito di OGNI ordine, personale.
+    #   Chi lo usa chiede di entrare e il bot accetta solo il PRIMO
+    #   (`usato_da`, scritto prima di accettare: la corsa di due richieste
+    #   la vince una sola), poi lo revoca;
+    # - `abbonati_canale`: chi e' dentro grazie a noi, una riga per canale
+    #   e compratore. Il bot toglie SOLO chi sta qui: i membri arrivati da
+    #   altre strade (YouTube, inviti a mano) non li conosce e non li tocca.
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN "
+                    "abbonamento_canale INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    con.execute("CREATE TABLE IF NOT EXISTS abbonamenti_link ("
+                "ordine_id INTEGER PRIMARY KEY, "
+                "canale INTEGER NOT NULL, "
+                "link TEXT NOT NULL DEFAULT '', "
+                "creato INTEGER DEFAULT 0, "
+                "usato_da INTEGER DEFAULT 0, "
+                "usato_il INTEGER DEFAULT 0)")
+    con.execute("CREATE TABLE IF NOT EXISTS abbonati_canale ("
+                "canale INTEGER NOT NULL, "
+                "compratore_id INTEGER NOT NULL, "
+                "membro_tg INTEGER DEFAULT 0, "
+                "annuncio_id INTEGER DEFAULT 0, "
+                "ultimo_ordine INTEGER DEFAULT 0, "
+                "scade INTEGER DEFAULT 0, "
+                "avviso_prima_il INTEGER DEFAULT 0, "
+                "avviso_scaduto_il INTEGER DEFAULT 0, "
+                "espulso_il INTEGER DEFAULT 0, "
+                "guasto_il INTEGER DEFAULT 0, "
+                "PRIMARY KEY (canale, compratore_id))")
     con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_rimborso_spese "
                 "ON rimborsi_asta(ordine_id) "
                 "WHERE motivo = 'spese_spedizione'")
@@ -24195,7 +24273,13 @@ def aggiornamenti_chiesti() -> list:
     sull'istanza di prova anche quelli dei widget: in produzione la
     richiesta resta parola per parola quella di ieri."""
     return (["message", "callback_query"]
-            + (["widget_query"] if widget_prova_acceso() else []))
+            + (["widget_query"] if widget_prova_acceso() else [])
+            # L'ABBONAMENTO A UN CANALE (20 nov 2026): le richieste
+            # d'ingresso, solo con un canale nella mappa — fino ad allora
+            # la richiesta resta parola per parola quella di ieri
+            + (["chat_join_request"] if any(
+                canale_abbonamento_di(v) for v in CANALI_ABBONAMENTO)
+               else []))
 
 
 def passo_widget_prova(dati) -> int | None:
@@ -25069,6 +25153,10 @@ async def gestisci_update(update: dict):
     if "widget_query" in update:
         # il widget di prova (solo sull'istanza di prova: vedi sopra)
         return await gestisci_widget_query(update["widget_query"])
+    if "chat_join_request" in update:
+        # qualcuno bussa a un canale con un link d'abbonamento
+        return await abbonamento_richiesta_ingresso(
+            update["chat_join_request"])
     msg = update.get("message") or {}
     testo = (msg.get("text") or "").strip()
     mittente = msg.get("from") or {}
@@ -29489,6 +29577,9 @@ CAMPI_VETRINA = (
     # nei bottoncini. I numeri della famiglia (quante, da quanto) li
     # aggiunge arricchisci_righe_vetrina.
     "a.famiglia, a.famiglia_titolo, a.opzioni, "
+    # L'ABBONAMENTO A UN CANALE (20 nov 2026): la scheda lo dice prima
+    # di pagare, e il selettore dei pezzi si ferma a uno
+    "a.abbonamento, "
     # LE SCELTE «QUALSIASI» (19 nov 2026): le tendine della scheda,
     # pubbliche come le opzioni (le dice il negozio a tutti)
     "a.scelte, "
@@ -29582,6 +29673,21 @@ def arricchisci_righe_vetrina(righe):
     che continua a funzionare: fail-open senza un ramo d'errore."""
     for r in righe:
         r["slug"] = _slug(r.get("titolo") or "")
+        # 4) L'ABBONAMENTO A UN CANALE (20 nov 2026): il NOME del canale,
+        # per la riga della scheda («Abbonamento di 30 giorni a «Bitcoin
+        # On»…»). Chi vende non esce mai dalla vetrina, quindi lo si
+        # chiede qui, e solo per le righe-abbonamento (poche per natura)
+        if r.get("abbonamento"):
+            try:
+                con_a = db()
+                v = con_a.execute("SELECT venditore_id FROM annunci "
+                                  "WHERE id=?", (r.get("id"),)).fetchone()
+                con_a.close()
+                r["abbonamento_nome"] = (nome_canale_noto(v["venditore_id"])
+                                         if v else "")
+            except Exception:
+                r["abbonamento_nome"] = ""
+            r["abbonamento_giorni"] = ABBONAMENTO_GIORNI
         presi = set((r.pop("venditore_distintivi", "") or "").split(","))
         r["venditore_distintivi"] = [
             dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
@@ -31040,6 +31146,13 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         no_casa = 0
         if consegna in ("spedizione", "entrambe"):
             zone = {"dom": (0, 0.0)}
+    # L'ABBONAMENTO A UN CANALE (20 nov 2026): la casella, col suo 400
+    # prima di ogni scrittura. Un mese non si esaurisce: la quantita' va
+    # al sentinel dei servizi, e un ordine e' sempre un mese (compra()).
+    abbonamento = abbonamento_da_payload(d, user["id"], consegna, anche_dig,
+                                         asta_secondi)
+    if abbonamento:
+        quantita = MAX_QUANTITA_ANNUNCIO
 
     # ALMENO UNA FOTO (11 ott 2026, cantiere foto-obbligatorie). Qui,
     # dopo i giudici dei campi e PRIMA della moderazione e dell'INSERT:
@@ -31193,6 +31306,10 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     if etichetta:
         con.execute("UPDATE annunci SET etichetta=? WHERE id=?",
                     (etichetta, annuncio_id))
+    # l'abbonamento (20 nov 2026): stesso UPDATE a parte
+    if abbonamento:
+        con.execute("UPDATE annunci SET abbonamento=1 WHERE id=?",
+                    (annuncio_id,))
     con.commit()
     con.close()
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
@@ -31451,7 +31568,8 @@ def un_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     # dato pubblico come la categoria, e serve al form Vendi che
     # precompila la modifica e il duplicato da questa scheda
     r = con.execute(f"SELECT {campi}, a.sottocategoria, "
-                    "a.etichetta, a.stato, a.domande, a.incasso FROM annunci a "
+                    "a.etichetta, a.stato, a.domande, a.incasso, a.abbonamento "
+                    "FROM annunci a "
                     "JOIN utenti u ON u.tg_id = a.venditore_id "
                     "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
                     (annuncio_id,)).fetchone()
@@ -33543,6 +33661,17 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         # deve tornare a 1 al primo ritocco del titolo).
         if consegna == "servizio":
             quantita = MAX_QUANTITA_ANNUNCIO
+        # L'ABBONAMENTO (20 nov 2026), col patto della presenza: chiave
+        # assente = si conserva, finche' la forma regge (solo codice
+        # online); presente = vale quel che dice, coi suoi 400
+        if "abbonamento" in d:
+            abbonamento = abbonamento_da_payload(d, user["id"], consegna,
+                                                 anche_dig)
+        else:
+            abbonamento = int(bool(e_abbonamento(a) and consegna == "digitale"
+                                   and not anche_dig))
+        if abbonamento:
+            quantita = MAX_QUANTITA_ANNUNCIO
     except HTTPException:
         con.close()
         raise
@@ -33742,6 +33871,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     if etichetta is not None:
         con.execute("UPDATE annunci SET etichetta=? WHERE id=?",
                     (etichetta, annuncio_id))
+    # (20 nov 2026) l'abbonamento: deciso qui sopra, si scrive sempre
+    con.execute("UPDATE annunci SET abbonamento=? WHERE id=?",
+                (abbonamento, annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -37667,6 +37799,20 @@ def _leve_stato():
                          "testo"),
         ]},
         {"gruppo": "💾 Consegna digitale", "voci": [
+            # L'ABBONAMENTO A UN CANALE (20 nov 2026): acceso di serie,
+            # inerte senza canali nella mappa
+            _leva("Abbonamenti ai canali Telegram", "ABBONAMENTI_CANALE",
+                  ABBONAMENTI_CANALE,
+                  acceso="chi ha un canale in CANALI_ABBONAMENTO vende un "
+                         "mese alla volta: link d'invito automatico, "
+                         "promemoria e uscita dopo la tolleranza",
+                  spento="niente link né espulsioni: gli abbonati dentro "
+                         "restano, e gli annunci-abbonamento non si "
+                         "comprano"),
+            _leva("Canali con l'abbonamento", "CANALI_ABBONAMENTO",
+                  len(CANALI_ABBONAMENTO),
+                  spento="nessun canale collegato: la casella non compare "
+                         "a nessuno"),
             # UN CODICE ALLA VOLTA (16 nov 2026): acceso di serie
             _leva("Più codici: uno alla volta", "CODICI_UNO_ALLA_VOLTA",
                   CODICI_UNO_ALLA_VOLTA,
@@ -45948,6 +46094,11 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
                                      f"si aggiudica da solo, fuori dal set")
+        if e_abbonamento(a):
+            # (20 nov 2026) un mese di canale si paga da solo: il giro del
+            # link guarda un ordine per volta
+            con.close()
+            raise HTTPException(400, MSG_ABBONAMENTO_NEL_CARRELLO)
     venditori = {a["venditore_id"] for a in tutti.values()}
     if len(venditori) > 1:
         con.close()
@@ -47434,6 +47585,11 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
                                      f"si aggiudica da solo, fuori dal set")
+        if e_abbonamento(a):
+            # (20 nov 2026) un mese di canale si paga da solo: il giro del
+            # link guarda un ordine per volta
+            con.close()
+            raise HTTPException(400, MSG_ABBONAMENTO_NEL_CARRELLO)
     venditori = {a["venditore_id"] for a in tutti.values()}
     if len(venditori) > 1:
         con.close()
@@ -47959,6 +48115,18 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, f"Per questo servizio il massimo per "
                                  f"ordine è {a['servizio_limite_ordine']} "
                                  f"unità: scegli una quantità più piccola")
+    # L'ABBONAMENTO A UN CANALE (20 nov 2026): un mese per acquisto, solo
+    # in Lightning (l'uscita on-chain vuole due firme, e l'ingresso nel
+    # canale chiude l'acquisto da solo), e solo se il canale c'e' ancora
+    # nella mappa — senza, nessuno consegnerebbe il link.
+    if e_abbonamento(a):
+        if not canale_abbonamento_di(a["venditore_id"]):
+            con.close()
+            raise HTTPException(400, MSG_ABBONAMENTO_NON_DISPONIBILE)
+        if onchain:
+            con.close()
+            raise HTTPException(400, MSG_ABBONAMENTO_SOLO_LN)
+        richiesti = 1
 
     # La scelta della consegna, validata contro le STRADE che
     # l'annuncio offre davvero (dal lug 2026 anche in combinazione:
@@ -49590,7 +49758,34 @@ async def _incassa_ordine(ordine_id: int) -> dict:
             print(f"[fotografia] ordine {ordine_id}: non fotografato ({e})")
     a = None
     esauriti, taglie = [], []
+    # L'ABBONAMENTO A UN CANALE (20 nov 2026): il canale di quest'ordine,
+    # 0 se non lo e'. Un mese non e' un pezzo di magazzino: lo stock non
+    # scala (l'annuncio non si esaurisce mai) e il link parte qui sotto,
+    # dopo il commit. Lo si scrive sull'ordine, nella stessa transazione
+    # del 'locked': da qui in poi l'ordine sa di essere un abbonamento
+    # anche se domani la riga del config cambiasse.
+    canale_abbo = 0
+    if not e_set and o["consegna_scelta"] == "digitale":
+        try:
+            a_abbo = con.execute("SELECT abbonamento, venditore_id FROM "
+                                 "annunci WHERE id=?",
+                                 (o["annuncio_id"],)).fetchone()
+        except Exception:
+            # un database (o un banco di prove.py, che esegue questa
+            # funzione da sola) senza la colonna: non e' un abbonamento
+            a_abbo = None
+        if a_abbo and e_abbonamento(a_abbo):
+            canale_abbo = canale_abbonamento_di(a_abbo["venditore_id"])
+    if canale_abbo:
+        con.execute("UPDATE ordini SET abbonamento_canale=? WHERE id=?",
+                    (canale_abbo, ordine_id))
     for r in righe:
+        if canale_abbo:
+            a = con.execute("SELECT contatto_nostr, titolo, quantita, "
+                            "taglia_pacco FROM annunci WHERE id=?",
+                            (r["annuncio_id"],)).fetchone()
+            taglie.append(("", r["quantita"]))
+            continue
         con.execute("UPDATE annunci SET quantita=MAX(quantita-?,0) "
                     "WHERE id=?", (r["quantita"], r["annuncio_id"]))
         a = con.execute("SELECT contatto_nostr, titolo, quantita, "
@@ -49806,7 +50001,11 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         msg += "\n\n" + _coda_magazzino(magazzino)
     # ...e sotto, il tasto che apre l'ordine (dove stanno la data e la
     # guida): solo dove c'e' la data, gli altri avvisi restano quelli di ieri
-    if entro:
+    # L'ABBONAMENTO (20 nov 2026) ha i suoi avvisi, nel giro del link:
+    # «spedisci» e «il deposito aspetta il pacco» qui direbbero il falso
+    if canale_abbo:
+        pass
+    elif entro:
         await notifica(o["venditore_id"], msg,
                        (BOTTONE_ORDINE_VENDUTO,
                         f"{URL_PUBBLICO}/?ordine={int(ordine_id)}"))
@@ -49819,16 +50018,17 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     # escapa DOPO, o un «<» spegne la ricevuta in silenzio (la lezione
     # dell'avviso di spedizione).
     titolo = html.escape(_titolo_ordine(righe)[:60])
-    await notifica(o["compratore_id"],
-                   f"🔒 <b>Ordine pagato!</b> «{titolo}» — i sats "
-                   f"sono nel deposito di garanzia: "
-                   + _coda_ricevuta(o["consegna_scelta"], o["via_punto"],
-                                    bool(o["punto_ritiro"]),
-                                    o["indirizzo_atteso"],
-                                    bool(o["indirizzo_il"]),
-                                    o["zona_sped"], o["paese_sped"],
-                                    o["domestico_sped"])
-                   + riga_premio_pagato(premio_pagato, "compratore"))
+    if not canale_abbo:
+        await notifica(o["compratore_id"],
+                       f"🔒 <b>Ordine pagato!</b> «{titolo}» — i sats "
+                       f"sono nel deposito di garanzia: "
+                       + _coda_ricevuta(o["consegna_scelta"], o["via_punto"],
+                                        bool(o["punto_ritiro"]),
+                                        o["indirizzo_atteso"],
+                                        bool(o["indirizzo_il"]),
+                                        o["zona_sped"], o["paese_sped"],
+                                        o["domestico_sped"])
+                       + riga_premio_pagato(premio_pagato, "compratore"))
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
         f"🛒 <b>Nuovo ordine:</b> «{titolo}» — "
@@ -49845,6 +50045,10 @@ async def _incassa_ordine(ordine_id: int) -> dict:
             f"qualcun altro: la tua offerta decade. In vetrina ci "
             f"sono altre occasioni che aspettano!")
     con.close()
+    if canale_abbo:
+        # il link (o il rinnovo), dopo tutto il resto: fail-open, e un
+        # guasto lo riprende la ronda
+        await _abbonamento_dopo_incasso(ordine_id, canale_abbo)
     return {"stato": "locked"}
 
 
@@ -52201,6 +52405,535 @@ async def codice_funziona(ordine_id: int, req: Request,
 # stato visualizzato. Da li' partono le finestre corte del digitale
 # (ORE_CONFERMA_DIGITALE / ORE_SILENZIO_DIGITALE nell'orologio).
 
+# ======== L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026) ========
+# Cantiere abbonamento-canale, idea e ok di Andrea: il negozio AndreAI
+# vende un mese del suo canale privato. E' un annuncio digitale come gli
+# altri, con la casella «abbonamento» in piu', e il resto lo fa il bot
+# (@ilbarattolobot, amministratore del canale con «Invita utenti» e
+# «Banna utenti"):
+# 1. AL PAGAMENTO (`_incassa_ordine` → `_abbonamento_dopo_incasso`) nasce
+#    un link d'invito PERSONALE, con la richiesta d'ingresso: e' il
+#    contenuto digitale dell'ordine, e chi compra lo rivela come un
+#    codice. Chi e' gia' dentro non riceve link: il mese si somma e
+#    l'ordine si chiude subito, perche' l'accesso continua.
+# 2. ALL'INGRESSO (`abbonamento_richiesta_ingresso`, dal campanello) il
+#    bot accetta SOLO il primo che usa quel link, poi lo revoca: girato a
+#    un amico non apre niente. ENTRARE CHIUDE L'ACQUISTO (decisione di
+#    Andrea, 20 nov: «uno puo' entrare, guardarsi i video riservati e
+#    dopo 24 ore dire che non gli piace») — l'ingresso e' un FATTO che
+#    dice Telegram, non una parola di parte, quindi vale come la
+#    rivelazione del codice: i sats partono adesso. Prima di entrare la
+#    disputa resta (il link che non funziona); se non entra mai valgono
+#    le finestre del digitale (ORE_CONFERMA/ORE_SILENZIO_DIGITALE).
+# 3. ALLA SCADENZA (`ronda_abbonamenti`, nell'orologio) promemoria
+#    ABBONAMENTO_AVVISO_GIORNI prima e il giorno stesso; passata la
+#    tolleranza il bot lo toglie (ban + unban: fuori, ma libero di
+#    rientrare pagando). Toglie SOLO chi ha fatto entrare lui.
+# Il rinnovo e' a mano, e non per pigrizia: Lightning non preleva da
+# solo, e un permesso di spesa (NWC) salvato sul server e' respinto
+# dalla regola ferrea 2. Si ricompra lo stesso annuncio, un mese alla
+# volta.
+
+MSG_ABBONAMENTO_NO_CANALE = ("Gli abbonamenti si vendono solo con un "
+                             "canale collegato a Barattolo")
+MSG_ABBONAMENTO_FORMA = ("L'abbonamento si vende a prezzo fisso, solo "
+                         "con l'invio del codice online")
+MSG_ABBONAMENTO_SOLO_LN = "L'abbonamento si paga in Lightning"
+MSG_ABBONAMENTO_NON_DISPONIBILE = ("Questo abbonamento ora non è "
+                                   "disponibile")
+MSG_ABBONAMENTO_NEL_CARRELLO = ("L'abbonamento si compra da solo, non "
+                                "nel carrello")
+MSG_ABBONAMENTO_DA_SOLO = ("L'abbonamento si consegna da solo: il link "
+                           "d'invito parte col pagamento")
+BOTTONE_RINNOVA = "🔑 Rinnova"
+
+
+def canale_abbonamento_di(venditore_id) -> int:
+    """L'id del canale di chi vende, o 0. E' l'UNICO giudice di «questo
+    venditore vende abbonamenti»: 0 a leva spenta, 0 per chi non sta
+    nella mappa del config, 0 per una riga scritta storta."""
+    if not ABBONAMENTI_CANALE:
+        return 0
+    try:
+        chi = int(venditore_id or 0)
+        # la chiave come numero (il config) o come testo (una leva
+        # scritta dal pannello passa da JSON, che le chiavi le fa testo)
+        v = CANALI_ABBONAMENTO.get(chi) or CANALI_ABBONAMENTO.get(str(chi))
+        return int(v or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0
+
+
+def e_abbonamento(a) -> bool:
+    """PURA: l'annuncio (o la riga di vetrina) e' un abbonamento?"""
+    try:
+        return int(_campo(a, "abbonamento", 0) or 0) == 1
+    except (TypeError, ValueError):
+        return False
+
+
+def abbonamento_da_payload(d, venditore_id, consegna: str, anche_dig,
+                           asta: int = 0) -> int:
+    """La casella del form: 1 o 0. Chiave assente o falsa = 0 (i client
+    di ieri). Accesa, vuole un canale collegato e la forma che il giro
+    sa portare: solo il codice online, a prezzo fisso — una spedizione
+    accanto non avrebbe niente da spedire, e un'asta non si rinnova."""
+    if not (d or {}).get("abbonamento"):
+        return 0
+    if not canale_abbonamento_di(venditore_id):
+        raise HTTPException(400, MSG_ABBONAMENTO_NO_CANALE)
+    if consegna != "digitale" or anche_dig or asta:
+        raise HTTPException(400, MSG_ABBONAMENTO_FORMA)
+    return 1
+
+
+def _giorno_abbonamento(ts: int) -> str:
+    """«22 dicembre»: il giorno della scadenza come lo legge una persona
+    (l'ora no, e' quella del server: la lezione di `giorno_entro`)."""
+    t = time.localtime(int(ts or 0))
+    return f"{t.tm_mday} {MESI_IT[t.tm_mon - 1]}"
+
+
+def nuova_scadenza_abbonamento(scade: int, espulso_il: int,
+                               adesso: int, mesi: int = 1) -> int:
+    """PURA: la scadenza dopo un mese pagato. Chi e' ancora dentro (non
+    tolto) somma dal giorno in cui scadeva — anche se e' gia' passato e
+    sta nella tolleranza: quei giorni li ha avuti. Chi e' uscito, o non
+    e' mai entrato, comincia da adesso."""
+    base = scade if (scade and not espulso_il) else adesso
+    return int(base) + max(1, int(mesi or 1)) * ABBONAMENTO_GIORNI * 86400
+
+
+# I NOMI DEI CANALI (20 nov 2026, Andrea: «devono essere personalizzati
+# sti messaggi»): il titolo vero, chiesto a Telegram e tenuto in memoria,
+# cosi' se Andrea rinomina il canale i messaggi seguono da soli. Finche'
+# Telegram non ha risposto, i testi dicono «il canale».
+_NOMI_CANALI: dict = {}
+
+
+async def nome_canale(canale: int, rinfresca: bool = False) -> str:
+    """Il titolo del canale, '' se Telegram non lo dice. Si chiede una
+    volta per avvio, e la ronda lo rinfresca ogni giro (`rinfresca`): il
+    nome vecchio resta finche' Telegram non ne dice uno nuovo."""
+    canale = int(canale or 0)
+    if canale and (rinfresca or canale not in _NOMI_CANALI):
+        r = await bot_api("getChat", {"chat_id": canale})
+        res = (r or {}).get("result")
+        titolo = (res.get("title") if isinstance(res, dict) else "") or ""
+        if MODALITA_COLLAUDO and r and r.get("ok") and not titolo:
+            titolo = "Canale di prova"
+        if titolo:
+            _NOMI_CANALI[canale] = str(titolo)[:80]
+    return _NOMI_CANALI.get(canale, "")
+
+
+def nome_canale_noto(venditore_id) -> str:
+    """PURA sulla memoria: il titolo del canale di chi vende, se gia'
+    saputo — per la scheda dell'annuncio, che non aspetta Telegram."""
+    return _NOMI_CANALI.get(canale_abbonamento_di(venditore_id), "")
+
+
+def _nel(nome: str, senza: str = "il canale") -> str:
+    """«Bitcoin On» fra caporali e gia' escapato (i testi sono HTML), o
+    la parola generica quando il nome non c'e'."""
+    return f"«{html.escape(nome)}»" if nome else senza
+
+
+def testo_link_abbonamento(link: str, nome: str = "") -> str:
+    """Il contenuto che chi compra rivela: il link e le due regole. E'
+    testo semplice (passa da esc() nella pagina), quindi niente HTML."""
+    dove = f"«{nome}»" if nome else "nel canale"
+    return (f"Il tuo link per entrare {'in ' if nome else ''}{dove}: {link}\n\n"
+            f"Toccalo e chiedi di entrare: vieni accettato in automatico. "
+            f"Vale una volta sola, solo per te.")
+
+
+def _nome_link_abbonamento(ordine_id: int) -> str:
+    # il nome del link: lo vede chi amministra il canale, e ci torna
+    # nella richiesta d'ingresso anche quando il link arriva troncato
+    return f"Barattolo ordine {int(ordine_id)}"
+
+
+def _ordine_dal_nome_link(nome: str) -> int:
+    m = re.fullmatch(r"Barattolo ordine (\d{1,12})", str(nome or ""))
+    return int(m.group(1)) if m else 0
+
+
+async def _bot_canale(metodo: str, dati: dict) -> dict | None:
+    """Una chiamata al bot per il canale, col risultato. In collaudo
+    `bot_api` simula senza risultato: il link si inventa, cosi' il giro
+    intero si prova anche senza Telegram."""
+    r = await bot_api(metodo, dati)
+    res = (r or {}).get("result")
+    res = res if isinstance(res, dict) else {}
+    if MODALITA_COLLAUDO and r and r.get("ok"):
+        if metodo == "createChatInviteLink" and not res.get("invite_link"):
+            return {"ok": True, "result": {
+                "invite_link": f"https://t.me/+collaudo{abs(_finto_msg_id)}",
+                "name": dati.get("name", "")}}
+        if metodo == "getChatMember" and not res.get("status"):
+            return {"ok": True, "result": {"status": "member"}}
+    return r
+
+
+async def _avvisa_guasto_abbonamento(cosa: str):
+    await notifica_admin(
+        f"⚠️ <b>Abbonamento al canale</b>: il bot non riesce a {cosa}. "
+        f"Controlla che @ilbarattolobot sia amministratore con «Invita "
+        f"utenti» e «Banna utenti».", argomento="errori")
+
+
+async def _crea_link_abbonamento(con, o, canale: int) -> str:
+    """Il link personale di quest'ordine, o '' se Telegram dice di no.
+    Chi chiama ha la connessione e committa: qui si scrive la riga del
+    link e l'ordine diventa 'shipped' col link come contenuto."""
+    r = await _bot_canale("createChatInviteLink", {
+        "chat_id": canale, "name": _nome_link_abbonamento(o["id"]),
+        "creates_join_request": True})
+    res = (r or {}).get("result")
+    link = (res.get("invite_link") if isinstance(res, dict) else "") or ""
+    if not (r and r.get("ok") and link):
+        print(f"⚠️ Ordine #{o['id']}: link d'invito non creato "
+              f"({(r or {}).get('description', 'nessuna risposta')})")
+        return ""
+    adesso = int(time.time())
+    con.execute("INSERT OR REPLACE INTO abbonamenti_link(ordine_id, canale, "
+                "link, creato) VALUES(?,?,?,?)",
+                (o["id"], canale, link, adesso))
+    # la consegna digitale di sempre, scritta dal server: da qui
+    # rivelazione e finestre sono quelle di qualunque codice
+    con.execute("UPDATE ordini SET stato='shipped', "
+                "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                "contenuto_digitale=?, aggiornato=? "
+                "WHERE id=? AND stato='locked'",
+                (adesso, _cifra_contenuto(testo_link_abbonamento(
+                    link, await nome_canale(canale))),
+                 adesso, o["id"]))
+    print(f"🔑 Ordine #{o['id']}: link d'invito al canale creato")
+    return link
+
+
+async def _ancora_nel_canale(canale: int, membro_tg: int) -> bool:
+    """Chi abbiamo fatto entrare e' ancora nel canale? Se Telegram non
+    risponde si dice di no: riceve un link nuovo, che e' il male minore
+    (rinnovare e restare fuori sarebbe il peggiore)."""
+    if not membro_tg:
+        return False
+    r = await _bot_canale("getChatMember", {"chat_id": canale,
+                                            "user_id": int(membro_tg)})
+    res = (r or {}).get("result")
+    stato = (res.get("status") if isinstance(res, dict) else "") or ""
+    return bool(r and r.get("ok")) and stato in (
+        "member", "administrator", "creator", "restricted")
+
+
+async def _abbonamento_dopo_incasso(ordine_id: int, canale: int):
+    """I sats sono nel deposito: il rinnovo di chi e' dentro, o il link a
+    chi deve entrare. Fail-open: un guasto qui lascia l'ordine 'locked'
+    e la ronda riprova il link al giro dopo."""
+    con = db()
+    try:
+        o = con.execute("SELECT * FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        if not o or o["stato"] != "locked":
+            return
+        ab = con.execute("SELECT * FROM abbonati_canale WHERE canale=? "
+                         "AND compratore_id=?",
+                         (canale, o["compratore_id"])).fetchone()
+        dentro = bool(ab and not ab["espulso_il"]
+                      and await _ancora_nel_canale(canale, ab["membro_tg"]))
+        adesso = int(time.time())
+        if dentro:
+            # IL RINNOVO: l'accesso continua, quindi l'ordine si chiude
+            # adesso — consegnato e rivelato nello stesso istante
+            scade = nuova_scadenza_abbonamento(ab["scade"], 0, adesso)
+            con.execute("UPDATE abbonati_canale SET scade=?, ultimo_ordine=?, "
+                        "annuncio_id=?, avviso_prima_il=0, "
+                        "avviso_scaduto_il=0 WHERE canale=? "
+                        "AND compratore_id=?",
+                        (scade, ordine_id, o["annuncio_id"], canale,
+                         o["compratore_id"]))
+            nome = await nome_canale(canale)
+            testo = (f"Abbonamento{' a «' + nome + '»' if nome else ''} "
+                     f"rinnovato fino al {_giorno_abbonamento(scade)}.")
+            con.execute("UPDATE ordini SET stato='delivered', "
+                        "corriere='Consegna digitale', tracking='', "
+                        "spedito_il=?, consegnato=?, contenuto_digitale=?, "
+                        "aggiornato=? WHERE id=? AND stato='locked'",
+                        (adesso, adesso, _cifra_contenuto(testo), adesso,
+                         ordine_id))
+            con.commit()
+            print(f"🔑 Ordine #{ordine_id}: abbonamento rinnovato "
+                  f"(scade {_giorno_abbonamento(scade)})")
+            await notifica(o["compratore_id"],
+                           f"🔑 <b>Abbonamento"
+                           f"{' a ' + _nel(nome) if nome else ''} "
+                           f"rinnovato</b> fino al "
+                           f"{_giorno_abbonamento(scade)}.")
+            con.close()
+            con = None
+            await _sblocca_sats(ordine_id)
+            return
+        link = await _crea_link_abbonamento(con, o, canale)
+        con.commit()
+        if not link:
+            await _avvisa_guasto_abbonamento("creare il link d'invito")
+            return
+        nome = await nome_canale(canale)
+        await notifica(o["compratore_id"],
+                       f"🔑 <b>Abbonamento"
+                       f"{' a ' + _nel(nome) if nome else ''} pagato!</b> "
+                       "Il tuo link d'invito è "
+                       "pronto: apri l'ordine e tocca «🔓 Rivela». Il link è "
+                       "solo tuo e vale una volta. ⚠️ Quando entri nel canale "
+                       "l'acquisto è definitivo.",
+                       ("🔓 Apri l'ordine",
+                        f"{URL_PUBBLICO}/?ordine={int(ordine_id)}"))
+        # a chi vende, qui e non in «Hai venduto»: sul rinnovo non c'e'
+        # nessun link che parte, e i sats arrivano con «Affare concluso»
+        await notifica(o["venditore_id"],
+                       f"🔑 <b>Nuovo abbonamento"
+                       f"{' a ' + _nel(nome) if nome else ''} venduto!</b> "
+                       f"Il link d'invito è partito da solo: i sats ti "
+                       f"arrivano quando entra nel canale.")
+    except Exception as e:
+        print(f"⚠️ Ordine #{ordine_id}: abbonamento dopo l'incasso "
+              f"interrotto: {e}")
+    finally:
+        if con is not None:
+            con.close()
+
+
+async def abbonamento_richiesta_ingresso(rq: dict):
+    """Qualcuno chiede di entrare in un canale con un link: se e' il
+    link di un ordine nostro, mai usato, e l'ordine e' pagato e non in
+    disputa, entra — e l'acquisto si chiude. Ogni altro caso nei NOSTRI
+    canali si rifiuta; i canali che non conosciamo non si toccano."""
+    canale = int(((rq or {}).get("chat") or {}).get("id") or 0)
+    chi = int(((rq or {}).get("from") or {}).get("id") or 0)
+    inv = (rq or {}).get("invite_link") or {}
+    if not canale or not chi or canale not in {
+            canale_abbonamento_di(v) for v in CANALI_ABBONAMENTO}:
+        return
+    link = str(inv.get("invite_link") or "")
+    con = db()
+    try:
+        r = con.execute("SELECT * FROM abbonamenti_link WHERE canale=? "
+                        "AND link=?", (canale, link)).fetchone()
+        if not r:
+            # il link puo' arrivare troncato: il nome no
+            oid = _ordine_dal_nome_link(inv.get("name"))
+            r = con.execute("SELECT * FROM abbonamenti_link WHERE canale=? "
+                            "AND ordine_id=?", (canale, oid)).fetchone()
+        o = (con.execute("SELECT * FROM ordini WHERE id=?",
+                         (r["ordine_id"],)).fetchone() if r else None)
+        # pagato e non conteso: anche 'confirmed'/'released' (chi non e'
+        # entrato in tempo l'ha pagato lo stesso, e il link resta suo)
+        buono = bool(o and o["stato"] in ("shipped", "delivered",
+                                          "confirmed", "released")
+                     and int(o["abbonamento_canale"] or 0) == canale)
+        # IL LINK E' DI CHI HA PAGATO (20 nov 2026, Andrea: «lui non puo'
+        # inviarlo ad altre persone»): se chi compra e' su Barattolo con
+        # Telegram, il suo numero e' il suo account, e solo quello entra.
+        # Un altro che bussa col link non lo consuma: il link resta suo.
+        # Chi compra con la sola Nostr (id negativo) non ha un account
+        # Telegram che conosciamo: per lui vale il primo che lo usa.
+        if buono and 0 < int(o["compratore_id"]) < 2 ** 52 \
+                and chi != int(o["compratore_id"]):
+            buono = False
+        # LA CORSA: il link si prende PRIMA di accettare, con la
+        # condizione nella UPDATE — due richieste insieme, entra una
+        preso = buono and con.execute(
+            "UPDATE abbonamenti_link SET usato_da=?, usato_il=? "
+            "WHERE ordine_id=? AND usato_da=0",
+            (chi, int(time.time()), r["ordine_id"])).rowcount == 1
+        con.commit()
+        if not preso:
+            await _bot_canale("declineChatJoinRequest",
+                              {"chat_id": canale, "user_id": chi})
+            print(f"🚪 Richiesta d'ingresso nel canale rifiutata "
+                  f"(link {'gia usato' if buono else 'non valido, non suo o in disputa'})")
+            return
+        ok = await _bot_canale("approveChatJoinRequest",
+                               {"chat_id": canale, "user_id": chi})
+        if not (ok and ok.get("ok")):
+            # non e' entrato: il link torna libero per il prossimo giro
+            con.execute("UPDATE abbonamenti_link SET usato_da=0, usato_il=0 "
+                        "WHERE ordine_id=?", (r["ordine_id"],))
+            con.commit()
+            await _avvisa_guasto_abbonamento("far entrare un abbonato")
+            return
+        await _bot_canale("revokeChatInviteLink",
+                          {"chat_id": canale, "invite_link": r["link"]})
+        adesso = int(time.time())
+        ab = con.execute("SELECT * FROM abbonati_canale WHERE canale=? "
+                         "AND compratore_id=?",
+                         (canale, o["compratore_id"])).fetchone()
+        scade = nuova_scadenza_abbonamento(
+            ab["scade"] if ab else 0, ab["espulso_il"] if ab else 1, adesso)
+        con.execute(
+            "INSERT INTO abbonati_canale(canale, compratore_id, membro_tg, "
+            "annuncio_id, ultimo_ordine, scade) VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(canale, compratore_id) DO UPDATE SET "
+            "membro_tg=excluded.membro_tg, annuncio_id=excluded.annuncio_id, "
+            "ultimo_ordine=excluded.ultimo_ordine, scade=excluded.scade, "
+            "avviso_prima_il=0, avviso_scaduto_il=0, espulso_il=0, "
+            "guasto_il=0",
+            (canale, o["compratore_id"], chi, o["annuncio_id"], o["id"],
+             scade))
+        # ENTRARE E' LA RICEVUTA: chi non aveva ancora rivelato il link
+        # (l'ha avuto da un'altra strada) la firma qui
+        con.execute("UPDATE ordini SET consegnato=CASE WHEN consegnato>0 "
+                    "THEN consegnato ELSE ? END, stato=CASE WHEN "
+                    "stato='shipped' THEN 'delivered' ELSE stato END, "
+                    "aggiornato=? WHERE id=?", (adesso, adesso, o["id"]))
+        con.commit()
+        print(f"✅ Ordine #{o['id']}: entrato nel canale, abbonamento fino "
+              f"al {_giorno_abbonamento(scade)}")
+    except Exception as e:
+        print(f"⚠️ Richiesta d'ingresso nel canale non gestita: {e}")
+        return
+    finally:
+        con.close()
+    nome = await nome_canale(canale)
+    await notifica(o["compratore_id"],
+                   f"✅ <b>Sei dentro"
+                   f"{' ' + _nel(nome) if nome else ''}!</b> Abbonamento "
+                   f"attivo fino al "
+                   f"{_giorno_abbonamento(scade)}. Ti avvisiamo "
+                   f"{ABBONAMENTO_AVVISO_GIORNI} giorni prima della scadenza.")
+    await notifica(o["venditore_id"],
+                   f"🔑 <b>Un nuovo abbonato è entrato "
+                   f"{'in ' + _nel(nome) if nome else 'nel canale'}:</b> "
+                   f"i sats stanno arrivando.")
+    if o["stato"] in ("shipped", "delivered", "confirmed"):
+        await _sblocca_sats(o["id"])
+
+
+def scadenze_abbonamenti(righe, adesso: int) -> list:
+    """PURA: cosa fare per ogni abbonato, (riga, gesto) con gesto in
+    'avviso_prima' | 'avviso_scaduto' | 'togli'. Un gesto per riga e per
+    giro, il piu' avanti che serve: chi torna dopo un fermo lungo viene
+    tolto, non riceve tre avvisi di fila."""
+    fuori = []
+    for r in righe:
+        if r["espulso_il"] or not r["scade"]:
+            continue
+        if adesso >= r["scade"] + ABBONAMENTO_TOLLERANZA_GIORNI * 86400:
+            fuori.append((r, "togli"))
+        elif adesso >= r["scade"]:
+            if not r["avviso_scaduto_il"]:
+                fuori.append((r, "avviso_scaduto"))
+        elif adesso >= r["scade"] - ABBONAMENTO_AVVISO_GIORNI * 86400:
+            if not r["avviso_prima_il"]:
+                fuori.append((r, "avviso_prima"))
+    return fuori
+
+
+def _titolo_abbonamento(con, annuncio_id) -> str:
+    r = con.execute("SELECT titolo FROM annunci WHERE id=?",
+                    (int(annuncio_id or 0),)).fetchone()
+    return ((r["titolo"] if r else "") or "abbonamento")[:60]
+
+
+async def ronda_abbonamenti():
+    """Il giro dell'orologio: i link mai nati (un guasto al pagamento),
+    i promemoria e chi esce. Fuori dai canali della mappa non tocca
+    niente: un canale tolto dal config smette di avere un bot che
+    toglie qualcuno."""
+    canali = {canale_abbonamento_di(v) for v in CANALI_ABBONAMENTO} - {0}
+    if not canali:
+        return
+    for c in canali:
+        # il nome si rinfresca a ogni giro: un canale rinominato si
+        # legge giusto entro dieci minuti
+        await nome_canale(c, rinfresca=True)
+    adesso = int(time.time())
+    con = db()
+    try:
+        # 1) I LINK DA RIFARE: pagato, ancora 'locked', nessun link
+        mancanti = con.execute(
+            "SELECT * FROM ordini WHERE stato='locked' "
+            "AND COALESCE(abbonamento_canale,0)<>0 AND id NOT IN "
+            "(SELECT ordine_id FROM abbonamenti_link)").fetchall()
+        righe = con.execute("SELECT * FROM abbonati_canale "
+                            "WHERE espulso_il=0").fetchall()
+    finally:
+        con.close()
+    for o in mancanti:
+        if int(o["abbonamento_canale"]) in canali:
+            await _abbonamento_dopo_incasso(o["id"],
+                                            int(o["abbonamento_canale"]))
+    for r, gesto in scadenze_abbonamenti(righe, adesso):
+        if r["canale"] not in canali:
+            continue
+        nome = await nome_canale(r["canale"])
+        con = db()
+        # il nome del canale, o il titolo dell'annuncio se Telegram tace:
+        # tutti e due testo altrui, scappati prima dell'HTML
+        titolo = html.escape(_titolo_abbonamento(con, r["annuncio_id"]))
+        con.close()
+        dove = _nel(nome, f"«{titolo}»")
+        rinnova = (BOTTONE_RINNOVA,
+                   f"{URL_PUBBLICO}/annuncio/{int(r['annuncio_id'] or 0)}")
+        if gesto == "avviso_prima":
+            await notifica(r["compratore_id"],
+                           f"⏳ Il tuo abbonamento a {dove} scade il "
+                           f"{_giorno_abbonamento(r['scade'])}. Per restare "
+                           f"nel canale rinnovalo: ricompra lo stesso "
+                           f"annuncio.", rinnova)
+            colonna = "avviso_prima_il"
+        elif gesto == "avviso_scaduto":
+            await notifica(r["compratore_id"],
+                           f"⏳ Il tuo abbonamento a {dove} è scaduto "
+                           f"oggi. Hai ancora {ABBONAMENTO_TOLLERANZA_GIORNI} "
+                           f"giorni per rinnovarlo, poi esci dal canale.",
+                           rinnova)
+            colonna = "avviso_scaduto_il"
+        else:
+            tolto = await _bot_canale("banChatMember", {
+                "chat_id": r["canale"], "user_id": int(r["membro_tg"])})
+            if not (tolto and tolto.get("ok")):
+                # un avviso ai moderatori per abbonato, non uno a giro
+                if not r["guasto_il"]:
+                    con = db()
+                    con.execute("UPDATE abbonati_canale SET guasto_il=? "
+                                "WHERE canale=? AND compratore_id=?",
+                                (adesso, r["canale"], r["compratore_id"]))
+                    con.commit()
+                    con.close()
+                    await _avvisa_guasto_abbonamento("togliere un abbonato")
+                continue
+            # fuori, ma non bandito: se ripaga, il link nuovo lo fa entrare
+            await _bot_canale("unbanChatMember", {
+                "chat_id": r["canale"], "user_id": int(r["membro_tg"]),
+                "only_if_banned": True})
+            colonna = "espulso_il"
+            print(f"🚪 Abbonato tolto dal canale (compratore "
+                  f"{r['compratore_id']}, scaduto il "
+                  f"{_giorno_abbonamento(r['scade'])})")
+            await notifica(r["compratore_id"],
+                           f"🚪 Abbonamento non rinnovato: sei uscito "
+                           f"{'da ' + dove if nome else 'dal canale di ' + dove}. "
+                           f"Quando vuoi, ricompri "
+                           f"l'annuncio e rientri.", rinnova)
+            con_v = db()
+            riga_v = con_v.execute(
+                "SELECT venditore_id FROM annunci WHERE id=?",
+                (int(r["annuncio_id"] or 0),)).fetchone()
+            con_v.close()
+            if riga_v:
+                await notifica(riga_v["venditore_id"],
+                               f"🚪 Un abbonato non ha rinnovato ed è "
+                               f"uscito {'da ' + _nel(nome) if nome else 'dal canale'}.")
+        con = db()
+        con.execute(f"UPDATE abbonati_canale SET {colonna}=? "
+                    f"WHERE canale=? AND compratore_id=?",
+                    (adesso, r["canale"], r["compratore_id"]))
+        con.commit()
+        con.close()
+
+
 @app.post("/api/orders/{ordine_id}/consegna-digitale")
 async def consegna_digitale(ordine_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
@@ -52273,6 +53006,11 @@ async def consegna_digitale(ordine_id: int, req: Request,
     if o["consegna_scelta"] != "digitale":
         con.close()
         raise HTTPException(400, "Questo ordine non è a consegna digitale")
+    # L'ABBONAMENTO (20 nov 2026): il link lo scrive il server, e chi
+    # vende non lo riscrive — sarebbe un ingresso che il bot non conosce
+    if int(_campo(o, "abbonamento_canale", 0) or 0):
+        con.close()
+        raise HTTPException(400, MSG_ABBONAMENTO_DA_SOLO)
     # UN CODICE ALLA VOLTA (16 nov 2026): da due pezzi in su un riquadro
     # per pezzo, col suo ramo — la ricevuta qui sotto (`consegnato`)
     # guarda il campo unico, e sui riquadri il confine e' l'ultimo
@@ -53774,6 +54512,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         profilo["avatar"] = avatar_da_mostrare(
             u["avatar"], u["avatar_scelta"])
     profilo["admin"] = e_admin(user["id"])
+    # L'ABBONAMENTO A UN CANALE (20 nov 2026): chi vede la casella in
+    # Vendi — solo chi ha il canale nella mappa del config
+    profilo["abbonamento_canale"] = bool(canale_abbonamento_di(user["id"]))
     # Chi vede il foglio «⛓️ On-chain (prova)». E' il CANCELLO che
     # risponde, non `admin`: le due cose oggi coincidono (ONCHAIN_SOLO_
     # ADMIN) ma dicono due cose diverse, e il giorno che la beta si
@@ -104528,6 +105269,12 @@ async def orologio():
             await controlla_scadenze()
         except Exception as e:
             print(f"Orologio sblocchi, errore (riprovo tra 10 min): {e}")
+        try:
+            # gli abbonamenti ai canali (20 nov 2026): link da rifare,
+            # promemoria, chi esce. Senza canali nella mappa non fa niente
+            await ronda_abbonamenti()
+        except Exception as e:
+            print(f"⚠️ Ronda degli abbonamenti saltata: {e}")
         try:
             # lo storico degli annunci oltre l'anno (18 nov 2026):
             # quasi sempre una query vuota

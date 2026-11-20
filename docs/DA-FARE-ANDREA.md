@@ -1045,3 +1045,58 @@ secondo scrive un SUO indirizzo bc1 e «Chiedi l'incasso», poi «Firma».
 Quel che si vede (e gli errori, parola per parola) va nel verbale:
 CANTIERI, «Le gift card di Bitpost», «COSA RESTA». Fatta la prova,
 questa voce si cancella.
+
+## 30. L'abbonamento a «Bitcoin On»: collegare il canale (20 nov 2026, cantiere abbonamento-canale; Andrea: «chi compra il mio abbonamento accede in maniera diretta al canale Telegram»)
+
+**Perché.** Il codice c'è (leva `ABBONAMENTI_CANALE`, accesa di serie), ma
+resta inerte finché il canale non è collegato: serve il bot amministratore
+del canale e una riga nel config del VPS. Va fatto DOPO la promozione su
+main. Il giro intero: Cantieri, «L'abbonamento a un canale Telegram».
+
+**1) Telegram (dal telefono o dal desktop).** Canale «Bitcoin On» →
+Amministratori → Aggiungi amministratore → `@ilbarattolobot`. Permessi:
+«Aggiungi iscritti» (o «Invita utenti tramite link») e, se compare,
+«Banna utenti». Gli altri permessi non servono: spegnili.
+
+**2) L'id del canale.** Comincia con `-100`. Si legge da
+https://web.telegram.org/a aprendo il canale: l'indirizzo finisce con
+`#-100…`. (Se vuoi lo legge Claude dal tuo Telegram desktop.)
+
+**3) Sola lettura, sul VPS (root).** Che la riga non ci sia già:
+```
+grep -n "^CANALI_ABBONAMENTO\|^ABBONAMENTI_CANALE" /srv/barattolo/config.py
+```
+
+**4) La riga, sul VPS (root).** Prima la copia, poi la riga. Al posto di
+`ID_VENDITORE` il numero dell'account che vende (il tuo principale è
+1879103467) e al posto di `ID_CANALE` il numero del passo 2:
+```
+cp -p /srv/barattolo/config.py /srv/barattolo/config.py.prima-abbonamento
+```
+```
+printf '\nCANALI_ABBONAMENTO = {ID_VENDITORE: ID_CANALE}\n' | sudo tee -a /srv/barattolo/config.py
+```
+```
+systemctl restart barattolo && sleep 5 && journalctl -u barattolo --since "1 min ago" | grep -i "webhook"
+```
+Deve comparire la riga «🔔 Webhook Telegram»: da lì il bot riceve anche le
+richieste d'ingresso.
+
+**5) I permessi del bot, sul VPS (root, sola lettura: stampa solo due sì/no).**
+```
+cd /srv/barattolo && sudo -u barattolo python3 -c "import config,json,urllib.request as u; c=list(config.CANALI_ABBONAMENTO.values())[0]; me=json.load(u.urlopen(f'https://api.telegram.org/bot{config.BOT_TOKEN}/getMe'))['result']['id']; r=json.load(u.urlopen(f'https://api.telegram.org/bot{config.BOT_TOKEN}/getChatMember?chat_id={c}&user_id={me}'))['result']; print('invita:', r.get('can_invite_users'), '| banna:', r.get('can_restrict_members'))"
+```
+Devono essere `True` tutti e due.
+
+**6) L'annuncio.** Dal tuo account: Vendi → «💾 Invio del codice online» →
+spunta «🔑 Abbonamento al mio canale Telegram» → prezzo in euro (25 €).
+
+**7) La prova dal vivo, col secondo account (8711624959).** Abbassa il
+prezzo per la prova, compra, apri l'ordine, «🔓 Rivela», tocca il link:
+devi entrare nel canale, l'ordine chiudersi e i sats arrivarti subito.
+Poi rimetti 25 €. Lo stesso link aperto da un terzo account deve essere
+rifiutato. L'espulsione si vede solo dopo 33 giorni: la ronda gira da sola.
+
+**ROLLBACK.** Togliere la riga (`cp -p
+/srv/barattolo/config.py.prima-abbonamento /srv/barattolo/config.py`) e
+riavviare: niente link né espulsioni, e gli abbonati già dentro restano.

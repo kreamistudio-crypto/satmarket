@@ -217,3 +217,4 @@ collaudo_vetrina_pulita
 collaudo_tempo_pagare
 collaudo_avvisi_bz_metodo
 collaudo_sessioni_attive
+collaudo_abbonamento_canale

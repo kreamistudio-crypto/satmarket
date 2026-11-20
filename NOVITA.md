@@ -896,3 +896,9 @@ frase: Barattolo Negozio adesso si apre sulla pagina del tuo negozio, uguale a q
 dove: Profilo → «🏪 Cassa in negozio»: la vetrina del tuo negozio, la barra in fondo «Controlla e incassa», e in alto «📒 Vendite».
 leva: CASSA_ATTIVA (accesa di serie)
 pubblico: sì
+
+## 2026-11-20 · abbonamento-canale
+frase: Su Barattolo si può comprare un mese di accesso al canale Telegram privato di un negozio. Paghi in sats, apri l'ordine e con «🔓 Rivela» trovi il tuo link d'invito personale: lo tocchi e il bot ti fa entrare. Per restare rinnovi ricomprando lo stesso annuncio, e Barattolo ti avvisa prima della scadenza.
+dove: nella scheda dell'annuncio, la nota «🔑 Abbonamento di 30 giorni a…»; dopo il pagamento, l'ordine → «🔓 Rivela».
+leva: ABBONAMENTI_CANALE (accesa di serie; attiva solo coi canali collegati in CANALI_ABBONAMENTO)
+pubblico: sì

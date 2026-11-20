@@ -521,6 +521,19 @@ DIGITALE_MIN_VENDITE = 0     # es. 1: per pubblicare annunci digitali
 # compra. Acceso di serie; False = interruttore d'emergenza: gli ordini
 # nuovi tornano al campo unico (quelli gia' a riquadri restano cosi').
 CODICI_UNO_ALLA_VOLTA = True
+# L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026): un annuncio digitale
+# a prezzo fisso diventa un mese d'ingresso a un canale privato. Chi paga
+# riceve un link valido solo per lui; i sats arrivano a chi vende quando
+# entra. Promemoria prima della scadenza, poi chi non rinnova esce (il bot
+# toglie solo chi ha fatto entrare lui). Il bot del server deve essere
+# admin del canale coi permessi «Invita» e «Banna».
+ABBONAMENTI_CANALE = True        # False = interruttore d'emergenza
+CANALI_ABBONAMENTO = {}          # {id Telegram di chi vende: id del canale},
+                                 # es. {123456789: -1001234567890}; vuota =
+                                 # funzione inerte
+ABBONAMENTO_GIORNI = 30          # quanto dura un mese pagato
+ABBONAMENTO_AVVISO_GIORNI = 3    # il promemoria parte N giorni prima
+ABBONAMENTO_TOLLERANZA_GIORNI = 3  # dopo la scadenza, N giorni prima di uscire
 
 # --- Offerte (contrattazione sul prezzo) -----------------------------
 # Il compratore propone una cifra, il venditore accetta, rifiuta o fa

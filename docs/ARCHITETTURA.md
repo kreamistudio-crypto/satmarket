@@ -38234,3 +38234,46 @@ mai il kind 0 di nessuno: regola ferrea 2).
   ordine dal seme on-chain, `m/48'/0'/<100+n>'/2'`, e la firma
   dell'incasso sul telefono (`gcFirma`, `gcTrovaChiave`) solo su una PSBT
   che paga l'indirizzo scritto lì.
+
+- L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026, cantiere abbonamento-
+  canale; Cantieri, «L'abbonamento a un canale Telegram»). Un annuncio
+  con `annunci.abbonamento=1` vende un mese (ABBONAMENTO_GIORNI, 30) del
+  canale di chi vende: il canale lo dice SOLO `CANALI_ABBONAMENTO` nel
+  config ({tg di chi vende: id del canale}; chiavi anche come testo, per
+  il pannello), letto da `canale_abbonamento_di`, che a leva
+  `ABBONAMENTI_CANALE` spenta risponde 0 a tutti. La forma: solo codice
+  online, a prezzo fisso (`abbonamento_da_payload`), quantità al
+  sentinel dei servizi, un mese per ordine (`compra`), solo Lightning,
+  mai nel set. IL GIRO: `_incassa_ordine` scrive `ordini.abbonamento_
+  canale` nella transazione del 'locked', non scala lo stock, non manda
+  «Hai venduto»/«Ordine pagato» e chiama `_abbonamento_dopo_incasso`:
+  chi è già dentro (riga in `abbonati_canale` non tolta e `getChatMember`
+  che lo vede) ha la scadenza allungata e l'ordine 'delivered' subito,
+  poi `_sblocca_sats`; gli altri ricevono un link `createChatInviteLink`
+  (`creates_join_request`, nome «Barattolo ordine N») salvato in
+  `abbonamenti_link`, scritto cifrato come contenuto digitale e l'ordine
+  'shipped' (da lì rivelazione e finestre del digitale). Un guasto di
+  Telegram lascia l'ordine 'locked' e avvisa i moderatori;
+  `ronda_abbonamenti` lo rifà. L'INGRESSO: il campanello chiede
+  `chat_join_request` solo con un canale nella mappa
+  (`aggiornamenti_chiesti`); `abbonamento_richiesta_ingresso` ignora i
+  canali fuori mappa, trova il link per testo o per nome, vuole l'ordine
+  pagato e non conteso (shipped/delivered/confirmed/released) e, se chi
+  compra ha un id Telegram (positivo), solo quell'account. Il link si
+  prende con una UPDATE condizionata PRIMA di `approveChatJoinRequest`
+  (la corsa la vince uno), si revoca, nasce o si aggiorna la riga in
+  `abbonati_canale` (`nuova_scadenza_abbonamento`: somma se ancora
+  dentro, da adesso se uscito), si timbra `consegnato` e si chiama
+  `_sblocca_sats`: entrare chiude l'acquisto. Ogni altro caso nei nostri
+  canali: `declineChatJoinRequest`. LA RONDA (nell'`orologio`, ogni dieci
+  minuti): il giudice puro `scadenze_abbonamenti` dà un gesto per riga —
+  promemoria ABBONAMENTO_AVVISO_GIORNI prima, promemoria alla scadenza,
+  e dopo ABBONAMENTO_TOLLERANZA_GIORNI `banChatMember` + `unbanChatMember`
+  (`only_if_banned`); se Telegram rifiuta, un solo avviso ai moderatori
+  per abbonato (`guasto_il`) e la riga resta dentro. Il bot toglie SOLO le
+  righe di `abbonati_canale`. I nomi dei canali vengono da `getChat`
+  (`nome_canale`, in memoria, rinfrescati dalla ronda); la scheda li ha
+  da `arricchisci_righe_vetrina` (`abbonamento_nome`). Nella pagina: la
+  casella `sellAbbo` in Vendi (`myAbboCanale` da `/api/me`
+  «abbonamento_canale»), la nota `notaAbbonamento` nella scheda al posto
+  di quella del codice, `qtaMassimaAnnuncio` = 1.
