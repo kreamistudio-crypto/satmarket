@@ -482,6 +482,22 @@ def scena_campanello():
         "chat": {"id": -100999}, "from": {"id": 111},
         "invite_link": {"invite_link": "https://t.me/+altro"}}}))
     prova("un canale che non conosciamo non si tocca", [], BOT)
+    # I LINK DI CHI AMMINISTRA (20 nov 2026, Andrea: gli iscritti da
+    # YouTube entrano coi suoi link): nel NOSTRO canale una richiesta
+    # che non viene da un link nostro resta a lui — niente rifiuto
+    BOT.clear()
+    asyncio.run(SRV.gestisci_update({"chat_join_request": {
+        "chat": {"id": CANALE}, "from": {"id": 777},
+        "invite_link": {"invite_link": "https://t.me/+youtube",
+                        "name": "Iscritti YouTube"}}}))
+    prova("nel nostro canale il link di chi amministra non si tocca",
+          [], BOT)
+    BOT.clear()
+    asyncio.run(SRV.gestisci_update({"chat_join_request": {
+        "chat": {"id": CANALE}, "from": {"id": 777},
+        "invite_link": {"invite_link": "https://t.me/+finto",
+                        "name": "Barattolo ordine 999999"}}}))
+    prova("...nemmeno col nome di un ordine che non c'e'", [], BOT)
 
 
 AID = [0]

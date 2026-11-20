@@ -38276,7 +38276,9 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `ronda_abbonamenti` lo rifà. L'INGRESSO: il campanello chiede
   `chat_join_request` solo con un canale nella mappa
   (`aggiornamenti_chiesti`); `abbonamento_richiesta_ingresso` ignora i
-  canali fuori mappa, trova il link per testo o per nome, vuole l'ordine
+  canali fuori mappa, trova il link per testo o per nome — e se non è un
+  link nostro NON TOCCA la richiesta (né accetta né rifiuta: resta a chi
+  amministra, per gli inviti suoi e degli iscritti da YouTube) —, vuole l'ordine
   pagato e non conteso (shipped/delivered/confirmed/released) e, se chi
   compra ha un id Telegram (positivo), solo quell'account. Il link si
   prende con una UPDATE condizionata PRIMA di `approveChatJoinRequest`

@@ -52707,8 +52707,12 @@ async def _abbonamento_dopo_incasso(ordine_id: int, canale: int):
 async def abbonamento_richiesta_ingresso(rq: dict):
     """Qualcuno chiede di entrare in un canale con un link: se e' il
     link di un ordine nostro, mai usato, e l'ordine e' pagato e non in
-    disputa, entra — e l'acquisto si chiude. Ogni altro caso nei NOSTRI
-    canali si rifiuta; i canali che non conosciamo non si toccano."""
+    disputa, entra — e l'acquisto si chiude. Un link nostro che non vale
+    (gia' usato, non suo, in disputa) si rifiuta. Le richieste che NON
+    arrivano da un link nostro non si toccano mai: restano a chi
+    amministra il canale, come prima (20 nov 2026, Andrea: gli iscritti
+    da YouTube entrano coi suoi link); i canali che non conosciamo
+    nemmeno."""
     canale = int(((rq or {}).get("chat") or {}).get("id") or 0)
     chi = int(((rq or {}).get("from") or {}).get("id") or 0)
     inv = (rq or {}).get("invite_link") or {}
@@ -52725,6 +52729,13 @@ async def abbonamento_richiesta_ingresso(rq: dict):
             oid = _ordine_dal_nome_link(inv.get("name"))
             r = con.execute("SELECT * FROM abbonamenti_link WHERE canale=? "
                             "AND ordine_id=?", (canale, oid)).fetchone()
+        if not r:
+            # NON E' UN LINK NOSTRO (20 nov 2026): un link del canale
+            # fatto da chi lo amministra — gli iscritti da YouTube, gli
+            # inviti a mano — resta suo: niente rifiuto, decide lui
+            print("🚪 Richiesta d'ingresso nel canale con un link non "
+                  "nostro: lasciata a chi amministra")
+            return
         o = (con.execute("SELECT * FROM ordini WHERE id=?",
                          (r["ordine_id"],)).fetchone() if r else None)
         # pagato e non conteso: anche 'confirmed'/'released' (chi non e'
