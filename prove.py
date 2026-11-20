@@ -217166,6 +217166,63 @@ console.log(JSON.stringify([a, b]));
            "stessa chiave Nostr" in T[1]])
 
 
+def prove_timer_deposito_oc():
+    """IL TEMPO PER DEPOSITARE NELLA PAGINA ON-CHAIN (20 nov 2026, cantiere
+    timer-deposito; Andrea alla prova con Alan, sulla pagina «Preso: si
+    aspetta il deposito»: «manca il timer dei 30 minuti qua», «c'è troppo
+    testo lì, fallo più corto»). Quel che si rompe in silenzio: la riga che
+    non nasce (o nasce a tempo finito), l'anello alla quota sbagliata, il
+    battito che non la trova, e la frase lunga che torna."""
+    print("\n[il tempo per depositare nella pagina on-chain]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    js = "\n".join([
+        "function esc(s){ return String(s); }",
+        "function anelloTempoP2P(q){ return '[' + Math.round(q * 100) + ']'; }",
+        _fn_js(mini, "function traQuantoP2P(sec){"),
+        _fn_js(mini, "function rigaTempoDepositoOcP2P(o, adesso){"),
+        r"""
+const ora = 100000;
+const R = [
+  rigaTempoDepositoOcP2P({preso_il: ora - 600, deposito_entro: ora + 1200}, ora),
+  rigaTempoDepositoOcP2P({preso_il: ora - 1500, deposito_entro: ora + 300}, ora),
+  rigaTempoDepositoOcP2P({preso_il: 0, deposito_entro: ora + 3 * 3600}, ora),
+  rigaTempoDepositoOcP2P({preso_il: ora - 1800, deposito_entro: ora - 1}, ora),
+  rigaTempoDepositoOcP2P({preso_il: ora, deposito_entro: 0}, ora),
+  rigaTempoDepositoOcP2P(null, ora)];
+console.log(JSON.stringify({R}));
+"""])
+    o = _node_banco(js)
+    if o is None:
+        salta("il banco del tempo per depositare", "node assente")
+        return
+    if "R" not in o:
+        prova("il banco del tempo per depositare gira", True, False)
+        return
+    R = o["R"]
+    prova("a chi deve depositare «⏱ Hai ancora 20 min per depositare», con l'anello alla "
+          "sua quota (20 su 30) e i numeri per il battito; rossa sotto i dieci minuti",
+          (True, True, True, False, True, True),
+          ("Hai ancora <b>20 min</b> per depositare" in R[0], "[67]" in R[0],
+           'data-entro="101200" data-tot="1800"' in R[0], " rosso" in R[0],
+           " rosso" in R[1] and "<b>5 min</b>" in R[1], "<b>3 h</b>" in R[2] and "[100]" in R[2]))
+    prova("...e niente a tempo finito, senza un limite, senza scambio", ["", "", ""], R[3:])
+    scheda = _fn_js(mini, "function schedaOnchainP2P(o){")
+    prova("la pagina la mette SOTTO la nota dello stato (una riga dentro lo span della nota "
+          "spezzerebbe l'HTML) e il battito di casa la trova; l'ora scritta resta solo senza riga",
+          (True, True, True, True),
+          ("? `Deposita <b>${fmt(o.importo_sats)} sats</b> nel 2-di-3: tocca «🔒 Blocca i sats».`" in scheda
+           and "(tempoDep = typeof rigaTempoDepositoOcP2P === 'function' ? rigaTempoDepositoOcP2P(o) : '')" in scheda,
+           "+ '<br>' + testo + '</span></div>'\n    /* il tempo per depositare, sotto la nota (20 nov 2026, timer-deposito) */\n    + tempoDep" in scheda,
+           "class=\"p2p-tempo-card" in _fn_js(mini, "function rigaTempoDepositoOcP2P(o, adesso){")
+           and ".p2p-tempo-card[data-entro]" in _fn_js(mini, "function battitoTempoCardP2P(){"),
+           "? '' : (o.deposito_entro ? ` Entro le ${quando(o.deposito_entro)}.` : ''))" in scheda))
+    prova("LA FRASE CORTA (Andrea: «leva il testo»): via il margine, la commissione e «Con una "
+          "conferma lo scambio va avanti» dalla pagina di chi deposita (li dice il foglio)",
+          (False, False),
+          ("di margine per la rete`" in scheda, "Blocca i sats». Con una conferma lo scambio va avanti." in scheda))
+
+
 def prove_timer_card_scambi():
     """IL TEMPO ANCHE NELLA CARD DI «I MIEI SCAMBI» (20 nov 2026, cantiere
     timer-card-scambi; Andrea, sulla card «Sats in garanzia 👉 tocca a te»
@@ -217561,7 +217618,7 @@ def _esce(f):
 CATEGORIE = {
     "p2p": """
     vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
-    timer_card_scambi
+    timer_card_scambi timer_deposito_oc
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque chiavi_parcheggiate
@@ -218890,6 +218947,7 @@ def main():
               prove_chiavi_ovunque,
               prove_chiavi_dal_conto,
               prove_timer_card_scambi,
+              prove_timer_deposito_oc,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

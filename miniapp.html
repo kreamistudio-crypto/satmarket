@@ -76294,6 +76294,23 @@ function rigaTempoCardOcP2P(o, adesso){
     + '" data-tot="' + tot + '">' + anelloTempoP2P(resta / tot) + '<span>⏱ Hai ancora <b>'
     + esc(traQuantoP2P(resta)) + '</b></span></div>';
 }
+/* IL TEMPO PER DEPOSITARE (20 nov 2026, cantiere timer-deposito; Andrea:
+   «manca il timer dei 30 minuti qua»): a chi deve mandare i sats nel
+   2-di-3, la riga della card col tempo che scorre (`deposito_entro`, che
+   la presa scrive col tempo scelto da chi vende: al piu' sei ore). La fa
+   battere `battitoTempoCardP2P`, rossa negli ultimi dieci minuti, e allo
+   zero se ne va. PURA. */
+function rigaTempoDepositoOcP2P(o, adesso){
+  if (!o || typeof anelloTempoP2P !== 'function' || typeof traQuantoP2P !== 'function') return '';
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const fine = Number(o.deposito_entro) || 0, resta = fine - ora;
+  if (!(fine > 0) || resta <= 0) return '';
+  const dal = Number(o.preso_il) || 0;
+  const tot = dal > 0 && fine > dal ? fine - dal : resta;
+  return '<div class="p2p-tempo-card' + (resta <= 600 ? ' rosso' : '') + '" data-entro="' + fine
+    + '" data-tot="' + tot + '">' + anelloTempoP2P(resta / tot) + '<span>⏱ Hai ancora <b>'
+    + esc(traQuantoP2P(resta)) + '</b> per depositare</span></div>';
+}
 /* la tinta della casella, nella tavolozza del Lightning (`P2P_TINTA_STATO`):
    arancio il gesto mio, viola l'attesa, rosso la disputa */
 function tintaOnchainP2P(o){
@@ -77199,7 +77216,7 @@ function schedaOnchainP2P(o){
   const ind = o.indirizzo || {};
   const espl = o.esploratore || onchainRete().esplora;
   const quando = (t) => t ? new Date(t * 1000).toLocaleString('it-IT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '';
-  let testo = '', gesti = '';
+  let testo = '', gesti = '', tempoDep = '';
   const bott = (cls, onclick, label) => `<button type="button" class="btn ${cls}" onclick="${onclick}">${label}</button>`;
   const g = (cosa, label, cls) => bott(cls || 'ghost', `gestoOnchainP2P(this, ${o.id}, '${cosa}')`, label);
   switch (o.stato) {
@@ -77221,10 +77238,14 @@ function schedaOnchainP2P(o){
       testo = vistoDep
         ? `La rete ha visto i tuoi <b>${fmt(Number(o.visti_sats) || o.importo_sats)} sats</b>: `
           + 'si aspetta la conferma, di solito entro un\'ora. Non depositare di nuovo. Con una conferma lo scambio va avanti.'
+        /* (20 nov 2026, cantiere timer-deposito; Andrea alla prova con
+           Alan: «manca il timer dei 30 minuti qua», «c'è troppo testo lì,
+           fallo più corto») una riga sola e sotto il tempo che scorre;
+           il margine e la commissione li dice il foglio «🔒 Blocca i sats» */
         : deposito
-        ? `Deposita <b>${fmt(o.importo_sats)} sats</b> (${fmt(o.sats)} + ${fmt(o.margine_sats)} di margine per la rete`
-          + (Number(o.quota_sats) > 0 ? ` + ${fmt(Number(o.quota_sats) - (Number(o.quota_ricevente_sats) || 0))} di commissione` : '') + ') '
-          + `nel 2-di-3 entro le ${quando(o.deposito_entro)}: tocca «🔒 Blocca i sats». Con una conferma lo scambio va avanti.`
+        ? `Deposita <b>${fmt(o.importo_sats)} sats</b> nel 2-di-3: tocca «🔒 Blocca i sats».`
+          + ((tempoDep = typeof rigaTempoDepositoOcP2P === 'function' ? rigaTempoDepositoOcP2P(o) : '')
+             ? '' : (o.deposito_entro ? ` Entro le ${quando(o.deposito_entro)}.` : ''))
         : tabOc ? `Chi vende sta depositando i sats (entro le ${quando(o.deposito_entro)}). Poi vedi il PayCode.`
         : `Chi vende sta depositando ${fmt(o.importo_sats)} sats nell'indirizzo 2-di-3 (entro le ${quando(o.deposito_entro)}). `
           + (contOc ? 'Ti avvisiamo appena sono confermati: allora vi vedete e consegni i contanti.'
@@ -77574,6 +77595,8 @@ function schedaOnchainP2P(o){
         : paroleOc(o, P2P_ONCHAIN_STATI[o.stato] || o.stato)) + '</b>'
       + (tocca ? '<span class="p2p-tocca">👉 tocca a te</span>' : (finito || mod ? '' : '<span class="p2p-aspetta">✋ Aspetta</span>'))
       + '<br>' + testo + '</span></div>'
+    /* il tempo per depositare, sotto la nota (20 nov 2026, timer-deposito) */
+    + tempoDep
     /* il tempo per pagare, sotto la nota (17 nov 2026) */
     + (typeof tempoPagareRigaOcP2P === 'function' && !rinunciaOc ? tempoPagareRigaOcP2P(o) : '')
     /* chi e' l'altra parte (17 nov 2026), come nel Lightning */
