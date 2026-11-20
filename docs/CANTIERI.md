@@ -93527,3 +93527,48 @@ prove.py` 30.582 passate e 2 esplose (`prove_p2p_libro`,
 `prove_p2p_dettaglio`: cercavano la firma vecchia di `barraScadenzaP2P`),
 rigirate dopo la cura delle due ancore: 594 passate, 0 fallite; collaudi
 della CI 163 verdi, 0 rossi.
+
+## La categoria dal nome, per tutte le categorie (20 nov 2026, cantiere categoria-dal-nome-2; Andrea, dopo il primo giro solo sugli alimenti: «Sì, va bene. Sì, il barattolo prova a capirla dal nome del prodotto non solo per gli alimenti, per tutto però»)
+
+COSA. `PAROLE_NOME_CATEGORIA` ha ora una voce per ogni categoria tranne
+«Altro» (prima solo «Alimenti e bevande», voce sopra), con alcune
+frasi di più parole («hardware wallet», «macchina da caffe», «olio
+motore»): contano solo intere, a confini di parola (`_parola_nel_nome`).
+`PAROLE_NOME_FERMANO` diventa per voce: le parole di prima fermano i
+soli alimenti, e le altre voci restano in gara — «Tazza per caffè» va
+in Casa per la tazza, «Macchina da caffè» negli Elettrodomestici.
+Il «sì, va bene» copre anche la frase di Tappo proposta, nella forma
+«per tutto»: in `assistente/sapere.md` «se nemmeno il negozio la
+indica, Barattolo prova a capirla dal nome del prodotto, e il resto va
+in «Altro»».
+
+LE DECISIONI, coi perché.
+- OGNI PAROLA IN UNA VOCE SOLA (lo guarda `prove.py`): una parola in
+  due voci farebbe sempre pareggio, e il vincitore unico non ci
+  sarebbe mai.
+- FUORI LE PAROLE CON DUE MESTIERI, oltre a quelle degli alimenti:
+  «batteria» (telefono o band), «tastiera» (pc o piano), «switch»,
+  «obiettivo», «servizio» (di piatti), «soggiorno» (il salotto),
+  «ceramica», «lampada», «pc» («10 pc» sono pezzi), «tv» (il mobile
+  porta tv), «moto» (il telefono Moto G) e «bitcoin»: sta sulle
+  magliette dei negozi di merce, e la maglietta vince da sola. Bitcoin
+  si riconosce dagli oggetti (Coldcard, Trezor, Bitaxe, «hardware
+  wallet», «seed plate»).
+- IL DUBBIO RESTA IN «ALTRO»: «Borsa per laptop», «Gatto di peluche»
+  hanno due categorie, e nessuna vince.
+
+PROVATO. `prove_connettori_categoria`, sezione 2b riscritta (56): un
+nome per dieci categorie diverse, le frasi intere a confini di parola,
+le parole con due mestieri che non decidono, le parole che fermano solo
+gli alimenti, il dubbio, ogni categoria con la sua voce, nessuna parola
+in due voci, tabelle normalizzate. CONTROPROVE (rotture apposta, tutte
+rosse, rimesso il codice verdi): fermate ignorate, frase senza confini
+di parola, prefisso al posto della parola intera, una parola in due
+voci, «pc» rimesso, vincitore non unico accettato.
+`collaudo_categoria_negozio` verde senza ritocchi.
+GIRATO, nel venv con le sole dipendenze del workflow (senza coincurve)
+e nostr-tools via `IDENTITA_NODE_MODULES`, sull'albero develop cbb8a6ff
+più questo cantiere: `PROVE_SEVERE=1 python prove.py` 30847 passate, 1
+rossa mia (`conoscenza.md` da rigenerare dopo il ritocco di
+`sapere.md`: rigenerato, `prove_conoscenza_tappo` 10 verdi), 0 saltate;
+`collaudi_ci.py --elenco ci/collaudi.txt`: 163 verdi, 0 rossi.

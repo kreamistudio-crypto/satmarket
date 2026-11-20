@@ -27415,14 +27415,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
     venditore ha già classificato il prodotto sul suo negozio.
   · se anche il negozio tace (20 nov 2026, cantiere categoria-dal-nome,
     i biscotti di Luca su un Woo senza categorie) decide il NOME del
-    prodotto, `categoria_dal_nome`: SOLO il titolo, parole INTERE di
-    `PAROLE_NOME_CATEGORIA` (oggi la sola voce «Alimenti e bevande»,
-    parole che nominano la cosa e quasi mai la descrivono: niente
-    «miele», «vino», «olio», «pasta»), le `PAROLE_NOME_FERMANO`
-    («stampo», «macchina», «barattolo», «colore»…) che rimandano in
-    «Altro» un oggetto PER il cibo, e un vincitore solo. Vale solo per
-    i negozi collegati: Nostr resta senza (la lezione di
-    `categoria_automatica` sopra).
+    prodotto, `categoria_dal_nome`: SOLO il titolo, parole INTERE (o
+    frasi intere, «hardware wallet») di `PAROLE_NOME_CATEGORIA`, una
+    voce per ogni categoria tranne «Altro» e ogni parola in una voce
+    sola — parole che nominano la cosa e quasi mai la descrivono:
+    niente «miele», «vino», «olio», «pasta», «batteria», «tastiera»,
+    «pc», «tv», «moto», «bitcoin» —; le `PAROLE_NOME_FERMANO`, per
+    voce («stampo», «macchina», «barattolo», «colore»… fermano gli
+    alimenti: un oggetto PER il cibo non è cibo, e le altre voci restano
+    in gara); un vincitore solo, due categorie nello stesso nome sono un
+    dubbio. Vale solo per i negozi collegati: Nostr resta senza (la
+    lezione di `categoria_automatica` sopra).
   DOVE SCENDE. Alla nascita (`_una_riga`, come sempre `r.get("categoria")
   or "Altro"`); al giro dell'ora `_aggiorna` RIEMPIE SOLO LA CASELLA
   VUOTA — una riga in «Altro» prende la categoria del giudice, una

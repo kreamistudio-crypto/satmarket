@@ -119800,9 +119800,10 @@ def prove_connettori_categoria():
         lezione di `categoria_automatica`, che indovinava e sbagliava
         in silenzio;
      2b. se anche il negozio tace (20 nov 2026) decide il NOME, ma
-        stretto: solo il titolo, parole intere di una tabella corta,
-        le parole che fermano («stampo per biscotti») e un vincitore
-        solo — i biscotti di Luca, su un Woo senza categorie;
+        stretto: solo il titolo, parole intere di una tabella per
+        categoria (tutte, dalla sera del 20), le parole che fermano
+        («stampo per biscotti») e un vincitore solo — i biscotti di
+        Luca, su un Woo senza categorie;
      3. il giro dell'ora riempie solo la casella vuota: chi sta gia' in
         una categoria vera (un moderatore l'ha spostato) non si muove;
         a spostare tutto il negozio e' solo il gesto del venditore,
@@ -119894,34 +119895,63 @@ def prove_connettori_categoria():
           [nome("PANETTONE artigianale"), nome("Caffè in grani 1 kg")])
     prova("la parola deve essere INTERA: «biscottiera» non e' un biscotto",
           "Altro", nome("Biscottiera in ceramica"))
-    prova("le parole che FERMANO: un oggetto per il cibo resta in «Altro»",
-          ["Altro"] * 4,
+    prova("le parole che FERMANO gli alimenti: un oggetto per il cibo non "
+          "e' cibo, e decide l'oggetto (o resta il dubbio)",
+          ["Altro", "Elettrodomestici", "Scarpe e accessori", "Altro",
+           "Casa e giardino"],
           [nome("Stampo per biscotti in silicone"),
            nome("Macchina da caffè espresso"),
            nome("Borsa in pelle colore cioccolato"),
-           nome("Scatola di latta per biscotti vintage")])
-    prova("le parole larghe NON sono nella tabella (miele, vino, olio, "
-          "pasta)", ["Altro"] * 4,
+           nome("Scatola di latta per biscotti vintage"),
+           nome("Tazza per caffè")])
+    prova("le parole larghe NON sono nella tabella: miele, vino, olio, "
+          "pasta non tirano verso gli alimenti",
+          ["Elettrodomestici", "Abbigliamento", "Motori", "Informatica",
+           "Altro"],
           [nome("Lavatrice Miele 8 kg"), nome("Maglione rosso vino"),
-           nome("Olio motore 5W30"), nome("Pasta termica per CPU")])
+           nome("Olio motore 5W30"), nome("Pasta termica per CPU"),
+           nome("Miele millefiori 500 g")])
+    # PER TUTTE LE CATEGORIE (20 nov 2026, Andrea: «non solo per gli
+    # alimenti, per tutto però»)
+    prova("tutte le categorie: un nome per voce, al suo posto",
+          ["Telefonia", "Bitcoin", "Strumenti musicali", "Biciclette",
+           "Lezioni e corsi", "Audio e video", "Collezionismo",
+           "Abbigliamento", "Animali", "Libri e media"],
+          [nome("iPhone 13 128GB"), nome("Seed plate in acciaio"),
+           nome("Chitarra Fender Stratocaster"), nome("Bici da corsa"),
+           nome("Corso di inglese online"), nome("Cuffie Sony"),
+           nome("Monete d'argento"), nome("T-shirt Bitcoin is freedom"),
+           nome("Cuccia per cane"), nome("Manga One Piece vol. 1")])
+    prova("le frasi di piu' parole contano solo intere, a confini di "
+          "parola («borsE BIKE» non e' una e-bike)",
+          ["Bitcoin", "Altro", "Scarpe e accessori"],
+          [nome("Hardware wallet per Bitcoin"), nome("Wallet in pelle"),
+           nome("Borse bike packing")])
+    prova("le parole con due mestieri restano fuori: pc, tv, moto, "
+          "bitcoin da sole non decidono", ["Altro"] * 4,
+          [nome("Set 10 pc"), nome("Mobile porta tv"), nome("Moto G 5G"),
+           nome("Bitcoin")])
     prova("senza parole che contano, o senza titolo: «Altro»",
           ["Altro"] * 3,
           [nome("Box regalo Natale"), nome(""), nome(None)])
+    prova("due categorie nello stesso nome sono un dubbio: «Altro»",
+          ["Altro"] * 2, [nome("Borsa per laptop"), nome("Gatto di peluche")])
     _tab = amb["PAROLE_NOME_CATEGORIA"]
-    try:
-        _tab["Bitcoin"] = frozenset({"biscotti"})
-        prova("due categorie nello stesso nome sono un dubbio: «Altro»",
-              "Altro", nome("Biscotti al cioccolato"))
-    finally:
-        _tab.pop("Bitcoin", None)
-    prova("ogni voce della tabella e' una nostra categoria, mai «Altro»",
-          True, all(c in amb["CATEGORIE"] and c != "Altro" for c in _tab))
-    prova("le parole della tabella sono gia' normalizzate (una parola, "
-          "minuscola, senza accenti)", True,
-          all(p == amb["normalizza"](p) and " " not in p
-              for v in _tab.values() for p in v)
-          and all(p == amb["normalizza"](p)
-                  for p in amb["PAROLE_NOME_FERMANO"]))
+    _ferma = amb["PAROLE_NOME_FERMANO"]
+    prova("ogni voce della tabella e' una nostra categoria, mai «Altro», "
+          "e ogni nostra categoria ha la sua voce", True,
+          all(c in amb["CATEGORIE"] and c != "Altro" for c in _tab)
+          and all(c in _tab for c in amb["CATEGORIE"] if c != "Altro")
+          and all(c in _tab for c in _ferma))
+    _tutte = [p for v in _tab.values() for p in v]
+    prova("ogni parola sta in UNA voce sola (sennò il vincitore unico "
+          "non c'e' mai)", [], sorted({p for p in _tutte
+                                       if _tutte.count(p) > 1}))
+    prova("le parole delle tabelle sono gia' normalizzate (minuscole, "
+          "senza accenti, uno spazio fra le parole)", True,
+          all(p == amb["normalizza"](p) for p in _tutte)
+          and all(p == amb["normalizza"](p) and " " not in p
+                  for v in _ferma.values() for p in v))
 
     def righe_nome():
         return [{"categorie_grezze": ["Senza categoria"],

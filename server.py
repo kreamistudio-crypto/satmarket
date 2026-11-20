@@ -103231,42 +103231,178 @@ def categoria_dal_negozio(nomi) -> str:
 # te») ha un WooCommerce che le categorie non le dichiara, e i suoi
 # «Augurelli Biscotti farciti…» finivano in «Altro» anche se dal nome
 # lo capisce chiunque. Richiesta di Andrea: «essendoci biscotti nel
-# nome credo sia facile indirizzarli nella giusta categoria».
+# nome credo sia facile indirizzarli nella giusta categoria», e poi,
+# lo stesso giorno: «prova a capirla dal nome del prodotto non solo
+# per gli alimenti, per tutto però».
 # NON E' LA `categoria_automatica` TOLTA A LUGLIO, e la differenza e'
 # il punto: quella pescava parole larghe anche nella descrizione, e lo
 # «Sparkling Sake» finiva fra gli arredi per un «cucina». Qui:
 # · SOLO IL TITOLO, cioe' il nome che il venditore ha dato al prodotto;
-# · SOLO PAROLE CHE NOMINANO LA COSA e quasi mai la descrivono: niente
-#   «miele» (e' anche una marca di lavatrici), «vino» (il maglione
-#   rosso vino), «olio» (quello del motore), «pasta» (quella termica);
-# · LE PAROLE CHE FERMANO: «stampo per biscotti», «macchina da caffè»,
-#   «barattolo per biscotti» parlano di un oggetto che col cibo ha a
-#   che fare, e il dubbio resta in «Altro»;
+# · SOLO PAROLE CHE NOMINANO LA COSA e quasi mai la descrivono, INTERE
+#   (una parola sola = parola esatta del titolo; piu' parole = quella
+#   frase intera). Fuori apposta le parole con due mestieri: «miele»
+#   (marca di lavatrici), «vino» (il maglione rosso vino), «olio» e
+#   «pasta» (del motore, termica), «batteria» (del telefono o della
+#   band), «tastiera» (del pc o del piano), «switch», «obiettivo»,
+#   «servizio» (di piatti), «soggiorno» (il salotto), «ceramica»,
+#   «bitcoin» (sta sulle magliette: la maglietta vince da sola), «pc»
+#   («10 pc» sono pezzi), «tv» (il mobile porta tv), «moto» (il
+#   telefono Moto G);
+# · LE PAROLE CHE FERMANO, per categoria: «stampo per biscotti» o
+#   «macchina da caffè» parlano di un oggetto che col cibo ha a che
+#   fare, e gli alimenti si fermano li';
 # · UN VINCITORE SOLO: due categorie trovate nello stesso nome sono un
-#   dubbio, e il dubbio resta in «Altro» come in `sottocategoria_indovina`.
+#   dubbio («Borsa per laptop», «Gatto di peluche»), e il dubbio resta
+#   in «Altro» come in `sottocategoria_indovina`. Per questo ogni
+#   parola sta in UNA voce sola (lo controlla `prove.py`).
 # SOLO GLI IMPORTATI DA UN NEGOZIO e solo quando cassetto e negozio non
 # hanno deciso niente: il form ha un umano che sceglie, e Nostr resta
-# com'e' (lo colloca il venditore). Si allarga con una riga per voce,
-# con le stesse regole: parole che nominano la cosa, mai un aggettivo.
+# com'e' (lo colloca il venditore).
 PAROLE_NOME_CATEGORIA = {
+    "Elettronica": frozenset({
+        "powerbank", "power bank", "caricabatterie", "alimentatore",
+        "arduino", "raspberry", "multimetro"}),
+    "Informatica": frozenset({
+        "laptop", "computer", "mouse", "stampante", "ssd",
+        "hard disk", "router", "macbook", "chromebook", "webcam",
+        "processore", "cpu", "ipad", "tablet"}),
+    "Telefonia": frozenset({
+        "smartphone", "cellulare", "cellulari", "iphone", "telefono",
+        "telefonino"}),
+    "Audio e video": frozenset({
+        "cuffie", "auricolari", "airpods", "altoparlante", "speaker",
+        "soundbar", "televisore", "smart tv", "giradischi", "proiettore",
+        "stereo", "subwoofer", "hifi"}),
+    "Console e videogiochi": frozenset({
+        "playstation", "ps4", "ps5", "xbox", "nintendo", "videogioco",
+        "videogiochi", "gameboy", "joystick"}),
+    "Foto e ottica": frozenset({
+        "fotocamera", "reflex", "mirrorless", "binocolo", "telescopio",
+        "cannocchiale", "treppiede", "gopro", "polaroid"}),
+    "Bitcoin": frozenset({
+        "hardware wallet", "coldcard", "seedsigner", "trezor", "bitaxe",
+        "umbrel", "satscard", "tapsigner", "nodo bitcoin", "seed plate"}),
+    "Casa e giardino": frozenset({
+        "divano", "poltrona", "tavolo", "sedia", "sedie", "tappeto",
+        "cuscino", "cuscini", "lenzuola", "piumone", "vaso", "vasi",
+        "candela", "candele", "specchio", "mensola", "armadio",
+        "comodino", "pentola", "pentole", "padella", "padelle",
+        "bicchieri", "tazza", "tazze", "posate", "tovaglia",
+        "asciugamani", "zerbino"}),
+    "Elettrodomestici": frozenset({
+        "lavatrice", "lavastoviglie", "frigorifero", "frigo",
+        "microonde", "aspirapolvere", "frullatore", "tostapane",
+        "bollitore", "friggitrice", "macchina da caffe", "ferro da stiro",
+        "asciugatrice", "condizionatore", "stufa", "ventilatore",
+        "impastatrice", "centrifuga"}),
+    "Fai da te e utensili": frozenset({
+        "trapano", "avvitatore", "cacciavite", "cacciaviti", "martello",
+        "chiave inglese", "seghetto", "smerigliatrice", "livella",
+        "pinza", "pinze", "saldatore", "saldatrice", "cassetta attrezzi",
+        "attrezzi", "utensili", "tassellatore"}),
     "Alimenti e bevande": frozenset({
         "biscotti", "biscotto", "frollini", "cantucci", "cantuccini",
         "amaretti", "savoiardi", "ricciarelli", "panforte", "torrone",
         "torroni", "panettone", "panettoni", "pandoro", "pandori",
         "cioccolato", "cioccolata", "cioccolatini", "cioccolatino",
-        "praline", "marmellata", "marmellate", "confettura",
+        "praline", "caramelle", "marmellata", "marmellate", "confettura",
         "confetture", "grissini", "taralli", "tarallini", "crackers",
         "extravergine", "tisana", "tisane", "zafferano", "legumi",
-        "lenticchie", "caffe"}),
+        "lenticchie", "caffe", "salame", "salami", "prosciutto",
+        "formaggio", "formaggi", "parmigiano", "pecorino", "pistacchi",
+        "nocciole", "mandorle", "farina", "liquore", "liquori", "grappa",
+        "limoncello", "prosecco", "spumante", "champagne", "whisky",
+        "gin", "vodka", "rum", "sidro", "kombucha"}),
+    "Bellezza e benessere": frozenset({
+        "shampoo", "balsamo", "sapone", "saponi", "profumo", "profumi",
+        "deodorante", "rossetto", "mascara", "siero", "lozione", "scrub",
+        "dentifricio", "integratore", "integratori", "vitamine",
+        "creatina", "collagene", "cosmetici", "olio essenziale",
+        "oli essenziali", "crema viso", "crema mani", "crema corpo"}),
+    "Abbigliamento": frozenset({
+        "maglietta", "magliette", "maglione", "felpa", "felpe",
+        "camicia", "camicie", "pantaloni", "jeans", "giacca",
+        "giubbotto", "cappotto", "gonna", "vestito", "tshirt", "t shirt",
+        "hoodie", "leggings", "pigiama", "calzini", "piumino",
+        "canottiera", "cardigan", "blazer"}),
+    "Scarpe e accessori": frozenset({
+        "scarpe", "scarpa", "sneakers", "stivali", "sandali",
+        "mocassini", "ciabatte", "borsa", "borse", "zaino", "zaini",
+        "portafoglio", "cintura", "occhiali", "cappello", "berretto",
+        "sciarpa", "guanti", "valigia", "trolley", "marsupio"}),
+    "Orologi e gioielli": frozenset({
+        "orologio", "orologi", "smartwatch", "collana", "anello",
+        "anelli", "bracciale", "braccialetto", "orecchini", "ciondolo",
+        "gioiello", "gioielli", "spilla", "cronografo"}),
+    "Bambini": frozenset({
+        "passeggino", "culla", "seggiolone", "pannolini", "ciuccio",
+        "biberon", "giocattolo", "giocattoli", "peluche", "neonato",
+        "neonata", "bambola", "bambole", "seggiolino"}),
+    "Sport e hobby": frozenset({
+        "pallone", "racchetta", "racchette", "tapis roulant",
+        "kettlebell", "sacco a pelo", "canna da pesca", "mulinello",
+        "sci", "snowboard", "skateboard", "monopattino", "pattini",
+        "guantoni"}),
+    "Biciclette": frozenset({
+        "bicicletta", "biciclette", "bici", "mtb", "mountain bike",
+        "ebike", "e bike", "bmx", "sellino"}),
+    "Motori": frozenset({
+        "motocicletta", "scooter", "motorino", "pneumatici", "pneumatico",
+        "marmitta", "carburatore", "olio motore", "ricambi auto",
+        "cerchi in lega", "casco moto"}),
+    "Animali": frozenset({
+        "cane", "cani", "gatto", "gatti", "cuccia", "guinzaglio",
+        "collare", "crocchette", "lettiera", "acquario", "tiragraffi"}),
+    "Libri e media": frozenset({
+        "libro", "libri", "romanzo", "fumetto", "fumetti", "manga",
+        "rivista", "riviste", "ebook", "audiolibro", "enciclopedia",
+        "dizionario"}),
+    "Musica e film": frozenset({
+        "vinile", "vinili", "dvd", "bluray", "blu ray", "cd"}),
+    "Strumenti musicali": frozenset({
+        "chitarra", "chitarre", "pianoforte", "violino", "ukulele",
+        "sassofono", "flauto", "tromba", "fisarmonica", "armonica",
+        "plettri", "synth", "sintetizzatore", "metronomo", "violoncello",
+        "clarinetto", "ocarina"}),
+    "Collezionismo": frozenset({
+        "francobolli", "francobollo", "moneta", "monete", "figurine",
+        "banconote", "medaglie", "action figure", "funko", "modellismo",
+        "trenino", "soldatini"}),
+    "Arte e artigianato": frozenset({
+        "dipinto", "quadro", "quadri", "acquerello", "litografia",
+        "scultura", "uncinetto", "ricamo", "stampa d arte"}),
+    "Buoni ed esperienze": frozenset({
+        "gift card", "giftcard", "buono regalo", "buono acquisto",
+        "voucher", "codice regalo", "degustazione"}),
+    "Lezioni e corsi": frozenset({
+        "lezione", "lezioni", "corso", "corsi", "ripetizioni",
+        "workshop", "masterclass", "webinar"}),
+    "Lavoro e servizi": frozenset({
+        "consulenza", "consulenze", "riparazione", "riparazioni",
+        "traduzione", "traduzioni", "copywriting", "sito web",
+        "trasloco", "traslochi"}),
 }
 
-# Le parole che fermano il giudice: se una c'e' nel nome, il prodotto e'
-# un oggetto PER il cibo (o un colore), non il cibo.
-PAROLE_NOME_FERMANO = frozenset({
-    "stampo", "stampi", "formina", "formine", "tagliabiscotti",
-    "macchina", "macchinetta", "moka", "tazza", "tazze", "tazzina",
-    "tazzine", "barattolo", "barattoli", "contenitore", "scatola",
-    "latta", "porta", "colore", "color", "ricettario", "libro"})
+# Le parole che fermano UNA voce: se una c'e' nel nome, il prodotto e'
+# un oggetto PER quella cosa (o un colore), non la cosa. Le altre voci
+# restano in gara: «Tazza per caffè» ferma gli alimenti e va in «Casa
+# e giardino» per la tazza.
+PAROLE_NOME_FERMANO = {
+    "Alimenti e bevande": frozenset({
+        "stampo", "stampi", "formina", "formine", "tagliabiscotti",
+        "macchina", "macchinetta", "moka", "tazza", "tazze", "tazzina",
+        "tazzine", "barattolo", "barattoli", "contenitore", "scatola",
+        "latta", "porta", "colore", "color", "ricettario", "libro"}),
+}
+
+
+def _parola_nel_nome(voce: str, parole: set, testo: str) -> bool:
+    """Una voce della tabella nel nome: una parola sola = parola esatta
+    del titolo (niente prefissi: «biscottiera» non e' un biscotto); piu'
+    parole = la frase intera, a confini di parola."""
+    if " " in voce:
+        return f" {voce} " in testo
+    return voce in parole
 
 
 def categoria_dal_nome(titolo) -> str:
@@ -103274,11 +103410,14 @@ def categoria_dal_nome(titolo) -> str:
     negozio (20 nov 2026), o «Altro». Le regole sopra
     `PAROLE_NOME_CATEGORIA`: parole intere del titolo, le parole che
     fermano, un vincitore solo."""
-    parole = set(normalizza(titolo).split())
-    if not parole or parole & PAROLE_NOME_FERMANO:
+    t = normalizza(titolo)
+    parole = set(t.split())
+    if not parole:
         return "Altro"
+    testo = f" {t} "
     trovate = [cat for cat, voci in PAROLE_NOME_CATEGORIA.items()
-               if parole & voci]
+               if not parole & PAROLE_NOME_FERMANO.get(cat, frozenset())
+               and any(_parola_nel_nome(v, parole, testo) for v in voci)]
     return trovate[0] if len(trovate) == 1 else "Altro"
 
 
