@@ -93434,3 +93434,71 @@ dal vivo: Telegram Desktop e Telegram Web, dove niente è cambiato.
 FUORI DA QUESTO CANTIERE, notato: «Apri Amber» (nostrconnect://) dentro
 Telegram per Android passa dalla stessa strada e con ogni probabilità
 rompe la Mini App allo stesso modo.
+
+## «Chi ha pubblicato quest'ordine» in una riga, e il tocco apre le recensioni (20 nov 2026, cantiere card-chi-pubblica; Andrea davanti al foglio «Stai comprando sats» on-chain: «Anche qui la card è troppo confusionaria. Innanzitutto quando ci clicco sopra chi ha pubblicato l'ordine voglio vedere le recensioni e poi comunque quella card lì è troppo complicata», e sulla proposta con tre scatti: «Perfetto, sì, va bene»)
+
+DECISO.
+- IL RIQUADRO È UNA RIGA SOLA, come una persona: il volto a sinistra (44px),
+  accanto, uno sotto l'altro, il nome, «★ 5,0 · 14 recensioni» e i fatti
+  corti «✅ 15 scambi P2P · ⚡ Risponde in fretta» (le stesse parole della
+  card del libro, `scambiCortiP2P` e `badgeVeloceP2P(…, true)`). I marchi
+  «⚠️ N non completati» e «⚖️ N dispute perse» restano, in riga, perché
+  chi sta per pagare li deve vedere. Uscite le tre colonne (stella da 28,
+  omino da 22, volto) e le due frasi intere sotto, col loro CSS
+  (`.p2p-rep-tre`, `.p2p-rep-col*`, `.p2p-rep-segno*`); resta
+  `.p2p-rep-volto`, la faccia.
+- IL TOCCO APRE LE RECENSIONI LÌ SOTTO, dentro il riquadro, e un secondo
+  tocco le chiude (`recensioniChiP2P`, accanto alle «Recensioni ricevute»
+  del Profilo). Si chiedono UNA volta, alla rotta del negozio con
+  `limit=1` e senza `vista` (non conta una visita), e si disegnano con
+  `feedbackNegozioHTML`, che prende un quarto argomento: un id suo per il
+  «Mostra tutti» (negozio e Profilo possono essere ancora nel DOM) e i nomi
+  SENZA porta, perché il negozio è una vista e da un foglio finirebbe
+  sotto. Un tocco dentro l'elenco non chiude il riquadro.
+- LA FRECCIA › E IL TOCCO SOLO SE C'È QUALCOSA DA APRIRE: recensioni e
+  negozio. Senza recensioni la riga dice «Ancora nessuna recensione»
+  (frase approvata da Andrea con la proposta) e non si tocca.
+- VALE OVUNQUE STA IL RIQUADRO: il foglio di chi prende on-chain e il
+  dettaglio Lightning. Nel dettaglio Lightning il tocco apriva il negozio
+  (set 2026): adesso apre le recensioni, come ha chiesto. Il foglio
+  on-chain non spegne più il negozio (`{negozio: ''}`): serve a chiedere
+  le recensioni, non apre più niente.
+- NIENTE SERVER: la rotta del negozio dà già i feedback a chi ha una
+  sessione, e ogni utente ha il suo codice negozio.
+
+SCARTATO. Un foglio delle recensioni sopra il foglio (due fogli impilati,
+e l'indietro da tenere allineato); aprire il negozio scorrendo alle
+recensioni (chiude il foglio e perde la cifra scelta: è il motivo per cui
+l'on-chain la porta l'aveva spenta).
+
+RESTA DA GUARDARE. `apriNegozioDettP2P` e la `porta` di `sezioneNuovoP2P`
+non hanno più chiamanti veri (resta il ritorno al foglio dal negozio, con
+le sue prove): se toglierli lo decide Andrea. Il thread «Bloccare in alto
+Lightning/On-chain» tocca le righe subito sopra nel foglio on-chain.
+
+PROVATO. In `prove_p2p_dettaglio` il banco node rifà il riquadro: la riga
+sola con nome, «4,8 · 12 recensioni» e la faccia; le tre colonne uscite
+dal file; «Ancora nessuna recensione» senza voti, il singolare a una; i
+fatti corti e i marchi in riga; il tocco (role, aria-expanded, il
+contenitore nascosto, la freccia) SOLO con recensioni e negozio; il veleno
+nel codice filtrato; la chiamata on-chain col negozio; la fetch unica alla
+rotta del negozio senza `vista`, una volta sola; i nomi senza porta
+nell'elenco. Ritoccate le sentinelle che contavano i vecchi pezzi (stella
+da 28, completati e dispute nei quattro posti, la riga di
+`feedbackNegozioHTML`, la chiamata del foglio on-chain). CONTROPROVE
+(rotture apposta, rosse, poi verdi): il tocco anche senza recensioni, i
+nomi con la porta, le recensioni richieste a ogni tocco. Scatti con
+Playwright del foglio vero (prima, dopo, aperto) in
+`/mnt/project-files/card-chi-pubblica/`, il terzo dopo un clic vero.
+GIRATO, nel venv con le sole dipendenze del workflow (senza coincurve) e
+nostr-tools, sull'albero develop 0cc0fb35 più questo cantiere: `PROVE_SEVERE=1
+python prove.py` 30825 passate e 4 rosse, curate (una riga 12,5px in
+--muted portata a 13px, la scorsa morbida che chiede a `tourRidotto`, due
+conteggi aggiornati) e rigirate nelle loro sezioni: 909 verdi;
+`collaudi_ci.py --elenco ci/collaudi.txt`: 163 verdi, 0 rossi.
+Dopo il rebase su cbb8a6ff (di altri: 9f006e58 dettaglio-schede, 4b76be99
+via-riassunto, che tocca la riga accanto nel foglio on-chain, e cbb8a6ff
+apri-wallet-telegram; nessun simbolo in comune) il giro mirato: le
+diciannove sezioni toccate più le sedici che leggono i documenti, 2018
+verdi, e cinque collaudi vicini (presa on-chain, Barattozon on-chain,
+reputazione, feedback, recensione P2P), verdi.

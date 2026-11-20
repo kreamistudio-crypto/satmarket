@@ -70102,16 +70102,14 @@ def prove_p2p_libro():
     _mis = lambda blocco: int(re.search(r"width:(\d+)px", blocco).group(1))
     prova("nella card la stella e' piu' grande dell'omino", True,
           _var(_st_box) > _mis(pezzo_js(mini, "  .p2p-ico.p2p-ico-mini{", "}")))
-    # ⚠️ E NEL RIQUADRO L'OMINO STA POCO SOTTO LA STELLA, non alla pari
-    # (11 set 2026, taratura di Andrea guardandolo: 28 e poi 22): a
-    # parita' di altezza disegnata un TRATTO da un pixel e mezzo e una
-    # forma PIENA non pesano uguale, ed e' la stessa regola gia'
-    # scritta per il glifo dentro il tondo. Si guarda la RELAZIONE fra
-    # le due misure, che regge ai ritocchi meglio di due numeri.
-    _st28 = _var(pezzo_js(mini, "  .p2p-rep-col.media .p2p-rep-stella{", "}"))
-    _om = _mis(pezzo_js(mini, "  .p2p-rep-segno .p2p-ico.p2p-ico-mini{", "}"))
-    prova("...e nel riquadro l'omino e' poco sotto la stella", True,
-          _st28 == 28 and _om == 22 and _st28 > _om > _st28 * 0.7)
+    # (20 nov 2026, card-chi-pubblica) NEL RIQUADRO LA STELLA STA IN RIGA
+    # col testo, come la stellina del volto: le tre colonne con la stella
+    # da 28 e l'omino da 22 sono uscite con la riga sola. Si gira sempre
+    # la variabile, mai gli svg (la sentinella della taglia unica, qui sopra).
+    prova("...e nel riquadro la stella e' quella della riga di testo, con la sua variabile",
+          [14, 14],
+          [_var(pezzo_js(mini, "  .p2p-chi-voti .p2p-rep-stella{", "}")),
+           _var(pezzo_js(mini, "  .stellina-volto .p2p-rep-stella{", "}"))])
     # il disegno vive in UNA costante: due stelle diverse sarebbero due
     # stelle diverse
     prova("il disegno della stella e' scritto una volta sola", 1,
@@ -72221,6 +72219,11 @@ console.log(JSON.stringify(out));
         "function avvisoPresaTabacchinoP2P(o, adesso){",
         "function notaTabacchinoDettP2P(o){",
         "function repRiquadroP2P(f, id){",
+        # (20 nov 2026, card-chi-pubblica) i fatti corti e i marchi in riga
+        "function scambiCortiP2P(n){",
+        "function badgeVeloceP2P(si, inRiga, mio){",
+        "function marchioMancatiP2P(n, inRiga){",
+        "function marchioDisputeP2P(n, inRiga){",
         "function monetaP2P(o){",
         "function segnoMonetaP2P(o){",
         "function commissioneVivaP2P(){",
@@ -72367,6 +72370,8 @@ console.log(JSON.stringify(out));
     # marchio al posto del nome, e senza il banco esplode
     i_ve = mini.index("const P2P_VESTE_METODI = {")
     pezzi.append(mini[i_ve:mini.index("\n};", i_ve) + 3])
+    # la soglia del marchio dei non completati (20 nov 2026, card-chi-pubblica)
+    pezzi.append(_riga_js(mini, "const P2P_MANCATI_DA = "))
     banco = "\n".join(pezzi) + r"""
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -72626,6 +72631,11 @@ out.repSenzaFoto = repRiquadroP2P({nome: 'Cip', media: 5, voti: 2,
 /* senza NEGOZIO la sezione non e' un bersaglio, e l'etichetta lo dice */
 out.repSenzaNegozio = repRiquadroP2P({nome: 'Dina', media: 5, voti: 2,
                                       avatar: 'av_y.jpg'});
+/* (20 nov 2026, card-chi-pubblica) un voto solo, e i fatti con i marchi */
+out.repSenzaVotiNeg = repRiquadroP2P({nome: 'Ivo', media: 0, voti: 0, negozio: 'ab12cd34'}, 'ord-ivo');
+out.repUnVoto = repRiquadroP2P({nome: 'Fio', media: 5, voti: 1, negozio: 'ab12cd34'}, 'ord-fio');
+out.repFatti = repRiquadroP2P({nome: 'Gea', media: 5, voti: 14, completati: 15, veloce: true,
+                               mancati: 3, dispute: 1, negozio: 'ab12cd34'}, 'ord-gea');
 /* e un veleno nel nome del negozio non esce dall'attributo */
 out.repVeleno = repRiquadroP2P({nome: 'Evo', media: 5, voti: 2,
                                 negozio: 'a" onclick="rubo()'});
@@ -73626,30 +73636,31 @@ console.log(JSON.stringify(out));
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
-    # LE TRE COLONNE SONO STELLA, RECENSIONI e VOLTO (set 2026, ritocco
-    # di Andrea): i giorni sono usciti — una faccia dice in un colpo
-    # quel che «41 giorni qui» diceva in due parole e un conto, ed e'
-    # la cosa che si riconosce fra un ordine e l'altro.
-    prova("...e con lui ci sono le tre colonne", True,
-          "p2p-rep-tre" in o["repPiena"] and ">4,8<" in o["repPiena"]
-          and ">12<" in o["repPiena"]
+    # ⚠️ UNA RIGA SOLA, COME UNA PERSONA (20 nov 2026, cantiere
+    # card-chi-pubblica, Andrea: «la card è troppo confusionaria»): erano
+    # tre colonne (stella, omino, volto) e due frasi intere; adesso il volto
+    # a sinistra e accanto nome, stelle con le recensioni e i fatti corti.
+    prova("...e con lui la riga sola: volto, nome, stelle e recensioni", True,
+          "p2p-chi-riga" in o["repPiena"] and "p2p-rep-tre" not in o["repPiena"]
+          and '<b class="p2p-chi-nome">Ada</b>' in o["repPiena"]
+          and "<b>4,8</b> · 12 recensioni" in o["repPiena"]
           and "p2p-rep-volto" in o["repPiena"]
           and "giorni qui" not in o["repPiena"])
-    # LA STELLA E' PIU' GRANDE DELLE ALTRE DUE: cresce il SEGNO e non
-    # la cifra, o le tre colonne si scalerebbero fra loro
-    prova("...e la stella della media e' la piu' grande", True,
-          '<div class="p2p-rep-col media">' in o["repPiena"]
-          # ⚠️ SI GIRA LA VARIABILE E NON GLI `svg`: ingrandire i soli
-          # svg e' il difetto della banda, e lo vieta la sentinella
-          # della taglia unica (blocco della stella, piu' su)
-          and ".p2p-rep-col.media .p2p-rep-stella{--st:28px}" in mini
-          # ⚠️ e la RIGA del segno e' alta 28 per tutt'e tre: misurato,
-          # con le righe «quanto serve» le tre colonne partivano
-          # sfalsate di 8px — una griglia nata per tenerle in riga
-          and "height:28px" in pezzo_js(mini, "  .p2p-rep-segno{", "}"))
+    prova("...le tre colonne e la loro stella grande non ci sono piu'", [False, False, False],
+          ["p2p-rep-col" in mini, "p2p-rep-tre" in mini, "p2p-rep-segno" in mini])
     # ZERO VOTI NON E' «ZERO STELLE», e' «non si sa»: la regola di casa
-    prova("...e chi non ha voti porta un trattino, mai uno zero", True,
-          o["repSenzaVoti"].count(">—<") == 2 and ">0<" not in o["repSenzaVoti"])
+    # (frase approvata da Andrea il 20 nov 2026)
+    prova("...e chi non ha voti lo dice a parole, mai uno zero", True,
+          "Ancora nessuna recensione" in o["repSenzaVoti"]
+          and ">0<" not in o["repSenzaVoti"] and "recensioni" not in o["repSenzaVoti"])
+    prova("...e una recensione sola si dice al singolare", True,
+          "· 1 recensione<" in o["repUnVoto"])
+    # i fatti con le parole corte della card del libro, i marchi in riga
+    prova("...i fatti corti in una riga: «✅ 15 scambi P2P · ⚡ Risponde in fretta»", True,
+          "✅ 15 scambi P2P · <span class=\"p2p-veloce\">⚡ Risponde in fretta</span>" in o["repFatti"]
+          and "scambi P2P completati" not in o["repFatti"] and "quando gli prendono" not in o["repFatti"])
+    prova("...e i marchi restano, in riga", True,
+          "⚠️ 3 non completati" in o["repFatti"] and "⚖️ 1 disputa persa" in o["repFatti"])
     # IL VOLTO E' QUELLO DELLE CARD, ripieghi compresi: foto se c'e'
     # (con l'onerror che la toglie da sola), altrimenti l'iniziale
     prova("il volto porta la foto quando c'e'", True,
@@ -73658,36 +73669,47 @@ console.log(JSON.stringify(out));
     prova("...e l'iniziale quando non c'e'", True,
           "av-foto" not in o["repSenzaFoto"]
           and ">C</span>" in o["repSenzaFoto"])
-    # ⚠️ LA SEZIONE INTERA E' LA PORTA, e solo col negozio: una sezione
-    # che si annuncia cliccabile e non risponde e' il difetto gia'
-    # pagato con la pillola sola del metodo.
-    prova("col negozio la sezione e' un bersaglio", True,
+    # ⚠️ IL TOCCO APRE LE RECENSIONI (20 nov 2026, Andrea: «quando ci clicco
+    # sopra chi ha pubblicato l'ordine voglio vedere le recensioni»), li'
+    # sotto, dentro il riquadro: era la porta del negozio. E SOLO quando
+    # c'e' qualcosa da aprire — una sezione che si annuncia cliccabile e non
+    # risponde e' il difetto gia' pagato con la pillola sola del metodo.
+    prova("con negozio e recensioni la sezione e' un bersaglio che apre le recensioni", True,
           'role="button"' in o["repPiena"]
+          and 'aria-expanded="false"' in o["repPiena"]
           and 'data-negozio="ab12cd34"' in o["repPiena"]
-          and "apriNegozioDettP2P(event, this.dataset.negozio)" in o["repPiena"])
-    prova("...e senza negozio non lo e'", True,
-          'role="button"' not in o["repSenzaNegozio"]
-          and "onclick" not in o["repSenzaNegozio"])
-    # ⚠️ SOTTO LA FOTO NON C'E' SCRITTO NIENTE (11 set 2026, ritocco di
-    # Andrea): «il negozio ›» spiegava il tocco, e una faccia non ha
-    # bisogno di un'etichetta che dica che e' una faccia. La colonna
-    # resta senza `<small>`, quindi il volto si CENTRA nell'altezza
-    # della riga invece di restare appeso in alto.
-    prova("sotto la foto non c'e' nessuna etichetta", [False, False, True],
-          ["il negozio" in o["repPiena"], "venditore" in o["repSenzaNegozio"],
-           '<div class="p2p-rep-col volto">' in o["repPiena"]])
-    # ⚠️ IL VOLTO SI ALLINEA IN ALTO COI DUE SEGNI (11 set 2026,
-    # ritocco di Andrea), e `center` era la causa di quel che aveva
-    # visto: centrava il tondo nell'altezza dell'INTERA colonna mentre
-    # stella e omino stanno nella fascia alta — misurati, i loro centri
-    # a 14px dal bordo del riquadro e quello del volto a 33.
-    prova("...e il volto parte dove partono gli altri due segni", True,
-          "justify-content:flex-start" in pezzo_js(
-              mini, "  .p2p-rep-col.volto{", "}"))
-    # il codice del negozio e' testo che arriva dal server: scappato
+          and 'onclick="recensioniChiP2P(event, this)"' in o["repPiena"]
+          and '<div class="p2p-chi-recensioni" hidden></div>' in o["repPiena"]
+          and 'class="p2p-chi-freccia"' in o["repPiena"]
+          and "apriNegozioDettP2P" not in o["repPiena"])
+    prova("...e senza negozio o senza recensioni non lo e', e la freccia non c'e'", [True, True],
+          # (il bollino dello staff, nascosto, ha il suo tocco: si guarda la sezione)
+          [all(o[k].startswith('<div class="p2p-sez p2p-chi"><div class="p2p-sez-tit">')
+               and "recensioniChiP2P" not in o[k]
+               and "p2p-chi-freccia" not in o[k] for k in ("repSenzaNegozio", "repSenzaVoti", "repSenzaVotiNeg")),
+           "p2p-chi-recensioni" not in o["repSenzaNegozio"]])
+    # il codice del negozio e' testo che arriva dal server: passa dal
+    # filtro-alfabeto prima di finire nell'attributo
     prova("...e un veleno nel codice non esce dall'attributo", True,
           'onclick="rubo()' not in o["repVeleno"]
-          and "&quot;" in o["repVeleno"])
+          and 'data-negozio="aonclickrubo"' in o["repVeleno"])
+    # il foglio on-chain passa il negozio: e' da li' che si chiedono
+    prova("...e il foglio on-chain passa il negozio al riquadro (non lo spegne piu')", [1, 0],
+          [mini.count("repRiquadroP2P(ordineVoltoOnchainP2P(o).faccia, 'oc-' + Number(o.id))"),
+           mini.count("{negozio: ''}), 'oc-'")])
+    _rc = pezzo_js(mini, "async function recensioniChiP2P(ev, box){", "\n}\n")
+    prova("il tocco chiede le recensioni UNA volta, alla rotta del negozio, senza contare una visita",
+          [1, True, False, True, True],
+          [_rc.count("fetch("), "/negozio/${encodeURIComponent(cod)}?limit=1`" in _rc,
+           "vista" in re.sub(r"/\*[\s\S]*?\*/", "", _rc),
+           "giu.dataset.pronte === '1'" in _rc and "giu.dataset.pronte = '1'" in _rc,
+           "{id: 'fbAltriChi', senzaPorte: true}" in _rc])
+    prova("...e un tocco dentro l'elenco (il «Mostra tutti», una foto) non lo chiude", True,
+          "ev.target.closest('.p2p-chi-recensioni')) return;" in _rc)
+    _fb = pezzo_js(mini, "function feedbackNegozioHTML(feedback, nFeedback, mio, opz){", "\n}\n")
+    prova("...e nell'elenco del riquadro i nomi non aprono il negozio sotto il foglio", True,
+          "cod && !o.senzaPorte ? `<b class=\"fb-chi\" onclick=\"apriNegozio('${cod}')\">" in _fb
+          and "const idAltri = o.id || (mio ? 'fbAltriMie' : 'fbAltri');" in _fb)
     # IL FOGLIO SI CHIUDE PRIMA: il negozio e' una VISTA, e aperta da
     # sotto una pagina a pieno schermo ancora `open` resterebbe coperta
     an = pezzo_js(mini, "function apriNegozioDettP2P(ev, chi){", "\n}\n")
@@ -145494,7 +145516,7 @@ def prove_volto_unico():
         "negozio": ("voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio",
                     "function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
         "recensioni": ("voltoHTML({nome: chi, avatar: f.da_avatar",
-                       "function feedbackNegozioHTML(feedback, nFeedback, mio){"),
+                       "function feedbackNegozioHTML(feedback, nFeedback, mio, opz){"),
         "riquadro venditore": ("voltoHTML({nome: l.seller", None),
         "profilo": ("voltoHTML({nome: myNome || myUsername", "function renderProfilo(){"),
         # (16 ott 2026) le righe del foglio, la pastiglia e «Stai usando»
@@ -179724,8 +179746,11 @@ def prove_feedback_p2p():
     # (12 nov 2026, card-coppia) la riga delle stelline, sulla card del
     # libro, dice la forma CORTA («✅ 22 scambi P2P»): il suo posto c'e'
     # ancora, con la sua funzione
+    # (20 nov 2026, card-chi-pubblica) e nel riquadro «Chi ha pubblicato
+    # quest'ordine», diventato una riga sola, la stessa forma corta: la
+    # frase intera non la scrive piu' (0)
     prova("il numero dei completati sta nei quattro posti: riga delle stelline, riquadro, "
-          "card dell'altra parte, negozio", [1, 1, 1, 2],
+          "card dell'altra parte, negozio", [2, 0, 1, 2],
           [m.count("scambiCortiP2P(f.completati)"), m.count("completatiP2P(f.completati)"),
            m.count("completatiP2P(c.completati, true)"),
            m.count("completatiP2P(v.scambi_completati, true)")])
@@ -179890,7 +179915,7 @@ def prove_recensioni_ricevute():
           + fetta("const esc = s =>", "}[c]));") + "\n"
           + fetta("const FEEDBACK_VISIBILI = ", ";") + "\n"
           + "".join(_fn_js(mini, f) for f in (
-              "function feedbackNegozioHTML(feedback, nFeedback, mio){",
+              "function feedbackNegozioHTML(feedback, nFeedback, mio, opz){",
               "function toggleFeedbackAltri(b){",
               "function fotoRecensioneHTML(",
               "function bollinoStaff(",
@@ -180693,7 +180718,8 @@ def prove_malus_p2p():
 
     # --- 7) IL CLIENT, in node ------------------------------------------------
     prova("il marchio delle dispute perse sta nei quattro posti del contatore", [1, 1, 1, 2],
-          [m.count("marchioDisputeP2P(f.dispute)"), m.count("marchioDisputeP2P(c.dispute, true)"),
+          # (20 nov 2026, card-chi-pubblica) nel riquadro il marchio sta in riga
+          [m.count("marchioDisputeP2P(f.dispute, true)"), m.count("marchioDisputeP2P(c.dispute, true)"),
            m.count("marchioDisputeP2P(v.dispute_perse, true)"),
            m.count("marchioDisputeP2P(r.dispute, true)")])
     prova("la spunta della colpa sta nella card della decisione, dopo quella della cauzione, "
@@ -182299,7 +182325,7 @@ def prove_tempo_pubblica_app():
            in fn("function renderOrdineP2P(){")])
     prova("il badge sta dove si vede chi ha pubblicato: il riquadro, la card dell'altra "
           "parte, il negozio, il proprio profilo", [True, True, True, True],
-          ["badgeVeloceP2P(f.veloce)" in fn("function repRiquadroP2P(f, id){"),
+          ["badgeVeloceP2P(f.veloce, true)" in fn("function repRiquadroP2P(f, id){"),
            "badgeVeloceP2P(c.veloce, true)" in fn("function cardParte(c, chi, opz){"),
            "badgeVeloceP2P(v.risponde_in_fretta, true)"
            in fn("function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
@@ -183437,7 +183463,7 @@ console.log(JSON.stringify(c));
     prova("i filtri arrivano dalle tre letture, come le zone", 3, m.count("prendiFiltriP2P(d && d.filtri)"))
     prova("dove si vede il marchio: il riquadro di chi ha pubblicato, la card dell'altra parte, il negozio, il mio profilo",
           [True, True, True, True],
-          ["marchioMancatiP2P(f.mancati)" in fn("function repRiquadroP2P(f, id){"),
+          ["marchioMancatiP2P(f.mancati, true)" in fn("function repRiquadroP2P(f, id){"),
            "marchioMancatiP2P(c.mancati, true)" in fn("function cardParte(c, chi, opz){"),
            "marchioMancatiP2P(v.non_completati, true)" in fn("function renderNegozio(v, annunci, feedback=[], esauriti=[]){"),
            "rigaMiaReputazioneP2P()" in fn("function renderProfiloP2P(){")])
@@ -196826,7 +196852,7 @@ console.log(JSON.stringify(r));
     prova("il foglio di chi prende: il riquadro di chi ha pubblicato, la fascia in attesa e «🧾 Il "
           "tuo PayCode», che apre il foglio dei dati a parte",
           [True, True, True, True],
-          ["repRiquadroP2P(Object.assign({}, ordineVoltoOnchainP2P(o).faccia, {negozio: ''})" in aoc,
+          ["repRiquadroP2P(ordineVoltoOnchainP2P(o).faccia, 'oc-' + Number(o.id))" in aoc,
            "'Scrivi i dati del tuo PayCode Amazon per vedere il dettaglio')" in aoc,
            "etichetta: bzC ? '🧾 Il tuo PayCode'" in aoc,
            "setTimeout(() => apriPayCodeBzOcP2P(Number(o.id)), 350)" in aoc])

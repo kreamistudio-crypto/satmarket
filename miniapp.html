@@ -6303,63 +6303,11 @@
   #p2pDettSheet .foglio-testa{position:sticky;top:0;z-index:2;
     background:var(--card)}
   .p2p-dett-uno{font-size:15px;font-weight:800}
-  /* LE TRE COLONNE DELLA REPUTAZIONE pesano uguale per GRIGLIA e non
-     per flex: le tre cifre hanno larghezze diverse («4,8», «12»,
-     «—»), e con lo spazio avanzato da spartire i due divisori
-     cadrebbero storti — la lezione gia' pagata dalla pillola del
-     filtro. Tre colonne `1fr` valgono uguale comunque. */
-  .p2p-rep-tre{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-  .p2p-rep-col{min-width:0;display:flex;flex-direction:column;
-    align-items:center;gap:3px;text-align:center}
-  .p2p-rep-col b{font-size:17px;font-weight:800;line-height:1}
-  .p2p-rep-col small{font-size:11px;font-weight:700;color:var(--muted)}
-  /* ⚠️ LA RIGA DEL SEGNO E' ALTA 28 PER TUTT'E TRE, e non e' un numero
-     scelto a occhio: e' l'altezza della stella grande. Misurato, con
-     le righe alte «quanto serve» le tre colonne partivano sfalsate —
-     la cifra della media a 31px dal bordo e quella delle recensioni a
-     23, cioe' otto pixel di dislivello su una griglia nata apposta
-     per tenerle in riga. L'icona piccola si centra dentro la riga
-     alta; a crescere e' lo SPAZIO, non l'omino. */
-  .p2p-rep-segno{display:flex;align-items:center;justify-content:center;
-    height:28px;color:var(--muted)}
-  /* LA STELLA DELLA MEDIA E' PIU' GRANDE DELLE ALTRE DUE (set 2026,
-     ritocco di Andrea): fra i tre elementi e' quello che si guarda
-     per primo, e a 20px pesava come l'omino accanto. Cresce il SEGNO,
-     non la cifra — le tre cifre restano allineate, o le colonne si
-     scalerebbero fra loro.
-     ⚠️ SI GIRA LA VARIABILE E NON GLI `svg`: ingrandire i soli svg e'
-     esattamente il difetto della banda, curato qui sopra. */
-  .p2p-rep-col.media .p2p-rep-stella{--st:28px}
-  /* E L'OMINO STA POCO SOTTO: `.p2p-ico-mini` lo teneva a 12px — la
-     misura buona in una riga di testo, minuscola accanto a una stella
-     da 28 — ma alla pari esatta pesava troppo (taratura di Andrea,
-     guardandolo: 28 e poi 22). Non e' un ripensamento sulla misura
-     «visiva»: a parita' di altezza disegnata un TRATTO da un pixel e
-     mezzo e una forma PIENA non pesano uguale, ed e' la stessa regola
-     gia' scritta per il glifo dentro il tondo. Il selettore nomina
-     tutt'e due le classi (0,3,0) cosi' non dipende da chi e' scritto
-     dopo nel foglio. */
-  .p2p-rep-segno .p2p-ico.p2p-ico-mini{width:22px;height:22px}
-  /* IL VOLTO AL POSTO DEI GIORNI: la stessa faccia che sta
-     nell'anello delle card — foto se c'e', iniziale sul tondo scuro
-     se non c'e' — ma qui grande abbastanza da riconoscere qualcuno.
-     E' alto quanto segno + cifra delle altre due colonne (28+3+17),
-     cosi' le tre etichette restano sulla stessa riga. */
-  /* ⚠️ IL VOLTO SI ALLINEA IN ALTO COI DUE SEGNI (set 2026, ritocco
-     di Andrea: «la foto non è centrata»), e `center` era proprio la
-     causa: centrava il tondo nell'altezza dell'INTERA colonna —
-     segno, cifra ed etichetta — mentre stella e omino stanno tutti e
-     due nella fascia alta. Misurato: i loro centri a 14px dal bordo
-     del riquadro, quello del volto a 33, cioe' diciannove piu' giu'.
-     Da `flex-start` il tondo parte dove partono loro e copre la
-     fascia del segno piu' quella della cifra (48px esatti, che e' il
-     motivo per cui e' alto cosi'): i tre pezzi cominciano alla stessa
-     altezza e la colonna smette di galleggiare.
-     ⚠️ IL CENTRO ESATTO A 14 NON SI PUO' AVERE con un tondo da 48: lo
-     porterebbe da −10 a +38, cioe' a sporgere sopra il riquadro e
-     sotto il titolo. Questo e' il massimo allineamento che sta dentro
-     le righe. */
-  .p2p-rep-col.volto{justify-content:flex-start}
+  /* IL VOLTO DEL RIQUADRO «CHI HA PUBBLICATO QUEST'ORDINE»: la stessa
+     faccia che sta nell'anello delle card — foto se c'e', iniziale sul
+     tondo scuro se non c'e' — grande abbastanza da riconoscere qualcuno.
+     (Le tre colonne con la stella grande sono uscite il 20 nov 2026,
+     cantiere card-chi-pubblica: la riga sola sta in `.p2p-chi-*`.) */
   .p2p-rep-volto{width:48px;height:48px;border-radius:50%;
     background:var(--ink);color:var(--on-ink);position:relative;
     display:flex;align-items:center;justify-content:center;
@@ -6375,6 +6323,31 @@
      mouse lo dice l'etichetta sotto il volto. */
   .p2p-sez[role="button"]{cursor:pointer}
   .p2p-sez[role="button"]:active{background:var(--line-soft)}
+  /* «CHI HA PUBBLICATO QUEST'ORDINE» IN UNA RIGA (20 nov 2026, cantiere
+     card-chi-pubblica): il volto a sinistra, accanto nome, stelle e fatti
+     uno sotto l'altro, la freccia a destra quando il tocco apre le
+     recensioni. La freccia gira giu' quando sono aperte. */
+  .p2p-chi-riga{display:flex;align-items:center;gap:12px}
+  .p2p-chi .p2p-rep-volto{width:44px;height:44px;font-size:18px}
+  .p2p-chi-testo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .p2p-chi-nome{font-size:15px;font-weight:800;line-height:1.25;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .p2p-chi-voti{font-size:13.5px;color:var(--muted);line-height:1.35}
+  .p2p-chi-voti b{color:var(--ink);font-weight:800}
+  .p2p-chi-voti .p2p-rep-stella{--st:14px;vertical-align:-1px}
+  .p2p-chi-fatti{font-size:13px;color:var(--muted);line-height:1.35}
+  .p2p-chi-freccia{flex:0 0 auto;font-size:30px;font-weight:700;line-height:1;
+    color:var(--muted);transition:transform .2s ease;margin-top:-3px}
+  .p2p-chi[aria-expanded="true"] .p2p-chi-freccia{transform:rotate(90deg)}
+  .p2p-chi-recensioni{margin-top:10px;border-top:1px solid var(--line-soft);padding-top:2px}
+  .p2p-chi-recensioni .section-label{display:none}
+  /* le recensioni dentro il riquadro sono righe, non card dentro la card */
+  .p2p-chi-recensioni .trust-note.nota-feedback{background:none;border:0;border-radius:0;
+    padding:10px 0;margin:0;border-bottom:1px solid var(--line-soft)}
+  .p2p-chi-recensioni .trust-note.nota-feedback .stars{font-size:11px;letter-spacing:-1px;
+    padding-top:3px}
+  .p2p-chi-recensioni .trust-note.nota-feedback:last-of-type{border-bottom:0}
+  .p2p-chi-recensioni .fb-tutti{margin-top:6px}
   /* IL TEMPO IN UNA RIGA (16 nov 2026, cantiere ricevi-mercato, era
      l'anello a sessanta tacche): sopra «Tempo rimasto» e il conto ai due
      capi, sotto la barra piena che si accorcia da destra. La pista spenta
@@ -29333,13 +29306,19 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
    filtro-alfabeto, che finisce dentro un onclick.
    Pura (legge solo `isAdmin`): la fa girare il banco di prove.py. */
 const FEEDBACK_VISIBILI = 3;
-function feedbackNegozioHTML(feedback, nFeedback, mio){
+function feedbackNegozioHTML(feedback, nFeedback, mio, opz){
   if (!feedback || !feedback.length) return '';
+  /* `opz` (20 nov 2026, card-chi-pubblica): le stesse righe nel riquadro
+     «Chi ha pubblicato quest'ordine» del P2P, che sta dentro un foglio —
+     un id suo per il blocco nascosto (negozio e Profilo possono essere
+     ancora nel DOM) e i nomi SENZA porta: il negozio e' una vista, e
+     aperto da qui finirebbe sotto il foglio */
+  const o = opz || {};
   /* `mio` (14 nov 2026, recensioni-ricevute): lo stesso elenco nel tuo
      Profilo. Cambiano solo le parole del ruolo (scritte verso di te),
      l'id del blocco nascosto (il negozio puo' essere ancora nel DOM)
      e niente titolo (lo fa il cassetto) ne' «rimuovi» */
-  const idAltri = mio ? 'fbAltriMie' : 'fbAltri';
+  const idAltri = o.id || (mio ? 'fbAltriMie' : 'fbAltri');
   const ruolo = f => mio
     ? (f.ruolo==='acquirente'?'ha comprato da te':f.ruolo==='venditore'?'ti ha venduto':f.ruolo==='scambio'?'da uno scambio P2P':'utente')
     : (f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente');
@@ -29349,7 +29328,7 @@ function feedbackNegozioHTML(feedback, nFeedback, mio){
     const faccia = voltoHTML({nome: chi, avatar: f.da_avatar, negozio: cod,
                               ignoto: true}, 'fb-faccia');
     const nome = chi
-      ? (cod ? `<b class="fb-chi" onclick="apriNegozio('${cod}')">${esc(chi)}</b>`
+      ? (cod && !o.senzaPorte ? `<b class="fb-chi" onclick="apriNegozio('${cod}')">${esc(chi)}</b>`
              : `<b>${esc(chi)}</b>`)
       : '<b>Un utente</b>';
     return `
@@ -47222,6 +47201,40 @@ async function caricaRecensioniRicevute(){
   } catch (e) {
     box.innerHTML = '<div class="hint">Non riesco a leggere le recensioni adesso: riprova tra poco.</div>';
   }
+}
+/* IL TOCCO SUL RIQUADRO «CHI HA PUBBLICATO QUEST'ORDINE» del P2P (20 nov
+   2026, card-chi-pubblica, vedi `repRiquadroP2P`): apre o chiude le
+   recensioni li' sotto. Si chiedono
+   alla rotta del negozio con limit=1 alla PRIMA apertura (dei suoi annunci
+   qui non serve niente, i feedback arrivano interi sulla prima pagina — il
+   patto delle recensioni del Profilo); senza `vista`, quindi non e' una
+   visita al negozio. Un tocco DENTRO l'elenco (il «Mostra tutti», una foto)
+   non chiude il riquadro. */
+async function recensioniChiP2P(ev, box){
+  if (ev && ev.target && ev.target.closest && ev.target.closest('.p2p-chi-recensioni')) return;
+  const giu = box && box.querySelector('.p2p-chi-recensioni');
+  const cod = box && box.dataset.negozio;
+  if (!giu || !cod) return;
+  haptic();
+  const apre = giu.hidden;
+  giu.hidden = !apre;
+  box.setAttribute('aria-expanded', apre ? 'true' : 'false');
+  if (!apre || giu.dataset.pronte === '1') return;
+  giu.innerHTML = '<div class="hint">Un attimo…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/negozio/${encodeURIComponent(cod)}?limit=1`,
+                          {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (!r.ok) throw new Error('negozio');
+    const d = await r.json();
+    const v = d.venditore || {};
+    giu.innerHTML = feedbackNegozioHTML(d.feedback || [], Number(v.n_feedback) || 0,
+                                        false, {id: 'fbAltriChi', senzaPorte: true})
+      || '<div class="hint">Ancora nessuna recensione</div>';
+    giu.dataset.pronte = '1';
+  } catch (e) {
+    giu.innerHTML = '<div class="hint">Non riesco a leggere le recensioni adesso: riprova tra poco.</div>';
+  }
+  if (!giu.hidden) giu.scrollIntoView({block: 'nearest', behavior: tourRidotto() ? 'auto' : 'smooth'});
 }
 
 /* ---------------- IL WIDGET DA INCORPORARE (ago 2026) ----------------
@@ -75057,10 +75070,11 @@ function apriOnchainP2P(id, modo){
          (18 nov 2026); senza il riquadro resta la riga di prima */
       + (o.nome && typeof repRiquadroP2P !== 'function' ? '<small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
       /* «CHI HA PUBBLICATO QUEST'ORDINE», con stelle, recensioni, volto e
-         scambi, il riquadro del dettaglio di Lightning (18 nov 2026): senza
-         la porta del negozio, che chiuderebbe il foglio di Lightning */
+         scambi, il riquadro del dettaglio di Lightning (18 nov 2026). Il
+         negozio resta (20 nov 2026, card-chi-pubblica): non e' piu' una porta
+         che chiude il foglio, e' da dove si chiedono le recensioni al tocco */
       + (typeof repRiquadroP2P === 'function'
-        ? repRiquadroP2P(Object.assign({}, ordineVoltoOnchainP2P(o).faccia, {negozio: ''}), 'oc-' + Number(o.id)) : '')
+        ? repRiquadroP2P(ordineVoltoOnchainP2P(o).faccia, 'oc-' + Number(o.id)) : '')
       /* IL LUOGO E LA REGOLA DEL CONTANTI, come nel dettaglio Lightning
          (17 nov 2026, cantiere onchain-contanti): la zona se «Contanti» e'
          fra i metodi; la regola col tetto quando e' l'UNICO metodo (con
@@ -92394,50 +92408,52 @@ function battitoAnelloneP2P(){
    disegno sta in git — e il nome NON si riusa per altro. */
 function repRiquadroP2P(f, id){
   if (!f) return '';
-  const media = (f.voti > 0 && f.media > 0)
-    ? esc(f.media.toLocaleString('it-IT',
-        {minimumFractionDigits: 1, maximumFractionDigits: 1})) : '—';
-  const voti = f.voti > 0 ? esc(String(f.voti)) : '—';
-  const col = (segno, cifra, et, cls) =>
-    '<div class="p2p-rep-col' + (cls ? ' ' + cls : '')
-    + '"><span class="p2p-rep-segno">' + segno + '</span>'
-    + '<b>' + cifra + '</b><small>' + et + '</small></div>';
-  /* ⚠️ IL VOLTO AL POSTO DEI GIORNI (set 2026, ritocco di Andrea), e
-     i giorni escono con la loro icona: una faccia dice in un colpo
-     quel che «41 giorni qui» diceva in due parole e un conto, e
-     soprattutto e' la cosa che si riconosce fra un ordine e l'altro.
-     LO STESSO GIUDICE DEI VOLTI DELLE CARD, e non una copia: foto se
-     c'e' (`avatarImg`, che se ne va da sola quando il file non
-     risponde), altrimenti l'iniziale sul tondo scuro — la stessa
-     scala di ripieghi di `anelloScadenzaP2P`, scritta li' per primo.
-     L'ETICHETTA SOTTO DICE DOVE PORTA il tocco quando c'e' un negozio
-     da aprire: e' l'unico segno visibile che questa sezione e' un
-     bersaglio, e senza negozio torna a dire soltanto chi e'. */
+  /* ⚠️ UNA RIGA SOLA, COME UNA PERSONA (20 nov 2026, cantiere
+     card-chi-pubblica, Andrea davanti al foglio «Stai comprando sats»: «la
+     card è troppo confusionaria… quando ci clicco sopra chi ha pubblicato
+     l'ordine voglio vedere le recensioni»). Erano tre colonne (stella,
+     omino, volto) e sotto due frasi intere: adesso il volto a sinistra e
+     accanto, uno sotto l'altro, il nome, le stelle con le recensioni e i
+     fatti in forma corta — le stesse parole della card del libro
+     («✅ 15 scambi P2P», «⚡ Risponde in fretta»). I marchi brutti restano,
+     in riga, perché chi sta per pagare li deve vedere.
+     IL TOCCO APRE LE RECENSIONI, li' sotto, dentro il riquadro (era la porta
+     del negozio): niente fogli che si chiudono e niente viste sotto, il
+     foglio resta com'era. La freccia › dice che si tocca, e c'e' solo se ci
+     sono recensioni da leggere e un negozio da cui chiederle. */
+  const voti = f.voti > 0 && f.media > 0 ? Math.floor(f.voti) : 0;
+  const media = voti ? esc(f.media.toLocaleString('it-IT',
+        {minimumFractionDigits: 1, maximumFractionDigits: 1})) : '';
   const volto = voltoHTML(f, 'p2p-rep-volto', {chiave: id ? 'p2p:' + id : ''});
-  return sezioneNuovoP2P({
-    ico: '', titolo: 'Chi ha pubblicato quest\'ordine',
-    porta: f.negozio || '',
-    corpo: '<div class="p2p-rep-tre">'
-      + col(stellaP2P(f.media), media, 'media', 'media')
-      + col(icoPersonaP2P(), voti, 'recensioni')
-      /* ⚠️ SOTTO LA FOTO NON C'E' SCRITTO NIENTE (set 2026, ritocco
-         di Andrea): «il negozio ›» spiegava il tocco, e una faccia
-         non ha bisogno di un'etichetta che dica che e' una faccia.
-         La colonna resta senza `<small>`, quindi il volto si centra
-         nell'altezza della riga invece di restare appeso in alto. */
-      + '<div class="p2p-rep-col volto"><span class="volto-cornice">' + volto
-      + bollinoVolto(id ? 'p2p:' + id : '') + '</span></div>'
-      + '</div>'
-      /* il marchio «⚠️ N non completati» (10 ott 2026, reputazione-p2p):
-         sotto le tre colonne, solo da due in su — lo dice il server */
-      /* gli scambi completati (10 ott 2026, feedback-p2p), prima dei marchi */
-      + (typeof completatiP2P === 'function' ? completatiP2P(f.completati) : '')
-      /* «⚡ Risponde in fretta» (12 ott 2026), fra il conto buono e i marchi */
-      + (typeof badgeVeloceP2P === 'function' ? badgeVeloceP2P(f.veloce) : '')
-      + (typeof marchioMancatiP2P === 'function' ? marchioMancatiP2P(f.mancati) : '')
-      /* ...e «⚖️ N dispute perse» (10 ott 2026, malus-p2p), da una in su */
-      + (typeof marchioDisputeP2P === 'function' ? marchioDisputeP2P(f.dispute) : '')
-  });
+  const cod = String(f.negozio || '').replace(/[^A-Za-z0-9_-]/g, '');
+  const apre = !!(voti && cod);
+  const fatti = [
+    typeof scambiCortiP2P === 'function' ? scambiCortiP2P(f.completati) : '',
+    typeof badgeVeloceP2P === 'function' ? badgeVeloceP2P(f.veloce, true) : '',
+  ].filter(Boolean).join(' · ');
+  const marchi = [
+    typeof marchioMancatiP2P === 'function' ? marchioMancatiP2P(f.mancati, true) : '',
+    typeof marchioDisputeP2P === 'function' ? marchioDisputeP2P(f.dispute, true) : '',
+  ].filter(Boolean).join(' · ');
+  return '<div class="p2p-sez p2p-chi"'
+    + (apre ? ' role="button" tabindex="0" aria-expanded="false" data-negozio="' + esc(cod)
+      + '" onclick="recensioniChiP2P(event, this)">' : '>')
+    + '<div class="p2p-sez-tit"><span>Chi ha pubblicato quest\'ordine</span></div>'
+    + '<div class="p2p-chi-riga">'
+    + '<span class="volto-cornice">' + volto + bollinoVolto(id ? 'p2p:' + id : '') + '</span>'
+    + '<div class="p2p-chi-testo">'
+    + (f.nome ? '<b class="p2p-chi-nome">' + esc(f.nome) + '</b>' : '')
+    + '<div class="p2p-chi-voti">' + (voti
+        ? stellaP2P(f.media) + ' <b>' + media + '</b> · ' + voti + ' '
+          + (voti === 1 ? 'recensione' : 'recensioni')
+        : 'Ancora nessuna recensione') + '</div>'
+    + (fatti ? '<div class="p2p-chi-fatti">' + fatti + '</div>' : '')
+    + (marchi ? '<div class="p2p-chi-fatti">' + marchi + '</div>' : '')
+    + '</div>'
+    + (apre ? '<span class="p2p-chi-freccia" aria-hidden="true">›</span>' : '')
+    + '</div>'
+    + (apre ? '<div class="p2p-chi-recensioni" hidden></div>' : '')
+    + '</div>';
 }
 /* La porta dal dettaglio al negozio: il gemello di `apriNegozioP2P`
    delle card, con una cosa in piu' che qui e' obbligatoria — IL
