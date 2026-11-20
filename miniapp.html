@@ -96873,7 +96873,8 @@ const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Wi
 const P2P_TABACCHINO = 'Contanti al tabacchino';
 /* LA LISTA CORTA DEL FOGLIO (2 nov 2026, Andrea: «la lista comincia a
    diventare grande»). Nella tendina di «Pubblica» si vedono subito i
-   quattro di tutti i giorni — SEPA, Revolut, Satispay, Contanti — e
+   quattro di tutti i giorni — SEPA, Revolut, Satispay, Contanti — piu'
+   SEPA Instant subito sotto SEPA (dal 20 nov 2026), e
    sotto «Altri metodi ▾» apre questi. UN METODO GIA' SCELTO RESTA
    SEMPRE IN VISTA: chi l'ha scelto deve poterlo togliere senza
    riaprire niente. La lista e' di quelli da NASCONDERE e non di quelli
@@ -96884,7 +96885,11 @@ const P2P_TABACCHINO = 'Contanti al tabacchino';
    non col suo nome di variabile: i banchi delle prove raccolgono le
    liste `const P2P_… = [...]` una per una, e una che ne chiama un'altra
    li romperebbe. Una prova controlla che ogni voce sia in `P2P_METODI`. */
-const P2P_METODI_ALTRI = ['SEPA Instant', 'PayPal', 'Wise', 'Contanti al tabacchino', 'Contante per posta'];
+/* «SEPA Instant» NON STA FRA GLI ALTRI (20 nov 2026, Andrea: «deve stare
+   assolutamente sotto a SEPA, non nella tendina altri metodi, deve stare
+   esattamente lì sotto, sempre»): si vede subito, e il posto subito sotto
+   «SEPA» glielo da' l'ordine di `P2P_METODI`, che la tendina rispetta. */
+const P2P_METODI_ALTRI = ['PayPal', 'Wise', 'Contanti al tabacchino', 'Contante per posta'];
 function vociTendinaMetodiP2P(lista, scelti, aperti){
   const s = scelti || [];
   /* ...e ETH, Monero e USDe (16 nov 2026, cantiere p2p-monete-ritocchi:

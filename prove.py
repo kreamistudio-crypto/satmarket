@@ -164043,11 +164043,12 @@ console.log(JSON.stringify(out));
               "Invii gli ETH col metodo scelto", o.get("come"))
         prova("ai moderatori il terzo passo dice la moneta", ["XMR inviati", "Euro inviati"], o.get("mod"))
         prova("lista corta: le sette voci delle monete stanno sotto «Altri metodi ▾»",
-              # (17 nov 2026) ...e il contante per posta, il quinto degli euro nascosti
-              [["SEPA", "Revolut", "Satispay", "Contanti"], 5 + 7], o.get("chiusa"))
+              # (17 nov 2026) ...e il contante per posta fra gli euro nascosti;
+              # (20 nov 2026) SEPA Instant no: si vede subito, sotto SEPA
+              [["SEPA", "SEPA Instant", "Revolut", "Satispay", "Contanti"], 4 + 7], o.get("chiusa"))
         prova("...aperta ci sono tutte, euro e monete", 9 + 7, o.get("aperta"))
         prova("...e una moneta gia' scelta resta in vista, al suo posto",
-              ["SEPA", "Revolut", "Satispay", "Contanti", "USDe (Solana)"], o.get("scelta"))
+              ["SEPA", "SEPA Instant", "Revolut", "Satispay", "Contanti", "USDe (Solana)"], o.get("scelta"))
         prova("le voci delle monete sono sette (ETH, XMR, cinque reti di USDe)", [7, 16], o.get("solo"))
     rn = pezzo_js(mini, "function paroleUsdtHtmlP2P(o, html, dove){", "\n}\n")
     prova("anche l'HTML della pagina e delle card passa dal traduttore con una moneta",
@@ -164212,8 +164213,11 @@ def prove_lista_corta_metodi():
     la lista comincia a diventare grande»; la forma scelta da lui: «per
     la lista corta come hai proposta va bene»). Nella tendina del foglio
     «Pubblica» si vedono SEPA, Revolut, Satispay e Contanti; «Altri
-    metodi ▾» apre SEPA Instant, PayPal, Wise e il tabacchino; un metodo
-    gia' scelto resta sempre in vista. Wise ha il suo form di recapito."""
+    metodi ▾» apre PayPal, Wise e il tabacchino; un metodo gia' scelto
+    resta sempre in vista. Wise ha il suo form di recapito. SEPA INSTANT
+    (20 nov 2026, Andrea: «deve stare assolutamente sotto a SEPA, non
+    nella tendina altri metodi [...] sempre») si vede subito, subito
+    sotto SEPA."""
     print("\n🧾 La lista corta dei metodi, e Wise")
     mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
     lista = re.search(r"const P2P_METODI = \[[^\n]*\];", mini).group(0)
@@ -164245,8 +164249,8 @@ def prove_lista_corta_metodi():
     else:
         prova("il banco della lista corta gira", True, bool(o))
         o = o or {}
-        prova("chiusa: i quattro di tutti i giorni, e cinque nascosti (il contante per posta dal 17 nov 2026)",
-              [["SEPA", "Revolut", "Satispay", "Contanti"], 5],
+        prova("chiusa: i quattro di tutti i giorni con SEPA Instant subito sotto SEPA (20 nov 2026), e quattro nascosti",
+              [["SEPA", "SEPA Instant", "Revolut", "Satispay", "Contanti"], 4],
               [(o.get("chiusa") or {}).get("voci"), (o.get("chiusa") or {}).get("nascosti")])
         prova("aperta: tutte e nove, nell'ordine del vocabolario, e niente da aprire",
               [9, 0, "Wise"],
@@ -164254,15 +164258,19 @@ def prove_lista_corta_metodi():
                (o.get("aperta") or {}).get("nascosti"),
                ((o.get("aperta") or {}).get("voci") or [""] * 6)[5]])
         prova("un metodo scelto fra gli altri resta in vista, al suo posto",
-              [["SEPA", "Revolut", "Satispay", "Wise", "Contanti"], 4],
+              [["SEPA", "SEPA Instant", "Revolut", "Satispay", "Wise", "Contanti"], 3],
               [(o.get("scelto") or {}).get("voci"), (o.get("scelto") or {}).get("nascosti")])
         prova("...anche il tabacchino scelto, che il titolo dice «uno solo»",
               True, "Contanti al tabacchino" in ((o.get("tab") or {}).get("voci") or []))
-        prova("chi compra: niente tabacchino, e quattro nascosti", 4,
+        prova("chi compra: niente tabacchino, e tre nascosti", 3,
               (o.get("compro") or {}).get("nascosti"))
         prova("le reti USDT non sono fra gli altri: si vedono tutte e due", [2, 0],
               [len((o.get("usdt") or {}).get("voci") or []), (o.get("usdt") or {}).get("nascosti")])
         prova("ogni voce degli altri e' una voce del vocabolario", True, o.get("dentro"))
+        prova("SEPA Instant mai fra gli altri, e nel vocabolario subito dopo SEPA (20 nov 2026)",
+              [False, 1],
+              ["'SEPA Instant'" in altri,
+               (lambda v: v.index("SEPA Instant") - v.index("SEPA"))(re.findall(r"'([^']+)'", lista))])
         prova("Wise ha il suo form, e parte come «Wise: …»", ["wise", "Wise: @mariorossi"],
               [o.get("wise"), o.get("wiseTesto")])
         prova("...riconosce Wise come parola, non dentro un'altra", ["wise", "altro:otherwise"],
