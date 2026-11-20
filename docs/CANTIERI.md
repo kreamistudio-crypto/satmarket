@@ -93165,6 +93165,13 @@ nessun simbolo in comune, un conflitto solo in coda a CANTIERI, unite):
 sezioni toccate, quelle che leggono i documenti e
 `prove_conoscenza_tappo` 975 passate, 0 fallite, 0 saltate; i tre
 collaudi vicini verdi; `node --check` sul JS della pagina.
+TAPPO (20 nov 2026, dopo il sì di Andrea, «Ok, perfetto»): in
+`assistente/sapere.md` e `assistente/conoscenza.md`, nel paragrafo della
+commissione del P2P, la frase proposta e approvata «Negli scambi P2P
+on-chain la commissione è almeno di 546 sats in tutto, divisi tra i due
+in proporzione, perché la rete non trasmette cifre più piccole.» Provato:
+le sezioni che leggono i due file (179 passate, 0 fallite, 0 saltate) e
+`collaudo_assistente_bot`.
 Resta da guardare: gli scambi presi prima della promozione restano col
 loro zero (la quota si scrive alla presa); il primo on-chain piccolo vero
 dopo la promozione deve mostrare la riga col numero e portare l'uscita a
