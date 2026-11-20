@@ -367,7 +367,9 @@ RACCONTI_NEGOZI = {
         #   andreai-bitcoin-on-3.webp    il telefono coi video
         #   andreai-bitcoin-on-4.webp    il telefono coi grafici
         #   andreai-bitcoin-on-5.webp    i tre post di «cosa avevo scritto»
-        #   andreai-bitcoin-on-6.webp    il telefono con la tesi
+        #   andreai-bitcoin-on-6.webp    un sondaggio e le domande agli
+        #                                abbonati (il telefono con la tesi
+        #                                rifaceva la copertina: Andrea)
         #   andreai-bitcoin-on-7.webp    grafici, tabella del rischio e tesi
         "foto": True,
         # il logo della card «Consigliati»: il volto del ritratto in un
@@ -491,8 +493,9 @@ RACCONTI_NEGOZI = {
                 ("Per chi cerca guadagni facili con la leva: io la leva non "
                  "la uso."),
             ]},
-            {"t": "foto", "n": 6, "etichetta": "telefono con la tesi",
-             "alt": "Il canale Bitcoin ON sul telefono, con la tesi"},
+            {"t": "foto", "n": 6, "etichetta": "sondaggi e commenti",
+             "alt": ("Un sondaggio e le domande agli abbonati nel canale "
+                     "Bitcoin ON")},
             {"t": "tappe", "h": "COME FUNZIONA", "voci": [
                 {"h": "Paghi in sats",
                  "p": ("25 € al mese in sats, il 50% in meno dei 50 € del "
