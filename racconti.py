@@ -48,6 +48,10 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
     con lei), negativo per salire, da -12 a 12. Serve ai marchi col
     peso tutto in alto o in basso, che centrati a riquadro sembrano
     fuori centro. Esce nella busta dei Consigliati accanto al logo.
+  - `logo_pieno` (20 nov 2026, AndreAI): il logo e' una FOTO quadrata
+    che riempie tutto il quadrato della card, senza il margine dei
+    marchi (e senza `logo_giu`, che sposterebbe una foto fuori posto).
+    Vuole il vero booleano. Esce nella busta dei Consigliati.
   - `banner` (set 2026): l'immagine della card del negozio nella
     pagina «Consigliati», in `assets/scoprire/<slug>.webp` — le misure
     del banner di To The Mooon (1040x498), col nome dentro il disegno.
@@ -364,7 +368,8 @@ RACCONTI_NEGOZI = {
         #   andreai-bitcoin-on-cop.webp  il ritratto col telefono, 21:9
         #   andreai-bitcoin-on-1.webp    tesi, settimana in arrivo e Fed
         #   andreai-bitcoin-on-2.webp    quattro video riservati
-        #   andreai-bitcoin-on-3.webp    il telefono coi video
+        #   andreai-bitcoin-on-3.webp    la copertina di un video col play,
+        #                                1200x780 (apre YouTube)
         #   andreai-bitcoin-on-4.webp    il telefono coi grafici
         #   andreai-bitcoin-on-5.webp    i tre post di «cosa avevo scritto»
         #   andreai-bitcoin-on-6.webp    un sondaggio e le domande agli
@@ -372,10 +377,14 @@ RACCONTI_NEGOZI = {
         #                                rifaceva la copertina: Andrea)
         #   andreai-bitcoin-on-7.webp    grafici, tabella del rischio e tesi
         "foto": True,
-        # il logo della card «Consigliati»: il volto del ritratto in un
-        # tondo trasparente, al 92% del riquadro
-        #   python prepara_logo_consigliato.py logo-tondo.png andreai-bitcoin-on 0.92
+        # il logo della card «Consigliati»: il ritratto QUADRATO che
+        # riempie tutta la card (20 nov 2026, Andrea: «dato che è una card
+        # quadrata la lascerei quadrata»), 432x432 dal ritratto del canale
+        # tagliato sul volto — una foto, non un marchio scontornato,
+        # quindi niente prepara_logo_consigliato.py (che lo stringerebbe
+        # nel riquadro col margine)
         "logo": True,
+        "logo_pieno": True,
         # il banner della card nella pagina «Consigliati» e dello spazio
         # sponsorizzato di «Da scoprire», 1040x498, col nome nel disegno
         "banner": True,
@@ -438,8 +447,16 @@ RACCONTI_NEGOZI = {
                  "p": ("La tesi della settimana, il riassunto di tutto con "
                        "lo scenario che mi aspetto.")},
             ]},
-            {"t": "foto", "n": 3, "etichetta": "telefono coi video",
-             "alt": "Il canale Bitcoin ON sul telefono, coi video"},
+            # LA FOTO CHE APRE UN VIDEO (20 nov 2026, Andrea: «chi ci
+            # clicca lo porta su youtube»): la copertina di un video vero
+            # col tasto play, e il link al video non in elenco — il
+            # renderer accetta solo link di YouTube (linkVideoRacconto)
+            {"t": "foto", "n": 3, "etichetta": "copertina di un video",
+             "alt": ("La copertina del video «Peggio del 2018? La mappa "
+                     "dei mercati fino a dicembre»"),
+             "link": "https://youtu.be/5Y2g7uexfXA",
+             "link_testo": "▶️ Guarda un video gratis",
+             "link_sotto": "Puntata del 10 novembre"},
             {"t": "testo", "h": "PERCHÉ SERVE A CHI SPECULA",
              "p": ("Chi fa trading su Bitcoin vive di tempismo e di "
                    "livelli. Qui hai un punto di vista basato sui dati, "

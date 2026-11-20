@@ -1333,6 +1333,16 @@
      tutti. E' il posto dove ogni logo STA, e quello dove lo scorrimento
      qui sotto lo fa arrivare: il ritocco non ha una corsa sua. */
   .cella-consigliati .cons-logo{transform:translateY(var(--giu,0%))}
+  /* IL LOGO PIENO (20 nov 2026, AndreAI: «dato che è una card quadrata
+     la lascerei quadrata»): una FOTO quadrata, non un marchio, che
+     riempie TUTTO il quadrato invece del riquadro col 5% di margine.
+     Esce dal riquadro di 5/90 per lato e diventa 100/90 del riquadro;
+     gli angoli li arrotonda il quadrato col suo overflow. La corsa
+     resta quella di tutti: scendendo del 106% della sua altezza
+     (che ora e' il quadrato intero) sparisce lo stesso. Il `--giu` qui
+     non serve, e il catalogo non lo da'. */
+  .cella-consigliati .cons-logo.cons-pieno{left:-5.556%;top:-5.556%;
+    width:111.112%;height:111.112%;object-fit:cover}
   /* LO SCORRIMENTO (set 2026, ritocco di Andrea che SOSTITUISCE la
      dissolvenza): come una slot machine lenta, dall'alto in basso. Il
      logo che c'e' parte lento e accelera fino a uscire dal fondo del
@@ -10598,6 +10608,13 @@
      primo — e il nostro selettore composto non ci difende, perche' a
      colpire il nodo e' la regola NUDA di un altro. */
   .rac-g.rac-cima{margin:0}
+  /* la foto che apre un video (20 nov 2026): il guscio di sempre, e
+     sotto la sua scritta in arancio, centrata */
+  .rac-video{display:block;text-decoration:none;color:inherit}
+  .rac-video-eti{display:block;margin:10px 0 0;text-align:center;
+    font-size:15px;font-weight:800;color:var(--sats-text)}
+  .rac-video-sotto{display:block;margin:2px 0 0;text-align:center;
+    font-size:13px;font-weight:600;color:var(--muted)}
   /* l'onerror toglie l'immagine e il guscio resta vuoto: senza questa
      riga resterebbero i suoi 16px di stacco a separare due paragrafi
      per niente. ⚠️ `:empty` non perdona lo spazio bianco — nel
@@ -26727,7 +26744,7 @@ function consigliatiPubblicati(){
     if (r.consigliato === true && r.negozio && r.logo === true)
       fuori.push({slug, titolo: r.titolo || '', emoji: r.emoji || '📣',
                   negozio: r.negozio, banner: slug + '.webp',
-                  giu: r.logo_giu});
+                  giu: r.logo_giu, pieno: r.logo_pieno === true});
   });
   /* LE PAGINE DEL SERVER: la busta porta solo le pubblicate col logo, e
      qui si ripassano dalla forma per cintura — lo slug finisce in un
@@ -26743,7 +26760,7 @@ function consigliatiPubblicati(){
     fuori.push({slug, titolo: String(s.titolo || ''),
                 emoji: String(s.emoji || '📣'), negozio: String(s.negozio),
                 banner: s.banner === true ? slug + '.webp' : '',
-                giu: s.logo_giu});
+                giu: s.logo_giu, pieno: s.logo_pieno === true});
   });
   return fuori;
 }
@@ -26835,7 +26852,7 @@ function cardConsigliati(voci){
        title="Consigliati" aria-label="Consigliati"
        onclick="apriConsigliatiDaTocco(event)">
       <span class="cat-quad"><span class="cat-fig">${loghi.map((v, k) => `<img
-           class="cons-logo${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${urlLogoConsigliato(v.slug)}"
+           class="cons-logo${v.pieno ? ' cons-pieno' : ''}${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${urlLogoConsigliato(v.slug)}"
            style="--giu:${giuLogoConsigliato(v.giu)}%"
            alt="" loading="lazy" decoding="async" fetchpriority="low"
            onerror="this.remove()">`).join('')}<span class="cat-emoji"
@@ -28979,11 +28996,24 @@ function raccontoNegozio(v){
          `rac-piccola` e' per le foto che non vanno a colonna piena —
          un marchio, un QR — e che stanno ferme: il respiro e' per le
          fotografie. */
-      return `<span class="rac-g${++nf % 2 ? '' : ' rac-sfalsa'}${
+      const guscio = `<span class="rac-g${++nf % 2 ? '' : ' rac-sfalsa'}${
                x.piccola ? ' rac-piccola' : ''}">` +
              `<img class="rac-foto" src="${foto(x.n)}" ` +
              `alt="${esc(x.alt || '')}" loading="lazy" ` +
              `decoding="async" onerror="this.remove()"></span>`;
+      /* LA FOTO CHE APRE UN VIDEO (20 nov 2026, AndreAI: «la copertina
+         con l'anteprima, chi ci clicca lo porta su youtube»): solo un
+         video di YouTube, giudicato dalla forma (linkVideoRacconto) —
+         un indirizzo qualsiasi del catalogo non diventa un link. La
+         scritta sotto viene dal catalogo, come ogni testo della pagina. */
+      const video = linkVideoRacconto(x.link);
+      if (!video) return guscio;
+      return `<a class="rac-video" href="${video}" target="_blank" ` +
+             `rel="noopener noreferrer" ` +
+             `onclick="return apriVideoRacconto(this.href)">${guscio}` +
+             (x.link_testo ? `<span class="rac-video-eti">${esc(x.link_testo)}</span>` : '') +
+             (x.link_sotto ? `<span class="rac-video-sotto">${esc(x.link_sotto)}</span>` : '') +
+             `</a>`;
     }
     return '';
   }).join('');
@@ -29055,6 +29085,22 @@ function raccontoNegozio(v){
    i tuoi dati» (`apriContattoDati`), dove risponde una persona.
    Pubblicare resta dei soli moderatori: in questo ramo un «Pubblica»
    non c'e', e c'e' la prova che non ci arrivi. */
+/* IL VIDEO DI UNA FOTO (20 nov 2026): solo YouTube, nelle due forme
+   del link di condivisione, con l'id di 11 caratteri — e nient'altro
+   dopo, cosi' l'indirizzo che finisce nell'href e' sempre uno di
+   questi due. Tutto il resto vale «nessun video». */
+function linkVideoRacconto(u){
+  const m = /^https:\/\/(?:youtu\.be\/|www\.youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})$/
+    .exec(String(u || ''));
+  return m ? `https://www.youtube.com/watch?v=${m[1]}` : '';
+}
+/* dentro Telegram il link esce dalla Mini App col suo openLink (come i
+   link dei banner); fuori, l'<a> fa da se' in una scheda nuova */
+function apriVideoRacconto(url){
+  if (!linkVideoRacconto(url)) return false;
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return false; } catch(e){} }
+  return true;
+}
 function avvisoBozzaRacconto(r){
   if (r.anteprima === 'venditore')
     return `

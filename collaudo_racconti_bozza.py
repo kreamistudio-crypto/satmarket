@@ -362,9 +362,11 @@ def giro(c, SRV, SLUG, NOME):
     cat["logo_giu"] = 3 if giu_salvato != 3 else -3
     st, e_lista, mia, testo = consigliati()
     prova("...col logo si': col codice del negozio risolto, il nome, "
-          "l'emoji, il ritocco del logo e il banner (vero o falso)",
+          "l'emoji, il ritocco del logo, il logo pieno e il banner (vero o "
+          "falso)",
           [{"slug": SLUG, "titolo": cat["titolo"], "emoji": cat["emoji"],
             "negozio": codice, "logo_giu": cat["logo_giu"],
+            "logo_pieno": cat.get("logo_pieno") is True,
             "banner": cat.get("banner") is True}], mia)
     cat["logo_giu"] = giu_salvato
     # IL BANNER (set 2026): a pagina pubblicata la rotta di «Da scoprire»

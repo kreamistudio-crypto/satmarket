@@ -55154,6 +55154,7 @@ def prove_racconto_girato():
              # l'estrazione non ha cambiato risposta.
              + _fetta("function raccontoDi(v){", "\n}") + "\n"
              + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
+            + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
              + _fetta("function toggleRacconto(btn){", "\n}"))
     js = pezzi + _BANCO_RACCONTO
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -55317,6 +55318,27 @@ def prove_racconti_bozza():
         prova("...e nemmeno il suo nome o il suo slug", (False, False),
               (r.get("titolo", "?") in mini, slug in mini))
 
+    # ---- 1b. LA FOTO CHE APRE UN VIDEO (20 nov 2026) ----------------
+    # il renderer fa un <a> solo col giudice della forma, e il giudice
+    # risponde giusto: girato davvero, non letto
+    import subprocess
+    prova("il link di una foto passa dal giudice dei video di YouTube", True,
+          "const video = linkVideoRacconto(x.link);" in _rn
+          and "if (!video) return guscio;" in _rn
+          and 'href="${video}"' in _rn)
+    _lv = pezzo_js(mini, "function linkVideoRacconto(u){", "\n}\n") + "\n}\n"
+    _casi = ["https://youtu.be/5Y2g7uexfXA",
+             "https://www.youtube.com/watch?v=5Y2g7uexfXA",
+             "https://youtu.be/5Y2g7uexfXA?t=1", "javascript:alert(1)",
+             "https://evil.example/youtu.be/5Y2g7uexfXA",
+             'https://youtu.be/5Y2g7uexf"A', ""]
+    _out = subprocess.run(["node", "-e", _lv + "for (const u of "
+                           + json.dumps(_casi) + ") console.log("
+                           "JSON.stringify(linkVideoRacconto(u)))"],
+                          capture_output=True, text=True, timeout=30)
+    prova("...che accetta solo le due forme del link di YouTube",
+          ['"https://www.youtube.com/watch?v=5Y2g7uexfXA"'] * 2
+          + ['""'] * 5, _out.stdout.split())
     # ---- 2. LA FORMA DEL CATALOGO ----------------------------------
     _f = re.search(r'FORMA_RACCONTO = re\.compile\(r"([^"]+)"\)', src)
     FORMA = re.compile(_f.group(1)) if _f else re.compile("$^")
@@ -55341,6 +55363,16 @@ def prove_racconti_bozza():
               [n for n in ns if not FORMA.match(f"{slug}-{n}.webp")])
         prova("...e ogni foto dice cosa ci va (l'etichetta del segnaposto)",
               [], [b.get("n") for b in foto if not b.get("etichetta")])
+        # LA FOTO CHE APRE UN VIDEO (20 nov 2026): solo un link di
+        # YouTube nelle due forme di condivisione, e con la sua scritta
+        prova("...e una foto con un link porta solo a un video di YouTube, "
+              "con la sua scritta", [],
+              [b.get("n") for b in foto if "link" in b and not (
+                  re.fullmatch(r"https://(?:youtu\.be/|www\.youtube\.com/"
+                               r"watch\?v=)[A-Za-z0-9_-]{11}",
+                               str(b["link"]))
+                  and isinstance(b.get("link_testo"), str)
+                  and b["link_testo"])])
         # LA RIGA DEL CANTIERE DI UNA RIGA: `foto` e' un vero booleano,
         # e quando passa a True i file ci devono essere DAVVERO — o la
         # pagina uscirebbe coi segnaposto tolti e le foto mancanti, cioe'
@@ -55661,6 +55693,7 @@ def prove_racconti_bozza():
           + _fetta("const RACCONTI = {", "\n};") + "\n"
           + _fetta("function raccontoDi(v){", "\n}") + "\n"
           + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
+            + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
           + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
           + _fetta("function copiaMessaggioVenditore(slug){", "\n}") + "\n"
           + "const CAT = " + _json.dumps(CAT, ensure_ascii=False) + ";\n"
@@ -142331,6 +142364,7 @@ let location = {pathname: '/negozio/casa-to-the-mooon'};
             + "\n" + _fetta("const RACCONTI = {", "\n};") + "\n"
             + _fetta("function raccontoDi(v){", "\n}") + "\n"
             + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
+            + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
             # l'avviso della bozza: il renderer lo chiama in anteprima
             + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
             + pezzo_js(mini, "async function apriNegozio(chi, aperto, "
@@ -142619,7 +142653,8 @@ def _consigliati_giudice(src, mini, _pz):
     finta = {"titolo": "Bottega di prova", "emoji": "🌾", "sottotitolo": "S",
              "intro": "I", "foto": False, "blocchi": [], "logo": True,
              "negozio": "", "venditore_tg": 525}
-    cat = {"pubblicata": dict(finta, logo_giu=3, banner=True),
+    cat = {"pubblicata": dict(finta, logo_giu=3, banner=True,
+                              logo_pieno=True),
            "bozza": dict(finta, banner=True),
            "senza-logo": dict(finta, logo=False),
            # il logo e' un VERO booleano: una stringa non accende niente
@@ -142627,7 +142662,7 @@ def _consigliati_giudice(src, mini, _pz):
            "orfana": dict(finta, venditore_tg=0),
            # il banner fra virgolette non vale: vuole il vero booleano
            "per-codice": dict(finta, negozio="ab12cd34", venditore_tg=0,
-                              banner="si")}
+                              banner="si", logo_pieno="si")}
 
     def _imp(k, d=""):
         chieste.append(k)
@@ -142650,9 +142685,14 @@ def _consigliati_giudice(src, mini, _pz):
     # ⚠️ ERANO CINQUE (set 2026, «Un tempo per te»): la sesta e' il
     # BANNER della card della pagina, un vero/falso e mai il nome di un
     # file — il nome lo compone il client dallo slug che ha gia' ripassato
-    prova("...con sei chiavi e nessun'altra",
-          [["banner", "emoji", "logo_giu", "negozio", "slug", "titolo"]] * 2,
+    # ...E SETTE (20 nov 2026, AndreAI): il LOGO PIENO, la foto quadrata
+    # che riempie la card, anche lui un vero/falso
+    prova("...con sette chiavi e nessun'altra",
+          [["banner", "emoji", "logo_giu", "logo_pieno", "negozio", "slug",
+            "titolo"]] * 2,
           [sorted(x) for x in fuori])
+    prova("...e il logo pieno e' vero solo col True del catalogo",
+          [True, False], [x.get("logo_pieno") for x in fuori])
     prova("...e il banner e' vero solo col True del catalogo", [True, False],
           [x.get("banner") for x in fuori])
     # IL RITOCCO DEL LOGO (set 2026): esce quel che il catalogo dice, e
@@ -156404,6 +156444,17 @@ def prove_negozi_fuori_dal_ciclo():
     prova("...e l'orologio lo LANCIA senza aspettarlo", True,
           "asyncio.create_task(sincronizza_connettori_in_sfondo())" in oro
           and "await sincronizza_connettori()" not in oro)
+    # L'IMPORT NOSTR, STESSA CURA (20 nov 2026): coi relay morti teneva
+    # fermo l'orologio per minuti, e il promemoria di un abbonamento
+    # aspettava lui
+    imf = pezzo("importa_nostr_in_sfondo")
+    prova("l'import Nostr gira in un task suo, uno alla volta", True,
+          "if _IMPORT_NOSTR_VIVO:" in imf
+          and "await importa_nostr_periodico()" in imf
+          and "_IMPORT_NOSTR_VIVO = False" in imf.split("finally:")[1])
+    prova("...e l'orologio lo LANCIA senza aspettarlo", True,
+          "asyncio.create_task(importa_nostr_in_sfondo())" in oro
+          and "await importa_nostr_periodico()" not in oro)
 
 
 def prove_freni():
