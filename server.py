@@ -116589,6 +116589,17 @@ async def p2p_onchain_recapito(oid: int, req: Request, x_tg_init_data: str = Hea
         # niente: si cambia come prima, e lo storico lo vedono solo i
         # moderatori (degli euro mai il testo, come sempre)
         prima = str(o["recapito"] or "")
+        # (20 nov 2026, audit giro 4, Andrea: «chi compra dal momento che
+        # sa dove inviare deve poter premere sempre ho inviato») DOPO IL
+        # DEPOSITO il recapito scritto non si SVUOTA piu': vuoto, chi
+        # compra non puo' toccare «Ho inviato» e la ronda del recapito nel
+        # tempo (`_p2p_onchain_chiudi_recapiti_mancati`) lo leggerebbe
+        # come «mai scritto», firmando il rimborso a chi vende dentro il
+        # tempo di chi ha gia' pagato. Cambiarlo si puo' come prima
+        # (lo storico qui sotto); prima del deposito anche svuotarlo
+        if o["stato"] == "depositato" and prima.strip() and not testo:
+            raise HTTPException(409, "Dopo il deposito il recapito non si "
+                                     "cancella: puoi solo cambiarlo")
         cambiato_dopo = (o["stato"] == "depositato" and prima and prima != testo)
         if cambiato_dopo:
             _p2p_onchain_recapito_storia(con, oid, prima, user["id"])

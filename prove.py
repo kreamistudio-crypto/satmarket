@@ -212192,6 +212192,13 @@ def prove_audit_tornata_tutto():
     prova("...si scrive solo DOPO il deposito, e i moderatori lo sanno", True,
           "cambiato_dopo = (o[\"stato\"] == \"depositato\" and prima and prima != testo)" in rr
           and 'argomento="moderazione"' in rr)
+    # (20 nov 2026, audit giro 4) svuotato dopo il deposito, chi compra non
+    # tocca piu' «Ho inviato» e la ronda del recapito nel tempo firmerebbe il
+    # rimborso a chi vende: il vuoto si rifiuta PRIMA di scrivere
+    prova("...e dopo il deposito un recapito scritto non si svuota (409 prima dell'UPDATE)", True,
+          0 < rr.find('if o["stato"] == "depositato" and prima.strip() and not testo:')
+          < rr.find("raise HTTPException(409, \"Dopo il deposito il recapito non si \"")
+          < rr.find("UPDATE p2p_onchain_ordini SET recapito=?"))
 
     # ---- 3. il deposito on-chain -----------------------------------------
     amb = {}

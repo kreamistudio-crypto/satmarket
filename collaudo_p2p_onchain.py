@@ -640,6 +640,12 @@ def main():
     paga(oa)
     prova("deposito confermato", "depositato",
           gesto(999, oid2, "controlla").json()["stato"])
+    # (20 nov 2026, audit giro 4) svuotato, chi compra non toccherebbe piu'
+    # «Ho inviato» e la ronda del recapito nel tempo lo leggerebbe «mai scritto»
+    prova("dopo il deposito chi vende non SVUOTA il recapito: 409, e resta quello di prima",
+          (409, "IBAN nuovo"),
+          (gesto(999, oid2, "recapito", recapito="  ").status_code,
+           uno(888, oid2)["recapito"]))
     prova("chi vende bitcoin non propone il rimborso a se stesso: 403", 403,
           gesto(999, oid2, "proposta", verso="compratore",
                 psbt=psbt_di(uno(999, oid2), [(oa["rimborso"], 51080 - 300)], 999)
