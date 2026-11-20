@@ -217675,6 +217675,193 @@ console.log(JSON.stringify([a, b]));
            "stessa chiave Nostr" in T[1]])
 
 
+def prove_dettaglio_schede():
+    """LE SCHEDE DI «NEL DETTAGLIO» (20 nov 2026, cantiere dettaglio-schede;
+    l'idea e' di un utente, girata da Andrea: «proporre la lista delle
+    attività come prima cosa, appena entrato, e le altre info accessibili
+    tramite schede in alto»; Andrea sulla card: «Tutti e due»).
+
+    Quel che qui si rompe in silenzio: un pezzo che finisce nella scheda
+    sbagliata (il tasto del passo nascosto dentro «Importi»), il segno che
+    non si mette prima del confronto dei pezzi (ogni ridisegno rifarebbe
+    la pagina intera, e chi scrive in chat perderebbe la tastiera), la
+    scheda che non riparte da «Passi», la chat dell'avviso che resta
+    nascosta dietro un'altra scheda, il pallino dei messaggi nuovi che
+    non si aggiorna, e lo schermo largo che perde le sue colonne."""
+    print("\n[le schede di «Nel dettaglio»: Passi, Importi, Chat]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    js = "\n".join([
+        "function esc(s){ return String(s); }",
+        "function haptic(){}",
+        "let LARGO = false, FUORI = true;",
+        "const document = {documentElement: {classList: {contains: c => c === 'fuori-telegram' && FUORI}}};",
+        "function matchMedia(){ return {matches: LARGO}; }",
+        "const DOM = {};",
+        "function el(id){ return DOM[id] || null; }",
+        _riga_js(mini, "const P2P_SCHEDE_LARGO = "),
+        pezzo_js(mini, "const P2P_SCHEDE = [", "];\n") + "];\n",
+        _riga_js(mini, "const p2pSchedaVista = "),
+        _fn_js(mini, "function segnaSchedeP2P(nodi){"),
+        _fn_js(mini, "function schedeAcceseP2P(){"),
+        _fn_js(mini, "function aggiornaSchedeP2P(idCorpo){"),
+        _fn_js(mini, "function vediSchedaP2P(idCorpo, k, muto){"),
+        _fn_js(mini, "function schedaDelPezzoP2P(nodo){"),
+        r"""
+function nodo(classe){
+  const a = {};
+  return {nodeType: 1, classe, a, setAttribute(k, v){ a[k] = String(v); },
+          getAttribute(k){ return k in a ? a[k] : null; }};
+}
+const com = t => ({nodeType: 8, nodeValue: t});
+function corpo(id, figli, conto){
+  const cl = new Set(), a = {};
+  const b = {id, children: figli, classList: {add: c => cl.add(c), remove: c => cl.delete(c), contains: c => cl.has(c)},
+             setAttribute(k, v){ a[k] = String(v); }, getAttribute(k){ return k in a ? a[k] : null; },
+             querySelector(q){ return q === '.chatsc-richiamo .chatsc-conto' && conto ? {textContent: conto} : null; },
+             cl, a};
+  figli.forEach(f => { f.parentElement = b; });
+  DOM[id] = b;
+  DOM[id.replace('Corpo', 'Schede')] = {hidden: true, innerHTML: '', getBoundingClientRect: () => ({top: 50})};
+  return b;
+}
+/* 1. il segno dal commento che precede, fino al commento dopo; prima del
+      primo commento niente segno (il richiamo della chat) */
+const richiamo = nodo('chatsc-richiamo'), contoN = nodo('p2p-ord'), passiN = nodo('p2p-passi'),
+      tasto = nodo('btn'), chatN = nodo('chatsc'), annulla = nodo('btn ghost');
+segnaSchedeP2P([richiamo, com('scheda:passi'), com('scheda:importi'), {nodeType: 3, nodeValue: ' '},
+                contoN, com('scheda:passi'), passiN, tasto, com('scheda:chat'), chatN,
+                com('scheda:passi'), annulla, com('altro commento'), nodo('x')]);
+const segni = [richiamo, contoN, passiN, tasto, chatN, annulla].map(n => n.getAttribute('data-scheda'));
+/* 2. la barra: tre schede col pallino, «Passi» accesa */
+const b1 = corpo('p2pOrdineCorpo', [richiamo, contoN, passiN, tasto, chatN, annulla], '2');
+aggiornaSchedeP2P('p2pOrdineCorpo');
+const barra1 = DOM.p2pOrdineSchede;
+const r1 = {classe: b1.cl.has('a-schede'), vedi: b1.a['data-vedi'], nascosta: barra1.hidden, html: barra1.innerHTML};
+/* 3. il tocco su «Importi», poi la chat che va fatta vedere (l'avviso) */
+vediSchedaP2P('p2pOrdineCorpo', 'importi');
+const dopoImporti = b1.a['data-vedi'];
+schedaDelPezzoP2P(chatN);
+const dopoChat = b1.a['data-vedi'];
+/* 4. senza chat: due schede; la scheda «chat» ricordata torna a «Passi» */
+const b2 = corpo('p2pOnchainCorpo', [contoN, passiN], '');
+p2pSchedaVista.p2pOnchainCorpo = 'chat';
+aggiornaSchedeP2P('p2pOnchainCorpo');
+const r2 = {vedi: b2.a['data-vedi'], html: DOM.p2pOnchainSchede.innerHTML};
+/* 5. nessun segno (l'elenco on-chain): barra via, corpo senza classe */
+b2.children = [nodo('btn orange')]; b2.cl.add('a-schede');
+aggiornaSchedeP2P('p2pOnchainCorpo');
+const r3 = {nascosta: DOM.p2pOnchainSchede.hidden, classe: b2.cl.has('a-schede')};
+/* 6. lo schermo largo fuori da Telegram: niente schede; in Telegram si' */
+LARGO = true;
+aggiornaSchedeP2P('p2pOrdineCorpo');
+const r4 = {nascosta: barra1.hidden, classe: b1.cl.has('a-schede')};
+FUORI = false;
+aggiornaSchedeP2P('p2pOrdineCorpo');
+const r5 = {nascosta: barra1.hidden, classe: b1.cl.has('a-schede')};
+console.log(JSON.stringify({segni, r1, dopoImporti, dopoChat, r2, r3, r4, r5}));
+"""])
+    o = _node_banco(js)
+    if o is None:
+        salta("il banco delle schede", "node assente")
+        return
+    if "segni" not in o:
+        prova("il banco delle schede gira", True, False)
+        return
+    prova("il segno viene dal commento che precede: il conto e' «Importi», i passi e i tasti "
+          "«Passi», la chat «Chat», e il richiamo prima di ogni commento resta senza",
+          [None, "importi", "passi", "passi", "chat", "passi"], o["segni"])
+    r1 = o["r1"]
+    prova("la barra: tre schede nell'ordine, «Passi» accesa, il pallino dei messaggi nuovi "
+          "sulla «Chat», il corpo con la classe che nasconde le altre",
+          [True, "passi", False, True, True, True],
+          [r1["classe"], r1["vedi"], r1["nascosta"],
+           r1["html"].index("📋 Passi") < r1["html"].index("💰 Importi") < r1["html"].index("💬 Chat"),
+           'class="p2p-accesso-chip on" onclick="vediSchedaP2P(\'p2pOrdineCorpo\', \'passi\')">📋 Passi' in r1["html"],
+           '💬 Chat<span class="chatsc-conto">2</span>' in r1["html"]])
+    prova("il tocco su «Importi» la accende; la chat da far vedere (il tasto dell'avviso, "
+          "il richiamo) porta alla sua scheda",
+          ["importi", "chat"], [o["dopoImporti"], o["dopoChat"]])
+    prova("senza chat le schede sono due, e una «Chat» ricordata torna a «Passi»",
+          ["passi", False, True], [o["r2"]["vedi"], "Chat" in o["r2"]["html"], "Importi" in o["r2"]["html"]])
+    prova("una pagina senza segni (l'elenco on-chain) toglie barra e classe",
+          [True, False], [o["r3"]["nascosta"], o["r3"]["classe"]])
+    prova("sullo schermo largo fuori da Telegram niente schede (le colonne di prima); "
+          "dentro Telegram, anche largo, le schede ci sono",
+          [True, False, False, True],
+          [o["r4"]["nascosta"], o["r4"]["classe"], o["r5"]["nascosta"], o["r5"]["classe"]])
+
+    lampo = _fn_js(mini, "function renderOrdineP2P(){")
+    oc = _fn_js(mini, "function schedaOnchainP2P(o){")
+
+    def in_fila(testo, pezzi):
+        i = 0
+        for p in pezzi:
+            j = testo.find(p, i)
+            if j < 0:
+                return False
+            i = j + len(p)
+        return True
+    prova("LIGHTNING: «Passi» prima dell'appuntamento, «Importi» intorno al SOLO conto, "
+          "«Chat» intorno a profilo e chat, poi di nuovo «Passi»; la barra si rifa' a ogni disegno",
+          [True, True, True],
+          [in_fila(lampo, ["chatScRichiamoP2P(o) : '') +", "'<!--scheda:passi-->' +",
+                           "riquadroAppuntamentoP2P(o) +", "'<!--scheda:importi-->' +",
+                           "+ conto + '</div>' +", "'<!--scheda:passi-->' +", "rigaMetodoSceltoP2P(o) +"]),
+           in_fila(lampo, ["'<!--scheda:chat-->' +", "(o.peer ? profiloControparteP2P(o) : '') +",
+                           "bloccoChatScambioP2P(o) : '') +", "'<!--scheda:passi-->' +",
+                           "campiOrdineP2P(o) : '') +"]),
+           in_fila(lampo, ["chatScSegnaColonnaP2P(box);",
+                           "if (typeof aggiornaSchedeP2P === 'function') aggiornaSchedeP2P('p2pOrdineCorpo');"])])
+    prova("ON-CHAIN: gli stessi segni — «Passi» per le parti del moderatore, «Importi» per il "
+          "conto, «Chat» per chi e' l'altra persona e per la chat in fondo",
+          [True, True],
+          [in_fila(oc, ["chatOcRichiamoHTML(o) : '')", "+ '<!--scheda:passi-->'", "+ parti",
+                        "+ '<!--scheda:importi-->'", "contoOnchainP2P(o) + '</div>')",
+                        "+ '<!--scheda:passi-->'", "'<div class=\"p2p-passi\">",
+                        "+ '<!--scheda:chat-->'", "controparteOcP2P(o, mod) : '')",
+                        "+ '<!--scheda:passi-->'", "incassoMancanteOnchainP2P(o)"]),
+           in_fila(oc, ["+ decidi", "+ '<!--scheda:chat-->'", "chatOcBloccoHTML(o) : '')",
+                        "chatOcModHTML(o) : '');"])])
+    rid = _fn_js(mini, "function ridisegnaSeCambiaP2P(box, html){")
+    roc = _fn_js(mini, "async function renderP2POnchain(){")
+    prova("il segno si mette PRIMA del confronto dei pezzi (sennò ogni ridisegno rifà tutto); "
+          "nella pagina on-chain dopo il disegno, e la barra si spegne sull'elenco",
+          [True, True, 3],
+          [in_fila(rid, ["t.innerHTML = html;",
+                         "if (typeof segnaSchedeP2P === 'function') segnaSchedeP2P(Array.from(t.content.childNodes));",
+                         "posaPezziP2P(box, Array.from(t.content.childNodes));"]),
+           in_fila(roc, ["box.innerHTML = schedaOnchainP2P(o);",
+                         "segnaSchedeP2P(Array.from(box.childNodes));",
+                         "aggiornaSchedeP2P('p2pOnchainCorpo');"]),
+           roc.count("aggiornaSchedeP2P('p2pOnchainCorpo');")])
+    vai = _fn_js(mini, "function vaiAllaChatP2P(){")
+    avv = _fn_js(mini, "function chatDaAvvisoProvaP2P(){")
+    agg = _fn_js(mini, "function chatScRichiamoAggiornaP2P(id){")
+    prova("si riparte da «Passi» a ogni scambio aperto (Lightning e on-chain); la chat del "
+          "richiamo e del tasto dell'avviso passa dalla sua scheda PRIMA di scorrere; il "
+          "pallino si rifa' col richiamo",
+          [True, True, True, True, True],
+          [in_fila(_fn_js(mini, "function apriOrdineP2P(id){"),
+                   ["p2pSchedaVista.p2pOrdineCorpo = 'passi';", "renderOrdineP2P();"]),
+           in_fila(_fn_js(mini, "function apriDettaglioOnchainP2P(id){"),
+                   ["p2pSchedaVista.p2pOnchainCorpo = 'passi';", "renderP2POnchain()"]),
+           in_fila(vai, ["schedaDelPezzoP2P(b);", "b.scrollIntoView("]),
+           in_fila(avv, ["schedaDelPezzoP2P(box);", "box.scrollIntoView("]),
+           in_fila(agg, ["r.remove();", "aggiornaSchedeP2P('p2pOrdineCorpo');",
+                         "aggiornaSchedeP2P('p2pOnchainCorpo');"])])
+    prova("la barra sta sopra i due corpi, appesa in alto; la regola nasconde solo col corpo "
+          "`.a-schede`, e lì il richiamo «💬 Chat ↓» non serve",
+          [True, True, True, True, True],
+          ['<div class="p2p-schede" id="p2pOrdineSchede" role="tablist" hidden></div>\n'
+           '      <div id="p2pOrdineCorpo"></div>' in mini,
+           '<div class="p2p-schede" id="p2pOnchainSchede" role="tablist" hidden></div>\n'
+           '      <div id="p2pOnchainCorpo"></div>' in mini,
+           ".p2p-schede{position:sticky;top:0;" in mini,
+           '.a-schede[data-vedi="passi"] > [data-scheda]:not([data-scheda="passi"]),' in mini,
+           ".a-schede > .chatsc-richiamo{display:none !important}" in mini])
+
+
 def prove_timer_deposito_oc():
     """IL TEMPO PER DEPOSITARE NELLA PAGINA ON-CHAIN (20 nov 2026, cantiere
     timer-deposito; Andrea alla prova con Alan, sulla pagina «Preso: si
@@ -218127,7 +218314,7 @@ def _esce(f):
 CATEGORIE = {
     "p2p": """
     vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
-    timer_card_scambi timer_deposito_oc
+    timer_card_scambi timer_deposito_oc dettaglio_schede
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque chiavi_parcheggiate
@@ -219460,6 +219647,7 @@ def main():
               prove_chiavi_dal_conto,
               prove_timer_card_scambi,
               prove_timer_deposito_oc,
+              prove_dettaglio_schede,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

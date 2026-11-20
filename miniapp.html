@@ -3682,6 +3682,33 @@
   .conf-fissa{top:-20px}
   @media (min-width:768px){ .p2p-dett-fissi{top:-20px} }
   .p2p-dett-fissi > .p2p-box:first-child,.conf-fissa > .p2p-box:first-child{margin-top:0}
+  /* LE SCHEDE DELLO SCAMBIO (20 nov 2026, cantiere dettaglio-schede;
+     l'idea e' di un utente, girata da Andrea: «proporre la lista delle
+     attività come prima cosa, appena entrato, e le altre info accessibili
+     tramite schede in alto»; Andrea sulla card: «Tutti e due»). Sopra il
+     corpo di «Nel dettaglio», Lightning e on-chain, tre pastiglie fisse
+     in alto: 📋 Passi (si apre qui: i passi, lo stato, il tasto), 💰
+     Importi (il conto), 💬 Chat (la chat e chi e' l'altra persona). Il
+     DOM resta PIATTO — i pezzi sono figli diretti del corpo come prima,
+     la griglia dello schermo largo e `chatScSegnaColonnaP2P` li trovano
+     dove li cercavano — e ognuno porta `data-scheda`: la scheda che non
+     si guarda la nasconde questa regola, solo col corpo `.a-schede`.
+     Sullo schermo largo fuori da Telegram (dove la chat sta gia' a
+     destra) la classe non c'e' e la pagina resta quella di prima. Le
+     pastiglie sono quelle di «Chi può prendere l'ordine», il pallino
+     dei messaggi nuovi e' quello del richiamo «💬 Chat ↓», che con le
+     schede non serve piu' e si nasconde. */
+  .p2p-schede{position:sticky;top:0;z-index:3;display:flex;gap:8px;
+    margin:0 calc(-1 * var(--pad)) 10px;padding:6px var(--pad) 8px;background:var(--bg)}
+  .p2p-schede[hidden]{display:none}
+  .p2p-schede .p2p-accesso-chip{flex:1 1 0;min-width:0;min-height:40px;padding:6px 4px;
+    display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+  .p2p-schede .chatsc-conto{line-height:18px;min-width:18px;padding:0 5px}
+  .a-schede > .chatsc-richiamo{display:none !important}
+  .a-schede > *{scroll-margin-top:64px}
+  .a-schede[data-vedi="passi"] > [data-scheda]:not([data-scheda="passi"]),
+  .a-schede[data-vedi="importi"] > [data-scheda]:not([data-scheda="importi"]),
+  .a-schede[data-vedi="chat"] > [data-scheda]:not([data-scheda="chat"]){display:none !important}
   .p2p-box.p2p-tempo-pagare.scaduto .p2p-anello .pieno{stroke:var(--ink-soft)}
   .p2p-orologio{display:flex;align-items:center;gap:12px}
   .p2p-orologio .p2p-anello{width:44px;height:44px}
@@ -15373,6 +15400,7 @@ document.getElementById('cartello')?.remove();</script>
         <h3>Nel dettaglio</h3>
         <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
       </div>
+      <div class="p2p-schede" id="p2pOrdineSchede" role="tablist" hidden></div>
       <div id="p2pOrdineCorpo"></div>
     </div>
   </div>
@@ -15482,6 +15510,7 @@ document.getElementById('cartello')?.remove();</script>
         <h3 id="p2pOnchainTit" class="p2p-oc-tit">Scambi on-chain</h3>
         <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
       </div>
+      <div class="p2p-schede" id="p2pOnchainSchede" role="tablist" hidden></div>
       <div id="p2pOnchainCorpo"></div>
     </div>
   </div>
@@ -74888,6 +74917,7 @@ const P2P_ONCHAIN_STATI = {
    venuti (`navIndietro`), come quello di Lightning. */
 function apriDettaglioOnchainP2P(id){
   p2pOnchainAperto = Number(id) || 0;
+  p2pSchedaVista.p2pOnchainCorpo = 'passi';
   chiudiFoglioP2P('p2pNuovoSheet');
   if (vistaAttivaP2P() === 'view-p2ponchain') return renderP2POnchain();
   go('p2ponchain');
@@ -76801,6 +76831,7 @@ async function renderP2POnchain(){
     return;
   }
   if (!p2pOnchainMiei.length) box.innerHTML = '<div class="hint">Leggo i tuoi scambi…</div>';
+  aggiornaSchedeP2P('p2pOnchainCorpo');
   await leggiMieiOnchainP2P();
   if (isAdmin) {
     try {
@@ -76826,6 +76857,8 @@ async function renderP2POnchain(){
     /* ...e l'indirizzo del rimborso che si sta scrivendo (17 nov 2026) */
     const rimbV = (el('ocP2pRimbValore') || {}).value || '';
     box.innerHTML = schedaOnchainP2P(o);
+    segnaSchedeP2P(Array.from(box.childNodes));
+    aggiornaSchedeP2P('p2pOnchainCorpo');
     if (bozzaV !== null && el('p2pOcRecCommento')) el('p2pOcRecCommento').value = bozzaV;
     if (rimbV && el('ocP2pRimbValore')) { el('ocP2pRimbValore').value = rimbV; onchainIncassoGuardaPresto('ocP2pRimb'); }
     if (typeof chiediRecensibileOcP2P === 'function') chiediRecensibileOcP2P(o);
@@ -76859,6 +76892,7 @@ async function renderP2POnchain(){
      Lightning (30 ott 2026). */
   box.innerHTML = '<button type="button" class="btn orange p2p-oc-pubblica" onclick="apriPubblicaOnchainP2P()">'
     + P2P_OC_MONETA + 'Pubblica uno scambio on-chain</button>';
+  aggiornaSchedeP2P('p2pOnchainCorpo');
 }
 
 /* la proposta che aspetta la MIA seconda firma: dell'altra parte o di
@@ -77869,7 +77903,10 @@ function schedaOnchainP2P(o){
      la parte lighting»), col typeof per i banchi che ritagliano questa
      funzione da sola; al moderatore la chat delle parti in lettura */
   return (typeof chatOcRichiamoHTML === 'function' ? chatOcRichiamoHTML(o) : '')
+    /* le schede, come nel Lightning (cerca «LE SCHEDE DELLO SCAMBIO») */
+    + '<!--scheda:passi-->'
     + parti
+    + '<!--scheda:importi-->'
     /* LA FASCIA DI BARATTOZON ANCORA NEL LIBRO, come il dettaglio di
        Lightning sul proprio intervallo (18 nov 2026, cantiere
        barattozon-oc-carta): «da 25,00 a 250,00 €» e la frase, al posto di
@@ -77878,6 +77915,7 @@ function schedaOnchainP2P(o){
       ? contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),
                        FRASE_INTERVALLO_DOPO_PRESA)
       : '<div class="p2p-ord lato-' + (vendo ? 'vendo' : 'compro') + '">' + contoOnchainP2P(o) + '</div>')
+    + '<!--scheda:passi-->'
     + '<div class="p2p-passi"><div class="steps">'
     + ps.passi.map((p, i) => {
         const cl = ps.fermo >= 0 ? (i < ps.fermo ? 'done' : i === ps.fermo ? 'stop' : 'todo')
@@ -77894,7 +77932,9 @@ function schedaOnchainP2P(o){
     /* il tempo per pagare, sotto la nota (17 nov 2026) */
     + (typeof tempoPagareRigaOcP2P === 'function' && !rinunciaOc ? tempoPagareRigaOcP2P(o) : '')
     /* chi e' l'altra parte (17 nov 2026), come nel Lightning */
+    + '<!--scheda:chat-->'
     + (typeof controparteOcP2P === 'function' ? controparteOcP2P(o, mod) : '')
+    + '<!--scheda:passi-->'
     /* chi compra senza un posto dove ricevere lo scrive qui (thread del
        2-di-3, richiesta di Alan): subito sotto la nota, ben in vista */
     + `${incassoMancanteOnchainP2P(o)}`
@@ -77921,6 +77961,7 @@ function schedaOnchainP2P(o){
     + (contOc && typeof passoDueContantiOcP2P === 'function' ? passoDueContantiOcP2P(o, gesti) : '')
     + '<div class="p2p-onchain-gesti">' + gesti + '</div>'
     + decidi
+    + '<!--scheda:chat-->'
     + (typeof chatOcBloccoHTML === 'function' ? chatOcBloccoHTML(o) : '')
     + (typeof chatOcModHTML === 'function' ? chatOcModHTML(o) : '');
 }
@@ -94732,6 +94773,8 @@ function apriOrdineP2P(id){
   /* le stelle scelte e non mandate sono di QUELLO scambio: aprendone un
      altro ripartono da zero (la bozza del commento guarda il suo id) */
   if (p2pOrdineAperto !== id) p2pStellaScelta = 0;
+  /* chi entra vede per prima cosa i passi (cerca «LE SCHEDE DELLO SCAMBIO») */
+  p2pSchedaVista.p2pOrdineCorpo = 'passi';
   p2pOrdineAperto = id;
   /* il PayCode che non e' partito riparte da qui (vedi «LA RIPRESA») */
   if (typeof riprendiAutoRecapitoP2P === 'function') riprendiAutoRecapitoP2P(id, true);
@@ -94797,6 +94840,10 @@ function ridisegnaSeCambiaP2P(box, html){
   try {
     const t = document.createElement('template');
     t.innerHTML = html;
+    /* le schede si segnano PRIMA del confronto: i pezzi gia' posati
+       portano il loro `data-scheda`, e i nuovi devono avere la stessa
+       firma per restare dove sono (vedi «LE SCHEDE DELLO SCAMBIO») */
+    if (typeof segnaSchedeP2P === 'function') segnaSchedeP2P(Array.from(t.content.childNodes));
     posaPezziP2P(box, Array.from(t.content.childNodes));
   } catch(e) {
     box.innerHTML = html;
@@ -94841,6 +94888,99 @@ function pezziCheRestanoP2P(vecchi, nuovi){
   }
   return coppie;
 }
+/* ---- LE SCHEDE DELLO SCAMBIO (20 nov 2026, cantiere dettaglio-schede) ----
+   Il CSS spiega il perche' (cerca «LE SCHEDE DELLO SCAMBIO»). Qui il come:
+   chi disegna la pagina mette nell'HTML un commento `<!--scheda:chat-->`
+   prima dei pezzi di quella scheda, e `segnaSchedeP2P` da' a ogni pezzo
+   che segue il suo `data-scheda`, fino al commento dopo. Prima del primo
+   commento i pezzi restano senza: sono di tutte le schede (il richiamo
+   della chat, che con le schede si nasconde da se'). La scheda scelta
+   vive per corpo e riparte da «Passi» a ogni scambio aperto: chi entra
+   vede per prima cosa i passi. */
+const P2P_SCHEDE = [
+  {k: 'passi', t: '📋 Passi'},
+  {k: 'importi', t: '💰 Importi'},
+  {k: 'chat', t: '💬 Chat'}
+];
+const p2pSchedaVista = {p2pOrdineCorpo: 'passi', p2pOnchainCorpo: 'passi'};
+/* PURA sui nodi: il segno di ogni pezzo, dal commento che lo precede */
+function segnaSchedeP2P(nodi){
+  let k = '';
+  (nodi || []).forEach(n => {
+    if (n.nodeType === 8 && /^scheda:[a-z]+$/.test(n.nodeValue || '')) k = n.nodeValue.slice(7);
+    else if (n.nodeType === 1 && k) n.setAttribute('data-scheda', k);
+  });
+}
+/* le schede si accendono dappertutto, tranne sullo schermo largo fuori da
+   Telegram: li' lo scambio e' gia' su due o tre colonne e la chat sta a
+   destra. La stessa media della griglia (cerca «LO SCAMBIO P2P: a
+   sinistra il conto») */
+const P2P_SCHEDE_LARGO = '(min-width:1280px) and (hover:hover) and (pointer:fine)';
+function schedeAcceseP2P(){
+  try {
+    return !(document.documentElement.classList.contains('fuori-telegram')
+             && matchMedia(P2P_SCHEDE_LARGO).matches);
+  } catch(e) { return true; }
+}
+/* la barra delle schede, dai pezzi che il corpo ha davvero: «Importi» se
+   c'e' il conto, «Chat» se c'e' la chat o chi e' l'altra persona. Con la
+   sola «Passi» la barra non c'e', e il corpo resta com'era */
+function aggiornaSchedeP2P(idCorpo){
+  const box = el(idCorpo), barra = el(idCorpo.replace('Corpo', 'Schede'));
+  if (!box || !barra || !box.children) return;
+  const ci = new Set(Array.prototype.map.call(box.children,
+    c => c.getAttribute ? c.getAttribute('data-scheda') : null).filter(Boolean));
+  const schede = P2P_SCHEDE.filter(s => s.k === 'passi' || ci.has(s.k));
+  if (!schedeAcceseP2P() || !ci.size || schede.length < 2) {
+    barra.hidden = true;
+    box.classList.remove('a-schede');
+    return;
+  }
+  let v = p2pSchedaVista[idCorpo];
+  if (!schede.some(s => s.k === v)) v = 'passi';
+  box.classList.add('a-schede');
+  if (box.getAttribute('data-vedi') !== v) box.setAttribute('data-vedi', v);
+  /* i messaggi nuovi: il conto e' quello del richiamo «💬 Chat ↓», che
+     resta nel corpo (nascosto) e si tiene in pari da se' */
+  const conto = box.querySelector('.chatsc-richiamo .chatsc-conto');
+  const n = conto ? conto.textContent : '';
+  const html = schede.map(s => '<button type="button" role="tab" aria-selected="' + (s.k === v)
+    + '" class="p2p-accesso-chip' + (s.k === v ? ' on' : '') + '" onclick="vediSchedaP2P(\'' + idCorpo
+    + '\', \'' + s.k + '\')">' + esc(s.t)
+    + (s.k === 'chat' && n ? '<span class="chatsc-conto">' + esc(n) + '</span>' : '') + '</button>').join('');
+  if (barra.innerHTML !== html) barra.innerHTML = html;
+  barra.hidden = false;
+}
+/* il tocco su una scheda; `muto` per chi ci porta da se' (la chat dal
+   tasto dell'avviso, il richiamo) senza vibrare ne' scorrere */
+function vediSchedaP2P(idCorpo, k, muto){
+  if (!muto) haptic();
+  p2pSchedaVista[idCorpo] = k;
+  aggiornaSchedeP2P(idCorpo);
+  const barra = el(idCorpo.replace('Corpo', 'Schede'));
+  /* la barra e' rimasta appesa in alto: la scheda nuova comincia dal suo
+     inizio, non a meta' di dove si era scesi nell'altra */
+  if (!muto && barra && barra.getBoundingClientRect().top <= 1) {
+    try { el(idCorpo).scrollIntoView({block: 'start'}); window.scrollBy(0, -barra.offsetHeight); } catch(e) {}
+  }
+  if (k === 'chat' && typeof chatScGuardataP2P === 'function') setTimeout(chatScGuardataP2P, 60);
+}
+/* un pezzo della pagina che va fatto vedere (la chat): se sta in una
+   scheda che non si guarda, prima si va li' */
+function schedaDelPezzoP2P(nodo){
+  const box = nodo && nodo.parentElement;
+  const k = nodo && nodo.getAttribute && nodo.getAttribute('data-scheda');
+  if (!box || !k || !box.id || !box.classList.contains('a-schede')) return;
+  if (box.getAttribute('data-vedi') !== k) vediSchedaP2P(box.id, k, true);
+}
+/* lo schermo che cambia misura (la finestra allargata, il telefono
+   girato): le schede si accendono o si spengono da sole */
+try {
+  const mq = matchMedia(P2P_SCHEDE_LARGO);
+  const rifai = () => { aggiornaSchedeP2P('p2pOrdineCorpo'); aggiornaSchedeP2P('p2pOnchainCorpo'); };
+  if (mq.addEventListener) mq.addEventListener('change', rifai);
+  else if (mq.addListener) mq.addListener(rifai);
+} catch(e) {}
 function renderOrdineP2P(){
   const box = el('p2pOrdineCorpo');
   if (!box) return;
@@ -95098,10 +95238,15 @@ function renderOrdineP2P(){
     /* IL RICHIAMO «💬 Chat» (12 ott 2026, notte): il primo pezzo della
        pagina, col conto dei messaggi nuovi; porta giu' al riquadro */
     (typeof chatScRichiamoP2P === 'function' ? chatScRichiamoP2P(o) : '') +
+    /* le schede (cerca «LE SCHEDE DELLO SCAMBIO»): il conto e' «Importi»,
+       la chat e chi e' l'altra persona sono «Chat», il resto «Passi» */
+    '<!--scheda:passi-->' +
     riquadroAppuntamentoP2P(o) +
+    '<!--scheda:importi-->' +
     /* il conto veste il lato della RIGA, non del tab del libro (24
        set 2026): vedi il CSS di `.p2p-ord.lato-vendo` */
     '<div class="p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '">' + conto + '</div>' +
+    '<!--scheda:passi-->' +
     /* LA CAUZIONE, sotto il conto (1 ott 2026): la riga di chi l'ha
        messa e, dall'altro lato, la meta' che gli spetta se e' bruciata */
     /* IL METODO SCELTO, DI QUA E DI LA' (13 nov 2026, cantiere rete-
@@ -95240,11 +95385,13 @@ function renderOrdineP2P(){
        IL GUARDIANO E' `o.peer`, la chiave dell'altra parte: prima
        della presa non esiste, quindi prima della presa non c'e'
        niente da mostrare — e non si chiede niente al server. */
+    '<!--scheda:chat-->' +
     (o.peer ? profiloControparteP2P(o) : '') +
     /* LA CHAT NELLO SCAMBIO (12 ott 2026): sotto il profilo — quello
        dice CON CHI scambi, questa serve a PARLARSI — dalla presa alla
        fine. Vive nel suo blocco, che si ridisegna da solo */
     (typeof bloccoChatScambioP2P === 'function' ? bloccoChatScambioP2P(o) : '') +
+    '<!--scheda:passi-->' +
     /* i recapiti stanno FRA il passo da fare e le uscite (fase 6, al
        posto della chat): quel che e' arrivato si mostra, quel che
        manca si chiede. Compaiono solo quando si sa con chi si sta
@@ -95270,6 +95417,7 @@ function renderOrdineP2P(){
   /* il richiamo della chat si nasconde sullo schermo largo (vedi
      `chatScSegnaColonnaP2P`) */
   if (typeof chatScSegnaColonnaP2P === 'function') chatScSegnaColonnaP2P(box);
+  if (typeof aggiornaSchedeP2P === 'function') aggiornaSchedeP2P('p2pOrdineCorpo');
   rimettiBozzaRecensioneP2P(bozza);
 }
 /* ---- IL RIQUADRO DELLA RECENSIONE (23 set 2026, «Ritocchi allo
@@ -118519,6 +118667,11 @@ function chatScRichiamoAggiornaP2P(id){
   const html = o ? chatScRichiamoP2P(o) : '';
   if (r && html) { if (r.outerHTML !== html) r.outerHTML = html; }
   else if (r && !html) r.remove();
+  /* ...e il pallino della scheda «Chat», che lo legge da li' */
+  if (typeof aggiornaSchedeP2P === 'function') {
+    aggiornaSchedeP2P('p2pOrdineCorpo');
+    aggiornaSchedeP2P('p2pOnchainCorpo');
+  }
 }
 /* la lista e' entrata nello schermo: quel che c'e' e' visto */
 function chatScGuardataP2P(){
@@ -118568,6 +118721,8 @@ function chatDaAvvisoProvaP2P(){
   const box = chatScApertoP2P() === v.id ? (chatScEl('p2pChatSc') || chatScEl('chatscChiusa')) : null;
   if (!box) { setTimeout(chatDaAvvisoProvaP2P, 250); return; }
   p2pChatDaAvviso = null;
+  /* con le schede la chat sta nella sua: dal tasto dell'avviso ci si va */
+  if (typeof schedaDelPezzoP2P === 'function') schedaDelPezzoP2P(box);
   /* sullo schermo largo il riquadro e' appeso a destra (sticky): non
      si scorre la pagina, si illumina */
   const appeso = typeof getComputedStyle === 'function' && getComputedStyle(box).position === 'sticky';
@@ -118609,6 +118764,8 @@ function vaiAllaChatP2P(){
   const b = chatScEl('p2pChatSc');
   if (!b) return;
   haptic();
+  /* con le schede la chat sta nella sua: prima ci si va */
+  schedaDelPezzoP2P(b);
   /* la scorsa chiede al GIUDICE degli effetti (`tourRidotto`), come
      ogni scorsa di casa: mai una domanda nuova al sistema */
   b.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'});

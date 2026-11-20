@@ -878,3 +878,9 @@ frase: In Barattolo Negozio la cassa al banco ha due cose nuove. Sul QR c'è «�
 dove: Profilo → «🏪 Cassa in negozio» → «Incassa» → «🔁 Gira verso il cliente»; e la scheda «📒 Vendite» → «📒 Chiusura di cassa».
 leva: CASSA_ATTIVA (accesa di serie)
 pubblico: sì
+
+## 2026-11-20 · dettaglio-schede
+frase: La pagina di uno scambio P2P è più ordinata: in alto tre schede, «📋 Passi», «💰 Importi» e «💬 Chat». Entrando vedi subito i passi, lo stato e il bottone da toccare; il conto e la chat sono a un tocco, con un pallino rosso quando ti hanno scritto.
+dove: P2P → «I miei scambi» → uno scambio (Lightning o on-chain): le schede sotto il titolo «Nel dettaglio», ferme in alto anche scorrendo.
+leva: nessuna
+pubblico: sì
