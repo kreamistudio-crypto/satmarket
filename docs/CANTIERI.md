@@ -92794,3 +92794,71 @@ PROVATO. Nel venv con le sole dipendenze della CI (senza coincurve), su 5179bc09
 COSA. Nel P2P on-chain, a scambio `depositato`, la rotta `/api/p2p/onchain/{oid}/recapito` accettava un testo vuoto e azzerava `recapito_il` («cancellarlo lo ferma», ritorno-nel-libro del 19 nov). Due regole del 19 nov, giuste da sole, insieme facevano un buco: senza recapito `/euro-inviati` risponde 409 a chi compra, e la ronda del recapito nel tempo (`_p2p_onchain_chiudi_recapiti_mancati`, leva `P2P_RECAPITO_NEL_TEMPO` accesa di serie) legge il vuoto come «mai scritto», con la scadenza contata dal deposito: Barattolo firmava il rimborso a chi vende dentro il tempo di chi aveva già pagato. Ora, a scambio `depositato`, un recapito già scritto non si svuota: 409 «Dopo il deposito il recapito non si cancella: puoi solo cambiarlo», PRIMA di ogni scrittura. Cambiarlo resta possibile come prima (lo storico per i moderatori, dal 14 nov); prima del deposito anche svuotarlo, come prima. Vale per ogni valuta (euro, CHF, USDT, monete) e per i contanti di persona.
 NON TOCCATO. Il Lightning: lì il recapito va da telefono a telefono e non passa dal server, e «Ho inviato» lo riceve il nodo. La ronda e `p2p_onchain_recapito_entro` restano com'erano: senza il vuoto dopo il deposito non c'è più il caso. La Mini App non cambia: se chi vende salva il campo vuoto vede il toast con la frase del server.
 PROVATO. Sull'albero di develop `57e7387f` più questo cantiere, nel cloud (il PC non chiesto per un diff di dieci righe): suite severa nel venv con le sole dipendenze del workflow, 30.719 passate, 0 fallite, 2 saltate (le solite di nostr-tools, che fuori dal PC non c'è); prova nuova in `prove.py` (il 409 sta prima dell'UPDATE) e passo nuovo in `collaudo_p2p_onchain` (rotta vera: svuotato dopo il deposito → 409, il recapito resta); collaudi della CI senza proxy 161 verdi più `collaudo_sentinella` verde a parte (il venv del cloud non ha uvicorn, che la CI installa: rigirato in un venv che lo ha). Da guardare: nessuno scambio vero è passato da qui; sul VPS, in sola lettura, gli scambi chiusi «recapito-scaduto» con una riga in `p2p_onchain_recapiti_storia` (comando nel rapporto del giro 4).
+
+## Il tempo del mio passo anche nella card di «I miei scambi», il riquadro del tempo colorato solo per chi agisce e nella valuta dell'ordine, la pagina che scende al passo, il bottone che sparisce a tempo finito (20 nov 2026, cantiere timer-card-scambi; Andrea, con lo scatto della card «Vuoi ricevere 10,00 USDT · Sats in garanzia 👉 tocca a te»: «Sarebbe utile anche nella card, nei miei scambi, mettere un timer anche lì, così lo capisci già subito anche solo dalla card»)
+
+DECISO, in quattro richieste dello stesso giro. (1) Sotto la casella dello
+stato della card una riga sola, «⏱ Hai ancora 8 min», con l'anellino che
+si svuota e la barretta a sinistra arancio, rossa negli ultimi dieci
+minuti (Andrea: «se vuoi mettere lo sbuffo rosso, metti anche lo sbuffo
+arancione»). Testo approvato da Andrea prima del codice. C'è SOLO quando
+tocca a me e il mio passo ha un termine che corre: a chi vende il tempo
+per dire dove vuole i soldi (`recapitoEntro`), a chi compra quello per
+pagare (`pagaEntro`) — `rigaTempoCardScambioP2P`, coi numeri del riquadro
+letti dallo stesso archivio (`rigaTempoCardP2P`); on-chain
+`rigaTempoCardOcP2P` (`recapito_entro` a chi ha depositato, `paga_entro` a
+chi paga). Scende da sola (`battitoTempoCardP2P`, nell'unico interval) e
+allo zero se ne va. (2) Il riquadro del tempo nella pagina è arancio o
+rosso SOLO per chi deve fare il gesto (Andrea: «arancione e rosso solo
+nel momento in cui devi compiere un'azione»): chi aspetta l'altro lo
+legge in chiaro con la barretta bianca (classe `attesa`, che il battito
+non scalda), Lightning e on-chain. E dice la valuta dell'ordine: nello
+scatto diceva «Indica dove ricevere gli euro» sopra il bottone «…gli
+USDT», e «inviarti gli euro» a chi aspetta — il traduttore della pagina
+(`paroleUsdtHtmlP2P`) lavora solo dentro `P2P_USDT_DOVE`, che adesso
+comprende `.p2p-tempo-pagare`; nella pagina on-chain le frasi di
+`tempoPagareRigaOcP2P` passano da `paroleOcP2P`. (3) Toccando la card la
+pagina scende da sola al passo (Andrea: «appena clicco, voglio che la
+pagina scorra da sola verso il basso»): `apriScambioDallaCardP2P` usa lo
+stesso gesto dell'avviso, `azioneInVistaP2P` (la riga dello stato in cima,
+sotto il tempo e il bottone), solo su uno scambio vivo; on-chain lo
+scambio aperto dalla card si segna (`p2pOcInVista`) e la scheda,
+disegnata, si porta in vista una volta (`azioneInVistaOcP2P`). (4) A tempo
+finito il bottone non si vede più (Andrea, dal vivo: arrivato l'avviso del
+tempo scaduto «per un attimo ho visto ancora il tasto ho inviato gli
+USDT»): `azioneVivaP2P` toglie il gesto del passo — «Ho inviato» o
+«Indica dove ricevere» — appena passa il suo termine, guardando l'ora
+sul telefono senza aspettare il server; anche il «tocca a te» della card.
+I termini valgono solo se l'archivio è dello stesso giro della riga
+(come `orariPassiP2P`): quelli di un giro vecchio dello stesso ordine non
+spengono il gesto di quello nuovo.
+
+SCARTATO. Il timer della card anche a chi aspetta: Andrea l'ha chiesto per
+il proprio passo. Spezzare `tempoPagareRigaOcP2P` in due funzioni: i
+banchi la ritagliano per firma fino alla prima graffa. Togliere il gesto
+scaduto anche nell'on-chain: lì allo scadere non si annulla niente (resta
+la disputa), quindi «Ho inviato» ha ancora un senso.
+
+CAMBIATE TRE ATTESE DI IERI, per la regola nuova di Andrea (il colore è
+di chi deve fare il gesto): in `prove_tempo_pagare_p2p` chi vende col
+tempo di chi compra non si scalda più («vicino»/«rosso» → `attesa`), e in
+`prove_conto_alla_rovescia_p2p` chi aspetta il recapito on-chain non è
+più rosso negli ultimi dieci minuti.
+
+PROVATO. `prove_timer_card_scambi` (nuova, categoria p2p): le righe pure
+della card (chi vende senza recapito, chi compra col recapito, rosso e
+arancio, quota dell'anello; niente a chi aspetta, a tempo finito o fermo,
+senza tempo, dopo «Ho inviato», sulla riga solo da guardare), il posto
+nelle due card e il battito, il colore solo per chi agisce, la valuta del
+riquadro nelle due pagine, la pagina che scende (solo scambi vivi), il
+gesto che sparisce a tempo finito (giro vecchio e archivio assente non
+spengono niente). Controprove: il riquadro tolto da `P2P_USDT_DOVE`, `pa(`
+tolto dall'on-chain, la soglia del rosso a un minuto, la riga tolta dalla
+card, il giudice di chi tocca rotto, il controllo dei finiti tolto dallo
+scorrere, il gesto scaduto che non scade → ognuna rossa. Scatti con dati
+finti in /mnt/project-files/timer-card-scambi/ (card, pagina di chi agisce
+che scende al passo, pagina di chi aspetta). Sull'albero di develop
+`5179bc09` più il cantiere, nel venv con le sole dipendenze del workflow
+(senza coincurve) e nostr-tools@2.25.2: `PROVE_SEVERE=1 python prove.py`
+30.762 passate, 0 fallite; collaudi della CI 162 verdi, 0 rossi. Resta da
+guardare dal vivo: un ordine a tempo corto, dai due lati.

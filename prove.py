@@ -73620,7 +73620,7 @@ console.log(JSON.stringify(out));
     prova("...e sul MIO ordine pubblicato resta «Premio che hai offerto»", [True, False],
           ["Premio che hai offerto" in o["presoMio"], "premio-nota" in o["presoMio"]])
     pagina = mini[mini.index("function renderOrdineP2P("):]
-    pagina = pagina[:pagina.index("const azione = azioniDisponibili(o);")]
+    pagina = pagina[:pagina.index("const azione = ")]
     prova("...e la pagina dello scambio passa `mio` dalla riga, non `mio: true`",
           [True, False], ["mio: !!o.mio," in pagina, "mio: true," in pagina])
 
@@ -215620,12 +215620,14 @@ console.log(JSON.stringify(out));
           ["per inviare gli USDT" in o["dett"][6], "«Ho inviato gli USDT»" in o["dett"][6],
            "gli euro" in o["dett"][6], "per inviare gli USDT" in o["dett"][7]])
     sc = o["scambio"]
-    prova("IL TIMER: a chi compra il tempo che resta, a chi vende lo stesso (vicino alla "
-          "fine si scalda); l'ANELLO porta la parte che resta; finito dice che lo scambio "
+    prova("IL TIMER: a chi compra il tempo che resta, a chi vende lo stesso ma IN CHIARO "
+          "(20 nov 2026, Andrea: «arancione e rosso solo nel momento in cui devi compiere "
+          "un'azione»); l'ANELLO porta la parte che resta; finito dice che lo scambio "
           "scade e l'ordine torna nel libro (19 nov 2026); senza attivo niente",
           [True, True, True, True, True, ""],
           ["Hai ancora <b>50 min</b>" in sc[0] and 'data-entro="4000"' in sc[0],
-           "Chi compra ha ancora <b>10 min</b>" in sc[1] and " vicino" in sc[1],
+           "Chi compra ha ancora <b>10 min</b>" in sc[1] and " attesa" in sc[1]
+           and " vicino" not in sc[1] and " rosso" not in sc[1],
            'data-tot="3600"' in sc[0] and 'class="p2p-anello"' in sc[0],
            "scaduto" in sc[2] and "l'ordine torna nel libro" in sc[2],
            "vicino" not in sc[0], sc[3]])
@@ -215640,8 +215642,8 @@ console.log(JSON.stringify(out));
            sc[6]])
     prova("LA RIGA CHE NON DEVE SFUGGIRE (Andrea: «uno magari non capisce e perde i soldi»): "
           "a chi compra sotto il timer e nel dettaglio prima della presa, mai a chi vende; "
-          "rossa negli ultimi dieci minuti",
-          [True, False, True, False, True, True, False],
+          "rossa negli ultimi dieci minuti, e solo per chi deve pagare (20 nov 2026)",
+          [True, False, True, False, True, False, False],
           ["Se hai pagato, tocca «Ho inviato gli euro»" in sc[0],
            "Se hai pagato" in sc[1], "Se hai pagato" in o["dett"][0], "Se hai pagato" in o["dett"][1],
            " rosso" in sc[7], " rosso" in sc[1], " rosso" in sc[0]])
@@ -216154,11 +216156,12 @@ def prove_recapito_nel_tempo():
     except Exception:
         sc = ["errore: " + r.stderr[-300:]] * 4
     prova("L'APP ON-CHAIN: chi ha depositato legge quanto gli resta per scrivere dove vuole "
-          "gli euro; chi compra che non deve mandare niente se non arriva, rossa negli "
-          "ultimi dieci minuti; allo scadere la riga dell'annullo; senza limite la riga ferma",
+          "gli euro; chi compra che non deve mandare niente se non arriva, IN CHIARO anche "
+          "negli ultimi dieci minuti (20 nov 2026: il colore e' di chi deve fare il gesto); "
+          "allo scadere la riga dell'annullo; senza limite la riga ferma",
           [True, True, True, True],
           ["Hai ancora <b>15 min</b> per scrivere dove vuoi gli euro" in sc[0] and " rosso" not in sc[0],
-           "Chi vende ha ancora <b>5 min</b>" in sc[1] and " rosso" in sc[1],
+           "Chi vende ha ancora <b>5 min</b>" in sc[1] and " attesa" in sc[1] and " rosso" not in sc[1],
            "scaduto" in sc[2] and "Barattolo firma il rimborso" in sc[2],
            "fermo" in sc[3]])
     prova("L'APP: la riga del Lightning conta il tempo del recapito, il banner della presa "
@@ -217033,6 +217036,203 @@ console.log(JSON.stringify([a, b]));
            "stessa chiave Nostr" in T[1]])
 
 
+def prove_timer_card_scambi():
+    """IL TEMPO ANCHE NELLA CARD DI «I MIEI SCAMBI» (20 nov 2026, cantiere
+    timer-card-scambi; Andrea, sulla card «Sats in garanzia 👉 tocca a te»
+    di un ordine in USDT: «mettere un timer anche lì, così lo capisci già
+    subito anche solo dalla card»). E nello stesso scatto il riquadro rosso
+    della pagina diceva «Indica dove ricevere gli euro» sopra il bottone
+    «Indica dove ricevere gli USDT».
+
+    Quel che qui si rompe in silenzio: il timer sulla card di chi ASPETTA
+    (gli direbbe «hai ancora» un tempo che non e' suo), il timer a tempo
+    finito o fermo, il conto che non scende (il battito che non lo trova),
+    e il riquadro che torna in euro su un ordine in un'altra valuta."""
+    import subprocess
+    print("\n[il tempo del mio passo nella card di «I miei scambi»]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    js = "\n".join([
+        "function esc(s){ return String(s); }",
+        "function anelloTempoP2P(q){ return '[' + Math.round(q * 100) + ']'; }",
+        "function cauzioneVivaP2P(){ return false; }",
+        _riga_js(mini, "const P2P_MINUTI_PAGARE_MIN = "),
+        _riga_js(mini, "const P2P_MINUTI_PAGARE_MAX = "),
+        _riga_js(mini, "const P2P_MINUTI_PAGARE_PASSO = "),
+        _fn_js(mini, "function minutiPagareSceltaP2P(v){"),
+        _fn_js(mini, "function traQuantoP2P(sec){"),
+        _fn_js(mini, "function recapitoEuroArrivatoP2P(o){"),
+        _fn_js(mini, "function azioniDisponibili(o){"),
+        _fn_js(mini, "function tempoPagareFermoOcP2P(o){"),
+        _fn_js(mini, "function tempoPagareOcP2P(o, adesso){"),
+        _fn_js(mini, "function rigaTempoCardScambioP2P(o, adesso){"),
+        _fn_js(mini, "function rigaTempoCardOcP2P(o, adesso){"),
+        r"""
+const ora = 100000, peer = 'ab'.repeat(32);
+const vende = {stato: 'attivo', lato: 'vendo', peer, minutiPagare: 15, recapitoEntro: ora + 480, pagaEntro: 0};
+const compra = {stato: 'attivo', lato: 'compro', minutiPagare: 30, pagaEntro: ora + 1500,
+                campiLoro: {euro: {testo: 'IT60X'}}};
+const L = [
+  rigaTempoCardScambioP2P(vende, ora),
+  rigaTempoCardScambioP2P(Object.assign({}, vende, {recapitoEntro: ora + 1200}), ora),
+  rigaTempoCardScambioP2P(compra, ora),
+  /* chi compra mentre chi vende deve ancora dire dove: tocca all'altro */
+  rigaTempoCardScambioP2P({stato: 'attivo', lato: 'compro', minutiPagare: 15, recapitoEntro: ora + 480}, ora),
+  /* chi vende, recapito dato: il tempo che corre e' di chi compra */
+  rigaTempoCardScambioP2P(Object.assign({}, vende, {campiMiei: {euro: {}}, pagaEntro: ora + 600}), ora),
+  rigaTempoCardScambioP2P(Object.assign({}, vende, {recapitoEntro: ora - 1}), ora),
+  rigaTempoCardScambioP2P(Object.assign({}, vende, {recapitoEntro: 0}), ora),
+  rigaTempoCardScambioP2P(Object.assign({}, vende, {minutiPagare: 0}), ora),
+  rigaTempoCardScambioP2P(Object.assign({}, compra, {stato: 'euro_inviati'}), ora),
+  rigaTempoCardScambioP2P(Object.assign({}, vende, {soloVista: true}), ora)];
+const oc = {stato: 'depositato', recapito: '', paga_entro: 0, minuti_pagamento: 15, recapito_entro: ora + 300};
+const C = [
+  rigaTempoCardOcP2P(Object.assign({ruolo: 'compratore'}, oc), ora),
+  rigaTempoCardOcP2P(Object.assign({ruolo: 'venditore'}, oc), ora),
+  rigaTempoCardOcP2P({ruolo: 'venditore', stato: 'depositato', recapito: 'IT', paga_entro: ora + 3000,
+                      pagare_dal: ora - 600}, ora),
+  rigaTempoCardOcP2P({ruolo: 'compratore', stato: 'depositato', recapito: 'IT', paga_entro: ora + 3000}, ora),
+  rigaTempoCardOcP2P({ruolo: 'venditore', stato: 'depositato', recapito: 'IT', paga_entro: ora - 5}, ora),
+  rigaTempoCardOcP2P(Object.assign({ruolo: 'compratore'}, oc, {recapito_entro: 0}), ora)];
+console.log(JSON.stringify({L, C}));
+"""])
+    o = _node_banco(js)
+    if o is None:
+        salta("il banco del timer nella card", "node assente")
+        return
+    if "L" not in o:
+        prova("il banco del timer nella card gira", True, False)
+        return
+    L, C = o["L"], o["C"]
+    prova("LIGHTNING: a chi vende senza recapito «⏱ Hai ancora 8 min», rossa sotto i dieci "
+          "minuti e arancio sopra; a chi compra col recapito arrivato il suo tempo per pagare, "
+          "con l'anello alla sua quota",
+          [True, True, True],
+          ['class="p2p-tempo-card rosso" data-entro="100480" data-tot="900">[53]<span>⏱ Hai ancora <b>8 min</b></span>' in L[0],
+           'class="p2p-tempo-card" data-entro="101200"' in L[1] and "<b>20 min</b>" in L[1],
+           'data-tot="1800">[83]' in L[2] and "<b>25 min</b>" in L[2]])
+    prova("LIGHTNING: niente timer quando tocca all'altro, a tempo finito o fermo, senza un "
+          "tempo scelto, dopo «Ho inviato», sulla riga solo da guardare",
+          [""] * 7, L[3:])
+    prova("ON-CHAIN: a chi ha depositato e deve scrivere dove vuole i soldi il suo tempo, a chi "
+          "paga il tempo per pagare; niente all'altro, a tempo finito, senza un termine",
+          [True, "", True, "", "", ""],
+          ['data-entro="100300" data-tot="900">[33]' in C[0] and "<b>5 min</b>" in C[0] and " rosso" in C[0],
+           C[1],
+           'data-tot="3600">[83]' in C[2] and "<b>50 min</b>" in C[2],
+           C[3], C[4], C[5]])
+    card = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    card_oc = pezzo_js(mini, "function rigaScambioOnchainP2P(o){", "\n}\n")
+    prova("le due card la mettono SUBITO sotto la casella dello stato; il battito di casa la "
+          "fa scendere (dall'unico interval) e la toglie allo zero",
+          [True, True, True, True],
+          ["rigaAttesaP2P(o) + '</div>'\n    /* IL TEMPO DEL MIO PASSO" in card
+           and "rigaTempoCardP2P(o) : '')" in card,
+           "'</span>' : '') + '</div>'\n    /* il tempo del mio passo" in card_oc
+           and "rigaTempoCardOcP2P(o) : '')" in card_oc,
+           "if (typeof battitoTempoCardP2P === 'function') battitoTempoCardP2P();" in mini,
+           "'.view.active .p2p-tempo-card[data-entro]'" in mini and "r.remove(); return;" in mini])
+    pag = _fn_js(mini, "function rigaTempoPagareScambioP2P(o, adesso){")
+    batt = _fn_js(mini, "function battitoTempoPagareP2P(){")
+    prova("IL COLORE E' DI CHI DEVE FARE IL GESTO (Andrea: «arancione e rosso solo nel "
+          "momento in cui devi compiere un'azione»): nel riquadro della pagina chi aspetta "
+          "e' `attesa` (in chiaro, barretta bianca), e il battito non lo scalda",
+          [True, True, True, True],
+          ["(compro ? ' attesa' : resta0 <= 600 ? ' rosso' : '')" in pag,
+           "(!compro ? ' attesa'" in pag,
+           "box.classList.toggle('rosso', !attesa && resta <= 600);" in batt,
+           ".p2p-box.p2p-tempo-pagare.attesa{" in mini])
+    # a tempo finito il gesto non c'e' piu'
+    r = subprocess.run(["node", "-e", "\n".join([
+        "let p2pScambiServer = null;",
+        "function azioniDisponibili(o){ return o.a; }",
+        _fn_js(mini, "function pagaEntroP2P(o){"),
+        _fn_js(mini, "function recapitoEntroP2P(o){"),
+        _fn_js(mini, "function gestoScadutoP2P(o, azione, adesso){"),
+        _fn_js(mini, "function azioneVivaP2P(o){"),
+        "const ora = Math.floor(Date.now() / 1000);",
+        "const g = (a, p, r) => gestoScadutoP2P({pagaEntro: p, recapitoEntro: r}, a, 1000);",
+        "const out = [g('euro-inviati', 1000, 0), g('euro-inviati', 1001, 0), g('euro-inviati', 0, 0),",
+        "  g('recapito', 0, 999), g('recapito', 0, 1001), g('recapito', 2000, 999), g('rilascia', 999, 999)];",
+        "p2pScambiServer = {a: {paga_entro: ora - 5, giro: 2}, b: {paga_entro: ora + 600, giro: 2},",
+        "  c: {recapito_entro: ora - 5, paga_entro: 0, giro: 2}};",
+        "out.push(azioneVivaP2P({id: 'a', a: 'euro-inviati', giro: 2}), azioneVivaP2P({id: 'b', a: 'euro-inviati', giro: 2}),",
+        "  azioneVivaP2P({id: 'c', a: 'recapito'}), azioneVivaP2P({id: 'a', a: 'euro-inviati', giro: 3}),",
+        "  azioneVivaP2P({id: 'z', a: 'euro-inviati'}), azioneVivaP2P({id: 'a', a: 'rilascia'}));",
+        "console.log(JSON.stringify(out));"])], capture_output=True, text=True)
+    try:
+        gs = json.loads(r.stdout)
+    except Exception:
+        gs = "errore: " + r.stderr[-300:]
+    pagina_sc = mini[mini.index("function renderOrdineP2P("):]
+    prova("A TEMPO FINITO IL BOTTONE NON SI VEDE PIU' (Andrea, dal vivo: «appena entro non "
+          "dovrebbe neanche più vedersi»): passato il termine del mio passo il gesto sparisce "
+          "subito, senza aspettare il server; un termine di un giro vecchio, o nessun archivio, "
+          "non spegne niente; gli altri gesti mai; e la pagina e la card lo usano",
+          [[True, False, False, True, False, False, False,
+            "", "euro-inviati", "", "euro-inviati", "euro-inviati", "rilascia"], True, True],
+          [gs, "const azione = typeof azioneVivaP2P === 'function' ? azioneVivaP2P(o) : azioniDisponibili(o);"
+           in pagina_sc,
+           "(typeof azioneVivaP2P === 'function' ? azioneVivaP2P(o) : azioniDisponibili(o))" in card])
+    # dalla card, la pagina scende al passo
+    r = subprocess.run(["node", "-e", "\n".join([
+        "const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];",
+        "let aperti = [], inVista = [];",
+        "function apriOrdineP2P(id){ aperti.push(id); }",
+        "function azioneInVistaP2P(id){ inVista.push(id); }",
+        "const R = {a: {stato: 'attivo'}, c: {stato: 'concluso'}};",
+        "function ordiniP2P(){ return R; }",
+        _fn_js(mini, "function apriScambioDallaCardP2P(id){"),
+        "['a', 'c', 'x'].forEach(apriScambioDallaCardP2P);",
+        "console.log(JSON.stringify([aperti, inVista]));"])], capture_output=True, text=True)
+    try:
+        sv = json.loads(r.stdout)
+    except Exception:
+        sv = "errore: " + r.stderr[-300:]
+    ocv = _fn_js(mini, "function azioneInVistaOcP2P(o){")
+    prova("DALLA CARD LA PAGINA SCENDE DA SOLA AL PASSO (Andrea: «appena clicco, voglio che "
+          "la pagina scorra da sola verso il basso»): la card Lightning apre con "
+          "`apriScambioDallaCardP2P`, che porta in vista solo uno scambio vivo; la card "
+          "on-chain segna lo scambio e la scheda, disegnata, lo porta in vista una volta sola",
+          [[["a", "c", "x"], ["a"]], True, True, True],
+          [sv, 'onclick="apriScambioDallaCardP2P(this.dataset.id)">' in card,
+           "p2pOcInVista = Number(id) || 0;" in mini
+           and "if (typeof azioneInVistaOcP2P === 'function') azioneInVistaOcP2P(o);" in mini,
+           "p2pOcInVista = 0;" in ocv and "!P2P_ONCHAIN_VIVI.has(o.stato)" in ocv
+           and "nota.scrollIntoView({block: 'start'});" in ocv])
+    # il riquadro rosso nella valuta dell'ordine
+    dove = mini[mini.index("const P2P_USDT_DOVE = "):]
+    dove = dove[:dove.index("\n")]
+    riga_oc = _fn_js(mini, "function tempoPagareRigaOcP2P(o, adesso){")
+    prova("IL RIQUADRO DEL TEMPO NELLA VALUTA DELL'ORDINE: nella pagina Lightning passa dal "
+          "traduttore della pagina (`P2P_USDT_DOVE`), in quella on-chain ogni frase da "
+          "`paroleOcP2P`",
+          [True, 4],
+          ["'.p2p-tempo-pagare'" in dove.replace(", .p2p-tempo-pagare,", ", '.p2p-tempo-pagare',"),
+           riga_oc.count("pa(")])
+    r = subprocess.run(["node", "-e", "\n".join([
+        "function esc(s){ return String(s); }",
+        "function minutiPagareDetteP2P(m){ return m + ' minuti'; }",
+        "function contantiOcP2P(){ return false; }",
+        "function paroleOcP2P(o, t){ return o.usdt ? String(t).replace(/\\b[Ee]uro\\b/g, 'USDT') : t; }",
+        _fn_js(mini, "function traQuantoP2P(sec){"),
+        _fn_js(mini, "function tempoPagareFermoOcP2P(o){"),
+        riga_oc,
+        "const o = {stato: 'depositato', recapito: '', paga_entro: 0, minuti_pagamento: 30, recapito_entro: 7000, usdt: {rete: 'tron'}};",
+        "console.log(JSON.stringify([tempoPagareRigaOcP2P(Object.assign({ruolo: 'compratore'}, o), 6100),"
+        " tempoPagareRigaOcP2P(Object.assign({ruolo: 'venditore'}, o), 6700),"
+        " tempoPagareRigaOcP2P(Object.assign({ruolo: 'compratore'}, o, {recapito_entro: 0}), 6100)]));"])],
+        capture_output=True, text=True)
+    try:
+        sc = json.loads(r.stdout)
+    except Exception:
+        sc = ["errore: " + r.stderr[-300:]] * 3
+    prova("ON-CHAIN IN USDT: il riquadro dice «gli USDT», mai «gli euro», e le classi restano",
+          [True, True, True],
+          ["gli USDT" in x and "euro" not in x.lower() and 'class="p2p-box p2p-tempo-pagare' in x
+           for x in sc])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -217206,6 +217406,7 @@ def _esce(f):
 CATEGORIE = {
     "p2p": """
     vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
+    timer_card_scambi
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque chiavi_parcheggiate
@@ -218533,6 +218734,7 @@ def main():
               prove_apri_ordine_notifica,
               prove_chiavi_ovunque,
               prove_chiavi_dal_conto,
+              prove_timer_card_scambi,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

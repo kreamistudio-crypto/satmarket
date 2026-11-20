@@ -3633,6 +3633,24 @@
   .p2p-tempo-avviso{display:block;margin-top:6px;font-size:12px;font-weight:700;line-height:1.4}
   .p2p-box.p2p-tempo-pagare.rosso{background:rgba(220,38,38,.12);color:#b91c1c;box-shadow:inset 3px 0 0 #dc2626}
   .p2p-box.p2p-tempo-pagare.rosso .p2p-tempo-avviso{color:#b91c1c}
+  /* (20 nov 2026, cantiere timer-card-scambi; Andrea: «arancione e rosso
+     solo nel momento in cui devi compiere un'azione») chi ASPETTA l'altro
+     legge il tempo in chiaro, con la barretta bianca: non deve fare niente */
+  .p2p-box.p2p-tempo-pagare.attesa{background:var(--chip-bg);color:var(--ink);font-weight:600;
+    box-shadow:inset 3px 0 0 var(--ink)}
+  .p2p-box.p2p-tempo-pagare.attesa .p2p-anello .pieno{stroke:var(--ink)}
+  /* IL TEMPO ANCHE NELLA CARD (20 nov 2026, cantiere timer-card-scambi;
+     Andrea: «mettere un timer anche lì, così lo capisci già subito anche
+     solo dalla card»): una riga sotto la casella dello stato, l'anellino
+     che si svuota, rossa negli ultimi dieci minuti come il riquadro; la
+     barretta a sinistra arancio prima, rossa poi (Andrea: «se vuoi mettere
+     lo sbuffo rosso, metti anche lo sbuffo arancione») */
+  .p2p-tempo-card{display:flex;align-items:center;gap:8px;margin-top:8px;padding:6px 10px;
+    border-radius:12px;background:var(--sats-soft);color:var(--sats-text);
+    box-shadow:inset 3px 0 0 var(--sats);font-size:13px;font-weight:700;line-height:1.3}
+  .p2p-tempo-card b{font-variant-numeric:tabular-nums}
+  .p2p-tempo-card .p2p-anello{width:20px;height:20px}
+  .p2p-tempo-card.rosso{background:rgba(220,38,38,.12);color:#b91c1c;box-shadow:inset 3px 0 0 #dc2626}
   /* L'OROLOGIO DEL TEMPO PER PAGARE (18 nov 2026, «un orologio con un
      timer che decidi tu»): un anello arancio di casa che dice quanto del
      giorno e' concesso — pieno a 24 ore, uno spicchio a un quarto d'ora —
@@ -30229,6 +30247,8 @@ setInterval(() => {
   if (typeof battitoPausaLibroP2P === 'function') battitoPausaLibroP2P();
   /* ...e il tempo per pagare nella pagina dello scambio (18 nov 2026) */
   if (typeof battitoTempoPagareP2P === 'function') battitoTempoPagareP2P();
+  /* ...e nelle card di «I miei scambi» (20 nov 2026, timer-card-scambi) */
+  if (typeof battitoTempoCardP2P === 'function') battitoTempoCardP2P();
   battitoTabacchinoP2P();
   battitoControlloTabP2P();
   battitoPagamentiP2P();
@@ -76161,6 +76181,10 @@ function tempoPagareFermoOcP2P(o){
 }
 function tempoPagareRigaOcP2P(o, adesso){
   const ora = adesso || Math.floor(Date.now() / 1000);
+  /* NELLA VALUTA DELLO SCAMBIO (20 nov 2026, cantiere timer-card-scambi):
+     «gli euro» di queste frasi in USDT, franchi o moneta, come il resto
+     della pagina (`paroleOcP2P` guarda solo le parole, non le classi) */
+  const pa = t => typeof paroleOcP2P === 'function' ? paroleOcP2P(o, t) : t;
   if (tempoPagareFermoOcP2P(o)) {
     const min = Number(o.minuti_pagamento) || (Number(o.ore_pagamento) || 0) * 60;
     const detto = min && typeof minutiPagareDetteP2P === 'function' ? minutiPagareDetteP2P(min) : '';
@@ -76175,18 +76199,19 @@ function tempoPagareRigaOcP2P(o, adesso){
       const quanto0 = typeof traQuantoP2P === 'function' ? traQuantoP2P(Math.max(0, resta0))
         : Math.max(1, Math.ceil(resta0 / 60)) + ' min';
       if (resta0 <= 0)
-        return '<div class="p2p-box p2p-tempo-pagare scaduto"><span>⏱ ' + (o.ruolo === 'venditore'
+        return '<div class="p2p-box p2p-tempo-pagare scaduto"><span>⏱ ' + pa(o.ruolo === 'venditore'
           ? 'Chi vende non ha scritto in tempo dove mandare gli euro: lo scambio si annulla, non mandare niente.'
           : 'Non hai scritto in tempo dove vuoi gli euro: lo scambio si annulla e Barattolo firma il rimborso dei tuoi sats.')
           + '</span></div>';
-      return '<div class="p2p-box p2p-tempo-pagare' + (resta0 <= 600 ? ' rosso' : '') + '"><span>⏱ ' + (o.ruolo === 'venditore'
+      /* il colore a chi deve scrivere, in chiaro a chi aspetta (20 nov 2026) */
+      return '<div class="p2p-box p2p-tempo-pagare' + (o.ruolo === 'venditore' ? ' attesa' : resta0 <= 600 ? ' rosso' : '') + '"><span>⏱ ' + pa(o.ruolo === 'venditore'
         ? 'Chi vende ha ancora <b>' + esc(quanto0) + '</b> per scriverti dove mandare gli euro: se non lo fa, lo scambio si annulla e non devi mandare niente.'
           + (detto ? ' Poi avrai <b>' + esc(detto) + '</b> per pagare.' : '')
         : 'Hai ancora <b>' + esc(quanto0) + '</b> per scrivere dove vuoi gli euro: se non lo fai, lo scambio si annulla e i sats tornano a te.'
           + (detto ? ' Poi chi compra avrà <b>' + esc(detto) + '</b> per pagarti.' : ''))
         + '</span></div>';
     }
-    return '<div class="p2p-box p2p-tempo-pagare fermo"><span>' + (o.ruolo === 'venditore'
+    return '<div class="p2p-box p2p-tempo-pagare fermo"><span>' + pa(o.ruolo === 'venditore'
       ? 'Avrai ' + (detto ? '<b>' + esc(detto) + '</b>' : 'il tuo tempo') + ' per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.'
       : 'Chi compra ha ' + (detto ? '<b>' + esc(detto) + '</b>' : 'il suo tempo') + ' per pagarti, da quando scrivi dove vuoi gli euro: finché non lo fai, il suo tempo non parte e i tuoi sats restano fermi.')
       + '</span></div>';
@@ -76208,8 +76233,32 @@ function tempoPagareRigaOcP2P(o, adesso){
        negli ultimi dieci minuti: senza il bottone, «ho pagato» non lo sa nessuno */
     + (o.ruolo === 'venditore' && !o.tabacchino
        ? '<span class="p2p-tempo-avviso' + (manca <= 600 ? ' rosso' : '') + '">'
-         + '⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone, allo scadere chi vende può aprire una disputa anche se hai pagato.</span>' : '')
+         + pa('⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone, allo scadere chi vende può aprire una disputa anche se hai pagato.') + '</span>' : '')
     + '</div>';
+}
+/* IL TEMPO ANCHE NELLA CARD ON-CHAIN (20 nov 2026, cantiere timer-card-
+   scambi): la riga della card di Lightning (`rigaTempoCardScambioP2P`),
+   sotto la casella, SOLO sul mio passo a tempo — a chi paga gli euro il
+   tempo per pagare (`paga_entro`), a chi ha depositato e deve scrivere
+   dove li vuole il suo (`recapito_entro`, il tempo fermo). PURA. */
+function rigaTempoCardOcP2P(o, adesso){
+  if (!o || typeof anelloTempoP2P !== 'function' || typeof traQuantoP2P !== 'function') return '';
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const min = Number(o.minuti_pagamento) || (Number(o.ore_pagamento) || 0) * 60;
+  let fine = 0, tot = 0;
+  if (o.ruolo === 'compratore' && tempoPagareFermoOcP2P(o)) {
+    fine = Number(o.recapito_entro) || 0;
+    tot = min * 60;
+  } else if (o.ruolo === 'venditore' && tempoPagareOcP2P(o, ora)) {
+    fine = Number(o.paga_entro) || 0;
+    tot = fine - (Number(o.pagare_dal) || Number(o.depositato_il) || 0);
+  }
+  const resta = fine - ora;
+  if (!(fine > 0) || resta <= 0) return '';
+  if (!(tot > 0)) tot = resta;
+  return '<div class="p2p-tempo-card' + (resta <= 600 ? ' rosso' : '') + '" data-entro="' + fine
+    + '" data-tot="' + tot + '">' + anelloTempoP2P(resta / tot) + '<span>⏱ Hai ancora <b>'
+    + esc(traQuantoP2P(resta)) + '</b></span></div>';
 }
 /* la tinta della casella, nella tavolozza del Lightning (`P2P_TINTA_STATO`):
    arancio il gesto mio, viola l'attesa, rosso la disputa */
@@ -76321,6 +76370,8 @@ function rigaScambioOnchainP2P(o){
     + (typeof premioOcMioP2P === 'function' ? premioOcMioP2P(o) : '')
     + '<div class="p2p-scambio-stato' + tintaOnchainP2P(o) + '"><span>' + esc(st.t) + '</span>' + agire
     + (st.d ? '<span class="p2p-aspetta-riga">' + esc(st.d) + '</span>' : '') + '</div>'
+    /* il tempo del mio passo, sotto la casella (20 nov 2026) */
+    + (typeof rigaTempoCardOcP2P === 'function' ? rigaTempoCardOcP2P(o) : '')
     + (typeof pagaReteCardP2P === 'function' ? pagaReteCardP2P : x => x)(metodi.length ? '<div class="p2p-box p2p-paga'
        + (insegna ? ' p2p-paga-marchio' : '') + (insegna && (chiuso || annullato) ? ' p2p-paga-spenta' : '')
        + '" title="' + esc(metodi.join(', ')) + '">'
@@ -76358,7 +76409,37 @@ function premioOcMioP2P(o){
 /* il tocco: «Nel dettaglio», la porta unica del design */
 function apriScambioOnchainMioP2P(id){
   haptic();
+  /* ...e la pagina scende da sola al passo (20 nov 2026, timer-card-
+     scambi): quando la scheda e' disegnata, vedi `azioneInVistaOcP2P` */
+  p2pOcInVista = Number(id) || 0;
   apriDettaglioOnchainP2P(Number(id));
+}
+/* LO SCAMBIO ON-CHAIN APERTO DALLA CARD (20 nov 2026, cantiere timer-card-
+   scambi; Andrea: «la pagina deve scendere fino al messaggio dove si vede
+   quanto tempo hai ancora»): una volta sola, a scheda disegnata, come
+   `azioneInVistaP2P` del Lightning — la riga dello stato in cima e, se tocca
+   a me e il bottone resta sotto la barra, il bottone al centro. Solo su
+   uno scambio vivo. */
+let p2pOcInVista = 0;
+function azioneInVistaOcP2P(o){
+  if (!o || p2pOcInVista !== Number(o.id)) return;
+  p2pOcInVista = 0;
+  if (!P2P_ONCHAIN_VIVI.has(o.stato)) return;
+  setTimeout(() => {
+    if (p2pOnchainAperto !== Number(o.id) || vistaAttivaP2P() !== 'view-p2ponchain') return;
+    const v = el('view-p2ponchain');
+    const nota = v && v.querySelector('.nota-scambio');
+    if (!nota) return;
+    const b = nota.querySelector('.p2p-tocca')
+      ? Array.from(v.querySelectorAll('.btn.orange:not([disabled])')).find(x => !x.closest('.chatmod')
+          && (nota.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING)) : null;
+    try {
+      nota.scrollIntoView({block: 'start'});
+      window.scrollBy(0, -12);
+      if (b && b.getBoundingClientRect().bottom > innerHeight - 96)
+        b.scrollIntoView({block: 'center'});
+    } catch(e) {}
+  }, 350);
 }
 
 /* LA PAGINA: l'elenco dei miei (col foglio «Pubblica» e, per i
@@ -76403,6 +76484,8 @@ async function renderP2POnchain(){
     if (bozzaV !== null && el('p2pOcRecCommento')) el('p2pOcRecCommento').value = bozzaV;
     if (rimbV && el('ocP2pRimbValore')) { el('ocP2pRimbValore').value = rimbV; onchainIncassoGuardaPresto('ocP2pRimb'); }
     if (typeof chiediRecensibileOcP2P === 'function') chiediRecensibileOcP2P(o);
+    /* aperto dalla card, la pagina scende al passo (20 nov 2026) */
+    if (typeof azioneInVistaOcP2P === 'function') azioneInVistaOcP2P(o);
     /* il QR dell'indirizzo USDT di chi vende, a chi paga (2 nov 2026) */
     /* ...e quello dell'indirizzo della moneta (16 nov 2026), stesso posto */
     const qu = el('p2pOcUsdtQr');
@@ -94298,6 +94381,18 @@ function apriOrdineP2P(id){
       renderOrdineP2P();
   }).catch(() => {});
 }
+/* DALLA CARD DI «I MIEI SCAMBI» LA PAGINA SCENDE DA SOLA (20 nov 2026,
+   cantiere timer-card-scambi; Andrea: «appena clicco, voglio che la
+   pagina scorra da sola verso il basso e si concentri a livello del
+   messaggio che serve»): lo stesso gesto dell'avviso (`azioneInVistaP2P`)
+   — la riga dello stato in cima, sotto il tempo e il bottone del passo —
+   ma solo su uno scambio ancora vivo: su un finito non c'e' niente da fare */
+function apriScambioDallaCardP2P(id){
+  apriOrdineP2P(id);
+  const o = ordiniP2P()[id];
+  if (o && P2P_FINALI.indexOf(o.stato) < 0 && typeof azioneInVistaP2P === 'function')
+    azioneInVistaP2P(id);
+}
 function vistaAttivaP2P(){
   const v = document.querySelector('.view.active');
   return v ? v.id : '';
@@ -94525,7 +94620,8 @@ function renderOrdineP2P(){
     /* in moneta a mercato, il cambio di chi ha preso guardato col mio
        (16 nov 2026, ricevi-mercato): '' quasi sempre */
     + (typeof avvisoCambioCoinP2P === 'function' ? avvisoCambioCoinP2P(o) : '');
-  const azione = azioniDisponibili(o);
+  /* a tempo finito il gesto non c'e' piu' (20 nov 2026): `azioneVivaP2P` */
+  const azione = typeof azioneVivaP2P === 'function' ? azioneVivaP2P(o) : azioniDisponibili(o);
   /* chi vende e riapre l'app a scambio attivo: se l'avviso del
      recapito non era partito, parte adesso (le condizioni le guarda
      lui, e non ripete) */
@@ -97093,7 +97189,11 @@ function paroleUsdtHtmlP2P(o, html, dove){
 }
 /* le scatole della pagina dello scambio che parlano l'app: i quattro
    passi, le note dello stato, i bottoni, le righe d'aiuto, il tempo */
-const P2P_USDT_DOVE = '.steps, .trust-note, button, .hint, .p2p-gesto-tempo, label';
+/* ...e il riquadro del tempo (20 nov 2026, cantiere timer-card-scambi;
+   Andrea, scatto di un ordine in USDT: il riquadro rosso diceva «Indica
+   dove ricevere gli euro» sopra il bottone «Indica dove ricevere gli
+   USDT»): la stessa valuta del bottone che nomina */
+const P2P_USDT_DOVE = '.steps, .trust-note, button, .hint, .p2p-gesto-tempo, .p2p-tempo-pagare, label';
 /* IL METRO DI UN ORDINE: quanto vale un sat nella SUA valuta, adesso; 0
    = non lo so, e allora le stime tacciono. L'USDT vale un dollaro (il
    prezzo `pegged` del nodo), e senza dollaro vero non si inventa. */
@@ -99100,7 +99200,11 @@ function rigaTempoPagareScambioP2P(o, adesso){
                     : 'Non hai detto in tempo dove ricevere gli euro: lo scambio finisce e i sats tornano a te.')
           + '</div>';
       const tot0 = min * 60;
-      return '<div class="p2p-box p2p-tempo-pagare' + (resta0 <= 600 ? ' rosso' : '') + '" id="p2pTempoPagare" data-entro="'
+      /* IL COLORE E' DI CHI DEVE FARE IL GESTO (20 nov 2026, cantiere
+         timer-card-scambi; Andrea: «arancione e rosso solo nel momento in
+         cui devi compiere un'azione»): qui il gesto e' di chi vende, e chi
+         compra aspetta in chiaro (`attesa`) */
+      return '<div class="p2p-box p2p-tempo-pagare' + (compro ? ' attesa' : resta0 <= 600 ? ' rosso' : '') + '" id="p2pTempoPagare" data-entro="'
         + rEntro + '" data-tot="' + tot0 + '">' + anelloTempoP2P(resta0 / tot0) + '<span>' + (compro
           ? 'Chi vende ha ancora <b>' + esc(traQuantoP2P(resta0)) + '</b> per dirti dove mandare gli euro: se non lo fa, lo scambio finisce e non devi mandare niente. Poi avrai ' + minutiPagareDetteP2P(min) + ' per pagare.'
           : 'Hai ancora <b>' + esc(traQuantoP2P(resta0)) + '</b> per toccare «Indica dove ricevere gli euro»: se non lo fai, lo scambio finisce e i sats tornano a te. Poi chi compra avrà ' + minutiPagareDetteP2P(min) + ' per pagarti.')
@@ -99124,7 +99228,10 @@ function rigaTempoPagareScambioP2P(o, adesso){
   const tot = (minutiPagareSceltaP2P(o.minutiPagare) || 0) * 60;
   /* ...e a chi compra la riga che non deve sfuggire, rossa negli ultimi
      dieci minuti (`rosso`, la rimette il battito) */
-  return '<div class="p2p-box p2p-tempo-pagare' + (resta <= 900 ? ' vicino' : '') + (resta <= 600 ? ' rosso' : '')
+  /* ...e qui il gesto e' di chi compra: chi vende aspetta in chiaro
+     (20 nov 2026, vedi sopra) */
+  return '<div class="p2p-box p2p-tempo-pagare' + (!compro ? ' attesa'
+      : (resta <= 900 ? ' vicino' : '') + (resta <= 600 ? ' rosso' : ''))
     + '" id="p2pTempoPagare" data-entro="'
     + entro + '" data-tot="' + tot + '">' + anelloTempoP2P(tot ? resta / tot : 1) + '<span>' + (compro
       ? 'Hai ancora <b>' + esc(quanto) + '</b> per inviare gli euro e toccare «Ho inviato gli euro»: poi lo scambio scade e l\'ordine torna nel libro.'
@@ -99156,6 +99263,85 @@ function rigaTempoPagareP2P(o){
                                                          minutiPagare: minutiPagareScambioP2P(o),
                                                          recapitoEntro: recapitoEntroP2P(o)}));
 }
+/* A TEMPO FINITO IL BOTTONE NON SI VEDE PIU' (20 nov 2026, cantiere
+   timer-card-scambi; Andrea, dal vivo: arrivato l'avviso su Telegram del
+   tempo scaduto, entrando nello scambio «per un attimo ho visto ancora il
+   tasto ho inviato gli USDT», poi «Scambio annullato»: «appena entro non
+   dovrebbe neanche più vedersi»). La pagina guarda l'ora da sola, senza
+   aspettare il giro del server: passato il termine del MIO passo — il
+   tempo per pagare a chi compra, quello per dire dove a chi vende — quel
+   gesto non c'e' piu'. PURA: `pagaEntro` e `recapitoEntro` si passano. */
+function gestoScadutoP2P(o, azione, adesso){
+  if (!o) return false;
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const entro = Number(o.pagaEntro) || 0;
+  if (azione === 'euro-inviati') return entro > 0 && ora >= entro;
+  if (azione === 'recapito') {
+    const r = Number(o.recapitoEntro) || 0;
+    return !(entro > 0) && r > 0 && ora >= r;
+  }
+  return false;
+}
+/* ...il gesto vivo dello scambio: quello di `azioniDisponibili`, tolto se
+   il suo tempo e' finito. I termini dall'archivio del server, solo se e'
+   dello stesso giro della riga (come `orariPassiP2P`): quelli di un giro
+   vecchio dello stesso ordine non spengono il gesto di quello nuovo */
+function azioneVivaP2P(o){
+  const a = azioniDisponibili(o);
+  if (a !== 'euro-inviati' && a !== 'recapito') return a;
+  const s = o && typeof p2pScambiServer !== 'undefined' && p2pScambiServer ? p2pScambiServer[o.id] : null;
+  if (!s || (Number(o.giro) > 0 && Number(s.giro) > 0 && Number(o.giro) !== Number(s.giro))) return a;
+  return gestoScadutoP2P({pagaEntro: pagaEntroP2P(o), recapitoEntro: recapitoEntroP2P(o)}, a) ? '' : a;
+}
+/* IL TEMPO ANCHE NELLA CARD DI «I MIEI SCAMBI» (20 nov 2026, cantiere
+   timer-card-scambi; Andrea, sulla card «Sats in garanzia 👉 tocca a
+   te»: «mettere un timer anche lì, così lo capisci già subito anche solo
+   dalla card»). PURA: la riga sotto la casella dello stato, SOLO quando
+   tocca a me e il mio passo ha un termine che corre — a chi vende, il
+   tempo per dire dove vuole i soldi (`recapitoEntro`); a chi compra,
+   quello per pagare (`pagaEntro`). Gli stessi numeri del riquadro della
+   pagina (`rigaTempoPagareScambioP2P`), rossa negli stessi dieci minuti.
+   Tocca all'altro, tempo fermo o finito: '' (la casella lo dice gia'). */
+function rigaTempoCardScambioP2P(o, adesso){
+  if (!o || o.soloVista || o.stato !== 'attivo') return '';
+  if (typeof azioniDisponibili === 'function' && !azioniDisponibili(o)) return '';
+  const min = minutiPagareSceltaP2P(o.minutiPagare);
+  if (!min) return '';
+  const entro = Number(o.pagaEntro) || 0;
+  const fine = o.lato === 'compro' ? entro : (entro > 0 ? 0 : Number(o.recapitoEntro) || 0);
+  if (!(fine > 0)) return '';
+  const resta = fine - (adesso || Math.floor(Date.now() / 1000));
+  if (resta <= 0) return '';
+  const tot = min * 60;
+  return '<div class="p2p-tempo-card' + (resta <= 600 ? ' rosso' : '') + '" data-entro="' + fine
+    + '" data-tot="' + tot + '">' + anelloTempoP2P(resta / tot) + '<span>⏱ Hai ancora <b>'
+    + esc(traQuantoP2P(resta)) + '</b></span></div>';
+}
+/* ...la riga nella card, coi termini letti dall'archivio del server */
+function rigaTempoCardP2P(o){
+  if (!o || o.soloVista) return '';
+  return rigaTempoCardScambioP2P(Object.assign({}, o, {pagaEntro: pagaEntroP2P(o),
+                                                       minutiPagare: minutiPagareScambioP2P(o),
+                                                       recapitoEntro: recapitoEntroP2P(o)}));
+}
+/* ...e il suo battito: i minuti e l'anello in place, la tinta negli
+   ultimi dieci minuti; allo zero la riga se ne va (la casella dello stato
+   cambia col giro del server) */
+function battitoTempoCardP2P(){
+  if (typeof document === 'undefined' || !document.querySelectorAll) return;
+  const righe = document.querySelectorAll('.view.active .p2p-tempo-card[data-entro]');
+  if (!righe.length) return;
+  const ora = Date.now() / 1000;
+  righe.forEach(r => {
+    const resta = (Number(r.dataset.entro) || 0) - ora;
+    if (resta <= 0) { r.remove(); return; }
+    const b = r.querySelector('b'), q = traQuantoP2P(resta);
+    if (b && b.textContent !== q) b.textContent = q;
+    r.classList.toggle('rosso', resta <= 600);
+    const tot = Number(r.dataset.tot) || 0;
+    if (tot) quotaAnelloP2P(r.querySelector('.p2p-anello'), resta / tot);
+  });
+}
 /* IL BATTITO, nell'unico interval dell'app: i minuti in place, e allo
    zero la pagina si ridisegna UNA volta (la frase cambia) */
 function battitoTempoPagareP2P(){
@@ -99169,8 +99355,10 @@ function battitoTempoPagareP2P(){
   }
   const b = box.querySelector('b'), q = traQuantoP2P(resta);
   if (b && b.textContent !== q) b.textContent = q;
-  box.classList.toggle('vicino', resta <= 900);
-  box.classList.toggle('rosso', resta <= 600);
+  /* chi aspetta resta in chiaro (20 nov 2026, timer-card-scambi) */
+  const attesa = box.classList.contains('attesa');
+  box.classList.toggle('vicino', !attesa && resta <= 900);
+  box.classList.toggle('rosso', !attesa && resta <= 600);
   const tot = Number(box.dataset.tot) || 0;
   if (tot) quotaAnelloP2P(box.querySelector('.p2p-anello'), resta / tot);
 }
@@ -108321,7 +108509,8 @@ function rigaScambioP2P(o){
      accessibilita' prima che di gusto — qui c'e' perche' non
      racconta, CHIAMA. Il suo `aria-hidden` e' la regola di casa: e'
      un segno, e le parole accanto lo dicono gia'. */
-  const agire = azioniDisponibili(o)
+  /* ...e a tempo finito niente «tocca a te» (20 nov 2026, `azioneVivaP2P`) */
+  const agire = (typeof azioneVivaP2P === 'function' ? azioneVivaP2P(o) : azioniDisponibili(o))
     ? '<span class="p2p-tocca"><span class="p2p-manina" aria-hidden="true">👉</span>'
       + ' tocca a te</span>' : '';
   /* ---- QUEL CHE E' FATTO SI DICE AL PASSATO (22 set 2026, richiesta
@@ -108444,7 +108633,7 @@ function rigaScambioP2P(o){
   return '<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + (spenta ? ' spenta' : '')
     + (acceso ? ' appena-fatto" style="--fatto-da:-' + acceso + 'ms' : '')
     + '" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
-    + 'onclick="apriOrdineP2P(this.dataset.id)">'
+    + 'onclick="apriScambioDallaCardP2P(this.dataset.id)">'
     /* LA DATA DI CHIUSURA STA NELL'ANGOLO (22 set 2026, richiesta di
        Andrea): piccola e discreta, e solo sulle card CONCLUSE — sugli
        annullati la data sta nella frase, e sulle vive non c'e' niente
@@ -108489,6 +108678,9 @@ function rigaScambioP2P(o){
     /* ...e quando non tocca a me la casella dice «✋ Aspetta» con la
        riga di cosa fa l'altra persona (24 set 2026) */
     + '<span>' + esc(st.t) + '</span>' + (agire || pillolaAttesaP2P(o)) + rigaAttesaP2P(o) + '</div>'
+    /* IL TEMPO DEL MIO PASSO, sotto la casella (20 nov 2026, cantiere
+       timer-card-scambi): vedi `rigaTempoCardScambioP2P` */
+    + (typeof rigaTempoCardP2P === 'function' ? rigaTempoCardP2P(o) : '')
     /* IL MESSAGGIO NON LETTO DELLA CHAT (12 ott 2026): sotto lo stato,
        col suo pallino; si spegne aprendo lo scambio */
     + (typeof chatScSegnoCardP2P === 'function' ? chatScSegnoCardP2P(o) : '')
