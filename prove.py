@@ -37120,6 +37120,8 @@ def _censimento(acceso, dopo=None):
     # ...e la riga del cambio in Lightning (28 ott 2026) CHIAMA il giudice
     # delle reti: settima occorrenza della trappola del 7
     amb["onchain_ln_rete_ok"] = lambda fornitore=None: bool(acceso)
+    # ...e quella delle gift card di Bitpost (20 nov 2026): ottava
+    amb["bitpost_configurato"] = lambda: bool(acceso)
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
     amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
@@ -47725,8 +47727,10 @@ def prove_fogli_di_casa():
           "e riprendi i sats?» del deposito on-chain incompleto; «Chiedi di "
           "annullare?» a chi compra on-chain; dal 19 nov il riquadro «⏱ Hai "
           "… per pagare» alla presa, Lightning e on-chain; «Ti riprendi i "
-          "sats?» on-chain a tempo finito)",
-          132, solo_codice(mini).count("chiediConferma({"))
+          "sats?» on-chain a tempo finito; dal 20 nov le sei delle gift "
+          "card di Bitpost: chiedi, prendi, funzionano, disputa, annulla, "
+          "firma l'incasso)",
+          138, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -118560,7 +118564,8 @@ def prove_piu_account_ovunque():
           "return t ? CONTO_MINI_CHIAVE + '@' + t : '';" in mini)
     prova("il filo dell'account scelto e' montato su fetch", True,
           "window.fetch = fetchColConto(fetchCheRiprova(" in mini)
-    prova("i gesti coi soldi chiedono il volto (soldi: true)", 6,
+    # (20 nov 2026) +3: le gift card di Bitpost (chiedi, prendi, firma l'incasso)
+    prova("i gesti coi soldi chiedono il volto (soldi: true)", 9,
           mini.count("soldi: true,"))
     prova("...e i due fogli di pagamento hanno il loro posto", 2,
           mini.count('<div class="conto-in-vista" data-conto-in-vista'))
@@ -156421,6 +156426,8 @@ def prove_freni():
            # l'on-chain della tappa 2 (20 ott 2026, numeri di Andrea):
            # la xpub dedicata 5 all'ora, un indirizzo di prova 20 all'ora
            "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
+           # le gift card di Bitpost (20 nov 2026): ogni tocco chiama Bitpost
+           "bitpost": (120, 3600),
            # il wallet unico (2 nov 2026 sera): registrare l'impronta 20
            # all'ora, prenotare il numero di un cambio 120 all'ora
            "wallet_unico": (20, 3600), "wallet_casa": (20, 3600), "wallet_cassetta": (30, 3600), "sessioni_attive": (30, 3600), "wallet_numero": (120, 3600),
@@ -218949,6 +218956,162 @@ console.log(JSON.stringify({L, C}));
            for x in sc])
 
 
+def prove_bitpost_gift_card():
+    """LE GIFT CARD DI BITPOST (20 nov 2026, cantiere bitpost-gift-card).
+    Il giro vero col Bitpost finto e' `collaudo_bitpost_gift_card.py`;
+    qui i giudici puri, le cose ferme scritte nel sorgente e il BANCO
+    DELLA FIRMA: il bundle vero in node, un 2-di-3 come lo farebbe Bitpost
+    dalla xpub di un ordine, e il telefono che ritrova la sua chiave e
+    firma.
+
+    QUEL CHE SI ROMPE IN SILENZIO: il link della carta che finisce in una
+    tabella (la carta e' il link); la leva che nasce accesa; il webhook
+    che sulla prova privata resta chiuso dietro PROVA_SOLO_IDS; una firma
+    HMAC confrontata male; la chiave dell'ordine che il telefono non
+    ritrova (sats fermi nel 2-di-3 di Bitpost)."""
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    print("\n[le gift card di Bitpost]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) le leve e le porte -------------------------------------------
+    prova("1) la leva nasce SPENTA, solo-admin di serie, tetto 250", [True] * 5,
+          ["except ImportError:\n    BITPOST_ATTIVO = False" in src,
+           "BITPOST_ATTIVO = BITPOST_ATTIVO is True" in src,
+           "\nBITPOST_ATTIVO = False\n" in es,
+           "\nBITPOST_SOLO_ADMIN = True\n" in es,
+           "\nBITPOST_MAX_EURO = 250\n" in es])
+    prova("...chiave e segreto restano «mai dal pannello» per la forma del "
+          "nome", [False, False, False],
+          [bool(re.fullmatch(r"[A-Z][A-Z0-9_]*", k))
+           and not re.search(r"TOKEN|SEGRET|SECRET|NSEC|MACAROON|_KEY$|PASSWORD"
+                             r"|CHIAVE|URL|RELAY|NPUB|XPUB|_API|LINK|_IDS?$|ONION"
+                             r"|WEBHOOK|DB$|SERVER|CERT|AVVISA$", k)
+           for k in ("BITPOST_API_KEY", "BITPOST_WEBHOOK_SEGRETO",
+                     "BITPOST_API_BASE")])
+    prova("il webhook resta aperto sulla prova privata (lo protegge la firma)",
+          True, '"/api/bitpost/webhook")' in src)
+    prova("ogni rotta per gli utenti passa dal cancello", [],
+          [m.group(1) for m in re.finditer(
+              r'@app\.(?:get|post)\("(/api/bitpost/[^"]+)"\)\nasync def \w+\([^)]*\):'
+              r'(.*?)\n\n\n', src, re.S)
+           if "webhook" not in m.group(1)
+           and "_bitpost_porta(" not in m.group(2)])
+
+    # --- 2) il link della carta non si salva -----------------------------
+    m = re.search(r"CREATE TABLE IF NOT EXISTS bitpost_carte\((.*?)\)\"\"\"", src, re.S)
+    prova("2) la tabella delle carte non ha una colonna per il link", False,
+          bool(m) and ("url" in m.group(1).lower() or "link" in m.group(1).lower()))
+    w = pezzo("bitpost_webhook")
+    prova("...il webhook scrive numero, valore, scadenza e mai card_url",
+          (True, False),
+          ("INSERT OR REPLACE INTO bitpost_carte" in w,
+           'carta.get("card_url")' in w or "card_url" in w.split("bitpost_carte", 1)[1][:600]))
+
+    # --- 3) i giudici puri ------------------------------------------------
+    import hashlib as _hl
+    import hmac as _hm
+    import time as _t
+    from urllib.parse import urlparse as _up
+    amb = {"hmac": _hm, "hashlib": _hl, "re": re, "urlparse": _up}
+    for n in ("_fmt_eur", "bitpost_firma_valida", "_bitpost_base_ammessa",
+              "bitpost_minimo_bitcoin", "bitpost_ordine_ammesso"):
+        exec(pezzo(n), amb)
+    fv = amb["bitpost_firma_valida"]
+    corpo = b'{"id":"e1"}'
+    t = 1763547123
+    v1 = _hm.new(b"s3gr3to", f"{t}.".encode() + corpo, _hl.sha256).hexdigest()
+    prova("3) la firma HMAC: giusta si', storta/vecchia/senza segreto no",
+          [True, False, False, False, False, False],
+          [fv(corpo, f"t={t},v1={v1}", "s3gr3to", t + 10),
+           fv(corpo + b" ", f"t={t},v1={v1}", "s3gr3to", t + 10),
+           fv(corpo, f"t={t},v1={v1}", "s3gr3to", t + 301),
+           fv(corpo, f"t={t},v1={v1}", "", t),
+           fv(corpo, f"t={t},v1={v1}", "INCOLLA_QUI", t),
+           fv(corpo, "v1=" + v1, "s3gr3to", t)])
+    cat = {"denominations": [100, 500, 5000, 25000, 50000], "max_order_price": 90000,
+           "networks": [{"network": "Liquid", "min_order_price": 0},
+                        {"network": "Bitcoin", "available": True, "min_order_price": 4200}]}
+    oa = amb["bitpost_ordine_ammesso"]
+    prova("il taglio e il tetto: 2×50 si', 1×500 oltre i 250, 1×5 sotto il "
+          "minimo, un taglio inventato no",
+          [True, False, False, False, True],
+          [oa(cat, 5000, 2, 250) == "", oa(cat, 50000, 1, 250) == "",
+           oa(cat, 500, 1, 250) == "", oa(cat, 777, 1, 250) == "",
+           oa(cat, 50000, 1, 0) == ""])
+    prova("il minimo e' quello di Bitcoin, non di Liquid", 4200,
+          amb["bitpost_minimo_bitcoin"](cat))
+
+    # --- 4) il banco della firma ------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della firma Bitpost", "node non c'e'")
+        return
+    banco_js = r"""
+const fs = require('fs');
+const B = new Function(fs.readFileSync(process.argv[2], 'utf8') + '\nreturn BarattoloBTC;')();
+const mini = fs.readFileSync(process.argv[3], 'utf8');
+const pezzo = n => { const i = mini.indexOf('function ' + n + '('); return mini.slice(i, mini.indexOf('\n}\n', i) + 3); };
+let gcStato = {strada_base: 100};
+eval(pezzo('gcConto') + pezzo('gcTrovaChiave'));
+const parole = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+const conto = gcConto(B, parole, 3);
+const fuori = {xpub: conto.publicExtendedKey.slice(0, 4), profondita: conto.depth,
+               ultimo: conto.index};
+const giro = (figlio) => {
+  const mio = figlio(B.HDKey.fromExtendedKey(conto.publicExtendedKey));
+  const altro = B.HDKey.fromMasterSeed(new Uint8Array(32).fill(7)).deriveChild(1);
+  const bp = B.HDKey.fromMasterSeed(new Uint8Array(32).fill(9)).deriveChild(2);
+  const w = B.p2wsh(B.p2ms(2, [mio.publicKey, altro.publicKey, bp.publicKey]));
+  const tx = new B.Transaction();
+  tx.addInput({txid: new Uint8Array(32).fill(1), index: 0,
+    witnessUtxo: {script: w.script, amount: 20000n}, witnessScript: w.witnessScript});
+  tx.addOutputAddress('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', 19000n, B.NETWORK);
+  tx.signIdx(bp.privateKey, 0);
+  const t2 = B.Transaction.fromPSBT(tx.toPSBT());
+  const x = t2.getInput(0);
+  const pk = B.OutScript.decode(x.witnessScript).pubkeys.map(k => B.hex.encode(k));
+  const k = gcTrovaChiave(B, conto, pk, x.bip32Derivation);
+  if (!k) return 'non trovata';
+  t2.signIdx(k.privateKey, 0);
+  t2.finalize();
+  return t2.isFinal ? 'firmata' : 'non finale';
+};
+fuori.conto = giro(p => p);
+fuori.zero5 = giro(p => p.deriveChild(0).deriveChild(5));
+fuori.sette = giro(p => p.deriveChild(7));
+fuori.altroOrdine = gcTrovaChiave(B, gcConto(B, parole, 4),
+  [B.hex.encode(conto.publicKey)], []) === null;
+console.log(JSON.stringify(fuori));
+"""
+    with _tf.TemporaryDirectory() as cartella:
+        f = os.path.join(cartella, "banco.js")
+        open(f, "w", encoding="utf-8").write(banco_js)
+        r = _sp.run([node, f, os.path.abspath("vendor/btc.bundle.js"),
+                     os.path.abspath("miniapp.html")],
+                    capture_output=True, text=True, timeout=120)
+    try:
+        esito = _js.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        esito = {"errore": (r.stderr or r.stdout)[-300:]}
+    prova("4) la chiave di un ordine e' una xpub MAINNET, profondita' 4, "
+          "ultimo passo 2'", {"xpub": "xpub", "profondita": 4, "ultimo": 0x80000002},
+          {k: esito.get(k) for k in ("xpub", "profondita", "ultimo")})
+    prova("...il telefono ritrova la sua chiave e firma il 2-di-3 (il conto, "
+          "/0/5, /7)", ["firmata"] * 3,
+          [esito.get("conto"), esito.get("zero5"), esito.get("sette")])
+    prova("...e il conto di un ALTRO ordine non firma niente", True,
+          esito.get("altroOrdine"))
+    prova("il telefono firma solo se la transazione paga l'indirizzo scritto "
+          "qui, e mostra tutte le uscite prima", [True, True],
+          ["Questa transazione non paga il tuo indirizzo" in mini,
+           "Altre uscite:" in mini])
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -219298,6 +219461,7 @@ CATEGORIE = {
     onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto onchain_consigliato payjoin
     p2p_onchain p2p_onchain_usdt p2p_onchain_tetto volto_porta_card rete_onchain_dal_pannello
     scelta_rete_mercatino cifra_btc foglio_oc_visto seconda_firma_parla
+    bitpost_gift_card
     """.split(),
 }
 
@@ -220457,6 +220621,7 @@ def main():
               prove_timer_deposito_oc,
               prove_dettaglio_schede,
               prove_pubblica_passi,
+              prove_bitpost_gift_card,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

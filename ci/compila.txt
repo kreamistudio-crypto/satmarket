@@ -180,6 +180,7 @@ collaudo_presa_ln_p2p.py
 collaudo_margine_cassaforte.py
 collaudo_onchain_indirizzo.py
 collaudo_onchain_prova_lucchetto.py
+collaudo_bitpost_gift_card.py
 collaudo_onchain_ordine.py
 collaudo_onchain_incasso.py
 collaudo_onchain_verso_lightning.py

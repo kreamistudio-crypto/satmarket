@@ -993,3 +993,55 @@ ROLLBACK (solo se la `-bar12` non regge): `cd ~/nodo && cp -p
 docker-compose.yml.prima-bar12 docker-compose.yml && docker compose up -d
 mostro` → `-bar11`; il sorgente torna con `git -C ~/nodo/mostro-src reset
 --hard HEAD~1`. Fatte le due prove, questa voce si cancella.
+
+## 29. Le gift card di Bitpost sul collaudo (20 nov 2026, cantiere bitpost-gift-card; Andrea: «procedi pure con una implementazione in collaudo per fare dei test»)
+
+Il codice è su develop e il collaudo lo tira da solo; la leva nasce
+SPENTA, quindi finché non scrivi queste righe non cambia niente. ⚠️ Il
+collaudo qui parla col Bitpost VERO (beta.bitpost.shop) e coi SATS VERI
+(mainnet): minimo 42 € a ordine, il tetto nostro resta 250 €.
+⚠️ La chiave API e il segreto del webhook mandati da Gabriele il 20 nov
+sono finiti in chiaro in chat: prima di questi passi chiedigli una
+coppia nuova (regola ferrea 1). I passi, un comando alla volta.
+
+La copia del config, prima di toccarlo:
+```
+sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-bitpost
+```
+La chiave API nel suo file (non si vede mentre la incolli; deve dire
+«Scritta»):
+```
+sudo -v && read -rsp "Chiave API di Bitpost: " K && echo && if [ -z "$K" ]; then echo "Vuota: non scrivo niente"; else printf '%s' "$K" | sudo tee /etc/barattolo-collaudo/bitpost_api_key > /dev/null && sudo chown root:collaudo /etc/barattolo-collaudo/bitpost_api_key && sudo chmod 640 /etc/barattolo-collaudo/bitpost_api_key && echo "Scritta"; fi; unset K
+```
+Il segreto del webhook, uguale:
+```
+sudo -v && read -rsp "Segreto del webhook di Bitpost: " K && echo && if [ -z "$K" ]; then echo "Vuoto: non scrivo niente"; else printf '%s' "$K" | sudo tee /etc/barattolo-collaudo/bitpost_webhook > /dev/null && sudo chown root:collaudo /etc/barattolo-collaudo/bitpost_webhook && sudo chmod 640 /etc/barattolo-collaudo/bitpost_webhook && echo "Scritto"; fi; unset K
+```
+Le righe del config (la leva resta solo per i moderatori):
+```
+printf '\nBITPOST_API_KEY = _segreto("bitpost_api_key")\nBITPOST_WEBHOOK_SEGRETO = _segreto("bitpost_webhook")\nBITPOST_ATTIVO = True\nBITPOST_SOLO_ADMIN = True\nBITPOST_MAX_EURO = 250\n' | sudo tee -a /srv/collaudo/barattolo/config.py > /dev/null
+```
+Il file si legge ancora (deve dire `ok`), poi il riavvio (atteso 200):
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/collaudo/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo-collaudo && sleep 30 && curl -s -o /dev/null -w "%{http_code}\n" https://collaudo.barattolo.store/api/salute
+```
+La porta del webhook risponde senza firma con 401 (è giusto: vuol dire
+che c'è e che chiede la firma):
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X POST https://collaudo.barattolo.store/api/bitpost/webhook
+```
+LA PROVA, coi due account moderatori su @barattolo_collaudo_bot (servono
+le 12 parole on-chain già al sicuro su tutt'e due): Profilo →
+Amministrazione → «🎁 Gift card». Dal primo «Compra»: una carta da 50 €
+(il minimo è 42), «Chiedi le carte». Dal secondo, scheda «Bitworker»:
+«Prendi». Dal primo, «I miei»: paga da Sparrow ESATTAMENTE i sats
+mostrati, in una transazione. Dopo le conferme il secondo vede l'email
+di Bitpost: compra la carta su Shoppy Code e la regala a quell'email. Il
+primo apre la carta («Apri»), la prova e tocca «✅ Funzionano». Il
+secondo scrive un SUO indirizzo bc1 e «Chiedi l'incasso», poi «Firma».
+Quel che si vede (e gli errori, parola per parola) va nel verbale:
+CANTIERI, «Le gift card di Bitpost», «COSA RESTA». Fatta la prova,
+questa voce si cancella.

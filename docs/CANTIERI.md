@@ -93796,6 +93796,88 @@ detto cosa; se e' la pagina del PayCode non riconosciuta serve uno
 screenshot.
 
 
+## Le gift card di Bitpost, la prova sul collaudo (20 nov 2026, cantiere bitpost-gift-card; Andrea, dopo la valutazione della bozza API del 19 nov e la versione del 20 nov di Gabriele Ceresara di Bitpost: «ok procedi pure con una implementazione in collaudo per fare dei test»)
+
+COSA. Le carte regalo Shoppy Code pagate in sats, con Bitpost come
+garante. Chi compra chiede N carte di un taglio; un Bitworker (un altro
+utente di Barattolo) prende l'ordine; chi compra paga un deposito on-chain
+che è un 2-di-3 di BITPOST (chiave di chi compra, del Bitworker e di
+Bitpost); il Bitworker compra le carte coi suoi euro e le regala a una
+casella di Bitpost dedicata all'ordine; ogni carta arriva a Barattolo dal
+webhook; chi compra la apre, conferma («✅ Funzionano», o il silenzio di
+36 ore) o apre una disputa che decide Bitpost; chi incassa scrive un suo
+indirizzo bc1 e FIRMA SUL TELEFONO la PSBT che Bitpost ha già firmato.
+Leva madre `BITPOST_ATTIVO` (nasce SPENTA: è una prova sul collaudo, non
+un servizio), `BITPOST_SOLO_ADMIN` (accesa: la vedono i moderatori, dal
+Profilo → Amministrazione → «🎁 Gift card»), `BITPOST_MAX_EURO = 250` (il
+tetto della beta, sotto i 900 € di Bitpost), `BITPOST_API_BASE`,
+`BITPOST_API_KEY`, `BITPOST_WEBHOOK_SEGRETO` (questi tre «mai dal pannello»
+per la forma del nome). Le rotte: `/api/bitpost/stato`, `/ordini`,
+`/ordini/{id}` (+ `/prendi`, `/carte`, `/conferma`, `/disputa`, `/prove`,
+`/annulla`, `/incasso`, `/firma`) dietro il cancello `bitpost_ammesso`, e
+`/api/bitpost/webhook` aperto (anche nella prova privata: PROVA_PORTE_APERTE)
+ma solo con la firma HMAC giusta e fresca. Le tabelle `bitpost_ordini`,
+`bitpost_eventi` (i doppioni), `bitpost_carte`, `bitpost_firme`.
+LE TRE COSE FERME. (1) IL LINK DELLA CARTA NON SI SALVA: `card_url` è la
+carta, chi ha il link la spende. Il webhook scrive solo numero, valore e
+scadenza; chi compra il link lo rilegge da Bitpost a ogni apertura,
+passando dal server, e lo vede solo lui (il collaudo legge il file del
+database e cerca il link: non c'è). Bitpost dice «salvala prima del 2xx»:
+non serve, perché `GET /orders/<id>/cards` la ridà sempre. (2) UNA XPUB
+PER ORDINE, MAI QUELLA DEI NOSTRI 2-DI-3: il telefono la ricava dal seme
+on-chain di sempre su `m/48'/0'/<100+n>'/2'`, n indurito e diverso per
+ogni ordine (il server propone il primo libero e rifiuta un doppione).
+Con la xpub dei 2-di-3 Bitpost vedrebbe tutti gli indirizzi on-chain di
+quella persona. È MAINNET anche dal collaudo (Bitpost è sui sats veri):
+il collaudo on-chain di Barattolo resta su testnet4, queste chiavi no.
+(3) IN COLLAUDO LOCALE SOLO UN BITPOST FINTO: con MODALITA_COLLAUDO la base
+deve essere loopback (`_bitpost_base_ammessa`), come la lettura simulata.
+LA FIRMA SUL TELEFONO. `gcFirma` legge la PSBT, vuole che paghi
+l'indirizzo che la persona ha scritto SU QUESTO telefono (salvato in
+localStorage al momento della richiesta: mai un indirizzo detto dal solo
+server), mostra TUTTE le uscite nel foglio di conferma, e firma ogni
+moneta col figlio giusto del conto dell'ordine: Bitpost dalla xpub deriva
+come vuole, quindi `gcTrovaChiave` prova la strada scritta nella PSBT,
+poi il conto stesso e le solite /0/i, /1/i, /i. Le 12 parole devono essere
+già al sicuro (`onchainSemeCoperto`), come prima di uno scambio on-chain:
+un incasso che solo questo telefono sa firmare è un incasso fragile. Il
+server accetta la firma solo per una sessione della parte di chi chiama.
+SCARTATE. Salvare il link cifrato per il telefono di chi compra (la
+proposta della valutazione): rileggerlo da Bitpost è più semplice e non
+lascia niente da noi. I file nelle prove della disputa (la rotta di
+Bitpost vuole multipart, 5 file da 5 MB): per la prova basta il commento,
+i file alla tappa dopo. Liquid: tolto da Bitpost il 20 nov.
+`selected_fee`: non si manda, vale la divisione di Bitpost (2,5% + 2,5%).
+PROVATO. `collaudo_bitpost_gift_card.py` (51 prove, col Bitpost finto al
+posto di `_bitpost_chiama`): il cancello, i tetti (500 € no, 5 € no), la
+xpub (tpub e privata no), il numero di conto doppio, la bacheca senza xpub
+né reference, il pagamento solo a chi compra, la firma HMAC (storta,
+vecchia, col segnaposto: 401), l'evento doppio, l'evento vecchio arrivato
+dopo che non torna indietro, il link che non c'è nel file del database, le
+carte solo a chi compra, conferma solo di chi compra, la disputa con
+motivo e note, le prove di una parte sola, l'incasso (indirizzo testnet
+no, bc1 maiuscolo sì e minuscolo a Bitpost), la firma solo della propria
+sessione, la firma chiesta dal webhook che il telefono ritrova.
+`prove_bitpost_gift_card` (categoria onchain): le leve, il link mai
+salvato, i giudici puri, e il BANCO DELLA FIRMA col bundle vero in node
+(un 2-di-3 come lo farebbe Bitpost dal conto, da /0/5 e da /7: il
+telefono ritrova la chiave e la transazione si finalizza; il conto di un
+altro ordine non firma niente). Un giro dal vivo in Chromium a 390 px col
+server vero e un Bitpost finto su loopback: la pagina, le tre schede, il
+dettaglio con il QR del deposito, il bottone in Amministrazione, nessun
+errore JavaScript.
+COSA RESTA. La prova vera sul collaudo coi due account moderatori
+(DA-FARE-ANDREA, voce 29), con sats veri: minimo 42 € a ordine. Da
+chiedere a Bitpost (la valutazione del 19-20 nov): una quota per
+Barattolo (nell'API non c'è), se il Bitworker riceve copia del codice da
+Shoppy Code, come si proteggono dagli storni di carte comprate con carte
+rubate, che percorso derivano dalla xpub e che script usano, se c'è un
+ambiente di prova (la chiave è `bpk_live`). La chiave e il segreto mandati
+in chat il 20 nov vanno rifatti prima della prova. Non c'è ancora: i file
+nelle prove, la riga dell'ordine in «Ordini» (oggi vive nella sua pagina),
+la reputazione del Bitworker, gli avvisi a scadenza (5 giorni, 36 ore).
+
+
 
 
 ## Il «Rileggi» della Pubblica a passi: tasti più bassi e «Pubblica» su una riga (20 nov 2026, sera, cantiere rileggi-tasti; Andrea sulla foto del passo on-chain in produzione: «In basso i tasti, fammeli più piccoli, come piuttosto elimina ordine e lascia solo pubblica, così rimane su una riga tutto»)

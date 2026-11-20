@@ -38215,3 +38215,22 @@ mai il kind 0 di nessuno: regola ferrea 2).
   firma): prima il giro delle cauzioni lo vedeva chiuso e la rimandava a
   chi non aveva pagato. Niente nodo: l'on-chain non passa da Mostro. Leva
   `P2P_ONCHAIN_RITORNO_DA_SOLO`, accesa di serie, nel pannello.
+
+- LE GIFT CARD DI BITPOST (20 nov 2026, cantiere bitpost-gift-card; il
+  perché in CANTIERI, «Le gift card di Bitpost, la prova sul collaudo»).
+  Un servizio a parte, fuori dagli ordini del mercatino: le sue tabelle
+  (`bitpost_ordini`, `bitpost_eventi`, `bitpost_carte` senza link,
+  `bitpost_firme`), la sua pagina (`view-giftcard`, porta in Profilo →
+  Amministrazione), il suo cancello (`bitpost_ammesso`: `BITPOST_ATTIVO`
+  spenta di serie, `BITPOST_SOLO_ADMIN`). Il server è un PONTE: parla con
+  Bitpost solo da `_bitpost_chiama` (chiave API mai al telefono; in
+  MODALITA_COLLAUDO solo una base loopback), e lo stato vive negli eventi
+  del webhook `POST /api/bitpost/webhook` — rotta API aperta anche sulla
+  prova privata (PROVA_PORTE_APERTE), protetta dalla firma HMAC
+  `bitpost_firma_valida` (cinque minuti, confronto a tempo costante), con
+  i doppioni scartati per id e gli eventi vecchi che non riscrivono uno
+  stato più nuovo. Il link della carta non si salva mai: chi compra lo
+  rilegge da Bitpost a ogni apertura. Le chiavi: una xpub MAINNET per
+  ordine dal seme on-chain, `m/48'/0'/<100+n>'/2'`, e la firma
+  dell'incasso sul telefono (`gcFirma`, `gcTrovaChiave`) solo su una PSBT
+  che paga l'indirizzo scritto lì.

@@ -3153,6 +3153,8 @@ FRENI = {
     # xpub dedicata e un gesto di una volta, un indirizzo di prova
     # scrive una riga e consuma tre numeri
     "onchain_xpub": (5, 3600),        # «Accendi l'on-chain», per persona
+    # le gift card di Bitpost (20 nov 2026): ogni tocco chiama Bitpost
+    "bitpost": (120, 3600),
     # il wallet unico (2 nov 2026 sera): l'impronta si registra di rado,
     # un numero si prenota a ogni cambio
     "wallet_unico": (20, 3600),       # registrare l'impronta del wallet, per persona
@@ -3558,7 +3560,9 @@ except ImportError:
 # deploy), il campanello di Telegram (ha il suo segreto, e senza il bot
 # di prova sarebbe sordo) e il login (senza, nessuno potrebbe dire chi
 # e'). Per PREFISSO solo il login, che ha le sue rotte sorelle.
-PROVA_PORTE_APERTE = ("/api/salute", "/api/telegram/aggiornamenti")
+# il webhook di Bitpost (20 nov 2026): nessun utente dietro, lo protegge
+# la firma HMAC. La tupla resta su UNA riga: prove_istanza_prova la legge così.
+PROVA_PORTE_APERTE = ("/api/salute", "/api/telegram/aggiornamenti", "/api/bitpost/webhook")
 PROVA_PREFISSO_LOGIN = "/api/login/"
 MSG_PROVA_PRIVATA = "Istanza di prova, privata"
 # IL GUSCIO (20 ott 2026, «chi non e' in lista non vede NIENTE»): quel
@@ -38446,6 +38450,30 @@ def _leve_stato():
                          "qualunque del coro, anche di uno da cui il "
                          "coordinator non legge"),
         ]},
+        {"gruppo": "🎁 Gift card Bitpost", "voci": [
+            # LE GIFT CARD DI BITPOST (20 nov 2026): nascono spente, per la
+            # prova sul collaudo; la chiave e il segreto stanno solo nel
+            # config (sono «mai dal pannello» per la forma del nome)
+            _leva("Gift card Shoppy Code via Bitpost", "BITPOST_ATTIVO",
+                  bool(BITPOST_ATTIVO),
+                  acceso="le rotte /api/bitpost/* rispondono e in Profilo → "
+                         "Amministrazione c'è «🎁 Gift card»",
+                  spento="nessuna rotta, nessun foglio, per nessuno",
+                  allarme=bool(BITPOST_ATTIVO) and not bitpost_configurato()),
+            _leva("Solo gli admin", "BITPOST_SOLO_ADMIN",
+                  bool(BITPOST_SOLO_ADMIN),
+                  acceso="le gift card le vedono solo i moderatori",
+                  spento="le vede chiunque, appena la leva madre è accesa"),
+            _leva("Tetto per ordine (€)", "BITPOST_MAX_EURO",
+                  BITPOST_MAX_EURO,
+                  acceso="il più basso fra questo e quello di Bitpost",
+                  spento="vale solo il tetto di Bitpost (900 €)"),
+            _leva("Chiave API e segreto del webhook", "BITPOST_API_KEY",
+                  "impostati" if bitpost_configurato() and BITPOST_WEBHOOK_SEGRETO
+                  else "mancano",
+                  allarme=bool(BITPOST_ATTIVO) and not (
+                      bitpost_configurato() and BITPOST_WEBHOOK_SEGRETO)),
+        ]},
         {"gruppo": "₿ Pagamento on-chain", "voci": [
             # IL CANCELLO E LA SUA PORTICINA (16 ott 2026): due leve
             # perche' dicono due cose diverse — se la funzione esiste, e
@@ -53763,6 +53791,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # tasti grandi (2 nov 2026, MERCATINO_SCELTA_RETE): solo a chi vede
     # l'on-chain, agli altri non c'e' niente da scegliere
     profilo["scelta_rete"] = bool(MERCATINO_SCELTA_RETE and profilo["onchain"])
+    # ...e le gift card di Bitpost (20 nov 2026): il loro cancello
+    profilo["bitpost"] = bitpost_ammesso(user["id"])
     # ...e chi puo' pubblicare e prendere scambi P2P con la garanzia
     # 2-di-3 (30 ott 2026): la leva P2P_ONCHAIN_ATTIVO sotto il cancello
     # dell'on-chain e quello del P2P. Il libro, invece, lo vede chiunque.
@@ -129503,3 +129533,873 @@ async def gioco_tappo_oggetto(req: Request, x_tg_init_data: str = Header(""),
 # (Qui finisce il blocco della Caccia a Tappo. La riga non e' un vezzo:
 # le prove ritagliano una funzione fino alle due righe vuote che la
 # seguono, e l'ultima del file senza niente dopo non si ritaglia.)
+
+
+# ===== LE GIFT CARD DI BITPOST (20 nov 2026, cantiere bitpost-gift-card;
+# Andrea: «ok procedi pure con una implementazione in collaudo per fare
+# dei test», dopo la valutazione della bozza del 19 nov e la versione del
+# 20 nov di Gabriele Ceresara: solo Bitcoin on-chain, conferma, disputa
+# con le prove, annullo) =====
+# Chi compra chiede delle carte Shoppy Code, un Bitworker (un altro utente
+# di Barattolo) le compra coi suoi euro e le regala a una casella di
+# Bitpost; i sats stanno in un 2-di-3 di BITPOST (chiave di chi compra,
+# del Bitworker e di Bitpost), e chi incassa firma sul SUO telefono.
+# Barattolo fa da ponte e basta: parla con Bitpost SOLO da qui (la chiave
+# API non arriva mai a un telefono), riceve gli aggiornamenti dal webhook
+# firmato, e non tiene MAI una chiave privata.
+# LE TRE COSE FERME, coi perche' (docs/CANTIERI.md, «Le gift card di
+# Bitpost»):
+#  1. IL LINK DELLA CARTA NON SI SALVA. `card_url` e' la carta: chi ha il
+#     link la spende. Il webhook ne scrive solo i dati (numero, valore,
+#     scadenza), e chi compra il link lo rilegge da Bitpost a ogni
+#     apertura (`GET /orders/<id>/cards`), passando da qui. Niente link
+#     nel database, nei backup, nel journal.
+#  2. UNA XPUB PER ORDINE, MAI QUELLA DEI NOSTRI 2-DI-3: Bitpost vedrebbe
+#     tutti gli indirizzi on-chain di quella persona. Il telefono la
+#     ricava dal seme di sempre su `m/48'/0'/<100+indice>'/2'` (MAINNET
+#     sempre: Bitpost e' sui sats veri, anche dal collaudo) e qui arriva
+#     solo la meta' pubblica, col numero.
+#  3. IN COLLAUDO LOCALE SOLO UN BITPOST FINTO: con MODALITA_COLLAUDO la
+#     base deve essere loopback, come la lettura simulata del P2P.
+try:
+    from config import BITPOST_ATTIVO
+except ImportError:
+    BITPOST_ATTIVO = False
+BITPOST_ATTIVO = BITPOST_ATTIVO is True
+# ...e per ora lo vedono solo i moderatori (la prova di Andrea e Alan)
+try:
+    from config import BITPOST_SOLO_ADMIN
+except ImportError:
+    BITPOST_SOLO_ADMIN = True
+BITPOST_SOLO_ADMIN = BITPOST_SOLO_ADMIN is not False
+try:
+    from config import BITPOST_API_BASE
+except ImportError:
+    BITPOST_API_BASE = "https://beta.bitpost.shop/api/v1/barattolo"
+BITPOST_API_BASE = str(BITPOST_API_BASE or "").strip().rstrip("/")
+try:
+    from config import BITPOST_API_KEY
+except ImportError:
+    BITPOST_API_KEY = ""
+try:
+    from config import BITPOST_WEBHOOK_SEGRETO
+except ImportError:
+    BITPOST_WEBHOOK_SEGRETO = ""
+# IL TETTO NOSTRO (la beta a 250 €, come il P2P): Bitpost arriva a 900 €
+try:
+    from config import BITPOST_MAX_EURO
+    BITPOST_MAX_EURO = max(0, int(BITPOST_MAX_EURO))
+except (ImportError, TypeError, ValueError):
+    BITPOST_MAX_EURO = 250
+# la strada del conto di un ordine: il numero dell'ordine e' indurito,
+# cosi' da una xpub non si arriva alle altre
+BITPOST_STRADA_BASE = 100
+BITPOST_STATI = {
+    1: "In attesa di un Bitworker", 2: "Preso: chi compra deve pagare",
+    3: "Pagamento visto, in conferma", 1000: "Pagato: il Bitworker compra le carte",
+    1001: "Arrivate alcune carte", 1002: "Carte arrivate: 36 ore per controllarle",
+    8: "Confermato: il Bitworker può incassare", 9: "In disputa: decide Bitpost",
+    10: "Concluso", 11: "Annullato", 12: "Disputa vinta da chi compra",
+    13: "Disputa vinta dal Bitworker", 14: "Rimborso a chi compra",
+    15: "Nessuno l'ha preso", 16: "Rimborso a chi compra",
+}
+BITPOST_INCASSABILI = (8, 14, 16)
+
+
+def bitpost_configurato() -> bool:
+    return bool(BITPOST_API_KEY and BITPOST_API_BASE
+                and not str(BITPOST_API_KEY).startswith("INCOLLA"))
+
+
+def bitpost_ammesso(tg_id) -> bool:
+    """IL CANCELLO, sul calco di `onchain_ammesso`: a leva spenta e' no per
+    chiunque, admin compresi; senza chiave non c'e' niente da aprire."""
+    if not BITPOST_ATTIVO or not bitpost_configurato():
+        return False
+    return e_admin(tg_id) if BITPOST_SOLO_ADMIN else True
+
+
+def _bitpost_base_ammessa(base: str, collaudo: bool) -> bool:
+    """PURA: in collaudo locale la base dev'essere di casa (un Bitpost
+    finto su loopback); fuori, https e basta."""
+    try:
+        u = urlparse(base)
+    except Exception:
+        return False
+    if collaudo:
+        return u.scheme in ("http", "https") and u.hostname in (
+            "127.0.0.1", "localhost", "::1")
+    return u.scheme == "https" and bool(u.hostname)
+
+
+def bitpost_firma_valida(corpo: bytes, testata: str, segreto: str,
+                         adesso: int, tolleranza: int = 300) -> bool:
+    """PURA: `X-Bitpost-Signature` = `t=<secondi>,v1=<hex>` con
+    v1 = HMAC-SHA256(segreto, "<t>.<corpo grezzo>"). Un `t` oltre i cinque
+    minuti si rifiuta (una busta vecchia rimandata), il confronto e' a
+    tempo costante. Senza segreto (o col segnaposto): no, sempre."""
+    if not segreto or str(segreto).startswith("INCOLLA") or not testata:
+        return False
+    parti = {}
+    for p in str(testata).split(","):
+        k, _, v = p.strip().partition("=")
+        parti[k] = v
+    try:
+        t = int(parti.get("t") or "0")
+    except ValueError:
+        return False
+    if not t or abs(int(adesso) - t) > tolleranza:
+        return False
+    atteso = hmac.new(str(segreto).encode(), f"{t}.".encode() + corpo,
+                      hashlib.sha256).hexdigest()
+    return hmac.compare_digest(atteso, str(parti.get("v1") or ""))
+
+
+def bitpost_xpub_motivo(testo) -> str:
+    """'' se e' una xpub MAINNET pubblica, sennò il perche' (mai con la
+    chiave dentro). Bitpost e' sui sats veri anche dal collaudo."""
+    s = str(testo or "").strip()
+    if not s or len(s) > 200:
+        return "manca la chiave pubblica"
+    if _onchain_sembra_privata(s):
+        return "questa è una chiave PRIVATA: qui non entra"
+    if not s.startswith("xpub"):
+        return "serve una xpub di mainnet"
+    if not EMBIT:
+        return ""
+    try:
+        k = _embit_bip32.HDKey.from_string(s)
+    except Exception:
+        return "non è una chiave estesa leggibile"
+    if k.is_private:
+        return "questa è una chiave PRIVATA: qui non entra"
+    return ""
+
+
+def bitpost_indirizzo_motivo(testo) -> str:
+    """'' se e' un indirizzo bitcoin MAINNET, sennò il perche'."""
+    s = str(testo or "").strip()
+    if not s or len(s) > 100:
+        return "manca l'indirizzo"
+    if not re.fullmatch(r"(bc1[02-9ac-hj-np-z]{8,87}|[13][1-9A-HJ-NP-Za-km-z]{25,34})",
+                        s.lower() if s[:3].lower() == "bc1" else s):
+        return "non è un indirizzo bitcoin (bc1…, 1… o 3…)"
+    if EMBIT:
+        try:
+            from embit.script import address_to_scriptpubkey
+            n = s.lower() if s[:3].lower() == "bc1" else s
+            if address_to_scriptpubkey(n).address(_EMBIT_RETI["main"]) != n:
+                raise ValueError
+        except Exception:
+            return "non è un indirizzo bitcoin di mainnet"
+    return ""
+
+
+def bitpost_per_chi(ordine: dict, ruolo: str) -> dict:
+    """PURA: l'ordine come lo vede `ruolo` ('compratore', 'bitworker' o
+    'bacheca'). Le xpub non si mostrano (non sono segreti, ma dicono
+    troppo), e `purchase` — cosa comprare e dove regalarlo — e' solo del
+    Bitworker."""
+    o = dict(ordine or {})
+    o.pop("buyer_xpub", None)
+    o.pop("bitworker_xpub", None)
+    if ruolo != "bitworker":
+        o.pop("purchase", None)
+    if ruolo == "bacheca":
+        o.pop("reference", None)
+    st = (o.get("status") or {}).get("id")
+    o["stato_testo"] = BITPOST_STATI.get(st, (o.get("status") or {}).get("name") or "?")
+    return o
+
+
+def _bitpost_prepara(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS bitpost_ordini(
+        id INTEGER PRIMARY KEY,
+        reference TEXT UNIQUE NOT NULL,
+        compratore_id INTEGER NOT NULL,
+        compratore_indice INTEGER NOT NULL,
+        bitworker_id INTEGER DEFAULT 0,
+        bitworker_indice INTEGER DEFAULT -1,
+        stato INTEGER DEFAULT 1,
+        ordine TEXT DEFAULT '{}',
+        evento_at TEXT DEFAULT '',
+        creato INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0)""")
+    con.execute("""CREATE TABLE IF NOT EXISTS bitpost_eventi(
+        id TEXT PRIMARY KEY, tipo TEXT, ordine_id INTEGER DEFAULT 0,
+        ricevuto INTEGER DEFAULT 0)""")
+    # LE CARTE SENZA LINK (la prima cosa ferma): numero, valore, scadenza
+    con.execute("""CREATE TABLE IF NOT EXISTS bitpost_carte(
+        ordine_id INTEGER NOT NULL, numero INTEGER NOT NULL,
+        importo INTEGER DEFAULT 0, scade TEXT DEFAULT '',
+        ricevuta TEXT DEFAULT '', PRIMARY KEY(ordine_id, numero))""")
+    # le firme chieste: la PSBT non e' un segreto, e il telefono la
+    # ritrova qui anche se l'avviso e' arrivato a schermo spento
+    con.execute("""CREATE TABLE IF NOT EXISTS bitpost_firme(
+        ordine_id INTEGER NOT NULL, sessione INTEGER NOT NULL,
+        parte TEXT NOT NULL, psbt TEXT NOT NULL,
+        indirizzo TEXT DEFAULT '', importo INTEGER DEFAULT 0,
+        scade TEXT DEFAULT '', fatta INTEGER DEFAULT 0,
+        PRIMARY KEY(ordine_id, sessione))""")
+
+
+def _bitpost_db():
+    con = db()
+    _bitpost_prepara(con)
+    return con
+
+
+def _bitpost_ruolo(riga, tg_id) -> str:
+    if riga and riga["compratore_id"] == tg_id:
+        return "compratore"
+    if riga and riga["bitworker_id"] == tg_id:
+        return "bitworker"
+    return ""
+
+
+def _bitpost_applica(con, ordine: dict, quando: str = "") -> tuple:
+    """Scrive l'ordine che dice Bitpost sulla sua riga. `quando` e' il
+    `created_at` dell'evento: uno piu' vecchio dell'ultimo applicato non
+    riscrive niente (i webhook arrivano anche fuori ordine). Torna
+    (stato_prima, stato_dopo), o (None, None) per un ordine non nostro."""
+    try:
+        oid = int(ordine.get("id"))
+    except (TypeError, ValueError):
+        return None, None
+    riga = con.execute("SELECT * FROM bitpost_ordini WHERE id=?",
+                       (oid,)).fetchone()
+    if not riga:
+        return None, None
+    if quando and riga["evento_at"] and quando < riga["evento_at"]:
+        return riga["stato"], riga["stato"]
+    try:
+        nuovo = int((ordine.get("status") or {}).get("id"))
+    except (TypeError, ValueError):
+        nuovo = riga["stato"]
+    con.execute("UPDATE bitpost_ordini SET stato=?, ordine=?, evento_at=?, "
+                "aggiornato=? WHERE id=?",
+                (nuovo, json.dumps(ordine, ensure_ascii=False),
+                 quando or riga["evento_at"], int(time.time()), oid))
+    return riga["stato"], nuovo
+
+
+async def _bitpost_chiama(metodo: str, percorso: str, corpo=None,
+                          dati=None, fuori_base: bool = False):
+    """Una chiamata a Bitpost, dal server soltanto. Torna il JSON, o una
+    HTTPException col messaggio di Bitpost (un 4xx e' una risposta, un
+    5xx o la rete muta un 502). La chiave non finisce mai in un errore."""
+    if not _bitpost_base_ammessa(BITPOST_API_BASE, MODALITA_COLLAUDO):
+        raise HTTPException(503, "Bitpost: indirizzo non ammesso qui")
+    if fuori_base:
+        url = BITPOST_API_BASE.split("/v1/")[0] + percorso
+        testate = {}
+    else:
+        url = BITPOST_API_BASE + percorso
+        testate = {"Authorization": f"Bearer {BITPOST_API_KEY}"}
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.request(metodo, url, json=corpo, data=dati,
+                                headers=testate)
+    except Exception as e:
+        print(f"[bitpost] {metodo} {percorso}: rete ({type(e).__name__})",
+              flush=True)
+        raise HTTPException(502, "Bitpost non risponde, riprova fra poco")
+    try:
+        d = r.json()
+    except Exception:
+        d = {}
+    if r.status_code >= 500:
+        print(f"[bitpost] {metodo} {percorso}: {r.status_code}", flush=True)
+        raise HTTPException(502, "Bitpost ha un problema, riprova fra poco")
+    if r.status_code >= 400:
+        msg = str((d or {}).get("message") or "richiesta rifiutata")[:300]
+        kind = str((d or {}).get("kind") or "")[:60]
+        raise HTTPException(409 if r.status_code == 409 else 400,
+                            f"Bitpost: {msg}" + (f" ({kind})" if kind else ""))
+    return d
+
+
+_BITPOST_CATALOGO = {"t": 0, "d": None}
+
+
+async def _bitpost_catalogo() -> dict:
+    """Il catalogo pubblico (tagli, massimo, minimo Bitcoin), un minuto
+    in memoria: il minimo e' una cifra in sats e in euro si muove."""
+    if _BITPOST_CATALOGO["d"] and time.time() - _BITPOST_CATALOGO["t"] < 60:
+        return _BITPOST_CATALOGO["d"]
+    d = await _bitpost_chiama("GET", "/gift-cards/shoppycode", fuori_base=True)
+    _BITPOST_CATALOGO.update(t=time.time(), d=d)
+    return d
+
+
+def bitpost_minimo_bitcoin(catalogo: dict) -> int:
+    """PURA: il minimo in centesimi della rete Bitcoin (0 se non c'e')."""
+    for n in (catalogo or {}).get("networks") or []:
+        if n.get("network") == "Bitcoin":
+            if not n.get("available", True):
+                return -1
+            return int(n.get("min_order_price") or 0)
+    return 0
+
+
+def bitpost_ordine_ammesso(catalogo: dict, taglio, quanti,
+                           max_euro: int) -> str:
+    """PURA: '' se `quanti` carte da `taglio` centesimi si possono
+    chiedere, sennò il perche'. Il tetto e' il piu' basso fra quello di
+    Bitpost e il nostro."""
+    try:
+        taglio, quanti = int(taglio), int(quanti)
+    except (TypeError, ValueError):
+        return "taglio o quantità non validi"
+    if taglio not in [int(x) for x in (catalogo or {}).get("denominations") or []]:
+        return "questo taglio non c'è"
+    if not 1 <= quanti <= 50:
+        return "da 1 a 50 carte"
+    tot = taglio * quanti
+    tetto = int((catalogo or {}).get("max_order_price") or 0)
+    if max_euro:
+        tetto = min(tetto, max_euro * 100) if tetto else max_euro * 100
+    if tetto and tot > tetto:
+        return f"il massimo per ordine è {tetto // 100} €"
+    minimo = bitpost_minimo_bitcoin(catalogo)
+    if minimo < 0:
+        return "i pagamenti bitcoin sono in pausa"
+    if tot < minimo:
+        return f"il minimo per ordine è {_fmt_eur(minimo / 100)} €"
+    return ""
+
+
+def _bitpost_porta(x_tg_init_data, barattolo_sessione) -> dict:
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not bitpost_ammesso(user["id"]):
+        raise HTTPException(404, "Non esiste")
+    _frena("bitpost", user["id"])
+    return user
+
+
+def _bitpost_indice_libero(con, tg_id, indice) -> bool:
+    try:
+        indice = int(indice)
+    except (TypeError, ValueError):
+        return False
+    if not 0 <= indice < 10 ** 6:
+        return False
+    return not con.execute(
+        "SELECT 1 FROM bitpost_ordini WHERE (compratore_id=? AND "
+        "compratore_indice=?) OR (bitworker_id=? AND bitworker_indice=?)",
+        (tg_id, indice, tg_id, indice)).fetchone()
+
+
+def _bitpost_prossimo_indice(con, tg_id) -> int:
+    r = con.execute(
+        "SELECT MAX(i) FROM (SELECT compratore_indice AS i FROM bitpost_ordini"
+        " WHERE compratore_id=? UNION ALL SELECT bitworker_indice FROM "
+        "bitpost_ordini WHERE bitworker_id=?)", (tg_id, tg_id)).fetchone()
+    return (r[0] + 1) if r and r[0] is not None and r[0] >= 0 else 0
+
+
+def _bitpost_riga_mia(con, oid, tg_id):
+    riga = con.execute("SELECT * FROM bitpost_ordini WHERE id=?",
+                       (oid,)).fetchone()
+    if not riga or not _bitpost_ruolo(riga, tg_id):
+        raise HTTPException(404, "Ordine non trovato")
+    return riga
+
+
+def _bitpost_in_lista(riga, tg_id) -> dict:
+    ruolo = _bitpost_ruolo(riga, tg_id) or "bacheca"
+    o = bitpost_per_chi(json.loads(riga["ordine"] or "{}"), ruolo)
+    o["ruolo"] = ruolo
+    return o
+
+
+@app.get("/api/bitpost/stato")
+async def bitpost_stato(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """La pagina «🎁 Gift card»: il catalogo, il tetto, i miei ordini (da
+    chi compra e da Bitworker), la bacheca degli ordini da prendere e il
+    prossimo numero di conto libero per questo telefono."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    try:
+        catalogo = await _bitpost_catalogo()
+    except HTTPException:
+        catalogo = None
+    con = _bitpost_db()
+    try:
+        miei = con.execute(
+            "SELECT * FROM bitpost_ordini WHERE compratore_id=? OR "
+            "bitworker_id=? ORDER BY id DESC LIMIT 50",
+            (user["id"], user["id"])).fetchall()
+        bacheca = con.execute(
+            "SELECT * FROM bitpost_ordini WHERE stato=1 AND compratore_id<>? "
+            "ORDER BY id DESC LIMIT 50", (user["id"],)).fetchall()
+        prossimo = _bitpost_prossimo_indice(con, user["id"])
+    finally:
+        con.close()
+    return {"catalogo": catalogo, "max_euro": BITPOST_MAX_EURO,
+            "strada_base": BITPOST_STRADA_BASE, "prossimo_indice": prossimo,
+            "miei": [_bitpost_in_lista(r, user["id"]) for r in miei],
+            "bacheca": [_bitpost_in_lista(r, user["id"]) for r in bacheca]}
+
+
+@app.post("/api/bitpost/ordini")
+async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """Chi compra chiede le carte: taglio, quantita' e la xpub del SUO
+    conto per questo ordine (col numero, che il telefono ricordera')."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    xpub = str(d.get("xpub") or "").strip()
+    motivo = bitpost_xpub_motivo(xpub)
+    if motivo:
+        raise HTTPException(400, motivo)
+    catalogo = await _bitpost_catalogo()
+    motivo = bitpost_ordine_ammesso(catalogo, d.get("taglio"),
+                                    d.get("quanti"), BITPOST_MAX_EURO)
+    if motivo:
+        raise HTTPException(400, motivo)
+    con = _bitpost_db()
+    try:
+        if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
+            raise HTTPException(409, "Numero di conto già usato: riapri la pagina")
+    finally:
+        con.close()
+    rif = "brt-" + secrets.token_hex(8)
+    corpo = {"reference": rif, "buyer_xpub": xpub,
+             "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
+             "denomination": int(d["taglio"]), "quantity": int(d["quanti"])}
+    o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
+    adesso = int(time.time())
+    con = _bitpost_db()
+    try:
+        con.execute(
+            "INSERT INTO bitpost_ordini(id, reference, compratore_id, "
+            "compratore_indice, stato, ordine, creato, aggiornato) VALUES "
+            "(?,?,?,?,?,?,?,?)",
+            (int(o["id"]), rif, user["id"], int(d["indice"]),
+             int((o.get("status") or {}).get("id") or 1),
+             json.dumps(o, ensure_ascii=False), adesso, adesso))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "ordine": bitpost_per_chi(o, "compratore")}
+
+
+@app.post("/api/bitpost/ordini/{oid}/prendi")
+async def bitpost_prendi(oid: int, req: Request,
+                         x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Un Bitworker prende l'ordine con la xpub del suo conto per questo
+    ordine. Chi l'ha chiesto non puo' prenderlo da se'."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    xpub = str(d.get("xpub") or "").strip()
+    motivo = bitpost_xpub_motivo(xpub)
+    if motivo:
+        raise HTTPException(400, motivo)
+    con = _bitpost_db()
+    try:
+        riga = con.execute("SELECT * FROM bitpost_ordini WHERE id=?",
+                           (oid,)).fetchone()
+        if not riga:
+            raise HTTPException(404, "Ordine non trovato")
+        if riga["compratore_id"] == user["id"]:
+            raise HTTPException(400, "È un tuo ordine: non puoi prenderlo tu")
+        if riga["stato"] != 1:
+            raise HTTPException(409, "L'ha già preso qualcun altro")
+        if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
+            raise HTTPException(409, "Numero di conto già usato: riapri la pagina")
+    finally:
+        con.close()
+    corpo = {"bitworker_xpub": xpub}
+    if d.get("sats"):
+        corpo["expected_sats"] = int(d["sats"])
+    o = await _bitpost_chiama("POST", f"/orders/{oid}/select", corpo)
+    con = _bitpost_db()
+    try:
+        con.execute("UPDATE bitpost_ordini SET bitworker_id=?, "
+                    "bitworker_indice=? WHERE id=?",
+                    (user["id"], int(d["indice"]), oid))
+        _bitpost_applica(con, o)
+        compratore = riga["compratore_id"]
+        con.commit()
+    finally:
+        con.close()
+    await notifica(compratore, "🎁 Un Bitworker ha preso il tuo ordine di "
+                   "gift card: apri Barattolo e paga il deposito on-chain.")
+    return {"ok": True, "ordine": bitpost_per_chi(o, "bitworker")}
+
+
+@app.get("/api/bitpost/ordini/{oid}")
+async def bitpost_ordine(oid: int, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """L'ordine fresco da Bitpost, per chi ne fa parte: col pagamento (a
+    chi compra, da pagare), i dati delle carte, gli incassi, le mie prove
+    in disputa e le firme che aspettano il mio telefono."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+    finally:
+        con.close()
+    ruolo = _bitpost_ruolo(riga, user["id"])
+    parte = "buyer" if ruolo == "compratore" else "bitworker"
+    o = await _bitpost_chiama("GET", f"/orders/{oid}")
+    con = _bitpost_db()
+    try:
+        _bitpost_applica(con, o)
+        con.commit()
+        firme = con.execute(
+            "SELECT sessione, psbt, indirizzo, importo, scade FROM "
+            "bitpost_firme WHERE ordine_id=? AND parte=? AND fatta=0",
+            (oid, parte)).fetchall()
+        indice = riga["compratore_indice"] if ruolo == "compratore" \
+            else riga["bitworker_indice"]
+    finally:
+        con.close()
+    st = int((o.get("status") or {}).get("id") or 0)
+    fuori = {"ordine": bitpost_per_chi(o, ruolo), "ruolo": ruolo,
+             "indice": indice, "strada_base": BITPOST_STRADA_BASE,
+             "firme": [dict(f) for f in firme]}
+    if ruolo == "compratore" and st == 2:
+        fuori["pagamento"] = await _bitpost_chiama("GET", f"/orders/{oid}/payment")
+    if st in BITPOST_INCASSABILI or st == 10:
+        p = await _bitpost_chiama("GET", f"/orders/{oid}/payouts")
+        fuori["incasso"] = next((x for x in p.get("payouts") or []
+                                 if x.get("party") == parte), None)
+    if st in (9, 12, 13, 14):
+        try:
+            disp = await _bitpost_chiama("GET", f"/orders/{oid}/dispute")
+            fuori["disputa"] = {"open": bool(disp.get("open")), "prove": [
+                e for e in disp.get("evidence") or []
+                if e.get("party") == parte]}
+        except HTTPException:
+            pass
+    return fuori
+
+
+@app.get("/api/bitpost/ordini/{oid}/carte")
+async def bitpost_carte(oid: int, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Le carte coi LINK, solo a chi compra, rilette da Bitpost adesso: qui
+    non si salvano (la prima cosa ferma)."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+    finally:
+        con.close()
+    if _bitpost_ruolo(riga, user["id"]) != "compratore":
+        raise HTTPException(403, "Le carte le vede solo chi le ha comprate")
+    c = await _bitpost_chiama("GET", f"/orders/{oid}/cards")
+    return {"carte": [{k: x.get(k) for k in ("number", "amount", "currency",
+                                              "card_url", "expires_on")}
+                      for x in c.get("cards") or []],
+            "rimborsate": int(c.get("refunded_quantity") or 0),
+            "scadenza_mancanti": c.get("missing_cards_deadline")}
+
+
+async def _bitpost_azione(oid, user, solo_ruolo, metodo, percorso, corpo=None,
+                          dati=None):
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+    finally:
+        con.close()
+    ruolo = _bitpost_ruolo(riga, user["id"])
+    if solo_ruolo and ruolo != solo_ruolo:
+        raise HTTPException(403, "Questo gesto non è tuo")
+    o = await _bitpost_chiama(metodo, percorso, corpo, dati)
+    if isinstance(o, dict) and "status" in o and "id" in o:
+        con = _bitpost_db()
+        try:
+            _bitpost_applica(con, o)
+            con.commit()
+        finally:
+            con.close()
+    return riga, ruolo, o
+
+
+@app.post("/api/bitpost/ordini/{oid}/conferma")
+async def bitpost_conferma(oid: int, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Chi compra dice che le carte funzionano: il Bitworker incassa prima
+    delle 36 ore."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    await _bitpost_azione(oid, user, "compratore", "POST",
+                          f"/orders/{oid}/confirm")
+    return {"ok": True}
+
+
+@app.post("/api/bitpost/ordini/{oid}/disputa")
+async def bitpost_disputa(oid: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Chi compra dice che una carta non funziona o vale meno: decide
+    Bitpost, che verifica con Shoppy Code."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    motivo = d.get("motivo")
+    if motivo not in ("NotWorking", "WrongAmount"):
+        raise HTTPException(400, "Scegli il motivo")
+    note = str(d.get("note") or "").strip()[:2000]
+    corpo = {"reason": motivo}
+    if note:
+        corpo["notes"] = note
+    await _bitpost_azione(oid, user, "compratore", "POST",
+                          f"/orders/{oid}/dispute", corpo)
+    return {"ok": True}
+
+
+@app.post("/api/bitpost/ordini/{oid}/prove")
+async def bitpost_prove(oid: int, req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Un commento per la disputa, da una delle due parti (i file restano
+    per la tappa dopo). Ognuno vede solo le sue prove."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    testo = str(d.get("commento") or "").strip()
+    if not testo or len(testo) > 2000:
+        raise HTTPException(400, "Scrivi cosa è successo (al più 2000 caratteri)")
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+    finally:
+        con.close()
+    parte = "buyer" if _bitpost_ruolo(riga, user["id"]) == "compratore" else "bitworker"
+    await _bitpost_azione(oid, user, "", "POST",
+                          f"/orders/{oid}/dispute/evidence",
+                          dati={"party": parte, "comment": testo})
+    return {"ok": True}
+
+
+@app.post("/api/bitpost/ordini/{oid}/annulla")
+async def bitpost_annulla(oid: int, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Chi compra annulla prima di pagare; il Bitworker rinuncia prima del
+    pagamento e l'ordine torna in bacheca."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+    finally:
+        con.close()
+    ruolo = _bitpost_ruolo(riga, user["id"])
+    parte = "buyer" if ruolo == "compratore" else "bitworker"
+    await _bitpost_azione(oid, user, "", "POST", f"/orders/{oid}/cancel",
+                          {"party": parte})
+    if ruolo == "bitworker":
+        con = _bitpost_db()
+        try:
+            con.execute("UPDATE bitpost_ordini SET bitworker_id=0, "
+                        "bitworker_indice=-1 WHERE id=?", (oid,))
+            con.commit()
+        finally:
+            con.close()
+    return {"ok": True}
+
+
+@app.post("/api/bitpost/ordini/{oid}/incasso")
+async def bitpost_incasso(oid: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Chiedo il mio incasso a un indirizzo bitcoin MIO: Bitpost costruisce
+    la transazione, gia' firmata da lui, e la torna da firmare al mio
+    telefono (24 ore)."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ind = str(d.get("indirizzo") or "").strip()
+    motivo = bitpost_indirizzo_motivo(ind)
+    if motivo:
+        raise HTTPException(400, motivo)
+    if ind[:3].lower() == "bc1":
+        ind = ind.lower()
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+    finally:
+        con.close()
+    parte = "buyer" if _bitpost_ruolo(riga, user["id"]) == "compratore" else "bitworker"
+    r = await _bitpost_chiama("POST", f"/orders/{oid}/payouts",
+                              {"party": parte, "address": ind})
+    if r.get("psbt") and r.get("session_id"):
+        con = _bitpost_db()
+        try:
+            con.execute(
+                "INSERT OR REPLACE INTO bitpost_firme(ordine_id, sessione, "
+                "parte, psbt, indirizzo, importo, scade) VALUES (?,?,?,?,?,?,?)",
+                (oid, int(r["session_id"]), parte, r["psbt"], ind,
+                 int(r.get("amount_sats") or 0), ""))
+            con.commit()
+        finally:
+            con.close()
+    return {"ok": True, "sessione": r.get("session_id"), "psbt": r.get("psbt"),
+            "importo": r.get("amount_sats"), "indirizzo": ind}
+
+
+@app.post("/api/bitpost/ordini/{oid}/firma")
+async def bitpost_firma(oid: int, req: Request,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """La PSBT firmata dal mio telefono, verso Bitpost che la trasmette. La
+    sessione dev'essere della MIA parte: una firma non si gira ad altri."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    try:
+        sessione = int(d.get("sessione"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Sessione di firma mancante")
+    firmata = str(d.get("psbt") or "").strip()
+    if not firmata or len(firmata) > 200_000:
+        raise HTTPException(400, "Transazione firmata mancante")
+    con = _bitpost_db()
+    try:
+        riga = _bitpost_riga_mia(con, oid, user["id"])
+        parte = "buyer" if _bitpost_ruolo(riga, user["id"]) == "compratore" else "bitworker"
+        f = con.execute("SELECT * FROM bitpost_firme WHERE ordine_id=? AND "
+                        "sessione=? AND parte=?", (oid, sessione, parte)).fetchone()
+    finally:
+        con.close()
+    if not f:
+        raise HTTPException(404, "Questa firma non è tua o è scaduta")
+    r = await _bitpost_chiama("POST", f"/orders/{oid}/signature",
+                              {"session_id": sessione, "signed": firmata})
+    con = _bitpost_db()
+    try:
+        con.execute("UPDATE bitpost_firme SET fatta=1 WHERE ordine_id=? AND "
+                    "sessione=?", (oid, sessione))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "txid": r.get("txid")}
+
+
+# GLI AVVISI DEI CAMBI DI STATO: a chi, e cosa (stato → (ruolo, testo))
+BITPOST_AVVISI = {
+    3: ("bitworker", "🎁 Chi compra ha pagato il deposito: aspettiamo le "
+                     "conferme della rete."),
+    1000: ("bitworker", "🎁 Deposito confermato: hai 5 giorni per comprare le "
+                        "carte su Shoppy Code. Apri Barattolo per i dettagli."),
+    1002: ("compratore", "🎁 Sono arrivate tutte le tue gift card: controllale "
+                         "entro 36 ore (il silenzio vale come conferma)."),
+    8: ("bitworker", "🎁 Ordine confermato: puoi incassare i tuoi sats."),
+    9: ("bitworker", "🎁 Chi compra ha aperto una disputa: manda le tue prove "
+                     "da Barattolo."),
+    14: ("compratore", "🎁 Il tuo ordine di gift card è da rimborsare: apri "
+                       "Barattolo e chiedi l'incasso."),
+}
+
+
+async def _bitpost_avvisa(riga, stato):
+    voce = BITPOST_AVVISI.get(stato)
+    if not voce:
+        return
+    chi = riga["compratore_id"] if voce[0] == "compratore" else riga["bitworker_id"]
+    if chi:
+        await notifica(chi, voce[1])
+    # la decisione della disputa la sanno tutt'e due
+    if stato in (8, 14) and riga["stato"] == 9:
+        altro = riga["bitworker_id"] if voce[0] == "compratore" else riga["compratore_id"]
+        if altro:
+            await notifica(altro, "🎁 Bitpost ha deciso la disputa della "
+                                  "gift card: apri Barattolo.")
+
+
+@app.post("/api/bitpost/webhook")
+async def bitpost_webhook(req: Request):
+    """IL WEBHOOK DI BITPOST: aperto a tutti (anche sulla prova privata,
+    PROVA_PORTE_APERTE), ma passa solo una busta con la firma HMAC giusta
+    e fresca. Si risponde in fretta (Bitpost aspetta 10 secondi): l'evento
+    si segna, si applica, e gli avvisi partono dopo. Un evento gia' visto
+    e' un 200 e basta; un ordine non nostro anche."""
+    corpo = await req.body()
+    if not bitpost_firma_valida(corpo, req.headers.get("x-bitpost-signature", ""),
+                                BITPOST_WEBHOOK_SEGRETO, int(time.time())):
+        raise HTTPException(401, "Firma non valida")
+    try:
+        ev = json.loads(corpo)
+        eid = str(ev["id"])[:100]
+        tipo = str(ev.get("type") or "")[:60]
+        quando = str(ev.get("created_at") or "")[:40]
+        dati = ev.get("data") or {}
+        ordine = dati.get("order") or {}
+    except Exception:
+        raise HTTPException(400, "Busta malformata")
+    avvisi = []
+    con = _bitpost_db()
+    try:
+        if con.execute("SELECT 1 FROM bitpost_eventi WHERE id=?",
+                       (eid,)).fetchone():
+            return {"ok": True, "gia": True}
+        con.execute("INSERT INTO bitpost_eventi(id, tipo, ordine_id, ricevuto)"
+                    " VALUES (?,?,?,?)",
+                    (eid, tipo, int(ordine.get("id") or 0), int(time.time())))
+        riga = con.execute("SELECT * FROM bitpost_ordini WHERE id=?",
+                           (int(ordine.get("id") or 0),)).fetchone()
+        if riga:
+            if tipo == "order.status_changed":
+                prima, dopo = _bitpost_applica(con, ordine, quando)
+                if dopo is not None and dopo != prima:
+                    avvisi.append(("stato", riga, dopo))
+            elif tipo == "order.gift_card_delivered":
+                carta = dati.get("card") or {}
+                # SOLO I DATI, MAI IL LINK (la prima cosa ferma)
+                con.execute(
+                    "INSERT OR REPLACE INTO bitpost_carte(ordine_id, numero, "
+                    "importo, scade, ricevuta) VALUES (?,?,?,?,?)",
+                    (riga["id"], int(carta.get("number") or 0),
+                     int(carta.get("amount") or 0),
+                     str(carta.get("expires_on") or "")[:20],
+                     str(carta.get("received_at") or "")[:40]))
+                _bitpost_applica(con, ordine, quando)
+                avvisi.append(("testo", riga["compratore_id"],
+                               "🎁 È arrivata una gift card del tuo ordine: "
+                               "aprila da Barattolo."))
+            elif tipo == "order.gift_card_rejected":
+                avvisi.append(("testo", riga["bitworker_id"],
+                               "🎁 Bitpost ha scartato una carta (valore "
+                               "sbagliato o in più): te la restituisce. "
+                               "Manda quella giusta."))
+            elif tipo == "order.signature_requested":
+                parte = str(dati.get("party") or "")
+                psbt = str(dati.get("pset") or dati.get("psbt") or "")
+                dest = dati.get("recipient") or {}
+                if parte in ("buyer", "bitworker") and psbt:
+                    con.execute(
+                        "INSERT OR REPLACE INTO bitpost_firme(ordine_id, "
+                        "sessione, parte, psbt, indirizzo, importo, scade) "
+                        "VALUES (?,?,?,?,?,?,?)",
+                        (riga["id"], int(dati.get("session_id") or 0), parte,
+                         psbt, str(dest.get("address") or "")[:100],
+                         int(dest.get("amount_sats") or 0),
+                         str(dati.get("expires_at") or "")[:40]))
+                    chi = riga["compratore_id"] if parte == "buyer" else riga["bitworker_id"]
+                    avvisi.append(("testo", chi, "🎁 Il tuo incasso della gift "
+                                   "card aspetta la tua firma: apri Barattolo "
+                                   "entro 24 ore."))
+            elif tipo == "order.payout_updated":
+                if dati.get("event") == "failed":
+                    parte = dati.get("party")
+                    chi = riga["compratore_id"] if parte == "buyer" else \
+                        riga["bitworker_id"] if parte == "bitworker" else 0
+                    if chi:
+                        avvisi.append(("testo", chi, "🎁 Il tuo incasso della "
+                                       "gift card non è partito: richiedilo "
+                                       "da Barattolo."))
+        con.commit()
+    finally:
+        con.close()
+    for a in avvisi:
+        try:
+            if a[0] == "stato":
+                await _bitpost_avvisa(a[1], a[2])
+            elif a[1]:
+                await notifica(a[1], a[2])
+        except Exception as e:
+            print(f"[bitpost] avviso non partito: {type(e).__name__}", flush=True)
+    return {"ok": True}
+
+
+# (Qui finisce il blocco delle gift card di Bitpost: la riga vuota tripla
+# sopra questa serve alle prove che ritagliano le funzioni.)

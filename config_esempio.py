@@ -1452,6 +1452,19 @@ DB = "satmarket.db"
 # docs/STUDIO-HACKATHON-RGB-2026-10.md (parte seconda) e la lista di
 # cosa si prepara prima in docs/HACKATHON-SETUP.md (sezione 10).
 RGB_ATTIVO = False
+# ── LE GIFT CARD SHOPPY CODE VIA BITPOST (20 nov 2026, cantiere
+# bitpost-gift-card). Chi compra chiede le carte, un Bitworker (un altro
+# utente) le compra coi suoi euro, il deposito e' un 2-di-3 on-chain di
+# Bitpost e chi incassa firma sul suo telefono. Nasce SPENTO: si accende
+# sul collaudo per la prova, con la chiave e il segreto che da' Bitpost
+# (SOLO qui dentro, mai nel repo, mai in chat). In collaudo locale
+# (MODALITA_COLLAUDO) la base deve essere un Bitpost finto su loopback.
+BITPOST_ATTIVO = False
+BITPOST_SOLO_ADMIN = True
+BITPOST_API_BASE = "https://beta.bitpost.shop/api/v1/barattolo"
+BITPOST_API_KEY = "INCOLLA_QUI_LA_CHIAVE_BITPOST"
+BITPOST_WEBHOOK_SEGRETO = "INCOLLA_QUI_IL_SEGRETO_DEL_WEBHOOK"
+BITPOST_MAX_EURO = 250
 # ── IL PAGAMENTO ON-CHAIN (16 ott 2026): il cancello, e niente altro.
 # Lo studio — il 2-di-3 non custodial, le chiavi nel browser, la beta a
 # 250 euro — sta in docs/CANTIERI.md, «Il pagamento on-chain come

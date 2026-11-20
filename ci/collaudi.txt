@@ -148,6 +148,7 @@ collaudo_presa_ln_p2p
 collaudo_margine_cassaforte
 collaudo_onchain_indirizzo
 collaudo_onchain_prova_lucchetto
+collaudo_bitpost_gift_card
 collaudo_onchain_ordine
 collaudo_onchain_incasso
 collaudo_onchain_verso_lightning

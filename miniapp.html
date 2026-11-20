@@ -3701,6 +3701,22 @@
   .p2p-schede{position:sticky;top:0;z-index:3;display:flex;gap:8px;
     margin:0 calc(-1 * var(--pad)) 10px;padding:6px var(--pad) 8px;background:var(--bg)}
   .p2p-schede[hidden]{display:none}
+  /* 🎁 le gift card di Bitpost (20 nov 2026): la pagina di prova */
+  .gc-schede{display:flex;gap:8px;margin:8px 0}
+  .gc-schede button{flex:1 1 0;min-height:40px;border-radius:12px;border:1px solid var(--line,#ddd);
+    background:transparent;color:inherit;font:inherit;font-weight:600}
+  .gc-schede button.attiva{background:var(--sats,#f7931a);color:#fff;border-color:transparent}
+  .gc-box{display:flex;flex-direction:column;gap:10px;padding:4px 0 24px}
+  .gc-box h4{margin:4px 0 0}
+  .gc-campo{display:flex;flex-direction:column;gap:4px;font-weight:600}
+  .gc-campo select,.gc-campo input,.gc-box textarea,.gc-box input{font:inherit;padding:10px;
+    border-radius:10px;border:1px solid var(--line,#ddd);background:transparent;color:inherit}
+  .gc-box textarea{min-height:80px}
+  .gc-riga{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid var(--line,#ddd)}
+  .gc-riga > div:first-child{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+  .gc-riga small{opacity:.7}
+  .gc-stato{font-size:.85em;opacity:.8;max-width:40%;text-align:right}
+  .gc-mono{font-family:ui-monospace,monospace;word-break:break-all;font-size:.9em}
   .p2p-schede .p2p-accesso-chip{flex:1 1 0;min-width:0;min-height:40px;padding:6px 4px;
     display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
   .p2p-schede .chatsc-conto{line-height:18px;min-width:18px;padding:0 5px}
@@ -15543,6 +15559,20 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- 🎁 LE GIFT CARD DI BITPOST (20 nov 2026, cantiere bitpost-gift-card):
+       la pagina di prova; la riempie renderGiftcard() -->
+  <div class="view" id="view-giftcard">
+    <div class="sicu">
+      <div class="foglio-testa">
+        <button type="button" class="foglio-back" onclick="navIndietro()"
+                title="Torna indietro" aria-label="Torna indietro">&#10005;</button>
+        <h3 class="p2p-oc-tit">🎁 Gift card Shoppy Code</h3>
+        <span class="foglio-back vuoto" aria-hidden="true">&#10005;</span>
+      </div>
+      <div id="gcCorpo"></div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: LA PAGINA DEL PACCO (ago 2026) ============
        Il rifacimento di «Riempi il pacco»: una pagina a tutto schermo
        in stile vetrina — le card di sempre (cardHTML, un solo cuore)
@@ -17212,6 +17242,9 @@ document.getElementById('cartello')?.remove();</script>
            moderatori compresi. -->
       <button type="button" class="btn ghost" id="admOnchain" style="display:none"
               onclick="onchainTab='info';go('onchain')"><span class="cambio-moneta btc p2p-oc-moneta" aria-hidden="true"><svg class="cambio-svg" viewBox="0 0 24 24"><g transform="rotate(13 12 12)"><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>On-chain</button>
+      <!-- 🎁 le gift card di Bitpost (20 nov 2026): la accende il cancello -->
+      <button type="button" class="btn ghost" id="admGiftcard" style="display:none"
+              onclick="gcAperto=null;go('giftcard')">🎁 Gift card</button>
       <div id="adminStats"></div>
         </div>
       </div>
@@ -19903,6 +19936,7 @@ let myTgId = null, isAdmin = false;
    SERVER in /api/me, e non si deduce da `isAdmin` — a leva spenta e'
    falso anche per i moderatori. */
 let myOnchain = false;
+let myBitpost = false;      // le gift card di Bitpost (20 nov 2026)
 let myOnchainRete = '';     // «signet» o «mainnet», detta da /api/me (30 ott 2026)
 let mySceltaRete = false;   // al «Paga» di un oggetto si sceglie prima la rete (2 nov 2026)
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
@@ -22449,6 +22483,8 @@ function voceNav(view){
   else if (view === 'ordine') view = 'affari';
   // la stradina e' una pagina del Profilo: la nav lo dice (17 nov 2026)
   else if (view === 'stradina') view = 'profilo';
+  // ...e le gift card di Bitpost, aperte dall'Amministrazione (20 nov 2026)
+  else if (view === 'giftcard') view = 'profilo';
   // le raccolte si aprono dalla tessera della vetrina (17 nov 2026)
   else if (view === 'raccolte') view = 'esplora';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
@@ -23736,6 +23772,8 @@ function go(view){
      a ogni ingresso, e «I miei scambi» li mescola ai Lightning — si
      rileggono entrando e la lista si ridisegna quando arrivano */
   if (view==='p2ponchain') { renderP2POnchain(); osservaDepositoOnchainP2P(); }
+  /* 🎁 le gift card (20 nov 2026): si rileggono a ogni ingresso */
+  if (view==='giftcard') renderGiftcard();
   if (view==='p2pmiei' && myP2POnchain) rileggiOnchainMieiP2P();
   /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
      entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
@@ -59391,6 +59429,7 @@ async function loadAdminStats(){
     if (el('admOnchain')) {
       el('admOnchain').style.display = myOnchain ? '' : 'none';
     }
+    if (el('admGiftcard')) el('admGiftcard').style.display = myBitpost ? '' : 'none';
     /* l'assistenza in app (3 nov 2026): leva viva E admin */
     vestiAssistenza();
   } catch(e) {
@@ -120747,6 +120786,7 @@ async function avvia(){
     /* il CANCELLO dell'on-chain, non `admin`: oggi coincidono, e il
        giorno che la beta si allarga questa riga e' gia' giusta */
     myOnchain = !!me.onchain;
+    myBitpost = !!me.bitpost;
     myOnchainRete = me.onchain_rete || '';
     /* ...e la scelta della rete al «Paga» (2 nov 2026, MERCATINO_SCELTA_RETE) */
     mySceltaRete = !!me.scelta_rete;
@@ -121552,6 +121592,401 @@ if ('serviceWorker' in navigator && !tg?.initData
     && location.protocol.startsWith('http')) {
   window.addEventListener('load', () =>
     navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
+/* ============ 🎁 LE GIFT CARD DI BITPOST (20 nov 2026, cantiere
+   bitpost-gift-card; Andrea: «procedi pure con una implementazione in
+   collaudo per fare dei test») ============
+   Chi compra chiede carte Shoppy Code, un Bitworker le compra coi suoi
+   euro, il deposito e' un 2-di-3 di Bitpost sui sats VERI (mainnet anche
+   dal collaudo) e chi incassa firma QUI, col seme di sempre. Il server fa
+   da ponte: la chiave API non arriva mai qui.
+   LA CHIAVE DI UN ORDINE: `m/48'/0'/<100+n>'/2'` dal seme on-chain, n
+   indurito e diverso per ogni ordine — Bitpost vede la xpub e non deve
+   arrivare alle altre (mai quella dei nostri 2-di-3). Il numero lo
+   propone il server (il primo libero), il telefono lo ricava ogni volta.
+   IL LINK DELLA CARTA e' la carta: si chiede al server a ogni apertura,
+   non si salva qui ne' la'. */
+let gcStato = null;          // l'ultima risposta di /bitpost/stato
+let gcScheda = 'compra';     // compra | bacheca | miei
+let gcAperto = null;         // il dettaglio aperto (risposta di /bitpost/ordini/<id>)
+let gcCarte = null;          // le carte coi link, solo di chi compra, solo in memoria
+let gcOccupato = false;
+
+async function gcApi(percorso, metodo, corpo){
+  const r = await fetch(`${API_BASE}/bitpost${percorso}`, {
+    method: metodo || 'GET',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: corpo ? JSON.stringify(corpo) : undefined});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || `errore ${r.status}`);
+  return d;
+}
+
+function gcEuro(cent){
+  return (Number(cent || 0) / 100).toLocaleString('it-IT',
+    {minimumFractionDigits: 0, maximumFractionDigits: 2}) + ' €';
+}
+
+function gcPct(x){ return (Number(x || 0) / 100).toLocaleString('it-IT') + '%'; }
+
+/* il conto dell'ordine numero `n`: sempre mainnet (le versioni di serie
+   di HDKey sono xpub/xprv) */
+function gcConto(B, parole, n){
+  const madre = B.HDKey.fromMasterSeed(B.mnemonicToSeedSync(parole, ''));
+  return madre.derive(`m/48'/0'/${(gcStato?.strada_base ?? 100) + Number(n)}'/2'`);
+}
+
+/* il seme, ma solo se le 12 parole sono gia' al sicuro fuori da qui: un
+   incasso che solo questo telefono sa firmare e' un incasso fragile */
+async function gcSeme(){
+  const parole = await onchainSemeAssicurato();
+  if (!(await onchainSemeCoperto(parole)))
+    throw new Error('prima metti al sicuro le 12 parole (Profilo → On-chain)');
+  return parole;
+}
+
+async function gcXpub(n){
+  const B = await caricaBitcoin();
+  return gcConto(B, await gcSeme(), n).publicExtendedKey;
+}
+
+async function renderGiftcard(){
+  const box = el('gcCorpo');
+  if (!box) return;
+  if (!gcStato) box.innerHTML = '<p class="hint">Carico…</p>';
+  try { gcStato = await gcApi('/stato'); }
+  catch(e){ box.innerHTML = `<p class="hint">⚠️ ${esc(e.message)}</p>`; return; }
+  gcDisegna();
+}
+
+function gcDisegna(){
+  const box = el('gcCorpo');
+  if (!box || !gcStato) return;
+  const schede = [['compra', 'Compra'], ['bacheca', `Bitworker (${gcStato.bacheca.length})`],
+                  ['miei', `I miei (${gcStato.miei.length})`]];
+  let h = `<div class="p2p-schede gc-schede" role="tablist">${schede.map(([k, t]) =>
+    `<button type="button" class="${gcScheda === k ? 'attiva' : ''}" onclick="gcScheda='${k}';gcAperto=null;gcDisegna()">${esc(t)}</button>`).join('')}</div>`;
+  if (gcAperto) h += gcDettaglioHTML();
+  else if (gcScheda === 'compra') h += gcCompraHTML();
+  else if (gcScheda === 'bacheca') h += gcListaHTML(gcStato.bacheca, true);
+  else h += gcListaHTML(gcStato.miei, false);
+  box.innerHTML = h;
+  if (gcAperto?.pagamento) disegnaQr(el('gcQr'), gcAperto.pagamento.destination);
+}
+
+function gcCompraHTML(){
+  const c = gcStato.catalogo;
+  if (!c) return '<p class="hint">⚠️ Il catalogo di Bitpost non risponde: riprova fra poco.</p>';
+  const tetto = Math.min(c.max_order_price || Infinity, gcStato.max_euro ? gcStato.max_euro * 100 : Infinity);
+  const minimo = (c.networks || []).find(n => n.network === 'Bitcoin')?.min_order_price || 0;
+  const tagli = (c.denominations || []).filter(d => d <= tetto);
+  return `<div class="gc-box">
+    <p class="hint">Carte regalo <b>Shoppy Code</b> pagate in sats. Un altro utente
+      (il <i>Bitworker</i>) le compra per te; i tuoi sats restano in un deposito
+      di garanzia 2-di-3 di Bitpost finché non le ricevi. ⚠️ Sats veri, rete Bitcoin.</p>
+    <label class="gc-campo">Taglio
+      <select id="gcTaglio" onchange="gcTotale()">${tagli.map(d =>
+        `<option value="${d}">${esc(gcEuro(d))}</option>`).join('')}</select></label>
+    <label class="gc-campo">Quante carte
+      <input id="gcQuanti" type="number" min="1" max="50" value="1" inputmode="numeric" oninput="gcTotale()"></label>
+    <p class="hint" id="gcTotale"></p>
+    <p class="hint">Minimo per ordine ${esc(gcEuro(minimo))}, massimo ${esc(gcEuro(tetto))}.
+      Commissione di Bitpost dal deposito.</p>
+    <button type="button" class="btn orange" onclick="gcCrea(this)">🎁 Chiedi le carte</button>
+  </div>`;
+}
+
+function gcTotale(){
+  const t = Number(el('gcTaglio')?.value || 0) * Number(el('gcQuanti')?.value || 0);
+  if (el('gcTotale')) el('gcTotale').textContent = 'Valore delle carte: ' + gcEuro(t);
+}
+
+function gcListaHTML(lista, bacheca){
+  if (!lista.length) return `<p class="hint">${bacheca
+    ? 'Nessun ordine da prendere adesso.' : 'Ancora nessun ordine di gift card.'}</p>`;
+  return lista.map(o => `<div class="gc-riga" onclick="gcApri(${Number(o.id)})">
+      <div><b>${Number(o.quantity)} × ${esc(gcEuro(o.denomination))}</b>
+        <small>#${Number(o.id)} · ${o.ruolo === 'compratore' ? 'compri tu'
+          : o.ruolo === 'bitworker' ? 'sei il Bitworker' : 'da prendere'}</small></div>
+      <div class="gc-stato">${esc(o.stato_testo)}</div>
+      ${bacheca ? `<button type="button" class="btn ghost" onclick="event.stopPropagation();gcPrendi(${Number(o.id)}, this)">Prendi</button>` : ''}
+    </div>`).join('');
+}
+
+async function gcCrea(btn){
+  if (gcOccupato) return;
+  const taglio = Number(el('gcTaglio')?.value), quanti = Number(el('gcQuanti')?.value);
+  chiediConferma({titolo: 'Chiedi le gift card?', soldi: true,
+    corpo: `${quanti} carta/e da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\n\nQuando un Bitworker prende l'ordine paghi il deposito on-chain, in sats veri.`,
+    etichetta: 'Chiedi', poi: async () => {
+      gcOccupato = true;
+      try {
+        const indice = gcStato.prossimo_indice;
+        const xpub = await gcXpub(indice);
+        const d = await gcApi('/ordini', 'POST', {taglio, quanti, xpub, indice});
+        toast('🎁 Ordine creato: aspettiamo un Bitworker');
+        gcScheda = 'miei';
+        await renderGiftcard();
+        gcApri(d.ordine.id);
+      } catch(e){ toast('⚠️ ' + e.message, 5000); }
+      finally { gcOccupato = false; }
+    }});
+}
+
+async function gcPrendi(id, btn){
+  if (gcOccupato) return;
+  const o = gcStato.bacheca.find(x => x.id === id);
+  if (!o) return;
+  chiediConferma({titolo: 'Prendi questo ordine?', soldi: true,
+    corpo: `Compri tu ${o.quantity} carta/e Shoppy Code da ${gcEuro(o.denomination)} coi tuoi euro, quando chi le chiede ha pagato il deposito. Hai 5 giorni dal pagamento.\n\nCommissione Bitworker: ${gcPct(o.bitworker_fee)}.`,
+    etichetta: 'Prendi', poi: async () => {
+      gcOccupato = true;
+      try {
+        const indice = gcStato.prossimo_indice;
+        const xpub = await gcXpub(indice);
+        await gcApi(`/ordini/${id}/prendi`, 'POST', {xpub, indice});
+        toast('🎁 Preso: aspettiamo il pagamento di chi compra');
+        gcScheda = 'miei';
+        await renderGiftcard();
+        gcApri(id);
+      } catch(e){ toast('⚠️ ' + e.message, 5000); }
+      finally { gcOccupato = false; }
+    }});
+}
+
+async function gcApri(id){
+  if (!gcStato?.miei.some(o => o.id === id)) return;
+  gcCarte = null;
+  try { gcAperto = await gcApi(`/ordini/${id}`); }
+  catch(e){ return toast('⚠️ ' + e.message, 5000); }
+  const st = gcAperto.ordine.status?.id;
+  if (gcAperto.ruolo === 'compratore' && [1000, 1001, 1002, 8, 9, 10].includes(st)) {
+    try { gcCarte = await gcApi(`/ordini/${id}/carte`); } catch(e){ gcCarte = null; }
+  }
+  gcDisegna();
+}
+
+function gcDettaglioHTML(){
+  const a = gcAperto, o = a.ordine, st = o.status?.id, io = a.ruolo;
+  const id = Number(o.id);
+  let h = `<div class="gc-box">
+    <button type="button" class="btn ghost" onclick="gcAperto=null;gcDisegna()">← Indietro</button>
+    <h4>#${id} · ${Number(o.quantity)} × ${esc(gcEuro(o.denomination))}</h4>
+    <p><b>${esc(o.stato_testo)}</b></p>
+    <p class="hint">Sei ${io === 'compratore' ? 'chi compra' : 'il Bitworker'} ·
+      commissioni: chi compra ${esc(gcPct(o.buyer_fee))}, Bitworker ${esc(gcPct(o.bitworker_fee))}${o.total_sats ? ` · deposito ${Number(o.total_sats).toLocaleString('it-IT')} sats` : ''}</p>`;
+  if (io === 'compratore' && st === 2 && a.pagamento) {
+    const p = a.pagamento;
+    h += `<p>Paga <b>esattamente ${Number(p.amount_sats).toLocaleString('it-IT')} sats</b>, in una sola transazione:</p>
+      <div class="qr" id="gcQr"></div>
+      <p class="gc-mono">${esc(p.address)}</p>
+      <button type="button" class="btn ghost" onclick="gcCopia('${esc(p.address)}')">Copia l'indirizzo</button>
+      <button type="button" class="btn ghost" onclick="gcCopia('${esc(String(p.amount_sats))}')">Copia l'importo</button>`;
+  }
+  if (io === 'bitworker' && [1000, 1001].includes(st) && o.purchase) {
+    const c = o.purchase;
+    h += `<p>Compra <b>${Number(c.quantity)} carta/e da ${esc(gcEuro(c.denomination))}</b> su Shoppy Code e
+      <b>regala ognuna</b> a questo indirizzo email (vale solo per questo ordine):</p>
+      <p class="gc-mono">${esc(c.recipient_email)}</p>
+      <button type="button" class="btn ghost" onclick="gcCopia('${esc(c.recipient_email)}')">Copia l'email</button>
+      <button type="button" class="btn orange" onclick="apriLinkEsterno('${esc(c.url)}')">Apri Shoppy Code</button>
+      <p class="hint">Hai 5 giorni dal pagamento, poi chi compra viene rimborsato.</p>`;
+  }
+  if (io === 'compratore' && gcCarte) {
+    h += gcCarte.carte.length ? `<p>Le tue carte (il link <b>è</b> la carta: non darlo a nessuno):</p>` +
+      gcCarte.carte.map(c => `<div class="gc-riga"><div><b>Carta ${Number(c.number)}</b>
+        <small>${esc(gcEuro(c.amount))} · scade ${esc(c.expires_on || '?')}</small></div>
+        <button type="button" class="btn ghost" onclick="apriLinkEsterno('${esc(c.card_url)}')">Apri</button></div>`).join('')
+      : '<p class="hint">Nessuna carta arrivata finora.</p>';
+    if (gcCarte.rimborsate) h += `<p class="hint">${Number(gcCarte.rimborsate)} carta/e non arrivate: rimborsate.</p>`;
+  }
+  if (io === 'compratore' && st === 1002) {
+    h += `<p class="hint">Prova le carte: hai 36 ore dall'ultima, poi il silenzio vale come conferma.</p>
+      <button type="button" class="btn orange" onclick="gcConferma(${id})">✅ Funzionano</button>
+      <label class="gc-campo">Se una non va
+        <select id="gcMotivo"><option value="NotWorking">Non funziona (già usata, non riconosciuta…)</option>
+          <option value="WrongAmount">Vale meno di quanto dovrebbe</option></select></label>
+      <textarea id="gcNote" maxlength="2000" placeholder="Quale carta, e cosa succede quando la usi"></textarea>
+      <button type="button" class="btn ghost" onclick="gcDisputa(${id})">⚠️ Apri una disputa</button>`;
+  }
+  if (st === 9) {
+    const prove = a.disputa?.prove || [];
+    h += `<p>La disputa la decide Bitpost. Le tue prove (l'altra parte non le vede):</p>
+      ${prove.map(p => `<p class="hint">• ${esc(p.comment || '(file)')}</p>`).join('') || '<p class="hint">Nessuna, per ora.</p>'}
+      <textarea id="gcProva" maxlength="2000" placeholder="Cosa è successo"></textarea>
+      <button type="button" class="btn ghost" onclick="gcProva(${id})">Manda a Bitpost</button>`;
+  }
+  if ((io === 'compratore' && [1, 2].includes(st)) || (io === 'bitworker' && st === 2))
+    h += `<button type="button" class="btn ghost" onclick="gcAnnulla(${id})">${io === 'compratore'
+      ? 'Annulla l\'ordine' : 'Rinuncia (torna in bacheca)'}</button>`;
+  if (a.incasso) h += gcIncassoHTML(id, a.incasso);
+  for (const f of a.firme || [])
+    h += `<button type="button" class="btn orange" onclick="gcFirma(${id}, ${Number(f.sessione)})">✍️ Firma l'incasso (${Number(f.importo || 0).toLocaleString('it-IT')} sats)</button>`;
+  return h + '</div>';
+}
+
+function gcIncassoHTML(id, p){
+  const salvato = gcIndirizzoSalvato(id);
+  if (p.state === 'available') return `<p>Ti spettano <b>${Number(p.owed_sats).toLocaleString('it-IT')} sats</b>
+      (la commissione di rete esce da qui). Dove li vuoi? Un indirizzo bitcoin <b>tuo</b>:</p>
+    <input id="gcIndirizzo" class="gc-mono" placeholder="bc1…" value="${esc(salvato)}" autocomplete="off">
+    <button type="button" class="btn orange" onclick="gcChiediIncasso(${id})">Chiedi l'incasso</button>`;
+  if (p.state === 'awaiting_signature') return `<p class="hint">L'incasso aspetta la tua firma.</p>`;
+  if (p.state === 'confirming' || p.state === 'paid') return `<p>${p.state === 'paid' ? '✅ Incassato' : '⏳ In conferma'}
+      ${p.txid ? `· <a href="https://mempool.space/tx/${esc(p.txid)}" onclick="event.preventDefault();apriLinkEsterno(this.href)">vedi la transazione</a>` : ''}</p>`;
+  return '';
+}
+
+function gcIndirizzoSalvato(id){
+  try { return localStorage.getItem('gcIncasso:' + id) || ''; } catch(e){ return ''; }
+}
+
+async function gcAzione(percorso, corpo, ok){
+  if (gcOccupato) return;
+  gcOccupato = true;
+  try {
+    await gcApi(percorso, 'POST', corpo);
+    if (ok) toast(ok);
+    const id = gcAperto?.ordine?.id;
+    await renderGiftcard();
+    if (id) await gcApri(id);
+  } catch(e){ toast('⚠️ ' + e.message, 5000); }
+  finally { gcOccupato = false; }
+}
+
+function gcConferma(id){
+  chiediConferma({titolo: 'Le carte funzionano?', corpo: 'Confermando, il Bitworker può incassare subito. Non si torna indietro.',
+    etichetta: 'Sì, funzionano', poi: () => gcAzione(`/ordini/${id}/conferma`, {}, '✅ Confermato')});
+}
+
+function gcDisputa(id){
+  const motivo = el('gcMotivo')?.value, note = (el('gcNote')?.value || '').trim();
+  chiediConferma({titolo: 'Apri una disputa?', vestito: 'allarme',
+    corpo: 'Bitpost verifica con Shoppy Code e decide chi riceve i sats. Poi potrai mandare altre prove.',
+    etichetta: 'Apri la disputa', poi: () => gcAzione(`/ordini/${id}/disputa`, {motivo, note}, 'Disputa aperta')});
+}
+
+function gcProva(id){
+  const commento = (el('gcProva')?.value || '').trim();
+  if (!commento) return toast('Scrivi cosa è successo');
+  gcAzione(`/ordini/${id}/prove`, {commento}, 'Mandato a Bitpost');
+}
+
+function gcAnnulla(id){
+  chiediConferma({titolo: 'Sei sicuro?', corpo: 'Annullare dopo che un Bitworker ha preso l\'ordine costa reputazione su Bitpost.',
+    etichetta: 'Sì', poi: () => gcAzione(`/ordini/${id}/annulla`, {}, 'Fatto')});
+}
+
+async function gcChiediIncasso(id){
+  const ind = (el('gcIndirizzo')?.value || '').trim();
+  if (!ind) return toast('Scrivi il tuo indirizzo bitcoin');
+  const B = await caricaBitcoin();
+  const norm = ind.slice(0, 3).toLowerCase() === 'bc1' ? ind.toLowerCase() : ind;
+  try { B.Address(B.NETWORK).decode(norm); }
+  catch(e){ return toast('⚠️ Non è un indirizzo bitcoin di mainnet'); }
+  try { localStorage.setItem('gcIncasso:' + id, norm); } catch(e){}
+  if (gcOccupato) return;
+  gcOccupato = true;
+  let d;
+  try { d = await gcApi(`/ordini/${id}/incasso`, 'POST', {indirizzo: norm}); }
+  catch(e){ gcOccupato = false; return toast('⚠️ ' + e.message, 5000); }
+  gcOccupato = false;
+  await gcApri(id);
+  if (d.sessione) gcFirma(id, d.sessione);
+}
+
+/* LA CHIAVE DI QUESTA MONETA: il conto dell'ordine, o un suo figlio
+   (Bitpost dalla xpub deriva come vuole: si prova la strada scritta nella
+   PSBT, poi le solite /0/i, /1/i e /i) */
+function gcTrovaChiave(B, conto, chiavi, bip32){
+  const giusta = n => n && n.privateKey && chiavi.includes(B.hex.encode(n.publicKey)) ? n : null;
+  if (giusta(conto)) return conto;
+  for (const voce of bip32 || []) {
+    const strada = (voce[1]?.path || []).filter(p => p < 0x80000000);
+    for (let tagli = Math.min(2, strada.length); tagli >= 1; tagli--) {
+      try {
+        let n = conto;
+        for (const p of strada.slice(-tagli)) n = n.deriveChild(p);
+        if (giusta(n)) return n;
+      } catch(e){}
+    }
+  }
+  for (let i = 0; i < 50; i++)
+    for (const pre of [[0], [1], []]) {
+      try {
+        let n = conto;
+        for (const p of pre) n = n.deriveChild(p);
+        n = n.deriveChild(i);
+        if (giusta(n)) return n;
+      } catch(e){}
+    }
+  return null;
+}
+
+/* LA FIRMA DELL'INCASSO, sul telefono: si guarda la PSBT di Bitpost (gia'
+   firmata da lui), si controlla che paghi l'indirizzo che HO scritto io
+   su questo telefono, si mostrano tutte le uscite, e solo col sì si firma
+   con la chiave dell'ordine. Mai un indirizzo detto dal solo server. */
+async function gcFirma(id, sessione){
+  if (gcOccupato) return;
+  const f = (gcAperto?.firme || []).find(x => Number(x.sessione) === Number(sessione));
+  if (!f) return toast('⚠️ Firma non trovata: riapri l\'ordine');
+  const mio = gcIndirizzoSalvato(id) || (el('gcIndirizzo')?.value || '').trim();
+  if (!mio) return toast('⚠️ Su questo telefono non c\'è il tuo indirizzo: chiedi di nuovo l\'incasso');
+  let B, tx, uscite = [];
+  try {
+    B = await caricaBitcoin();
+    tx = B.Transaction.fromPSBT(B.base64.decode(f.psbt));
+    for (let i = 0; i < tx.outputsLength; i++) {
+      const x = tx.getOutput(i);
+      let a = '?';
+      try { a = B.Address(B.NETWORK).encode(B.OutScript.decode(x.script)); } catch(e){}
+      uscite.push([a, Number(x.amount)]);
+    }
+  } catch(e){ return toast('⚠️ Transazione illeggibile'); }
+  const a_me = uscite.filter(([a]) => a === mio).reduce((s, [, v]) => s + v, 0);
+  if (!a_me) return toast('⚠️ Questa transazione non paga il tuo indirizzo: non la firmo', 6000);
+  const altre = uscite.filter(([a]) => a !== mio);
+  chiediConferma({titolo: 'Firmi l\'incasso?', soldi: true,
+    corpo: `Ricevi ${a_me.toLocaleString('it-IT')} sats su\n${mio}` +
+      (altre.length ? `\n\nAltre uscite:\n${altre.map(([a, v]) => `• ${v.toLocaleString('it-IT')} sats → ${a}`).join('\n')}` : ''),
+    etichetta: 'Firma', poi: async () => {
+      gcOccupato = true;
+      try {
+        const conto = gcConto(B, await gcSeme(), gcAperto.indice);
+        let firmate = 0;
+        for (let i = 0; i < tx.inputsLength; i++) {
+          const x = tx.getInput(i);
+          const ws = x.witnessScript || x.redeemScript;
+          if (!ws) continue;
+          let chiavi = [];
+          try { chiavi = (B.OutScript.decode(ws).pubkeys || []).map(k => B.hex.encode(k)); } catch(e){}
+          const k = gcTrovaChiave(B, conto, chiavi, x.bip32Derivation);
+          if (!k) continue;
+          tx.signIdx(k.privateKey, i);
+          firmate++;
+        }
+        if (!firmate) throw new Error('nessuna moneta è della chiave di questo ordine');
+        const d = await gcApi(`/ordini/${id}/firma`, 'POST', {sessione, psbt: B.base64.encode(tx.toPSBT())});
+        toast(d.txid ? '✅ Incasso partito' : '✅ Firmato');
+        await gcApri(id);
+      } catch(e){ toast('⚠️ ' + e.message, 6000); }
+      finally { gcOccupato = false; }
+    }});
+}
+
+function gcCopia(testo){
+  haptic();
+  if (navigator.clipboard) navigator.clipboard.writeText(testo).then(
+    () => toast('Copiato'), () => toast(testo, 6000));
+  else toast(testo, 6000);
+}
+
+function apriLinkEsterno(url){
+  if (!/^https:\/\//.test(String(url))) return;
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 /* Invio nel campo Cerca = submit del form .searchbar: niente doppio
