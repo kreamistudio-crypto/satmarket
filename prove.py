@@ -218329,6 +218329,7 @@ function foglio(nPezzi){
   const piede = nodo('div', ['foglio-piede', 'sola']);
   const invia = nodo('button', ['btn', 'rosso']); invia.textContent = '⚡Pubblica ordine';
   invia.setAttribute('onclick', 'inviaNuovoOrdineP2P()'); DOM.p2pNuovoInvia = invia;
+  invia.childNodes = [{nodeType: 1, childNodes: [{nodeType: 3, nodeValue: '⚡'}]}, {nodeType: 3, nodeValue: 'Pubblica ordine'}];
   piede.insertBefore(invia, null); box.insertBefore(piede, null);
   return box;
 }
@@ -218347,7 +218348,9 @@ box = foglio(10); p2pNuovoPasso = 3;
 foglioAPassiP2P(box, [sez + sez + sez, sez + sez + sez + sez, sez + sez], true, val, null);
 const piede2 = box.children[box.children.length - 1];
 const p2 = {vedi: box.getAttribute('data-vedi'), invia: DOM.p2pNuovoInvia.textContent, onclick: DOM.p2pNuovoInvia.a.onclick,
-  sola: piede2.cl.has('sola'), primo: piede2.children[0].textContent, primoClick: piede2.children[0].a.onclick};
+  sola: piede2.cl.has('sola'), primo: piede2.children[0].textContent, primoClick: piede2.children[0].a.onclick,
+  scritta: DOM.p2pNuovoInvia.childNodes.map(n => n.nodeValue || n.childNodes[0].nodeValue).join('|'),
+  aPassi: piede2.cl.has('a-passi')};
 /* 3. «Regole» vuoto: si salta; il 99 della ripubblica va all'ultimo (il Rileggi) */
 box = foglio(5); p2pNuovoPasso = 99;
 foglioAPassiP2P(box, [sez + sez, sez + sez, ''], false, val, null);
@@ -218415,6 +218418,12 @@ console.log(JSON.stringify({p1, p2, p3, p4, r5a, r5b, r5c, a1, a2, a3, a4, a5, a
           "c'e' «← Indietro»",
           ["rileggi", "⚡Pubblica ordine", "inviaNuovoOrdineP2P()", False, "← Indietro", "indietroNuovoP2P()"],
           [p2["vedi"], p2["invia"], p2["onclick"], p2["sola"], p2["primo"], p2["primoClick"]])
+    prova("al «Rileggi» il bottone dice solo «Pubblica» e l'icona della rete resta; il piede "
+          "a passi ha i tasti piu' bassi (Andrea, 20 nov sera: «elimina ordine e lascia solo "
+          "pubblica, così rimane su una riga tutto»)",
+          ["⚡|Pubblica", True, True],
+          [p2["scritta"], p2["aPassi"],
+           ".foglio-piede.a-passi .btn{min-height:46px;" in mini])
     prova("un passo senza pezzi si salta; il passo 99 (la ripubblica col paracadute) arriva "
           "dritto al «Rileggi»",
           ["rileggi", 2, "cosa,quanto,rileggi"], [o["p3"]["vedi"], o["p3"]["passo"], o["p3"]["passi"]])

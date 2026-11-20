@@ -5931,6 +5931,15 @@
      colonne resta dov'e' vero: il dettaglio di un ordine, dove le
      uscite sono davvero due. */
   .foglio-piede.sola{grid-template-columns:1fr}
+  /* NEL FOGLIO «PUBBLICA» A PASSI I TASTI SONO PIU' BASSI (20 nov 2026,
+     sera, Andrea sulla foto del «Rileggi»: «i tasti in basso, fammeli più
+     piccoli»): «← Indietro» e «Avanti →» / «Pubblica» stanno su una riga,
+     e il fulmine e la moneta si stringono con loro */
+  .foglio-piede.a-passi .btn{min-height:46px;padding:9px 12px;font-size:15px}
+  .foglio-piede.a-passi .btn.p2p-ico-3d .p2p-invia-ico{font-size:19px;margin:-4px 2px -4px 0}
+  .foglio-piede.a-passi .btn.p2p-ico-3d .p2p-invia-oc{gap:8px}
+  .foglio-piede.a-passi .btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta{width:24px;height:24px;margin:-4px 0}
+  .foglio-piede.a-passi .btn.p2p-ico-3d .p2p-invia-oc .cambio-moneta.p2p-oc-moneta .cambio-svg{width:14px;height:14px}
 
   /* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
      Il tondo della barra SCENDE verso la nav e si allarga fino a
@@ -104636,6 +104645,18 @@ function foglioAPassiP2P(box, gruppi, compro, val, valCoin){
     invia.textContent = 'Avanti →';
     invia.setAttribute('onclick', 'avantiNuovoP2P()');
   }
+  /* AL «RILEGGI» SOLO «PUBBLICA» (20 nov 2026, sera, Andrea sulla foto del
+     passo: «elimina ordine e lascia solo pubblica, così rimane su una riga
+     tutto»): accanto a «← Indietro» le due parole andavano a capo. Si
+     cambia la sola scritta, l'icona della rete resta */
+  if (invia && ultimo) {
+    const giu = n => n.nodeType === 3
+      ? (n.nodeValue.indexOf('Pubblica ordine') >= 0 && (n.nodeValue = n.nodeValue.replace('Pubblica ordine', 'Pubblica')))
+      : Array.from(n.childNodes || []).forEach(giu);
+    giu(invia);
+  }
+  /* ...e i tasti del piede piu' bassi (stessa sera): vedi `.foglio-piede.a-passi` */
+  piede.classList.add('a-passi');
   box.classList.add('a-schede');
   box.setAttribute('data-vedi', passi[qui].k);
   return true;
