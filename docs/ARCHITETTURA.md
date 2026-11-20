@@ -34257,6 +34257,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   governa solo `con-pacco`), col bottone riscritto da `barraCassa` in
   «Incassa» → `cassaIncassa` e rimesso a «Controlla e paga» uscendo.
   Accesa sul conto della scheda Cassa, spenta sul QR e fuori.
+  LA CASSA IN PRESENZA (20 nov 2026, cantiere cassa-presenza). Lo
+  schermo per il cliente è `#cassaCliente`, fuori dal foglio, fixed e su
+  bianco fisso: `mostraAlCliente` / `chiudiSchermoCliente` /
+  `disegnaSchermoCliente(qr)`; ridisegna il QR da `cassaQrCodice`
+  (testo e modo, scritti da `mostraQrCassa`: un codice, due tele) e lo
+  stato a ogni `statoVenditaCassa`. Wake Lock in `cassaSveglia`. Si
+  chiude in `cassaTornaAlConto` e in `modoNegozio(false)`. La chiusura
+  di cassa è in cima a `disegnaVenditeNegozio`: `chiusuraCassa(vendite,
+  indietro, adesso)` PURA sul giorno locale, `chiusuraCassaHTML`,
+  `chiusuraCassaTesto`; il giorno scelto in `eserGiorno`. Nessuna rotta
+  nuova: legge `ordiniCassa` (le ultime 100 di /cassa/storico).
 - L'INDIRIZZO DELLA QUOTA: swap@barattolo.store (19 ott 2026, perché
   in CANTIERI, «L'indirizzo della quota: swap@barattolo.store»). Dove
   SATS Routing manda a fine mese la quota di Barattolo sugli swap. È lo

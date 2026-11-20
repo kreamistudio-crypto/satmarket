@@ -9915,6 +9915,34 @@
   .cassa-stato{text-align:center;font-weight:800;font-size:15px;margin:10px 0;min-height:22px}
   .cassa-stato.ok{color:#1F9D55;font-size:22px}
   .cassa-stato .hint{font-size:13px;font-weight:600;color:var(--muted);margin-top:4px}
+  /* lo schermo per il cliente: bianco fisso nei due temi, come il QR
+     (alla cassa lo guarda un altro, spesso sotto una luce forte) */
+  #cassaCliente{position:fixed;inset:0;z-index:9000;background:#fff;color:#111;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:56px 16px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;text-align:center}
+  #cassaCliente .cliente-x{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;
+    width:44px;height:44px;border-radius:50%;border:0;background:#eee;color:#333;font-size:20px;cursor:pointer}
+  #cassaCliente .cliente-negozio{font-size:15px;font-weight:800;color:#555;margin-bottom:6px}
+  #cassaCliente .cliente-cifra{font-size:44px;font-weight:900;color:#E8590C;line-height:1.1}
+  #cassaCliente .cliente-cifra small{font-size:18px;color:#666;font-weight:700}
+  #cassaCliente .cliente-sotto{font-size:18px;font-weight:700;color:#444;min-height:22px}
+  #cassaCliente .cliente-cosa{font-size:14px;color:#666;margin:6px 0 12px;max-width:420px}
+  #cassaCliente .cliente-qr{width:min(78vw,52vh,380px);margin:0 auto;background:#fff;border:0;box-shadow:none;padding:0}
+  #cassaCliente .cliente-come{font-size:14px;color:#555;margin-top:12px;max-width:420px}
+  #cassaCliente .cliente-stato{font-size:16px;font-weight:800;color:#333;margin-top:10px;min-height:22px}
+  #cassaCliente.pagato .cliente-qr,#cassaCliente.pagato .cliente-come{display:none}
+  #cassaCliente.pagato .cliente-stato{font-size:40px;color:#1F9D55;margin-top:24px}
+  body.con-cliente{overflow:hidden}
+  .chiusura-cassa{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+  .chiusura-testa{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .chiusura-testa .chiusura-giorni{display:flex;gap:6px;margin:0}
+  .chiusura-giorni .consegna-pill{flex:0 0 auto;padding:6px 14px;font-size:13px}
+  .chiusura-cifra{text-align:center;font-size:30px;font-weight:900;color:var(--sats);margin:6px 0 0}
+  .chiusura-cifra small{font-size:14px;color:var(--muted);font-weight:700}
+  .chiusura-titolo{font-size:12px;font-weight:800;color:var(--muted);margin:10px 0 2px}
+  .chiusura-riga{display:flex;justify-content:space-between;gap:10px;font-size:14px;padding:5px 0;border-top:1px solid var(--line)}
+  .chiusura-riga span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chiusura-riga b{white-space:nowrap}
   .cassa-riga{display:flex;justify-content:space-between;gap:10px;padding:10px 0;
     border-bottom:1px solid var(--line);font-size:14px}
   .cassa-riga small{display:block;color:var(--muted);font-size:12px}
@@ -18352,10 +18380,28 @@ document.getElementById('cartello')?.remove();</script>
       <div class="qr" id="cassaQr"></div>
       <div class="invoice" id="cassaTesto" onclick="copiaCassa()" style="cursor:pointer" title="Tocca per copiare"></div>
       <div id="cassaStato" class="cassa-stato"></div>
+      <button class="btn orange" id="cassaAlCliente" style="display:none" onclick="mostraAlCliente()">🔁 Gira verso il cliente</button>
       <button class="btn primary" id="cassaRicevuto" style="display:none" onclick="cassaRicevuto(this)">✓ Ricevuto</button>
       <button class="btn orange" id="cassaNuovo" style="display:none" onclick="cassaNuovoConto()">Nuovo conto</button>
       <button class="btn ghost" id="cassaAnnulla" onclick="cassaAnnulla(this)">Annulla il conto</button>
     </div>
+  </div>
+
+  <!-- ============ LO SCHERMO PER IL CLIENTE (20 nov 2026) ============ -->
+  <!-- Barattolo Negozio, la cassa in presenza: il telefono si gira verso
+       chi paga e mostra solo quel che gli serve — la cifra, i pezzi, un
+       QR grande su bianco — e poi il «Pagato» quando arriva. Niente
+       bottoni del negozio sotto il pollice del cliente: si torna alla
+       cassa con la ✕ in alto, che e' di chi vende. -->
+  <div id="cassaCliente" role="dialog" aria-modal="true" aria-label="Schermo per il cliente" style="display:none">
+    <button type="button" class="cliente-x" onclick="chiudiSchermoCliente()" aria-label="Torna alla cassa">✕</button>
+    <div class="cliente-negozio" id="clienteNegozio"></div>
+    <div class="cliente-cifra"><span class="mono" id="clienteSats"></span> <small>sats</small></div>
+    <div class="cliente-sotto" id="clienteEuro"></div>
+    <div class="cliente-cosa" id="clienteCosa"></div>
+    <div class="qr cliente-qr" id="clienteQr"></div>
+    <div class="cliente-come" id="clienteCome"></div>
+    <div class="cliente-stato" id="clienteStato"></div>
   </div>
 
   <!-- ============ SHEET OFFERTA SUL CARRELLO (ago 2026) ============ -->
@@ -43114,6 +43160,7 @@ async function apriCassa(){
 }
 function cassaTornaAlConto(){
   fermaBattitoCassa();
+  chiudiSchermoCliente();
   el('cassaConto').style.display = '';
   el('cassaQrVista').style.display = 'none';
   barraCassa(appNegozio && eserScheda === 'cassa');
@@ -43291,9 +43338,11 @@ function mostraQrCassa(v){
   const ln = v.metodo === 'ln' && v.ln, oc = v.metodo === 'onchain' && v.onchain;
   const testo = ln ? v.ln.invoice : (oc ? v.onchain.indirizzo : '');
   el('cassaTesto').textContent = testo;
-  if (ln) disegnaQr(el('cassaQr'), ('lightning:' + v.ln.invoice).toUpperCase(), 'Alphanumeric');
-  else if (oc) disegnaQr(el('cassaQr'), v.onchain.uri);
+  cassaQrCodice = ln ? [('lightning:' + v.ln.invoice).toUpperCase(), 'Alphanumeric']
+                : (oc ? [v.onchain.uri, 'Byte'] : null);
+  if (cassaQrCodice) disegnaQr(el('cassaQr'), cassaQrCodice[0], cassaQrCodice[1]);
   statoVenditaCassa(v);
+  if (schermoClienteAperto()) disegnaSchermoCliente(true);
   fermaBattitoCassa();
   if (v.stato === 'attesa' || v.stato === 'in_arrivo')
     cassaBattito = setInterval(battitoCassa, CASSA_BATTITO_MS);
@@ -43308,7 +43357,9 @@ function statoVenditaCassa(v){
   el('cassaTesto').style.display = fine ? 'none' : '';
   el('cassaNuovo').style.display = fine ? '' : 'none';
   el('cassaAnnulla').style.display = v.stato === 'attesa' ? '' : 'none';
+  el('cassaAlCliente').style.display = fine ? 'none' : '';
   ric.style.display = 'none';
+  if (schermoClienteAperto()) disegnaSchermoCliente(false);
   if (v.stato === 'pagata') {
     const il = v.pagata_il ? new Date(v.pagata_il * 1000).toLocaleString('it-IT',
       {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
@@ -43371,6 +43422,55 @@ async function cassaPassaA(m){
     if (!r.ok) { toast(n.detail || 'Il QR non è arrivato: riprova', 6000); return; }
     mostraQrCassa(n);
   } catch(e) { toast('Rete assente: riprova'); }
+}
+/* ---- lo schermo per il cliente (20 nov 2026, cassa in presenza) ----
+   Lo stesso QR del foglio, piu' grande, su bianco, con la cifra e i
+   pezzi: il telefono si gira verso chi paga. Il battito della cassa
+   continua sotto e lo aggiorna: al «Pagato» il QR sparisce e resta il
+   segno verde, da far vedere. Lo schermo resta acceso finche' e' aperto
+   (Wake Lock, dove il telefono lo concede: altrove non succede niente). */
+let cassaQrCodice = null, cassaSveglia = null;
+function schermoClienteAperto(){
+  const c = el('cassaCliente');
+  return !!c && c.style.display !== 'none';
+}
+async function mostraAlCliente(){
+  const v = cassaVendita; if (!v || !cassaQrCodice) return;
+  haptic();
+  el('cassaCliente').style.display = '';
+  document.body.classList.add('con-cliente');
+  disegnaSchermoCliente(true);
+  try {
+    if (navigator.wakeLock && !cassaSveglia)
+      cassaSveglia = await navigator.wakeLock.request('screen');
+  } catch(e) { cassaSveglia = null; }
+}
+function chiudiSchermoCliente(){
+  const c = el('cassaCliente'); if (!c) return;
+  c.style.display = 'none';
+  c.classList.remove('pagato');
+  document.body.classList.remove('con-cliente');
+  if (cassaSveglia) { try { cassaSveglia.release(); } catch(e) {} cassaSveglia = null; }
+}
+/* `qr`: ridisegnare anche il codice (al cambio di metodo); il solo
+   stato si aggiorna a ogni battito senza rifare il canvas */
+function disegnaSchermoCliente(qr){
+  const v = cassaVendita; if (!v) return;
+  el('clienteNegozio').textContent = v.stato === 'pagata' ? '🏪 Grazie!' : '🏪 Da pagare';
+  el('clienteSats').textContent = fmt(v.sats);
+  el('clienteEuro').textContent = cassaEuroTesto(v.sats);
+  el('clienteCosa').textContent = titoloVenditaCassa(v) === 'Importo libero' ? '' : titoloVenditaCassa(v);
+  el('clienteCome').innerHTML = v.metodo === 'onchain'
+    ? 'Inquadra con il tuo wallet <b>bitcoin</b> (on-chain)'
+    : 'Inquadra con un wallet <b>Lightning</b> ⚡ · non serve un account';
+  if (qr && cassaQrCodice) disegnaQr(el('clienteQr'), cassaQrCodice[0], cassaQrCodice[1]);
+  const pagato = v.stato === 'pagata';
+  el('cassaCliente').classList.toggle('pagato', pagato);
+  el('clienteStato').textContent = pagato ? '✅ Pagato, grazie!'
+    : v.stato === 'in_arrivo' ? '₿ Pagamento visto in rete: in arrivo'
+    : v.stato === 'annullata' ? 'Conto annullato'
+    : v.stato === 'scaduta' ? 'Conto scaduto'
+    : '⏳ In attesa del pagamento…';
 }
 function copiaCassa(){
   const t = el('cassaTesto').textContent; if (!t) return;
@@ -43487,6 +43587,7 @@ function modoNegozio(acceso){
     document.body.classList.remove('app-negozio');
     barraCassa(false);
     fermaBattitoCassa();
+    chiudiSchermoCliente();
     cassa.classList.remove('in-pagina', 'open');
     el('cassaVaiVendite').textContent = '🧾 Le vendite della cassa, in «Ordini»';
     if (eserPostoCassa) eserPostoCassa.padre.insertBefore(cassa, eserPostoCassa.dopo);
@@ -43538,8 +43639,102 @@ function disegnaVenditeNegozio(){
     box.innerHTML = '<div class="eser-vuoto">Ancora nessuna vendita della cassa.<br>Quando incassi, la ritrovi qui e in «Ordini» di Barattolo.</div>';
     return;
   }
-  box.innerHTML = `<div class="hint" style="margin:0 0 10px">${cassaOggiTesto(cassaDati && cassaDati.oggi)}<br>Le stesse vendite stanno anche in «Ordini» di Barattolo, col filtro «🏪 Cassa».</div>`
+  box.innerHTML = chiusuraCassaHTML(chiusuraCassa(ordiniCassa, eserGiorno, Date.now()))
+    + '<div class="hint" style="margin:14px 0 10px">Tutte le vendite, dalla più recente. Le stesse stanno anche in «Ordini» di Barattolo, col filtro «🏪 Cassa».</div>'
     + ordiniCassa.map(cardCassaOrdine).join('');
+}
+
+/* ---- LA CHIUSURA DI CASSA (20 nov 2026, cassa in presenza) ----
+   A fine giornata chi tiene il banco vuole il conto: quante vendite,
+   quanti sats, quanti per Lightning e quanti on-chain, quali pezzi
+   sono usciti. Si fa qui, con le vendite che la scheda ha gia' letto
+   (le ultime 100 di /cassa/storico): nessuna rotta nuova. Il giorno e'
+   quello del TELEFONO, da mezzanotte a mezzanotte: e' il giorno del
+   negozio. I sats sono la verita'; gli euro sono al cambio di adesso,
+   col loro «≈», perche' una vendita con pezzi a listino in sats non ha
+   un valore in euro fissato al momento. */
+let eserGiorno = 0;   /* 0 oggi, 1 ieri */
+function inizioGiorno(ms, indietro){
+  const g = new Date(ms);
+  g.setHours(0, 0, 0, 0);
+  g.setDate(g.getDate() - (indietro || 0));
+  return g.getTime();
+}
+/* PURA: la chiusura del giorno `indietro` (0 oggi) contando da `adesso` */
+function chiusuraCassa(vendite, indietro, adesso){
+  const da = inizioGiorno(adesso, indietro) / 1000;
+  const a = inizioGiorno(inizioGiorno(adesso, indietro) + 36 * 3600 * 1000, 0) / 1000;
+  const c = {da, n:0, sats:0, ln:{n:0, sats:0}, oc:{n:0, sats:0},
+             libero:0, arrivo:0, pezzi:[], troncato:false};
+  const pezzi = new Map();
+  for (const v of vendite || []) {
+    const t = v.pagata_il || v.creato || 0;
+    if (t < da || t >= a) continue;
+    if (v.stato === 'in_arrivo') { c.arrivo += 1; continue; }
+    if (v.stato !== 'pagata') continue;
+    c.n += 1; c.sats += v.sats || 0;
+    const m = v.metodo === 'onchain' ? c.oc : c.ln;
+    m.n += 1; m.sats += v.sats || 0;
+    if (!(v.righe || []).length) c.libero += 1;
+    for (const r of v.righe || []) {
+      const k = String(r.id);
+      const p = pezzi.get(k) || {titolo: r.titolo || 'Articolo', q: 0};
+      p.q += Math.max(1, Number(r.q) || 1);
+      pezzi.set(k, p);
+    }
+  }
+  c.pezzi = [...pezzi.values()].sort((x, y) => y.q - x.q || x.titolo.localeCompare(y.titolo));
+  /* la lista e' troncata a 100: se la vendita piu' vecchia letta e'
+     ancora dentro il giorno, il conto potrebbe mancarne qualcuna */
+  const ultima = (vendite || [])[(vendite || []).length - 1];
+  c.troncato = (vendite || []).length >= 100 && !!ultima
+            && (ultima.pagata_il || ultima.creato || 0) >= da;
+  return c;
+}
+function chiusuraGiornoNome(c){
+  return new Date(c.da * 1000).toLocaleDateString('it-IT', {weekday:'long', day:'numeric', month:'long'});
+}
+function chiusuraCassaHTML(c){
+  const pill = (g, t) => `<button type="button" class="consegna-pill${eserGiorno === g ? ' attiva' : ''}" onclick="eserCambiaGiorno(${g})">${t}</button>`;
+  const riga = (t, m) => m.n ? `<div class="chiusura-riga"><span>${t}</span><b>${m.n} · <span class="mono">${fmt(m.sats)}</span> sats</b></div>` : '';
+  const corpo = c.n ? `
+      <div class="chiusura-cifra"><span class="mono">${fmt(c.sats)}</span> <small>sats</small></div>
+      <div class="hint" style="text-align:center;margin:0 0 8px">${c.n} ${c.n === 1 ? 'vendita' : 'vendite'} ${esc(cassaEuroTesto(c.sats))}</div>
+      ${riga('⚡ Lightning', c.ln)}${riga(P2P_OC_MONETA + 'On-chain', c.oc)}
+      ${c.pezzi.length ? '<div class="chiusura-titolo">Pezzi usciti</div>' + c.pezzi.map(p =>
+          `<div class="chiusura-riga"><span>${esc(p.titolo)}</span><b>× ${p.q}</b></div>`).join('') : ''}
+      ${c.libero ? `<div class="chiusura-riga"><span>Importi liberi</span><b>${c.libero}</b></div>` : ''}`
+    : '<div class="hint" style="text-align:center;margin:10px 0">Nessuna vendita pagata in questo giorno.</div>';
+  const note = [c.arrivo ? `₿ ${c.arrivo} ${c.arrivo === 1 ? 'pagamento' : 'pagamenti'} on-chain ancora in arrivo, non contati.` : '',
+                c.troncato ? 'Il conto guarda le ultime 100 vendite: per questo giorno potrebbe mancarne qualcuna.' : '']
+               .filter(Boolean).map(t => `<div class="hint" style="margin-top:6px">${t}</div>`).join('');
+  return `<div class="chiusura-cassa">
+      <div class="chiusura-testa"><b>📒 Chiusura di cassa</b><span class="consegna-scelta chiusura-giorni">${pill(0, 'Oggi')}${pill(1, 'Ieri')}</span></div>
+      <div class="hint" style="margin:2px 0 6px">${esc(chiusuraGiornoNome(c))}</div>
+      ${corpo}${note}
+      ${c.n ? '<button class="btn ghost" style="margin-top:10px" onclick="copiaChiusuraCassa()">📋 Copia il riepilogo</button>' : ''}
+    </div>`;
+}
+function eserCambiaGiorno(g){
+  haptic();
+  eserGiorno = g;
+  disegnaVenditeNegozio();
+}
+/* PURA: il riepilogo in testo semplice, da incollare dove si tiene la
+   contabilita' (un foglio, una chat col commercialista) */
+function chiusuraCassaTesto(c){
+  const r = [`Chiusura di cassa · ${chiusuraGiornoNome(c)}`,
+             `${c.n} ${c.n === 1 ? 'vendita' : 'vendite'} · ${fmt(c.sats)} sats ${cassaEuroTesto(c.sats)}`.trim()];
+  if (c.ln.n) r.push(`Lightning: ${c.ln.n} · ${fmt(c.ln.sats)} sats`);
+  if (c.oc.n) r.push(`On-chain: ${c.oc.n} · ${fmt(c.oc.sats)} sats`);
+  if (c.pezzi.length) { r.push('Pezzi usciti:'); for (const p of c.pezzi) r.push(`- ${p.titolo} × ${p.q}`); }
+  if (c.libero) r.push(`Importi liberi: ${c.libero}`);
+  if (c.arrivo) r.push(`On-chain in arrivo, non contati: ${c.arrivo}`);
+  return r.join('\n');
+}
+function copiaChiusuraCassa(){
+  haptic();
+  copiaLink(chiusuraCassaTesto(chiusuraCassa(ordiniCassa, eserGiorno, Date.now())), 'Riepilogo copiato 📋');
 }
 
 /* ---- feedback reciproco a affare concluso ---- */

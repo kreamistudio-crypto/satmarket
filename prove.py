@@ -202085,6 +202085,7 @@ const apriCassa = () => conta.apriCassa++, fermaBattitoCassa = () => conta.batti
 const renderPuntoPacchi = async () => {}, caricaCassaOrdini = async () => {}, disegnaVenditeNegozio = () => {};
 const go = v => conta.go.push(v);
 const barre = []; const barraCassa = on => barre.push(on);
+const cliente = []; const chiudiSchermoCliente = () => cliente.push(1);
 let location = {pathname:'/', search:'?app=negozio&x=1', hash:''};
 const history = {state:null, replaceState(st, t, u){ const i=u.indexOf('?'); location.search = i<0 ? '' : u.slice(i); }};
 __PEZZI__
@@ -202097,6 +202098,7 @@ __PEZZI__
   modoNegozio(true); R.dueVolte = conta.apriCassa;
   modoNegozio(false);
   R.barre = barre.slice();
+  R.cliente = cliente.length;
   R.fuori = [appNegozio, document.body.classList.contains('app-negozio'),
              N.app.figli.map(n => n.id).join(','), N.cassaSheet.classList.s.size,
              N.puntoBlocco.parentNode.id, conta.battito, location.search];
@@ -202126,6 +202128,70 @@ __PEZZI__
     prova("in DEMO la faccia non si accende", [False, "app"], e["demo"])
     prova("la porta diretta apre una volta sola", ["esercente"], e["porta"])
     prova("...e a cassa spenta non apre", 0, e["spenta"])
+    prova("uscendo dal negozio lo schermo per il cliente si chiude", 1, e["cliente"])
+
+    # --- (20 nov 2026, cassa-presenza) lo schermo per il cliente ---------
+    mq = pezzo_js(mini, "function mostraQrCassa(v){", "\n}\n")
+    prova("lo schermo per il cliente riusa LO STESSO codice del foglio (un QR, due tele)", True,
+          "cassaQrCodice = ln ?" in mq and "disegnaQr(el('cassaQr'), cassaQrCodice[0], cassaQrCodice[1])" in mq
+          and "disegnaQr(el('clienteQr'), cassaQrCodice[0], cassaQrCodice[1])"
+              in pezzo_js(mini, "function disegnaSchermoCliente(qr){", "\n}\n"))
+    sv = pezzo_js(mini, "function statoVenditaCassa(v){", "\n}\n")
+    prova("...il battito lo aggiorna (pagato, annullato) e il bottone c'e' solo a conto vivo", True,
+          "if (schermoClienteAperto()) disegnaSchermoCliente(false);" in sv
+          and "el('cassaAlCliente').style.display = fine ? 'none' : '';" in sv)
+    prova("...si chiude tornando al conto (nuovo conto, annullo)", True,
+          "chiudiSchermoCliente();" in pezzo_js(mini, "function cassaTornaAlConto(){", "\n}\n"))
+    ch = pezzo_js(mini, "function chiudiSchermoCliente(){", "\n}\n")
+    prova("...e chiudendo rilascia lo schermo acceso (Wake Lock)", True,
+          "cassaSveglia.release()" in ch and "con-cliente" in ch)
+    prova("...su bianco fisso nei due temi, come il QR", True,
+          "#cassaCliente{position:fixed;inset:0;z-index:9000;background:#fff;color:#111;" in mini)
+
+    # --- la chiusura di cassa, PURA, in node ---------------------------
+    pz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function inizioGiorno(ms, indietro){", "function chiusuraCassa(vendite, indietro, adesso){",
+        "function chiusuraGiornoNome(c){", "function chiusuraCassaTesto(c){"))
+    js = r"""
+const fmt = n => String(n), cassaEuroTesto = s => '≈ ' + (s / 1000) + ' €';
+__PZ__
+const adesso = new Date(2026, 10, 20, 18, 30).getTime();
+const t = (g, h) => new Date(2026, 10, g, h, 0).getTime() / 1000;
+const V = [
+  {id:6, stato:'in_arrivo', metodo:'onchain', sats:9000, creato:t(20,17), pagata_il:0, righe:[]},
+  {id:5, stato:'pagata', metodo:'ln', sats:3000, pagata_il:t(20,16), righe:[{id:1, titolo:'Miele', q:2}]},
+  {id:4, stato:'pagata', metodo:'onchain', sats:5000, pagata_il:t(20,0), righe:[{id:2, titolo:'Pane', q:1},{id:1, titolo:'Miele', q:1}]},
+  {id:3, stato:'pagata', metodo:'ln', sats:700, pagata_il:t(20,9), righe:[]},
+  {id:2, stato:'pagata', metodo:'ln', sats:1000, pagata_il:t(19,23), righe:[{id:2, titolo:'Pane', q:3}]},
+  {id:1, stato:'annullata', metodo:'ln', sats:50, pagata_il:t(19,10), righe:[]},
+];
+const o = chiusuraCassa(V, 0, adesso), i = chiusuraCassa(V, 1, adesso);
+const lunga = Array.from({length:100}, (_, k) => ({stato:'pagata', metodo:'ln', sats:1, pagata_il:t(20, 12), righe:[]}));
+console.log(JSON.stringify({
+  oggi:[o.n, o.sats, o.ln, o.oc, o.libero, o.arrivo, o.pezzi, o.troncato],
+  ieri:[i.n, i.sats, i.pezzi, i.arrivo],
+  troncata:[chiusuraCassa(lunga, 0, adesso).troncato, chiusuraCassa(lunga, 1, adesso).troncato,
+            chiusuraCassa(lunga.slice(0, 99).concat([{stato:'pagata', metodo:'ln', sats:1, pagata_il:t(19, 12), righe:[]}]), 0, adesso).troncato],
+  testo: chiusuraCassaTesto(o).split('\n')}));
+""".replace("__PZ__", pz)
+    pf = os.path.join(cart, "chiusura.js")
+    open(pf, "w", encoding="utf-8").write(js)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("la chiusura di cassa gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    c = _json.loads(r.stdout)
+    prova("oggi: le pagate da mezzanotte (anche quella a mezzanotte in punto), divise per metodo; "
+          "pezzi sommati per articolo, i piu' venduti prima; l'importo libero contato; l'on-chain in arrivo a parte",
+          [3, 8700, {"n": 2, "sats": 3700}, {"n": 1, "sats": 5000}, 1, 1,
+           [{"titolo": "Miele", "q": 3}, {"titolo": "Pane", "q": 1}], False], c["oggi"])
+    prova("ieri: solo ieri, e l'annullata non conta", [1, 1000, [{"titolo": "Pane", "q": 3}], 0], c["ieri"])
+    prova("la lista troncata a 100 lo dice se la piu' vecchia letta sta ancora nel giorno o dopo "
+          "(oggi; ieri, coperto tutto da oggi), non se arriva a prima", [True, True, False], c["troncata"])
+    prova("il riepilogo da copiare", [
+        "Chiusura di cassa · venerdì 20 novembre", "3 vendite · 8700 sats ≈ 8.7 €",
+        "Lightning: 2 · 3700 sats", "On-chain: 1 · 5000 sats", "Pezzi usciti:",
+        "- Miele × 3", "- Pane × 1", "Importi liberi: 1", "On-chain in arrivo, non contati: 1"], c["testo"])
 
 
 def prove_mancia_venditore():
