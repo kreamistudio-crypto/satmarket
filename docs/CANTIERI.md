@@ -93020,3 +93020,23 @@ saltate; collaudi vicini (p2p_onchain, tempo_pagare,
 p2p_onchain_commissione, contanti_p2p) 4 verdi; sintassi del JS della
 pagina con `node --check`.
 Resta da guardare dal vivo: sul telefono di Andrea, Mini App e web.
+
+## On-chain «tocca a te» sta a chi deve scrivere dove vuole i soldi (20 nov 2026, cantiere tocca-recapito-oc; seguito di timer-card-scambi, dalla coordinazione: «è un difetto, correggilo subito, stessa regola del Lightning»)
+
+DECISO. A deposito confermato e senza recapito (`tempoPagareFermoOcP2P`:
+niente `paga_entro`, niente recapito, non PayCode né contanti di persona)
+il gesto è di chi ha depositato — la casella dice già «Scrivi dove vuoi
+gli euro», col bottone «Indica dove ricevere» — e chi paga aspetta («Aspetta
+il recapito»). `toccaAMeOnchainP2P` invece dava «tocca a te» a chi paga,
+che non sapeva ancora dove mandarli, e niente a chi doveva scrivere: la
+regola del Lightning (`azioniDisponibili`, 18 set: «il recapito è un
+passo») portata qui. Col recapito o col tempo partito torna a chi paga;
+contanti e PayCode come prima. Con lui cambiano da soli il gruppo della
+lista («fare»/«corso») e la tinta della card.
+
+PROVATO. In `prove_timer_card_scambi` il giudice coi pezzi veri (nove
+casi); controprova: il ramo rimesso a `return ricevo` → rossa. Sull'albero
+di develop `bb5f370` più la cura, nel venv senza coincurve e con
+nostr-tools@2.25.2: `PROVE_SEVERE=1 python prove.py` 30.764 passate, 0
+fallite; collaudi della CI 162 verdi, 0 rossi. Dopo il rebase su
+`1b7444b` (tre commit senza simboli in comune) il giro mirato.

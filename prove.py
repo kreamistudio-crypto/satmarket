@@ -217272,6 +217272,31 @@ console.log(JSON.stringify({L, C}));
            "(!compro ? ' attesa'" in pag,
            "box.classList.toggle('rosso', !attesa && resta <= 600);" in batt,
            ".p2p-box.p2p-tempo-pagare.attesa{" in mini])
+    # (20 nov 2026, cantiere tocca-recapito-oc) on-chain il recapito e' un passo
+    r = subprocess.run(["node", "-e", "\n".join([
+        "const P2P_ONCHAIN_VIVI = new Set(['pending', 'preso', 'depositato', 'euro_inviati', 'disputa']);",
+        "function contantiOcP2P(o){ return !!o.contanti; }",
+        _fn_js(mini, "function depositoVistoOnchainP2P(o){"),
+        _fn_js(mini, "function daFirmareOnchainP2P(o){"),
+        _fn_js(mini, "function cambioDaFirmareOnchainP2P(o){"),
+        _fn_js(mini, "function tempoPagareFermoOcP2P(o){"),
+        _fn_js(mini, "function toccaAMeOnchainP2P(o){"),
+        "const b = {stato: 'depositato', incasso: 'tb1q', recapito: '', paga_entro: 0, proposta: null};",
+        "const t = x => toccaAMeOnchainP2P(Object.assign({}, b, x));",
+        "console.log(JSON.stringify([t({ruolo: 'compratore'}), t({ruolo: 'venditore'}),",
+        "  t({ruolo: 'compratore', recapito: 'IT60'}), t({ruolo: 'venditore', recapito: 'IT60'}),",
+        "  t({ruolo: 'venditore', paga_entro: 9}), t({ruolo: 'compratore', paga_entro: 9}),",
+        "  t({ruolo: 'venditore', contanti: true}), t({ruolo: 'compratore', contanti: true}),",
+        "  t({ruolo: 'venditore', tabacchino: true})]));"])], capture_output=True, text=True)
+    try:
+        tc = json.loads(r.stdout)
+    except Exception:
+        tc = "errore: " + r.stderr[-300:]
+    prova("ON-CHAIN IL RECAPITO E' UN PASSO, come nel Lightning: a deposito confermato senza "
+          "recapito «tocca a te» sta a chi ha depositato (deve scrivere dove vuole i soldi) e "
+          "non a chi paga; col recapito o col tempo partito torna a chi paga; contanti e "
+          "PayCode come prima",
+          [True, False, False, True, True, False, True, False, True], tc)
     # a tempo finito il gesto non c'e' piu'
     r = subprocess.run(["node", "-e", "\n".join([
         "let p2pScambiServer = null;",

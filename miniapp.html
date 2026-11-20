@@ -76093,7 +76093,13 @@ function toccaAMeOnchainP2P(o){
   if (ricevo && !o.incasso && o.stato !== 'disputa'
       && (!o.incasso_ln || (!!o.rilascio_chiesto_il && o.stato !== 'preso'))) return true;
   if (o.stato === 'preso') return deposito && !depositoVistoOnchainP2P(o);
-  if (o.stato === 'depositato') return ricevo;
+  /* IL RECAPITO E' UN PASSO ANCHE QUI (20 nov 2026, cantiere tocca-recapito-oc;
+     la regola del Lightning, `azioniDisponibili` del 18 set): a deposito
+     confermato e senza recapito (`tempoPagareFermoOcP2P`) il gesto e' di chi
+     ha depositato — «Scrivi dove vuoi gli euro» — e chi paga aspetta; prima
+     il «tocca a te» stava a chi paga, che non sapeva ancora dove mandarli */
+  if (o.stato === 'depositato')
+    return (typeof tempoPagareFermoOcP2P === 'function' && tempoPagareFermoOcP2P(o)) ? deposito : ricevo;
   if (o.stato === 'euro_inviati') return deposito && !(o.incasso_ln && o.rilascio_chiesto_il);
   return false;
 }
