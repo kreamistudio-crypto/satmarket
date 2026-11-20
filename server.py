@@ -4456,10 +4456,13 @@ def consigliati_pubblici(con) -> list:
     chiunque apra la home, e come `racconto_pubblico` non sa (e non deve
     sapere) chi bussa. Il moderatore la bozza la guarda dalla porta sua.
 
-    Escono sei chiavi e nessun'altra: lo slug (per il logo), il
+    Escono sette chiavi e nessun'altra: lo slug (per il logo), il
     titolo, l'emoji, il CODICE del negozio RISOLTO — mai il tg_id
     con cui il catalogo puo' legare la pagina, il patto dei CAMPI_RACCONTO
     —, `logo_giu`, il ritocco del suo logo nel quadrato (set 2026), e
+    `logo_pieno` (20 nov 2026, AndreAI): VERO se il logo e' una foto
+    quadrata che riempie TUTTO il quadrato della card, senza il margine
+    dei marchi — solo col `True` del catalogo, come il banner — e
     `banner` (set 2026, «Un tempo per te»): VERO se la pagina ha la sua
     immagine per la card della pagina «Consigliati», in
     `assets/scoprire/<slug>.webp`. Solo col `True` del catalogo: una
@@ -4487,6 +4490,7 @@ def consigliati_pubblici(con) -> list:
                           "negozio": v["negozio"],
                           "logo_giu": _logo_giu_consigliato(
                               r.get("logo_giu")),
+                          "logo_pieno": r.get("logo_pieno") is True,
                           "banner": r.get("banner") is True})
     except Exception as e:
         print(f"⚠️ [consigliati] la lista non si legge: {e}")
@@ -102009,6 +102013,28 @@ def venditori_nostr_attivi() -> list:
     return coppie
 
 
+_IMPORT_NOSTR_VIVO = False
+
+
+async def importa_nostr_in_sfondo():
+    """IL GIRO DELL'IMPORT IN UN TASK SUO (20 nov 2026), gemello di
+    `sincronizza_connettori_in_sfondo`: l'orologio lo lancia e non lo
+    aspetta. Uno alla volta: se il giro di prima sta ancora girando,
+    questo non parte (l'appuntamento orario lo tiene gia'
+    `importa_nostr_periodico`, questo e' il fermo per i giri lunghi)."""
+    global _IMPORT_NOSTR_VIVO
+    if _IMPORT_NOSTR_VIVO:
+        return
+    _IMPORT_NOSTR_VIVO = True
+    try:
+        await importa_nostr_periodico()
+    except Exception as e:
+        print(f"⚠️ Import Nostr periodico saltato (riprovo tra "
+              f"un'ora): {e}")
+    finally:
+        _IMPORT_NOSTR_VIVO = False
+
+
 async def importa_nostr_periodico():
     global _prossimo_import_nostr
     if not IMPORT_NOSTR_APERTO:
@@ -105551,7 +105577,13 @@ async def orologio():
         except Exception as e:
             print(f"⚠️ Giro delle ferie saltato: {e}")
         try:
-            await importa_nostr_periodico()
+            # IN UN TASK SUO (20 nov 2026, la prova d'uscita di Bitcoin
+            # On): l'import legge un venditore alla volta, e ogni relay
+            # morto costa 10 secondi a venditore — l'orologio restava
+            # fermo qui per parecchi minuti, e scadenze, abbonamenti e
+            # pagamenti aspettavano lui. Ora l'orologio lo LANCIA e va
+            # avanti, come il sync dei negozi collegati qui sotto.
+            asyncio.create_task(importa_nostr_in_sfondo())
         except Exception as e:
             print(f"⚠️ Import Nostr periodico saltato (riprovo tra "
                   f"un'ora): {e}")
