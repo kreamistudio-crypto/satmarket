@@ -205,7 +205,7 @@ La cassa in negozio (se nelle REGOLAZIONI del pannello «Cassa in negozio» è a
 <!-- pezzo libro-021 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (1/23)
 
-Nel P2P non compri da Barattolo: compri da un'altra persona. Vi accordate su un prezzo, gli euro viaggiano fra voi due col metodo scelto, e i sats restano bloccati finché gli euro non sono arrivati (sul Lightning con una fattura «trattenuta», non in un deposito di Barattolo). Barattolo non tocca i tuoi euro. Si entra dal tasto «P2P» in basso; lì ci sono il «Libro ordini», «I miei scambi», «Pubblica» e «Info P2P», che spiega tutto con calma. Dal 20 novembre 2026 la pagina di uno scambio («Nel dettaglio», Lightning e on-chain) ha in alto tre schede, sempre in vista anche scorrendo: «📋 Passi» (si apre lì: i passi, lo stato, il bottone da toccare, e in fondo «✕ Annulla» e la disputa), «💰 Importi» (il conto: quanto ricevi e quanto mandi) e «💬 Chat» (la chat e chi è l'altra persona; un pallino rosso conta i messaggi nuovi). Se la chat non c'è ancora, le schede sono due. Sul computer a schermo largo, fuori da Telegram, la pagina resta su colonne, senza schede.
+Nel P2P non compri da Barattolo: compri da un'altra persona. Vi accordate su un prezzo, gli euro viaggiano fra voi due col metodo scelto, e i sats restano bloccati finché gli euro non sono arrivati (sul Lightning con una fattura «trattenuta», non in un deposito di Barattolo). Barattolo non tocca i tuoi euro. Si entra dal tasto «P2P» in basso; lì ci sono il «Libro ordini», «I miei scambi», «Pubblica» e «Info P2P», che spiega tutto con calma. Dal 20 novembre 2026 la pagina di uno scambio («Nel dettaglio», Lightning e on-chain) ha in alto tre schede, sempre in vista anche scorrendo: «📋 Passi» (si apre lì: i passi, lo stato, il bottone da toccare, e in fondo «✕ Annulla» e la disputa), «💰 Importi» (il conto: quanto ricevi e quanto mandi) e «💬 Chat» (la chat e chi è l'altra persona; un pallino rosso conta i messaggi nuovi). Se la chat non c'è ancora, le schede sono due. Sul computer a schermo largo, fuori da Telegram, la pagina resta su colonne, senza schede. Dal 20 novembre 2026 anche il foglio «Pubblica» del P2P va a passi, una pagina alla volta: «1. Cosa» (valuta, metodi di pagamento, zona di scambio), «2. Quanto» (importo, tipo di prezzo, premio), «3. Regole» (chi può prendere l'ordine, tempo per pagare, cauzione, pausa, paracadute, ripubblica) e «4. Rileggi» (un riepilogo «Rileggi prima di pubblicare», poi il bottone che pubblica). Si va avanti con «Avanti →» (se manca qualcosa del passo lo dice e non va avanti), si torna con «← Indietro» o toccando un passo già fatto nella riga in alto. L'interruttore «On-chain / Lightning» resta in cima a ogni passo, e le scelte sono le stesse di prima. Con Barattozon il foglio resta quello di sempre, coi suoi quattro passi del PayCode.
 
 Come funziona, in cinque passi:
 1. Qualcuno pubblica un ordine: dice se compra o vende sats, per quanti euro e con quali metodi di pagamento. L'ordine va nel libro, che vedono tutti.
@@ -214,10 +214,10 @@ Come funziona, in cinque passi:
 4. Chi compra manda gli euro col metodo scelto, al recapito che l'altra persona lascia dentro lo scambio, e poi lo dice nell'app.
 5. Chi vende controlla di aver ricevuto gli euro e libera i sats: arrivano all'indirizzo Lightning o alla fattura di chi compra.
 
-La garanzia: nello scambio Lightning chi vende paga una fattura «trattenuta» (hold invoice), e i sats restano bloccati nella rete Lightning, non in un deposito di Barattolo. Possono prendere due strade sole: andare a chi compra quando chi vende conferma di aver ricevuto gli euro, o tornare a chi vende. Nessuno, nemmeno Barattolo, può prenderli o dirottarli altrove. A farli andare da una parte o dall'altra è il coordinatore, un programma che si chiama Mostro, che Barattolo fa girare sul suo nodo. Per il P2P Lightning non dire mai che Barattolo «fa da garante», «tiene i sats» o ha un «deposito di garanzia»: il deposito di garanzia di Barattolo c'è solo nel mercatino (sugli scambi on-chain c'è il deposito a due firme su tre, spiegato più sotto).
-
 <!-- pezzo libro-022 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (2/23)
+
+La garanzia: nello scambio Lightning chi vende paga una fattura «trattenuta» (hold invoice), e i sats restano bloccati nella rete Lightning, non in un deposito di Barattolo. Possono prendere due strade sole: andare a chi compra quando chi vende conferma di aver ricevuto gli euro, o tornare a chi vende. Nessuno, nemmeno Barattolo, può prenderli o dirottarli altrove. A farli andare da una parte o dall'altra è il coordinatore, un programma che si chiama Mostro, che Barattolo fa girare sul suo nodo. Per il P2P Lightning non dire mai che Barattolo «fa da garante», «tiene i sats» o ha un «deposito di garanzia»: il deposito di garanzia di Barattolo c'è solo nel mercatino (sugli scambi on-chain c'è il deposito a due firme su tre, spiegato più sotto).
 
 Come si legge una card del libro: in alto a destra due quadratini con una freccia dicono cosa invii e cosa ricevi (le stelle blu dell'Europa per gli euro, la T verde di Tether per gli USDT, il fulmine nero per i sats su Lightning, la ₿ arancio per bitcoin on-chain). Sotto ci sono la cifra da inviare e quella da ricevere, i metodi di pagamento e, nel riquadro in fondo, la faccia di chi ha pubblicato con le sue stelline e quanti scambi P2P ha già fatto («✅ 22 scambi P2P»); toccando la faccia si apre il suo negozio (anche sulle card on-chain; se non ha ancora un negozio, l'app te lo dice e non apre l'ordine). La riga colorata sul bordo di sotto è il tempo che resta all'ordine: si accorcia, diventa arancio negli ultimi tre giorni e rossa, lampeggiante, nell'ultimo.
 
@@ -225,12 +225,12 @@ Il prezzo di bitcoin nel libro: in cima al libro P2P, sotto i rettangoli «Novit
 
 Quanto si può per ordine nel P2P, per ora (fase beta): fino a 250 € negli scambi in Lightning e fino a 999 € in quelli on-chain (dal 16 novembre 2026; prima 500 €, e fino al 12 novembre 250 €). Gli acquisti on-chain del mercatino hanno un tetto loro, separato da quello del P2P dal 17 novembre 2026 (quel giorno anche lui 999 €); chi prende un ordine ricevendo sull'altra rete ha il suo, 999 €. Il foglio «Pubblica» lo scrive sotto la cifra e non lascia andare oltre.
 
+<!-- pezzo libro-023 | libro -->
+## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (3/23)
+
 Il prezzo: gli ordini si scrivono in euro e i sats si contano al cambio del momento, per questo finché l'ordine è nel libro la cifra in sats ha il segno ≈. La cifra esatta si fissa quando l'ordine viene preso. Alcuni ordini hanno un intervallo («da 20 a 100 €»): lì scegli tu quanto. Nel foglio «Quanto vuoi scambiare?» il campo è vuoto (dal 17 novembre 2026; prima c'era già scritto il minimo e andava cancellato): si scrive la cifra, oppure si tocca «Minimo» o «Massimo» per metterla con un tocco, e poi «Continua».
 
 I tasti «Compra BTC» e «Vendi BTC» in cima al libro P2P sono due pillole (dal 16 novembre 2026, di giorno e di sera): quella accesa, verde per «Compra BTC» e corallo per «Vendi BTC», dice quale lato del libro stai guardando.
-
-<!-- pezzo libro-023 | libro -->
-## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (3/23)
 
 L'ordine del libro: in cima al libro P2P la pillola con le tre righe (di serie dice «Recenti») apre «Ordina il libro», con quattro scelte: Più recenti, Convenienza, Importo dal più grande, Importo dal più piccolo. La pillola diventa arancio quando l'ordine non è quello di serie. Dal 14 novembre 2026 la scelta resta salvata su quel telefono o computer: alla visita dopo il libro si apre già ordinato così, sia in «Compra» sia in «Vendi». Su un altro dispositivo si sceglie di nuovo. Le card on-chain e quelle Lightning stanno nello stesso ordine, qualunque sia la scelta: con «Più recenti» la più nuova sta in cima, on-chain o Lightning che sia (dal 16 novembre 2026).
 
@@ -2666,5 +2666,13 @@ pubblico: sì
 
 frase: La pagina di uno scambio P2P è più ordinata: in alto tre schede, «📋 Passi», «💰 Importi» e «💬 Chat». Entrando vedi subito i passi, lo stato e il bottone da toccare; il conto e la chat sono a un tocco, con un pallino rosso quando ti hanno scritto.
 dove: P2P → «I miei scambi» → uno scambio (Lightning o on-chain): le schede sotto il titolo «Nel dettaglio», ferme in alto anche scorrendo.
+leva: nessuna
+pubblico: sì
+
+<!-- pezzo novita-142 | novita -->
+## Novità · 2026-11-20 · pubblica-passi
+
+frase: Pubblicare un ordine P2P adesso va a passi, una pagina alla volta: «1. Cosa», «2. Quanto», «3. Regole» e «4. Rileggi», col riepilogo prima di pubblicare. Si va con «Avanti →» e si torna con «← Indietro» o toccando un passo già fatto. La scelta fra ⚡ Lightning e ₿ On-chain resta in cima a ogni passo, e le scelte sono le stesse di prima.
+dove: P2P → il + → «Pubblica» (Vendi BTC o Compra BTC). Con Barattozon il foglio resta quello di sempre, coi suoi passi.
 leva: nessuna
 pubblico: sì

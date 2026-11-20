@@ -884,3 +884,9 @@ frase: La pagina di uno scambio P2P è più ordinata: in alto tre schede, «📋
 dove: P2P → «I miei scambi» → uno scambio (Lightning o on-chain): le schede sotto il titolo «Nel dettaglio», ferme in alto anche scorrendo.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-20 · pubblica-passi
+frase: Pubblicare un ordine P2P adesso va a passi, una pagina alla volta: «1. Cosa», «2. Quanto», «3. Regole» e «4. Rileggi», col riepilogo prima di pubblicare. Si va con «Avanti →» e si torna con «← Indietro» o toccando un passo già fatto. La scelta fra ⚡ Lightning e ₿ On-chain resta in cima a ogni passo, e le scelte sono le stesse di prima.
+dove: P2P → il + → «Pubblica» (Vendi BTC o Compra BTC). Con Barattozon il foglio resta quello di sempre, coi suoi passi.
+leva: nessuna
+pubblico: sì

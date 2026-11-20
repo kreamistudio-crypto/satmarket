@@ -218196,6 +218196,228 @@ console.log(JSON.stringify({segni, r1, dopoImporti, dopoChat, r2, r3, r4, r5}));
            ".a-schede > .chatsc-richiamo{display:none !important}" in mini])
 
 
+def prove_pubblica_passi():
+    """IL FOGLIO «PUBBLICA» A PASSI (20 nov 2026, cantiere pubblica-passi;
+    l'idea e' di un utente: «fare una creazione di ordine a step, pagina per
+    pagina»; Andrea: «uno deve poter sempre scegliere tra on-chain e
+    lightning», «controlla che rimanga tutto invariato come adesso»).
+
+    Quel che qui si rompe in silenzio: una sezione nuova aggiunta al foglio
+    ma non ai gruppi dei passi (finirebbe nel passo sbagliato, o farebbe
+    scivolare tutte le altre), l'interruttore ⚡/₿ che entra nel corpo e
+    sparisce dopo il primo passo, il PayCode di Barattozon che perde il suo
+    percorso, «Avanti» che lascia passare un campo del passo, l'avviso che
+    scorre a un campo nascosto in un altro passo, e il foglio che non
+    riparte dal primo passo."""
+    print("\n[il foglio «Pubblica» a passi]")
+    mini = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "miniapp.html"),
+                encoding="utf-8").read()
+    js = "\n".join([
+        "function esc(s){ return String(s); }",
+        "function fmt(n){ return String(n); }",
+        "function interoP2P(s){ const n = parseInt(String(s || '').replace(/\\D/g, ''), 10); return {n: n > 0 ? n : 0}; }",
+        "function etichettaEuroFoglioP2P(e, segno, modo){ return interoP2P(e).n + ' ' + segno + (modo === 'max' ? '!' : ''); }",
+        "function premioTestoP2P(n){ return (n > 0 ? '+' : '') + n + '%'; }",
+        "function sezioneNuovoP2P(o){ return '<div class=\"p2p-sez\">' + o.titolo + '|' + o.corpo + '</div>'; }",
+        "let p2pNuovoEuro = '50', p2pNuovoEuroMax = '', p2pNuovoDue = false, p2pNuovoFisso = false,",
+        "    p2pNuovoSats = '', p2pNuovoPremio = 0, p2pNuovoFiltro = 0, p2pNuovoMetodi = ['SEPA'];",
+        _riga_js(mini, "let p2pNuovoPasso = "),
+        pezzo_js(mini, "const P2P_PASSI_NUOVO = [", "];\n") + "];\n",
+        _fn_js(mini, "function passiNuovoAccesiP2P(tabMetodo){"),
+        _fn_js(mini, "function passiViviNuovoP2P(){"),
+        _fn_js(mini, "function foglioAPassiP2P(box, gruppi, compro, val, valCoin){"),
+        _fn_js(mini, "function riepilogoNuovoP2P(compro, val, valCoin){"),
+        _fn_js(mini, "function passoDelCampoNuovoP2P(id){"),
+        _fn_js(mini, "function indietroNuovoP2P(){"),
+        _fn_js(mini, "function avantiNuovoP2P(){"),
+        r"""
+/* UN DOM DI CARTONE: quanto basta a contare, segnare e inserire */
+function nodo(tag, classi){
+  const a = {}, cl = new Set(classi || []);
+  const n = {tag, a, children: [], textContent: '', parentElement: null,
+    classList: {add: c => cl.add(c), remove: c => cl.delete(c), contains: c => cl.has(c)}, cl,
+    setAttribute(k, v){ a[k] = String(v); }, getAttribute(k){ return k in a ? a[k] : null; },
+    removeAttribute(k){ delete a[k]; },
+    get firstChild(){ return n.children[0] || null; },
+    get firstElementChild(){ return n.children[0] || null; },
+    insertBefore(x, rif){ const i = rif ? n.children.indexOf(rif) : -1;
+      if (i < 0) n.children.push(x); else n.children.splice(i, 0, x); x.parentElement = n; },
+    closest(q){ let p = n; while (p) { if (q === '[data-scheda]' && p.getAttribute('data-scheda') !== null) return p; p = p.parentElement; } return null; }};
+  Object.defineProperty(n, 'innerHTML', {get(){ return n._html || ''; }, set(h){
+    n._html = h;
+    const conti = (String(h).match(/<div class="p2p-sez"/g) || []).length;
+    n.children = []; n.content = {children: []};
+    for (let i = 0; i < conti; i++) { const f = nodo('div', ['p2p-sez']); f._html = h; f.parentElement = n; n.children.push(f); n.content.children.push(f); }
+  }});
+  return n;
+}
+const document = {createElement: t => nodo(t)};
+const DOM = {};
+function el(id){ return DOM[id] || null; }
+let TOAST = [], AVVISI = [], VAI = [];
+function toast(t){ TOAST.push(t); }
+function avvisaMancaP2P(g){ AVVISI.push(g.campo); }
+function vaiPassoNuovoP2P(i){ VAI.push(i); p2pNuovoPasso = i; }
+let GIUDIZIO = {ok: true}, RIP = '';
+function campiNuovoP2P(){ return {metodi: p2pNuovoMetodi, zona: ''}; }
+function valeNuovoOrdineP2P(){ return GIUDIZIO; }
+function giudiceZonaP2P(){ return ''; }
+function erroreRipubblicaP2P(){ return RIP; }
+const sez = '<div class="p2p-sez">x</div>';
+function foglio(nPezzi){
+  const box = nodo('div'); box.id = 'p2pNuovoCorpo'; DOM.p2pNuovoCorpo = box;
+  for (let i = 0; i < nPezzi; i++) { const f = nodo('div', ['p2p-sez']); f.id = 'pz' + i; DOM['pz' + i] = f; box.insertBefore(f, null); }
+  const piede = nodo('div', ['foglio-piede', 'sola']);
+  const invia = nodo('button', ['btn', 'rosso']); invia.textContent = '⚡Pubblica ordine';
+  invia.setAttribute('onclick', 'inviaNuovoOrdineP2P()'); DOM.p2pNuovoInvia = invia;
+  piede.insertBefore(invia, null); box.insertBefore(piede, null);
+  return box;
+}
+const val = {segno: '€'};
+/* 1. tre gruppi (3, 4, 2) + un riquadro in fondo + il piede, al primo passo */
+let box = foglio(10);
+p2pNuovoPasso = 0;
+const ok1 = foglioAPassiP2P(box, [sez + sez + sez, sez + sez + sez + sez, sez + sez], false, val, null);
+const segni1 = box.children.map(c => c.getAttribute('data-scheda'));
+const p1 = {ok: ok1, segni: segni1, vedi: box.getAttribute('data-vedi'), classe: box.cl.has('a-schede'),
+  barra: box.children[0].id, barraHtml: box.children[0].innerHTML, riep: box.children[11].getAttribute('data-scheda'),
+  invia: DOM.p2pNuovoInvia.textContent, onclick: DOM.p2pNuovoInvia.a.onclick,
+  sola: box.children[box.children.length - 1].cl.has('sola'), figliPiede: box.children[box.children.length - 1].children.length};
+/* 2. all'ultimo passo: il bottone e' quello di sempre, e c'e' «← Indietro» */
+box = foglio(10); p2pNuovoPasso = 3;
+foglioAPassiP2P(box, [sez + sez + sez, sez + sez + sez + sez, sez + sez], true, val, null);
+const piede2 = box.children[box.children.length - 1];
+const p2 = {vedi: box.getAttribute('data-vedi'), invia: DOM.p2pNuovoInvia.textContent, onclick: DOM.p2pNuovoInvia.a.onclick,
+  sola: piede2.cl.has('sola'), primo: piede2.children[0].textContent, primoClick: piede2.children[0].a.onclick};
+/* 3. «Regole» vuoto: si salta; il 99 della ripubblica va all'ultimo (il Rileggi) */
+box = foglio(5); p2pNuovoPasso = 99;
+foglioAPassiP2P(box, [sez + sez, sez + sez, ''], false, val, null);
+const p3 = {vedi: box.getAttribute('data-vedi'), passo: p2pNuovoPasso, passi: box._passi.map(p => p.k).join(',')};
+/* 4. i conti non tornano (manca il piede in fondo): il foglio resta intero */
+box = foglio(3); box.children.pop(); box.cl.add('a-schede');
+const ok4 = foglioAPassiP2P(box, [sez, sez, sez + sez], false, val, null);
+const p4 = {ok: ok4, classe: box.cl.has('a-schede'), segni: box.children.filter(c => c.getAttribute('data-scheda')).length};
+/* 5. il riepilogo: vendo a mercato; compro con l'intervallo, prezzo fisso e filtro */
+const r5a = riepilogoNuovoP2P(false, val, null);
+p2pNuovoEuroMax = '100'; p2pNuovoDue = true; p2pNuovoFiltro = 3; p2pNuovoPremio = 2;
+const r5b = riepilogoNuovoP2P(true, val, null);
+p2pNuovoFisso = true; p2pNuovoSats = '70000';
+const r5c = riepilogoNuovoP2P(true, val, null);
+p2pNuovoFisso = false; p2pNuovoEuroMax = ''; p2pNuovoDue = false; p2pNuovoFiltro = 0; p2pNuovoPremio = 0;
+/* 6. «Avanti»: i metodi al primo passo, poi il giudice di sempre per i
+      campi del passo o di prima, e la ripubblica alle Regole */
+box = foglio(9); p2pNuovoPasso = 0;
+foglioAPassiP2P(box, [sez + sez + sez, sez + sez + sez, sez + sez], false, val, null);
+p2pNuovoMetodi = []; avantiNuovoP2P();
+const a1 = {avvisi: AVVISI.slice(), vai: VAI.slice()};
+p2pNuovoMetodi = ['SEPA']; AVVISI = []; VAI = [];
+GIUDIZIO = {ok: false, manca: 'Scrivi l\'importo', campo: 'pz3'};   /* del passo dopo: si va */
+avantiNuovoP2P();
+const a2 = {avvisi: AVVISI.slice(), vai: VAI.slice()};
+AVVISI = []; VAI = [];
+avantiNuovoP2P();                                                     /* ora e' di questo passo: ci si ferma */
+const a3 = {avvisi: AVVISI.slice(), vai: VAI.slice()};
+GIUDIZIO = {ok: false, manca: 'zona', campo: 'pz1'};                  /* di un passo prima: ci si ferma */
+AVVISI = []; VAI = [];
+avantiNuovoP2P();
+const a4 = {avvisi: AVVISI.slice(), vai: VAI.slice()};
+GIUDIZIO = {ok: true}; p2pNuovoPasso = 2; RIP = 'Ripubblica a meta'; AVVISI = []; VAI = [];
+avantiNuovoP2P();
+const a5 = {toast: TOAST.slice(-1)[0], vai: VAI.slice()};
+RIP = ''; VAI = [];
+avantiNuovoP2P();
+const a6 = {vai: VAI.slice()};
+VAI = []; p2pNuovoPasso = 2; indietroNuovoP2P();
+const a7 = {vai: VAI.slice()};
+console.log(JSON.stringify({p1, p2, p3, p4, r5a, r5b, r5c, a1, a2, a3, a4, a5, a6, a7,
+  bz: passiNuovoAccesiP2P(true), ln: passiNuovoAccesiP2P(false)}));
+"""])
+    o = _node_banco(js)
+    if o is None:
+        salta("il banco del foglio a passi", "node assente")
+        return
+    if "p1" not in o:
+        prova("il banco del foglio a passi gira", True, False)
+        return
+    p1 = o["p1"]
+    prova("i pezzi di sempre finiscono nel loro passo, nell'ordine: 3 in «Cosa», 4 in «Quanto», "
+          "2 in «Regole», il riquadro in fondo e il riepilogo in «Rileggi»; la riga dei passi "
+          "in cima e il piede restano di tutti",
+          [True, [None] + ["cosa"] * 3 + ["quanto"] * 4 + ["regole"] * 2 + ["rileggi", "rileggi", None],
+           "cosa", True, "p2pNuovoPassi", "rileggi"],
+          [p1["ok"], p1["segni"], p1["vedi"], p1["classe"], p1["barra"], p1["riep"]])
+    prova("al primo passo il bottone dice «Avanti →» e porta avanti, senza «← Indietro»; "
+          "la riga ha i quattro nomi approvati",
+          ["Avanti →", "avantiNuovoP2P()", True, 1, True],
+          [p1["invia"], p1["onclick"], p1["sola"], p1["figliPiede"],
+           all(t in p1["barraHtml"] for t in ("1. Cosa", "2. Quanto", "3. Regole", "4. Rileggi"))])
+    p2 = o["p2"]
+    prova("al «Rileggi» il bottone e' QUELLO DI SEMPRE (pubblica col suo gesto), e accanto "
+          "c'e' «← Indietro»",
+          ["rileggi", "⚡Pubblica ordine", "inviaNuovoOrdineP2P()", False, "← Indietro", "indietroNuovoP2P()"],
+          [p2["vedi"], p2["invia"], p2["onclick"], p2["sola"], p2["primo"], p2["primoClick"]])
+    prova("un passo senza pezzi si salta; il passo 99 (la ripubblica col paracadute) arriva "
+          "dritto al «Rileggi»",
+          ["rileggi", 2, "cosa,quanto,rileggi"], [o["p3"]["vedi"], o["p3"]["passo"], o["p3"]["passi"]])
+    prova("se i conti non tornano il foglio resta intero, come prima, senza segni",
+          [False, False, 0], [o["p4"]["ok"], o["p4"]["classe"], o["p4"]["segni"]])
+    prova("il riepilogo: «Vendi/Ricevi» o «Compri/Invii», l'importo (col massimo se c'e' "
+          "l'intervallo), i metodi, il prezzo e chi può prenderlo",
+          [True, True, True, True, True],
+          ["Vendi|" in o["r5a"].replace("</span><b>", "|") and "Ricevi|50 €" in o["r5a"].replace("</span><b>", "|")
+           and "Mercato, 0%" in o["r5a"] and "Chi può prenderlo</span><b>Tutti" in o["r5a"],
+           "Compri</span>" in o["r5b"] and "Invii</span><b>50 € – 100 €!" in o["r5b"],
+           "Mercato, +2%" in o["r5b"] and "3+ scambi" in o["r5b"],
+           "Prezzo fisso, 70000 sats" in o["r5c"] and "– 100" not in o["r5c"],
+           "Metodo</span><b>SEPA" in o["r5a"] and "Rileggi prima di pubblicare" in o["r5a"]])
+    prova("«Avanti →»: senza metodi si ferma sui metodi; un campo del passo DOPO non ferma, "
+          "uno di questo passo o di prima si'; la ripubblica storta ferma alle «Regole»; "
+          "«← Indietro» torna di uno",
+          [["p2pNuovoMetodiBtn"], [], [], [1], ["pz3"], [], ["pz1"], [], [], [3], [1]],
+          [o["a1"]["avvisi"], o["a1"]["vai"], o["a2"]["avvisi"], o["a2"]["vai"],
+           o["a3"]["avvisi"], o["a3"]["vai"], o["a4"]["avvisi"], o["a4"]["vai"],
+           o["a5"]["vai"], o["a6"]["vai"], o["a7"]["vai"]])
+    prova("col PayCode di Barattozon niente passi: ha gia' i suoi", [False, True], [o["bz"], o["ln"]])
+
+    def in_fila(testo, pezzi):
+        i = 0
+        for p in pezzi:
+            j = testo.find(p, i)
+            if j < 0:
+                return False
+            i = j + len(p)
+        return True
+    rnd = _fn_js(mini, "function renderNuovoOrdineP2P(){")
+    import re as _re
+    i = rnd.index("    valuta + metodi + zona + importo")
+    scatole = rnd[i:rnd.index("riquadroLimitiP2P() +", i)]
+    j = rnd.index("foglioAPassiP2P(box, [")
+    gruppi = rnd[j + len("foglioAPassiP2P(box, ["):rnd.index("],", j)]
+    parole = lambda t: [p for p in _re.split(r"[\s+,]+", t) if p]
+    prova("I GRUPPI DEI PASSI SONO LE SCATOLE DEL FOGLIO, una per una e nello stesso ordine: "
+          "una sezione nuova va aggiunta in tutti e due i posti",
+          parole(scatole), parole(gruppi))
+    prova("il foglio si disegna intero COME PRIMA e poi si divide; col PayCode la classe e il "
+          "passo se ne vanno; l'interruttore ⚡/₿ resta FUORI dal corpo (si vede a ogni passo)",
+          [True, True, True],
+          [in_fila(rnd, ["const rete = el('p2pNuovoRete');", "const foglio =", "box.innerHTML = foglio;",
+                         "passiNuovoAccesiP2P(tabMetodo))", "foglioAPassiP2P(box, [",
+                         "box.classList.remove('a-schede');", "box.removeAttribute('data-vedi');"]),
+           in_fila(mini, ['id="p2pNuovoRete"', 'id="p2pNuovoCorpo"']),
+           rnd.count("box.innerHTML") == 1])
+    prova("si riparte da «Cosa» a ogni foglio aperto dal +, e l'avviso va al passo del campo "
+          "PRIMA di cercarlo per scorrerci",
+          [True, True, True],
+          [in_fila(_fn_js(mini, "function apriNuovoOrdineP2P(metodo){"), ["p2pNuovoAltri = false;", "p2pNuovoPasso = 0;"]),
+           in_fila(_fn_js(mini, "function ripubblicaParacaduteP2P(){"), ["p2pNuovoPasso = 99;", "renderNuovoOrdineP2P();"]),
+           in_fila(_fn_js(mini, "function avvisaMancaP2P(g){"),
+                   ["toast(g.manca);", "vaiPassoNuovoP2P(dove);", "const c = g.campo && el(g.campo);"])])
+    prova("il CSS nasconde i passi non scelti solo col corpo `.a-schede`",
+          [True, True],
+          ['.a-schede[data-vedi="cosa"] > [data-scheda]:not([data-scheda="cosa"]),' in mini,
+           '.a-schede[data-vedi="rileggi"] > [data-scheda]:not([data-scheda="rileggi"]){display:none !important}' in mini])
+
+
 def prove_timer_deposito_oc():
     """IL TEMPO PER DEPOSITARE NELLA PAGINA ON-CHAIN (20 nov 2026, cantiere
     timer-deposito; Andrea alla prova con Alan, sulla pagina «Preso: si
@@ -218682,7 +218904,7 @@ def _esce(f):
 CATEGORIE = {
     "p2p": """
     vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
-    timer_card_scambi timer_deposito_oc dettaglio_schede
+    timer_card_scambi timer_deposito_oc dettaglio_schede pubblica_passi
     controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque chiavi_parcheggiate
@@ -220016,6 +220238,7 @@ def main():
               prove_timer_card_scambi,
               prove_timer_deposito_oc,
               prove_dettaglio_schede,
+              prove_pubblica_passi,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

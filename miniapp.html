@@ -3708,7 +3708,31 @@
   .a-schede > *{scroll-margin-top:64px}
   .a-schede[data-vedi="passi"] > [data-scheda]:not([data-scheda="passi"]),
   .a-schede[data-vedi="importi"] > [data-scheda]:not([data-scheda="importi"]),
-  .a-schede[data-vedi="chat"] > [data-scheda]:not([data-scheda="chat"]){display:none !important}
+  .a-schede[data-vedi="chat"] > [data-scheda]:not([data-scheda="chat"]),
+  .a-schede[data-vedi="cosa"] > [data-scheda]:not([data-scheda="cosa"]),
+  .a-schede[data-vedi="quanto"] > [data-scheda]:not([data-scheda="quanto"]),
+  .a-schede[data-vedi="regole"] > [data-scheda]:not([data-scheda="regole"]),
+  .a-schede[data-vedi="rileggi"] > [data-scheda]:not([data-scheda="rileggi"]){display:none !important}
+  /* IL FOGLIO «PUBBLICA» A PASSI (20 nov 2026, cantiere pubblica-passi;
+     la seconda meta' dell'idea dell'utente: «fare una creazione di
+     ordine a step, pagina per pagina»): le stesse sezioni di sempre,
+     divise in quattro passi con lo stesso meccanismo delle schede
+     (`data-scheda` + `data-vedi` sul corpo). In cima la riga dei passi:
+     quattro barrette e il nome, quelle fatte si toccano per tornarci. */
+  .p2p-passi-nuovo{display:flex;gap:6px;margin:2px 0 14px}
+  .p2p-passi-nuovo button{flex:1 1 0;min-width:0;font:inherit;font-size:12px;font-weight:700;
+    color:var(--ink-soft);background:none;border:0;padding:0;text-align:center;cursor:pointer;
+    -webkit-tap-highlight-color:transparent}
+  .p2p-passi-nuovo button:disabled{cursor:default}
+  .p2p-passi-nuovo button::before{content:'';display:block;height:5px;border-radius:3px;
+    margin-bottom:5px;background:var(--chip-bg)}
+  .p2p-passi-nuovo button.fatto{color:var(--ink)}
+  .p2p-passi-nuovo button.fatto::before{background:var(--sats-text)}
+  .p2p-rileggi-riga{display:flex;justify-content:space-between;gap:12px;padding:9px 0;
+    border-bottom:1px dashed var(--line-soft)}
+  .p2p-rileggi-riga:last-child{border-bottom:0}
+  .p2p-rileggi-riga span{color:var(--ink-soft)}
+  .p2p-rileggi-riga b{text-align:right;overflow-wrap:anywhere}
   .p2p-box.p2p-tempo-pagare.scaduto .p2p-anello .pieno{stroke:var(--ink-soft)}
   .p2p-orologio{display:flex;align-items:center;gap:12px}
   .p2p-orologio .p2p-anello{width:44px;height:44px}
@@ -100945,6 +100969,10 @@ function ripubblicaParacaduteP2P(){
   /* ...e la ripubblica dell'ordine vecchio, per la stessa ragione */
   const rip = typeof miaRipubblicaP2P === 'function' ? miaRipubblicaP2P(o) : null;
   p2pNuovoRipMin = rip ? String(rip.minimo) : ''; p2pNuovoRipMax = rip ? String(rip.massimo) : '';
+  /* col foglio a passi si arriva dritti al «Rileggi» (20 nov 2026): i
+     campi sono quelli dell'ordine di prima, e quel che c'e' da leggere e'
+     il riepilogo col prezzo nuovo. «← Indietro» riporta a ogni passo */
+  p2pNuovoPasso = 99;
   renderNuovoOrdineP2P();
 }
 /* ============ fine del paracadute nel motore ============ */
@@ -102375,6 +102403,7 @@ function valutaFoglioP2P(){
 }
 let p2pNuovoDue = false;     // il secondo campo dell'importo si e' fatto vedere
 let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di mercato
+let p2pNuovoPasso = 0;       // il passo del foglio a passi (cerca «IL FOGLIO «PUBBLICA» A PASSI»)
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
 let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
 let p2pNuovoTab = {ordine: '', importo: '', scade: '', barre: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data; `barre` il codice a barre facoltativo, gia' giudicato
@@ -102861,6 +102890,8 @@ function apriNuovoOrdineP2P(metodo){
     p2pNuovoMetodi = [metodo];
   p2pNuovoAperta = false;
   p2pNuovoAltri = false;
+  /* il foglio a passi riparte dal primo (cerca «IL FOGLIO «PUBBLICA» A PASSI») */
+  p2pNuovoPasso = 0;
   p2pNuovoValuta = P2P_VALUTE[0].cod;
   /* col tasto Barattozon di «Compra BTC» (5 nov 2026) la fascia e'
      obbligatoria: i due campi nascono a vista, come scegliendo il metodo */
@@ -104392,7 +104423,7 @@ function renderNuovoOrdineP2P(){
      in garanzia resta detto dove serve davvero — nella pagina dello
      scambio e in «I tuoi dati» — e la riga in fondo a questo foglio lo
      ripete a chi arriva fin la'. */
-  box.innerHTML =
+  const foglio =
     /* ⚠️ LA RIGA DEL TETTO E DELLA COMMISSIONE STA QUI, SOTTO
        L'IMPORTO (17 set 2026, ritocco di Andrea): erano due righe
        lunghe in fondo al foglio — «Si accettano ordini fino a…» e «La
@@ -104475,6 +104506,205 @@ function renderNuovoOrdineP2P(){
         (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</span></button>'
           : '<span class="p2p-invia-ico">⚡</span>' + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</button>') +
     '</div>';
+  /* IL FOGLIO A PASSI (cerca «IL FOGLIO «PUBBLICA» A PASSI»): il foglio
+     e' quello di sempre, nello stesso ordine e con gli stessi pezzi, e
+     `foglioAPassiP2P` lo divide in quattro passi dopo il disegno. Col
+     PayCode di Barattozon no: ha gia' i suoi passi e il suo «Rileggi e
+     pubblica», e resta com'era. */
+  box.innerHTML = foglio;
+  if (typeof foglioAPassiP2P === 'function' && passiNuovoAccesiP2P(tabMetodo))
+    foglioAPassiP2P(box, [valuta + metodi + zona,
+                          importo + (tab ? tipo + percorso : percorso + tipo) + quanti + premio,
+                          accesso + tempoPagare + cauzioneNuovo + pausa + paracadute + ripubblica],
+                    compro, val, valCoin);
+  else if (box.classList) {
+    box.classList.remove('a-schede');
+    box.removeAttribute('data-vedi');
+  }
+}
+/* ====== IL FOGLIO «PUBBLICA» A PASSI (20 nov 2026, cantiere
+   pubblica-passi) ======
+   L'idea viene da un utente («fare una creazione di ordine a step, pagina
+   per pagina»), le parole le ha scelte Andrea dall'anteprima. Il foglio
+   resta QUELLO DI SEMPRE: stessi pezzi, stesso ordine, stessi id, stessi
+   giudici e la stessa pubblicazione. Qui lo si divide soltanto, dopo il
+   disegno, in quattro passi — «Cosa» (valuta, metodi, zona), «Quanto»
+   (importo, tipo di prezzo, sats, premio), «Regole» (chi puo' prenderlo,
+   tempo per pagare, cauzione, pausa, paracadute, ripubblica) e «Rileggi»
+   (il riepilogo, poi il riquadro in fondo coi limiti o il recapito
+   on-chain) — con lo stesso meccanismo delle schede del dettaglio:
+   `data-scheda` su ogni pezzo e `data-vedi` sul corpo, e il CSS nasconde
+   gli altri. Niente si toglie dal DOM: un campo nascosto risponde lo
+   stesso a chi lo cerca per id.
+   ⚡/₿ RESTA SEMPRE IN CIMA (parola di Andrea): l'interruttore della rete
+   sta fuori dal corpo, sopra la testata, e si vede a ogni passo.
+   COL PAYCODE DI BARATTOZON NO: ha gia' i suoi quattro passi e il suo
+   «Rileggi e pubblica», e resta com'era (`passiNuovoAccesiP2P`).
+   IL BOTTONE E' LO STESSO: nei primi tre passi #p2pNuovoInvia dice
+   «Avanti →» (col vestito di sempre, cosi' la morfosi del + ci arriva
+   uguale) e al «Rileggi» torna «Pubblica ordine». Avanti controlla i
+   campi DEL passo coi giudici di sempre; un campo di un passo gia'
+   passato che non va piu' bene riporta a quel passo (`avvisaMancaP2P`). */
+const P2P_PASSI_NUOVO = [
+  {k: 'cosa', t: 'Cosa'},
+  {k: 'quanto', t: 'Quanto'},
+  {k: 'regole', t: 'Regole'},
+  {k: 'rileggi', t: 'Rileggi'}
+];
+/* PURA: il foglio va a passi? Si', tranne col PayCode di Barattozon */
+function passiNuovoAccesiP2P(tabMetodo){
+  return !tabMetodo;
+}
+/* i passi che ci sono davvero, dall'ultimo disegno (un passo senza pezzi
+   si salta; il «Rileggi» c'e' sempre) */
+function passiViviNuovoP2P(){
+  const box = el('p2pNuovoCorpo');
+  return (box && box._passi) || P2P_PASSI_NUOVO;
+}
+function foglioAPassiP2P(box, gruppi, compro, val, valCoin){
+  const figli = Array.from(box.children);
+  const conta = h => {
+    const t = document.createElement('template');
+    t.innerHTML = h || '';
+    return t.content.children.length;
+  };
+  const n = gruppi.map(conta);
+  const usati = n.reduce((a, b) => a + b, 0);
+  const piede = figli[figli.length - 1];
+  /* se i conti non tornano il foglio resta intero, com'era: meglio un
+     foglio lungo che un campo finito nel passo sbagliato */
+  if (!piede || !piede.classList.contains('foglio-piede') || usati > figli.length - 1) {
+    box.classList.remove('a-schede');
+    box.removeAttribute('data-vedi');
+    return false;
+  }
+  let i = 0;
+  n.forEach((q, g) => {
+    for (let j = 0; j < q; j++) figli[i++].setAttribute('data-scheda', P2P_PASSI_NUOVO[g].k);
+  });
+  const primoLimite = figli[i];
+  for (; i < figli.length - 1; i++) figli[i].setAttribute('data-scheda', 'rileggi');
+  const passi = P2P_PASSI_NUOVO.filter((p, g) => g === 3 || n[g] > 0);
+  box._passi = passi;
+  p2pNuovoPasso = Math.max(0, Math.min(passi.length - 1, Number(p2pNuovoPasso) || 0));
+  const qui = p2pNuovoPasso, ultimo = qui === passi.length - 1;
+  /* il riepilogo, prima del riquadro in fondo */
+  const riep = document.createElement('div');
+  riep.innerHTML = riepilogoNuovoP2P(compro, val, valCoin);
+  const r = riep.firstElementChild;
+  r.setAttribute('data-scheda', 'rileggi');
+  box.insertBefore(r, primoLimite || piede);
+  /* la riga dei passi in cima: quelli fatti si toccano per tornarci */
+  const barra = document.createElement('div');
+  barra.className = 'p2p-passi-nuovo';
+  barra.id = 'p2pNuovoPassi';
+  barra.innerHTML = passi.map((p, g) =>
+    '<button type="button"' + (g <= qui ? ' class="fatto"' : '') +
+    (g < qui ? ' onclick="vaiPassoNuovoP2P(' + g + ')"' : ' disabled') +
+    (g === qui ? ' aria-current="step"' : '') + '>' +
+    (g + 1) + '. ' + esc(p.t) + '</button>').join('');
+  box.insertBefore(barra, box.firstChild);
+  /* il piede: «← Indietro» dal secondo passo, «Avanti →» fino al Rileggi */
+  const invia = el('p2pNuovoInvia');
+  if (qui > 0) {
+    piede.classList.remove('sola');
+    const ind = document.createElement('button');
+    ind.type = 'button';
+    ind.className = 'btn ghost';
+    ind.id = 'p2pNuovoIndietro';
+    ind.textContent = '← Indietro';
+    ind.setAttribute('onclick', 'indietroNuovoP2P()');
+    piede.insertBefore(ind, piede.firstChild);
+  }
+  if (invia && !ultimo) {
+    invia.textContent = 'Avanti →';
+    invia.setAttribute('onclick', 'avantiNuovoP2P()');
+  }
+  box.classList.add('a-schede');
+  box.setAttribute('data-vedi', passi[qui].k);
+  return true;
+}
+/* il riepilogo del «Rileggi»: le scelte dei tre passi, dette in breve */
+function riepilogoNuovoP2P(compro, val, valCoin){
+  const segno = val ? val.segno : '€';
+  const modo = valCoin ? 'coin' : 'min';
+  let importo = etichettaEuroFoglioP2P(p2pNuovoEuro, segno, modo);
+  if (!p2pNuovoFisso && !valCoin && p2pNuovoDue && interoP2P(p2pNuovoEuroMax).n > 0)
+    importo += ' – ' + etichettaEuroFoglioP2P(p2pNuovoEuroMax, segno, 'max');
+  const sats = interoP2P(p2pNuovoSats).n;
+  const prezzo = p2pNuovoFisso
+    ? 'Prezzo fisso' + (sats > 0 ? ', ' + fmt(sats) + ' sats' : '')
+    : 'Mercato, ' + premioTestoP2P(p2pNuovoPremio);
+  const filtro = typeof p2pNuovoFiltro === 'number' ? p2pNuovoFiltro : 0;
+  const righe = [
+    [compro ? 'Compri' : 'Vendi', 'Bitcoin'],
+    [compro ? 'Invii' : 'Ricevi', importo],
+    ['Metodo', (p2pNuovoMetodi || []).join(', ') || '—'],
+    ['Prezzo', prezzo],
+    ['Chi può prenderlo', filtro ? filtro + '+ scambi' : 'Tutti']
+  ];
+  return sezioneNuovoP2P({
+    ico: '', titolo: 'Rileggi prima di pubblicare',
+    corpo: '<div class="p2p-rileggi" id="p2pNuovoRileggi">' + righe.map(r =>
+      '<div class="p2p-rileggi-riga"><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>').join('') +
+      '</div>'
+  });
+}
+/* si va a un passo: il foglio si ridisegna (i pezzi sono gli stessi) e
+   si riparte dall'alto */
+function vaiPassoNuovoP2P(i){
+  p2pNuovoPasso = Number(i) || 0;
+  renderNuovoOrdineP2P();
+  let n = el('p2pNuovoCorpo');
+  const fine = el('p2pNuovoSheet');
+  while (n) {
+    n.scrollTop = 0;
+    if (n === fine) break;
+    n = n.parentElement;
+  }
+}
+function indietroNuovoP2P(){
+  vaiPassoNuovoP2P(Math.max(0, p2pNuovoPasso - 1));
+}
+/* il passo di un campo, dal suo pezzo (-1 = fuori dai passi) */
+function passoDelCampoNuovoP2P(id){
+  const c = id && el(id);
+  const pezzo = c && c.closest ? c.closest('[data-scheda]') : null;
+  if (!pezzo) return -1;
+  return passiViviNuovoP2P().findIndex(p => p.k === pezzo.getAttribute('data-scheda'));
+}
+/* «Avanti →»: i giudici di sempre, e ci si ferma solo per un campo di
+   questo passo o di uno prima (quel che manca DOPO si sistema dopo) */
+function avantiNuovoP2P(){
+  const passi = passiViviNuovoP2P();
+  const qui = p2pNuovoPasso, k = passi[qui] && passi[qui].k;
+  const campi = campiNuovoP2P();
+  /* al primo passo i metodi e la zona: il giudice intero direbbe prima
+     dell'importo, che e' del passo dopo */
+  if (k === 'cosa') {
+    if (!(campi.metodi || []).length) {
+      avvisaMancaP2P({ok: false, manca: 'Scegli almeno un metodo di pagamento', campo: 'p2pNuovoMetodiBtn'});
+      return;
+    }
+    const zonaNo = typeof giudiceZonaP2P === 'function' ? giudiceZonaP2P(campi.zona, campi.metodi) : '';
+    if (zonaNo) { avvisaMancaP2P({ok: false, manca: zonaNo, campo: 'p2pNuovoZona'}); return; }
+  }
+  const g = valeNuovoOrdineP2P(campi);
+  if (!g.ok) {
+    const dove = passoDelCampoNuovoP2P(g.campo);
+    if (dove <= qui) { avvisaMancaP2P(g); return; }
+  }
+  if (k === 'regole') {
+    const noRip = typeof erroreRipubblicaP2P === 'function' ? erroreRipubblicaP2P(campi) : '';
+    /* la stessa frase e lo stesso campo di `inviaNuovoOrdineP2P` */
+    if (noRip) {
+      toast(noRip, 6000);
+      const i = el('p2pNuovoRipMin');
+      if (i) i.focus();
+      return;
+    }
+  }
+  vaiPassoNuovoP2P(Math.min(passi.length - 1, qui + 1));
 }
 /* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
    Quattro passi numerati, uno sotto l'altro nello stesso foglio (e non
@@ -104878,6 +105108,13 @@ function premioNotaP2P(compro, premio){
    sta gia' riempiendo. */
 function avvisaMancaP2P(g){
   toast(g.manca);
+  /* col foglio a passi (cerca «IL FOGLIO «PUBBLICA» A PASSI») si va prima
+     al passo del campo: nascosto, non si vedrebbe dove sta */
+  const box = el('p2pNuovoCorpo');
+  if (g.campo && box && box.classList.contains('a-schede') && typeof passoDelCampoNuovoP2P === 'function') {
+    const dove = passoDelCampoNuovoP2P(g.campo);
+    if (dove >= 0 && dove !== p2pNuovoPasso) vaiPassoNuovoP2P(dove);
+  }
   const c = g.campo && el(g.campo);
   if (!c) return;
   try {
