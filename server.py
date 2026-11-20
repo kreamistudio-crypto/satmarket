@@ -122163,6 +122163,111 @@ async def rotta_prova_wallet():
                                  "X-Robots-Tag": "noindex, nofollow"})
 
 
+# ---------------- LA PAGINETTA CHE APRE IL WALLET DAL BROWSER (20 nov 2026,
+# cantiere wallet-da-telegram; Andrea: «Sì, sistema», alla proposta di
+# far aprire DAVVERO il wallet da Telegram per Android, e «Apri Amber»).
+# IL CASO: dentro Telegram per Android la Mini App non puo' consegnare un
+# `lightning:`, un `bitcoin:` o un `nostrconnect://` al telefono (il
+# client per le Mini App non passa gli schemi non http al sistema: vedi
+# miniapp.html, «LA STRADA CHIUSA»). E nemmeno il browser interno di
+# Telegram e' una strada: `Browser.openInExternalApp` riscrive la URI
+# come scheme://host/path, e una URI opaca come `lightning:lnbc…` esce
+# `lightning:///`, cioe' il wallet si apre SENZA la fattura (letto in
+# DrKLO/Telegram, Browser.java, master del 20 nov 2026).
+# LA STRADA: la Mini App apre QUESTA pagina con `tg.openLink(url,
+# {try_browser: 'chrome'})`, cioe' in Chrome, dove il link parte nativo
+# e il sistema lo consegna intero all'app che ha dichiarato lo schema.
+# IL LINK VIAGGIA NEL FRAMMENTO (`/apri-wallet#<link>`): il server non lo
+# vede mai, ne' nei log ne' nella risposta, e la pagina e' sempre la
+# stessa, statica, senza database. La pagina accetta SOLO tre forme
+# (whitelist nello script: una bolt11 dopo `lightning:`, un indirizzo
+# con la sua cifra dopo `bitcoin:`, una URI `nostrconnect://` con la
+# chiave in esadecimale) e solo caratteri da URL senza `:` ne' `/` dopo
+# lo schema: niente `javascript:`, niente `intent:`, niente altri siti.
+# Una forma storta esce con la frase d'errore e nessun lancio. Prova
+# appena la pagina e' intera (dopo il `load`: un lancio durante il
+# disegno puo' fermare il caricamento; in Chrome un lancio da una
+# pagina aperta da un'app regge), e il tasto grande resta per il tocco,
+# che Chrome lascia sempre passare.
+APRI_WALLET_TESTI = {
+    "ln": ("⚡ Apri nel wallet", "📋 Copia la fattura", "Fattura copiata 📋",
+           "Se il wallet non si è aperto da solo, tocca il tasto qui sopra. "
+           "Quando hai pagato, torna su Barattolo in Telegram."),
+    "btc": ("₿ Apri nel wallet", "📋 Copia l'indirizzo", "📋 Indirizzo copiato",
+            "Se il wallet non si è aperto da solo, tocca il tasto qui sopra. "
+            "Quando hai pagato, torna su Barattolo in Telegram."),
+    "nostr": ("📲 Apri Amber e approva", "", "",
+              "Se Amber non si è aperto da solo, tocca il tasto qui sopra. "
+              "Quando hai approvato, torna su Barattolo in Telegram."),
+}
+APRI_WALLET_STORTO = ("Questo link non è valido. Torna su Barattolo e "
+                      "tocca di nuovo il tasto.")
+
+
+def pagina_apri_wallet() -> str:
+    """PURA: l'HTML della paginetta, intero e sempre uguale. Il link lo
+    legge lo script dal frammento, lo passa dalla whitelist e solo
+    allora veste la pagina e prova il lancio."""
+    import json as _json
+    testi = _json.dumps(APRI_WALLET_TESTI, ensure_ascii=False)
+    storto = _json.dumps(APRI_WALLET_STORTO, ensure_ascii=False)
+    return (
+        "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<meta name=\"robots\" content=\"noindex,nofollow\">"
+        "<meta name=\"referrer\" content=\"no-referrer\">"
+        "<title>Barattolo</title>"
+        "<style>:root{color-scheme:light dark;--bg:#FAF4E4;--fg:#2B2419;--m:#6B5E48}"
+        "@media (prefers-color-scheme:dark){:root{--bg:#1F1A14;--fg:#F3EBDD;--m:#B8AC97}}"
+        "body{font-family:system-ui,sans-serif;margin:0;padding:28px 16px 40px;"
+        "background:var(--bg);color:var(--fg);line-height:1.45;text-align:center}"
+        "h1{font-size:22px;margin:0 0 18px}"
+        "a.b,button{display:block;box-sizing:border-box;width:100%;max-width:420px;margin:0 auto 12px;"
+        "font:inherit;font-weight:800;font-size:17px;border:0;border-radius:14px;padding:16px;"
+        "text-decoration:none;cursor:pointer}"
+        "a.b{background:#F7931A;color:#fff}button{background:#1E7B4D;color:#fff}"
+        "p{color:var(--m);max-width:420px;margin:14px auto 0}"
+        "[hidden]{display:none!important}</style></head><body>"
+        "<h1>🫙 Barattolo</h1>"
+        "<a class=\"b\" id=\"apri\" href=\"#\" hidden></a>"
+        "<button type=\"button\" id=\"copia\" hidden></button>"
+        "<p id=\"nota\"></p>"
+        "<script>(function(){"
+        "var T=" + testi + ",STORTO=" + storto + ";"
+        "var FORME=[['ln',/^lightning:ln[a-z0-9]{20,1900}$/i],"
+        "['btc',/^bitcoin:[a-z0-9]{14,90}(\\?[a-z0-9%._~=&-]{1,600})?$/i],"
+        "['nostr',/^nostrconnect:\\/\\/[0-9a-f]{64}\\?[a-z0-9%._~=&+-]{1,1500}$/i]];"
+        "var link='';try{link=decodeURIComponent(location.hash.slice(1)).trim();}catch(e){link='';}"
+        "var tipo='';for(var i=0;i<FORME.length;i++){if(FORME[i][1].test(link)){tipo=FORME[i][0];break;}}"
+        "var nota=document.getElementById('nota');"
+        "if(!tipo){nota.textContent=STORTO;return;}"
+        "var t=T[tipo],a=document.getElementById('apri'),c=document.getElementById('copia');"
+        "a.textContent=t[0];a.href=link;a.hidden=false;nota.textContent=t[3];"
+        "if(t[1]){var dentro=link.slice(link.indexOf(':')+1).split('?')[0];"
+        "c.textContent=t[1];c.hidden=false;c.onclick=function(){"
+        "var fatto=function(){c.textContent=t[2];};"
+        "var antica=function(){var x=document.createElement('textarea');x.value=dentro;"
+        "x.setAttribute('readonly','');x.style.position='fixed';x.style.top='0';document.body.appendChild(x);"
+        "x.select();try{document.execCommand('copy');fatto();}catch(e){}x.remove();};"
+        "if(navigator.clipboard){navigator.clipboard.writeText(dentro).then(fatto,antica);}else{antica();}};}"
+        "var prova=function(){try{location.href=link;}catch(e){}};"
+        "if(document.readyState==='complete'){setTimeout(prova,0);}"
+        "else{window.addEventListener('load',function(){setTimeout(prova,0);});}"
+        "})();</script></body></html>"
+    )
+
+
+@app.get("/apri-wallet")
+async def rotta_apri_wallet():
+    """La paginetta che apre il wallet (o Amber) dal browser: senza
+    login, statica, noindex e no-store. Vedi il blocco qui sopra e
+    ARCHITETTURA, «LE ROTTE PUBBLICHE»."""
+    return HTMLResponse(pagina_apri_wallet(),
+                        headers={**HEADER_NO_CACHE,
+                                 "X-Robots-Tag": "noindex, nofollow",
+                                 "Referrer-Policy": "no-referrer"})
+
+
 # Le icone dell'app: generate da genera_icone.py (barattolo su tessera
 # arancio; le -maskable hanno il margine per i ritagli di Android).
 @app.get("/assets/icona-192.png")

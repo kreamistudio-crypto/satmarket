@@ -93572,3 +93572,92 @@ più questo cantiere: `PROVE_SEVERE=1 python prove.py` 30847 passate, 1
 rossa mia (`conoscenza.md` da rigenerare dopo il ritocco di
 `sapere.md`: rigenerato, `prove_conoscenza_tappo` 10 verdi), 0 saltate;
 `collaudi_ci.py --elenco ci/collaudi.txt`: 163 verdi, 0 rossi.
+## Il wallet si apre davvero da Telegram per Android, e «Apri Amber» anche (20 nov 2026, sera, cantiere wallet-da-telegram; Andrea, alle due proposte in coda ad apri-wallet-telegram — far aprire davvero il wallet da Telegram per Android passando dal browser, e «Apri Amber» che ha lo stesso difetto: «Sì, sistema»)
+
+IL CASO. Dopo apri-wallet-telegram il tasto non rompeva più la Mini
+App, ma dentro Telegram per Android non apriva niente: solo l'avviso
+col Copia. Lo stesso per «📲 Apri Amber e approva», che in più parte
+da solo col tocco fresco (`app.click()`), cioè rompeva la Mini App
+appena si chiedeva il codice nostrconnect.
+
+LE STRADE, lette nel client (DrKLO/Telegram, master del 20 nov 2026).
+- `tg.openLink` col link del wallet: lo script lo rifiuta
+  (`WebAppTgUrlInvalid`). Scartata.
+- `tg.openLink` verso una pagina https nel BROWSER INTERNO di Telegram
+  (il default): lì gli schemi non http passano da
+  `Browser.openInExternalApp`, che riscrive la URI come
+  scheme://host/path; una URI opaca come `lightning:lnbc…` (o
+  `bitcoin:bc1…?amount=`) esce `lightning:///`, e il wallet si apre
+  SENZA la fattura. Scartata.
+- `tg.openLink(url, {try_browser: 'chrome'})`: Telegram la passa a
+  Chrome (`openInExternalBrowser` col pacchetto di Chrome), e lì il
+  link parte nativo e il sistema lo consegna intero. SCELTA. Senza
+  Chrome sul telefono Telegram non apre niente: la Mini App resta a
+  schermo, il cane da guardia lo vede e dopo l'attimo arriva l'avviso
+  di sempre.
+
+COSA SI È FATTO.
+- La rotta `/apri-wallet` (server.py, `pagina_apri_wallet`, pura):
+  statica e sempre uguale, il link nel FRAMMENTO (`#<link>`), quindi al
+  server non arriva mai. Lo script lo passa da una whitelist di tre
+  forme — una bolt11 dopo `lightning:`, un indirizzo con la sua cifra
+  dopo `bitcoin:`, una `nostrconnect://` con la chiave in esadecimale —
+  coi soli caratteri da URL e niente `:` o `/` dopo lo schema; poi veste
+  il tasto grande, il Copia (bolt11, o l'indirizzo senza la cifra) e la
+  nota, e prova il lancio appena la pagina è intera. Una forma storta:
+  la frase d'errore, nessun tasto, nessun lancio. Noindex, no-store,
+  no-referrer, fuori dalla sitemap.
+- Nella Mini App `apriDalBrowser` / `paginaApriWallet`: in Telegram per
+  Android `apriNelWallet` chiede la paginetta e arma l'attimo (avviso se
+  la Mini App resta a schermo; subito se openLink rifiuta); la rete
+  `reteWalletTelegram` manda nel browser i link `lightning:`/`bitcoin:`
+  senza porta (copia solo se Telegram non la prende) e ferma anche i
+  `nostrconnect:`; `apriFirmatarioQui` consegna il nostrconnect alla
+  paginetta.
+
+LE DECISIONI. I testi nuovi della pagina (la nota sotto i tasti, la
+frase del link storto) li approva Andrea prima del push; tasti e
+toast sono quelli di sempre. Il segreto del nostrconnect passa nel
+frammento e resta nella cronologia di Chrome: è lo stesso del QR a
+schermo, monouso, e scade col suo appuntamento. Chiunque può fare un
+link `/apri-wallet#lightning:…` con una fattura sua: è quel che fa già
+un qualsiasi link `lightning:` in rete, la cifra la mostra il wallet, e
+la pagina non dice mai che la fattura è di Barattolo.
+
+PROVATO. In `prove_apri_nel_wallet`: le sentinelle emendate (openLink
+UNA volta e solo verso la paginetta, in Chrome; `location.origin` letta
+e mai navigata; dieci `('lightning:' + `), il banco con Telegram per
+Android che chiede la paginetta col link nel frammento e arma l'attimo
+(android, android_x, solo user agent), openLink che rifiuta → avviso
+subito, Chrome che passa davanti → niente avviso, la rete che manda nel
+browser senza copiare e ferma i nostrconnect; la parte 3, la paginetta:
+la rotta (una, senza login, pura, nessun parametro, noindex/no-store/
+no-referrer, in ARCHITETTURA, fuori dalla sitemap) e il suo script
+fatto girare sotto node coi testi veri — lightning (anche maiuscolo),
+bitcoin con la cifra e il Copia senza, nostrconnect senza Copia, il
+lancio solo dopo il `load`, e dodici forme storte senza lancio. In
+`prove_login_qr` il nostrconnect dentro Telegram per Android passa dalla
+paginetta, e fuori da Telegram no. In Chromium vero (Playwright) la
+pagina coi due casi, le schermate in `wallet-da-telegram/` della
+Library. CONTROPROVE: whitelist del bitcoin allargata, `try_browser`
+tolto, la paginetta tolta da Amber: otto rosse; rimesso, verdi.
+EMENDATA in `prove_onion`: i `location.origin` del client diventano
+otto, l'ottavo è la paginetta (un URL per questa app dentro Telegram,
+dove onion non c'è; sul collaudo resta il collaudo).
+GIRATO, nel venv con le sole dipendenze del workflow (senza coincurve),
+sull'albero origin/develop cbb8a6f più questo cantiere: `PROVE_SEVERE=1
+python prove.py` (con `IDENTITA_NODE_MODULES`) 30856 passate, 1 rossa
+— il censimento di `prove_onion`, emendato come sopra e rigirato verde
+con la sezione del wallet —, 0 saltate; `collaudi_ci.py --elenco
+ci/collaudi.txt --paralleli 2`: 163 verdi, 0 rossi. Dopo il rebase su
+7747438 (categoria dal nome per tutte, barra «Tempo per pagare», «Chi
+ha pubblicato»: di altri, nessun simbolo in comune) il giro mirato:
+le sezioni toccate (wallet, login QR, onion, prova-wallet, anteprime)
+e le 35 che leggono i documenti, 2358 passate, 0 saltate, più i tre
+collaudi coi fogli di pagamento vicini.
+DA GUARDARE dopo la promozione, sull'Oppo dentro Telegram: il tocco su
+«⚡ Apri nel wallet» apre Chrome e poi il wallet con la fattura; tornati
+su Telegram la Mini App è lì. Lo stesso con «Apri Amber». NON PROVATO
+dal vivo: un telefono senza Chrome (atteso l'avviso col Copia), e se
+Chrome chiede un tocco in più prima di passare al wallet (il tasto
+grande è lì per quello).

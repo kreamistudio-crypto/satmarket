@@ -38462,21 +38462,46 @@ function walletChiusoTelegram(dentroTelegram, ua, piattaformaTg){
   if (!dentroTelegram) return false;
   return ['android', 'android_x'].includes(String(piattaformaTg || '')) || /Android/i.test(String(ua || ''));
 }
-/* LA RETE: ogni tocco su un link `lightning:`/`bitcoin:`/`intent:`
-   dentro Telegram per Android si ferma qui, in cattura, prima che la
-   WebView ci vada. Se il link ha la sua porta (`apriNelWallet`, che
-   mette l'avviso) fa lei; se no si copia: la bolt11, o l'indirizzo
-   senza la cifra (lo stesso dei bottoni «Copia l'indirizzo»). */
+/* LA PAGINETTA NEL BROWSER (20 nov 2026, sera, cantiere
+   wallet-da-telegram; Andrea: «Sì, sistema»). Il link che la Mini App
+   non puo' consegnare lo consegna Chrome: `tg.openLink` apre
+   `/apri-wallet#<link>` con `try_browser: 'chrome'`, la pagina passa il
+   link dalla sua whitelist e lo lancia (subito, e col tasto grande).
+   NON il browser interno di Telegram: riscrive la URI come
+   scheme://host/path e `lightning:lnbc…` arriva al wallet come
+   `lightning:///`, senza la fattura (DrKLO/Telegram, Browser.java,
+   `openInExternalApp`, master del 20 nov 2026). Il link sta nel
+   FRAMMENTO: al server non arriva mai. Se Chrome non c'e', Telegram non
+   apre niente e la Mini App resta a schermo: il cane da guardia lo vede
+   e mette l'avviso di sempre.
+   PURA: l'indirizzo della paginetta per quel link */
+function paginaApriWallet(base, link){
+  return String(base || '') + '/apri-wallet#' + encodeURIComponent(String(link || '').trim());
+}
+/* la paginetta in Chrome; vero se Telegram ha preso la richiesta */
+function apriDalBrowser(link){
+  if (!tg || typeof tg.openLink !== 'function' || !link) return false;
+  try { tg.openLink(paginaApriWallet(location.origin, link), {try_browser: 'chrome'}); return true; }
+  catch(e) { return false; }
+}
+/* LA RETE: ogni tocco su un link `lightning:`/`bitcoin:`/`intent:`/
+   `nostrconnect:` dentro Telegram per Android si ferma qui, in
+   cattura, prima che la WebView ci vada. Se il link ha la sua porta
+   (`apriNelWallet`, `apriFirmatarioQui`) fa lei; se no la paginetta nel
+   browser e, se Telegram non la prende, si copia: la bolt11, o
+   l'indirizzo senza la cifra (lo stesso dei bottoni «Copia
+   l'indirizzo»). */
 function reteWalletTelegram(ev){
   const t = ev && ev.target;
   const a = t && typeof t.closest === 'function' ? t.closest('a[href]') : null;
   if (!a) return 'niente';
   const url = String(a.getAttribute('href') || '').trim();
-  const m = /^(lightning|bitcoin|intent):([^?#]*)/i.exec(url);
+  const m = /^(lightning|bitcoin|intent|nostrconnect):([^?#]*)/i.exec(url);
   if (!m || !walletChiusoTelegram(!!(tg && tg.initData), navigator.userAgent, tg && tg.platform)) return 'niente';
   ev.preventDefault();
   if (typeof a.onclick === 'function') return 'porta';
   const schema = m[1].toLowerCase();
+  if ((schema === 'lightning' || schema === 'bitcoin') && m[2] && apriDalBrowser(url)) return 'browser';
   if (schema === 'lightning' && m[2]) { haptic(); copiaLink(m[2], 'Fattura copiata 📋'); return 'fattura'; }
   if (schema === 'bitcoin' && m[2]) { haptic(); copiaLink(m[2], '📋 Indirizzo copiato'); return 'indirizzo'; }
   return 'fermo';
@@ -38496,7 +38521,12 @@ function apriNelWallet(a, ev, tentativo){
      l'avviso col Copia, senza attimo: si sa gia' che non si apre niente */
   if (strada === 'telegram' && walletChiusoTelegram(true, navigator.userAgent, tg && tg.platform)) {
     if (ev) ev.preventDefault();
-    avvisaWalletMuto(a, bolt11, tentativo, strada);
+    /* (20 nov 2026, sera, wallet-da-telegram) la paginetta in Chrome
+       apre il wallet davvero; se Telegram non la apre (o la pagina non
+       passa dietro), dopo l'attimo l'avviso col Copia, come prima */
+    if (apriDalBrowser('lightning:' + bolt11))
+      attendiWallet(giro, aperto => { if (!aperto) avvisaWalletMuto(a, bolt11, tentativo, strada); });
+    else avvisaWalletMuto(a, bolt11, tentativo, strada);
     return strada;
   }
   /* il link nudo parte dal tocco, nativo, su ogni altra strada: l'evento
@@ -80929,6 +80959,12 @@ function apriFirmatarioQui(a){
   const avviso = el('nostrApriMuto');
   if (avviso) avviso.style.display = 'none';
   const giro = ++walletGiro;
+  /* (20 nov 2026, sera, wallet-da-telegram) dentro Telegram per Android
+     il link non parte (lo ferma `reteWalletTelegram`: rompeva la Mini
+     App): lo consegna la paginetta in Chrome */
+  if (typeof walletChiusoTelegram === 'function'
+      && walletChiusoTelegram(!!(tg && tg.initData), navigator.userAgent, tg && tg.platform))
+    apriDalBrowser(a && a.getAttribute ? a.getAttribute('href') : '');
   attendiWallet(giro, aperto => { if (!aperto) avvisaFirmatarioMuto(a); });
 }
 function avvisaFirmatarioMuto(a){

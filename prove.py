@@ -41795,7 +41795,15 @@ def prove_onion():
           True, "origine: location.origin, avviso: avvisoRiprovo}));" in mini)
     # SETTE dal 1 nov 2026: il settimo e' l'URL del documento allegato
     # che scarica la app di Telegram (vedi il terzo qui sopra)
-    prova("...e nel codice non ne restano altri in giro", 7, len(_vive))
+    # OTTO dal 20 nov 2026 sera (wallet-da-telegram): l'ottavo e' la
+    # paginetta che apre il wallet in Chrome (`apriDalBrowser`): come
+    # l'allegato, un URL per QUESTA app dentro Telegram per Android —
+    # dove onion non c'e' — e non un link da dare a qualcun altro; e
+    # sul collaudo deve restare il collaudo
+    prova("...l'ottavo e' la paginetta del wallet, solo dentro Telegram", True,
+          "tg.openLink(paginaApriWallet(location.origin, link), {try_browser: 'chrome'});"
+          in pezzo_js(mini, "function apriDalBrowser(link){", "\n}\n"))
+    prova("...e nel codice non ne restano altri in giro", 8, len(_vive))
 
     # --- 4) il login Telegram non si offre su onion ----------------
     # Il Login Widget funziona SOLO sul dominio registrato con
@@ -127698,6 +127706,10 @@ def prove_login_qr():
                + "const NOME_FIRMATARIO_QUI = {android: 'Amber', ios: 'Clave'};\n"
                + pezzo_js(mini, "function intentNostrconnect(uri){", "\n}\n") + "\n}\n"
                + pezzo_js(mini, "function apriFirmatarioQui(a){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function walletChiusoTelegram(dentroTelegram, ua, piattaformaTg){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function paginaApriWallet(base, link){", "\n}\n") + "\n}\n"
+               + pezzo_js(mini, "function apriDalBrowser(link){", "\n}\n") + "\n}\n"
+               + "const location = {origin: 'https://barattolo.store'}; let chiesti = [];\n"
                + pezzo_js(mini, "function avvisaFirmatarioMuto(a){", "\n}\n") + "\n}\n"
                + "let navigator = {}, tg = null, nostrconnectApri = true;\n"
                + _mq + "\n}\n"
@@ -127710,12 +127722,13 @@ async function giro(ua, attivo, piattaforma, dentro){
   for (const k of Object.keys(nodi)) delete nodi[k];
   guardie = []; detto = '';
   navigator = {userAgent: ua, userActivation: attivo === null ? undefined : {isActive: attivo}};
-  tg = piattaforma ? {platform: piattaforma, initData: dentro ? 'x' : ''} : null;
+  tg = piattaforma ? {platform: piattaforma, initData: dentro ? 'x' : '', openLink: (u, o) => chiesti.push([u, o])} : null;
+  chiesti = [];
   el('nostrQrBox').style.display = 'none';
   await mostraQrConnessione(URI);
   const a = el('nostrApriApp');
   return [a.style.display, a.href, a.clic, el('nostrQrAiutoApp').style.display,
-          el('nostrQrAiuto').style.display, /Apri (Amber|Clave)/.test(detto)];
+          el('nostrQrAiuto').style.display, /Apri (Amber|Clave)/.test(detto), chiesti];
 }
 const nomi = () => [el('nostrApriApp').textContent, /Clave su questo telefono/.test(el('nostrQrAiutoApp').innerHTML),
                     /Apri Clave e approva/.test(el('nostrApriMutoTesto').textContent), /Approva in Clave/.test(detto)];
@@ -127773,24 +127786,29 @@ const nomi = () => [el('nostrApriApp').textContent, /Clave su questo telefono/.t
             _URI = "nostrconnect://PUB?relay=wss%3A%2F%2Fa.example&secret=s"
             prova("ANDROID col tocco fresco: il bottone porta la URI del QR e "
                   "parte da solo UNA volta, con la riga d'aiuto sua",
-                  ["", _URI, 1, "", "none", True], _dq["android"])
+                  ["", _URI, 1, "", "none", True, []], _dq["android"])
             prova("...e i testi dicono Amber", ["📲 Apri Amber e approva", False, False, False],
                   _dq["androidNomi"])
             prova("IPHONE col tocco fresco: il bottone porta la URI e parte da solo, "
-                  "come su Android", ["", _URI, 1, "", "none", True], _dq["iphone"])
+                  "come su Android", ["", _URI, 1, "", "none", True, []], _dq["iphone"])
             prova("...e i testi dicono Clave: bottone, aiuto, avviso e foglio",
                   ["📲 Apri Clave e approva", True, True, True], _dq["iphoneNomi"])
             prova("...e l'avviso su iPhone senza intent (e' solo di Android)",
                   ["", "none"], _dq["mutoIphone"])
             prova("...col tocco scaduto (relay lenti) non parte niente: resta "
-                  "il bottone", ["", _URI, 0, "", "none", True], _dq["scaduto"])
+                  "il bottone", ["", _URI, 0, "", "none", True, []], _dq["scaduto"])
             prova("...e senza l'API dell'attivazione neppure",
-                  ["", _URI, 0, "", "none", True], _dq["senzaApi"])
+                  ["", _URI, 0, "", "none", True, []], _dq["senzaApi"])
             prova("DAL PC niente bottone e niente lancio: il QR di sempre",
-                  ["none", "#", 0, "none", "", False], _dq["pc"])
+                  ["none", "#", 0, "none", "", False, []], _dq["pc"])
+            # (20 nov 2026 sera, wallet-da-telegram) e il link lo consegna la
+            # paginetta in Chrome: il nostrconnect:// nudo romperebbe la Mini App
             prova("DENTRO TELEGRAM su Android si offre anche se lo user agent "
-                  "non lo dice", ["", _URI, 1, "", "none", True], _dq["telegram"])
-            prova("A LEVA SPENTA tutto come prima", ["none", "#", 0, "none", "", False],
+                  "non lo dice, e il lancio passa dalla paginetta in Chrome col link nel frammento",
+                  ["", _URI, 1, "", "none", True,
+                   [["https://barattolo.store/apri-wallet#" + __import__("urllib.parse").parse.quote(_URI, safe="-_.!~*'()"), {"try_browser": "chrome"}]]],
+                  _dq["telegram"])
+            prova("A LEVA SPENTA tutto come prima", ["none", "#", 0, "none", "", False, []],
                   _dq["spenta"])
             prova("se non si apre niente l'avviso lo dice, e fuori da Telegram "
                   "offre l'intent", ["", "", "intent://PUB?relay=wss%3A%2F%2F"
@@ -177071,6 +177089,8 @@ def prove_apri_nel_wallet():
        nuovo, dalla fattura nuova e dalla fattura morta, il link `#` che
        non fa niente, e i due giudici puri."""
     print("\n[«Apri nel wallet»: la strada per piattaforma, e l'avviso del wallet muto]")
+    from urllib.parse import quote as _q
+    _ur_quote = lambda t: _q(t, safe="-_.!~*'()")   # come encodeURIComponent
     import json as _json
     import shutil as _sh
     import subprocess as _sp
@@ -177109,16 +177129,21 @@ def prove_apri_nel_wallet():
     # (15 nov 2026) il sesto e' quello della cassa in negozio
     # (17 nov 2026) il settimo e' quello dello zap a una raccolta
     # (17 nov 2026 sera) l'ottavo e' quello della cauzione del contanti on-chain
-    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, negli otto QR "
-          "e nel Riprova, e in nessuna navigazione da script",
-          [0, 9],
+    # (20 nov 2026 sera, wallet-da-telegram) il decimo non e' un lancio: e'
+    # il link messo nel frammento della paginetta (`apriDalBrowser`)
+    prova("nessun flusso lancia `lightning:` da solo dopo una fetch: lo schema sta nella porta, negli otto QR, "
+          "nel Riprova e nella paginetta del browser, e in nessuna navigazione da script",
+          [0, 10, 1],
           [len([l for l in mini.splitlines()
                 if re.search(r"""location(\.href)?\s*=\s*['"`]lightning:""", l)]),
-           mini.count("('lightning:' + ")])
+           mini.count("('lightning:' + "), mini.count("apriDalBrowser('lightning:' + bolt11)")])
+    # EMENDATA (20 nov 2026 sera): `location.origin` si legge (la base
+    # della paginetta), ma nessuna navigazione
     prova("NIENTE parte da uno script nel blocco (la regola di Chrome: un tocco per ogni lancio): "
-          "ne' location, ne' window.open, ne' click() finti",
+          "ne' location (se non la sola lettura di location.origin), ne' window.open, ne' click() finti",
           [False, False, False, False],
-          ["location" in codice, "window.open" in codice, ".click()" in codice, "dispatchEvent" in codice])
+          [bool(re.search(r"location(?!\.origin\b)", codice)), "window.open" in codice, ".click()" in codice,
+           "dispatchEvent" in codice])
     prova("la forma intent:// si scrive in un posto solo, senza pacchetto e senza fallback url, "
           "e vive SOLO nel link «Riprova» dell'avviso, solo su Android",
           [1, False, False, True, True],
@@ -177131,17 +177156,26 @@ def prove_apri_nel_wallet():
     # Telegram per Android il link nudo rompe la Mini App
     # (net::ERR_UNKNOWN_URL_SCHEME, Oppo Find X5 di Andrea): li' il tocco
     # si previene e mette subito l'avviso. I preventDefault diventano due.
-    prova("dentro Telegram NIENTE openLink (rifiuta gli schemi non http: WebAppTgUrlInvalid) ne' openInvoice: "
-          "i preventDefault sono quello del link `#` e quello di Telegram per Android",
-          [False, False, 2, True],
-          ["openLink" in codice, "openInvoice" in codice, anw.count("preventDefault"),
+    # EMENDATA (20 nov 2026, sera, wallet-da-telegram): openLink entra,
+    # ma UNA volta sola e mai col link del wallet — apre la paginetta
+    # https `/apri-wallet` in Chrome, che il link lo consegna davvero.
+    adb = nudo(fn("function apriDalBrowser(link){"))
+    prova("dentro Telegram openLink SOLO verso la paginetta https (mai col link del wallet: WebAppTgUrlInvalid), "
+          "in Chrome, ne' openInvoice; i preventDefault sono quello del link `#` e quello di Telegram per Android",
+          [1, True, True, False, 2, True],
+          [codice.count("openLink("),
+           "tg.openLink(paginaApriWallet(location.origin, link), {try_browser: 'chrome'});" in adb,
+           "'/apri-wallet#' + encodeURIComponent(" in nudo(fn("function paginaApriWallet(base, link){")),
+           "openInvoice" in codice, anw.count("preventDefault"),
            "if (strada === 'telegram' && walletChiusoTelegram(true, navigator.userAgent, tg && tg.platform)) {" in anw])
     rete = nudo(fn("function reteWalletTelegram(ev){"))
-    prova("LA RETE (20 nov 2026): in cattura su tutta la pagina, ferma lightning:/bitcoin:/intent: solo dentro "
-          "Telegram per Android, lascia fare alla porta che ha il suo onclick, e copia coi toast di sempre",
-          [1, True, True, True, True, True],
+    prova("LA RETE (20 nov 2026): in cattura su tutta la pagina, ferma lightning:/bitcoin:/intent:/nostrconnect: "
+          "solo dentro Telegram per Android, lascia fare alla porta che ha il suo onclick, poi la paginetta "
+          "nel browser, e se no copia coi toast di sempre",
+          [1, True, True, True, True, True, True],
           [mini.count("document.addEventListener('click', reteWalletTelegram, true);"),
-           "/^(lightning|bitcoin|intent):([^?#]*)/i" in rete,
+           "/^(lightning|bitcoin|intent|nostrconnect):([^?#]*)/i" in rete,
+           "if ((schema === 'lightning' || schema === 'bitcoin') && m[2] && apriDalBrowser(url)) return 'browser';" in rete,
            "walletChiusoTelegram(!!(tg && tg.initData), navigator.userAgent, tg && tg.platform)" in rete,
            "if (typeof a.onclick === 'function') return 'porta';" in rete,
            "copiaLink(m[2], 'Fattura copiata 📋')" in rete,
@@ -177209,6 +177243,8 @@ def prove_apri_nel_wallet():
         fn("function stradaWallet(dentroTelegram, ua){"), fn("function intentWallet(url){"),
         fn("function walletChiusoTelegram(dentroTelegram, ua, piattaformaTg){"),
         fn("function reteWalletTelegram(ev){"),
+        fn("function paginaApriWallet(base, link){"), fn("function apriDalBrowser(link){"),
+        "const location = {origin: 'https://barattolo.store'};",
         fn("function apriNelWallet(a, ev, tentativo){"), fn("function attendiWallet(giro, poi){"),
         fn("function avvisaWalletMuto(a, bolt11, tentativo, strada){"), fn("function copiaWalletMuto(){"),
         fn("function riprovaWalletMuto(link){"),
@@ -177316,23 +177352,41 @@ portaWallet(a, V.bolt);
 a.onclick(ev());
 emetti('pagehide'); scatta();
 out.telegramAperto = {avviso: !!f.avviso};
-/* 4b) (20 nov 2026) TELEGRAM PER ANDROID: il link NON parte (prevenuto), l'avviso SUBITO, niente attimo ne' Riprova */
-for (const [nome, ua, piat] of [['tgAndroid', V.and, 'android'], ['tgAndroidX', V.pc, 'android_x'], ['tgSoloUa', V.and, '']]) {
+/* 4b) (20 nov 2026) TELEGRAM PER ANDROID: il link NON parte (prevenuto), niente Riprova.
+   (sera, wallet-da-telegram) Telegram prende la paginetta: openLink UNA volta, in Chrome, col
+   link nel frammento, e l'attimo; se la pagina non passa dietro, l'avviso. Se openLink rifiuta:
+   l'avviso SUBITO */
+for (const [nome, ua, piat, rifiuta] of [['tgAndroid', V.and, 'android', false], ['tgAndroidX', V.pc, 'android_x', false],
+                                         ['tgSoloUa', V.and, '', false], ['tgRifiuta', V.and, 'android', true]]) {
   navigator.userAgent = ua;
-  tg = {initData: 'query_id=1', platform: piat, openLink: u => { aperti.push(u); throw new Error('WebAppTgUrlInvalid'); }};
+  const chiesti = [];
+  tg = {initData: 'query_id=1', platform: piat, openLink: (u, o) => { chiesti.push([u, o]); if (rifiuta) throw new Error('WebAppTgUrlInvalid'); }};
   timers.splice(0);
   ({f, a} = foglioFinto());
   const g4 = [];
   portaWallet(a, V.bolt, x => g4.push(x));
   const e = ev();
   const s = a.onclick(e);
-  out[nome] = {strada: s, prevenuto: e.prevenuto, timers: timers.length, avviso: !!f.avviso,
-    testo: !!f.avviso && f.avviso.html.includes('Non si è aperto nessun wallet: copia la fattura'),
-    riprova: riprova(f.avviso && f.avviso.html), gesti: g4, aperti: aperti.length};
+  out[nome] = {strada: s, prevenuto: e.prevenuto, timers: timers.length, avvisoSubito: !!f.avviso, chiesti, gesti: g4.slice()};
+  scatta();
+  out[nome].avviso = !!f.avviso;
+  out[nome].testo = !!f.avviso && f.avviso.html.includes('Non si è aperto nessun wallet: copia la fattura');
+  out[nome].riprova = riprova(f.avviso && f.avviso.html);
   copiato = [];
   copiaWalletMuto();
   out[nome].copia = copiato.slice();
+  out[nome].gesti = g4.slice();
 }
+/* ...e se Chrome passa davanti (la pagina si nasconde): niente avviso */
+navigator.userAgent = V.and;
+tg = {initData: 'query_id=1', platform: 'android', openLink: () => {}};
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+a.onclick(ev());
+emetti('visibilitychange'); scatta();
+out.tgAndroidAperto = {avviso: !!f.avviso};
+out.pagina = [paginaApriWallet('https://x.example', 'lightning:' + V.bolt), paginaApriWallet('', ' bitcoin:bc1q?amount=0.1&pj=a b '),
+  paginaApriWallet('https://x.example', '')];
 /* ...Telegram per iPhone: come prima, il link nativo */
 navigator.userAgent = V.ios;
 tg = {initData: 'query_id=1', platform: 'ios'};
@@ -177345,6 +177399,14 @@ scatta();
 const nodoLink = (href, onclick) => { const l = {getAttribute: n => n === 'href' ? href : null, onclick: onclick || null};
   l.closest = sel => sel === 'a[href]' ? l : null; return l; };
 const tocca = (bersaglio) => { const e = ev(); e.target = bersaglio; return [reteWalletTelegram(e), e.prevenuto]; };
+/* (sera) con Telegram che prende la paginetta: lightning e bitcoin vanno nel browser, niente copia */
+const chiestiRete = [];
+navigator.userAgent = V.and; tg = {initData: 'query_id=1', platform: 'android', openLink: (u, o) => chiestiRete.push([u, o])};
+copiato = [];
+out.reteBrowser = {btc: tocca(nodoLink('bitcoin:bc1qabc?amount=0.00010000')), ln: tocca(nodoLink('lightning:' + V.bolt)),
+  nostrPorta: tocca(nodoLink('nostrconnect://' + 'a'.repeat(64) + '?relay=x', () => 'x')),
+  nostrNudo: tocca(nodoLink('nostrconnect://' + 'a'.repeat(64) + '?relay=x')),
+  chiesti: chiestiRete, copiati: copiato.length};
 copiato = [];
 navigator.userAgent = V.and; tg = {initData: 'query_id=1', platform: 'android'};
 out.rete = {
@@ -177453,14 +177515,25 @@ console.log(JSON.stringify(out));
     prova("...pagina a schermo dopo l'attimo: l'avviso, e MAI il Riprova intent:// dentro Telegram",
           {"avviso": True, "riprova": None, "timers": 0}, o["telegramMuto"])
     prova("...se qualcosa passa davanti, niente avviso", {"avviso": False}, o["telegramAperto"])
+    PAG = "https://barattolo.store/apri-wallet#" + _ur_quote("lightning:" + BOLT)
     for nome, cosa in (("tgAndroid", "piattaforma android"), ("tgAndroidX", "piattaforma android_x"),
                        ("tgSoloUa", "solo lo user agent Android")):
         prova(f"TELEGRAM PER ANDROID ({cosa}): il link NON parte (prevenuto: la Mini App non si rompe), "
-              "l'avviso SUBITO col suo testo, niente attimo, niente Riprova, openLink mai, il tentativo detto, "
-              "e il Copia copia la stessa bolt11",
-              {"strada": "telegram", "prevenuto": True, "timers": 0, "avviso": True, "testo": True,
-               "riprova": None, "gesti": ["wallet", "copiata"], "aperti": 0,
+              "la paginetta in Chrome col link nel frammento (openLink una volta), l'attimo, niente avviso subito; "
+              "pagina ancora a schermo dopo l'attimo: l'avviso, senza Riprova, e il Copia",
+              {"strada": "telegram", "prevenuto": True, "timers": 1, "avvisoSubito": False,
+               "chiesti": [[PAG, {"try_browser": "chrome"}]], "gesti": ["wallet", "copiata"],
+               "avviso": True, "testo": True, "riprova": None,
                "copia": [[BOLT, "Fattura copiata 📋"]]}, o[nome])
+    prova("TELEGRAM PER ANDROID con openLink che rifiuta: l'avviso SUBITO, niente attimo",
+          {"strada": "telegram", "prevenuto": True, "timers": 0, "avvisoSubito": True,
+           "chiesti": [[PAG, {"try_browser": "chrome"}]], "gesti": ["wallet", "copiata"],
+           "avviso": True, "testo": True, "riprova": None, "copia": [[BOLT, "Fattura copiata 📋"]]}, o["tgRifiuta"])
+    prova("...e se Chrome passa davanti, niente avviso", {"avviso": False}, o["tgAndroidAperto"])
+    prova("paginaApriWallet: il link tutto nel frammento, codificato, spazi tolti",
+          ["https://x.example/apri-wallet#" + _ur_quote("lightning:" + BOLT),
+           "/apri-wallet#" + _ur_quote("bitcoin:bc1q?amount=0.1&pj=a b"), "https://x.example/apri-wallet#"],
+          o["pagina"])
     prova("TELEGRAM PER IPHONE: niente cambia, il link nativo e l'attimo",
           {"strada": "telegram", "prevenuto": False, "timers": 1}, o["tgIos"])
     v = o["rete"]
@@ -177471,6 +177544,13 @@ console.log(JSON.stringify(out));
            [["bc1qabc", "📋 Indirizzo copiato"], ["BC1QABC", "📋 Indirizzo copiato"], [BOLT, "Fattura copiata 📋"]]],
           [v["btc"], v["btcMaiuscolo"], v["ln"], v["porta"], v["intent"], v["https"], v["cancelletto"],
            v["nessunLink"], v["nessunBersaglio"], v["copiato"]])
+    Z = "nostrconnect://" + "a" * 64 + "?relay=x"
+    prova("LA RETE con Telegram che prende la paginetta: bitcoin e lightning nel browser (link intero nel frammento), "
+          "nessuna copia; nostrconnect fermo e lasciato alla sua porta, o fermo e basta",
+          {"btc": ["browser", True], "ln": ["browser", True], "nostrPorta": ["porta", True], "nostrNudo": ["fermo", True],
+           "chiesti": [["https://barattolo.store/apri-wallet#" + _ur_quote("bitcoin:bc1qabc?amount=0.00010000"), {"try_browser": "chrome"}],
+                       ["https://barattolo.store/apri-wallet#" + _ur_quote("lightning:" + BOLT), {"try_browser": "chrome"}]],
+           "copiati": 0}, o["reteBrowser"])
     prova("...in Telegram per iPhone e in Chrome la rete non tocca niente: il link parte come sempre",
           [["niente", False], ["niente", False], 0], [o["reteIos"], o["reteChrome"], o["reteCopiatoFuori"]])
     prova("walletChiusoTelegram: solo dentro Telegram, e solo Android (piattaforma o user agent)",
@@ -177486,6 +177566,94 @@ console.log(JSON.stringify(out));
     prova("la fattura morta toglie l'avviso (e la porta, come prima)",
           {"cera2": True, "viva": False, "avviso": False, "testo": "⌛ Fattura scaduta", "wallet": "none"}, o["fatturaMorta"])
     prova("...quella viva lo lascia", {"viva2": True, "avviso": True}, o["fatturaViva"])
+
+
+    # --- 3) LA PAGINETTA DEL BROWSER (20 nov 2026, sera, wallet-da-telegram)
+    src = _SORGENTE
+    _cod = globals()["codice"]   # qui `codice` e' il blocco del wallet
+    arch = open(os.path.join(QUI, "docs", "ARCHITETTURA.md"), encoding="utf-8").read()
+    i = src.index('@app.get("/apri-wallet")')
+    rotta = src[i:src.index("\n\n\n", i)]
+    prova("la paginetta: una rotta, senza login, l'HTML dalla sua funzione pura (mai il file nudo, mai il "
+          "database, nessun parametro letto), noindex, no-store e no-referrer",
+          [1, False, False, True, False, True, True, True, False, False],
+          [src.count('@app.get("/apri-wallet")'), "verifica_utente" in rotta, "Depends(" in rotta,
+           "HTMLResponse(pagina_apri_wallet()," in rotta, "FileResponse(" in rotta,
+           '"X-Robots-Tag": "noindex, nofollow"' in rotta, "**HEADER_NO_CACHE" in rotta,
+           '"Referrer-Policy": "no-referrer"' in rotta, "request" in rotta, "db(" in _cod(pezzo("pagina_apri_wallet"))])
+    prova("...sta nell'elenco delle rotte pubbliche di ARCHITETTURA, e fuori dalla sitemap",
+          [True, False], ["`/apri-wallet`" in arch, "apri-wallet" in _cod(pezzo("sitemap_xml"))])
+    amb = {}
+    i = src.index("APRI_WALLET_TESTI = {")
+    exec(src[i:src.index("\n\n\n", i)], amb)
+    exec(pezzo("pagina_apri_wallet"), amb)
+    pag = amb["pagina_apri_wallet"]()
+    prova("...la pagina e' sempre la stessa, e non porta nessun link di wallet scritto dentro",
+          [True, False, False], [pag == amb["pagina_apri_wallet"](), "lnbc" in pag.lower(), 'href="lightning' in pag])
+    script = pag[pag.index("<script>") + len("<script>"):pag.index("</script>")]
+    banco_pag = r"""
+const esiti = [];
+function giro(hash){
+  const nodi = {apri: {hidden: true, textContent: '', href: '#'}, copia: {hidden: true, textContent: '', onclick: null},
+                nota: {textContent: ''}};
+  const lanci = [];
+  const location = {hash, set href(v){ lanci.push(v); }, get href(){ return 'https://barattolo.store/apri-wallet' + hash; }};
+  const document = {getElementById: id => nodi[id], body: {appendChild(){}}, createElement: () => ({setAttribute(){}, style: {}, select(){}, remove(){}}),
+                    execCommand: () => true};
+  let copiato = null;
+  const navigator = {clipboard: {writeText: t => { copiato = t; return {then: f => f()}; }}};
+  document.readyState = 'loading';
+  const ascolti = {};
+  const window = {addEventListener: (n, f) => { ascolti[n] = f; }};
+  const timer = [];
+  const setTimeout = (f) => timer.push(f);
+  new Function('location', 'document', 'navigator', 'window', 'setTimeout', SCRIPT)(location, document, navigator, window, setTimeout);
+  const primaDelLoad = lanci.length;
+  if (ascolti.load) ascolti.load();
+  timer.splice(0).forEach(f => f());
+  if (primaDelLoad) lanci.unshift('PRIMA DEL LOAD');
+  if (nodi.copia.onclick) nodi.copia.onclick();
+  return {lanci, apri: nodi.apri.hidden ? null : [nodi.apri.textContent, nodi.apri.href], copia: nodi.copia.hidden ? null : nodi.copia.textContent,
+          copiato, nota: nodi.nota.textContent};
+}
+const C = encodeURIComponent;
+const out = {
+  ln: giro('#' + C('lightning:' + V.bolt)),
+  lnMaiuscolo: giro('#' + C('LIGHTNING:' + V.bolt.toUpperCase())),
+  btc: giro('#' + C('bitcoin:bc1qxyz0123456789abcdef?amount=0.00012345')),
+  nostr: giro('#' + C('nostrconnect://' + 'ab'.repeat(32) + '?relay=wss%3A%2F%2Fa.example&secret=s&name=Barattolo')),
+  storti: ['', '#', '#' + C('javascript:alert(1)'), '#' + C('intent://x#Intent;scheme=lightning;end'),
+           '#' + C('https://altro.example'), '#' + C('lightning:lnbc1 x'), '#' + C('lightning:lnbc1"><b>'),
+           '#' + C('bitcoin:bc1qxyz0123456789abcdef?x=javascript:alert(1)'), '#' + C('bitcoin:bc1qxyz0123456789abcdef/../x'),
+           '#' + C('nostrconnect://zz?relay=x'), '#%E0%A4%A', '#' + C('lightning:' + V.bolt + '#x')].map(giro)
+};
+console.log(JSON.stringify(out));
+"""
+    pb = os.path.join(cart, "paginetta.js")
+    open(pb, "w", encoding="utf-8").write("const SCRIPT = " + _json.dumps(script) + ";\nconst V = "
+                                         + _json.dumps({"bolt": BOLT}) + ";\n" + banco_pag)
+    rr = _sp.run([node, pb], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    prova("il banco della paginetta gira", "", (rr.stderr or "")[-900:])
+    if rr.returncode != 0:
+        return
+    q = _json.loads(rr.stdout)
+    T = amb["APRI_WALLET_TESTI"]
+    prova("LIGHTNING: il lancio subito col link intero, il tasto grande col link, il Copia che copia la bolt11",
+          {"lanci": ["lightning:" + BOLT], "apri": [T["ln"][0], "lightning:" + BOLT], "copia": T["ln"][2],
+           "copiato": BOLT, "nota": T["ln"][3]}, q["ln"])
+    prova("...anche tutta maiuscola (la forma del QR)", ["LIGHTNING:" + BOLT.upper()], q["lnMaiuscolo"]["lanci"])
+    prova("BITCOIN: il lancio con la cifra, il Copia che copia l'indirizzo senza la cifra",
+          {"lanci": ["bitcoin:bc1qxyz0123456789abcdef?amount=0.00012345"],
+           "apri": [T["btc"][0], "bitcoin:bc1qxyz0123456789abcdef?amount=0.00012345"], "copia": T["btc"][2],
+           "copiato": "bc1qxyz0123456789abcdef", "nota": T["btc"][3]}, q["btc"])
+    NZ = "nostrconnect://" + "ab" * 32 + "?relay=wss%3A%2F%2Fa.example&secret=s&name=Barattolo"
+    prova("NOSTRCONNECT: il lancio verso Amber, niente Copia",
+          {"lanci": [NZ], "apri": [T["nostr"][0], NZ], "copia": None, "copiato": None, "nota": T["nostr"][3]}, q["nostr"])
+    prova("le forme storte (vuoto, javascript:, intent:, un altro sito, spazi, virgolette, una query con i due "
+          "punti, un percorso, una chiave non esadecimale, un frammento rotto, un # in coda): nessun lancio, "
+          "nessun tasto, la frase d'errore",
+          [{"lanci": [], "apri": None, "copia": None, "copiato": None, "nota": amb["APRI_WALLET_STORTO"]}] * 12,
+          q["storti"])
 
 
 def prove_prova_wallet():

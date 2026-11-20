@@ -1410,6 +1410,16 @@
   📋») o l'indirizzo senza la cifra («📋 Indirizzo copiato»). iPhone,
   computer e fuori da Telegram: come prima. CANTIERI, «"Apri nel
   wallet" non rompe più la Mini App su Android».
+  E DAL 20 NOV SERA IL WALLET SI APRE DAVVERO («wallet-da-telegram»):
+  prima dell'avviso, `apriDalBrowser` chiede a Telegram
+  `tg.openLink('/apri-wallet#<link>', {try_browser: 'chrome'})`; la
+  paginetta in Chrome passa il link dalla whitelist e lo lancia, e lì
+  il sistema lo consegna intero. NON il browser interno di Telegram:
+  `Browser.openInExternalApp` riscrive la URI come scheme://host/path e
+  `lightning:lnbc…` arriva al wallet come `lightning:///`. Se Telegram
+  non apre niente (niente Chrome) la Mini App resta a schermo e dopo
+  l'attimo arriva l'avviso. Stessa strada per «📲 Apri Amber e
+  approva» (`apriFirmatarioQui`) e per i link senza porta della rete.
   IL FATTO SU WALLET OF SATOSHI (10 ott 2026, sera, provato da Andrea
   su /prova-wallet con WoS self-custodial dall'app sulla Home): il link
   `lightning:` nudo su una fattura normale apre la conferma; lo stesso
@@ -32091,6 +32101,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    la riga nel config; senza login, noindex, no-store, fuori da sitemap
    e menu; nascosta, non segreta; vedi CANTIERI, «La pagina di prova
    dei link al wallet» e «Le hold di prova G e H»),
+   `/apri-wallet` (20 nov 2026, cantiere wallet-da-telegram: la
+   paginetta che la Mini App apre in Chrome da Telegram per Android
+   per consegnare al telefono un `lightning:`, un `bitcoin:` o un
+   `nostrconnect://`; statica, sempre uguale, il link sta nel
+   FRAMMENTO e al server non arriva mai, lo script lo passa da una
+   whitelist di tre forme; senza login, noindex, no-store,
+   no-referrer, fuori da sitemap e menu; vedi «LA STRADA CHIUSA» e
+   CANTIERI, «Il wallet si apre davvero da Telegram per Android»),
    `/.well-known/nostr.json` (ott 2026, il NIP-05 di casa: i nomi di
    `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti
