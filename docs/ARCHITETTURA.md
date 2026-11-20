@@ -34348,6 +34348,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   foglio della cassa nella vista `esercente`, con `cassaRigheHTML`
   (righe di «Controlla il carrello») al posto della griglia; CSS sotto
   `body.cassa-vetrina`.
+  LA CASSA SOLO NELL'APP NEGOZIO (20 nov 2026, cantiere
+  cassa-solo-negozio; Andrea: «La parte della cassa nell'applicazione di
+  barattolo ufficiale non deve esserci»): nella Barattolo di sempre la
+  porta `#vocCassa` del Profilo si accende solo con `negozioSola()`, e
+  `caricaCassaOrdini` legge `/cassa/storico` solo con `appNegozio` o
+  `negozioSola()` — fuori, «Ordini» non ha le vendite della cassa né il
+  filtro «🏪 Cassa» (che si accende solo se ce n'è). La leva
+  `CASSA_ATTIVA` resta com'era: spenta toglierebbe le rotte anche
+  all'app Negozio. La porta da indirizzo `/?app=negozio` (il tablet del
+  banco) resta aperta.
   LA CASSA IN PRESENZA (20 nov 2026, cantiere cassa-presenza). Lo
   schermo per il cliente è `#cassaCliente`, fuori dal foglio, fixed e su
   bianco fisso: `mostraAlCliente` / `chiudiSchermoCliente` /
