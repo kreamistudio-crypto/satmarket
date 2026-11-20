@@ -70,7 +70,7 @@ def pezzi_pagina():
         tra("function tempoDepositoOnchainP2P(entro, adesso){"),
         # la riga «In BTC» del foglio (11 nov 2026, cifra-btc): le vere
         tra("function satsInBtc(sats, punto){"), tra("function cifraBtcCopiabile(sats){"),
-        tra("function rigaCifraBtc(sats){"),
+        tra("function cifraSatsCopiabile(sats){"), tra("function rigaCifraBtc(sats){"),
         tra("function renderDepositoOnchainP2P(){"),
         tra("function battitoFoglioDepositoOnchainP2P(){"),
         # il deposito in Lightning, intero

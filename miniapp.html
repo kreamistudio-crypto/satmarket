@@ -73205,9 +73205,15 @@ function cifraBtcCopiabile(sats){
     + ' title="Tocca per copiare" aria-label="Copia la cifra in BTC: ' + satsInBtc(n) + '">'
     + satsInBtc(n) + ' BTC <span aria-hidden="true">📋</span></button>';
 }
-/* la riga intera, per i fogli che mostrano la cifra in sats */
+/* la riga intera, per i fogli che mostrano la cifra in sats; sotto, la
+   gemella coi sats da copiare (20 nov 2026, cantiere sats-da-copiare,
+   Andrea: «deve esserci anche una stringa sotto con i sats da copiare,
+   esattamente come adesso BTC»): stesso bottoncino, per i wallet che
+   l'importo lo vogliono in sats. Una sola funzione, cosi' la coppia sta
+   insieme in tutte le schermate on-chain che mostrano «In BTC». */
 function rigaCifraBtc(sats){
-  return '<div class="cifra-btc-riga"><span>In BTC</span>' + cifraBtcCopiabile(sats) + '</div>';
+  return '<div class="cifra-btc-riga"><span>In BTC</span>' + cifraBtcCopiabile(sats) + '</div>'
+    + '<div class="cifra-btc-riga"><span>In sats</span>' + cifraSatsCopiabile(sats) + '</div>';
 }
 function copiaCifraBtc(sats){
   haptic();

@@ -93169,3 +93169,40 @@ Resta da guardare: gli scambi presi prima della promozione restano col
 loro zero (la quota si scrive alla presa); il primo on-chain piccolo vero
 dopo la promozione deve mostrare la riga col numero e portare l'uscita a
 Barattolo.
+
+## I sats da copiare sotto la cifra in BTC (20 nov 2026, cantiere sats-da-copiare; Andrea, con lo scatto di «🔒 Blocca i sats»: «sotto a quella scritta lì, copia BTC, deve esserci anche una stringa sotto con i sats da copiare, esattamente come adesso BTC»)
+
+FATTO. Sotto la riga «In BTC  0,00017433 BTC 📋» ora c'è la gemella
+«In sats  17 433 📋», stessa forma (`cifra-btc-riga` + il bottoncino
+`cifra-btc`): a schermo con lo spazio delle migliaia, negli appunti il
+numero nudo (`copiaCifraSats`, quello del Cambio del cantiere
+cifra-copia). La coppia nasce in UN posto, `rigaCifraBtc`, e quindi sta
+in tutte e cinque le schermate on-chain che mostravano «In BTC»: il
+foglio di pagamento on-chain del mercatino, «🔒 Blocca i sats» del P2P,
+il deposito della raccolta, il riquadro «Caricali in Lightning» e la
+carta del Cambio. Unico testo nuovo: l'etichetta «In sats».
+
+SCARTATO. Una funzione nuova chiamata accanto in ogni schermata: cinque
+ritocchi invece di uno, e una schermata dimenticata avrebbe di nuovo
+il BTC senza i sats. Scrivere «sats» anche dentro il bottoncino: c'è già
+nell'etichetta, e il bottone resta quello del Cambio.
+
+PROVATO. `prove_cifra_btc` ha una riga nuova: «In sats» sta sotto «In
+BTC», dopo il suo bottoncino, col tocco `copiaCifraSats(8128)`, e le
+righe sono due. Controprova: tolta la riga «In sats» da `rigaCifraBtc` →
+rossa. I tre banchi che ritagliano `rigaCifraBtc` (deposito P2P on-chain,
+rimborso liscio, collaudo_deposito_ln_p2p) ora ritagliano anche
+`cifraSatsCopiabile`. Scatto con dati finti in
+/mnt/project-files/sats-da-copiare/. Sull'albero di develop `bb5f370b` più il cantiere, nel venv con le sole
+dipendenze del workflow (senza coincurve) e nostr-tools@2.25.2:
+`PROVE_SEVERE=1 python prove.py` 30.764 passate, 0 fallite; collaudi
+della CI 162 verdi, 0 rossi. Dopo il rebase su `3c30c153` (bottoni-fissi,
+collaudo-orologio-recapito, tasto-rosso-conto, tocca-recapito-oc,
+timer-deposito; poi sepa-instant, Barattozon e fee-minima-oc: nessun simbolo in comune)
+il giro mirato (`--dai-file=origin/develop`: 269 sezioni onchain, p2p e
+documenti) 12.251 passate, 0 fallite; collaudi vicini (deposito_ln_p2p,
+p2p_onchain, tempo_pagare, cambio_p2p, swap_pagamento) 5 verdi. Sopra
+fee-minima-oc: le tre sezioni toccate più le 29 che leggono i documenti
+1.677 passate, 0 fallite; collaudi deposito_ln_p2p e p2p_onchain verdi.
+Resta da guardare dal telefono: il tocco su «17 433 📋» dentro Telegram
+e l'incolla nel wallet.

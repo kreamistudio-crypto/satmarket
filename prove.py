@@ -170015,6 +170015,7 @@ let p2pOnchainMiei = [];
         + pezzo_js(mini, "function onchainUriPagamento(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function satsInBtc(sats, punto){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function cifraBtcCopiabile(sats){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function cifraSatsCopiabile(sats){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function rigaCifraBtc(sats){", "\n}\n") + "\n}\n" \
         + scheda + foglio + """
 const out = {};
@@ -209851,6 +209852,7 @@ let ARRIVA = false;
         + _fn_js(mini, "function onchainUriPagamento(o){") \
         + _fn_js(mini, "function satsInBtc(sats, punto){") \
         + _fn_js(mini, "function cifraBtcCopiabile(sats){") \
+        + _fn_js(mini, "function cifraSatsCopiabile(sats){") \
         + _fn_js(mini, "function rigaCifraBtc(sats){") \
         + _fn_js(mini, "function onchainParolePerOrdine(B, parole, o){") \
         + mini[mini.index("function schedaOnchainP2P(o){"):mini.index("function copiaOnchainP2P(")] \
@@ -211815,9 +211817,11 @@ def prove_cifra_btc():
               encoding="utf-8").read()
     pezzi = (pezzo_js(mini, "function satsInBtc(sats, punto){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function cifraBtcCopiabile(sats){", "\n}\n") + "\n}\n"
+             + pezzo_js(mini, "function cifraSatsCopiabile(sats){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function rigaCifraBtc(sats){", "\n}\n") + "\n}\n"
              + pezzo_js(mini, "function copiaCifraBtc(sats){", "\n}\n") + "\n}\n")
     banco = (pezzi
+             + "const fmt = n => String(n);\n"
              + "let copiato = null, detto = null;\n"
              + "function haptic(){}\n"
              + "function copiaLink(t, f){ copiato = t; detto = f; }\n"
@@ -211829,7 +211833,12 @@ def prove_cifra_btc():
              + "console.log(JSON.stringify({fatte, copiato, detto,"
              + " tasto: [tasto.includes('0,00008128 BTC'), tasto.includes('copiaCifraBtc(8128)'),"
              + " tasto.includes('type=\"button\"')],"
-             + " riga: rigaCifraBtc(8128).includes(tasto)}));")
+             + " riga: rigaCifraBtc(8128).includes(tasto),"
+             # (20 nov 2026, sats-da-copiare) sotto «In BTC» la gemella «In sats»
+             + " sats: (r => [r.indexOf('In BTC') >= 0 && r.indexOf('In BTC') < r.indexOf('In sats'),"
+             + "   r.indexOf(tasto) < r.indexOf('In sats'), r.includes(cifraSatsCopiabile(8128)),"
+             + "   r.includes('copiaCifraSats(8128)'), (r.match(/class=\"cifra-btc-riga\"/g) || []).length])"
+             + "(rigaCifraBtc(8128))}));")
     r = _node_banco(banco)
     if r is None:
         salta("la cifra in BTC: il conto in node", "node non c'e'")
@@ -211843,6 +211852,8 @@ def prove_cifra_btc():
         prova("il bottoncino: virgola a schermo, il tocco giusto, un vero bottone",
               [True, True, True], r.get("tasto"))
         prova("...e la riga «In BTC» lo contiene", True, r.get("riga"))
+        prova("...e sotto, stessa forma, la riga «In sats» col bottoncino che copia "
+              "i sats (20 nov 2026, sats-da-copiare)", [True, True, True, True, 2], r.get("sats"))
     disegna = pezzo_js(mini, "async function payDisegnaOnchain(){", "\n}\n")
     deposito = pezzo_js(mini, "function renderDepositoOnchainP2P(){", "\n}\n")
     presa = pezzo_js(mini, "function rigaPresaOcP2P(o){", "\n}\n")
