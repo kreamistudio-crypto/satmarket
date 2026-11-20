@@ -38271,6 +38271,16 @@ def _leve_stato():
                          "ha depositato: per tutti gli altri e' come spento",
                   spento="«Riprendi i sats» vale per chiunque abbia "
                          "depositato (se la leva e' accesa)"),
+            # IL RITORNO DA SOLO (20 nov 2026, ritorno-da-solo-oc)
+            _leva("Sats on-chain indietro da soli a tempo finito",
+                  "P2P_ONCHAIN_RITORNO_DA_SOLO", P2P_ONCHAIN_RITORNO_DA_SOLO,
+                  acceso="col tempo per pagare finito senza «Ho inviato», "
+                         "Barattolo firma da solo il ritorno a chi ha "
+                         "depositato (lui mette la seconda firma) e l'ordine "
+                         "torna nel libro; non col Barattozon ne' coi "
+                         "contanti di persona",
+                  spento="col tempo finito restano «Riprendi i sats» (se "
+                         "aperto) e la disputa"),
             # LA META' DELLA CAUZIONE MANDATA DA SOLA (19 nov 2026)
             _leva("Metà della cauzione mandata da sola",
                   "P2P_ONCHAIN_CAUZIONE_META_AUTO", P2P_ONCHAIN_CAUZIONE_META_AUTO,
@@ -74895,9 +74905,16 @@ P2P_CONTO_ROSSO_FINO_MIN = 60
 P2P_CONTO_UN_MINUTO_S = 90
 
 
-def testo_manca_un_minuto_p2p(onchain: bool) -> str:
+def testo_manca_un_minuto_p2p(onchain: bool, da_solo: bool = False) -> str:
     """PURA: l'avviso a un minuto, scritto per gli euro (la valuta la
-    traduce chi chiama, come il conto)."""
+    traduce chi chiama, come il conto). `da_solo` (20 nov 2026,
+    ritorno-da-solo-oc): l'on-chain che allo scadere torna da solo dice la
+    frase del Lightning, non la disputa."""
+    if onchain and da_solo:
+        return (f"{P2P_ONCHAIN_SEGNO} ⏰ Manca 1 minuto: hai già mandato gli euro? "
+                "Tocca subito «Ho inviato gli euro». Se allo scadere non l'hai "
+                "toccato, lo scambio scade e i sats tornano a chi vende, anche se "
+                "hai già pagato.")
     if onchain:
         return (f"{P2P_ONCHAIN_SEGNO} ⏰ Manca 1 minuto: hai già mandato gli euro? "
                 "Tocca subito «Ho inviato gli euro». Senza il bottone, allo scadere "
@@ -75050,7 +75067,8 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
                 # i minuti per il tasto rosso: quelli dell'ordine, non la
                 # nascita del conto (che puo' arrivare un giro dopo)
                 minuti = int(_p2p_onchain_minuti(o) or 0) if o else 0
-                uno = (_p2p_onchain_parole(o, testo_manca_un_minuto_p2p(True))
+                uno = (_p2p_onchain_parole(o, testo_manca_un_minuto_p2p(
+                    True, globals().get("p2p_onchain_ritorno_da_solo_vale", lambda x: False)(o)))
                        if o and un_minuto_dovuto_p2p(stato, fine - adesso) else "")
             else:
                 momenti = [dict(m) for m in con.execute(
@@ -113757,7 +113775,11 @@ def _p2p_onchain_riga_pubblica(o, nome: str = "") -> dict:
          # la card di chi prende restava senza 🔐 e senza «Blocca la
          # cauzione» mentre la presa la pretendeva; e senza il bollino ⏱
          "minuti_pagamento": _p2p_onchain_minuti(o),
-         "cauzione_chiesta": p2p_onchain_cauzione_chiesta(o)}
+         "cauzione_chiesta": p2p_onchain_cauzione_chiesta(o),
+         # (20 nov 2026, ritorno-da-solo-oc) allo scadere i sats tornano da
+         # soli: il foglio e il banner della presa dicono la regola giusta
+         "ritorno_da_solo": globals().get(
+             "p2p_onchain_ritorno_da_solo_vale", lambda x: False)(o)}
     if nome:
         r["nome"] = nome
     # LA ZONA DEL CONTANTI ESCE A TUTTI, come quella di Lightning (17 nov
@@ -114138,6 +114160,9 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
         "riprendi_scaduto": (tg_id == int(o["depositante_id"] or 0)
                              and p2p_onchain_riprendi_scaduto_per(tg_id)
                              and not p2p_onchain_riprendi_scaduto_perche(o)),
+        # (20 nov 2026, ritorno-da-solo-oc) allo scadere torna da solo: la
+        # pagina dice «lo scambio scade» invece della disputa
+        "ritorno_da_solo": p2p_onchain_ritorno_da_solo_vale(o),
         "ore_pagamento": p2p_onchain_ore_pagamento(o),
         # (18 nov 2026) ...e quello scelto da chi pubblica, in minuti: il
         # bollino del libro e l'anello della pagina lo leggono da qui
@@ -115049,6 +115074,150 @@ def p2p_onchain_riprendi_scaduto_perche(o, adesso: int = 0) -> str:
     return ""
 
 
+def _p2p_onchain_chiudi_tempo_scaduto(con, o, chi: int, adesso: int) -> bool:
+    """LA CHIUSURA COL TEMPO PER PAGARE FINITO, una sola per il bottone e per
+    la ronda (20 nov 2026, ritorno-da-solo-oc): Barattolo firma il rimborso
+    verso chi ha depositato (`_onchain_psbt_barattolo`, ValueError se non
+    puo') e lo scambio diventa 'annullato' per 'tempo-scaduto', solo se
+    nessuno si e' mosso nel frattempo. `chi` = `decisione_da`: chi ha
+    depositato, anche quando chiude la ronda (la pagina dice che ha firmato
+    Barattolo). Timbra anche `pagamento_scaduto_il` se la ronda non l'aveva
+    ancora fatto: e' il fatto da cui la cauzione chiesta si perde per tempo
+    (`p2p_onchain_cauzione_persa_da_sola`). Torna True se ha chiuso."""
+    psbt = _onchain_psbt_barattolo(con, o, "compratore")
+    cur = con.execute(
+        "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
+        " chiuso_perche='tempo-scaduto',"
+        " proposta_verso='compratore', proposta_psbt=?, proposta_da=0,"
+        " proposta_il=?, decisione_da=?, decisione_il=?,"
+        " decisione_perche='tempo-scaduto', aggiornato=?,"
+        " pagamento_scaduto_il=CASE WHEN COALESCE(pagamento_scaduto_il, 0)>0"
+        " THEN pagamento_scaduto_il ELSE ? END"
+        " WHERE id=? AND stato='depositato' AND COALESCE(euro_inviati_il, 0)=0"
+        " AND COALESCE(proposta_psbt, '')='' AND COALESCE(decisione_da, 0)=0",
+        (int(adesso), psbt, int(adesso), int(chi), int(adesso), int(adesso),
+         int(adesso), int(o["id"])))
+    con.commit()
+    return bool(cur.rowcount)
+
+
+async def _p2p_onchain_di_tempo_scaduto(o) -> None:
+    """I due avvisi della chiusura col tempo finito (`o` = la riga gia'
+    chiusa): a chi compra che non deve mandare niente, a chi ha depositato
+    che manca la sua seconda firma."""
+    await _notifica_p2p_onchain(o, o["ricevente_id"], _p2p_onchain_parole(o,
+        "⏰ <b>Il tempo per pagare è finito</b> senza «Ho inviato gli euro», e chi "
+        f"vende si è ripreso i sats dello scambio di {_p2p_onchain_quanto(o)}.\n\n"
+        "Lo scambio è chiuso: non mandare niente. Se avevi già pagato, scrivi "
+        "subito ai moderatori dalla pagina dello scambio."),
+        _p2p_onchain_bottone(o))
+    await _notifica_p2p_onchain(o, o["depositante_id"],
+        "↩️ <b>Barattolo ha firmato il rimborso.</b>\n\n"
+        "Apri lo scambio e tocca «✍️ Metti la seconda firma»: i sats "
+        "tornano al tuo wallet (meno la commissione di rete) e l'ordine torna "
+        "nel libro.", _p2p_onchain_bottone(o))
+
+
+# IL RITORNO DA SOLO (20 nov 2026, cantiere ritorno-da-solo-oc; Andrea:
+# «nell'on-chain deve succedere uguale al lighting. Se scade il tempo, i
+# sats devono ritornare indietro in automatico», poi la scheda «Da solo,
+# come Lightning», che rovescia il «niente annullo automatico» del 18 nov).
+# Allo scadere del tempo per pagare senza «Ho inviato» la RONDA fa da sola
+# il gesto di «↩️ Riprendi i sats», per tutti e non solo per i moderatori:
+# stesso giudice (`p2p_onchain_riprendi_scaduto_perche`), stessa chiusura
+# (`_p2p_onchain_chiudi_tempo_scaduto`), stessi avvisi. Barattolo firma il
+# rimborso SOLO verso l'indirizzo di ritorno di chi ha depositato.
+# LA SECONDA FIRMA resta del telefono di chi ha depositato: la sua chiave
+# vive solo li', e il server non firma mai al posto di un utente (regola
+# ferrea 2). E' l'unica differenza dal Lightning, dove i sats tornano
+# senza nessun gesto. Alla seconda firma tutto va come dopo il bottone:
+# l'ordine rinasce nel libro, a chi non ha pagato si conta
+# `onchain-non-pagato`, la cauzione chiesta si perde per tempo (meta' da
+# sola a chi vende, meta' resta al nodo).
+# FUORI, apposta: il Barattozon (il tempo e' quello del PayCode, e chi l'ha
+# pagato al tabacchino lo dimostra con lo scontrino) e il contanti di
+# persona (chi ha consegnato i contanti senza toccare il bottone li
+# perderebbe davanti a chi li ha in tasca): li' restano l'avviso e la
+# disputa. Senza un indirizzo di ritorno non si firma niente: resta la
+# disputa, come per il recapito mancato, e la ronda riprova a ogni giro
+# (un indirizzo scritto dopo basta).
+# NON SERVE IL NODO: l'on-chain e' il 2-di-3 di Barattolo, Mostro non lo
+# vede. LA LEVA `P2P_ONCHAIN_RITORNO_DA_SOLO`, accesa di serie (regola delle
+# leve nuove, 14 nov 2026): un False nel config torna al bottone dei
+# moderatori e alla disputa.
+try:
+    from config import P2P_ONCHAIN_RITORNO_DA_SOLO
+    P2P_ONCHAIN_RITORNO_DA_SOLO = P2P_ONCHAIN_RITORNO_DA_SOLO is not False
+except ImportError:
+    P2P_ONCHAIN_RITORNO_DA_SOLO = True
+
+
+def p2p_onchain_ritorno_da_solo_vale(o) -> bool:
+    """PURA: questo scambio, allo scadere, torna da solo? La leva accesa, e
+    non e' un Barattozon ne' un contanti di persona. La legge anche la
+    pagina, per dire la regola giusta prima che il tempo finisca."""
+    if P2P_ONCHAIN_RITORNO_DA_SOLO is not True or not o:
+        return False
+    if globals().get("p2p_onchain_tab_scade", lambda x: 0)(o):
+        return False
+    return not globals().get("_p2p_onchain_contanti", lambda x: False)(o)
+
+
+def p2p_onchain_ritorno_da_solo(o, adesso: int = 0) -> bool:
+    """PURA: la ronda rimanda da sola i sats a chi ha depositato, ADESSO?"""
+    return (p2p_onchain_ritorno_da_solo_vale(o)
+            and not p2p_onchain_riprendi_scaduto_perche(o, adesso))
+
+
+def _p2p_onchain_tempi_mancati(con, adesso: int) -> list:
+    """Gli scambi col tempo per pagare finito (gia' timbrato dalla ronda),
+    senza «Ho inviato» e senza firme, che tornano da soli: le righe."""
+    return [o for o in con.execute(
+        "SELECT * FROM p2p_onchain_ordini WHERE stato='depositato'"
+        " AND COALESCE(euro_inviati_il,0)=0 AND COALESCE(proposta_psbt,'')=''"
+        " AND COALESCE(decisione_da,0)=0 AND COALESCE(ricevuti_sats,0)>0"
+        " AND COALESCE(pagamento_scaduto_il,0)>0 ORDER BY id LIMIT 20").fetchall()
+        if p2p_onchain_ritorno_da_solo(o, adesso)]
+
+
+async def _p2p_onchain_chiudi_tempi_mancati(adesso: int) -> set:
+    """Chiude da soli gli scambi di `_p2p_onchain_tempi_mancati` con la
+    firma di Barattolo verso chi ha depositato. Torna gli id chiusi: la
+    ronda non manda loro l'avviso del tempo finito (direbbe «libera i sats»
+    a uno scambio gia' chiuso)."""
+    con = _p2p_onchain_db()
+    try:
+        righe = _p2p_onchain_tempi_mancati(con, adesso)
+    finally:
+        con.close()
+    chiusi = set()
+    for o in righe:
+        oid = int(o["id"])
+        try:
+            con = _p2p_onchain_db()
+            try:
+                o = _p2p_onchain_carica(con, oid)
+                if not p2p_onchain_ritorno_da_solo(o, adesso):
+                    continue
+                if not _p2p_onchain_chiudi_tempo_scaduto(
+                        con, o, int(o["depositante_id"]), adesso):
+                    continue
+                o = _p2p_onchain_carica(con, oid)
+            finally:
+                con.close()
+            chiusi.add(oid)
+            _p2p_onchain_rifai_foto()
+            asyncio.create_task(_p2p_onchain_pubblica(oid))
+            print(f"⏰ P2P on-chain: scambio {oid}, tempo per pagare finito senza "
+                  "«Ho inviato»: Barattolo ha firmato il ritorno a chi ha "
+                  "depositato", flush=True)
+            await _p2p_onchain_di_tempo_scaduto(o)
+        except Exception as e:
+            print(f"⚠️ P2P on-chain: ritorno da solo dello scambio {oid} "
+                  f"non fatto: {e}", flush=True)
+    return chiusi
+
+
 @app.post("/api/p2p/onchain/{oid}/riprendi-scaduto")
 async def p2p_onchain_riprendi_scaduto(oid: int, x_tg_init_data: str = Header(""),
                                        barattolo_sessione: str = Cookie("")):
@@ -115070,20 +115239,10 @@ async def p2p_onchain_riprendi_scaduto(oid: int, x_tg_init_data: str = Header(""
         if perche:
             raise HTTPException(409, perche)
         try:
-            psbt = _onchain_psbt_barattolo(con, o, "compratore")
+            chiuso = _p2p_onchain_chiudi_tempo_scaduto(con, o, int(user["id"]), adesso)
         except ValueError as e:
             raise HTTPException(409, f"Barattolo non può firmare: {e}")
-        cur = con.execute(
-            "UPDATE p2p_onchain_ordini SET stato='annullato', chiuso_il=?,"
-            " chiuso_perche='tempo-scaduto',"
-            " proposta_verso='compratore', proposta_psbt=?, proposta_da=0,"
-            " proposta_il=?, decisione_da=?, decisione_il=?,"
-            " decisione_perche='tempo-scaduto', aggiornato=?"
-            " WHERE id=? AND stato='depositato' AND COALESCE(euro_inviati_il, 0)=0"
-            " AND proposta_psbt='' AND decisione_da=0",
-            (adesso, psbt, adesso, int(user["id"]), adesso, adesso, oid))
-        con.commit()
-        if not cur.rowcount:
+        if not chiuso:
             raise HTTPException(409, "Lo scambio è cambiato un attimo fa: riapri")
         o = _p2p_onchain_carica(con, oid)
         fuori = _p2p_onchain_per(con, o, user["id"])
@@ -115091,17 +115250,7 @@ async def p2p_onchain_riprendi_scaduto(oid: int, x_tg_init_data: str = Header(""
         con.close()
     _p2p_onchain_rifai_foto()
     asyncio.create_task(_p2p_onchain_pubblica(oid))
-    await _notifica_p2p_onchain(o, o["ricevente_id"], _p2p_onchain_parole(o,
-        "⏰ <b>Il tempo per pagare è finito</b> senza «Ho inviato gli euro», e chi "
-        f"vende si è ripreso i sats dello scambio di {_p2p_onchain_quanto(o)}.\n\n"
-        "Lo scambio è chiuso: non mandare niente. Se avevi già pagato, scrivi "
-        "subito ai moderatori dalla pagina dello scambio."),
-        _p2p_onchain_bottone(o))
-    await _notifica_p2p_onchain(o, o["depositante_id"],
-        "↩️ <b>Barattolo ha firmato il rimborso.</b>\n\n"
-        "Apri lo scambio e tocca «✍️ Metti la seconda firma»: i sats "
-        "tornano al tuo wallet (meno la commissione di rete) e l'ordine torna "
-        "nel libro.", _p2p_onchain_bottone(o))
+    await _p2p_onchain_di_tempo_scaduto(o)
     await notifica_admin(argomento="moderazione", testo=
         f"⏰ Scambio P2P on-chain #{int(oid)}: tempo per pagare finito senza "
         "«Ho inviato»; chi ha depositato si è ripreso i sats "
@@ -115601,7 +115750,12 @@ def p2p_onchain_cauzione_persa_da_sola(o, riga) -> str:
         if int(_p2p_onchain_campo(o, "annullo_chiesto_il", 0) or 0) > 0:
             return ""
         return "rinuncia"
-    if (stato in ("depositato", "disputa", "rimborsato")
+    # (20 nov 2026, ritorno-da-solo-oc) ...anche chiuso per il tempo finito
+    # e in attesa della seconda firma: senza, il giro delle cauzioni lo
+    # vedeva «a scambio chiuso» e la cauzione tornava a chi non aveva pagato
+    chiuso_per_tempo = (stato == "annullato" and str(_p2p_onchain_campo(
+        o, "chiuso_perche", "") or "") == "tempo-scaduto")
+    if ((stato in ("depositato", "disputa", "rimborsato") or chiuso_per_tempo)
             and int(_p2p_onchain_campo(o, "pagamento_scaduto_il", 0) or 0) > 0
             and int(_p2p_onchain_campo(o, "euro_inviati_il", 0) or 0) <= 0):
         return "tempo"
@@ -116572,7 +116726,11 @@ async def _p2p_onchain_controlla(oid: int) -> str:
                      f"garanzia 2-di-3 ✓</b> Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
                      f"Apri Barattolo: ora manda <b>{euro} €</b> a chi vende, poi tocca "
                      "«Ho inviato gli euro». Il recapito è nello scambio."
-                     f"\n\n⏳ <b>Hai {tempo_detto}</b>, poi chi vende può aprire una disputa."
+                     + (f"\n\n⏳ <b>Hai {tempo_detto}</b>: allo scadere lo scambio scade e "
+                        "l'ordine torna nel libro."
+                        # (20 nov 2026, ritorno-da-solo-oc) la frase del Lightning
+                        if p2p_onchain_ritorno_da_solo_vale(o) else
+                        f"\n\n⏳ <b>Hai {tempo_detto}</b>, poi chi vende può aprire una disputa.")
                      if senza_recapito is False else
                      # (19 nov 2026) anche senza recapito si dice PRIMA che
                      # i sats sono bloccati: la riga mancava
@@ -119145,6 +119303,13 @@ def _p2p_onchain_testi_pagare(o) -> dict:
     sono quelle dei bottoni dello scambio on-chain."""
     S = P2P_ONCHAIN_SEGNO
     minuti = _p2p_onchain_minuti(o)
+    # (20 nov 2026, ritorno-da-solo-oc) dove i sats tornano da soli, le
+    # frasi del Lightning (`SOLLECITO_TEMPO_PAGARE_*`) al posto della disputa
+    da_solo = globals().get("p2p_onchain_ritorno_da_solo_vale", lambda x: False)(o)
+    fine = ("Se allo scadere non l'hai toccato, lo scambio scade e i sats tornano "
+            "a chi vende, anche se hai già pagato." if da_solo else
+            "Senza il bottone, allo scadere chi vende può aprire una disputa anche "
+            "se hai già pagato.")
     if minuti < 24 * 60:
         # (18 nov 2026) il tempo corto: col tempo che RESTA scritto dentro,
         # come nel Lightning, e l'ultimo dice la disputa
@@ -119154,8 +119319,7 @@ def _p2p_onchain_testi_pagare(o) -> dict:
             resto = _durata_detta_p2p(minuti * 60 - fra)
             fuori[i] = (
                 f"{S} ⏰ Mancano {resto}: hai già mandato gli euro? Tocca subito «Ho "
-                "inviato gli euro». Senza il bottone, allo scadere chi vende può "
-                "aprire una disputa anche se hai già pagato."
+                f"inviato gli euro». {fine}"
                 if minuti * 60 - fra <= 10 * 60 else
                 f"{S} 💶 Promemoria: i sats sono nel 2-di-3 e aspettano i tuoi "
                 f"euro. Hai ancora {resto} per inviarli al recapito che trovi "
@@ -119171,15 +119335,14 @@ def _p2p_onchain_testi_pagare(o) -> dict:
             f"gli euro». Ti restano {ore - 6} ore. Se non puoi più, tocca «↩️ Rinuncio: "
             "rimborsa chi vende» nella pagina dello scambio: i sats tornano a chi vende."),
         3: (f"{S} ⏰ Mancano quattro ore alla fine del tempo per pagare. Invia gli "
-            "euro e tocca «Ho inviato gli euro»: dopo, chi vende può aprire una "
-            "disputa e a decidere sarà un moderatore."),
+            "euro e tocca «Ho inviato gli euro»: "
+            + ("allo scadere lo scambio scade e l'ordine torna nel libro." if da_solo else
+               "dopo, chi vende può aprire una disputa e a decidere sarà un moderatore.")),
         4: (f"{S} ⏰ Mancano dieci minuti: hai già mandato gli euro? Tocca subito "
-            "«Ho inviato gli euro». Senza il bottone, allo scadere chi vende può "
-            "aprire una disputa anche se hai già pagato."),
+            f"«Ho inviato gli euro». {fine}"),
         # (19 nov 2026, Andrea) ...e l'ultimo a cinque minuti
         5: (f"{S} ⏰ Mancano cinque minuti: hai già mandato gli euro? Tocca subito "
-            "«Ho inviato gli euro». Senza il bottone, allo scadere chi vende può "
-            "aprire una disputa anche se hai già pagato."),
+            f"«Ho inviato gli euro». {fine}"),
     }
 
 
@@ -119674,6 +119837,13 @@ async def _p2p_onchain_ronda() -> None:
                        or (lambda *_a: []))(con, adesso)
     finally:
         con.close()
+    # (20 nov 2026, ritorno-da-solo-oc) DOPO il timbro del tempo finito,
+    # PRIMA dei suoi avvisi: chi torna da solo riceve quelli della chiusura
+    try:
+        chiusi_da_soli = await _p2p_onchain_chiudi_tempi_mancati(adesso)
+    except Exception as e:
+        chiusi_da_soli = set()
+        print(f"⚠️ P2P on-chain: tempi per pagare non guardati: {e}", flush=True)
     for o, chi, testo in promemoria:
         try:
             await _notifica_p2p_onchain(o, chi, testo, _p2p_onchain_bottone(o))
@@ -119681,6 +119851,8 @@ async def _p2p_onchain_ronda() -> None:
             print(f"⚠️ P2P on-chain: promemoria dello scambio {o['id']} saltato: {e}",
                   flush=True)
     for o in senza_pagamento:
+        if int(o["id"]) in chiusi_da_soli:
+            continue
         for chi, testo in _p2p_onchain_testi_tempo_scaduto(o).items():
             if not chi:
                 continue

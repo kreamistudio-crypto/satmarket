@@ -210821,7 +210821,8 @@ def prove_onchain_cauzione():
     # portava) — la prova dal vivo e' in collaudo_p2p_onchain
     prova("...anche nella riga del libro di chi PRENDE, coi minuti per pagare per il bollino ⏱",
           (True, True),
-          ('"cauzione_chiesta": p2p_onchain_cauzione_chiesta(o)}' in pezzo("_p2p_onchain_riga_pubblica"),
+          # (20 nov 2026) non piu' l'ultima voce: dopo c'e' «ritorno_da_solo»
+          ('"cauzione_chiesta": p2p_onchain_cauzione_chiesta(o),' in pezzo("_p2p_onchain_riga_pubblica"),
            '"minuti_pagamento": _p2p_onchain_minuti(o),' in pezzo("_p2p_onchain_riga_pubblica")))
     C = amb["_p2p_onchain_contanti"]
     prova("il giudice unico del contanti si allarga al metodo scelto: il solo «Contanti», o "
@@ -216393,6 +216394,156 @@ def prove_recapito_nel_tempo():
            "o.chiuso_perche !== 'tempo-scaduto' && o.chiuso_perche !== 'recapito-scaduto'" in mini])
 
 
+def prove_ritorno_da_solo_onchain():
+    """I SATS ON-CHAIN TORNANO DA SOLI A TEMPO FINITO (20 nov 2026, cantiere
+    ritorno-da-solo-oc; Andrea: «nell'on-chain deve succedere uguale al
+    lighting. Se scade il tempo, i sats devono ritornare indietro in
+    automatico», scheda «Da solo, come Lightning»). La ronda fa da sola il
+    gesto di «Riprendi i sats»: Barattolo firma il ritorno verso chi ha
+    depositato, lui mette la seconda firma.
+
+    Quel che qui si rompe in silenzio: il ritorno su un Barattozon o un
+    contanti di persona (chi ha pagato perderebbe i soldi), la leva che non
+    spegne, la ronda che manda anche l'avviso «libera i sats» a uno scambio
+    gia' chiuso, e la cauzione chiesta che torna a chi non ha pagato perche'
+    il giro delle cauzioni vede lo scambio gia' «annullato»."""
+    print("\n[I sats on-chain tornano da soli a tempo finito]")
+    src = _SORGENTE
+    amb = {"time": time, "e_admin": lambda t: False}
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_ha_dove_pagare",
+              "p2p_onchain_riprendi_scaduto_perche", "p2p_onchain_ritorno_da_solo_vale",
+              "p2p_onchain_ritorno_da_solo", "p2p_onchain_cauzione_persa_da_sola"):
+        exec(pezzo(f), amb)
+    amb["p2p_onchain_paga_entro"] = lambda o: int(o.get("entro", 0))
+    amb["p2p_onchain_tab_scade"] = lambda o: int(o.get("tab", 0))
+    amb["_p2p_onchain_contanti"] = lambda o: bool(o.get("contanti"))
+    amb["p2p_onchain_cauzione_chiesta"] = lambda o: bool(o.get("cauzione_chiesta"))
+    amb["P2P_ONCHAIN_RITORNO_DA_SOLO"] = True
+    V, R = amb["p2p_onchain_ritorno_da_solo_vale"], amb["p2p_onchain_ritorno_da_solo"]
+    base = {"stato": "depositato", "euro_inviati_il": 0, "proposta_psbt": "", "decisione_da": 0,
+            "ricevuti_sats": 50000, "entro": 1000, "rimborso": "tb1qritorno", "recapito": "IBAN"}
+    prova("CHI TORNA DA SOLO: uno scambio normale si'; un Barattozon no; un contanti di "
+          "persona no",
+          [True, False, False],
+          [V(base), V(dict(base, tab=2000)), V(dict(base, contanti=True))])
+    casi = [base, dict(base, entro=1001), dict(base, euro_inviati_il=900, stato="euro_inviati"),
+            dict(base, proposta_psbt="cHNidP8"), dict(base, rimborso=""),
+            dict(base, stato="disputa"), dict(base, tab=2000), dict(base, contanti=True)]
+    prova("ADESSO: a tempo finito si'; un secondo prima no; dopo «Ho inviato» no; con una "
+          "firma gia' data no; senza indirizzo di ritorno no; in disputa no; Barattozon e "
+          "contanti mai",
+          [True, False, False, False, False, False, False, False],
+          [R(c, 1000) for c in casi])
+    amb["P2P_ONCHAIN_RITORNO_DA_SOLO"] = False
+    prova("LA LEVA SPENTA: nessuno torna da solo", [False, False], [V(base), R(base, 1000)])
+    amb["P2P_ONCHAIN_RITORNO_DA_SOLO"] = True
+    prova("...di serie e' accesa, nel pannello «Stato delle leve», e un solo False la spegne",
+          [True, True, True],
+          ["except ImportError:\n    P2P_ONCHAIN_RITORNO_DA_SOLO = True" in src,
+           "P2P_ONCHAIN_RITORNO_DA_SOLO = P2P_ONCHAIN_RITORNO_DA_SOLO is not False" in src,
+           '"P2P_ONCHAIN_RITORNO_DA_SOLO", P2P_ONCHAIN_RITORNO_DA_SOLO,' in src])
+    # la cauzione: anche a scambio chiuso per il tempo, prima della seconda firma
+    C = amb["p2p_onchain_cauzione_persa_da_sola"]
+    riga = {"stato": "tenuta", "in_gioco": 1, "tg_id": 222}
+    o = {"stato": "annullato", "chiuso_perche": "tempo-scaduto", "cauzione_chiesta": True,
+         "ricevente_id": 222, "depositato_il": 500, "recapito": "IBAN",
+         "pagamento_scaduto_il": 1000, "euro_inviati_il": 0}
+    prova("LA CAUZIONE CHIESTA SI PERDE ANCHE A SCAMBIO CHIUSO PER IL TEMPO (prima della "
+          "seconda firma); non se chiuso per un altro motivo, non dopo «Ho inviato», non "
+          "senza il tempo finito timbrato",
+          ["tempo", "", "", "", "tempo"],
+          [C(o, riga), C(dict(o, chiuso_perche="recapito-scaduto"), riga),
+           C(dict(o, euro_inviati_il=900), riga), C(dict(o, pagamento_scaduto_il=0), riga),
+           C(dict(o, stato="rimborsato"), riga)])
+    chiudi = pezzo("_p2p_onchain_chiudi_tempo_scaduto")
+    prova("...e la chiusura timbra il tempo finito se la ronda non l'aveva ancora fatto "
+          "(anche col bottone)", True,
+          "pagamento_scaduto_il=CASE WHEN COALESCE(pagamento_scaduto_il, 0)>0" in chiudi)
+    ronda = pezzo("_p2p_onchain_ronda", fine="\n\n\n@app")
+    i_timbro = ronda.index("senza_pagamento = _p2p_onchain_passata_tempo_pagare(con, adesso)")
+    i_chiudi = ronda.index("chiusi_da_soli = await _p2p_onchain_chiudi_tempi_mancati(adesso)")
+    i_avvisi = ronda.index("for o in senza_pagamento:")
+    prova("LA RONDA: chiude DOPO il timbro del tempo finito e PRIMA dei suoi avvisi, e a "
+          "chi e' tornato da solo non manda «libera i sats o apri una disputa»",
+          [True, True],
+          [i_timbro < i_chiudi < i_avvisi,
+           "for o in senza_pagamento:\n        if int(o[\"id\"]) in chiusi_da_soli:\n"
+           "            continue" in ronda])
+    # I TESTI: dove torna da solo, le frasi che il Lightning ha gia' (ok di
+    # Andrea, «Sì, perfetto»); altrove (Barattozon, contanti, leva spenta) quelle di prima
+    import subprocess
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+
+    def funz(firma):
+        i = mini.index(firma)
+        return mini[i:mini.index("\n}\n", i) + 3]
+    js = ("const minutiPagareSceltaP2P = m => m, minutiPagareDetteP2P = m => m + ' minuti';\n"
+          "const paroleOcP2P = (o, t) => t, paroleUsdtP2P = (o, t) => t;\n"
+          + "\n".join(l for l in mini.split("\n") if l.startswith(
+              ("const P2P_AVVISO_BOTTONE_PAGATO = ", "const P2P_AVVISO_BOTTONE_PAGATO_OC = ")))
+          + "\n" + funz("function bannerTempoPagareP2P(min, oc, o){")
+          + funz("function rigaTempoPagareDettP2P(o, tuo, oc){")
+          + "console.log(JSON.stringify(["
+            "bannerTempoPagareP2P(30, true, {ritorno_da_solo: true}).corpo,"
+            "bannerTempoPagareP2P(30, true, {ritorno_da_solo: false}).corpo,"
+            "bannerTempoPagareP2P(30, true).corpo,"
+            "rigaTempoPagareDettP2P({minuti_pagamento: 30, ritorno_da_solo: true}, false, true),"
+            "rigaTempoPagareDettP2P({minuti_pagamento: 30}, false, true)]));")
+    try:
+        r = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=60)
+        b1, b2, b3, d1, d2 = json.loads(r.stdout)
+    except Exception as e:
+        b1 = b2 = b3 = d1 = d2 = f"node: {e} {getattr(locals().get('r'), 'stderr', '')}"
+    prova("LA PAGINA: il banner della presa e il riquadro prima di prendere dicono «lo "
+          "scambio scade» dove torna da solo, la disputa dove no (e senza il dato del server)",
+          [True, False, True, True, True, False, True],
+          ["lo scambio scade e i sats tornano a chi vende, anche se hai pagato." in b1,
+           "disputa" in b1,
+           "chi vende può aprire una disputa" in b2, "chi vende può aprire una disputa" in b3,
+           # (20 nov 2026, dopo il rebase su bottoni-fissi) la riga corta
+           "Altrimenti lo scambio scade e i sats tornano a chi vende." in d1,
+           "disputa" in d1,
+           "Altrimenti chi vende può aprire una disputa." in d2])
+    prova("...e la riga sotto il timer dello scambio, col dato della pagina dello scambio",
+          True, "(o.ritorno_da_solo && typeof P2P_AVVISO_BOTTONE_PAGATO === 'string' ? "
+                "P2P_AVVISO_BOTTONE_PAGATO" in mini)
+    amb2 = {"P2P_ONCHAIN_SEGNO": "₿", "_p2p_onchain_minuti": lambda o: o["min"],
+            "_intervalli_tempo_pagare_p2p": lambda m: (m * 60 - 300,),
+            "_durata_detta_p2p": lambda s: f"{s // 60} minuti",
+            "p2p_onchain_ritorno_da_solo_vale": lambda o: o["solo"]}
+    exec(pezzo("_p2p_onchain_testi_pagare"), amb2)
+    T = amb2["_p2p_onchain_testi_pagare"]
+    corto_si, corto_no = T({"min": 30, "solo": True})[1], T({"min": 30, "solo": False})[1]
+    lungo_si, lungo_no = T({"min": 1440, "solo": True}), T({"min": 1440, "solo": False})
+    prova("IL BOT: gli ultimi promemoria e quello delle quattro ore dicono la frase del "
+          "Lightning dove torna da solo, la disputa dove no",
+          [True, False, True, True, True, True, True],
+          ["lo scambio scade e i sats tornano a chi vende, anche se hai già pagato" in corto_si,
+           "disputa" in corto_si, "chi vende può aprire una disputa" in corto_no,
+           "lo scambio scade e i sats tornano a chi vende" in lungo_si[5]
+           and "disputa" not in lungo_si[4],
+           "allo scadere lo scambio scade e l'ordine torna nel libro." in lungo_si[3],
+           "disputa" in lungo_no[3] and "disputa" in lungo_no[5],
+           "if p2p_onchain_ritorno_da_solo_vale(o) else" in src
+           and "⏳ <b>Hai {tempo_detto}</b>: allo scadere lo scambio scade e " in src])
+    amb3 = {"P2P_ONCHAIN_SEGNO": "₿", "SOLLECITO_TEMPO_PAGARE_ULTIMO": "{resto}"}
+    exec(pezzo("testo_manca_un_minuto_p2p"), amb3)
+    U = amb3["testo_manca_un_minuto_p2p"]
+    prova("...e l'avviso a un minuto: on-chain che torna da solo la frase del Lightning, "
+          "on-chain che no la disputa",
+          [True, False, True],
+          ["lo scambio scade e i sats tornano a chi vende" in U(True, True), "disputa" in U(True, True),
+           "chi vende può aprire una disputa" in U(True, False)])
+    passata = pezzo("_p2p_onchain_tempi_mancati")
+    prova("...cerca solo i depositati senza «Ho inviato», senza firme, coi sats e col "
+          "tempo finito gia' timbrato, e passa dal giudice",
+          [True] * 5,
+          ["stato='depositato'" in passata, "COALESCE(euro_inviati_il,0)=0" in passata,
+           "COALESCE(proposta_psbt,'')=''" in passata,
+           "COALESCE(pagamento_scaduto_il,0)>0" in passata,
+           "if p2p_onchain_ritorno_da_solo(o, adesso)" in passata])
+
+
 def prove_riprendi_scaduto_onchain():
     """«↩️ RIPRENDI I SATS» COL TEMPO PER PAGARE FINITO (19 nov 2026, cantiere
     riprendi-scaduto; Andrea: «nell'on-chain non si può far tornare da
@@ -216459,6 +216610,10 @@ def prove_riprendi_scaduto_onchain():
            '"P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN",' in src])
     rotta = src[src.index('@app.post("/api/p2p/onchain/{oid}/riprendi-scaduto")'):]
     rotta = rotta[:rotta.index("\n\n\ndef ")]
+    # (20 nov 2026, ritorno-da-solo-oc) la chiusura e i due avvisi sono
+    # passati in due pezzi, gli stessi della ronda che chiude da sola
+    chiudi = pezzo("_p2p_onchain_chiudi_tempo_scaduto")
+    avvisi = pezzo("_p2p_onchain_di_tempo_scaduto")
     prova("LA ROTTA: la leva per chi tocca (404 se no), solo chi ha depositato, il giudice, "
           "la firma di Barattolo verso chi ha depositato, lo stato cambiato UNA volta sola "
           "(senza «Ho inviato» e senza firme gia' date), i due avvisi e quello ai moderatori",
@@ -216466,10 +216621,12 @@ def prove_riprendi_scaduto_onchain():
           ["if not p2p_onchain_riprendi_scaduto_per(user[\"id\"]):\n        raise HTTPException(404" in rotta,
            '!= "compratore":\n            raise HTTPException(403' in rotta,
            "perche = p2p_onchain_riprendi_scaduto_perche(o, adesso)" in rotta,
-           'psbt = _onchain_psbt_barattolo(con, o, "compratore")' in rotta,
+           'chiuso = _p2p_onchain_chiudi_tempo_scaduto(con, o, int(user["id"]), adesso)' in rotta
+           and 'psbt = _onchain_psbt_barattolo(con, o, "compratore")' in chiudi,
            " WHERE id=? AND stato='depositato' AND COALESCE(euro_inviati_il, 0)=0\"\n"
-           "            \" AND proposta_psbt='' AND decisione_da=0\"" in rotta,
-           rotta.count("await _notifica_p2p_onchain(") == 2,
+           "        \" AND COALESCE(proposta_psbt, '')='' AND COALESCE(decisione_da, 0)=0\"" in chiudi,
+           "await _p2p_onchain_di_tempo_scaduto(o)" in rotta
+           and avvisi.count("await _notifica_p2p_onchain(") == 2,
            "await notifica_admin(" in rotta])
     prova("LA PAGINA: il bottone solo a chi ha depositato e col si' del server, la conferma "
           "che dice di guardare prima il conto, e il testo dello scambio chiuso",
@@ -217891,6 +218048,7 @@ CATEGORIE = {
     onchain_tempo_deposito
     recapito_nel_tempo
     riprendi_scaduto_onchain
+    ritorno_da_solo_onchain
     conto_alla_rovescia_p2p conto_chi_aspetta
     meta_cauzione_auto
     """.split(),
@@ -219150,6 +219308,7 @@ def main():
               prove_onchain_tempo_deposito,
               prove_recapito_nel_tempo,
               prove_riprendi_scaduto_onchain,
+              prove_ritorno_da_solo_onchain,
               prove_conto_alla_rovescia_p2p,
               prove_conto_chi_aspetta,
               prove_meta_cauzione_auto,

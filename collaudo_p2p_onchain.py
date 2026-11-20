@@ -892,9 +892,13 @@ def main():
     con.commit()
     con.close()
     banco.DETTO.clear()
+    # (20 nov 2026, ritorno-da-solo-oc) la strada di prima, a leva spenta:
+    # quella accesa e' il pezzo subito sotto
+    prima_ritorno = SRV.P2P_ONCHAIN_RITORNO_DA_SOLO
+    SRV.P2P_ONCHAIN_RITORNO_DA_SOLO = False
     asyncio.run(SRV._p2p_onchain_ronda())
-    prova("25 ore dopo il deposito, senza «Ho inviato»: la ronda avvisa tutt'e "
-          "due, e lo scambio resta depositato (niente si annulla)",
+    prova("25 ore dopo il deposito, senza «Ho inviato», col ritorno da solo SPENTO: la "
+          "ronda avvisa tutt'e due, e lo scambio resta depositato (niente si annulla)",
           (True, True, "depositato"),
           (detto_a(999, "Il tempo per pagare è finito"),
            detto_a(888, "Il tempo per pagare è finito"), uno(999, o8["id"])["stato"]))
@@ -904,6 +908,112 @@ def main():
     asyncio.run(SRV._p2p_onchain_ronda())
     prova("...la ronda dopo non lo ripete", (False, False),
           (detto_a(999, "tempo per pagare"), detto_a(888, "tempo per pagare")))
+    SRV.P2P_ONCHAIN_RITORNO_DA_SOLO = prima_ritorno
+    # ...e la leva riaccesa chiude anche questo, che aveva gia' avuto
+    # l'avviso: la ronda riprova a ogni giro
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("...riaccesa la leva, la ronda dopo lo chiude lei (tempo-scaduto)",
+          ("annullato", "tempo-scaduto"),
+          (uno(999, o8["id"])["stato"], uno(999, o8["id"]).get("chiuso_perche")))
+
+    # IL RITORNO DA SOLO (20 nov 2026, cantiere ritorno-da-solo-oc; Andrea:
+    # «nell'on-chain deve succedere uguale al lighting», scheda «Da solo,
+    # come Lightning»)
+    print("\n[la ronda: il tempo per pagare finito, i sats tornano da soli]")
+    prova("di serie la leva e' accesa", True, SRV.P2P_ONCHAIN_RITORNO_DA_SOLO)
+    o8b = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    prova("il libro di chi prende lo dice (la pagina scrive la frase del Lightning)", True,
+          next((e for e in libro(888)["onchain"]["eventi"] if e.get("id") == o8b["id"]),
+               {}).get("ritorno_da_solo"))
+    gesto(888, o8b["id"], "prendi")
+    banco.DETTO.clear()
+    paga(uno(999, o8b["id"]))
+    gesto(999, o8b["id"], "controlla")
+    prova("al deposito confermato chi paga legge la regola del Lightning, non la disputa",
+          (True, False), (detto_a(888, "allo scadere lo scambio scade e l'ordine torna nel libro"),
+                          detto_a(888, "poi chi vende può aprire una disputa")))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=? WHERE id=?",
+                (int(time.time()) - 2 * 3600, int(time.time()) - 3 * 3600, o8b["id"]))
+    con.commit()
+    con.close()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("col tempo che corre la ronda non chiude niente", "depositato",
+          uno(999, o8b["id"])["stato"])
+    rim8 = uno(999, o8b["id"])["rimborso"]
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=?, rimborso=''"
+                " WHERE id=?", (int(time.time()) - 25 * 3600, int(time.time()) - 26 * 3600,
+                                o8b["id"]))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("tempo finito ma SENZA l'indirizzo di ritorno: non si firma niente, resta "
+          "depositato e arriva l'avviso di prima (disputa)",
+          ("depositato", True, ""),
+          (uno(999, o8b["id"])["stato"], detto_a(888, "Il tempo per pagare è finito"),
+           uno(999, o8b["id"]).get("chiuso_perche") or ""))
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET rimborso=? WHERE id=?",
+                (rim8, o8b["id"]))
+    con.commit()
+    con.close()
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    d8 = uno(999, o8b["id"])
+    prova("scritto l'indirizzo, la ronda dopo chiude: annullato per tempo-scaduto, e "
+          "Barattolo ha firmato il rimborso senza moderatore e senza bottone",
+          ("annullato", "tempo-scaduto", "compratore", "tempo-scaduto"),
+          (d8["stato"], d8.get("chiuso_perche"), (d8.get("proposta") or {}).get("verso"),
+           (d8.get("proposta") or {}).get("barattolo")))
+    prova("...chi compra sa che e' chiuso e di non mandare niente, chi vende di mettere la "
+          "seconda firma; a nessuno «libera i sats» (lo scambio e' gia' chiuso)",
+          (True, True, True, False),
+          (detto_a(888, "Il tempo per pagare è finito"), detto_a(888, "non mandare niente"),
+           detto_a(999, "Metti la seconda firma"), detto_a(999, "libera i sats")))
+    uscite = PSBT.from_string(d8["proposta"]["psbt"]).tx.vout
+    prova("...un'uscita sola, verso il wallet di chi ha depositato", (1, d8["rimborso"]),
+          (len(uscite), script.Script(uscite[0].script_pubkey.data).address(N)))
+    banco.DETTO.clear()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("...la ronda dopo non firma di nuovo e non ridice niente; «Ho inviato» adesso "
+          "non passa piu'", (False, False, 409),
+          (detto_a(999, "Barattolo ha firmato"), detto_a(888, "tempo per pagare"),
+           gesto(888, o8b["id"], "euro-inviati").status_code))
+    r = gesto(999, o8b["id"], "firma", tx=cofirma(999, uno(999, o8b["id"])))
+    con = SRV.db()
+    figlio8 = con.execute("SELECT id FROM p2p_onchain_ordini WHERE rinato_da=?",
+                          (o8b["id"],)).fetchone()
+    con.close()
+    prova("la seconda firma di chi ha depositato: rimborsato, a chi non ha pagato il "
+          "«non completato», e l'ordine torna nel libro",
+          (200, "rimborsato", "altro", True),
+          (r.status_code, r.json()["stato"], uno(999, o8b["id"]).get("non_completato") or "",
+           figlio8 is not None))
+    if figlio8:
+        gesto(999, figlio8["id"], "annulla")
+    # dopo «Ho inviato» la ronda non tocca niente
+    o8c = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
+    gesto(888, o8c["id"], "prendi")
+    paga(uno(999, o8c["id"]))
+    gesto(999, o8c["id"], "controlla")
+    gesto(888, o8c["id"], "euro-inviati")
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET depositato_il=?, recapito_il=? WHERE id=?",
+                (int(time.time()) - 25 * 3600, int(time.time()) - 26 * 3600, o8c["id"]))
+    con.commit()
+    con.close()
+    asyncio.run(SRV._p2p_onchain_ronda())
+    prova("con «Ho inviato gli euro» toccato la ronda non riprende niente: resta a chi "
+          "vende liberare (o alla disputa)", ("euro_inviati", ""),
+          (uno(999, o8c["id"])["stato"], uno(999, o8c["id"]).get("chiuso_perche") or ""))
+    # non resti aperto: conta nel tetto degli scambi a testa, piu' avanti
+    con = SRV.db()
+    con.execute("UPDATE p2p_onchain_ordini SET stato='rilasciato', chiuso_il=? WHERE id=?",
+                (int(time.time()), o8c["id"]))
+    con.commit()
+    con.close()
     # I PROMEMORIA (17 nov 2026, cantiere onchain-chat-sollecito)
     print("\n[la ronda: i promemoria a chi paga e a chi libera]")
     o9 = pubblica(999, sats=30000, euro_cent=2700, metodi=["Bonifico"]).json()
@@ -2204,6 +2314,18 @@ def main():
     asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 30))
     prova("...e senza il recapito di chi vende non si perde mai (la regola del «non completato»)",
           "tenuta", riga_cauz(k3)["stato"])
+    # (20 nov 2026, ritorno-da-solo-oc) lo scambio che la ronda ha GIA'
+    # chiuso per il tempo finito, prima della seconda firma: e' «annullato»,
+    # e senza la cura il giro lo vedeva chiuso e la cauzione tornava
+    k5 = presa_chiesta()
+    metti(k5, stato="annullato", chiuso_perche="tempo-scaduto", chiuso_il=ora,
+          depositato_il=ora, pagamento_scaduto_il=ora)
+    asyncio.run(SRV.p2p_onchain_cauzioni_passata(ora + 35))
+    r5 = riga_cauz(k5)
+    prova("...anche a scambio gia' chiuso dalla ronda per il tempo finito (prima della "
+          "seconda firma) si perde: saldata, meta' a chi vende",
+          ("SETTLED", "persa", 1500), (LND["fatture"][r5["hash"]]["state"], r5["stato"],
+                                       r5["meta_sats"]))
     # -- LA META' MANDATA DA SOLA (19 nov 2026, Andrea: «Sì, in automatico con
     #    un tetto»): una riga nel registro «da riscuotere», la strada d'uscita
     #    di sempre; qui la si guarda da fuori (la strada ha i suoi collaudi)
@@ -2306,9 +2428,10 @@ def main():
                 cauz(999, m6, "Contanti").status_code)[1])
     SRV.LND_PONTE_MACAROON_CAUZIONE = MAC_C
     prova("al nodo passano solo hodl, cancel, la lettura di una fattura e le DUE saldature "
-          "chieste dal moderatore (una a LND muto), le DUE della cauzione chiesta persa da "
-          "sola e le TRE della meta' mandata da sola: nient'altro salda una cauzione",
-          (set(), 7),
+          "chieste dal moderatore (una a LND muto), le TRE della cauzione chiesta persa da "
+          "sola (20 nov 2026: anche a scambio chiuso dalla ronda per il tempo) e le TRE "
+          "della meta' mandata da sola: nient'altro salda una cauzione",
+          (set(), 8),
           ({v[1] for v in LND["visti"] if not v[1].startswith("/v1/invoice/")}
            - {"/v2/invoices/hodl", "/v2/invoices/cancel", "/v2/invoices/settle"},
            len(saldate())))

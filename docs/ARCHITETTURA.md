@@ -38107,3 +38107,28 @@ mai il kind 0 di nessuno: regola ferrea 2).
   chiusura è un `DELETE` con `tg_id` nel `WHERE` e la traccia «logout».
   Nella pagina: Profilo → «💻 Sessioni attive» (`apriSessioniAttive`,
   `renderSessioniAttive`, foglio `sessioniSheet`).
+- I SATS ON-CHAIN TORNANO DA SOLI A TEMPO FINITO (20 nov 2026, cantiere
+  ritorno-da-solo-oc; scheda di Andrea «Da solo, come Lightning», che
+  rovescia il «niente annullo automatico» del 18 nov). La ronda on-chain
+  (`_p2p_onchain_ronda`), DOPO il timbro `pagamento_scaduto_il` e PRIMA
+  dei suoi avvisi, chiama `_p2p_onchain_chiudi_tempi_mancati`: per ogni
+  scambio di `_p2p_onchain_tempi_mancati` (depositato, niente «Ho
+  inviato», nessuna firma, sats confermati, tempo timbrato) che passa il
+  giudice puro `p2p_onchain_ritorno_da_solo` (= `..._vale` + il giudice
+  del bottone, `p2p_onchain_riprendi_scaduto_perche`) fa la STESSA
+  chiusura del bottone, `_p2p_onchain_chiudi_tempo_scaduto` (firma di
+  Barattolo verso chi ha depositato, 'annullato'/'tempo-scaduto' in UN
+  `UPDATE`, `decisione_da` = chi ha depositato, e il timbro del tempo se
+  mancava), e gli stessi due avvisi, `_p2p_onchain_di_tempo_scaduto`. Agli
+  scambi chiusi così la ronda non manda l'avviso «libera i sats o apri una
+  disputa». La seconda firma resta del telefono di chi ha depositato
+  (regola ferrea 2): alla `/firma` tutto va come dopo il bottone.
+  `p2p_onchain_ritorno_da_solo_vale` esclude Barattozon
+  (`p2p_onchain_tab_scade`) e contanti di persona (`_p2p_onchain_contanti`);
+  senza `rimborso` la ronda non firma e riprova al giro dopo. Il flag
+  `ritorno_da_solo` va nella pagina dello scambio e nella riga del libro.
+  LA CAUZIONE: `p2p_onchain_cauzione_persa_da_sola` conta 'tempo' anche su
+  uno scambio 'annullato' per 'tempo-scaduto' (in attesa della seconda
+  firma): prima il giro delle cauzioni lo vedeva chiuso e la rimandava a
+  chi non aveva pagato. Niente nodo: l'on-chain non passa da Mostro. Leva
+  `P2P_ONCHAIN_RITORNO_DA_SOLO`, accesa di serie, nel pannello.

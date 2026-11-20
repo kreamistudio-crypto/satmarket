@@ -241,6 +241,12 @@ P2P_ONCHAIN_RIPRENDI_SCADUTO = True
 # ...e la porticina: True (di serie) = il bottone lo vede SOLO un moderatore
 # (ADMIN_IDS) per la prova in produzione. Si apre a tutti scrivendo False.
 P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = True
+# I sats on-chain tornano da soli (20 nov 2026, cantiere ritorno-da-solo-oc):
+# finito il tempo per pagare senza «Ho inviato gli euro», la ronda fa da sola
+# il gesto di «Riprendi i sats» per tutti (non Barattozon, non contanti di
+# persona); chi ha depositato mette la seconda firma. Accesa di serie;
+# False = torna il bottone dei moderatori e la disputa.
+P2P_ONCHAIN_RITORNO_DA_SOLO = True
 # Il conto alla rovescia nel bot (19 nov 2026): a chi deve pagare un
 # messaggio che si riscrive ogni minuto col tempo che resta (Lightning e
 # on-chain). Accesa di serie; False la spegne.

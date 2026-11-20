@@ -866,3 +866,9 @@ frase: Nel Profilo c'è «💻 Sessioni attive»: vedi dove è aperto il tuo acc
 dove: Profilo → gruppo «Impostazioni» → «💻 Sessioni attive».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-20 · ritorno-da-solo-oc
+frase: Negli scambi P2P on-chain è come sul Lightning: se il tempo per pagare finisce e chi compra non ha toccato «Ho inviato gli euro», Barattolo firma da solo il ritorno dei sats a chi vende, che mette la seconda firma, e l'ordine torna nel libro. Non vale col tabacchino e col contanti di persona.
+dove: P2P → «I miei scambi» → lo scambio on-chain a tempo finito: «⏰ Il tempo per pagare è finito…» e il tasto «✍️ Metti la seconda firma»; prima di prendere, il riquadro «⏱ Hai … per pagare» dice «lo scambio scade e i sats tornano a chi vende, anche se hai pagato».
+leva: P2P_ONCHAIN_RITORNO_DA_SOLO (accesa di serie)
+pubblico: sì

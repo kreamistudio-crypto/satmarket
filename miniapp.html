@@ -76364,7 +76364,9 @@ function tempoPagareRigaOcP2P(o, adesso){
        negli ultimi dieci minuti: senza il bottone, «ho pagato» non lo sa nessuno */
     + (o.ruolo === 'venditore' && !o.tabacchino
        ? '<span class="p2p-tempo-avviso' + (manca <= 600 ? ' rosso' : '') + '">'
-         + pa('⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone, allo scadere chi vende può aprire una disputa anche se hai pagato.') + '</span>' : '')
+         /* (20 nov 2026, ritorno-da-solo-oc) dove torna da solo, la riga del Lightning */
+         + pa(o.ritorno_da_solo && typeof P2P_AVVISO_BOTTONE_PAGATO === 'string' ? P2P_AVVISO_BOTTONE_PAGATO
+            : '⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone, allo scadere chi vende può aprire una disputa anche se hai pagato.') + '</span>' : '')
     + '</div>';
 }
 /* IL TEMPO ANCHE NELLA CARD ON-CHAIN (20 nov 2026, cantiere timer-card-
@@ -99328,8 +99330,12 @@ function rigaTempoPagareDettP2P(o, tuo, oc){
      intera (da quando parte il tempo, cosa succede dopo) resta nel banner
      della presa, `bannerTempoPagareP2P`. Sul MIO ordine la frase di prima. */
   if (oc) {
+    /* (20 nov 2026, ritorno-da-solo-oc) dove torna da solo, la riga corta
+       del Lightning (approvata da Andrea) al posto della disputa */
+    const daSolo = !!(o && o.ritorno_da_solo);
     const t = 'Hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro e toccare «Ho inviato gli euro».'
-      + '<span class="p2p-tempo-avviso">⚠️ Altrimenti chi vende può aprire una disputa.</span>';
+      + '<span class="p2p-tempo-avviso">' + (daSolo ? '⚠️ Altrimenti lo scambio scade e i sats tornano a chi vende.'
+                                                    : '⚠️ Altrimenti chi vende può aprire una disputa.') + '</span>';
     return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">' + icona + '<span>'
       + (typeof paroleOcP2P === 'function' ? paroleOcP2P(o, t) : t) + '</span></div>';
   }
@@ -99366,7 +99372,9 @@ function bannerTempoPagareP2P(min, oc, o){
     + '2) Manda gli euro.\n'
     + '3) Tocca subito «Ho inviato gli euro».\n\n'
     + 'Se il tempo finisce ma non hai premuto il bottone «Ho inviato gli euro», '
-    + (oc ? 'chi vende può aprire una disputa e far tornare indietro i suoi sats, anche se hai pagato.'
+    /* (20 nov 2026, ritorno-da-solo-oc) dove l'on-chain torna da solo
+       (`ritorno_da_solo`, lo dice il server), la frase del Lightning */
+    + (oc && !(o && o.ritorno_da_solo) ? 'chi vende può aprire una disputa e far tornare indietro i suoi sats, anche se hai pagato.'
           : 'lo scambio scade e i sats tornano a chi vende, anche se hai pagato.');
   const parole = !o ? null : oc ? (typeof paroleOcP2P === 'function' ? paroleOcP2P : null)
     : (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P : null);
