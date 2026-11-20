@@ -76655,8 +76655,12 @@ function tempoPagareRigaOcP2P(o, adesso){
   return '<div class="p2p-tempone p2p-tempone-riga">'
     + '<div class="p2p-tempo"><span>Tempo per pagare</span><b class="p2p-tempo-conto">'
       + esc(contoRimastoP2P(manca)) + '</b></div>'
-    + '<div class="p2p-anellone p2p-tempo-barra ' + statoAnelloP2P(manca * scala) + '" data-fine="' + fine
-      + '" data-inizio="' + inizio + '" data-scala="' + scala.toFixed(3) + '" role="img" aria-label="'
+    /* il colore e' di chi paga, in chiaro a chi aspetta (20 nov 2026,
+       `statoTempoPassoP2P`; il battito lo legge da `data-tocca`) */
+    + '<div class="p2p-anellone p2p-tempo-barra ' + (typeof statoTempoPassoP2P === 'function'
+      ? statoTempoPassoP2P(o.ruolo === 'venditore', manca) : statoAnelloP2P(manca * scala)) + '" data-fine="' + fine
+      + '" data-inizio="' + inizio + '" data-scala="' + scala.toFixed(3) + '" data-tocca="'
+      + (o.ruolo === 'venditore' ? '1' : '0') + '" role="img" aria-label="'
       + esc((scadeTestoP2P(fine) || '') + ' (' + (Number(o.ore_pagamento) || 0) + ' ore per pagare)')
       + '"><i style="width:' + larghezzaTempoP2P(Math.max(0, resta)) + '"></i></div>'
     /* (19 nov 2026, ritorno-nel-libro) la riga chiara a chi paga, rossa
@@ -76828,7 +76832,8 @@ function rigaScambioOnchainP2P(o){
     /* il tempo per pagare come bordo di sotto, la barra delle card del
        libro (17 nov 2026): solo a deposito confermato */
     + (o.stato === 'depositato' && Number(o.paga_entro) > 0 && typeof barraScadenzaP2P === 'function'
-       ? barraScadenzaP2P({scade: Number(o.paga_entro), creato: Number(o.pagare_dal) || Number(o.depositato_il) || 0}) : '')
+       ? barraScadenzaP2P({scade: Number(o.paga_entro), creato: Number(o.pagare_dal) || Number(o.depositato_il) || 0},
+                          undefined, o.ruolo === 'venditore') : '')
     + '</div>';
 }
 /* LA CONVENIENZA SULLA CARD ON-CHAIN DI «I MIEI SCAMBI» (17 nov 2026,
@@ -83431,13 +83436,17 @@ function voltoCardP2P(o){
    si conta come se la vita fosse di sette (24 ore: arancio nelle ultime
    ~10 ore, rosso nelle ultime ~3,4); da sette in su non cambia niente. */
 const P2P_VITA_SOGLIE_S = 7 * 86400;
-function barraScadenzaP2P(o, adesso){
+function barraScadenzaP2P(o, adesso, chiTocca){
   const resta = frazioneVitaP2P(o, adesso);
   if (resta < 0) return '';
   const vita = (o.scade || 0) - (o.creato || 0);
   const scala = vita > 0 && vita < P2P_VITA_SOGLIE_S ? P2P_VITA_SOGLIE_S / vita : 1;
   const manca = ((o.scade || 0) - (adesso || Math.floor(Date.now() / 1000))) * scala;
-  const st = statoAnelloP2P(manca);
+  /* (20 nov 2026) il tempo di un PASSO ha il colore di chi lo deve fare:
+     `chiTocca` vero/falso, vedi `statoTempoPassoP2P`; senza, le soglie di sempre */
+  const st = typeof chiTocca === 'boolean' && typeof statoTempoPassoP2P === 'function'
+    ? statoTempoPassoP2P(chiTocca, (o.scade || 0) - (adesso || Math.floor(Date.now() / 1000)))
+    : statoAnelloP2P(manca);
   const aria = scadeTestoP2P(o.scade) || 'senza scadenza';
   return '<div class="p2p-barra' + (st ? ' ' + st : '') + '" role="img" title="'
     + esc(aria) + '" aria-label="' + esc(aria) + '"><i style="width:'
@@ -83445,6 +83454,18 @@ function barraScadenzaP2P(o, adesso){
 }
 const P2P_ULTIMO_GIORNO_S = 86400;
 const P2P_ANELLO_VICINA_S = 3 * 86400;
+/* IL COLORE DEL TEMPO DI UN PASSO E' DI CHI LO DEVE FARE (20 nov 2026,
+   cantiere barra-tempo-colore; Andrea, sulla barra bianca di chi doveva
+   pagare: «per chi doveva compiere l'azione lo lasciavi arancione e poi
+   rosso quando mancavano gli ultimi minuti. Deve essere bianco solo per
+   chi ha già fatto l'azione e non deve fare più niente»). PURA: a chi
+   tocca arancio da subito e rosso negli ultimi dieci minuti (i minuti del
+   riquadro e della riga d'avviso), a chi aspetta il neutro. Le classi sono
+   quelle della barra (`vicina`, `ultimo-giorno`). */
+function statoTempoPassoP2P(tocca, manca){
+  if (!tocca) return '';
+  return Number(manca) <= 600 ? 'ultimo-giorno' : 'vicina';
+}
 
 /* LE STELLINE DEL MERCATINO, in una riga sola (set 2026): «⭐ 4,8 ·
    💬 12» — l'icona al posto della parola «recensioni», che in una card
@@ -92380,7 +92401,9 @@ function battitoAnelloneP2P(){
   if (i && i.style.width !== larga) i.style.width = larga;
   /* (17 nov 2026) la riga del tempo per pagare on-chain porta la sua
      proporzione: una vita di 24 ore non diventa rossa appena nata */
-  const st = statoAnelloP2P(manca * (Number(box.dataset.scala) || 1));
+  const st = box.dataset.tocca === '1' || box.dataset.tocca === '0'
+    ? statoTempoPassoP2P(box.dataset.tocca === '1', manca)   /* il tempo di un passo (20 nov 2026) */
+    : statoAnelloP2P(manca * (Number(box.dataset.scala) || 1));
   box.classList.toggle('vicina', st === 'vicina');
   box.classList.toggle('ultimo-giorno', st === 'ultimo-giorno');
 }

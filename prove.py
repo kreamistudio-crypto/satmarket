@@ -71528,7 +71528,7 @@ console.log(JSON.stringify(out));
     # inline e' la lunghezza: un colore li' vincerebbe sui tre stati
     prova("...e l'unico stile inline e' la lunghezza, mai un colore", True,
           "color-mix" not in pezzo_js(
-              mini, "function barraScadenzaP2P(o, adesso){", "\n}\n")
+              mini, "function barraScadenzaP2P(o, adesso, chiTocca){", "\n}\n")
           and re.findall(r'style="[^"]*"', out["barraMezzo"]) == ['style="width:50.0%"'])
     # L'ULTIMO GIORNO E' UN AVVISO: rosso che pulsa, e la soglia sta
     # nel JS — e' un giudizio, non un vestito. Li' lo stile inline non
@@ -72104,7 +72104,7 @@ console.log(JSON.stringify(out));
           # (12 nov 2026, card-coppia) l'anello piccolo e' diventato la
           # barra sul bordo della card: il giudice e' lo stesso
           and "statoAnelloP2P(manca)" in pezzo_js(
-              mini, "function barraScadenzaP2P(o, adesso){", "\n}\n"))
+              mini, "function barraScadenzaP2P(o, adesso, chiTocca){", "\n}\n"))
     # IL TEMPO IN UNA RIGA (16 nov 2026, Andrea: «Non mi piace piu'
     # l'anello rotondo, piuttosto fammelo in una riga, piu' similmente a
     # come e' adesso nelle card»): niente SVG, quindi niente id e niente
@@ -209677,6 +209677,7 @@ def prove_onchain_come_lightning():
                  "function tempoPagareOcP2P(o, adesso){", "function statoOnchainCardP2P(o){",
                  "function recensibileOcP2P(o){", "function riquadroRecensioneOcP2P(o, rec){",
                  "function stelleSceltaP2P(){", "function statoAnelloP2P(manca){",
+                 "function statoTempoPassoP2P(tocca, manca){",
                  "function contoRimastoP2P(sec){", "function larghezzaTempoP2P(resta){",
                  "function frazioneVitaP2P(o, adesso){", "function tempoPagareRigaOcP2P(o, adesso){",
                  "function tempoPagareFermoOcP2P(o){", "function minutiPagareDetteP2P(min){"))
@@ -209700,7 +209701,7 @@ out.card = [statoOnchainCardP2P(Object.assign({ruolo: 'venditore'}, dep)).d,
   statoOnchainCardP2P({ruolo: 'compratore', stato: 'depositato'}).t];
 const riga = tempoPagareRigaOcP2P(Object.assign({ruolo: 'venditore'}, dep));
 out.riga = [nudo(riga).indexOf('Tempo per pagare') >= 0, /data-scala="7\.000"/.test(riga),
-  /p2p-tempo-barra (ultimo-giorno|vicina)/.test(riga), /p2p-anellone/.test(riga),
+  /p2p-tempo-barra vicina"/.test(riga), /p2p-anellone/.test(riga),
   tempoPagareRigaOcP2P({stato: 'euro_inviati', paga_entro: ora + 100}),
   nudo(tempoPagareRigaOcP2P({ruolo: 'venditore', stato: 'depositato', minuti_pagamento: 90})),
   nudo(tempoPagareRigaOcP2P({ruolo: 'compratore', stato: 'depositato', ore_pagamento: 24})).indexOf('da quando scrivi dove vuoi gli euro') >= 0];
@@ -209735,9 +209736,10 @@ console.log(JSON.stringify(out));
            "Tempo per pagare finito: puoi aprire una disputa",
            "Poi tocca «Ho inviato gli euro»", "Chi compra ti manda gli euro",
            "Aspetta il recapito", "Scrivi dove vuoi gli euro"], r.get("card"))
-    prova("LA PAGINA: la riga «Tempo per pagare» col battito di sempre, e 24 ore NON nascono "
-          "rosse ne' arancio (la proporzione delle vite corte); fuori dal deposito niente",
-          [True, True, False, True, "",
+    prova("LA PAGINA: la riga «Tempo per pagare» col battito di sempre; a chi paga ARANCIO "
+          "DA SUBITO (20 nov 2026, Andrea: «arancione e poi rosso quando mancavano gli ultimi "
+          "minuti», era «24 ore non nascono arancio» del 17 nov); fuori dal deposito niente",
+          [True, True, True, True, "",
            "Avrai 1 ora e 30 minuti per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.",
            True], r.get("riga"))
     prova("LA RECENSIONE nella pagina: dove la ammette il giudice (non un rimborso "
@@ -218184,6 +218186,40 @@ console.log(JSON.stringify({L, C}));
           "non a chi paga; col recapito o col tempo partito torna a chi paga; contanti e "
           "PayCode come prima",
           [True, False, False, True, True, False, True, False, True], tc)
+    # (20 nov 2026, cantiere barra-tempo-colore) la barra del tempo di un passo
+    r = subprocess.run(["node", "-e", "\n".join([
+        "const esc = s => String(s);",
+        "const P2P_VITA_SOGLIE_S = 7 * 86400, P2P_ULTIMO_GIORNO_S = 86400, P2P_ANELLO_VICINA_S = 3 * 86400;",
+        "const scadeTestoP2P = () => '';",
+        _fn_js(mini, "function statoAnelloP2P(manca){"),
+        _fn_js(mini, "function statoTempoPassoP2P(tocca, manca){"),
+        _fn_js(mini, "function frazioneVitaP2P(o, adesso){"),
+        _fn_js(mini, "function barraScadenzaP2P(o, adesso, chiTocca){"),
+        "const o = {scade: 100000 + 1800, creato: 100000 - 120};",
+        "const cl = h => (/class=\"([^\"]*)\"/.exec(h) || [])[1];",
+        "console.log(JSON.stringify([statoTempoPassoP2P(true, 1500), statoTempoPassoP2P(true, 600),",
+        "  statoTempoPassoP2P(false, 60), statoTempoPassoP2P(false, 5000)",
+        "  ].concat([barraScadenzaP2P(o, 100000, true), barraScadenzaP2P(o, 100000, false),",
+        "  barraScadenzaP2P(Object.assign({}, o, {scade: 100000 + 300}), 100000, true),",
+        "  barraScadenzaP2P(o, 100000)].map(cl))));"])], capture_output=True, text=True)
+    try:
+        bt = json.loads(r.stdout)
+    except Exception:
+        bt = "errore: " + r.stderr[-300:]
+    riga_t = _fn_js(mini, "function tempoPagareRigaOcP2P(o, adesso){")
+    batt_a = _fn_js(mini, "function battitoAnelloneP2P(){")
+    prova("IL TEMPO DI UN PASSO HA IL COLORE DI CHI LO DEVE FARE (Andrea, sulla barra bianca "
+          "di chi doveva pagare: «deve essere bianco solo per chi ha già fatto l'azione»): a "
+          "chi tocca arancio da subito e rosso negli ultimi dieci minuti, a chi aspetta neutro "
+          "— nella riga «Tempo per pagare» on-chain (col battito che lo rilegge da `data-tocca`) "
+          "e nella barra della card; senza chi tocca, le soglie di sempre",
+          [["vicina", "ultimo-giorno", "", "",
+            "p2p-barra vicina", "p2p-barra", "p2p-barra ultimo-giorno", "p2p-barra"],
+           True, True, True],
+          [bt, "statoTempoPassoP2P(o.ruolo === 'venditore', manca)" in riga_t
+           and "data-tocca=" in riga_t,
+           "statoTempoPassoP2P(box.dataset.tocca === '1', manca)" in batt_a,
+           "undefined, o.ruolo === 'venditore') : '')" in mini])
     # a tempo finito il gesto non c'e' piu'
     r = subprocess.run(["node", "-e", "\n".join([
         "let p2pScambiServer = null;",

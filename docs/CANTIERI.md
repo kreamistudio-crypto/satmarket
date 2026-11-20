@@ -93502,3 +93502,28 @@ apri-wallet-telegram; nessun simbolo in comune) il giro mirato: le
 diciannove sezioni toccate più le sedici che leggono i documenti, 2018
 verdi, e cinque collaudi vicini (presa on-chain, Barattozon on-chain,
 reputazione, feedback, recensione P2P), verdi.
+
+## La barra «Tempo per pagare» arancio per chi deve pagare, in chiaro per chi aspetta (20 nov 2026, cantiere barra-tempo-colore; Andrea, con lo scatto di chi doveva pagare in produzione: «Perché è bianco? Avevamo detto che per chi doveva compiere l'azione lo lasciavi com'era, cioè arancione e poi rosso quando mancavano gli ultimi minuti. Deve essere bianco solo per chi ha già fatto l'azione e non deve fare più niente»)
+
+DECISO. La riga «Tempo per pagare» della pagina on-chain e la barra sul
+bordo della card on-chain usavano il giudice delle scadenze degli ordini
+(`statoAnelloP2P`, sette giorni in proporzione): neutra fino a metà vita,
+per tutti e due. Adesso il tempo di un PASSO ha il colore di chi lo deve
+fare (`statoTempoPassoP2P`): a chi paga arancio da subito e rosso
+negli ultimi dieci minuti (i minuti del riquadro e della riga d'avviso),
+a chi aspetta neutro. La riga porta `data-tocca` e il battito
+(`battitoAnelloneP2P`) lo rilegge; `barraScadenzaP2P` prende `chiTocca`
+(senza, le soglie di sempre per gli ordini del libro). Il Lightning era
+già così (riquadro arancio a chi agisce, `attesa` a chi aspetta, cantiere
+timer-card-scambi). Rovesciata l'attesa del 17 nov «24 ore non nascono
+arancio» in `prove_onchain_come_lightning`: era la regola di prima.
+
+PROVATO. In `prove_timer_card_scambi` il giudice e la barra coi pezzi
+veri (a chi tocca arancio, rosso a dieci minuti; a chi aspetta neutro;
+senza chi tocca le soglie di sempre) e le cuciture con riga e battito;
+controprova: il giudice senza arancio → due rosse. Sull'albero di develop
+`fcec7b5` più la cura, nel venv senza coincurve: `PROVE_SEVERE=1 python
+prove.py` 30.582 passate e 2 esplose (`prove_p2p_libro`,
+`prove_p2p_dettaglio`: cercavano la firma vecchia di `barraScadenzaP2P`),
+rigirate dopo la cura delle due ancore: 594 passate, 0 fallite; collaudi
+della CI 163 verdi, 0 rossi.
