@@ -93314,3 +93314,45 @@ DECISIONI E PERCHÉ. Nella scheda «Importi» va SOLO il conto: il metodo scelto
 SCARTATI. Tre contenitori veri, uno per scheda (avrebbero rotto la griglia dello schermo largo e la regola della colonna della chat); pagine separate per conto e chat (tre viste nuove con la loro navigazione indietro, per una cosa che è la stessa pagina); spostare annulla e disputa in una quarta scheda.
 PROVATO. Sezione `prove_dettaglio_schede`: un banco in node coi pezzi veri (`segnaSchedeP2P`, `aggiornaSchedeP2P`, `vediSchedaP2P`, `schedaDelPezzoP2P`) su un DOM di cartone — il segno dal commento, le tre schede col pallino, due senza chat, la «Chat» ricordata che torna a «Passi», l'elenco on-chain senza barra, lo schermo largo fuori da Telegram senza schede e dentro Telegram con — e le sentinelle sull'ordine dei segni nelle due pagine, sul segno prima del confronto, sui ritorni a «Passi», sulla chat dell'avviso e sul CSS. Controprove: tolto il segno prima del confronto, tolto il ritorno a «Passi», segnato anche prima del primo commento, tolto il passaggio di scheda del richiamo, spento il riguardo allo schermo largo: ognuna fa rossa la sezione. Giro dal vivo (server in collaudo su 127.0.0.1, Chromium a 390 px e a 1440 px): Lightning con la chat (pallino «1», il richiamo porta alla scheda e il messaggio diventa letto, riaperto lo scambio si torna a «Passi»), on-chain a deposito confermato (due schede), barra ferma in alto scorrendo, schermo largo identico a prima. Nessun errore di pagina.
 DA GUARDARE. Sul telefono vero, dentro Telegram: la barra appesa sotto la testata di Telegram e lo scorrimento al passo aperto dalla card. Le pagine di chi modera: la chat del moderatore nel Lightning sta dentro il blocco del moderatore, quindi in «Passi».
+
+## Via il riassunto in cima alla presa on-chain e via «Controvalore di» dal conto (20 nov 2026, pomeriggio, cantiere via-riassunto; seguito di bottoni-fissi; Andrea con due schermate di «Stai comprando sats» on-chain in USDT: «Levami dove dice circa 1.688.827 sats per 1.099 USDT. A prezzo di mercato i sats si contano quando prendi l'ordine. Levami tutte quelle scritte, tanto c'è già nel dettaglio sotto», poi «levami controvalore di, lascia solo l'importo e a fianco circa X sats. Fai la stessa cosa anche per gli euro… con un importo grande non ci sta più in una riga»)
+
+IL RIASSUNTO. In `apriOnchainP2P` il riquadro `.p2p-onchain-riass` non
+dice più «≈ N sats per X» né «A prezzo di mercato: i sats si contano
+quando prendi l'ordine.»: cifra, sats e cambio li dice il conto sotto. La
+riga del metodo («USDT (Ethereum)») sparisce sugli USDT, dove la rete la
+dice la frase in fondo («⚠️ Gli USDT viaggiano solo su Ethereum»); RESTA
+sugli altri metodi (SEPA, Revolut…): con un metodo solo le pillole non ci
+sono e il metodo sarebbe sparito dal foglio. Restano anche il filtro 🛡️ e
+il «Pubblicato da» di riserva; una riga per voce col CSS
+(`.p2p-onchain-riass small{display:block}`) al posto dei `<br>`.
+Barattozon in «Compra BTC» non cambia. Nel dettaglio Lightning un
+riassunto così non c'era.
+
+IL CONTO. L'etichetta della prima riga è la sola cifra, «**1099,00
+USDT**» con «≈ N sats» a destra, nel conto Lightning (`contoDettP2P`,
+`etichettaCtrl`) e in quello on-chain (`contoOnchainP2P`); senza una
+cifra nota resta la parola «Controvalore». La guida dei tutorial
+(GUIDA-P2P-PASSI) è ritoccata.
+
+LA DISPUTA NELLA SCHERMATA. La foto delle 15:40 (Rome) diceva ancora
+«⚠️ Altrimenti chi vende può aprire una disputa»: il commit del ritorno
+automatico on-chain su main (`189da2a`) porta le 15:59, quindi la foto è
+di PRIMA del rilascio, non un foglio dimenticato. Il foglio lo legge da
+`ritorno_da_solo` della riga del libro (`_p2p_onchain_riga_pubblica`),
+vero fuori da contanti e Barattozon.
+
+PROVATO. Suite severa intera nel venv delle sole prove della CI, con
+nostr-tools, sull'albero di develop `0cc0fb3` più il cantiere: 30.812
+passate, 12 fallite, tutte attese col «Controvalore di» (`prove_p2p_dettaglio`,
+`prove_conto_intervallo`, `prove_premio_conto_onchain`,
+`prove_sconto_fisso_decimale`), riscritte sulla sola cifra e rigirate: 0
+fallite, 0 saltate. Sentinella nuova in `prove_tempo_pagare_p2p` («VIA IL
+RIASSUNTO»), con controprova (la regola CSS rimessa inline → rossa).
+Collaudi della CI senza coincurve e senza proxy: 163 verdi, 0 rossi. Poi
+rebase su develop `9f006e5` («Nel dettaglio» a schede, nessun simbolo in
+comune; conflitto solo in coda a CANTIERI): sezioni toccate, la sua
+`prove_dettaglio_schede` e `prove_conoscenza_tappo` verdi, sintassi del JS
+con `node --check`. Resta da
+guardare dal vivo sul telefono di Andrea: la riga «1099,00 USDT ≈ N sats»
+su una riga sola.

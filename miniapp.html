@@ -5016,6 +5016,8 @@
   #p2pOcRecapitoVivo:focus,#p2pOcMotivo:focus{border-color:var(--ink)}
   .p2p-onchain-gesti:empty{display:none}
   .p2p-onchain-riass{text-align:center;font-size:15px;margin-bottom:6px}
+  /* una riga per voce, senza i <br> fra l'una e l'altra (20 nov 2026, via-riassunto) */
+  .p2p-onchain-riass small{display:block}
   /* ══ IL RIDISEGNO DELL'ON-CHAIN (30 ott 2026, cantiere grafica-p2p-onchain) ══
      LA MONETA: la `.cambio-moneta.btc` della pagina Cambio (e il fulmine
      `.ln`), rimpicciolita dove sta. */
@@ -74987,15 +74989,19 @@ function apriOnchainP2P(id, modo){
           + esc(metodi) + '">' + (o.metodi || []).map(m => typeof marchioMetodoP2P === 'function'
             ? marchioMetodoP2P(m) : esc(m)).join(', ') + '</div>'
           + '<small>Chi ha pubblicato paga in contanti al tabacchino il PayCode Amazon che scrivi tu.</small>'
-        : '<div class="p2p-onchain-riass"><b>' + esc(satsCardOnchainP2P(o)) + '</b> per <b>'
-          + esc(cifraOc(o)) + '</b>' + (metodi ? '<br><small>' + esc(metodi) + '</small>' : ''))
-      /* «quando prendi L'ORDINE» (16 nov 2026, mappa-recenti): la frase
-         finiva su «prendi» e la riga sotto, «di Jj», la continuava */
-      + (o.mercato ? '<br><small>A prezzo di mercato: i sats si contano quando prendi l\'ordine.</small>' : '')
-      + (Number(o.filtro) > 0 ? '<br><small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
+        /* VIA IL RIASSUNTO (20 nov 2026, cantiere via-riassunto, Andrea:
+           «Levami dove dice circa 1.688.827 sats per 1.099 USDT. A prezzo di
+           mercato i sats si contano quando prendi l'ordine. Levami tutte
+           quelle scritte, tanto c'è già nel dettaglio sotto»): sats e cifra
+           li dice il conto, la rete degli USDT la frase in fondo. IL METODO
+           RESTA dove sotto non lo dice nessuno (SEPA, Revolut...): con un
+           metodo solo e niente pillole sarebbe sparito dal foglio. */
+        : '<div class="p2p-onchain-riass">'
+          + (metodi && !(typeof usdtOcP2P === 'function' && usdtOcP2P(o)) ? '<small>' + esc(metodi) + '</small>' : ''))
+      + (Number(o.filtro) > 0 ? '<small>🛡️ ' + esc(fraseFiltroP2P(Number(o.filtro))) + '</small>' : '')
       /* «Pubblicato da» e' diventato il riquadro di Lightning, qui sotto
          (18 nov 2026); senza il riquadro resta la riga di prima */
-      + (o.nome && typeof repRiquadroP2P !== 'function' ? '<br><small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
+      + (o.nome && typeof repRiquadroP2P !== 'function' ? '<small>Pubblicato da ' + esc(o.nome) + '</small>' : '') + '</div>'
       /* «CHI HA PUBBLICATO QUEST'ORDINE», con stelle, recensioni, volto e
          scambi, il riquadro del dettaglio di Lightning (18 nov 2026): senza
          la porta del negozio, che chiuderebbe il foglio di Lightning */
@@ -78526,7 +78532,9 @@ function contoOnchainP2P(o){
     circaSats(Math.abs(ctrl - base), prem > 0 ? '−' : '+'), 'premio') : '';
   const righeBase = conPremio
     ? (stima && typeof rigaTassoContoP2P === 'function' ? rigaTassoContoP2P(o, 0) : '')
-      + r('Controvalore di <b>' + esc(cifraOc(o)) + '</b>', circaSats(ctrl))
+      /* SOLO LA CIFRA, SENZA «Controvalore di» (20 nov 2026, via-riassunto,
+         Andrea: «così con un importo grande non ci sta più in una riga») */
+      + r('<b>' + esc(cifraOc(o)) + '</b>', circaSats(ctrl))
       + (typeof conNotaPremioP2P === 'function' && typeof notaPremioP2P === 'function'
         ? conNotaPremioP2P(rigaPremio, notaPremioP2P(o.mio, affare, prem)) : rigaPremio)
       + r('Subtotale', sats(o.sats), 'sub')
@@ -92695,7 +92703,11 @@ function contoDettP2P(o){
   const cifreEuro = !euroNoto ? num('—')
     : toccaImporto ? attrImportoP2P(o.euro, '<span class="num">' + euriTesto + ' ' + monetaP2P(o) + '</span>')
     : num(euriTesto + ' ' + monetaP2P(o));
-  const etichettaCtrl = euroNoto ? 'Controvalore di <b>' + euriTesto + ' '
+  /* SOLO LA CIFRA (20 nov 2026, cantiere via-riassunto, Andrea: «levami
+     controvalore di, lascia solo l'importo e a fianco circa X sats… così
+     con un importo grande non ci sta più in una riga»): la base resta
+     nell'etichetta, senza le parole. Senza una cifra nota, il nome. */
+  const etichettaCtrl = euroNoto ? '<b>' + euriTesto + ' '
     + segnoMonetaP2P(o) + '</b>' : 'Controvalore';
   /* la commissione: percentuale di chi legge + la sua cifra; «in
      promo» quando la fee viva sta sotto il listino di Barattolo —

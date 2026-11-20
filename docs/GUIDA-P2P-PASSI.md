@@ -371,7 +371,8 @@ SEPA, 3% più conveniente / 🫙 Apri il libro ordini».
      scambio non completato negli ultimi 30 giorni e nessuna disputa
      persa negli ultimi 90»;
    - «Tempo rimasto: <6g 23:47:17>»;
-   - il **conto**: «Controvalore di **50 €**», poi (se c'è) «<N>% più
+   - il **conto**: «**50 €**» con «≈ <N> sats» a fianco (dal 20 nov 2026
+     senza «Controvalore di»), poi (se c'è) «<N>% più
      conveniente» / «<N>% meno conveniente» con sotto «Premio richiesto
      dall'utente», «Premio offerto dall'utente», «Sconto offerto
      dall'utente» o «Sconto richiesto dall'utente», e «Subtotale», poi «Fee P2P **1,5%**» col cartellino («beta», «🌱

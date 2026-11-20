@@ -72955,7 +72955,7 @@ console.log(JSON.stringify(out));
     prova("scelta la cifra: la riga della cifra con la fascia e «Cambia», il conto a UNA colonna", [True, True, False, True],
           ['Importo scelto: <b>60,00 €</b> <span class="conto-scelto-fascia">(da\u00a020,00 a\u00a0100,00 €)</span>' in rs,
            'aria-label="Cambia l\'importo scelto" onclick="apriQuantoP2P(p2pDettOrdine)">Cambia</button>' in rs,
-           "conto-due" in rs, "Controvalore di <b>60,00" in rs])
+           "conto-due" in rs, "<span><b>60,00" in rs])
     prova("...con «sats» piccolo e la sua copia per la voce, e il bottone torna «Compra» verde", [True, True, True],
           ['<span class="unita-sats"> sats</span>' in rs, '<span class="solo-voce">≈ 120000 sats</span>' in rs,
            # (30 ott 2026, 18:57-19:04) vestito scuro e fulmine a sinistra
@@ -73124,23 +73124,23 @@ console.log(JSON.stringify(out));
     # particolare NON la bandierina, che resta alla cifra in fondo.
     prova("...e il controvalore e' al mercato puro, con la sua base",
           True,
-          '<span>Controvalore di <b>6,00 €</b></span>' in cm
+          '<span><b>6,00 €</b></span>' in cm
           and "≈ 12000 sats" in cm)
     # ...e un intervallo arrivato qui lo stesso (7 ott 2026, una colonna
     # sola) dice il suo minimo nell'etichetta, come un importo fisso
     prova("...e un intervallo arrivato al conto dice il minimo nell'etichetta", [False, True],
           ['<span>Controvalore</span>' in o["contoRange"],
-           "Controvalore di <b>20,00 €</b>" in o["contoRange"]])
+           "<span><b>20,00 €</b>" in o["contoRange"]])
     # ⚠️ E UNA VALUTA FUORI DAL CATALOGO PORTA LA SIGLA, qui come in
     # fondo: `segnoMonetaP2P` ricalca la regola di `monetaP2P` invece
     # di inventarsi un segno che non esiste.
     prova("...e una valuta ignota porta la sigla, mai un segno finto",
           True,
-          '<span>Controvalore di <b>6,00 USD</b></span>' in o["contoAltra"])
+          '<span><b>6,00 USD</b></span>' in o["contoAltra"])
     # ...e nel Vendi l'etichetta e' la stessa: la base non si specchia,
     # e' il verso delle righe sotto a cambiare
     prova("...e nel Vendi la base e' la stessa", True,
-          '<span>Controvalore di <b>6,00 €</b></span>' in o["contoVendi"])
+          '<span><b>6,00 €</b></span>' in o["contoVendi"])
     # «FEE BARATTOLO» (11 set 2026, decisione di Andrea): lo stesso
     # nome nei due conti, e il nome torna a dire DI CHI e'. A restare
     # VIETATA e' la formula lunga, non il nome: «Commissione
@@ -73425,7 +73425,7 @@ console.log(JSON.stringify(out));
     prova("un intervallo passato al conto si conta sul minimo, a una colonna",
           [False, False, True, False, True],
           ["conto-due" in cr, "--n:" in cr, "≈ 40000 sats" in cr, "200000" in cr,
-           "Controvalore di <b>20,00 €</b>" in cr])
+           "<span><b>20,00 €</b>" in cr])
     prova("...e in nessun conto restano due colonne, ne' il ₿", [False, False],
           [any("conto-due" in v for v in crudo.values() if isinstance(v, str)),
            any("₿" in v for v in crudo.values() if isinstance(v, str) and "ctrl-conto" in v)])
@@ -151803,8 +151803,10 @@ def prove_conto_intervallo():
           and "unitaPiccola" not in mini)
     prova("...e nel conto non resta nessun ₿, ne' la sua funzione", [False, False],
           ["₿" in cdc, "conBtc" in mini])
-    prova("...e il Controvalore dice i suoi euro nell'etichetta", True,
-          "const etichettaCtrl = euroNoto ? 'Controvalore di <b>'" in cd
+    # (20 nov 2026, via-riassunto; Andrea: «levami controvalore di, lascia solo
+    # l'importo») l'etichetta e' la sola cifra
+    prova("...e il Controvalore dice i suoi euro nell'etichetta (la sola cifra, senza parole)", True,
+          "const etichettaCtrl = euroNoto ? '<b>'" in cd
           # ⚠️ EMENDATA (19 ott 2026, importo-copia): la cifra del totale
           # si tocca nella pagina dello scambio di chi compra, e veste
           # `attrImportoP2P`; altrove resta il `num` di sempre
@@ -168449,7 +168451,7 @@ process.stdout.write(JSON.stringify(out));
     prova("IL CASO DEL TELEFONO: «Rispetto al mercato della presa: −0,6%», non piu' −1%",
           "Rispetto al mercato della presa: −0,6%", a["conv"])
     prova("...Controvalore 319.693, «Sconto che hai offerto 0,6%» con i suoi 1.982 sats, Subtotale 321.675",
-          ["Controvalore di 200,00 € | ≈ 319.693 sats",
+          ["200,00 € | ≈ 319.693 sats",
            "Sconto che hai offerto 0,6% | ≈ +1.982 sats",
            "Subtotale | 321.675 sats"], a["righe"][:3])
     prova("...e la percentuale e' davvero quella dei sats: 1.982 su 319.693 fa 0,6",
@@ -168469,7 +168471,7 @@ process.stdout.write(JSON.stringify(out));
           "coin-quasi: «Invia ≈ 97 000 sats» su un ordine in XMR): il Controvalore resta "
           "una stima, il Subtotale e il totale no",
           [True, False, False],
-          [any(x.startswith("Controvalore") and "≈" in x for x in o["senzaFee"]["righe"]),
+          [any(re.match(r"[\d.,]+ \S+ \| ≈", x) for x in o["senzaFee"]["righe"]),
            any(x.startswith("Subtotale") and "≈" in x for x in o["senzaFee"]["righe"]),
            any(x.startswith(("Invia", "Ricevi")) and "≈" in x for x in o["senzaFee"]["righe"])])
     prova("...e il totale c'e' davvero, coi suoi 321.675 sats", True,
@@ -209297,7 +209299,7 @@ console.log(JSON.stringify(out));
           "cambio, il Controvalore ricavato, «5% meno conveniente» con la nota, il "
           "Subtotale (la cifra della card), poi la fee e il Ricevi di sempre",
           ["CAMBIO 1 BTC ≈ 62.688 USDT",
-           "Controvalore di 1099,00 USDT | ≈ 1.753.126 sats",
+           "1099,00 USDT | ≈ 1.753.126 sats",
            "5% meno conveniente | ≈ −87.656 sats / Premio richiesto dall'utente",
            "Subtotale | ≈ 1.665.470 sats",
            "Fee P2P 1%Pioniere | ≈ −16.655 sats",
@@ -209306,14 +209308,14 @@ console.log(JSON.stringify(out));
           1665470, 1753126 - 87656)
     prova("sul MIO ordine preso: «Premio che hai richiesto 5%» senza nota, niente "
           "cambio di adesso (la cifra e' un fatto), il Subtotale esatto",
-          ["Controvalore di 1099,00 USDT | ≈ 1.753.126 sats",
+          ["1099,00 USDT | ≈ 1.753.126 sats",
            "Premio che hai richiesto 5% | ≈ −87.656 sats",
            "Subtotale | 1.665.470 sats",
            "Margine per la rete | 1.080 sats"], r.get("mioPreso", [])[:4])
     prova("lo SCONTO (−2% su un «compra BTC», chi prende vende): il «+», «2% meno "
           "conveniente» e «Sconto richiesto dall'utente»",
           ["CAMBIO 1 BTC ≈ 62.688 USDT",
-           "Controvalore di 1099,00 USDT | ≈ 98.039 sats",
+           "1099,00 USDT | ≈ 98.039 sats",
            "2% meno conveniente | ≈ +1.961 sats / Sconto richiesto dall'utente",
            "Subtotale | ≈ 100.000 sats"], r.get("sconto", [])[:4])
     prova("senza premio e a sats fissi il conto di ieri, «Sats dello scambio» in testa",
@@ -216052,6 +216054,18 @@ console.log(JSON.stringify(out));
            ".p2p-dett-fissi,.conf-fissa{position:sticky;top:0;z-index:2;background:var(--card);" in mini,
            "  .conf-fissa{top:-20px}\n" in mini,
            "@media (min-width:768px){ .p2p-dett-fissi{top:-20px} }" in mini])
+    # VIA IL RIASSUNTO (20 nov 2026, cantiere via-riassunto, Andrea: «Levami dove
+    # dice circa … sats per 1.099 USDT. A prezzo di mercato… Levami tutte quelle
+    # scritte, tanto c'è già nel dettaglio sotto»): in cima alla presa on-chain
+    # niente «≈ sats per cifra» ne' «A prezzo di mercato»; il metodo resta solo
+    # dove sotto non lo dice nessuno (gli USDT li dice la frase in fondo)
+    prova("VIA IL RIASSUNTO in cima alla presa on-chain: niente sats per cifra, niente "
+          "«A prezzo di mercato», il metodo solo fuori dagli USDT, una riga per voce",
+          [False, False, True, True],
+          ["esc(satsCardOnchainP2P(o)) + '</b> per <b>'" in ao,
+           "A prezzo di mercato: i sats si contano quando prendi" in ao,
+           "(metodi && !(typeof usdtOcP2P === 'function' && usdtOcP2P(o)) ? '<small>' + esc(metodi) + '</small>' : '')" in ao,
+           "  .p2p-onchain-riass small{display:block}\n" in mini])
     prova("IL BOLLINO sta sulle due card del libro (Lightning e on-chain) e su quella "
           "della fila della home (`bolliniVetrinaP2P`), e l'on-chain "
           "manda la scelta quando pubblica", [3, True, True],
