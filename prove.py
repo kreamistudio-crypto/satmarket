@@ -202811,6 +202811,61 @@ console.log(JSON.stringify({
         "- Miele × 3", "- Pane × 1", "Importi liberi: 1", "On-chain in arrivo, non contati: 1"], c["testo"])
 
 
+def prove_cassa_solo_negozio():
+    """LA CASSA SOLO NELL'APP NEGOZIO (20 nov 2026, cantiere
+    cassa-solo-negozio; Andrea: «La parte della cassa nell'applicazione di
+    barattolo ufficiale non deve esserci»). Nella Barattolo di sempre
+    spariscono la porta del Profilo e le vendite della cassa in «Ordini»
+    (e con loro il filtro «🏪 Cassa», che si accende solo se ce n'e');
+    nell'app Barattolo Negozio (`negozioSola`) e dentro la sua faccia
+    (`appNegozio`) restano. Qui in node `caricaCassaOrdini` vera, con una
+    fetch di cartone."""
+    print("\n[La cassa solo nell'app Barattolo Negozio]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    rp = pezzo_js(mini, "function renderProfilo(", "\n}\n")
+    prova("la porta «🏪 Cassa in negozio» del Profilo si accende solo nell'app Negozio", True,
+          "el('vocCassa').style.display =\n    cassaAttiva&&negozioSola()&&!DEMO&&!VETRINA ? '' : 'none';" in mini)
+    prova("...ed e' renderProfilo a deciderla (una riga sola)", 1, rp.count("el('vocCassa').style.display ="))
+    node = _sh.which("node")
+    if not node:
+        salta("le vendite della cassa in «Ordini», in node", "node assente")
+        return
+    pezzo = pezzo_js(mini, "async function caricaCassaOrdini(){", "\n}\n") + "\n}\n"
+    banco = r"""
+let DEMO = false, VETRINA = false, cassaAttiva = true, appNegozio = false, sola = false;
+const negozioSola = () => sola;
+const API_BASE = '', authHdr = () => 'x';
+let chiamate = 0;
+const fetch = async () => { chiamate++; return {ok: true, json: async () => ({vendite: [{id: 7}]})}; };
+let ordiniCassa = [];
+__PEZZO__
+(async () => {
+  const R = {};
+  await caricaCassaOrdini(); R.barattolo = [ordiniCassa.length, chiamate];
+  appNegozio = true; await caricaCassaOrdini(); R.faccia = [ordiniCassa.length, chiamate];
+  appNegozio = false; sola = true; await caricaCassaOrdini(); R.sola = [ordiniCassa.length, chiamate];
+  cassaAttiva = false; await caricaCassaOrdini(); R.spenta = [ordiniCassa.length, chiamate];
+  console.log(JSON.stringify(R));
+})();
+""".replace("__PEZZO__", pezzo)
+    cart = _tf.mkdtemp()
+    pf = os.path.join(cart, "cassa_ordini.js")
+    open(pf, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pf], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco delle vendite della cassa gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    e = _json.loads(r.stdout)
+    prova("nella Barattolo di sempre «Ordini» non chiede e non mostra le vendite della cassa", [0, 0], e["barattolo"])
+    prova("...dentro la faccia del Negozio si' (la scheda «📒 Vendite»)", [1, 1], e["faccia"])
+    prova("...e nell'app Barattolo Negozio anche", [1, 2], e["sola"])
+    prova("...a leva spenta in nessuna delle due", [0, 2], e["spenta"])
+
+
 def prove_mancia_venditore():
     """LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore,
     piano approvato da Andrea). Qui i pezzi veri, eseguiti; il giro sulle
@@ -219410,7 +219465,7 @@ CATEGORIE = {
     meta_cauzione_auto
     """.split(),
     "mercatino": """
-    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio
+    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
@@ -220638,6 +220693,7 @@ def main():
               prove_raccolte,
               prove_premi_fedelta,
               prove_app_negozio,
+              prove_cassa_solo_negozio,
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,
               prove_assistente_bot,

@@ -21788,7 +21788,10 @@ function cardOnchainDaPagare(o){
    Muta sui guasti: la lista di sempre non aspetta la cassa. */
 let ordiniCassa = [];
 async function caricaCassaOrdini(){
-  if (!cassaAttiva || DEMO || VETRINA) { ordiniCassa = []; return; }
+  /* (20 nov 2026, cassa-solo-negozio) nella Barattolo di sempre le
+     vendite della cassa non entrano in «Ordini»: stanno nella scheda
+     «📒 Vendite» dell'app Barattolo Negozio */
+  if (!cassaAttiva || DEMO || VETRINA || !(appNegozio || negozioSola())) { ordiniCassa = []; return; }
   try {
     const r = await fetch(`${API_BASE}/cassa/storico`, {headers:{'X-Tg-Init-Data':authHdr()}});
     const d = r.ok ? await r.json() : {};
@@ -45300,8 +45303,11 @@ function renderProfilo(){
     myNegozio&&!DEMO&&!VETRINA ? '' : 'none';
   if (el('recensioniConta')) el('recensioniConta').textContent =
     (Number(myNFeedback) || 0) > 0 ? `(${Number(myNFeedback)})` : '';
+  /* (20 nov 2026, cantiere cassa-solo-negozio; Andrea: «La parte della
+     cassa nell'applicazione di barattolo ufficiale non deve esserci»)
+     la porta resta solo nell'app Barattolo Negozio (`negozioSola`) */
   if (el('vocCassa')) el('vocCassa').style.display =
-    cassaAttiva&&!DEMO&&!VETRINA ? '' : 'none';
+    cassaAttiva&&negozioSola()&&!DEMO&&!VETRINA ? '' : 'none';
   if (el('vocRaccolte')) el('vocRaccolte').style.display =
     raccolteAttive&&!DEMO&&!VETRINA ? '' : 'none';
   if (el('vocWidgetNegozio')) el('vocWidgetNegozio').style.display =
