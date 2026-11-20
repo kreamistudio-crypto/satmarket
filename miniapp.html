@@ -3661,6 +3661,27 @@
   .p2p-anello .pieno{stroke:var(--sats);stroke-linecap:round;transition:stroke-dashoffset .35s}
   .p2p-box.p2p-tempo-pagare,.p2p-box.p2p-tempo-dett{display:flex;align-items:center;gap:10px}
   .p2p-tempo-icona{flex:0 0 auto;font-size:26px;line-height:1}
+  /* I TASTI DELLA RETE E IL TEMPO FISSI IN ALTO (20 nov 2026, cantiere
+     bottoni-fissi, Andrea: «quando scorro la pagina, devono stare
+     bloccati in alto»): nel dettaglio di un ordine Lightning il blocco e'
+     il primo figlio del corpo che scorre, nella presa on-chain e' il primo
+     del foglio. Lo sfondo del foglio, e largo fino ai bordi (margine
+     negativo e lo stesso rientro dentro): senza, il contenuto che sale
+     si vedrebbe passare nelle due strisce ai lati. Il padding sotto tiene
+     dentro il margine dell'ultimo riquadro, che altrimenti uscirebbe
+     trasparente. */
+  .p2p-dett-fissi,.conf-fissa{position:sticky;top:0;z-index:2;background:var(--card);
+    margin:0 calc(-1 * var(--pad));padding:6px var(--pad) 8px;
+    box-shadow:0 1px 0 var(--line-soft)}
+  .p2p-dett-fissi .p2p-rete-foglio,.conf-fissa > #p2pOcPresaRete{margin:0 !important}
+  /* ⚠️ IL `top` CONTA DAL PADDING DEL FOGLIO (guardato a schermo): dove
+     scorre `.sheet`, coi suoi 20px sopra, `top:0` lasciava una striscia
+     da cui si vedeva passare il contenuto. -20px = il bordo del foglio.
+     A pieno schermo sul telefono scorre il corpo, che sopra non ha
+     padding: li' resta 0. */
+  .conf-fissa{top:-20px}
+  @media (min-width:768px){ .p2p-dett-fissi{top:-20px} }
+  .p2p-dett-fissi > .p2p-box:first-child,.conf-fissa > .p2p-box:first-child{margin-top:0}
   .p2p-box.p2p-tempo-pagare.scaduto .p2p-anello .pieno{stroke:var(--ink-soft)}
   .p2p-orologio{display:flex;align-items:center;gap:12px}
   .p2p-orologio .p2p-anello{width:44px;height:44px}
@@ -17979,6 +18000,11 @@ document.getElementById('cartello')?.remove();</script>
        aria-labelledby="confTit">
     <div class="grab"></div>
     <h3 id="confTit"></h3>
+    <!-- IL BLOCCO FISSO (20 nov 2026, cantiere bottoni-fissi): quel che
+         chi apre vuole sempre a vista mentre il foglio scorre — nella
+         presa on-chain i tasti ⚡/₿ e il tempo per pagare (`fissa` in
+         chiediConferma). Vuoto e nascosto per tutti gli altri. -->
+    <div class="conf-fissa" id="confFissa" style="display:none"></div>
     <!-- «Stai usando …» (16 ott 2026): solo per i gesti coi soldi
          (`soldi: true` in chiediConferma) e con piu' account aperti -->
     <div class="conto-in-vista" id="confConto" style="display:none"></div>
@@ -40826,6 +40852,10 @@ function chiediConferma(c){
   const chi = c.soldi && typeof contoInVistaHTML === 'function' ? contoInVistaHTML() : '';
   const posto = el('confConto');
   if (posto) { posto.innerHTML = chi; posto.style.display = chi ? '' : 'none'; }
+  /* `fissa`: il blocco appiccicato in cima (20 nov 2026, bottoni-fissi);
+     il foglio e' uno per tutti, quindi si svuota a ogni apertura */
+  const fissa = el('confFissa');
+  if (fissa) { fissa.innerHTML = c.fissa || ''; fissa.style.display = c.fissa ? '' : 'none'; }
   const testata = el('confTestata');
   testata.innerHTML = c.testata || '';
   testata.style.display = c.testata ? '' : 'none';
@@ -74617,12 +74647,16 @@ function apriOnchainP2P(id, modo){
     /* i due tasti della rete al posto di «via on-chain» (16 nov 2026),
        dove l'altra rete c'e' per chi guarda */
     via: conTasti ? '' : 'via on-chain',
-    testata: (conTasti ? '<div id="p2pOcPresaRete" style="margin-bottom:12px">'
+    /* I TASTI E IL TEMPO FISSI IN ALTO, come nel dettaglio Lightning (20 nov
+       2026, cantiere bottoni-fissi): fuori dalla testata, nel blocco che
+       resta a vista mentre il foglio scorre */
+    fissa: (conTasti ? '<div id="p2pOcPresaRete" style="margin-bottom:12px">'
         + reteOcPresaHtmlP2P(o, vendeLui) + '</div>' : '')
       /* IL TEMPO PER PAGARE IN CIMA, come nel dettaglio Lightning (19 nov
          2026, regole-sulla-card; Andrea: «quando io clicco sulla card, deve
          essere informato subito chi la prende»): a chi compra */
-      + (vendeLui && typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, false, true) : '')
+      + (vendeLui && typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, false, true) : ''),
+    testata: ''
       /* BARATTOZON IN «COMPRA BTC» COME IL DETTAGLIO DI LIGHTNING (18 nov
          2026, cantiere barattozon-oc-carta, Andrea: «deve essere uguale al
          lighting»): in cima l'insegna del metodo, la cifra la dice il
@@ -74990,32 +75024,30 @@ function corpoPresaOcP2P(o, vendeLui){
      non il conto. Qui l'ordine e' quello del libro: vale il solo metodo */
   const cont = typeof metodoPresaOcP2P === 'function' ? metodoPresaOcP2P(o) === 'Contanti'
     : typeof soloContantiP2P === 'function' && soloContantiP2P(o.metodi);
+  /* UNA RIGA, DUE AL PIU' (20 nov 2026, cantiere bottoni-fissi, Andrea:
+     «Troppo testo troppo complicato»; i testi li ha approvati lui: «Ok, va
+     bene»). Commissione, swap e cifre esatte li dice il conto qui sopra.
+     Barattozon in «Compra BTC» resta com'era: non era fra i testi
+     proposti. */
   return paroleOc(o, vendeLui
-      ? 'Chi vende deposita i sats in un indirizzo 2-di-3 (sue, tue e di Barattolo: ne servono due). '
-        + (cont ? 'Quando sono confermati vi vedete dove ti scrive lui, consegni i contanti e tocchi «Ho consegnato i contanti»; '
+      ? (cont ? 'Vi vedete, consegni i contanti e tocchi «Ho consegnato i contanti». '
            /* Barattozon in «Vendi BTC» (18 nov 2026, barattozon-oc-carta,
               Andrea: «tutto uguale al Lightning»): non si mandano euro, si
               paga il SUO PayCode al tabacchino */
            : typeof tabacchinoP2P === 'function' && tabacchinoP2P(o.metodi)
-           ? 'Quando sono confermati vedi il suo PayCode Amazon, lo paghi in contanti al tabacchino e tocchi «🧾 Ho pagato al tabacchino»; '
-           : 'Quando sono confermati mandi gli euro col metodo scritto e tocchi «Ho inviato gli euro»; ')
-        + (ln
-          ? 'lui li libera e, con lo swap, ti arrivano in Lightning, meno la tua metà della commissione e il costo dello swap. '
-          : 'lui li libera e arrivano sul TUO wallet on-chain, meno la tua metà della commissione. ')
+           ? 'Paghi il suo PayCode Amazon al tabacchino e tocchi «🧾 Ho pagato al tabacchino». '
+           : 'I sats restano nel deposito finché chi vende non li libera. ')
         + 'Se qualcosa va storto decide un moderatore.'
-      : 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
-        + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore'
-        + (ln ? ', pagando da Lightning con lo swap' : '') + '. '
-        /* Barattozon in «Compra BTC» (18 nov 2026, barattozon-oc-carta): chi
-           compra non manda euro, paga il TUO PayCode al tabacchino */
-        + (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o)
-           ? 'Chi compra paga in contanti al tabacchino il tuo PayCode Amazon, e tu liberi i sats SOLO quando '
+      /* Barattozon in «Compra BTC» (18 nov 2026, barattozon-oc-carta): chi
+         compra non manda euro, paga il TUO PayCode al tabacchino */
+      : (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o)
+           ? 'Se prendi, depositi tu ' + satsCardOnchainP2P(o) + ' più la tua metà della commissione e il margine di rete '
+             + 'nell\'indirizzo 2-di-3 entro ' + p2pOnchainLibro.oreDeposito + ' ore'
+             + (ln ? ', pagando da Lightning con lo swap' : '') + '. '
+             + 'Chi compra paga in contanti al tabacchino il tuo PayCode Amazon, e tu liberi i sats SOLO quando '
              + 'Amazon ti conferma il pagamento. Se non arriva, apri una disputa: decide un moderatore.'
-           : cont ? 'Poi scrivi nello scambio dove vedervi: chi compra ti consegna ' + esc(fmtSoldiP2P(o.euro, o))
-                  + ' € in contanti e tu liberi i sats SOLO dopo averli contati, lì davanti a lui. '
-                  + 'Se non te li dà, apri una disputa: decide un moderatore.'
-           : 'Chi compra ti manda ' + esc(fmtSoldiP2P(o.euro, o)) + ' € e tu liberi i sats SOLO quando li vedi sul tuo conto. '
-             + 'Se non arrivano, apri una disputa: decide un moderatore.'))
+           : 'Depositi i sats entro ' + p2pOnchainLibro.oreDeposito + ' ore e li liberi solo quando vedi gli euro. '
+             + 'Se non arrivano, apri una disputa.'))
     + (usdtOc(o) ? ' ⚠️ Gli USDT viaggiano solo su ' + (o.metodi || []).map(m => (reteUsdtDaMetodoP2P(m) || {}).nome).filter(Boolean).join(' o ')
       + (vendeLui ? '.' : ': dopo la presa scrivi nello scambio il tuo indirizzo USDT.') : '');
 }
@@ -75141,21 +75173,17 @@ function rigaCauzioneOcP2P(o, c){
   const stima = cauzioneOcSatsP2P(Number(o.sats) > 0 ? o.sats : o.stima, c);
   /* LA CAUZIONE CHIESTA DA CHI PUBBLICA (18 nov 2026), con un metodo
      che non e' il contanti: stessa regola, un'altra ragione */
+  /* DUE RIGHE E NON SETTE (20 nov 2026, cantiere bottoni-fissi, Andrea
+     sulla presa on-chain con la cauzione: «Troppo testo troppo
+     complicato»; testi proposti e approvati da lui: «Ok, va bene»). Senza
+     la stima (cifra non ancora nota) la regola al posto della cifra. */
+  const quanto = stima > 0 ? 'circa <b>' + fmt(stima) + ' sats</b>'
+    : 'il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats,' : '');
+  const testa = '<div class="hint cauzione-regola">🔐 <b>Cauzione:</b> ' + quanto
+    + ' in Lightning. <b>Tornano a fine scambio</b>; ';
   if (o && o.cauzione_chiesta === true && metodoPresaOcP2P(o) !== 'Contanti')
-    return '<div class="hint cauzione-regola">🔐 <b>Chi vende chiede una cauzione.</b> '
-      + 'Per prendere quest\'ordine blocchi una piccola cauzione in Lightning'
-      + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
-      + ' (il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')'
-      + ': resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>. La perdi se rinunci dopo che i '
-      + 'bitcoin sono nel deposito, o se lasci scadere il tempo per pagare senza toccare «Ho inviato».'
-      + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
-  return '<div class="hint cauzione-regola">🔐 <b>La cauzione di chi prende.</b> '
-    + 'Per prendere quest\'ordine in contanti blocchi una piccola cauzione in Lightning'
-    + (stima > 0 ? ' di circa <b>' + fmt(stima) + ' sats</b>' : '')
-    + ' (il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats' : '') + ')'
-    + ': resta in sospeso nel tuo wallet e <b>torna a fine scambio</b>. La perdi solo se un moderatore '
-    + 'decide che non ti sei presentato all\'incontro.'
-    + ' Finché non è bloccata, l\'ordine resta nel libro e qualcun altro può prenderlo.</div>';
+    return testa + 'li perdi se rinunci o lasci scadere il tempo.</div>';
+  return testa + 'li perdi se non ti presenti all\'incontro.</div>';
 }
 /* il riquadro dei metodi nel foglio della presa: le pillole (se c'e' da
    scegliere), la zona, la regola del contanti e la cauzione */
@@ -92920,13 +92948,22 @@ function renderDettaglioP2P(){
      cifra ha il suo nome) e il lato e' salito nel TITOLO. Quel che
      resta e' l'ordine dei gesti — come pago, con chi ho a che fare,
      quanto tempo resta, quanto viene. */
+  /* il tempo per pagare, a chi prende PRIMA di premere e sul mio (18 nov
+     2026): IN CIMA, la prima cosa che si legge (19 nov 2026,
+     regole-sulla-card; Andrea: «deve essere informato subito») */
+  const tempoDett = (typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '');
   box.innerHTML =
-    reteTasti +
-    (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
-    /* il tempo per pagare, a chi prende PRIMA di premere e sul mio (18 nov
-       2026): IN CIMA, la prima cosa che si legge (19 nov 2026,
-       regole-sulla-card; Andrea: «deve essere informato subito») */
-    (typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '') +
+    /* I TASTI DELLA RETE E IL TEMPO RESTANO FISSI IN ALTO (20 nov 2026,
+       cantiere bottoni-fissi, Andrea: «i bottoni lightning e on-chain in
+       alto, quando scorro la pagina, devono stare bloccati in alto. E
+       anche la scritta… deve essere bloccata anche lei»): un blocco solo,
+       appiccicato in cima al corpo che scorre. Solo a chi prende: sul MIO
+       ordine i tasti non ci sono e la riga resta nel corpo. */
+    (!tuo && (reteTasti || tempoDett)
+      ? '<div class="p2p-dett-fissi">' + reteTasti + tempoDett + '</div>'
+      : reteTasti
+        + (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '')
+        + tempoDett) +
     metodiDettP2P(o) +
     /* la regola e il tetto del contanti, a chi sta per prendere (30 set 2026).
        SOLO SCEGLIENDO «CONTANTI» (12 ott 2026, cantiere contanti-solo-scelti,
@@ -99124,10 +99161,17 @@ function rigaTempoPagareDettP2P(o, tuo, oc){
      E LE PAROLE DELLA VALUTA DELL'ORDINE: «gli USDT», «i franchi», «gli
      ETH», coi traduttori della pagina dello scambio (euro: lettera per lettera) */
   const icona = '<span class="p2p-tempo-icona" aria-hidden="true">⏱</span>';
+  /* LA RIGA CORTA (20 nov 2026, cantiere bottoni-fissi, Andrea: «quella
+     scritta lì deve essere più corta e deve essere bloccata anche lei»;
+     testo scelto da lui fra due, scheda «1: due righe col bottone», poi
+     ritoccato da lui: «hai 24 ore per inviare gli USDT e toccare il tasto
+     ho inviato gli USDT», «e i sats ritornano a chi vende»): sta
+     fissa in alto coi tasti, quindi due righe e non sei. La spiegazione
+     intera (da quando parte il tempo, cosa succede dopo) resta nel banner
+     della presa, `bannerTempoPagareP2P`. Sul MIO ordine la frase di prima. */
   if (oc) {
-    const t = 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro, da quando i sats '
-      + 'sono nel deposito e chi vende ti dice dove mandarli: poi chi vende può aprire una disputa.'
-      + '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO_OC + '</span>';
+    const t = 'Hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro e toccare «Ho inviato gli euro».'
+      + '<span class="p2p-tempo-avviso">⚠️ Altrimenti chi vende può aprire una disputa.</span>';
     return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">' + icona + '<span>'
       + (typeof paroleOcP2P === 'function' ? paroleOcP2P(o, t) : t) + '</span></div>';
   }
@@ -99135,10 +99179,10 @@ function rigaTempoPagareDettP2P(o, tuo, oc){
      e allo scadere l'ordine torna nel libro; a chi prende, sotto, la riga
      che non deve sfuggire (Andrea: «uno magari non capisce e perde i
      soldi») */
-  const t = (tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro, da quando gli dici dove mandarli'
-                 : 'Se lo prendi hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro, da quando chi vende ti dice dove mandarli')
-    + ': poi lo scambio scade e l\'ordine torna nel libro.'
-    + (tuo ? '' : '<span class="p2p-tempo-avviso">' + P2P_AVVISO_BOTTONE_PAGATO + '</span>');
+  const t = tuo ? 'Chi lo prende ha <b>' + minutiPagareDetteP2P(min) + '</b> per inviarti gli euro, da quando gli dici dove mandarli'
+      + ': poi lo scambio scade e l\'ordine torna nel libro.'
+    : 'Hai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro e toccare «Ho inviato gli euro».'
+      + '<span class="p2p-tempo-avviso">⚠️ Altrimenti lo scambio scade e i sats tornano a chi vende.</span>';
   return '<div class="p2p-box p2p-accesso p2p-tempo-dett" id="p2pTempoPagareDett">' + icona + '<span>'
     + (typeof paroleUsdtP2P === 'function' ? paroleUsdtP2P(o, t) : t) + '</span></div>';
 }
@@ -99146,8 +99190,6 @@ function rigaTempoPagareDettP2P(o, tuo, oc){
    questa roba qua, perché altrimenti uno magari non capisce e perde i
    soldi»): accanto al timer, sulla card prima della presa e nel banner */
 const P2P_AVVISO_BOTTONE_PAGATO = '⚠️ Se hai pagato, tocca «Ho inviato gli euro» prima che il tempo finisca: senza il bottone lo scambio scade anche se hai pagato.';
-/* ...e sull'on-chain, dove allo scadere non scade niente da solo */
-const P2P_AVVISO_BOTTONE_PAGATO_OC = '⚠️ Se hai pagato, tocca subito «Ho inviato gli euro»: senza il bottone, a tempo finito chi vende può aprire una disputa e riavere i sats anche se hai pagato.';
 /* PURA: IL BANNER DELLA PRESA (19 nov 2026, Andrea: «quando uno prende
    l'ordine esce fuori un banner dove gli si informa di come funziona
    questo ordine»): i tre passi, coi minuti dell'ordine. `oc` = on-chain,

@@ -167026,12 +167026,16 @@ process.stdout.write(JSON.stringify(out));
            "La commissione è quella degli scambi Lightning, metà a testa" in mini])
     presa = pezzo_js(mini, "function apriOnchainP2P(id, modo){", "\n}\n")
     frase = pezzo_js(mini, "function corpoPresaOcP2P(o, vendeLui){", "\n}\n")
+    # (20 nov 2026, bottoni-fissi; Andrea: «Troppo testo troppo complicato») le
+    # frasi sono quelle corte approvate da lui: la meta' della commissione la
+    # dice il CONTO, che c'e' sempre; resta nella frase solo di Barattozon
     prova("IL FOGLIO DI CHI PRENDE porta il conto, come il dettaglio Lightning, e le "
-          "due frasi dicono la meta' della commissione", [True, True, True, True],
+          "frasi corte lasciano la commissione al conto", [True, True, True, False, True],
           ["contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'," in presa,
            "corpo: corpoPresaOcP2P(o, vendeLui)," in presa,
            "più la tua metà della commissione e il margine di rete" in frase,
-           "meno la tua metà della commissione" in frase])
+           "meno la tua metà della commissione" in frase,
+           "'I sats restano nel deposito finché chi vende non li libera. '" in frase])
 
 
 
@@ -167609,7 +167613,7 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
   await scegliReteOcPresaP2P(7, 'ln');
   out.swapNo = [p2pOcPresaRete[7], premuto(NODI.p2pOcPresaRete.innerHTML),
                 NODI.p2pOcPresaRete.innerHTML.replace(/<[^>]+>/g, '').replace(/.*Lightning₿ On-chain/, ''),
-                NODI.confOk.icona === iconaPresaOcP2P(false), NODI.confCorpo.textContent.indexOf('TUO wallet on-chain') > 0];
+                NODI.confOk.icona === iconaPresaOcP2P(false), NODI.confCorpo.textContent.indexOf('I sats restano nel deposito') === 0];
   await scegliReteOcPresaP2P(8, 'ln');
   out.swapNoDep = p2pOcPresaRete[8];
   PREV_NO = null;
@@ -167668,15 +167672,20 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
               True, o["ocLn"][0] == ["⚡ Lightning:true", "₿ On-chain:false"]
               and o["ocLn"][1] == "L'utente ha pubblicato quest'ordine on-chain: ricevi in Lightning "
               "con uno swap di SATS Routing (costo circa 900 sats, ti arrivano circa 97.600 sats).")
-        prova("LA FRASE SOTTO IL CONTO segue il tasto: on-chain «sul TUO wallet on-chain», "
-              "con «⚡ Lightning» «ti arrivano in Lightning» e, per chi deposita, «pagando "
-              "da Lightning con lo swap»",
-              [True, False, True, False, True],
-              ["arrivano sul TUO wallet on-chain" in o["frasePrima"][0],
-               "pagando da Lightning" in o["frasePrima"][1],
-               "ti arrivano in Lightning, meno la tua metà della commissione e il costo dello swap" in o["fraseLn"],
-               "TUO wallet on-chain" in o["fraseLn"],
-               "pagando da Lightning con lo swap" in o["fraseDepLn"]])
+        # (20 nov 2026, bottoni-fissi; Andrea: «Troppo testo troppo complicato»)
+        # la frase e' la CORTA approvata da lui, uguale con tutti e due i tasti:
+        # lo swap e la commissione li dice il conto
+        prova("LA FRASE SOTTO IL CONTO e' quella corta, uguale col tasto «⚡ Lightning»: chi "
+              "compra «I sats restano nel deposito…», chi deposita «Depositi i sats entro…»; "
+              "niente piu' commissione, wallet o swap nella frase (stanno nel conto)",
+              [True, True, True, True, False],
+              [o["frasePrima"][0] == "I sats restano nel deposito finché chi vende non li libera. "
+                                     "Se qualcosa va storto decide un moderatore.",
+               o["frasePrima"][1].startswith("Depositi i sats entro ")
+               and o["frasePrima"][1].endswith(" ore e li liberi solo quando vedi gli euro. Se non arrivano, apri una disputa."),
+               o["fraseLn"] == o["frasePrima"][0],
+               o["fraseDepLn"] == o["frasePrima"][1],
+               "commissione" in o["frasePrima"][0] + o["frasePrima"][1] + o["fraseLn"] + o["fraseDepLn"]])
         prova("...e chi deposita quanto paga in Lightning e il costo",
               "L'utente ha pubblicato quest'ordine on-chain: depositi da Lightning con uno swap di "
               "SATS Routing (costo circa 700 sats, paghi circa 101.700 sats più il margine per la rete).", o["depLn"])
@@ -167724,7 +167733,10 @@ const premuto = h => [...h.matchAll(/class="btn (orange|ghost)"[^>]*aria-pressed
            and "reteLn: conTasti && (p2pOcPresaRete[o.id] || {}).rete === 'ln'," in presa,
            "await applicaReteOcPresaP2P(id, d.ruolo);" in prendi,
            "if (tit && !reteTasti) tit.insertAdjacentHTML('beforeend', '<small class=\"p2p-via\">via Lightning</small>');" in dett,
-           "box.innerHTML =\n    reteTasti +" in dett])
+           # (20 nov 2026, bottoni-fissi) sempre la prima cosa del corpo, ora dentro
+           # il blocco fisso in alto insieme alla riga del tempo
+           "box.innerHTML =\n    /* I TASTI DELLA RETE E IL TEMPO RESTANO FISSI IN ALTO" in dett
+           and "      ? '<div class=\"p2p-dett-fissi\">' + reteTasti + tempoDett + '</div>'\n      : reteTasti\n" in dett])
 
 def prove_icone_valute_filtro():
     """LE ICONE DELLE VALUTE NEL FILTRO E DELLE RETI USDT (16 nov 2026,
@@ -196564,11 +196576,13 @@ console.log(JSON.stringify([
     prova("la frase della presa: in «Vendi BTC» si paga il PayCode al tabacchino, in «Compra "
           "BTC» lo paga chi compra, gli altri ordini con gli euro come prima",
           [[True, False], [True, False], [False, True]],
-          [["lo paghi in contanti al tabacchino e tocchi «🧾 Ho pagato al tabacchino»" in out[0],
+          # (20 nov 2026, bottoni-fissi) le righe corte approvate da Andrea; in
+          # «Compra BTC» col tabacchino la frase resta quella di prima
+          [["Paghi il suo PayCode Amazon al tabacchino e tocchi «🧾 Ho pagato al tabacchino»." in out[0],
             "mandi gli euro" in out[0]],
            ["Chi compra paga in contanti al tabacchino il tuo PayCode Amazon" in out[1],
             "ti manda" in out[1]],
-           ["al tabacchino" in out[2], "mandi gli euro col metodo scritto" in out[2]]])
+           ["al tabacchino" in out[2], "I sats restano nel deposito finché chi vende non li libera." in out[2]]])
 
 
 def prove_estensione_barattozon():
@@ -210446,8 +210460,10 @@ def prove_onchain_contanti_scambio():
           (True, True, True, True),
           ("{t: 'Consegna i contanti', d: 'Quando vi vedete, poi tocca «Ho consegnato i contanti»'}" in card,
            "{t: 'Contanti consegnati', d: 'Contali e libera i sats'}" in card,
-           "consegni i contanti e tocchi «Ho consegnato i contanti»; " in presa,
-           "tu liberi i sats SOLO dopo averli contati, lì davanti a lui. " in presa))
+           "'Vi vedete, consegni i contanti e tocchi «Ho consegnato i contanti». '" in presa,
+           # (20 nov 2026, bottoni-fissi) chi vende in contanti: la riga corta di
+           # chi deposita, «li liberi solo quando vedi gli euro» (approvata da Andrea)
+           "' ore e li liberi solo quando vedi gli euro. '" in presa))
     banco = "\n".join(_fn_js(mini, f) for f in (
         "function contantiAManoP2P(metodi){", "function soloContantiP2P(metodi){",
         "function contantiOcP2P(o){", "function vistaContantiOcP2P(o){",
@@ -210966,9 +210982,10 @@ out.contanti = [metodoPresaOcP2P(misto), h1.includes('tema-pill active'), h1.inc
 out.altro = metodoPresaOcP2P({...misto, id: 9});
 p2pOnchainLibro = {cauzione: REGOLA};
 const h2 = metodiPresaOcHtmlP2P(misto, true);
-out.accesa = [cauzioneOcServeP2P(misto), h2.includes('cauzione-regola'), h2.includes('<b>3000 sats</b>'),
-              h2.includes('il 3%, almeno 1000 sats'), h2.includes('torna a fine scambio'),
-              h2.includes('solo se un moderatore')];
+/* (20 nov 2026, bottoni-fissi; Andrea: «Troppo testo») la riga corta */
+out.accesa = [cauzioneOcServeP2P(misto), h2.includes('cauzione-regola'), h2.includes('circa <b>3000 sats</b> in Lightning'),
+              h2.includes('<b>Tornano a fine scambio</b>'), h2.includes('li perdi se non ti presenti all\'incontro.'),
+              rigaCauzioneOcP2P({id: 2, metodi: ['Contanti']}, REGOLA).includes('🔐 <b>Cauzione:</b> il 3%, almeno 1000 sats, in Lightning.')];
 p2pOcPresaMetodo = {id: 2, metodo: 'Bonifico'};
 const h3 = metodiPresaOcHtmlP2P(misto, true);
 out.bonifico = [cauzioneOcServeP2P(misto), h3.includes('cauzione-regola'), h3.includes('[zona'), h3.includes('[regola')];
@@ -211014,11 +211031,10 @@ const chiesto = {...online, id: 4, cauzione_chiesta: true};
 const h5 = metodiPresaOcHtmlP2P(chiesto, true);
 p2pOcPresaMetodo = {id: 5, metodo: 'Contanti'};
 const mc = {...misto, id: 5, cauzione_chiesta: true};
-out.chiesta = [cauzioneOcServeP2P(chiesto), h5.includes('Chi vende chiede una cauzione'),
-               h5.includes('<b>3000 sats</b>'), h5.includes('se rinunci dopo che i bitcoin sono nel deposito')
-                 && h5.includes('senza toccare «Ho inviato»'),
+out.chiesta = [cauzioneOcServeP2P(chiesto), h5.includes('🔐 <b>Cauzione:</b> circa'),
+               h5.includes('<b>3000 sats</b>'), h5.includes('li perdi se rinunci o lasci scadere il tempo.'),
                cauzioneOcServeP2P({...online, cauzione_chiesta: 1}),
-               rigaCauzioneOcP2P(mc, REGOLA).includes('non ti sei presentato')];
+               rigaCauzioneOcP2P(mc, REGOLA).includes('non ti presenti all\'incontro')];
 p2pOnchainLibro = {cauzione: null};
 out.chiestaSpenta = cauzioneOcServeP2P(chiesto);
 const AS = {cauzione: {...REGOLA, aScelta: true}};
@@ -211063,8 +211079,8 @@ console.log(JSON.stringify(out));
     prova("«Contanti» scelto a leva spenta: la pillola accesa, la zona e la regola col tetto; cauzione no",
           ["Contanti", True, True, True, False, False], out.get("contanti"))
     prova("la scelta vale per QUELL'ordine: su un altro si riparte", "", out.get("altro"))
-    prova("a leva accesa «Contanti» porta la riga della cauzione: la cifra, il 3% col minimo, "
-          "che torna, e che si perde solo per un moderatore",
+    prova("a leva accesa «Contanti» porta la riga della cauzione, corta: la cifra, che torna, "
+          "che si perde se non ti presenti; senza stima il 3% col minimo al posto della cifra",
           [True, True, True, True, True, True], out.get("accesa"))
     prova("...e «Bonifico» no: niente cauzione, niente zona, niente regola del contanti",
           [False, False, False, False], out.get("bonifico"))
@@ -215416,7 +215432,7 @@ def prove_tempo_pagare_p2p():
                 "const P2P_METODI_VELOCI = ",
                 "let p2pMinutiPagare = ", "let p2pNuovoMinutiPagare = ",
                 "const P2P_TABACCHINO = ", "const P2P_CONTANTI = ", "const P2P_POSTA = ",
-                "const P2P_AVVISO_BOTTONE_PAGATO = ", "const P2P_AVVISO_BOTTONE_PAGATO_OC = "))
+                "const P2P_AVVISO_BOTTONE_PAGATO = "))
            + pezzo_js(mini, "const P2P_MINUTI_PAGARE_FERMI = ", "\n})();\n") + "\n})();\n"
            + "".join(_fn_js(mini, f) for f in (
                "function idMostroVero(id){", "function traQuantoP2P(sec){",
@@ -215597,11 +215613,15 @@ console.log(JSON.stringify(out));
           ["⏱ 4 h" in V[0], "🔐" in V[0], V[1], "⏱ 30 min" in V[2], "🔐" in V[2],
            V[3], V[4], V[5], "⏱ 30 min" in V[6], "🔐 Cauzione" in V[6],
            "⏱" in V[7], "🔐 Cauzione" in V[7], "🔐" in V[8], "🔐" in V[9], "⏱ 4 h" in V[9]])
-    prova("la riga del dettaglio: a chi prende «Se lo prendi hai 4 ore», a chi ha pubblicato "
-          "«Chi lo prende ha 30 minuti», con l'anello; senza tempo niente",
-          [True, True, True, False, ""],
-          ["Se lo prendi hai <b>4 ore</b> per inviare gli euro" in o["dett"][0],
+    # (20 nov 2026, bottoni-fissi) a chi prende la riga CORTA scelta da Andrea
+    prova("la riga del dettaglio: a chi prende «Hai 4 ore per inviare gli euro e toccare "
+          "«Ho inviato gli euro».» e cosa succede altrimenti, a chi ha pubblicato «Chi lo prende ha 30 minuti», con "
+          "l'icona; senza tempo niente",
+          [True, True, True, False, True, False, ""],
+          ["<span>Hai <b>4 ore</b> per inviare gli euro e toccare «Ho inviato gli euro».<span class=\"p2p-tempo-avviso\">"
+           "⚠️ Altrimenti lo scambio scade e i sats tornano a chi vende.</span></span>" in o["dett"][0],
            "Chi lo prende ha <b>30 minuti</b> per inviarti gli euro" in o["dett"][1],
+           "p2p-tempo-avviso" in o["dett"][0], "da quando" in o["dett"][0],
            # (19 nov 2026, Andrea: «perché prima ancora di prendere l'ordine vedo
            # il timer già che sta per scadere?») un'icona ferma, non l'anello
            'class="p2p-tempo-icona"' in o["dett"][0], 'p2p-anello' in o["dett"][0], o["dett"][2]])
@@ -215610,9 +215630,9 @@ console.log(JSON.stringify(out));
     prova("...e sull'on-chain: i minuti dalla riga del libro, il deposito e la disputa, la "
           "riga del bottone sua; minuti storti o mancanti, niente",
           [True, True, True, True, "", ""],
-          ["Se lo prendi hai <b>15 minuti</b> per inviare gli euro, da quando i sats sono nel deposito"
-           in o["dett"][3], "chi vende può aprire una disputa." in o["dett"][3],
-           "riavere i sats anche se hai pagato" in o["dett"][3],
+          ["Hai <b>15 minuti</b> per inviare gli euro e toccare «Ho inviato gli euro»." in o["dett"][3],
+           "⚠️ Altrimenti chi vende può aprire una disputa." in o["dett"][3],
+           len(o["dett"][3]) < 400,
            'class="p2p-tempo-icona"' in o["dett"][3], o["dett"][4], o["dett"][5]])
     prova("...e le parole della valuta dell'ordine passano dai traduttori (Lightning e "
           "on-chain): in USDT «gli USDT», anche nel nome del bottone",
@@ -215640,12 +215660,14 @@ console.log(JSON.stringify(out));
            and "il tempo parte quando chi vende ti dice dove mandarli" in sc[4],
            "fermo" in sc[5] and "da quando tocchi «Indica dove ricevere gli euro»" in sc[5],
            sc[6]])
+    # (20 nov 2026, bottoni-fissi) nel dettaglio prima della presa la riga e'
+    # quella CORTA di Andrea, col bottone dentro la frase e il ⚠️ di cosa succede
     prova("LA RIGA CHE NON DEVE SFUGGIRE (Andrea: «uno magari non capisce e perde i soldi»): "
-          "a chi compra sotto il timer e nel dettaglio prima della presa, mai a chi vende; "
-          "rossa negli ultimi dieci minuti, e solo per chi deve pagare (20 nov 2026)",
+          "a chi compra sotto il timer e nel dettaglio prima della presa (la corta), mai a "
+          "chi vende; rossa negli ultimi dieci minuti, e solo per chi deve pagare (20 nov 2026)",
           [True, False, True, False, True, False, False],
           ["Se hai pagato, tocca «Ho inviato gli euro»" in sc[0],
-           "Se hai pagato" in sc[1], "Se hai pagato" in o["dett"][0], "Se hai pagato" in o["dett"][1],
+           "Se hai pagato" in sc[1], "⚠️ Altrimenti" in o["dett"][0], "⚠️" in o["dett"][1],
            " rosso" in sc[7], " rosso" in sc[1], " rosso" in sc[0]])
     bn = o["banner"]
     prova("IL BANNER DELLA PRESA (Andrea: «quando uno prende l'ordine esce fuori un banner "
@@ -215696,6 +215718,28 @@ console.log(JSON.stringify(out));
            -1 < ao.find("reteOcPresaHtmlP2P(o, vendeLui)")
               < ao.find("rigaTempoPagareDettP2P(o, false, true)") < ao.find("p2p-onchain-riass"),
            ao.count("(vendeLui && typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, false, true) : '')")])
+    # I FISSI IN ALTO (20 nov 2026, cantiere bottoni-fissi, Andrea: «i bottoni
+    # lightning e on-chain in alto, quando scorro la pagina, devono stare
+    # bloccati in alto. E anche la scritta…»): nel dettaglio Lightning i tasti
+    # e la riga del tempo in un blocco solo appiccicato in cima al corpo, solo
+    # a chi prende; nella presa on-chain lo stesso blocco esce dalla testata e
+    # va in `fissa`, il primo figlio del foglio di conferma
+    cc = pezzo_js(mini, "function chiediConferma(c){", "\n}\n")
+    foglio = mini[mini.index('<div class="sheet" id="confermaSheet"'):]
+    foglio = foglio[:foglio.index('id="confOk"')]
+    prova("I TASTI E IL TEMPO FISSI IN ALTO: il blocco nel dettaglio Lightning (solo a chi "
+          "prende), il blocco `fissa` nella presa on-chain coi tasti e il tempo e la testata "
+          "che riparte dopo, il foglio di conferma che lo svuota a ogni apertura e lo tiene "
+          "fra il titolo e la testata, e il CSS appiccicato (col -20px del padding del foglio)",
+          [True, True, True, True, True, True, True],
+          ["(!tuo && (reteTasti || tempoDett)\n      ? '<div class=\"p2p-dett-fissi\">' + reteTasti + tempoDett + '</div>'" in rd,
+           -1 < ao.find("fissa: (conTasti ?") < ao.find("reteOcPresaHtmlP2P(o, vendeLui)")
+              < ao.find("rigaTempoPagareDettP2P(o, false, true)") < ao.find("testata: ''"),
+           "fissa.innerHTML = c.fissa || ''; fissa.style.display = c.fissa ? '' : 'none';" in cc,
+           -1 < foglio.find('id="confTit"') < foglio.find('id="confFissa"') < foglio.find('id="confTestata"'),
+           ".p2p-dett-fissi,.conf-fissa{position:sticky;top:0;z-index:2;background:var(--card);" in mini,
+           "  .conf-fissa{top:-20px}\n" in mini,
+           "@media (min-width:768px){ .p2p-dett-fissi{top:-20px} }" in mini])
     prova("IL BOLLINO sta sulle due card del libro (Lightning e on-chain) e su quella "
           "della fila della home (`bolliniVetrinaP2P`), e l'on-chain "
           "manda la scelta quando pubblica", [3, True, True],

@@ -92925,3 +92925,98 @@ PROVATO. Il collaudo verde; con due secondi di sonno messi apposta prima
 della ronda resta verde; con l'orologio finto rimesso all'ora vera e gli
 stessi due secondi diventa rosso proprio su quella riga.
 
+## I tasti ⚡/₿ e la riga del tempo restano fissi in alto, e la riga si accorcia (20 nov 2026, cantiere bottoni-fissi; Andrea: «i bottoni lighting e on-chain in alto, quando scorro la pagina, devono stare bloccati in alto. E anche la scritta, se lo prendi a X tempo per inviare euro o USDT, quella scritta lì deve essere più corta e deve essere bloccata anche lei da qualche parte»)
+
+IL PROBLEMA. Nel foglio che si apre toccando un ordine («Stai comprando
+sats») i tasti «⚡ Lightning» / «₿ On-chain» e la riga del tempo per
+pagare erano le prime righe del corpo: scorrendo verso il conto e
+«Compra» se ne andavano. E la riga era di sei righe sul telefono («Se lo
+prendi hai 24 ore per inviare gli USDT, da quando chi vende ti dice dove
+mandarli: poi lo scambio scade e l'ordine torna nel libro. ⚠️ Se hai
+pagato, tocca…»).
+
+LA CURA. Un blocco appiccicato (`position:sticky`) coi tasti e la riga
+del tempo. Nel dettaglio Lightning (`renderDettaglioP2P`) è
+`.p2p-dett-fissi`, primo figlio del corpo che scorre, solo a chi prende:
+sul MIO ordine i tasti non ci sono e la riga di chi ha pubblicato resta
+nel corpo com'era. Nella presa on-chain (`apriOnchainP2P`, foglio di
+conferma) tasti e riga escono dalla testata e vanno nel blocco nuovo
+`fissa` di `chiediConferma` (`#confFissa`, fra il titolo e la testata;
+vuoto e nascosto per ogni altro uso del foglio, che si svuota a ogni
+apertura). Il blocco ha lo sfondo del foglio, largo fino ai bordi (margine
+negativo e lo stesso rientro dentro). ⚠️ IL `top` CONTA DAL PADDING:
+dove scorre `.sheet` (la conferma; e il dettaglio da 768px in su) i suoi
+20px lasciavano una striscia da cui passava il contenuto: lì `top:-20px`.
+Sul telefono il dettaglio scorre nel corpo, senza padding sopra: `top:0`.
+Il titolo del foglio di conferma scorre via, come prima: Andrea ha chiesto
+i tasti e la riga.
+
+IL TESTO, SCELTO DA ANDREA (regola delle scritte nuove: due varianti su
+una scheda, poi due ritocchi suoi in chat: «aggiungi e i sats ritornano a
+chi [vende]», «meglio dire hai 24 ore per inviare gli USDT e toccare il
+tasto ho inviato gli USDT»). Lightning: «⏱ Hai 24 ore per inviare gli
+USDT e toccare «Ho inviato gli USDT». ⚠️ Altrimenti lo scambio scade e i
+sats tornano a chi vende.»; on-chain: «…⚠️ Altrimenti chi vende può aprire
+una disputa.». «Altrimenti» al posto del suo «Poi», detto a lui prima del
+push: con «Poi» sembrava che lo scambio scadesse PERCHÉ si tocca il
+bottone. Le parole della valuta passano dai traduttori di sempre
+(`paroleUsdtP2P`, `paroleOcP2P`). Da quando parte il tempo e cosa succede
+dopo lo dice per intero il banner della presa (`bannerTempoPagareP2P`),
+che non cambia. `P2P_AVVISO_BOTTONE_PAGATO_OC` era usata solo qui ed è
+tolta; `P2P_AVVISO_BOTTONE_PAGATO` resta (timer della pagina dello
+scambio, card). Tappo: `sapere.md` ritoccato, `conoscenza.md` rifatta.
+
+ANCHE LA CAUZIONE E LA RIGA IN FONDO, sulla presa on-chain (stessa
+mattina, Andrea con la schermata di «Compra» on-chain con la cauzione:
+«Troppo testo troppo complicato»). Sei testi corti proposti e approvati
+(«Ok, va bene»): cauzione chiesta da chi vende «🔐 Cauzione: circa N sats
+in Lightning. Tornano a fine scambio; li perdi se rinunci o lasci scadere
+il tempo.», col contanti «…li perdi se non ti presenti all'incontro.»
+(senza stima, al posto della cifra la regola: «il 3%, almeno 1000
+sats,»). In fondo (`corpoPresaOcP2P`), a chi compra «I sats restano nel
+deposito finché chi vende non li libera. Se qualcosa va storto decide un
+moderatore.», in contanti «Vi vedete, consegni i contanti e tocchi «Ho
+consegnato i contanti». …», col tabacchino «Paghi il suo PayCode Amazon al
+tabacchino e tocchi «🧾 Ho pagato al tabacchino». …»; a chi vende
+«Depositi i sats entro N ore e li liberi solo quando vedi gli euro. Se non
+arrivano, apri una disputa.» (anche in contanti). Commissione, wallet e
+swap non sono più nella frase: li dice il conto sopra, e la frase non
+cambia più col tasto «⚡ Lightning». Barattozon in «Compra BTC» resta
+com'era: non era fra i testi proposti. La riga della cauzione del
+dettaglio LIGHTNING (`rigaCauzioneDettP2P`) non è toccata: non chiesta.
+La frase della disputa nella nota del tempo on-chain la cambierà il
+cantiere del ritorno automatico on-chain.
+
+SCARTATO. Lasciare nel corpo la nota dello swap (quella che compare sotto
+i tasti scegliendo l'altra rete) staccandola dai tasti: voleva rifare
+`reteDettP2P` e il ridisegno della presa on-chain per una riga che compare
+solo dopo un tocco; resta coi tasti, quindi fissa anche lei. La riga in
+basso sopra «Annulla/Compra»: il piede è già alto, e Andrea la voleva coi
+tasti.
+
+PROVATO. A schermo con Playwright, sul CSS vero di miniapp.html (390×760
+e 1200×800, dettaglio Lightning e presa on-chain, scorso di 600px): il
+blocco resta attaccato in cima, niente striscia sopra, il contenuto passa
+sotto. `prove_tempo_pagare_p2p` (le righe corte, Lightning, on-chain, in
+USDT; la sentinella nuova dei fissi: blocco, `fissa` prima della testata,
+svuotamento, CSS col -20px), `prove_tasti_rete_foglio` (i tasti sempre
+prima cosa del corpo, ora nel blocco; la frase corta uguale coi due
+tasti), `prove_onchain_cauzione`, `prove_onchain_contanti_scambio`,
+`prove_barattozon_onchain` (i testi corti della seconda parte). Controprove: blocco tolto, `fissa`
+mai scritta, `top:0` sulla conferma, «e i sats tornano a chi vende» tolto
+→ 2 prove rosse su 2. Suite severa intera sull'albero di develop
+`5179bc09` più il cantiere (seconda parte compresa), nel venv delle sole
+prove della CI e con nostr-tools@2.25.2: 30.753 passate, 1 fallita
+(`prove_p2p_onchain_commissione` cercava «meno la tua metà della
+commissione» nella frase: ora la dice il conto, riscritta e rigirata: 0
+fallite), 0 saltate. Collaudi della CI nel venv senza coincurve e senza
+variabili del proxy: 162 verdi, 0 rossi.
+Poi rebase su develop `faab7a3` (cinque commit d'altri: recapito-fisso,
+via-garante-onchain, timer-card-scambi, tasto-rosso-conto,
+collaudo-orologio-recapito; nessun simbolo toccato in comune, un
+conflitto solo nelle attese di «LA RIGA CHE NON DEVE SFUGGIRE», unite):
+sezioni toccate più `prove_conoscenza_tappo` 491 passate, 0 fallite, 0
+saltate; collaudi vicini (p2p_onchain, tempo_pagare,
+p2p_onchain_commissione, contanti_p2p) 4 verdi; sintassi del JS della
+pagina con `node --check`.
+Resta da guardare dal vivo: sul telefono di Andrea, Mini App e web.
