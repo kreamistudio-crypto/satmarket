@@ -24,6 +24,9 @@ con un WooCommerce di cartone. Le domande:
   · tornare a «decide il negozio» rimette in «Altro» le righe della
     dichiarazione, e il giro dopo le porta dove dice il negozio — ma chi
     un moderatore ha spostato resta dov'e'.
+  · (20 nov 2026) se cassetto e negozio tacciono decide il NOME del
+    prodotto: i biscotti di un WooCommerce senza categorie nascono negli
+    alimenti, e quelli gia' entrati in «Altro» ne escono al giro dopo.
 
 IL NEGOZIO NON SI CHIAMA MAI: la prova del collegamento e le risposte
 dell'API sono di cartone, e in CI lo garantisce la gabbia di
@@ -194,6 +197,27 @@ def main():
     prova("...e il giro dopo le rimette dove dice il negozio",
           {"1": "Bitcoin", "2": "Altro", "3": "Collezionismo",
            "4": "Casa e giardino", "5": "Bitcoin"}, categorie(cid))
+
+    # ---------------------------------------------------------------
+    # (20 nov 2026, Luca di «Un tempo per te»: un WooCommerce senza
+    # categorie, e i biscotti in «Altro»)
+    print("\n[il nome del prodotto, quando cassetto e negozio tacciono]")
+    CATALOGO.append(prodotto(6, "Augurelli Biscotti farciti con "
+                                "cioccolato al latte veg",
+                             "Senza categoria"))
+    giro(cid)
+    prova("un prodotto nuovo coi biscotti nel nome nasce negli alimenti",
+          "Alimenti e bevande", categorie(cid).get("6"))
+    con = SRV.db()
+    con.execute("UPDATE annunci SET categoria='Altro' "
+                "WHERE connettore_id=? AND origine_chiave='6'", (cid,))
+    con.commit()                        # com'era prima di oggi
+    con.close()
+    giro(cid)
+    prova("quello gia' entrato in «Altro» ci esce al giro dopo, gli altri "
+          "fermi", {"1": "Bitcoin", "2": "Altro", "3": "Collezionismo",
+                    "4": "Casa e giardino", "5": "Bitcoin",
+                    "6": "Alimenti e bevande"}, categorie(cid))
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")

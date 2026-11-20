@@ -93248,3 +93248,62 @@ DECISIONI E PERCHÉ. Andrea chiedeva di proseguire «in presenza», non i punti 
 SCARTATI. Una rotta `/cassa/chiusura` lato server (inutile finché bastano le ultime 100); il nome del negozio sullo schermo del cliente (`/api/cassa` non lo dà, e aggiungerlo era un ritocco in più al server); ruotare lo schermo di 180° (il telefono si gira con la mano).
 PROVATO. In `prove_app_negozio`: sentinelle dello schermo (stesso codice QR, aggiornato dal battito, chiuso tornando al conto e uscendo dal negozio, Wake Lock rilasciato, bianco fisso) e un banco in node della chiusura, PURA (`chiusuraCassa`, `chiusuraCassaTesto`): mezzanotte in punto dentro, ieri separato, annullate fuori, on-chain in arrivo a parte, pezzi sommati, la lista troncata. Giro dal vivo (server in collaudo, Venditore 222, due temi): conto con due articoli, schermo del cliente, pagamento visto dal battito → «Pagato, grazie!», secondo conto a importo libero, chiusura di Oggi e Ieri; nessun errore di pagina. Schermate in `/mnt/project-files/app-negozio/presenza-*`.
 DA GUARDARE. Lo schermo su un telefono vero, con un wallet vero che inquadra; il Wake Lock dentro Telegram (WebView: può non concederlo). Il totale «Oggi» in cima alla Cassa lo conta il server sul giorno UTC, la chiusura sul giorno del telefono: fra mezzanotte e l'una (le due d'estate) possono dire numeri diversi.
+
+## I biscotti di un negozio senza categorie: decide il nome (20 nov 2026, cantiere categoria-dal-nome; Andrea, girando Luca di «Un tempo per te», negozio WooCommerce di Migliobruno, annunci 3336 «Augurelli Biscotti farciti…» e 3335 «Natalini Biscotti speziati…»: «Questi sono stati importati dal woocommerce ma son finiti in categoria altro. Essendoci biscotti nel nome credo sia facile indirizzarli nella giusta categoria anche se su woocommerce non è esplicitata»)
+
+LA DIAGNOSI. Il Woo di Luca non classifica i prodotti («Senza
+categoria»), il cassetto è su «Decide il negozio», e
+`categoria_dal_negozio` (16 nov) giustamente non trova un nome che
+combaci: tutto in «Altro».
+
+COSA SI È FATTO. Un terzo giudice in `categorie_righe_negozio`, PER
+ULTIMO: cassetto, poi negozio, poi `categoria_dal_nome(titolo)`. Due
+tabelle accanto, `PAROLE_NOME_CATEGORIA` (oggi la sola voce «Alimenti
+e bevande»: biscotti, panettone, torrone, cioccolato, marmellata,
+caffè…) e `PAROLE_NOME_FERMANO` (stampo, macchina, tazza, barattolo,
+scatola, latta, colore, libro…). Il resto della strada c'era già: alla
+nascita scende `r["categoria"]`, e `_aggiorna` riempie la casella
+«Altro» al giro dell'ora — quindi i 3336 e 3335 escono da «Altro» da
+soli al primo giro dopo la promozione, senza comandi sul database.
+
+LE DECISIONI, coi perché.
+- ROVESCIA IN PARTE LA LEZIONE DI LUGLIO, e lo sa: `categoria_automatica`
+  fu tolta perché indovinava dal titolo e sbagliava in silenzio
+  («Sparkling Sake» fra gli arredi per un «cucina»). Qui lo chiede
+  Andrea, e le differenze sono il recinto: SOLO IL TITOLO (mai la
+  descrizione), SOLO PAROLE INTERE che nominano la cosa (niente
+  «miele» — marca di lavatrici —, «vino» — rosso vino —, «olio»,
+  «pasta» — termica), LE PAROLE CHE FERMANO un oggetto per il cibo
+  («stampo per biscotti», «macchina da caffè»), UN VINCITORE SOLO, e
+  SOLO I NEGOZI COLLEGATI (Nostr resta senza, il form ha un umano).
+- SOLO GLI ALIMENTI, per ora: è quello che è stato chiesto. La tabella
+  si allarga con una riga per voce, con le stesse regole.
+- Il dubbio resta in «Altro», dove il venditore lo sposta col cassetto
+  e la coda dei moderatori lo trova. «Biscottiera» non è un biscotto
+  (parola intera), «Barattolo di miele» resta in «Altro» (ferma).
+- Niente testi nuovi per l'utente. La frase di Tappo in
+  `assistente/sapere.md` («e il resto va in «Altro»») NON è ritoccata:
+  la proposta va ad Andrea.
+
+PROVATO. In `prove_connettori_categoria` la sezione 2b (i due titoli
+di Luca, maiuscole e accenti, parola intera, le parole che fermano, le
+parole larghe fuori, il dubbio fra due categorie, la tabella dentro il
+catalogo e già normalizzata, il nome per ultimo, il cassetto che lo
+batte). `collaudo_categoria_negozio` sul server vero: un prodotto coi
+biscotti nel nome nasce negli alimenti, e una riga già in «Altro» ne
+esce al giro dopo mentre le altre restano ferme. CONTROPROVE (sei
+rotture apposta, tutte rosse, rimesso il codice verdi): parole che
+fermano tolte, vincitore non unico accettato, titolo non normalizzato,
+il nome prima del negozio, chiamata tolta (rossa anche nel collaudo),
+«miele» nella tabella.
+GIRATO, nel venv con le sole dipendenze del workflow (senza coincurve),
+sull'albero develop d32b176c più questo cantiere: `PROVE_SEVERE=1 python
+prove.py` 30778 passate, 0 rosse, 2 saltate per nostr-tools assente
+nell'ambiente (`prove_annuncio_identita` e `prove_relay_di_barattolo`
+rigirate con `IDENTITA_NODE_MODULES`: 97 passate, 0 saltate);
+`collaudi_ci.py --elenco ci/collaudi.txt`: 163 verdi, 0 rossi. Dopo il
+rebase su 4bf1aefe (cassa in presenza, di altri, nessun simbolo in
+comune) il giro mirato: la sezione toccata e il suo collaudo.
+DA GUARDARE dopo la promozione: al primo giro dell'ora del negozio di
+Migliobruno, 3336 e 3335 in «Alimenti e bevande»; gli altri suoi
+prodotti, se sono tutti di un tipo, si sistemano col cassetto.

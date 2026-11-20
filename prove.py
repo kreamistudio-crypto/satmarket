@@ -119777,6 +119777,10 @@ def prove_connettori_categoria():
         sinonimo intero): niente prima parola, niente titolo — la
         lezione di `categoria_automatica`, che indovinava e sbagliava
         in silenzio;
+     2b. se anche il negozio tace (20 nov 2026) decide il NOME, ma
+        stretto: solo il titolo, parole intere di una tabella corta,
+        le parole che fermano («stampo per biscotti») e un vincitore
+        solo — i biscotti di Luca, su un Woo senza categorie;
      3. il giro dell'ora riempie solo la casella vuota: chi sta gia' in
         una categoria vera (un moderatore l'ha spostato) non si muove;
         a spostare tutto il negozio e' solo il gesto del venditore,
@@ -119797,7 +119801,14 @@ def prove_connettori_categoria():
     exec(_SORGENTE[i:_SORGENTE.index(")", i) + 1], amb)
     i = _SORGENTE.index("SINONIMI_CATEGORIA = {")
     exec(_SORGENTE[i:_SORGENTE.index("\n}", i) + 2], amb)
-    for nome in ("_nome_categoria_negozio", "categoria_dal_negozio",
+    # il terzo giudice (20 nov 2026): le sue due tabelle e `normalizza`
+    import unicodedata as _ud
+    amb["unicodedata"] = _ud
+    i = _SORGENTE.index("PAROLE_NOME_CATEGORIA = {")
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\ndef categoria_dal_nome(", i)],
+         amb)
+    for nome in ("normalizza", "_nome_categoria_negozio",
+                 "categoria_dal_negozio", "categoria_dal_nome",
                  "categorie_righe_negozio", "_categoria_negozio",
                  "_sposta_categoria_negozio"):
         exec(pezzo(nome), amb)
@@ -119846,6 +119857,66 @@ def prove_connettori_categoria():
     amb["categorie_righe_negozio"](rr, {"id": 1})
     prova("...e cosi' un collegamento senza la colonna",
           "Bitcoin", rr[0]["categoria"])
+
+    # --- 2b) il NOME del prodotto, quando cassetto e negozio tacciono
+    # (20 nov 2026, Luca di «Un tempo per te»: i suoi biscotti senza
+    # categoria su WooCommerce finivano in «Altro») ------------------
+    nome = amb["categoria_dal_nome"]
+    prova("i biscotti di Luca vanno negli alimenti, dal nome",
+          ["Alimenti e bevande"] * 2,
+          [nome("Augurelli Biscotti farciti con cioccolato al latte veg"),
+           nome("Natalini Biscotti speziati farciti con cioccolato "
+                "fondente")])
+    prova("...con maiuscole e accenti qualsiasi",
+          ["Alimenti e bevande"] * 2,
+          [nome("PANETTONE artigianale"), nome("Caffè in grani 1 kg")])
+    prova("la parola deve essere INTERA: «biscottiera» non e' un biscotto",
+          "Altro", nome("Biscottiera in ceramica"))
+    prova("le parole che FERMANO: un oggetto per il cibo resta in «Altro»",
+          ["Altro"] * 4,
+          [nome("Stampo per biscotti in silicone"),
+           nome("Macchina da caffè espresso"),
+           nome("Borsa in pelle colore cioccolato"),
+           nome("Scatola di latta per biscotti vintage")])
+    prova("le parole larghe NON sono nella tabella (miele, vino, olio, "
+          "pasta)", ["Altro"] * 4,
+          [nome("Lavatrice Miele 8 kg"), nome("Maglione rosso vino"),
+           nome("Olio motore 5W30"), nome("Pasta termica per CPU")])
+    prova("senza parole che contano, o senza titolo: «Altro»",
+          ["Altro"] * 3,
+          [nome("Box regalo Natale"), nome(""), nome(None)])
+    _tab = amb["PAROLE_NOME_CATEGORIA"]
+    try:
+        _tab["Bitcoin"] = frozenset({"biscotti"})
+        prova("due categorie nello stesso nome sono un dubbio: «Altro»",
+              "Altro", nome("Biscotti al cioccolato"))
+    finally:
+        _tab.pop("Bitcoin", None)
+    prova("ogni voce della tabella e' una nostra categoria, mai «Altro»",
+          True, all(c in amb["CATEGORIE"] and c != "Altro" for c in _tab))
+    prova("le parole della tabella sono gia' normalizzate (una parola, "
+          "minuscola, senza accenti)", True,
+          all(p == amb["normalizza"](p) and " " not in p
+              for v in _tab.values() for p in v)
+          and all(p == amb["normalizza"](p)
+                  for p in amb["PAROLE_NOME_FERMANO"]))
+
+    def righe_nome():
+        return [{"categorie_grezze": ["Senza categoria"],
+                 "titolo": "Augurelli Biscotti farciti"},
+                {"categorie_grezze": ["Bitcoin"],
+                 "titolo": "Biscotti col logo Bitcoin"},
+                {"categorie_grezze": [], "titolo": "Box regalo"}]
+
+    rr = righe_nome()
+    amb["categorie_righe_negozio"](rr, {"categoria": ""})
+    prova("il nome viene PER ULTIMO: decide solo se il negozio tace",
+          ["Alimenti e bevande", "Bitcoin", "Altro"],
+          [r["categoria"] for r in rr])
+    rr = righe_nome()
+    amb["categorie_righe_negozio"](rr, {"categoria": "Collezionismo"})
+    prova("...e la dichiarazione del cassetto batte anche il nome",
+          ["Collezionismo"] * 3, [r["categoria"] for r in rr])
 
     # --- 3) il cassetto: cosa si puo' dichiarare -------------------
     cn = amb["_categoria_negozio"]

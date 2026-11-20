@@ -103226,18 +103226,81 @@ def categoria_dal_negozio(nomi) -> str:
     return "Altro"
 
 
+# --- La categoria dal NOME del prodotto (20 nov 2026) ----------------
+# Il terzo giudice, dopo il cassetto e il negozio: Luca («Un tempo per
+# te») ha un WooCommerce che le categorie non le dichiara, e i suoi
+# «Augurelli Biscotti farciti…» finivano in «Altro» anche se dal nome
+# lo capisce chiunque. Richiesta di Andrea: «essendoci biscotti nel
+# nome credo sia facile indirizzarli nella giusta categoria».
+# NON E' LA `categoria_automatica` TOLTA A LUGLIO, e la differenza e'
+# il punto: quella pescava parole larghe anche nella descrizione, e lo
+# «Sparkling Sake» finiva fra gli arredi per un «cucina». Qui:
+# · SOLO IL TITOLO, cioe' il nome che il venditore ha dato al prodotto;
+# · SOLO PAROLE CHE NOMINANO LA COSA e quasi mai la descrivono: niente
+#   «miele» (e' anche una marca di lavatrici), «vino» (il maglione
+#   rosso vino), «olio» (quello del motore), «pasta» (quella termica);
+# · LE PAROLE CHE FERMANO: «stampo per biscotti», «macchina da caffè»,
+#   «barattolo per biscotti» parlano di un oggetto che col cibo ha a
+#   che fare, e il dubbio resta in «Altro»;
+# · UN VINCITORE SOLO: due categorie trovate nello stesso nome sono un
+#   dubbio, e il dubbio resta in «Altro» come in `sottocategoria_indovina`.
+# SOLO GLI IMPORTATI DA UN NEGOZIO e solo quando cassetto e negozio non
+# hanno deciso niente: il form ha un umano che sceglie, e Nostr resta
+# com'e' (lo colloca il venditore). Si allarga con una riga per voce,
+# con le stesse regole: parole che nominano la cosa, mai un aggettivo.
+PAROLE_NOME_CATEGORIA = {
+    "Alimenti e bevande": frozenset({
+        "biscotti", "biscotto", "frollini", "cantucci", "cantuccini",
+        "amaretti", "savoiardi", "ricciarelli", "panforte", "torrone",
+        "torroni", "panettone", "panettoni", "pandoro", "pandori",
+        "cioccolato", "cioccolata", "cioccolatini", "cioccolatino",
+        "praline", "marmellata", "marmellate", "confettura",
+        "confetture", "grissini", "taralli", "tarallini", "crackers",
+        "extravergine", "tisana", "tisane", "zafferano", "legumi",
+        "lenticchie", "caffe"}),
+}
+
+# Le parole che fermano il giudice: se una c'e' nel nome, il prodotto e'
+# un oggetto PER il cibo (o un colore), non il cibo.
+PAROLE_NOME_FERMANO = frozenset({
+    "stampo", "stampi", "formina", "formine", "tagliabiscotti",
+    "macchina", "macchinetta", "moka", "tazza", "tazze", "tazzina",
+    "tazzine", "barattolo", "barattoli", "contenitore", "scatola",
+    "latta", "porta", "colore", "color", "ricettario", "libro"})
+
+
+def categoria_dal_nome(titolo) -> str:
+    """La nostra categoria dal NOME di un prodotto importato da un
+    negozio (20 nov 2026), o «Altro». Le regole sopra
+    `PAROLE_NOME_CATEGORIA`: parole intere del titolo, le parole che
+    fermano, un vincitore solo."""
+    parole = set(normalizza(titolo).split())
+    if not parole or parole & PAROLE_NOME_FERMANO:
+        return "Altro"
+    trovate = [cat for cat, voci in PAROLE_NOME_CATEGORIA.items()
+               if parole & voci]
+    return trovate[0] if len(trovate) == 1 else "Altro"
+
+
 def categorie_righe_negozio(righe: list, connettore) -> None:
     """Scrive `r["categoria"]` su ogni riga tradotta (16 nov 2026): la
     categoria dichiarata nel cassetto vale per tutte, e senza
-    dichiarazione decide il negozio (`categoria_dal_negozio`).
+    dichiarazione decide il negozio (`categoria_dal_negozio`); se anche
+    il negozio tace, il nome del prodotto (`categoria_dal_nome`, 20 nov
+    2026).
     E' L'UNICO POSTO che la decide: la nascita e il riempimento della
     casella «Altro» in `importa_negozio` leggono quel che c'e' scritto
     qui, e il modulo resta cieco del nostro catalogo."""
     detta = dict(connettore).get("categoria") or ""
     detta = detta if detta in CATEGORIE and detta != "Altro" else ""
     for r in righe:
-        r["categoria"] = detta or categoria_dal_negozio(
+        cat = detta or categoria_dal_negozio(
             r.get("categorie_grezze") or [r.get("categoria_grezza") or ""])
+        # IL NOME VIENE PER ULTIMO (20 nov 2026): solo quando cassetto e
+        # negozio tacciono — una scelta di qualcuno batte sempre una
+        # parola del titolo
+        r["categoria"] = (cat if cat != "Altro"
+                          else categoria_dal_nome(r.get("titolo") or ""))
 
 
 def _sposta_categoria_negozio(con, cid: int, prima: str, dopo: str) -> int:
