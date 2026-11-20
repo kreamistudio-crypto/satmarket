@@ -29283,6 +29283,8 @@ function payMetodoSpegni(){ payOc = null; }
 const location = {href: 'https://barattolo.store/'};
 let navApplicando = false, navRicordata = null, navGiuInVolo = 0, navUltimo = 0;
 let navSpingi = false, navSostituisci = false, navLasciaFoglio = null;
+/* (20 nov 2026) l'app Barattolo Negozio, spenta: qui si e' nel mercatino */
+let navPrimaPagina = false; function negozioSola(){ return false; }
 let uscitaDopoAnnullo = false, uscitaDopoSalva = false;
 let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let p2pDettOrdine = '', currentOrder = null, orders = [];
@@ -98205,6 +98207,8 @@ function ridisegnaNegozio(chi){ return apriNegozio(chi); }
 function haptic(){} function toast(t){ TOAST.push(t); }
 /* (30 set 2026) la sorella di navSpingi: la scelta di una variante */
 let navSostituisci = false;
+/* (20 nov 2026) l'app Barattolo Negozio, spenta: qui si e' nel mercatino */
+let navPrimaPagina = false; function negozioSola(){ return false; }
 let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
 const location = {href: 'https://barattolo.store/', protocol: 'https:'};
 const tg = {get initData(){ return MODO === 'tg' ? 'x' : ''; }, close(){ CHIUSO++; },
@@ -98951,6 +98955,8 @@ let p2pOrdineAperto = '', ramoVetrina = 'esplora', activeCat = 'Tutto', filtroAs
 let pollTimer = null, tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let p2pMieiFiltro = [], p2pMieiFiltroBozza = null, p2pMieiVerso = 'tutti', p2pMieiVersoBozza = null;
 let navSpingi = false, navSostituisci = false, navLasciaFoglio = null, navGradinoReparto = 0;
+/* (20 nov 2026) l'app Barattolo Negozio, spenta: qui si e' nel mercatino */
+let navPrimaPagina = false; function negozioSola(){ return false; }
 let navApplicando = false, uscitaDopoAnnullo = false, uscitaDopoSalva = false;
 /* (13 ott 2026) la terza bandierina, dell'annullo dal foglio della
    fattura: navApplica la legge in coda, e qui resta spenta */
@@ -139336,7 +139342,7 @@ def prove_permesso_splash_apk():
           0 < corpo.find("ritocchi = [prepara_launcher(progetto), "
                          "prepara_manifest(progetto)]")
           < corpo.find("_scrivi(*ritocco)")
-          < corpo.find("Image.open(base / SORGENTE)"))
+          < corpo.find("Image.open(base / sorgente)"))
 
 
 def prove_avvio_apk():
@@ -202585,6 +202591,41 @@ def prove_app_negozio():
     prova("`appNegozio` e la sua bandierina dichiarati PRIMA di go() (niente TDZ)", True,
           0 < mini.find("let appNegozio = false, appNegozioUrlAperto = false;")
           < mini.find("function go(view){"))
+    # --- L'APP SEPARATA (20 nov 2026, Andrea: «devono essere due
+    # completamente separate queste due app») -----------------------
+    ns = pezzo_js(mini, "function negozioSola(){", "\n}\n")
+    prova("la modalita' sola si accende dall'indirizzo (?app=negozio&sola=1) o dal referrer "
+          "dell'app Android, e resta per la sessione", True,
+          "q.get('sola') === '1'" in ns and "android-app://store.barattolo.negozio" in ns
+          and "barattolo_negozio_sola" in ns)
+    prova("nella modalita' sola non si esce al mercatino: ne' «← Barattolo» ne' l'uscita", [1, 1],
+          [pezzo_js(mini, "function tornaDalNegozio(", "\n}\n").count("if (negozioSola()) return;"),
+           pezzo_js(mini, "function esciAppNegozio(", "\n}\n").count("if (negozioSola()) return;")])
+    rif = pezzo_js(mini, "function navRiflette(){", "\n}\n")
+    prova("la vetrina PRENDE la entry dell'avvio (d=0): l'indietro di Android chiude l'app", True,
+          "if (navPrimaPagina && ora.length === 1 && ora[0].t === 'v') {" in rif
+          and "{app:'brt', pila: ora, d: 0, sotto: []}" in rif
+          and rif.find("navPrimaPagina &&") > rif.find("if (navUguali(ora, st))"))
+    prova("un foglio messo in pagina (la cassa) non e' uno strato della pila", True,
+          ".filter(s => !s.classList?.contains('in-pagina'))" in pezzo_js(mini, "function navPila(){", "\n}\n"))
+    prova("l'apertura della cassa alza la bandierina della prima pagina, nei due rami", 2,
+          pezzo_js(mini, "function apriCassaNelNegozio(){", "\n}\n").count("if (negozioSola()) navPrimaPagina = true;"))
+    avs = pezzo_js(mini, "async function avviaVetrina(){", "\n}\n")
+    prova("da non entrati: la schermata d'accesso del Negozio, e niente invito a installare Barattolo", True,
+          "if (negozioSola()) accessoNegozio();" in avs and "if (!negozioSola()) modaleTest(bannerInstallaPwa);" in avs)
+    srv = open("server.py", encoding="utf-8").read()
+    prova("le icone dell'app Negozio hanno la loro rotta esplicita (niente mount)", True,
+          '@app.get("/assets/negozio-icona-512.png")' in srv and '@app.get("/assets/negozio-icona-192.png")' in srv)
+    try:
+        from PIL import Image as _Im
+    except Exception as e:
+        salta("le icone dell'app Negozio alle misure giuste", f"{type(e).__name__}: {e}")
+    else:
+        prova("le icone dell'app Negozio esistono, quadrate, alle misure giuste", [(1024, 1024), (512, 512), (192, 192)],
+              [_Im.open(f"assets/negozio-icona-{n}.png").size for n in ("sorgente", "512", "192")])
+    gi = open("genera_icone_apk.py", encoding="utf-8").read()
+    prova("genera_icone_apk.py prende un disegno diverso con --sorgente (per la seconda app)", True,
+          "--sorgente" in gi)
     prova("la voce del Profilo apre il negozio, non piu' il foglio", True,
           'onclick="entraAppNegozio()"><span class="em">🏪</span>Cassa in negozio' in mini)
     # (16 nov 2026, cassa-carrello) LA CASSA E' IL CARRELLO: la stessa cella,
@@ -202630,6 +202671,7 @@ const document = {body: nodo('body'), querySelectorAll: () => []};
 let DEMO = false, VETRINA = false, cassaAttiva = true, appNegozio = false, appNegozioUrlAperto = false;
 let cassaNelNegozio = false, myNegozio = ''; const aperti = []; const apriNegozio = (...a) => aperti.push(a);
 const segnaCardCassa = () => {};
+let navPrimaPagina = false; const negozioSola = () => false;
 let eserScheda = 'cassa', eserPostoCassa = null, eserPostoPacchi = null, cassaVendita = null;
 let myPacchiPunto = {punti: [], pacchi: []}, ordiniCassa = [];
 const conta = {apriCassa:0, battito:0, go:[]};

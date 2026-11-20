@@ -34316,6 +34316,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   governa solo `con-pacco`), col bottone riscritto da `barraCassa` in
   «Incassa» → `cassaIncassa` e rimesso a «Controlla e paga» uscendo.
   Accesa sul conto della scheda Cassa, spenta sul QR e fuori.
+  L'APP ANDROID DEL NEGOZIO (20 nov 2026, cantiere app-negozio-apk):
+  un secondo involucro TWA, `store.barattolo.negozio`, con `startUrl`
+  `/?app=negozio` e lo stesso certificato di Barattolo; `assetlinks.json`
+  ha due voci. Procedura in PRODUZIONE, «LA SECONDA APP».
+  LA MODALITÀ «SOLA» (20 nov 2026, sera; Andrea: «devono essere due
+  completamente separate queste due app»): `negozioSola()` è vera con
+  `?app=negozio&sola=1` (lo `startUrl` della TWA) o col referrer
+  `android-app://store.barattolo.negozio`, e resta per la sessione
+  (`sessionStorage` `barattolo_negozio_sola`: una ricarica perde il
+  referrer). Accesa: `tornaDalNegozio` ed `esciAppNegozio` non fanno
+  niente e i loro bottoni sono nascosti (`body.negozio-sola`);
+  `navIndietro` sulla vetrina o sulla cassa resta lì; e la vetrina
+  PRENDE la entry dell'avvio con d=0 (`navPrimaPagina`, alzata da
+  `apriCassaNelNegozio` e spenta solo quando scrive), così l'indietro
+  di Android chiude l'app invece di tornare al mercatino. Perché la
+  vetrina sia una pila di UNA vista, `navPila` non conta i fogli
+  `.in-pagina` (la cassa messa nella pagina: prima spingeva un gradino
+  in più, anche fuori dalla modalità sola). Da non entrati
+  `avviaVetrina` chiama `accessoNegozio()`: il banner diventa la
+  schermata d'accesso a tutta pagina (icona, «Barattolo Negozio», le
+  porte Telegram e Nostr di sempre; `body.negozio-accesso` nasconde il
+  resto), senza l'invito a installare Barattolo. Le icone stanno in
+  `assets/negozio-icona-*.png`, ognuna con la sua rotta.
   LA CASSA È LA VISTA DEL NEGOZIO (20 nov 2026, cantiere cassa-vetrina):
   con `myNegozio` l'ingresso (`apriCassaNelNegozio`) apre la vista
   `negozio` del proprio negozio con la bandierina `cassaNelNegozio`;
@@ -34325,10 +34348,6 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   foglio della cassa nella vista `esercente`, con `cassaRigheHTML`
   (righe di «Controlla il carrello») al posto della griglia; CSS sotto
   `body.cassa-vetrina`.
-  L'APP ANDROID DEL NEGOZIO (20 nov 2026, cantiere app-negozio-apk):
-  un secondo involucro TWA, `store.barattolo.negozio`, con `startUrl`
-  `/?app=negozio` e lo stesso certificato di Barattolo; `assetlinks.json`
-  ha due voci. Procedura in PRODUZIONE, «LA SECONDA APP».
   LA CASSA IN PRESENZA (20 nov 2026, cantiere cassa-presenza). Lo
   schermo per il cliente è `#cassaCliente`, fuori dal foglio, fixed e su
   bianco fisso: `mostraAlCliente` / `chiudiSchermoCliente` /

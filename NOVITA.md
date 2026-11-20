@@ -902,3 +902,9 @@ frase: Su Barattolo si può comprare un mese di accesso al canale Telegram priva
 dove: nella scheda dell'annuncio, la nota «🔑 Abbonamento di 30 giorni a…»; dopo il pagamento, l'ordine → «🔓 Rivela».
 leva: ABBONAMENTI_CANALE (accesa di serie; attiva solo coi canali collegati in CANALI_ABBONAMENTO)
 pubblico: sì
+
+## 2026-11-20 · app-negozio-sola
+frase: Barattolo Negozio diventa un'app Android tutta sua, con la sua icona (la bottega verde col fulmine) e il suo nome. Si apre sulla cassa del tuo negozio, l'indietro la chiude invece di portarti al mercatino, e se non sei ancora entrato ti fa entrare col tuo account di Barattolo, con Telegram o con Nostr.
+dove: Zapstore → «Barattolo Negozio» (accanto a Barattolo, stesso firmatario).
+leva: CASSA_ATTIVA (accesa di serie)
+pubblico: no

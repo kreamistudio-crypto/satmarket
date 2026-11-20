@@ -93877,9 +93877,6 @@ in chat il 20 nov vanno rifatti prima della prova. Non c'è ancora: i file
 nelle prove, la riga dell'ordine in «Ordini» (oggi vive nella sua pagina),
 la reputazione del Bitworker, gli avvisi a scadenza (5 giorni, 36 ore).
 
-
-
-
 ## Il «Rileggi» della Pubblica a passi: tasti più bassi e «Pubblica» su una riga (20 nov 2026, sera, cantiere rileggi-tasti; Andrea sulla foto del passo on-chain in produzione: «In basso i tasti, fammeli più piccoli, come piuttosto elimina ordine e lascia solo pubblica, così rimane su una riga tutto»)
 COSA. Nel foglio «Pubblica» a passi il piede prende la classe `.a-passi`: tasti alti 46 px invece di 52, con fulmine e moneta più piccoli; al «Rileggi» il bottone dice solo «Pubblica» (la scritta parola di Andrea), con l'icona della rete accanto. «← Indietro» e «Pubblica» ora stanno su una riga anche a 390 px, Lightning e on-chain.
 DECISIONI. Si cambia la sola scritta dentro il bottone (il nodo di testo), così l'icona e il vestito restano quelli di sempre; vale solo nel foglio a passi: Barattozon, che non va a passi, tiene «Rileggi e pubblica» e il suo bottone alto.
@@ -93953,3 +93950,10 @@ intero o col nome (il codice regge tutti e due), che il bot amministratore
 possa accettare e togliere, e che chi si è unito alla Barattolo con un
 account fuso abbia l'id Telegram giusto (se no il suo ingresso viene
 rifiutato: la via d'uscita è la disputa prima di entrare).
+
+## Barattolo Negozio, un'app tutta sua (20 nov 2026, sera, cantiere app-negozio-apk; Andrea dopo la prima prova dell'APK: «quando torno indietro finisco sull'app di barattolo, invece devono essere due completamente separate queste due app. Infatti deve avere un'icona completamente diversa e si deve chiamare proprio barattolo negozio [...] devo comunque vedere il multi-login come con la prima»)
+COSA. (1) Un'icona sua: la bottega bianca con la tenda arancio e il fulmine sulla porta, su fondo verde (`assets/negozio-icona-sorgente.png`, 512 e 192 servite da rotte esplicite), e `genera_icone_apk.py --sorgente` per metterla nel progetto Android. (2) Il nome «Barattolo Negozio» anche sotto l'icona (`launcherName`, sul PC). (3) La modalità «sola» (`?app=negozio&sola=1`, o il referrer dell'app, poi la sessione): niente «← Barattolo» né uscita, l'indietro sulla vetrina resta, e la vetrina prende la entry dell'avvio con d=0 così l'indietro di Android CHIUDE l'app. (4) Da non entrati, la schermata d'accesso del Negozio con le porte di sempre (Telegram e Nostr): il «multi-login» della prima, letto così.
+DECISIONI E PERCHÉ. Una bandierina nell'indirizzo invece di un'altra pagina: la pagina è una sola (ARCHITETTURA) e la sessione serve per le ricariche, che perdono il referrer. Il motivo per cui la vetrina finiva a d=1 era la cassa messa in pagina, che `navPila` contava come un foglio aperto: ora i fogli `.in-pagina` non contano, ovunque (non è uno strato, l'indietro non deve «chiuderlo»). La entry dell'avvio si SOSTITUISCE (`navPrimaPagina`, spenta solo quando scrive: `navSostituisci` si consumava su un giro a vuoto dell'osservatore).
+SCARTATI. `history.go(-d)` per svuotare la cronologia dopo l'arrivo (un popstate in più, e il motore che riapplica Esplora); un'app con una pagina sua (due pagine da tenere uguali).
+PROVATO. `prove_app_negozio` con le sentinelle della modalità sola, delle rotte e delle icone. Giro dal vivo nei due temi (Compratore 111 col negozio): vetrina a d=0, indietro sulla vetrina resta, conto a d=1 e l'indietro torna alla vetrina d=0, la ricarica riapre la vetrina; senza `sola=1` tutto come prima (l'indietro torna al mercatino). La schermata d'accesso in collaudo mostra solo Nostr: il widget Telegram vuole il bot vero.
+DA GUARDARE. La nuova build sul PC (startUrl, icone, launcherName), la prova sul telefono, e se «multi-login» voleva dire il cambio fra più account.

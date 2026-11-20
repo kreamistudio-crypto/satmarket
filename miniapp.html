@@ -9999,6 +9999,17 @@
   body.cassa-vetrina .eser-titolo,body.cassa-vetrina .eser-esci,
   body.cassa-vetrina #cassaOggi,body.cassa-vetrina #cassaArticoliBox{display:none!important}
   .cassa-qr-tit{margin:0 0 4px}
+  /* l'app Barattolo Negozio da sola: nessuna uscita verso Barattolo */
+  body.negozio-sola #negozioTorna,body.negozio-sola .eser-esci{display:none!important}
+  body.negozio-sola .negozio-su{justify-content:flex-end}
+  /* ...e senza account la pagina e' solo l'accesso */
+  body.negozio-accesso #app > *:not(#demoBanner),body.negozio-accesso nav{display:none!important}
+  body.negozio-accesso #demoBanner{display:flex!important;flex-direction:column;align-items:stretch;
+    justify-content:center;gap:12px;min-height:100vh;margin:0;border-radius:0;padding:24px 16px;text-align:center}
+  body.negozio-accesso #demoBanner a.demo-cta[href^="https://t.me/"]{display:none!important}
+  .negozio-accesso-ico{width:96px;height:96px;border-radius:24px;margin:0 auto 6px;display:block}
+  .negozio-accesso-tit{display:block;font-size:24px;font-weight:900;color:var(--ink)}
+  .negozio-accesso-sotto{display:block;font-size:14px;color:var(--ink);opacity:.78;font-weight:600;margin-top:4px}
   .chiusura-cassa{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
   .chiusura-testa{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .chiusura-testa .chiusura-giorni{display:flex;gap:6px;margin:0}
@@ -19153,6 +19164,29 @@ const ISTANZA_PRIVATA = false;
 let appNegozio = false, appNegozioUrlAperto = false;
 /* (20 nov 2026, cassa-vetrina) la cassa E' la vista del proprio negozio */
 let cassaNelNegozio = false;
+/* L'APP «BARATTOLO NEGOZIO» DA SOLA (20 nov 2026, cantiere
+   app-negozio-apk; Andrea, provando l'APK: «quando torno indietro finisco
+   sull'app di barattolo, invece devono essere due completamente
+   separate»). L'involucro Android si apre su `/?app=negozio&sola=1` (e il
+   suo referrer e' `android-app://store.barattolo.negozio`): li' la cassa
+   non ha un'uscita verso Barattolo, la vetrina del negozio e' la prima
+   pagina (l'indietro da li' chiude l'app) e chi non e' entrato vede le
+   porte dell'accesso, non il mercatino. Si ricorda in sessionStorage,
+   che e' della SCHEDA (la TWA del Negozio non lo divide con Barattolo):
+   una ricarica perde il referrer ma non il negozio. */
+let negozioSolaMemo = null;
+function negozioSola(){
+  if (negozioSolaMemo !== null) return negozioSolaMemo;
+  let si = false;
+  try {
+    const q = new URLSearchParams(location.search);
+    si = q.get('app') === 'negozio' && (q.get('sola') === '1'
+      || (document.referrer || '').indexOf('android-app://store.barattolo.negozio') === 0);
+    if (si) { try { sessionStorage.setItem('barattolo_negozio_sola', '1'); } catch(e) {} }
+    else { try { si = sessionStorage.getItem('barattolo_negozio_sola') === '1'; } catch(e) {} }
+  } catch(e) { si = false; }
+  return (negozioSolaMemo = si);
+}
 
 /* ══ IL LINK DENTRO TELEGRAM (10 ott 2026) ═══════════════════════
    Un link `https://t.me/<bot>?startapp=<parametro>` toccato dentro
@@ -24048,6 +24082,11 @@ const RADICE_MADRE = 'esplora';
    apriCategoria e consumata al primo giro di navRiflette. */
 let navSpingi = false;
 let navSostituisci = false;   // un giro solo: la scelta di una variante (set 2026)
+/* (20 nov 2026) l'app Barattolo Negozio: la prima pagina vera (la vetrina
+   della cassa) prende la entry dell'avvio, con d=0. A differenza della
+   sorella si spegne solo quando SCRIVE: un giro a vuoto dell'osservatore
+   (pila uguale) non se la mangia mentre la vetrina e' ancora in arrivo. */
+let navPrimaPagina = false;
 /* IL FOGLIO LASCIATO PER UN NEGOZIO (6 ott 2026, dal campo di Andrea):
    dal dettaglio di un ordine del libro, «Chi ha pubblicato quest'ordine»
    apre il negozio di chi l'ha pubblicato — e l'indietro dal negozio deve
@@ -24574,7 +24613,10 @@ function vestiFogliCoperti(){
    apre SOPRA un altro, e nel markup non sta in coda. */
 function navPila(){
   const p = [navVista()];
-  [...document.querySelectorAll('.sheet.open')].map(s => s.id)
+  /* un foglio messo IN PAGINA (la cassa dell'app del Negozio, 20 nov
+     2026) non e' uno strato: fa parte della vista, e contarlo spingeva
+     un gradino in piu' sotto la vetrina */
+  [...document.querySelectorAll('.sheet.open')].filter(s => !s.classList?.contains('in-pagina')).map(s => s.id)
     .sort((a,b) => (a==='pickerSheet') - (b==='pickerSheet'))
     /* il dettaglio di un ordine del libro dice QUALE (6 ott 2026): e' l'unico
        strato che l'indietro sa riaprire (`navRiapriStrato`). Non entra nei
@@ -24747,6 +24789,11 @@ function navRiflette(){
        sul posto, per la ricarica */
     if ((ora[0].f || '') !== ((st[0] && st[0].f) || ''))
       try { history.replaceState(Object.assign({}, history.state, {pila: ora}), '', location.href); } catch(e){}
+    navFreccia(ora); return;
+  }
+  if (navPrimaPagina && ora.length === 1 && ora[0].t === 'v') {
+    navPrimaPagina = false;
+    try { history.replaceState({app:'brt', pila: ora, d: 0, sotto: []}, '', location.href); } catch(e){}
     navFreccia(ora); return;
   }
   /* Quanti gradini ci siamo scavati sotto i piedi: 0 = siamo sulla
@@ -24928,6 +24975,10 @@ function navApplica(s){
    Telegram. Uno solo smonta i livelli — l'ascoltatore di popstate —
    cosi' gesto e freccia non possono divergere. */
 function navIndietro(){
+  /* nell'app del Negozio la vetrina e' la prima pagina: da li' non si
+     torna al mercatino di Barattolo */
+  if (negozioSola() && (cassaVetrinaQui()
+      || (appNegozio && !cassaNelNegozio && el('view-esercente').classList.contains('active')))) return;
   const t = Date.now();
   if (t - navUltimo < 350) return;   /* due canali, un solo passo */
   navUltimo = t;
@@ -28218,6 +28269,7 @@ function apriSicurezza(ancora){
 function tornaDaSicurezza(){ navIndietro(); }
 function tornaDalNegozio(){
   /* nella cassa la vetrina e' la prima pagina: si esce dal negozio */
+  if (negozioSola()) return;   /* nell'app del Negozio non si esce verso Barattolo */
   if (appNegozio && cassaNelNegozio) { esciAppNegozio(); return; }
   navIndietro();
 }
@@ -43769,6 +43821,7 @@ function entraAppNegozio(){
   apriCassaNelNegozio();
 }
 function esciAppNegozio(){
+  if (negozioSola()) return;
   haptic();
   go('profilo');
 }
@@ -43792,6 +43845,7 @@ function modoNegozio(acceso){
     appNegozio = true;
     document.body.classList.add('app-negozio');
     document.body.classList.toggle('cassa-vetrina', cassaNelNegozio);
+    document.body.classList.toggle('negozio-sola', negozioSola());
     if (cassaNelNegozio) el('negozioTorna').textContent = '← Barattolo';
     el('sheetBg').classList.remove('open');
     eserPostoCassa = {padre: cassa.parentNode, dopo: cassa.nextSibling};
@@ -43848,8 +43902,15 @@ function cassaVetrinaQui(){
     && !!negozioCorrente && negozioCorrente.negozio === myNegozio;
 }
 function apriCassaNelNegozio(){
-  if (!myNegozio) { go('esercente'); return; }
+  if (!myNegozio) {
+    if (negozioSola()) navPrimaPagina = true;   /* anche qui, la prima pagina */
+    go('esercente'); return;
+  }
   cassaNelNegozio = true;
+  /* nell'app del Negozio la vetrina PRENDE IL POSTO della pagina
+     dell'avvio nella cronologia: l'indietro da li' chiude l'app invece
+     di tornare al mercatino */
+  if (negozioSola()) navPrimaPagina = true;
   /* `ridisegno`: il proprio negozio non si conta come una visita */
   apriNegozio(myNegozio, false, false, '', true);
 }
@@ -43913,6 +43974,16 @@ function cassaVaiVendite(){
   haptic();
   go('esercente');
   schedaNegozio('vendite');
+}
+/* l'accesso dell'app del Negozio: il banner delle porte, a tutta pagina,
+   col nome dell'app sopra; il resto della pagina si spegne col CSS */
+function accessoNegozio(){
+  const b = el('demoBanner'); if (!b) return;
+  const riga = b.firstElementChild;
+  if (riga) riga.innerHTML = '<img class="negozio-accesso-ico" src="/assets/negozio-icona-192.png" alt="">'
+    + '<b class="negozio-accesso-tit">Barattolo Negozio</b>'
+    + '<span class="negozio-accesso-sotto">La cassa in satoshi per chi vende di persona. Entra col tuo account di Barattolo.</span>';
+  document.body.classList.add('negozio-accesso');
 }
 /* la scheda Banco compare solo a chi tiene un punto di ritiro: la
    domanda la fa il server, come nel Profilo */
@@ -120638,6 +120709,9 @@ async function avviaVetrina(){
        SU ONION NOSTR VIENE PRIMA (20 ott 2026, cantiere onion-nostr-prima,
        decisione di Andrea): grande in alto, e il posto di Telegram sotto. */
     if (suOnion()) { bottoneLoginNostr(); bottoneLoginTelegram(); } else { bottoneLoginTelegram(); bottoneLoginNostr(); }
+    /* NELL'APP DEL NEGOZIO, senza account: le stesse porte dell'accesso
+       di Barattolo (Telegram e Nostr), da sole, e niente mercatino sotto */
+    if (negozioSola()) accessoNegozio();
     /* la fascia del rodaggio PRIMA delle card, come in avvia(): la
        risposta e' in volo dalla testa di avvia, l'attesa e' ~zero */
     /* le due strisce imparano rotellina e frecce (fuori da Telegram e
@@ -120669,7 +120743,7 @@ async function avviaVetrina(){
     apriInvitoDaUrl();
     /* prima il cartello del rodaggio, poi il banner installa: le
        guardie interne decidono comunque se comparire */
-    modaleTest(bannerInstallaPwa);
+    if (!negozioSola()) modaleTest(bannerInstallaPwa);
   } catch (e) {
     /* Backend non raggiungibile: demo coi dati finti */
     DEMO = true;

@@ -123079,6 +123079,23 @@ def icona_apple():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+# Le icone della SECONDA APP, Barattolo Negozio (20 nov 2026, Andrea:
+# «deve avere un'icona completamente diversa»): la bottega con la tenda,
+# su fondo verde. Le chiede il twa-manifest del suo involucro (iconUrl,
+# maskableIconUrl: il disegno sta nel cerchio sicuro, quindi la stessa
+# immagine serve tutte e due) e la scheda Zapstore.
+@app.get("/assets/negozio-icona-512.png")
+def icona_negozio_512():
+    return FileResponse("assets/negozio-icona-512.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/negozio-icona-192.png")
+def icona_negozio_192():
+    return FileResponse("assets/negozio-icona-192.png", media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 # --- TWA (lug 2026): l'APK Android che incarta il sito --------------------
 @app.get("/.well-known/assetlinks.json")
 @app.head("/.well-known/assetlinks.json")

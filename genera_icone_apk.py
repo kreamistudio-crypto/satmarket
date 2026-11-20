@@ -71,6 +71,10 @@
 #   python genera_icone_apk.py [percorso-progetto-twa]
 # default: ..\..\barattolo-twa (il progetto sta fuori dal repo, coi
 # keystore: MAI portarlo dentro).
+# La SECONDA APP, Barattolo Negozio (20 nov 2026), ha la sua icona:
+#   python genera_icone_apk.py <progetto-negozio> --sorgente assets/negozio-icona-sorgente.png
+# La ricetta e' la stessa (fondo campionato dagli angoli, disegno
+# scontornato): cambia solo la foto da cui parte.
 
 import re
 import sys
@@ -652,7 +656,15 @@ def patch_manifest(progetto):
 
 def genera():
     base = Path(__file__).resolve().parent
-    progetto = Path(sys.argv[1]) if len(sys.argv) > 1 \
+    argomenti = sys.argv[1:]
+    sorgente = SORGENTE
+    if "--sorgente" in argomenti:
+        i = argomenti.index("--sorgente")
+        if i + 1 >= len(argomenti):
+            sys.exit("--sorgente vuole il percorso dell'immagine")
+        sorgente = argomenti[i + 1]
+        del argomenti[i:i + 2]
+    progetto = Path(argomenti[0]) if argomenti \
         else base.parent.parent / "barattolo-twa"
     res = progetto / "app" / "src" / "main" / "res"
     if not (res / "mipmap-anydpi-v26").is_dir():
@@ -665,7 +677,7 @@ def genera():
     for ritocco in ritocchi:
         _scrivi(*ritocco)
 
-    img = Image.open(base / SORGENTE).convert("RGB")
+    img = Image.open(base / sorgente).convert("RGB")
     fondo = colore_fondo(img)
     esadecimale = "#{:02X}{:02X}{:02X}".format(*fondo)
     barattolo = scontorna(img, fondo)

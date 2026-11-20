@@ -3296,9 +3296,23 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   TWA, uguale al primo in tutto tranne quattro righe del
   `twa-manifest.json`: `packageId` **`store.barattolo.negozio`** (due app
   non possono avere lo stesso pacchetto), `name` «Barattolo Negozio»,
-  `launcherName` «Negozio», `startUrl` **`/?app=negozio`** (la porta
-  diretta della cassa: vedi ARCHITETTURA, «Barattolo Negozio»). Versioni
-  sue: si parte da 1.0 / versionCode 1.
+  `launcherName` **«Barattolo Negozio»**, `startUrl`
+  **`/?app=negozio&sola=1`** (la porta diretta della cassa, nella
+  modalità «sola»: vedi ARCHITETTURA, «Barattolo Negozio»), e
+  `iconUrl` e `maskableIconUrl` su
+  **`https://barattolo.store/assets/negozio-icona-512.png`** (la bottega
+  verde col fulmine: un'icona sua, non il barattolo). Versioni sue: si
+  parte da 1.0 / versionCode 1.
+  L'ICONA NEL PROGETTO ANDROID la scrive lo stesso script, col disegno
+  del Negozio: `python genera_icone_apk.py
+  C:\Users\Andrea\Documents\barattolo-negozio-twa --sorgente
+  assets/negozio-icona-sorgente.png` (senza `--sorgente` metterebbe il
+  barattolo). La scheda Zapstore punta a `negozio-icona-512.png`.
+  (20 nov 2026, sera, dalla prima prova di Andrea: «quando torno
+  indietro finisco sull'app di barattolo, invece devono essere due
+  completamente separate») — `&sola=1` è quello che la separa: senza,
+  l'indietro e «← Barattolo» portano al mercatino. Un APK fatto prima
+  con `startUrl /?app=negozio` va rifatto.
   LO STESSO FIRMATARIO, DUE VOLTE. (1) Android: lo STESSO keystore di
   Barattolo, `C:\Users\Andrea\Documents\barattolo-twa\barattolo.keystore`,
   alias `barattolo` — NON si copia: il `signingKey.path` del secondo
