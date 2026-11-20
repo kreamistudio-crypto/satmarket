@@ -65027,10 +65027,23 @@ def _dichiara_paracadute_p2p(con, tg_id: int, mappa, adesso: int, cambio) -> int
                         "AND maker=1", (ordine, int(tg_id))).fetchone()
         if not r or _tabacchino_libro(_metodi_lista_p2p(r[0])):
             continue
+        partenza = cambio if cambio > 0 else 0
+        # LA RIPUBBLICA SI PORTA DIETRO LA PARTENZA (20 nov 2026, cantiere
+        # ripubblica-semplice): un ordine rifatto dalla ripubblica dice `da`,
+        # l'ordine di prima, e le soglie si misurano dal prezzo di QUELLO —
+        # il range scelto il primo giorno resta quello. La partenza la
+        # prende il server dalla SUA riga, e solo se l'ordine di prima e'
+        # di chi dichiara: il telefono nomina un ordine, mai un numero
+        da = v.get("da") if isinstance(v, dict) else None
+        if isinstance(da, str) and FORMA_ORDINE_P2P.fullmatch(da) and da != ordine:
+            prima = con.execute("SELECT partenza FROM p2p_paracadute WHERE ordine=? "
+                                "AND tg_id=? AND partenza>0", (da, int(tg_id))).fetchone()
+            if prima:
+                partenza = float(prima[0])
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_paracadute(ordine, tg_id, soglia, partenza, "
             "creato, su, giu) VALUES(?,?,?,?,?,?,?)",
-            (ordine, int(tg_id), max(su, giu), cambio if cambio > 0 else 0,
+            (ordine, int(tg_id), max(su, giu), partenza,
              int(adesso), su, giu)).rowcount
     if scritti:
         con.commit()
@@ -65414,6 +65427,88 @@ def _dentro_ripubblica_p2p(minimo, massimo, prezzo) -> bool:
     return p > 0 and a > 0 and a <= p <= b
 
 
+# «VUOI RIPUBBLICARLO? SÌ / NO» (20 nov 2026, cantiere ripubblica-semplice,
+# Andrea: «siccome ad Alan non gli è chiara questa cosa, facciamo quella
+# funzione più semplice»; poi, sul doppione col paracadute, la scheda
+# «Solo Sì/No, paracadute fisso»). Il foglio non chiede piu' i due prezzi:
+# solo Sì o No. Il «Sì» viaggia come l'intervallo PIU' LARGO che si puo'
+# scrivere, 1–P2P_RIPUBBLICA_MAX: niente colonne, rotte o stati nuovi, e gli
+# ordini gia' pubblicati con un intervallo vero vanno avanti come prima.
+# IL RANGE DI UN «SÌ» E' IL PARACADUTE, ANCORATO AL PRIMO GIORNO: le sue
+# soglie si misurano dal prezzo di quando l'ordine e' nato la prima volta
+# (la partenza la ripubblica Lightning se la porta dietro,
+# `_dichiara_paracadute_p2p` col `da`; l'on-chain resta lo stesso ordine e
+# non la tocca), e alla scadenza BTC oltre una soglia vuol dire «non si
+# ripubblica». Senza paracadute un «Sì» si ripubblica SEMPRE e non guarda
+# il prezzo: senza range non c'e' niente da proteggere, e un prezzo muto
+# non deve lasciar scadere un ordine che si vuole rimettere nel libro.
+def _sempre_ripubblica_p2p(minimo, massimo) -> bool:
+    """PURA: la ripubblica e' il «Sì» del foglio (1–P2P_RIPUBBLICA_MAX)?"""
+    try:
+        return 0 < int(minimo or 0) <= 1 and int(massimo or 0) >= P2P_RIPUBBLICA_MAX
+    except (TypeError, ValueError):
+        return False
+
+
+def _dentro_paracadute_p2p(su, giu, partenza, prezzo) -> bool:
+    """PURA: BTC e' ancora dentro le soglie del paracadute, misurate dalla
+    `partenza`? Al filo esatto si' («piu' del 5%» dice il foglio, come
+    `_passo_paracadute_p2p`); un verso a 0 non guarda niente."""
+    scarto = _scarto_paracadute_p2p(partenza, prezzo)
+    return not ((su and scarto > su) or (giu and -scarto > giu))
+
+
+def _para_valido_p2p(para):
+    """PURA: `(su, giu, partenza)` buono per fare da range, o None: una
+    partenza che non si sa (0) o nessuna soglia non sono un range."""
+    if not para:
+        return None
+    try:
+        su, giu, partenza = int(para[0] or 0), int(para[1] or 0), float(para[2] or 0)
+    except (TypeError, ValueError, IndexError):
+        return None
+    return (su, giu, partenza) if partenza > 0 and (su or giu) else None
+
+
+def _giudica_ripubblica_p2p(minimo, massimo, valuta, para, prezzi, letto,
+                            adesso) -> tuple:
+    """PURA: `(esito, prezzo, col_paracadute)` di una ripubblica adesso.
+    `esito`: `dentro` | `fuori` | `muto` (nessun prezzo fresco per
+    giudicare). `prezzo` e' BTC nella valuta della riga (quello che si
+    DICE; 0 se non c'e'). Un intervallo vero si giudica com'e'; un «Sì»
+    con un paracadute buono (`para` = `(su, giu, partenza)`) si giudica
+    sulle soglie in EURO, la valuta del paracadute; un «Sì» senza e'
+    sempre `dentro`."""
+    prezzo = _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso)
+    if not _sempre_ripubblica_p2p(minimo, massimo):
+        if not prezzo > 0:
+            return "muto", 0.0, False
+        return ("dentro" if _dentro_ripubblica_p2p(minimo, massimo, prezzo)
+                else "fuori"), prezzo, False
+    para = _para_valido_p2p(para)
+    if not para:
+        return "dentro", prezzo, False
+    eur = _prezzo_ripubblica_p2p(prezzi, letto, "eur", adesso)
+    if not eur > 0:
+        return "muto", prezzo, True
+    return ("dentro" if _dentro_paracadute_p2p(para[0], para[1], para[2], eur)
+            else "fuori"), prezzo, True
+
+
+def _para_ripubblica_p2p(con, ordine):
+    """Il paracadute di un ordine Lightning come range della ripubblica:
+    `(su, giu, partenza)` o None. Pura sulla connessione."""
+    try:
+        r = con.execute("SELECT soglia, su, giu, partenza FROM p2p_paracadute "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if not r:
+        return None
+    su, giu = _versi_riga_paracadute_p2p(r[0], r[1], r[2])
+    return _para_valido_p2p((su, giu, r[3]))
+
+
 def _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso) -> float:
     """PURA: il prezzo di un bitcoin nella `valuta`, da `prezzi`
     ({eur, usd, chf}) letti all'ora `letto`; 0 se manca o se la lettura e'
@@ -65505,9 +65600,10 @@ def _segna_scadenza_ripubblica_p2p(con, ev: dict, fatto: dict, prezzi, letto,
     if not r:
         return []
     tg_id, minimo, massimo, valuta = int(r[0]), int(r[1]), int(r[2]), r[3]
-    prezzo = _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso)
-    esito = "saltato" if prezzo > 0 and not _dentro_ripubblica_p2p(
-        minimo, massimo, prezzo) else "pronto"
+    # il «Sì» col paracadute si giudica sulle soglie (20 nov 2026)
+    giudizio, prezzo, col_para = _giudica_ripubblica_p2p(
+        minimo, massimo, valuta, _para_ripubblica_p2p(con, ordine), prezzi, letto, adesso)
+    esito = "saltato" if giudizio == "fuori" else "pronto"
     cur = con.execute("UPDATE p2p_ripubblica SET stato=?, prezzo=?, deciso=? "
                       "WHERE ordine=? AND stato='armato'",
                       (esito, prezzo, int(adesso), ordine))
@@ -65516,6 +65612,8 @@ def _segna_scadenza_ripubblica_p2p(con, ev: dict, fatto: dict, prezzi, letto,
     con.commit()
     fatto["ripubblica"] = {"tg_id": tg_id, "esito": esito, "prezzo": prezzo,
                            "minimo": minimo, "massimo": massimo, "valuta": valuta}
+    if col_para:
+        fatto["ripubblica"]["paracadute"] = True
     return [f"🔁 Ripubblica P2P: {ordine[:8]} di {tg_id} scaduto con BTC a "
             + (f"{prezzo:.0f} {valuta}" if prezzo > 0 else "prezzo non fresco")
             + f" (intervallo {minimo}-{massimo}): "
@@ -65536,6 +65634,15 @@ def _frase_ripubblica_p2p(r: dict) -> str:
     Il simbolo e' «€» anche per i franchi e gli USDT: lo traducono
     `p2p_chf_frase` e `p2p_usdt_frase`, che girano dopo, come per il resto
     dell'avviso — e la cifra e' gia' nella valuta dell'ordine."""
+    prezzo = float(r.get("prezzo") or 0)
+    if _sempre_ripubblica_p2p(r.get("minimo"), r.get("massimo")):
+        # il «Sì» (20 nov 2026): il range e' il paracadute, senza cifre
+        if r.get("esito") == "saltato":
+            btc = f" a {_cifra_ripubblica_p2p(prezzo)} €" if prezzo > 0 else ""
+            return (f"🔁 <b>Non l'ho ripubblicato</b>: BTC è{btc}, oltre il tuo "
+                    "paracadute. Puoi ripubblicarlo quando vuoi.")
+        return ("🔁 <b>Lo ripubblico uguale</b> appena apri Barattolo, "
+                "non devi fare niente.")
     tra = (f"{_cifra_ripubblica_p2p(r.get('minimo'))}–"
            f"{_cifra_ripubblica_p2p(r.get('massimo'))} €")
     prezzo = float(r.get("prezzo") or 0)
@@ -65611,10 +65718,11 @@ def _pronti_ripubblica_p2p(con, tg_id, prezzi, letto, adesso: int) -> tuple:
         return [], []
     pronti, saltati, toccati = [], [], 0
     for r in righe:
-        prezzo = _prezzo_ripubblica_p2p(prezzi, letto, r[3], adesso)
-        if not prezzo > 0:
+        giudizio, prezzo, col_para = _giudica_ripubblica_p2p(
+            r[1], r[2], r[3], _para_ripubblica_p2p(con, r[0]), prezzi, letto, adesso)
+        if giudizio == "muto":
             continue
-        if _dentro_ripubblica_p2p(r[1], r[2], prezzo):
+        if giudizio == "dentro":
             pronti.append(r[0])
             continue
         toccati += con.execute(
@@ -65623,6 +65731,8 @@ def _pronti_ripubblica_p2p(con, tg_id, prezzi, letto, adesso: int) -> tuple:
             (prezzo, int(adesso), r[0])).rowcount
         saltati.append({"ordine": r[0], "prezzo": prezzo, "minimo": int(r[1]),
                         "massimo": int(r[2]), "valuta": r[3]})
+        if col_para:
+            saltati[-1]["paracadute"] = True
     if toccati:
         con.commit()
     return pronti, saltati
@@ -65654,14 +65764,18 @@ def _gesto_ripubblica_p2p(con, tg_id, ordine, gesto, prezzi, letto,
             stato == "in_corso" and int(r[4] or 0) < int(adesso) - P2P_RIPUBBLICA_PRESA_S)
         if not libero:
             return {"ok": False, "motivo": "presa"}
-        prezzo = _prezzo_ripubblica_p2p(prezzi, letto, r[2], adesso)
-        if not prezzo > 0:
+        giudizio, prezzo, col_para = _giudica_ripubblica_p2p(
+            r[0], r[1], r[2], _para_ripubblica_p2p(con, ordine), prezzi, letto, adesso)
+        if giudizio == "muto":
             return {"ok": False, "motivo": "prezzo"}
-        if not _dentro_ripubblica_p2p(r[0], r[1], prezzo):
+        if giudizio == "fuori":
             con.execute("UPDATE p2p_ripubblica SET stato='saltato', prezzo=?, "
                         "deciso=? WHERE ordine=?", (prezzo, int(adesso), ordine))
             con.commit()
-            return {"ok": False, "motivo": "fuori", "prezzo": prezzo}
+            fuori = {"ok": False, "motivo": "fuori", "prezzo": prezzo}
+            if col_para:
+                fuori["paracadute"] = True
+            return fuori
         cur = con.execute("UPDATE p2p_ripubblica SET stato='in_corso', preso_il=?, "
                           "prezzo=? WHERE ordine=? AND stato=?",
                           (int(adesso), prezzo, ordine, stato))
@@ -120114,15 +120228,24 @@ def _p2p_onchain_passata_ripubblica(con, scaduti: list, prezzi, letto,
         minimo = int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0)
         massimo = int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0)
         valuta = _p2p_onchain_metro(o)
-        prezzo = _prezzo_ripubblica_p2p(prezzi, letto, valuta, adesso)
-        if not prezzo > 0:
+        # il «Sì» col paracadute si giudica sulle soglie del primo giorno:
+        # l'ordine resta lo stesso, e la partenza non si sposta (20 nov 2026)
+        para = None
+        if int(_p2p_onchain_campo(o, "paracadute", 0) or 0) > 0:
+            su, giu = _versi_riga_paracadute_p2p(_p2p_onchain_campo(o, "paracadute", 0),
+                                                 _p2p_onchain_campo(o, "para_su", -1),
+                                                 _p2p_onchain_campo(o, "para_giu", -1))
+            para = (su, giu, _p2p_onchain_campo(o, "para_partenza", 0))
+        giudizio, prezzo, col_para = _giudica_ripubblica_p2p(
+            minimo, massimo, valuta, para, prezzi, letto, adesso)
+        if giudizio == "muto":
             continue
         a = {"id": int(o["id"]), "ordine": o["ordine"], "maker_id": int(o["maker_id"]),
              "prezzo": prezzo, "minimo": minimo, "massimo": massimo,
              "valuta": valuta, "lato": o["lato"], "euro_cent": int(o["euro_cent"]),
              "metodi": o["metodi"], "fiat": _p2p_onchain_campo(o, "fiat", "") or "",
-             "esito": "fuori"}
-        if _dentro_ripubblica_p2p(minimo, massimo, prezzo):
+             "esito": "fuori", "paracadute": col_para}
+        if giudizio == "dentro":
             cur = con.execute(
                 "UPDATE p2p_onchain_ordini SET scade=?, aggiornato=?,"
                 " rip_giri=COALESCE(rip_giri,0)+1 WHERE id=? AND stato='pending'",
@@ -120145,6 +120268,16 @@ def _p2p_onchain_testo_ripubblica(a: dict) -> str:
     btc = f"{_cifra_ripubblica_p2p(a.get('prezzo'))} {segno}"
     tra = (f"{_cifra_ripubblica_p2p(a.get('minimo'))}–"
            f"{_cifra_ripubblica_p2p(a.get('massimo'))} {segno}")
+    giorni = (f"{P2P_ONCHAIN_ORE_LIBRO // 24} giorni" if P2P_ONCHAIN_ORE_LIBRO % 24 == 0
+              else f"{P2P_ONCHAIN_ORE_LIBRO} ore")
+    if _sempre_ripubblica_p2p(a.get("minimo"), a.get("massimo")):
+        # il «Sì» del foglio (20 nov 2026): niente intervallo, il paracadute
+        if a.get("esito") == "rifatto":
+            return (f"{P2P_ONCHAIN_SEGNO} 🔁 <b>Ho ripubblicato il tuo ordine on-chain"
+                    f"{cosa}{euro}</b>: era scaduto. Resta nel libro altri {giorni}, uguale.")
+        return (f"{P2P_ONCHAIN_SEGNO} ⏰ <b>Il tuo ordine on-chain{cosa}{euro} è "
+                f"scaduto</b> e non l'ho ripubblicato: BTC è a {btc}, oltre il tuo "
+                "paracadute. Puoi ripubblicarlo quando vuoi dal libro degli ordini.")
     if a.get("esito") == "rifatto":
         return (f"{P2P_ONCHAIN_SEGNO} 🔁 <b>Ho ripubblicato il tuo ordine on-chain"
                 f"{cosa}{euro}</b>: era scaduto e BTC è a {btc}, dentro il tuo "

@@ -4922,11 +4922,6 @@
   .p2p-paracadute-riq{margin:0 0 12px}
   .p2p-paracadute-riq .p2p-paracadute{margin:0 0 8px;white-space:normal;line-height:1.4;font-weight:700}
   .p2p-paracadute-riq .btn{margin:0}
-  /* LA RIPUBBLICA (16 nov 2026): i due prezzi di BTC su una riga, col
-     simbolo della valuta in coda; a 320 px stanno ancora insieme */
-  .p2p-rip-campi{display:flex;align-items:center;gap:8px;min-width:0}
-  .p2p-rip-campi input{flex:1;min-width:0;width:0}
-  .p2p-rip-campi span{flex:none;font-weight:800;color:var(--muted)}
   #p2pPausaCorpo .p2p-pausa{margin:10px 0 12px}
   /* LA PAUSA IN VISTA (cantiere pausa-in-vista): la riga con lo stato e
      il bottone, nel foglio che pubblica e in cima a «I miei scambi».
@@ -14360,7 +14355,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'e978b46cb6';
+const LINGUA_VER = 'c3fbdd5db9';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -77844,7 +77839,7 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
   const g = valeNuovoOrdineP2P(campi);
   if (!g.ok) { avvisaMancaP2P(g); return; }
   const noRip = typeof erroreRipubblicaP2P === 'function' ? erroreRipubblicaP2P(campi) : '';
-  if (noRip) { toast(noRip, 6000); const i = el('p2pNuovoRipMin'); if (i) i.focus(); return; }
+  if (noRip) { toast(noRip, 6000); const i = el('p2pNuovoRipubblica'); if (i) i.focus(); return; }
   /* LE 12 PAROLE PRIMA (16 nov 2026, backup-obbligato), prima della
      pausa: dalla conferma della pausa si torna qui col velo addosso */
   if (!confermato && typeof backupOnchainPrima === 'function'
@@ -101094,8 +101089,13 @@ function paracaduteDaDichiarareP2P(ids){
   const fuori = {}, mie = typeof ordiniP2P === 'function' ? ordiniP2P() : {};
   for (const id of ids || []) {
     const riga = mie[id];
-    if (riga && riga.mio && !riga.tabacchino && haParacaduteP2P(riga.paracadute))
+    if (riga && riga.mio && !riga.tabacchino && haParacaduteP2P(riga.paracadute)) {
       fuori[id] = versiParacaduteP2P(riga.paracadute);
+      /* l'ordine rifatto dalla ripubblica (20 nov 2026): il server misura
+         le soglie dal prezzo dell'ordine di prima, il range del primo giorno */
+      if (riga.ripubblicatoDa && idMostroVero(riga.ripubblicatoDa) && riga.ripubblicatoDa !== id)
+        fuori[id].da = String(riga.ripubblicatoDa);
+    }
   }
   return fuori;
 }
@@ -101271,7 +101271,7 @@ function ripubblicaParacaduteP2P(){
   p2pNuovoParacadute = c.paracadute;
   /* ...e la ripubblica dell'ordine vecchio, per la stessa ragione */
   const rip = typeof miaRipubblicaP2P === 'function' ? miaRipubblicaP2P(o) : null;
-  p2pNuovoRipMin = rip ? String(rip.minimo) : ''; p2pNuovoRipMax = rip ? String(rip.massimo) : '';
+  p2pNuovoRipSi = !!rip;
   /* col foglio a passi si arriva dritti al «Rileggi» (20 nov 2026): i
      campi sono quelli dell'ordine di prima, e quel che c'e' da leggere e'
      il riepilogo col prezzo nuovo. «← Indietro» riporta a ogni passo */
@@ -101297,10 +101297,18 @@ function ripubblicaParacaduteP2P(){
    dollaro): e' quella che la persona ha davanti; per una moneta l'euro,
    che e' la valuta del filo (`valutaRipubblicaP2P`).
    QUI DENTRO ZERO `fetch`: le rotte stanno fuori, accanto a quelle del
-   paracadute. */
+   paracadute.
+   «VUOI RIPUBBLICARLO? SÌ / NO» (20 nov 2026, cantiere ripubblica-semplice,
+   Andrea: Alan non capiva i due prezzi; poi la scheda «Solo Sì/No,
+   paracadute fisso»): il foglio chiede solo Sì o No, di serie No. Il «Sì»
+   viaggia come l'intervallo piu' largo, 1–P2P_RIPUBBLICA_MAX
+   (`sempreRipubblicaP2P`), cosi' righe e rotte restano quelle; IL RANGE E'
+   IL PARACADUTE, misurato dal prezzo del primo giorno: l'ordine rifatto
+   dice al server da quale ordine viene (`paracaduteDaDichiarareP2P`, `da`)
+   e la partenza resta quella. Senza paracadute si ripubblica sempre. Gli
+   ordini gia' pubblicati con un intervallo vero si leggono come prima. */
 const P2P_RIPUBBLICA_MAX = 100000000;   // come il server: piu' di cosi' e' un errore di battitura
-let p2pNuovoRipMin = '';      // i due campi del foglio, come li scrive il dito
-let p2pNuovoRipMax = '';
+let p2pNuovoRipSi = false;    // «Vuoi ripubblicarlo?»: No di serie (20 nov 2026)
 let p2pMieRipubbliche = {};   // ordine -> {minimo, massimo, valuta, stato}: le mie, come le dice il server
 /* la leva del server, in busta come `ripubblica` (true/false) */
 function ripubblicaAttivaP2P(){
@@ -101335,14 +101343,15 @@ function cifraRipubblicaP2P(n){
 function traRipubblicaP2P(r, segno){
   return 'fra ' + cifraRipubblicaP2P(r.minimo) + ' e ' + cifraRipubblicaP2P(r.massimo) + ' ' + segno;
 }
-/* il prezzo di un bitcoin adesso nella valuta del foglio, intero; 0 se
-   non lo so. Gli USDT si misurano sul dollaro, come fa il server */
-function prezzoBtcRipubblicaP2P(cod){
-  const c = String(cod || '').toUpperCase();
-  const per = c === 'CHF' ? (typeof chfPerSat !== 'undefined' ? chfPerSat : 0)
-    : (c === 'USDT' || c === 'USD') ? (typeof usdPerSat !== 'undefined' ? usdPerSat : 0)
-    : ((typeof cambioVivo !== 'undefined' && cambioVivo && eurPerSat > 0) ? eurPerSat : 0);
-  return per > 0 ? Math.round(per * 1e8) : 0;
+/* PURA: la ripubblica e' il «Sì» (20 nov 2026)? Come il server
+   (`_sempre_ripubblica_p2p`) */
+function sempreRipubblicaP2P(r){
+  return !!r && Number(r.minimo) > 0 && Number(r.minimo) <= 1 && Number(r.massimo) >= P2P_RIPUBBLICA_MAX;
+}
+/* PURA: i due capi che partono col foglio, `[min, max]` come stringhe:
+   No -> vuoti (spenta); Sì -> l'intervallo piu' largo */
+function capiRipubblicaNuovoP2P(si){
+  return si ? ['1', String(P2P_RIPUBBLICA_MAX)] : ['', ''];
 }
 /* PURA sulle leve: la ripubblica c'entra con questo foglio? Mai a leva
    spenta, mai con Barattozon IN VENDITA: `tab` e' il percorso di chi vende
@@ -101361,44 +101370,36 @@ function ripubblicaPossibileP2P(tab, cod){
 function valutaRipubblicaP2P(cod){
   return (typeof valutaCoinP2P === 'function' && valutaCoinP2P(cod)) ? 'EUR' : cod;
 }
-/* PURA: la riga sotto i due campi */
-function fraseRipubblicaNuovoP2P(a, b, cod){
-  cod = valutaRipubblicaP2P(cod);
-  const segno = segnoValutaP2P(cod), ora = prezzoBtcRipubblicaP2P(cod);
-  const adesso = ora ? ' BTC adesso: ' + cifraRipubblicaP2P(ora) + ' ' + segno + '.' : '';
-  const r = intervalloRipubblicaP2P(a, b);
-  if (!r) return 'Quando l\'ordine scade, se BTC è fra questi due prezzi lo ripubblichiamo uguale, da solo. Vuoto = non si ripubblica.' + adesso;
-  if (r.errore) return '⚠️ ' + r.errore + '.';
-  return 'Alla scadenza, se BTC è ' + traRipubblicaP2P(r, segno)
-    + ', l\'ordine si ripubblica uguale, ogni volta che scade. Parte appena apri Barattolo.' + adesso;
+/* PURA: la riga sotto la sezione. Testo approvato da Andrea (20 nov 2026) */
+function fraseRipubblicaNuovoP2P(){
+  return 'Un ordine resta nel libro 7 giorni. Con Sì, se nessuno lo prende, alla scadenza torna nel libro '
+    + 'uguale, da solo, ogni volta. Se hai messo il paracadute, solo finché BTC resta dentro le soglie di oggi.';
 }
-/* ---- il foglio «Pubblica»: la sezione, dopo il paracadute ---- */
+/* ---- il foglio «Pubblica»: la sezione, dopo il paracadute ----
+   «Vuoi ripubblicarlo?» No · Sì, di serie No (20 nov 2026) */
 function sezioneRipubblicaNuovoP2P(tab){
   const cod = typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR';
   if (!ripubblicaPossibileP2P(tab, cod)) return '';
-  const campo = (id, v, ph, lab) => '<input type="text" inputmode="numeric" id="' + id + '" value="'
-    + esc(v) + '" placeholder="' + ph + '" autocomplete="off" enterkeyhint="done" aria-label="' + lab
-    + '" oninput="cambiaRipubblicaNuovoP2P()">';
+  const si = p2pNuovoRipSi === true;
+  const voce = (v, testo) =>
+    '<button type="button" class="p2p-accesso-chip' + (si === v ? ' on' : '')
+    + '" aria-pressed="' + (si === v ? 'true' : 'false') + '" data-si="' + (v ? '1' : '0')
+    + '" onclick="scegliRipubblicaNuovoP2P(this.dataset.si === \'1\')">' + testo + '</button>';
   return sezioneNuovoP2P({
     titolo: '🔁 Ripubblica',
-    corpo: '<div class="p2p-rip-campi">'
-      + campo('p2pNuovoRipMin', p2pNuovoRipMin, 'da', 'Prezzo minimo di BTC')
-      + '<span aria-hidden="true">–</span>'
-      + campo('p2pNuovoRipMax', p2pNuovoRipMax, 'a', 'Prezzo massimo di BTC')
-      + '<span class="p2p-rip-segno">' + esc(segnoValutaP2P(valutaRipubblicaP2P(cod))) + '</span></div>',
-    sotto: '<div class="hint" id="p2pNuovoRipFrase">'
-      + esc(fraseRipubblicaNuovoP2P(p2pNuovoRipMin, p2pNuovoRipMax, cod)) + '</div>'
+    corpo: '<div class="hint" style="margin:6px 0 4px">Vuoi ripubblicarlo?</div>'
+      + '<div class="p2p-accesso-scelte" id="p2pNuovoRipubblica">' + voce(false, 'No') + voce(true, 'Sì') + '</div>',
+    sotto: '<div class="hint">' + esc(fraseRipubblicaNuovoP2P()) + '</div>'
   });
 }
-/* si leggono i campi e si riscrive la riga, MAI un render: il dito e'
-   sul campo (la regola della zona) */
-function cambiaRipubblicaNuovoP2P(){
-  const a = el('p2pNuovoRipMin'), b = el('p2pNuovoRipMax');
-  if (a) p2pNuovoRipMin = String(a.value || '');
-  if (b) p2pNuovoRipMax = String(b.value || '');
-  const f = el('p2pNuovoRipFrase');
-  if (f) f.textContent = fraseRipubblicaNuovoP2P(p2pNuovoRipMin, p2pNuovoRipMax,
-    typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR');
+/* il tocco su «No» o «Sì»: scarta il click che arriva dopo il tocco sul
+   + (lo stesso orologio del paracadute: una ripubblica scelta per sbaglio
+   rimette in vetrina un ordine) */
+function scegliRipubblicaNuovoP2P(si){
+  if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
+  haptic();
+  p2pNuovoRipSi = !!si;
+  renderNuovoOrdineP2P();
 }
 /* la ripubblica che parte con l'ordine, dai campi: {minimo, massimo} o
    null. Un intervallo storto non parte (lo ferma prima `inviaNuovoOrdineP2P`) */
@@ -101447,6 +101448,7 @@ function segnoRipubblicaP2P(o){
   const riga = (o && o.id && typeof ordiniP2P === 'function' && ordiniP2P()[o.id]) || o;
   const r = miaRipubblicaP2P(riga);
   if (!r || r.stato !== 'armato' || !riga || (riga.stato !== 'pubblicato' && riga.stato !== 'pending')) return '';
+  if (sempreRipubblicaP2P(r)) return '<div class="p2p-box p2p-paracadute">🔁 Si ripubblica alla scadenza</div>';
   return '<div class="p2p-box p2p-paracadute">🔁 Ripubblica '
     + esc(traRipubblicaP2P(r, segnoValutaP2P(valutaRipubblicaP2P(valutaOrdineP2P(riga))))) + '</div>';
 }
@@ -101458,11 +101460,14 @@ function riquadroRipubblicaP2P(o){
   if (!r) return '';
   const segno = segnoValutaP2P(valutaRipubblicaP2P(valutaOrdineP2P(o)));
   let testo = '';
+  const sempre = sempreRipubblicaP2P(r);
   if (r.stato === 'armato' && (o.stato === 'pubblicato' || o.stato === 'pending'))
-    testo = '🔁 Ripubblica: quando scade, se BTC è ' + traRipubblicaP2P(r, segno)
+    testo = sempre ? '🔁 Quando scade, se nessuno l\'ha preso, si ripubblica uguale.'
+      : '🔁 Ripubblica: quando scade, se BTC è ' + traRipubblicaP2P(r, segno)
       + ', l\'ordine si ripubblica uguale.';
   else if (r.stato === 'pronto' || r.stato === 'in_corso')
-    testo = '🔁 È scaduto con BTC dentro il tuo intervallo: lo sto ripubblicando uguale.';
+    testo = sempre ? '🔁 È scaduto: lo sto ripubblicando uguale.'
+      : '🔁 È scaduto con BTC dentro il tuo intervallo: lo sto ripubblicando uguale.';
   if (!testo) return '';
   return '<div class="p2p-paracadute-riq" id="p2pRipubblicaRiq"><div class="p2p-box p2p-paracadute">'
     + esc(testo) + '</div>'
@@ -103178,7 +103183,7 @@ function apriNuovoOrdineP2P(metodo){
   p2pNuovoParacadute = {su: 0, giu: 0};
   /* ...e la ripubblica (16 nov 2026): sempre vuota dal +, per la stessa
      ragione — una ripubblica che nessuno ha scritto rimette in vetrina */
-  p2pNuovoRipMin = ''; p2pNuovoRipMax = '';
+  p2pNuovoRipSi = false;
   /* ...e la zona riparte dall'ULTIMA USATA, chiesta al server (10 ott
      2026): vedi `preparaZonaNuovoP2P` */
   if (typeof preparaZonaNuovoP2P === 'function') preparaZonaNuovoP2P();
@@ -103954,8 +103959,9 @@ function campiNuovoP2P(){
     /* il paracadute (13 ott 2026): dal 17 nov `{su, giu}`, 0 = in quel verso niente */
     paracadute: typeof versiParacaduteP2P === 'function' ? versiParacaduteP2P(p2pNuovoParacadute) : {su: 0, giu: 0},
     /* la ripubblica (16 nov 2026): i due prezzi di BTC come li scrive il dito */
-    ripMin: typeof p2pNuovoRipMin === 'string' ? p2pNuovoRipMin : '',
-    ripMax: typeof p2pNuovoRipMax === 'string' ? p2pNuovoRipMax : '',
+    /* dal 20 nov 2026 solo «Sì / No»: vedi `capiRipubblicaNuovoP2P` */
+    ripMin: typeof capiRipubblicaNuovoP2P === 'function' ? capiRipubblicaNuovoP2P(p2pNuovoRipSi === true)[0] : '',
+    ripMax: typeof capiRipubblicaNuovoP2P === 'function' ? capiRipubblicaNuovoP2P(p2pNuovoRipSi === true)[1] : '',
     premio: p2pNuovoPremio,
     /* il premio del percorso Barattozon, come scritto (23 set 2026) */
     premioTab: p2pNuovoPremioTab,
@@ -105024,7 +105030,7 @@ function avantiNuovoP2P(){
     /* la stessa frase e lo stesso campo di `inviaNuovoOrdineP2P` */
     if (noRip) {
       toast(noRip, 6000);
-      const i = el('p2pNuovoRipMin');
+      const i = el('p2pNuovoRipubblica');
       if (i) i.focus();
       return;
     }
@@ -106826,7 +106832,7 @@ async function inviaNuovoOrdineP2P(confermato){
   /* LA RIPUBBLICA STORTA SI DICE PRIMA (16 nov 2026): un intervallo a
      meta' non deve partire spento in silenzio */
   const noRip = typeof erroreRipubblicaP2P === 'function' ? erroreRipubblicaP2P(campi) : '';
-  if (noRip) { toast(noRip, 6000); const i = el('p2pNuovoRipMin'); if (i) i.focus(); return; }
+  if (noRip) { toast(noRip, 6000); const i = el('p2pNuovoRipubblica'); if (i) i.focus(); return; }
   /* IN PAUSA SI PUBBLICA SAPENDOLO (12 ott 2026, notte, cantiere
      libro-vuoto): chi e' in pausa ADESSO vede prima la domanda — «Sei
      in pausa fino alle 07:00: il tuo ordine si vedra' in grigio e si
@@ -115363,7 +115369,7 @@ async function ripubblicaProntiP2P(d){
       chiudiRipubblicaRigaP2P(s.ordine);
       if (o && o.mio)
         toast('🔁 Non ho ripubblicato il tuo ordine: BTC è a ' + cifraRipubblicaP2P(s.prezzo) + ' '
-          + segnoValutaP2P(valutaOrdineP2P(o)) + ', fuori dal tuo intervallo', 7000);
+          + segnoValutaP2P(valutaOrdineP2P(o)) + (s.paracadute ? ', oltre il tuo paracadute' : ', fuori dal tuo intervallo'), 7000);
     }
     for (const id of (Array.isArray(d.pronti) ? d.pronti : [])) {
       const o = ordiniP2P()[id];
@@ -115372,7 +115378,11 @@ async function ripubblicaProntiP2P(d){
       if (!presa || !presa.ok) {
         if (presa && presa.motivo === 'fuori') {
           chiudiRipubblicaRigaP2P(id);
-          toast('🔁 Non ho ripubblicato il tuo ordine: BTC è uscito dal tuo intervallo', 7000);
+          toast(presa.paracadute
+            ? '🔁 Non ho ripubblicato il tuo ordine: BTC è' + (Number(presa.prezzo) > 0 ? ' a '
+              + cifraRipubblicaP2P(presa.prezzo) + ' ' + segnoValutaP2P(valutaOrdineP2P(o)) : '')
+              + ', oltre il tuo paracadute'
+            : '🔁 Non ho ripubblicato il tuo ordine: BTC è uscito dal tuo intervallo', 7000);
         }
         continue;
       }
