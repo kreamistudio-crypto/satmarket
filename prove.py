@@ -202427,8 +202427,9 @@ def prove_app_negozio():
     prova("closeSheet non chiude la cassa ne' ferma il battito dentro il negozio", True,
           "if (!appNegozio) {\n    el('cassaSheet').classList.remove('open');\n    fermaBattitoCassa();\n  }" in cs)
     g = pezzo_js(mini, "function go(view){", "\n}\n")
-    prova("la faccia si accende e si spegne in go(), sulla vista", True,
-          "modoNegozio(view === 'esercente');" in g)
+    prova("la faccia si accende e si spegne in go(), sulla vista (e sulla vetrina del negozio, alla cassa)", True,
+          "modoNegozio(view === 'esercente' || (view === 'negozio' && cassaNelNegozio));" in g
+          and "if (appNegozio) barraCassa(cassaVetrinaQui());" in g)
     av = pezzo_js(mini, "async function avvia(){", "\n}\n")
     avv = pezzo_js(mini, "async function avviaVetrina(){", "\n}\n")
     prova("la porta diretta sta nell'avvio da entrati, non nella vetrina anonima",
@@ -202463,7 +202464,8 @@ def prove_app_negozio():
         return
     pezzi = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
         "function modoNegozio(acceso){", "async function schedaNegozio(k, soloVista){",
-        "async function eserControllaBanco(){", "function apriAppNegozioDaUrl(){"))
+        "async function eserControllaBanco(){", "function apriAppNegozioDaUrl(){",
+        "function apriCassaNelNegozio(){"))
     banco = r"""
 function nodo(id){ return {id, parentNode:null, figli:[], style:{}, textContent:'', innerHTML:'',
   classList:{s:new Set(), add(...c){c.forEach(x=>this.s.add(x))}, remove(...c){c.forEach(x=>this.s.delete(x))},
@@ -202473,11 +202475,13 @@ function nodo(id){ return {id, parentNode:null, figli:[], style:{}, textContent:
   insertBefore(n, rif){ if(n.parentNode) n.parentNode.figli.splice(n.parentNode.figli.indexOf(n),1);
     n.parentNode=this; const i = rif ? this.figli.indexOf(rif) : -1; if (i<0) this.figli.push(n); else this.figli.splice(i,0,n); }}; }
 const N = {};
-['app','cassaSheet','dopoCassa','profiloBox','puntoBlocco','eserCassa','eserVendite','eserBanco','eserSchedaBanco','sheetBg','cassaVaiVendite','cassaConto'].forEach(i => N[i]=nodo(i));
+['app','cassaSheet','dopoCassa','profiloBox','puntoBlocco','eserCassa','eserVendite','eserBanco','eserSchedaBanco','sheetBg','cassaVaiVendite','cassaConto','negozioTorna'].forEach(i => N[i]=nodo(i));
 N.app.append(N.cassaSheet); N.app.append(N.dopoCassa); N.profiloBox.append(N.puntoBlocco);
 const el = id => N[id] || null;
 const document = {body: nodo('body'), querySelectorAll: () => []};
 let DEMO = false, VETRINA = false, cassaAttiva = true, appNegozio = false, appNegozioUrlAperto = false;
+let cassaNelNegozio = false, myNegozio = ''; const aperti = []; const apriNegozio = (...a) => aperti.push(a);
+const segnaCardCassa = () => {};
 let eserScheda = 'cassa', eserPostoCassa = null, eserPostoPacchi = null, cassaVendita = null;
 let myPacchiPunto = {punti: [], pacchi: []}, ordiniCassa = [];
 const conta = {apriCassa:0, battito:0, go:[]};
@@ -202506,6 +202510,14 @@ __PEZZI__
   location.search = '?app=negozio';
   apriAppNegozioDaUrl(); apriAppNegozioDaUrl(); R.porta = conta.go.slice();
   appNegozioUrlAperto = false; cassaAttiva = false; conta.go = []; apriAppNegozioDaUrl(); R.spenta = conta.go.length;
+  /* (20 nov 2026, cassa-vetrina) col codice negozio la cassa E' la vetrina */
+  cassaAttiva = true; appNegozioUrlAperto = false; myNegozio = 'sole2222'; conta.go = [];
+  location.search = '?app=negozio'; apriAppNegozioDaUrl();
+  R.vetrinaPorta = [cassaNelNegozio, JSON.stringify(aperti), conta.go.length];
+  modoNegozio(true);
+  R.vetrinaDentro = [document.body.classList.contains('cassa-vetrina'), N.negozioTorna.textContent];
+  modoNegozio(false);
+  R.vetrinaFuori = [cassaNelNegozio, document.body.classList.contains('cassa-vetrina'), N.negozioTorna.textContent];
   console.log(JSON.stringify(R));
 })();
 """.replace("__PEZZI__", pezzi)
@@ -202528,6 +202540,21 @@ __PEZZI__
     prova("in DEMO la faccia non si accende", [False, "app"], e["demo"])
     prova("la porta diretta apre una volta sola", ["esercente"], e["porta"])
     prova("...e a cassa spenta non apre", 0, e["spenta"])
+    prova("col codice negozio la porta apre la VETRINA del proprio negozio, senza contarla come visita",
+          [True, '[["sole2222",false,false,"",true]]', 0], e["vetrinaPorta"])
+    prova("...dentro: la classe della vetrina e il ritorno che dice «← Barattolo»",
+          [True, "← Barattolo"], e["vetrinaDentro"])
+    prova("...fuori: la bandierina giu', la classe via, il ritorno di sempre",
+          [False, False, "← Torna"], e["vetrinaFuori"])
+    ac = pezzo_js(mini, "function apriCard(e, id){", "\n}\n")
+    prova("nella vetrina della cassa il tocco sulla card mette un pezzo nel conto, altrove apre la scheda", True,
+          "if (cassaVetrinaQui()) { cassaTocca(id); return; }" in ac and ac.index("cassaTocca") < ac.index("openDetail(id)"))
+    prova("...la vetrina e' la pagina del negozio vera (apriNegozio), non una copia", True,
+          "apriNegozio(myNegozio, false, false, '', true);" in pezzo_js(mini, "function apriCassaNelNegozio(){", "\n}\n"))
+    prova("...il conto ha le righe di «Controlla il carrello» (acq-art, facciaMini, stepperMini)", True,
+          all(k in pezzo_js(mini, "function cassaRigheHTML(){", "\n}\n") for k in ('class="acq-art"', "facciaMini(x, q)", "stepperMini(q,")))
+    prova("...la barra dice «Controlla e incassa» e porta al conto", True,
+          "cassaVetrinaQui() ? cassaApriConto() : cassaIncassa(b)" in mini and "'Controlla e incassa'" in pezzo_js(mini, "function aggiornaBarraCassa(){", "\n}\n"))
     prova("uscendo dal negozio lo schermo per il cliente si chiude", 1, e["cliente"])
 
     # --- (20 nov 2026, cassa-presenza) lo schermo per il cliente ---------

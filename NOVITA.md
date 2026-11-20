@@ -890,3 +890,9 @@ frase: Pubblicare un ordine P2P adesso va a passi, una pagina alla volta: «1. C
 dove: P2P → il + → «Pubblica» (Vendi BTC o Compra BTC). Con Barattozon il foglio resta quello di sempre, coi suoi passi.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-20 · cassa-vetrina
+frase: Barattolo Negozio adesso si apre sulla pagina del tuo negozio, uguale a quella che vede chi compra. Tocchi le card per mettere i pezzi nel conto, in fondo c'è la barra del carrello, e «Controlla e incassa» porta al conto e al QR: i sats vanno dritti al tuo wallet, senza deposito di garanzia.
+dove: Profilo → «🏪 Cassa in negozio»: la vetrina del tuo negozio, la barra in fondo «Controlla e incassa», e in alto «📒 Vendite».
+leva: CASSA_ATTIVA (accesa di serie)
+pubblico: sì

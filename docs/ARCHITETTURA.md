@@ -34303,6 +34303,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   governa solo `con-pacco`), col bottone riscritto da `barraCassa` in
   «Incassa» → `cassaIncassa` e rimesso a «Controlla e paga» uscendo.
   Accesa sul conto della scheda Cassa, spenta sul QR e fuori.
+  LA CASSA È LA VISTA DEL NEGOZIO (20 nov 2026, cantiere cassa-vetrina):
+  con `myNegozio` l'ingresso (`apriCassaNelNegozio`) apre la vista
+  `negozio` del proprio negozio con la bandierina `cassaNelNegozio`;
+  go() tiene `modoNegozio` acceso anche lì e accende la barra con
+  `cassaVetrinaQui()`; `apriCard` batte (`cassaTocca`) invece di aprire;
+  `segnaCardCassa` mette il segno del carrello sulle card. Il conto è il
+  foglio della cassa nella vista `esercente`, con `cassaRigheHTML`
+  (righe di «Controlla il carrello») al posto della griglia; CSS sotto
+  `body.cassa-vetrina`.
   L'APP ANDROID DEL NEGOZIO (20 nov 2026, cantiere app-negozio-apk):
   un secondo involucro TWA, `store.barattolo.negozio`, con `startUrl`
   `/?app=negozio` e lo stesso certificato di Barattolo; `assetlinks.json`
