@@ -85257,12 +85257,20 @@ async function giudicaMazzoP2P(m){
   }
   const dopo = mazzoMostro();
   if (!dopo || dopo.sk !== ora.sk) return;
-  /* CON UNA STORIA, VERSO LE PAROLE, SI VA IN PENSIONE (17 nov 2026):
-     le righe restano al loro posto e il posto lo prende il profilo delle
-     12 parole. Verso il seme di ieri resta la regola di ieri. */
+  /* CON UNA STORIA SI VA IN PENSIONE (17 nov 2026 verso le parole; dal
+     20 nov 2026 anche verso il seme del conto, cantiere
+     chiavi-parole-pensione, scheda di Andrea «Sì, profilo dell'account per
+     tutti»): le righe restano al loro posto, il profilo di prima finisce i
+     suoi scambi da qui, e il posto lo prende il profilo del conto, che si
+     rifa' uguale su ogni dispositivo. Prima lo si TENEVA («tenuto») per
+     non perderne la storia: ma gli ordini nuovi nascevano da lui e si
+     governavano solo da questo telefono, cioe' proprio il «apro dalla web
+     app e continuo dalla Mini App» che Andrea vuole senza eccezioni. La
+     reputazione che l'app mostra e' dell'account, non del profilo. */
   if (!senzaStoriaP2P(dopo)) {
-    if (s.parole) { await pensionaPerIlContoP2P(dopo, s); p2pMazzoEsito = 'pensione'; return; }
-    p2pMazzoEsito = 'tenuto'; return;
+    await pensionaPerIlContoP2P(dopo, s);
+    p2pMazzoEsito = 'pensione';
+    return;
   }
   await passaAlContoP2P(dopo, s);
   p2pMazzoEsito = 'ceduto';
@@ -89025,9 +89033,27 @@ async function identitaMieP2P(mz){
   try { s = await semeContoP2P(); } catch(e){ s = null; }
   p2pSemeNoto = (s && s.sk) ? s : null;
   if (s && s.sk && mie.indexOf(s.sk) < 0) mie.push(s.sk);
+  /* (20 nov 2026, cantiere chiavi-parole-pensione; Andrea, l'ordine
+     Barattozon ff3855c0 liberato da Chrome e non dalla Mini App: «dalla
+     miniapp mi dava l'errore delle chiavi») ANCHE IL PROFILO DELLE 12
+     PAROLE. Dal 17 al 19 nov gli scambi nascevano da lui; chiavi-dal-conto
+     lo ha mandato in pensione, ma SOLO dove era il vivo (Chrome): la Mini
+     App non l'aveva mai avuto, e uno scambio nato con lui li' restava
+     «di un altro profilo». Le parole sono mie per costruzione (tornano
+     dal mio cloud o dalla mia cassetta): se sono gia' su questo
+     dispositivo il loro profilo si chiede come gli altri. Mai farle
+     nascere da qui, e con le parole spente non si carica niente */
+  let w = null;
+  if (typeof semeDaParoleP2P === 'function' && typeof onchainSemeLocale === 'function'
+      && !P2P_CHIAVI_DALLE_PAROLE && onchainSemeLocale()) {
+    try { w = await semeDaParoleP2P(); } catch(e){ w = null; }
+  }
+  p2pParoleNote = (w && w.sk) ? w : null;
+  if (w && w.sk && mie.indexOf(w.sk) < 0) mie.push(w.sk);
   return mie;
 }
 let p2pSemeNoto = null;   /* il seme del conto, quando la restore l'ha gia' chiesto */
+let p2pParoleNote = null; /* ...e il profilo delle 12 parole, se le parole sono qui (20 nov 2026) */
 /* ...e quelle in pensione (17 nov 2026): i loro ordini restano MIEI
    finche' ne hanno, e la restore lo deve sapere */
 function conPensioneP2P(mie){
@@ -108369,8 +108395,14 @@ function rigaScambioP2P(o){
             + '<div class="p2p-scambio-euro">' + (tab ? 'pagando ' : 'inviando ')
             + (ricevoSats ? cifraEuro : cifraSats)
             + (tab ? ' al tabacchino' : '') + '</div>')
+      /* (20 nov 2026, Andrea, sulla card del suo ordine dopo il PayCode
+         di KabuCamel: «siccome ha pagato non deve dire Amazon da pagare
+         ma Amazon pagato») da «Euro inviati» in poi chi compra ha detto
+         di aver pagato alla cassa: la card lo dice al passato. Il
+         controllo su Amazon resta, e lo chiede la pagina dello scambio */
       : tab && !ricevoSats
-        ? '<div class="p2p-scambio-lato">Amazon da pagare: ' + cifraEuro + '</div>'
+        ? '<div class="p2p-scambio-lato">Amazon ' + (o.stato === 'euro_inviati' ? 'pagato' : 'da pagare')
+          + ': ' + cifraEuro + '</div>'
           + '<div class="p2p-scambio-euro">per ' + cifraSats + '</div>'
         : '<div class="p2p-scambio-lato">Vuoi ricevere '
           + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
@@ -109250,15 +109282,19 @@ function mazziParcheggiatiP2P(){
 }
 function chiaveDalParcheggioP2P(id, s){
   if (!s || typeof mandaInPensioneP2P !== 'function') return null;
-  /* ...e il seme del conto, se non e' il vivo (vedi `identitaMieP2P`) */
+  /* ...e il seme del conto, se non e' il vivo (vedi `identitaMieP2P`),
+     e il profilo delle 12 parole (20 nov 2026), se le parole sono qui */
   const candidati = mazziParcheggiatiP2P();
-  const seme = typeof p2pSemeNoto !== 'undefined' ? p2pSemeNoto : null;
   const vivo = (typeof mazzoMostro === 'function' && mazzoMostro()) || null;
-  if (seme && (!vivo || vivo.sk !== seme.sk) && !candidati.some(d => d.sk === seme.sk)
-      && !(typeof inPensioneP2P === 'function' && inPensioneP2P(seme.sk))) {
+  const semi = [[typeof p2pSemeNoto !== 'undefined' ? p2pSemeNoto : null, 'seme'],
+                [typeof p2pParoleNote !== 'undefined' ? p2pParoleNote : null, 'parole']];
+  for (const [seme, dove] of semi) {
+    if (!seme || !seme.sk || (vivo && vivo.sk === seme.sk) || candidati.some(d => d.sk === seme.sk)
+        || (typeof inPensioneP2P === 'function' && inPensioneP2P(seme.sk))) continue;
     try {
-      candidati.push({sk: seme.sk, pub: window.NostrTools.getPublicKey(window.NostrTools.utils.hexToBytes(seme.sk)),
-                      indice: seme.indice | 0, origine: 'conto', conto: myTgId, dove: 'seme'});
+      candidati.push(Object.assign({sk: seme.sk, pub: window.NostrTools.getPublicKey(window.NostrTools.utils.hexToBytes(seme.sk)),
+                                    indice: seme.indice | 0, conto: myTgId, dove: dove},
+                                   dove === 'parole' ? {parole: 1} : {origine: 'conto'}));
     } catch(e){}
   }
   for (const d of candidati) {

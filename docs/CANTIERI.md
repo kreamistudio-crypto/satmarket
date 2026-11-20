@@ -92709,3 +92709,78 @@ DA GUARDARE. Dopo la promozione: journal «🟣 Negozio #3 su Nostr: … pubblic
 ## La `-bar12` in servizio sul nodo (19 nov 2026, 23:16 Rome, cantieri pubblica-col-tempo e recapito-nel-tempo; Andrea: «possiamo procedere»)
 
 La patch 0015 (chi pubblica e chi vende hanno il tempo scelto per bloccare i sats e per dire dove vogliono gli euro) è sul nodo dalle 22:16 UTC, un comando alla volta da Andrea: albero `deb731c3`, test 750 + 90, build, compose con una riga cambiata. Il cambio si è fermato su `ff3855c0` (Barattozon attivo, chiudibile solo al mattino): rilanciato lasciando passare quel solo scambio per id, dopo aver letto nel sorgente che il riavvio lo riaggancia (`find_held_invoices`) e che la 0015 non lo tocca. Il WARN «Ignoring hold-invoice payment … pre-payment window» dopo il «Resubscribing» è il replay atteso. Il racconto intero: PRODUZIONE, «LA `-bar12`». Restano le due prove dal vivo dopo la promozione (DA-FARE, voce 28).
+
+## Lo scambio nato dal profilo delle 12 parole si chiude anche dalla Mini App, e il profilo vecchio con una storia va in pensione (20 nov 2026, cantiere chiavi-parole-pensione; Andrea, ordine Barattozon ff3855c0 di KabuCamel: «Stesso problema», «Si è concluso perché lo sbloccato da Chrome ma dalla miniapp mi dava l errore delle chiavi»; sulla scheda: «Sì, profilo dell'account per tutti»)
+
+IL CASO DAL VIVO, la mattina dopo la promozione ad333197 (con la cura di
+chiavi-parcheggiate). La Mini App apriva ff3855c0 ancora con «🔑 Le chiavi
+di questo scambio non sono in questo browser… Questo è di un altro
+profilo»; Andrea l'ha liberato da Chrome sullo stesso telefono (scambio
+concluso, i sats a KabuCamel, utente vero). Le due diagnosi: Mini App
+«profilo e9416d84 indice 6 … identita' chieste: 1», riga `indice=0
+chiave=`; Chrome «profilo e9416d84 indice 6 … identita' chieste: 2», riga
+`indice=1 chiave=ce22775f`.
+
+LA DIAGNOSI DI IERI SERA ERA SBAGLIATA. Diceva «l'ordine è nato col SEME
+del conto, e il vivo e9416d84 non è il seme». Ma con la cura il seme si
+chiede sempre e la Mini App chiede ancora UNA identità: il seme È il vivo
+e9416d84 (in `identitaMieP2P` il doppione non si aggiunge). La seconda
+identità di Chrome è un profilo in PENSIONE che c'è solo lì: quello delle
+12 parole. L'ordine è nato a indice 1 da lui, da una pagina di Chrome
+rimasta aperta col codice di prima di chiavi-dal-conto (le parole erano
+il vivo dal 17 nov); al ricaricare il giudice l'ha mandato in pensione e
+ha rimesso il conto. La Mini App non l'aveva mai avuto, e nessuna
+strada lo chiedeva. È un'inferenza dalle due diagnosi, non una lettura
+della pensione di Chrome (la diagnosi non ne stampa le chiavi).
+
+LA CURA, due pezzi. (1) `identitaMieP2P` chiede anche il profilo delle
+parole (`p2pParoleNote`) quando le parole sono GIÀ sul dispositivo
+(`onchainSemeLocale`; la Mini App le riceve dal cloud o dalla cassetta):
+mai farle nascere, e senza parole non si carica bitcoin né si chiede
+niente. `chiaveDalParcheggioP2P` lo prova come il seme: con la prova
+della `chiave_mia` del server (o della restore) va in pensione e la riga
+si governa. (2) DECISIONE DI ANDREA, scheda «Anche gli utenti di vecchia
+data passano al profilo dell'account?» → «Sì, profilo dell'account per
+tutti»: nel giudice il ramo «con storia» non tiene più (`'tenuto'`) ma
+manda in pensione (`pensionaPerIlContoP2P`) e il vivo è il conto. Prima
+un profilo di dispositivo di settembre con una storia restava attivo su
+quel telefono, e i suoi ordini nuovi si governavano solo da lì: proprio
+il «apro dalla web app e continuo dalla Mini App» che Andrea vuole senza
+eccezioni. Le righe restano al loro posto, la pensione finisce gli
+scambi aperti, la restore la chiede. Più (3), chiesto da Andrea sulla
+card del suo ordine: «siccome ha pagato non deve dire Amazon da pagare ma
+Amazon pagato» — da `euro_inviati` la card di chi fa pagare il suo
+ordine dice «Amazon pagato: X / per Y». Il controllo su Amazon lo chiede
+sempre la pagina dello scambio.
+
+SCARTATO. Riaccendere le parole come strada del profilo
+(`P2P_CHIAVI_DALLE_PAROLE`): rifà il buco del 19 nov. Cercare le parole
+anche nel cloud o sui relay alla restore: caricherebbe la libreria
+bitcoin a ogni sessione per chi non ha il wallet; la Mini App le tiene
+già in locale dopo la cassetta. Una cura lato moderatore per liberare i
+sats: non è servita, Chrome aveva la chiave.
+
+COSA SI PERDE col pezzo (2): la reputazione di Mostro di quel profilo
+vecchio (voti per identità); quella che l'app mostra è dell'account.
+La riga del foglio per `'tenuto'` resta nel codice, ora senza strada.
+
+PROVATO. `prove_chiavi_parcheggiate` (+3: le parole qui → la restore le
+chiede; lo scambio nato da loro torna governabile e va in pensione;
+senza parole niente, nemmeno la domanda), `prove_p2p_conto_dispositivo`
+(il banco della cessione: con indice, riga, lapide, pavimento e il
+'conto' col mio timbro → pensione col conto vivo; la sentinella «mai
+tenuto»), `prove_p2p_card_scambio` («Amazon pagato» da euro_inviati).
+Controprove: la riga delle parole tolta, il giudice rimesso a 'tenuto',
+il testo rimesso e il candidato delle parole spento → 9 rosse. Riscritte
+con la regola nuova due attese di ieri: `prove_p2p_chiavi` («uno con una
+storia va in pensione, mai sulla mensola, e il vivo è il conto»),
+`prove_chiavi_dalle_parole` (la sentinella del giudice) e
+`prove_tor_chiavi_scambio` (due profili per la stessa npub: con una
+storia la copia sui relay diventa il vivo, niente si ripubblica). Sull'albero
+di develop `26832736` più la cura, nel venv con le sole dipendenze del
+workflow (senza coincurve) e nostr-tools@2.25.2: `PROVE_SEVERE=1 python
+prove.py` 30.717 passate, 1 fallita (la npub, poi riscritta) e 2 saltate
+(nostr-tools non trovato); rigirate le sezioni toccate più le due delle
+saltate: 667 passate, 0 fallite, 0 saltate. Collaudi della CI 162 verdi,
+0 rossi. Resta da guardare dal vivo: la prossima volta che uno scambio
+nasce altrove, la Mini App lo apre senza la riga «chiavi».

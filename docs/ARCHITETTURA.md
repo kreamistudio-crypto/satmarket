@@ -31313,7 +31313,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
       dice un conto NON mio, o non
       dice quale                   → mensola (l'ambiguo del 10 set)
       strada sovrana ('mia')       → avviso, mai in silenzio
-      il resto, con storia         → tenuto, e lo dice il foglio
+      il resto, con storia         → pensione (dal 20 nov 2026: prima
+                                     «tenuto»), il vivo è il conto
       il resto, senza storia       → cede il posto al profilo del conto
 
   «SENZA STORIA» HA TRE APPIGLI (`senzaStoriaP2P`): indice zero DOPO il
@@ -37780,6 +37781,16 @@ mai il kind 0 di nessuno: regola ferrea 2).
   parole resta, spento: riaccenderlo e' una riga, ma rifa' il buco del
   19 nov (parole solo nella web app, che il cloud di Telegram non lo
   scrive). Le 12 parole restano solo per l'on-chain.
+  ⚠️ E LA PENSIONE DELLE PAROLE C'È SOLO DOVE ERANO IL VIVO (20 nov 2026,
+  cantiere chiavi-parole-pensione; l'ordine Barattozon ff3855c0 nato dalla
+  pagina di Chrome rimasta col codice di prima): la Mini App quel profilo
+  non l'aveva mai avuto. `identitaMieP2P` chiede anche il profilo delle
+  parole (`p2pParoleNote`) quando le parole sono GIÀ sul dispositivo
+  (`onchainSemeLocale`: mai farle nascere, e senza parole non si carica
+  niente), e `chiaveDalParcheggioP2P` lo prova come il seme. E il ramo
+  «con storia» del giudice non tiene più: un profilo di dispositivo con
+  una storia va in pensione come quello delle parole, e il vivo è il
+  conto (scheda di Andrea «Sì, profilo dell'account per tutti»).
 
 - LA CACCIA A TAPPO (17 nov 2026, cantiere caccia-a-tappo; il perché in
   CANTIERI, «La Caccia a Tappo: il gioco dentro Barattolo»). Il gioco

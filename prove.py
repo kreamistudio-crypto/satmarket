@@ -78178,12 +78178,15 @@ const corpo = f => JSON.parse(f.opt.body);
     && mced.conto === 111 && mazzoMostro().sk === skSeme
     && fetches.filter(f => String(f.url).endsWith('/p2p/seme')).length === 1;
   out.vecchioSullaMensola = !!store.get('barattolo_mostro@altrui:' + m.pub.slice(0, 8));
-  // ...e uno CON UNA STORIA resta dov'e': il derivato non e' «la
-  // versione giusta» di un profilo, e' un ALTRO profilo
+  // ...e uno CON UNA STORIA (20 nov 2026, chiavi-parole-pensione, scheda
+  // di Andrea «Sì, profilo dell'account per tutti») non resta piu' dov'e':
+  // va in PENSIONE, mai sulla mensola — finisce i suoi scambi, con
+  // l'indice suo — e il vivo e' il profilo del conto
   reset(); rispSeme = {ok: true, seme: skSeme, versione: 1};
   ricordaMazzo(Object.assign({}, m, {indice: 2}));
   const mten = await assicuraMazzo();
-  out.conStoriaTiene = mten.sk === m.sk && mazzoMostro().indice === 2
+  out.conStoriaTiene = mten.sk === skSeme && mazzoMostro().sk === skSeme
+    && mazziPensioneP2P().some(d => d.sk === m.sk && d.indice === 2)
     && !store.get('barattolo_mostro@altrui:' + m.pub.slice(0, 8));
   // ⚠️ I DUE CAMPI DEVONO SOPRAVVIVERE AL GIRO NEL CLOUD, e la tortura
   // e' venuta a chiederlo: togliendoli da `mazzoSerializza` non
@@ -78562,7 +78565,7 @@ const corpo = f => JSON.parse(f.opt.body);
         "localeUnSemeSolo": "col mazzo gia' in locale il seme si chiede UNA volta, e il mazzo non si tocca",
         "dispositivoCedeIlPosto": "...e uno di dispositivo mai usato cede il posto PRIMA di firmare",
         "vecchioSullaMensola": "...e il vecchio resta sulla mensola, mai buttato",
-        "conStoriaTiene": "...mentre uno con una storia resta dov'e'",
+        "conStoriaTiene": "...e uno con una storia va in pensione (mai sulla mensola), e il vivo e' il conto",
         "originePersiste": "...e origine e versione sopravvivono al giro nel cloud",
         "apertoBlocca": "con uno scambio aperto il profilo non si dimentica",
         "apertoLoDice": "...e lo dice invece di tacere",
@@ -87106,10 +87109,11 @@ def prove_chiavi_dalle_parole():
           True, sc.index("semeDaParoleP2P()") < sc.index("semeProfiloP2P()"))
     gm = pezzo_js(mini, "async function giudicaMazzoP2P(m){", "\n}\n")
     prova("il giudice: un ripiego non scalza il profilo delle parole (a strada delle parole "
-          "accesa, vedi `prove_chiavi_dal_conto`), e con una storia si va in pensione",
+          "accesa, vedi `prove_chiavi_dal_conto`), e con una storia si va in pensione "
+          "(dal 20 nov 2026 anche verso il seme del conto)",
           [True, True], ["if (P2P_CHIAVI_DALLE_PAROLE && ora.parole && !s.parole) "
                          "{ p2pMazzoEsito = 'mio'; return; }" in gm,
-                         "if (s.parole) { await pensionaPerIlContoP2P(dopo, s);" in gm])
+                         "if (!senzaStoriaP2P(dopo)) {\n    await pensionaPerIlContoP2P(dopo, s);" in gm])
     co = pezzo_js(mini, "async function chiamataOrdineP2P(o, azione, payload){", "\n}\n")
     prova("la porta dei gesti firma con il profilo della RIGA, ma pubblicare e prendere col vivo",
           True, "mz = mazzoRigaP2P(o) || mz;" in co
@@ -87436,12 +87440,13 @@ def prove_p2p_conto_dispositivo():
     # quella riga proprio a chi l'aveva letta.
     prova("la strada sovrana non cede mai il posto da sola", True,
           "if (ora.origine === 'mia') { p2pMazzoEsito = 'sovrano'; return; }" in giu)
-    # (17 nov 2026, «chiavi-dalle-parole») verso il seme di ieri resta
-    # 'tenuto'; verso le 12 parole va in pensione (scelta di Andrea),
-    # con le sue righe al loro posto: `prove_chiavi_dalle_parole`
-    prova("...e un profilo con una storia nemmeno, verso il seme di ieri", True,
-          "p2pMazzoEsito = 'tenuto'; return;" in giu
-          and "if (!senzaStoriaP2P(dopo)) {" in giu)
+    # (17 nov 2026, «chiavi-dalle-parole») verso le 12 parole un profilo
+    # con una storia va in pensione; dal 20 nov 2026 (chiavi-parole-
+    # pensione, scheda di Andrea) anche verso il seme del conto: niente
+    # piu' 'tenuto', le righe restano al loro posto
+    prova("...e un profilo con una storia va in pensione, mai tenuto", [True, False], [
+          "if (!senzaStoriaP2P(dopo)) {\n    await pensionaPerIlContoP2P(dopo, s);\n    p2pMazzoEsito = 'pensione';" in giu,
+          "p2pMazzoEsito = 'tenuto'" in giu])
     # TRE APPIGLI E NON UNO: l'indice torna a zero su un dispositivo
     # svuotato, le righe si perdono, le lapidi restano quando le righe
     # se ne vanno. Una sola sarebbe una scommessa.
@@ -87661,8 +87666,14 @@ console.log(JSON.stringify(out));
                       "function senzaStoriaP2P(m){",
                       "function mazzoDalSemeP2P(s, vecchio){",
                       "async function passaAlContoP2P(m, s){",
+                      # (20 nov 2026) con una storia si va in pensione
+                      "async function pensionaPerIlContoP2P(m, s){",
                       "async function giudicaMazzoP2P(m){")) + "\n" \
             + _riga_js(mini, "const P2P_CHIAVI_DALLE_PAROLE = ") + r"""
+let PENSIONE = [];
+function mazziPensioneP2P(){ return PENSIONE; }
+function mandaInPensioneP2P(m){ PENSIONE = PENSIONE.filter(d => d.sk !== m.sk).concat([m]); }
+function togliDallaPensioneP2P(sk){ PENSIONE = PENSIONE.filter(d => d.sk !== sk); }
 let LOCALE = null, SEME = null, SCAMBI = {}, LAPIDI = {};
 let PARCHEGGIO = null, NOTA = '', REGISTRATE = null, p2pPavimento = null;
 let p2pMazzoEsito = '', myTgId = 111, semeChiesto = 0;
@@ -87688,7 +87699,7 @@ console.log = () => {};
   const giro = async (pre) => {
     LOCALE = null; SEME = null; SCAMBI = {}; LAPIDI = {};
     PARCHEGGIO = null; NOTA = ''; REGISTRATE = null; p2pPavimento = null;
-    p2pMazzoEsito = ''; semeChiesto = 0; p2pPavimento = null;
+    p2pMazzoEsito = ''; semeChiesto = 0; p2pPavimento = null; PENSIONE = [];
     const m = pre();
     await giudicaMazzoP2P(m);
   };
@@ -87706,16 +87717,19 @@ console.log = () => {};
   // b) con una trade key bruciata: il posto non si cede
   await giro(() => { LOCALE = Object.assign({}, DI_QUI, {indice: 3});
     SEME = {sk: 'cc', versione: 2}; return LOCALE; });
-  out.conIndiceTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO
-    && LOCALE.sk === 'aa';
+  const inPensione = () => p2pMazzoEsito === 'pensione' && !PARCHEGGIO
+    && PENSIONE.length === 1 && PENSIONE[0].sk === 'aa'
+    && !!LOCALE && LOCALE.sk === 'cc' && LOCALE.origine === 'conto'
+    && !!REGISTRATE && REGISTRATE[0] === 'Pcc';
+  out.conIndiceTiene = inPensione();
   // c) con una riga di scambio, anche a indice zero
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); SEME = {sk: 'cc', versione: 2};
     SCAMBI = {'ord-a': {id: 'ord-a'}}; return LOCALE; });
-  out.conRigaTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO;
+  out.conRigaTiene = inPensione() && !!SCAMBI['ord-a'];
   // d) con una lapide, che resta quando la riga se n'e' andata
   await giro(() => { LOCALE = Object.assign({}, DI_QUI); SEME = {sk: 'cc', versione: 2};
     LAPIDI = {'ord-b': 1}; return LOCALE; });
-  out.conLapideTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO;
+  out.conLapideTiene = inPensione();
   // e) IL PAVIMENTO PARLA: l'indice locale e' zero, quello vero no.
   //    Il bump sta DOPO un await vero, o la prova passerebbe anche
   //    senza l'attesa (la lezione della tortura).
@@ -87723,7 +87737,7 @@ console.log = () => {};
     p2pPavimento = (async () => { await new Promise(r => setTimeout(r, 30));
       LOCALE = Object.assign({}, LOCALE, {indice: 2}); return true; })();
     return LOCALE; });
-  out.pavimentoAspettato = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO;
+  out.pavimentoAspettato = inPensione() && PENSIONE[0].indice === 2;
   // f) LA STRADA SOVRANA non cede mai in silenzio, nemmeno mai usata
   await giro(() => { LOCALE = Object.assign({}, DI_QUI, {origine: 'mia'});
     SEME = {sk: 'cc', versione: 2}; return LOCALE; });
@@ -87758,8 +87772,7 @@ console.log = () => {};
   await giro(() => { LOCALE = Object.assign({}, DI_QUI,
     {origine: 'conto', conto: 111, indice: 3}); SEME = {sk: 'cc', versione: 2};
     return LOCALE; });
-  out.timbratoMioConStoriaTiene = p2pMazzoEsito === 'tenuto' && !PARCHEGGIO
-    && LOCALE.sk === 'aa';
+  out.timbratoMioConStoriaTiene = inPensione();
   // m) ...e un 'conto' col timbro di un ALTRO (o senza timbro) va
   //    sulla mensola comunque: l'ambiguo del 10 set
   await giro(() => { LOCALE = Object.assign({}, DI_QUI,
@@ -87798,12 +87811,15 @@ console.log = () => {};
         else:
             prova("IL CASO DEL PC: il profilo mai usato cede il posto, e il "
                   "vecchio resta da parte", True, o8["ceduto"])
-            prova("...con una trade key bruciata non cede", True,
+            # (20 nov 2026, chiavi-parole-pensione, scheda di Andrea «Sì,
+            # profilo dell'account per tutti») CON UNA STORIA NON SI TIENE
+            # PIU': va in pensione, le righe restano, e il vivo e' il conto
+            prova("...con una trade key bruciata va in pensione e il vivo e' il conto", True,
                   o8["conIndiceTiene"])
-            prova("...ne' con una riga di scambio", True, o8["conRigaTiene"])
-            prova("...ne' con una lapide", True, o8["conLapideTiene"])
-            prova("...e il pavimento del server si ASPETTA: l'indice vero "
-                  "tiene il posto", True, o8["pavimentoAspettato"])
+            prova("...cosi' con una riga di scambio, che resta al suo posto", True, o8["conRigaTiene"])
+            prova("...e con una lapide", True, o8["conLapideTiene"])
+            prova("...e il pavimento del server si ASPETTA: la pensione "
+                  "porta l'indice vero", True, o8["pavimentoAspettato"])
             prova("la strada sovrana non cede mai da sola", True,
                   o8["sovranaTiene"])
             prova("il 409 non tocca niente", True, o8["ignoto"])
@@ -87812,7 +87828,7 @@ console.log = () => {};
             # LA FETTA CHE PRIMA NON GUARDAVA NESSUNO (il pezzo 2):
             prova("il 'conto' col MIO timbro e la sk vecchia cede il posto",
                   True, o8["timbratoMioCede"])
-            prova("...e se ha una storia si tiene, come ogni altro",
+            prova("...e se ha una storia va in pensione, come ogni altro",
                   True, o8["timbratoMioConStoriaTiene"])
             prova("il 'conto' col timbro di un ALTRO va sulla mensola",
                   True, o8["timbratoAltruiMensola"])
@@ -90733,6 +90749,8 @@ out.conclusoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'concluso',
 /* (19 nov 2026) Barattozon ANCORA APERTO e annullato, dai due lati */
 out.apertoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo', sats: 31209, metodi: [PM]}));
 out.apertoTabCompro = rigaScambioP2P(riga({lato: 'compro', stato: 'attivo', sats: 31209, metodi: [PM]}));
+/* (20 nov 2026) ...e da «Euro inviati» chi fa pagare il suo ordine lo legge pagato */
+out.euroInviatiTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'euro_inviati', sats: 31209, metodi: [PM]}));
 out.annullatoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'annullato', ultimaMossa: ORA,
                                              sats: 31209, metodi: [PM]}));
 out.apertoVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo', sats: 31209}));
@@ -91136,6 +91154,13 @@ console.log(JSON.stringify(out));
           ['Amazon da pagare: <span class="p2p-euro">5,00 €</span>' in o["apertoTabVendo"],
            'per <span class="p2p-sats invia">' in o["apertoTabVendo"],
            "Vuoi ricevere" in o["apertoTabVendo"], "inviando" in o["apertoTabVendo"]])
+    # (20 nov 2026, Andrea: «siccome ha pagato non deve dire Amazon da
+    # pagare ma Amazon pagato») da «Euro inviati» in poi, al passato
+    prova("...e da «Euro inviati» la sua card dice «Amazon pagato: X» / «per Y»",
+          [True, True, False],
+          ['Amazon pagato: <span class="p2p-euro">5,00 €</span>' in o["euroInviatiTabVendo"],
+           'per <span class="p2p-sats invia">' in o["euroInviatiTabVendo"],
+           "da pagare" in o["euroInviatiTabVendo"]])
     prova("...chi paga il PayCode: «Vuoi ricevere … sats» / «pagando … al tabacchino»",
           [True, True],
           ['Vuoi ricevere <span class="p2p-sats riceve">' in o["apertoTabCompro"],
@@ -103730,6 +103755,12 @@ const inPensioneP2P = sk => PENSIONE.some(d => d.sk === sk);
 const diarioP2P = r => DIARIO.push(r);
 let SEME = null;
 const semeContoP2P = async () => SEME;
+/* (20 nov 2026) il profilo delle 12 parole, se le parole sono qui */
+const P2P_CHIAVI_DALLE_PAROLE = false;
+let PAROLE_QUI = '', PAROLE_CHIESTE = 0;
+let p2pParoleNote = null;
+const onchainSemeLocale = () => PAROLE_QUI;
+const semeDaParoleP2P = async () => { PAROLE_CHIESTE++; return PAROLE_QUI ? {sk: H('0'), versione: 0, parole: 1} : null; };
 const H = c => c.repeat(64);
 const PB = H('8'), PD = H('7'), PA = H('6'), P1 = H('5'), P2 = H('4'), P3 = H('9');
 let VIVO = {sk: H('e'), pub: 'P-VIVO', indice: 6, origine: 'conto'};
@@ -103785,6 +103816,17 @@ const mazzoMostro = () => VIVO;
   /* ...ma il seme che E' il vivo non si pensiona */
   pulisci(); p2pSemeNoto = {sk: H('e'), indice: 6};
   out.semeVivo = [chiaveDalParcheggioP2P('o9', {chiave_mia: 'ee:3'}), PENSIONE.length];
+  /* h) (20 nov 2026, l'ordine ff3855c0 dal vivo) IL PROFILO DELLE 12 PAROLE:
+     con le parole qui la restore lo chiede, e la chiave del server che
+     rideriva da lui lo manda in pensione; senza parole non si chiede nemmeno */
+  pulisci(); p2pSemeNoto = null; SEME = {sk: H('e')}; PAROLE_QUI = 'dodici parole'; PAROLE_CHIESTE = 0;
+  out.paroleIdentita = (await identitaMieP2P(VIVO)).map(x => x[0]);
+  const tk4 = chiaveDalParcheggioP2P('ff3855c0', {chiave_mia: '00:1'});
+  out.dalleParole = [tk4 && tk4.indice, tk4 && tk4.pub, PENSIONE.map(d => d.sk[0]),
+                     DIARIO.some(r => r.includes('ff3855c0') && r.includes('parcheggiato'))];
+  pulisci(); PAROLE_QUI = ''; PAROLE_CHIESTE = 0;
+  out.senzaParole = [(await identitaMieP2P(VIVO)).map(x => x[0]), PAROLE_CHIESTE, p2pParoleNote,
+                     chiaveDalParcheggioP2P('ff3855c0', {chiave_mia: '00:1'})];
   console.log(JSON.stringify(out));
 })();
 """
@@ -103806,6 +103848,15 @@ const mazzoMostro = () => VIVO;
     prova("...che torna solo con la prova della chiave", 4, r.get("timbroAltroConChiave"))
     prova("IL SEME DEL CONTO che non e' il vivo: l'ordine nato con lui torna governabile", [33, ["c"]], r.get("dalSeme"))
     prova("...e il seme che e' gia' il vivo non si tocca", [None, 0], r.get("semeVivo"))
+    # (20 nov 2026, cantiere chiavi-parole-pensione; Andrea: «dalla miniapp
+    # mi dava l'errore delle chiavi», l'ordine ff3855c0 nato col profilo
+    # delle 12 parole, che solo Chrome aveva in pensione)
+    prova("IL PROFILO DELLE 12 PAROLE, se le parole sono qui: la restore lo chiede",
+          ["e", "0"], r.get("paroleIdentita"))
+    prova("...e lo scambio nato con lui torna governabile: la chiave del server rideriva, va in pensione",
+          [1, "00:1", ["0"], True], r.get("dalleParole"))
+    prova("...senza parole qui non si chiede niente e non si carica niente",
+          [["e"], 0, None, None], r.get("senzaParole"))
 
 
 def prove_scambi_ovunque():
@@ -184562,8 +184613,10 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
   out.bunkerVersoNsec = [mbA.origine, !!mbB, mbB && mbB.sk === mbA.sk, mbB && mbB.sk !== semeDaNsecP2P(conto('bea').skHex),
                          fetches.filter(f => String(f.url).endsWith('/p2p/chiavi')).length];
   /* I DUE PROFILI PER LA STESSA NPUB (il punto 4): un derivato di ieri SENZA copia
-     e la copia di un altro profilo sui relay. Con una storia si TIENE, e la
-     copia non si tocca; senza storia cede il posto, e va sulla mensola. */
+     e la copia di un altro profilo sui relay. Con una storia (dal 20 nov 2026,
+     chiavi-parole-pensione, scheda di Andrea «Sì, profilo dell'account per
+     tutti») va in PENSIONE e il vivo e' la copia, cioe' il profilo della npub
+     uguale ovunque; senza storia cede il posto, e va sulla mensola. */
   chiudiBrowser(); relayStore.clear(); pubblicati.length = 0; entra('ivo', 'nsec', true);
   const mi = await adottaProfiloContoP2P();           /* derivato, copia pubblicata dal render? no: il gesto qui sotto la farebbe */
   const altroSk = bytesToHex(NT.generateSecretKey());
@@ -184875,8 +184928,8 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     prova("ESTENSIONE → NSEC: lo stesso, e la nsec non deriva piu' niente", [True, True, 1], o["estensioneVersoNsec"])
     prova("BUNKER → NSEC su una npub nuova: vince il profilo nato col bunker, non la derivazione",
           ["", True, True, True, 1], o["bunkerVersoNsec"])
-    prova("due profili per la stessa npub: con una storia si TIENE e la copia altrui non si tocca ('altra'); senza, cede alla copia e va sulla mensola",
-          [["tenuto", True, "altra", 0], True, 3, True, "ceduto", True, True], o["dueProfili"])
+    prova("due profili per la stessa npub: con una storia va in pensione e il vivo e' la copia (20 nov 2026, niente si ripubblica); senza, cede alla copia e va sulla mensola",
+          [["pensione", False, "copia", 0], True, 3, True, "ceduto", True, True], o["dueProfili"])
     prova("con un'altra nsec e' un altro profilo", [True, True, True], o["nsecAltra"])
     prova("un conto Telegram non deriva dalla nsec, anche se sta nel browser", ["", None], o["telegramNo"])
     prova("col bunker, senza copia sui relay: niente si adotta e niente nasce guardando", [None, "niente", False], o["bunkerAdottaVuoto"])
