@@ -217149,8 +217149,58 @@ def prove_riprendi_scaduto_onchain():
            and "gesti = (vistoDep ? g('controlla', '🔎 Controlla la rete')" in sch,
            "Non depositare di nuovo." in sch,
            dep.count("liberaOnchainP2P"),
-           "!o.recapito ? bott('orange', 'vaiRecapitoOcP2P()', paroleOc(o, '💶 Indica dove ricevere gli euro'))" in dep,
+           "!o.recapito ? bott('orange', `vaiRecapitoOcP2P(this, ${o.id})`, paroleOc(o, '💶 Indica dove ricevere gli euro'))" in dep,
            "(o.recapito ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : '')" in dep])
+    # (20 nov 2026, Andrea alla prova: «Il tasto "ho inviato dove ricevere gli
+    # euro" non funziona. Funziona solo il tasto "salva"») col campo gia'
+    # scritto il bottone arancione salva come «Salva»; vuoto porta al campo
+    import subprocess
+    mini_v = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    i_v = mini_v.index("function vaiRecapitoOcP2P(btn, id){")
+    js_v = ("let salvati = [], fuoco = 0, campo = null;\n"
+            "const document = {getElementById: k => k === 'p2pOcRecapitoVivo' ? campo : null};\n"
+            "const recapitoOnchainP2P = (b, id) => { salvati.push(id); };\n"
+            + mini_v[i_v:mini_v.index("\n}\n", i_v) + 3]
+            + "const fai = v => { campo = {value: v, focus(){ fuoco++; }, scrollIntoView(){}}; };\n"
+              "fai('IT60X0542811101000000123456'); vaiRecapitoOcP2P({}, 7);\n"
+              "fai('   '); vaiRecapitoOcP2P({}, 8);\n"
+              "campo = null; vaiRecapitoOcP2P({}, 9);\n"
+              "console.log(JSON.stringify([salvati, fuoco]));")
+    try:
+        r_v = subprocess.run(["node", "-e", js_v], capture_output=True, text=True, timeout=60)
+        esito_v = json.loads(r_v.stdout)
+    except Exception as e:
+        esito_v = f"node: {e}"
+    prova("«Indica dove ricevere gli euro» col campo gia' scritto SALVA (lo stesso gesto di "
+          "«Salva»); vuoto porta al campo; senza campo non fa niente",
+          [[7], 1], esito_v)
+    # (20 nov 2026, Andrea alla prova: «Ho cliccato su metti la seconda firma e
+    # mi è uscito fuori il messaggio non firmato, non c'è niente da cofirmare»)
+    # la firma gia' messa in sottofondo: riletto lo scambio partito, non e' un errore
+    i_c = mini_v.index("async function cofirmaOnchainP2P(btn, id){")
+    js_c = ("let TOAST = [], FATTI = 0, DOPO = {};\n"
+            "let p2pOnchainMiei = [{id: 7, stato: 'depositato'}];\n"
+            "const haptic = () => {}, attesaP2P = () => () => {}, renderP2POnchain = () => {};\n"
+            "const toast = t => TOAST.push(t), fattoOnchainP2P = async () => { FATTI++; };\n"
+            "const onchainSemeAssicurato = async () => 'parole';\n"
+            "const onchainCofirma = async () => \"Non c'è niente da co-firmare\";\n"
+            "const leggiMieiOnchainP2P = async () => [Object.assign({id: 7}, DOPO)];\n"
+            + mini_v[i_c:mini_v.index("\n}\n", i_c) + 3]
+            + "(async () => {\n"
+              "DOPO = {stato: 'rimborsato'}; await cofirmaOnchainP2P(null, 7);\n"
+              "DOPO = {stato: 'depositato', txid_uscita: 'ab'}; await cofirmaOnchainP2P(null, 7);\n"
+              "DOPO = {stato: 'depositato'}; await cofirmaOnchainP2P(null, 7);\n"
+              "console.log(JSON.stringify([FATTI, TOAST]));\n})();")
+    try:
+        r_c = subprocess.run(["node", "-e", js_c], capture_output=True, text=True, timeout=60)
+        esito_c = json.loads(r_c.stdout)
+    except Exception as e:
+        esito_c = f"node: {e}"
+    prova("«Metti la seconda firma» quando il telefono l'aveva gia' messa da solo: "
+          "scambio riletto partito (rimborsato o con la transazione) → «Firmato e "
+          "trasmesso», ancora fermo → l'errore di sempre",
+          [2, ["✅ Firmato e trasmesso: i sats sono partiti"] * 2
+              + ["⚠️ Non firmato: Non c'è niente da co-firmare"]], esito_c)
     amb_v = {"_fmt_sats": lambda n: f"{int(n):,}".replace(",", "."),
              "p2p_onchain_tab_scade": lambda o: 0, "_p2p_onchain_contanti": lambda o: False}
     exec(pezzo("_p2p_onchain_testi_visto"), amb_v)

@@ -93670,3 +93670,49 @@ DECISIONI E PERCHÉ. L'interruttore ⚡/₿ sta FUORI dal corpo, sopra la testat
 SCARTATI. Quattro fogli separati (la tastiera dell'iPhone e i fogli dal basso hanno già pagato, e ogni foglio nuovo vuole la sua morfosi e il suo indietro); disegnare solo le scatole del passo (avrebbe tolto dal DOM i campi che i giudici cercano per id, e il confronto «tutto invariato» non sarebbe più stato possibile); un secondo bottone «Avanti» accanto a quello che pubblica (la morfosi del + punta a #p2pNuovoInvia).
 PROVATO. Sezione `prove_pubblica_passi`: un banco in node coi pezzi veri su un DOM di cartone (i segni per gruppo, la riga e il bottone al primo e all'ultimo passo, il passo vuoto saltato, il 99 della ripubblica, i conti che non tornano, il riepilogo nei due versi con intervallo, fisso e filtro, «Avanti» coi suoi quattro casi, «Indietro», Barattozon) e le sentinelle: gruppi = scatole, disegno intero prima della divisione, interruttore fuori dal corpo, ritorno a «Cosa», avviso al passo prima di scorrere, CSS. Controprove: tolto il premio dai gruppi, tolto il ritorno a «Cosa», «Avanti» che lascia passare il campo del passo, passi anche con Barattozon, passo vuoto non saltato, «Avanti» anche all'ultimo passo: ognuna fa rossa la sezione. PROVA DI CONFRONTO (Chromium, server in collaudo su 127.0.0.1): per 112 casi — vendo e compro, Lightning e on-chain, foglio vuoto, SEPA, contanti con la zona, intervallo con premio e filtro, prezzo fisso, USDT, Barattozon, ognuno ai quattro passi — il foglio di oggi (divisione spenta) e quello a passi, tolti i segni, la riga, il riepilogo e «Indietro», hanno lo STESSO HTML, e i campi che partono (`campiNuovoP2P`) sono gli stessi. Giro dal vivo a 390 px: «Avanti» senza metodi si ferma, senza importo si ferma, l'interruttore in cima a ogni passo, il cambio di rete al passo 3 resta al passo 3, il «Rileggi» on-chain col recapito e i limiti, un importo tolto al «Rileggi» riporta a «Quanto» al tocco su «Pubblica». Nessun errore di pagina.
 DA GUARDARE. Sul telefono vero, dentro Telegram: la morfosi del + che arriva su «Avanti →» e lo scorrimento in cima a ogni passo. I tutorial puntano a valuta e metodi, che stanno nel primo passo: se un tutorial nuovo punta a un campo di un altro passo, va portato lì prima.
+
+## «Indica dove ricevere gli euro» che salva, e la seconda firma già messa (20 nov 2026, cantiere tasto-recapito-oc; Andrea alla prova dal vivo on-chain: «Il tasto "ho inviato dove ricevere gli euro" non funziona. Funziona solo il tasto "salva".»)
+
+IL DIFETTO. Il bottone arancione «💶 Indica dove ricevere gli euro» di
+chi ha depositato (19 nov 2026, «come uno scambio normale») NON salvava:
+portava al campo «Dove vuoi gli euro» e apriva la tastiera. Ma il campo
+sta appena sopra il bottone, e in Telegram il `focus()` spesso non apre
+la tastiera: chi aveva già scritto l'IBAN toccava il bottone pieno, il
+gesto ovvio, e non succedeva niente. Solo «Salva» faceva partire il
+recapito (e il tempo per pagare di chi compra).
+
+DECISO. Col campo già scritto il bottone fa lo stesso gesto di «Salva»
+(`recapitoOnchainP2P`, coi suoi giudici di USDT e monete e la sua
+risposta); vuoto porta al campo come prima. Niente scritte nuove,
+nessun ritocco al server. SCARTATO: togliere «Salva» (in USDT e in
+moneta il campo ha solo quello) e trasformare il bottone in un foglio
+col suo campo (un secondo posto dove scrivere la stessa cosa).
+
+PROVATO. In `prove_riprendi_scaduto_onchain` la funzione gira in node:
+campo scritto → salva l'ordine giusto, campo di soli spazi → porta al
+campo, senza campo → niente; e il bottone passa `this` e l'id.
+CONTROPROVA: tolta la riga che salva, rossa (`[[], 2]`), rimessa verde.
+
+E LA SECONDA FIRMA GIÀ MESSA (stessa prova dal vivo, scambio 62: «Ho
+cliccato su metti la seconda firma e mi è uscito fuori il messaggio non
+firmato, non c'è niente da cofirmare», poi «Sì, fallo»). Il telefono
+l'aveva messa da solo all'apertura (`p2pOnchainCofirmeInAttesa`) e il
+bottone «✍️ Metti la seconda firma» era rimasto sullo schermo: il server
+rispondeva 409. Ora `cofirmaOnchainP2P`, a firma rifiutata, rilegge lo
+scambio: se è già partito (`rilasciato`, `rimborsato` o con la
+transazione d'uscita) dice la frase che c'era già, «✅ Firmato e
+trasmesso: i sats sono partiti», e torna a «I miei scambi»; sennò
+l'errore di sempre. Provato in node (rimborsato, con la transazione,
+ancora fermo). La prova dal vivo del ritorno da solo, cauzione compresa
+(500 sats arrivati da soli a chi vende, 1000 tolti a chi comprava), è
+riuscita: vedi la voce del ritorno da solo.
+GIRATO, nel venv dei collaudi (senza coincurve), sull'albero develop
+0cc0fb35 più questo cantiere (prima della seconda correzione):
+`PROVE_SEVERE=1 python prove.py` 30790 passate, 0 rosse, 2 saltate per
+nostr-tools assente nell'ambiente (le note). Dopo la seconda correzione e
+il rebase su 7747438f: le tre sezioni toccate (`prove_p2p_onchain`,
+`prove_onchain_rimborso_liscio`, `prove_riprendi_scaduto_onchain`) 97
+verdi, e `collaudi_ci.py --elenco ci/collaudi.txt` senza le variabili del
+proxy 163 verdi, 0 rossi. Dopo il rebase su 17767c04 (foglio «Pubblica» a
+passi e wallet da Telegram per Android, di altri, nessuna delle due
+funzioni toccate) di nuovo le tre sezioni.

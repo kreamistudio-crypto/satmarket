@@ -77037,10 +77037,16 @@ async function renderP2POnchain(){
    pagare, liberare, il tempo che scorre e «Dove vuoi gli euro» non hanno
    piu' senso: resta la firma. PURA. */
 /* «💶 Indica dove ricevere gli euro» (19 nov 2026): il campo e' gia' nella
-   pagina, sotto; il bottone ci porta e apre la tastiera */
-function vaiRecapitoOcP2P(){
+   pagina, sotto; il bottone ci porta e apre la tastiera.
+   (20 nov 2026, Andrea alla prova: «Il tasto "ho inviato dove ricevere gli
+   euro" non funziona. Funziona solo il tasto "salva"») il campo sta appena
+   sopra il bottone: chi l'ha gia' scritto tocca il bottone arancione e si
+   aspetta che parta. Col campo scritto il bottone SALVA, lo stesso gesto di
+   «Salva» (`recapitoOnchainP2P`); vuoto, porta al campo come prima */
+function vaiRecapitoOcP2P(btn, id){
   const c = document.getElementById('p2pOcRecapitoVivo');
   if (!c) return;
+  if (id && String(c.value || '').trim()) return recapitoOnchainP2P(btn, id);
   try { c.scrollIntoView({block: 'center'}); } catch (e) {}
   c.focus();
 }
@@ -77806,7 +77812,7 @@ function schedaOnchainP2P(o){
       /* l'etichetta nella valuta dello scambio (16 nov 2026): solo la
          scritta, mai il `cosa` del gesto */
       gesti = (ricevo ? (o.recapito ? g('euro-inviati', paroleOc(o, '💶 Ho inviato gli euro'), 'orange') : '')
-               : !o.recapito ? bott('orange', 'vaiRecapitoOcP2P()', paroleOc(o, '💶 Indica dove ricevere gli euro')) : '')
+               : !o.recapito ? bott('orange', `vaiRecapitoOcP2P(this, ${o.id})`, paroleOc(o, '💶 Indica dove ricevere gli euro')) : '')
         + (ricevo ? bott('ghost', `rinunciaOnchainP2P(this, ${o.id})`, '↩️ Rinuncio: rimborsa chi vende') : '')
         /* (19 nov 2026, riprendi-scaduto) il tempo per pagare finito senza
            «Ho inviato»: chi ha depositato si riprende i sats, senza
@@ -79487,6 +79493,16 @@ async function cofirmaOnchainP2P(btn, id){
     const parole = await onchainSemeAssicurato();
     no = await onchainCofirma(o, parole);
   } catch(e) { no = (e && e.message) || 'errore'; }
+  /* (20 nov 2026, Andrea alla prova del ritorno da solo: «Ho cliccato su
+     metti la seconda firma e mi è uscito fuori il messaggio non firmato,
+     non c'è niente da cofirmare») la seconda firma l'aveva gia' messa
+     questo telefono in sottofondo (`p2pOnchainCofirmeInAttesa`, all'apertura)
+     e il bottone era rimasto sullo schermo: se lo scambio, riletto, e' gia'
+     partito, si dice quello, non un errore */
+  if (no) {
+    const ora = (await leggiMieiOnchainP2P()).find(x => x.id === id);
+    if (ora && (ora.txid_uscita || ['rilasciato', 'rimborsato'].includes(ora.stato))) no = '';
+  }
   if (no) {
     rip();
     toast('⚠️ Non firmato: ' + no, 7000);
