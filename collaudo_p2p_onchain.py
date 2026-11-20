@@ -2521,19 +2521,43 @@ def main():
                     " preso_il=preso_il-? WHERE id=?", (secondi, secondi, oid))
         con.commit()
         con.close()
+    # L'OROLOGIO FERMO (20 nov 2026, cantiere collaudo-orologio-recapito): la
+    # ronda legge l'ora vera, e «Hai ancora 14 minuti» diventava «13» appena
+    # passava un secondo fra la conferma del deposito e la ronda (sotto carico,
+    # coi collaudi in parallelo). Qui la ronda gira a un'ora DETTA, contata dal
+    # deposito: il server vede un `time` il cui `time()` e' fermo, il resto
+    # (e asyncio, che usa il suo orologio) resta quello vero.
+    class OrologioFermo:
+        def __init__(self, quando):
+            self.quando = quando
+
+        def time(self):
+            return float(self.quando)
+
+        def __getattr__(self, nome):
+            return getattr(time, nome)
+
+    def ronda_alle(quando):
+        vero = SRV.time
+        SRV.time = OrologioFermo(quando)
+        try:
+            asyncio.run(SRV._p2p_onchain_ronda())
+        finally:
+            SRV.time = vero
     indietro_oc(o5t["id"], 16 * 60)
+    dep_t = int(uno(999, o5t["id"])["depositato_il"])
     banco.DETTO.clear()
-    asyncio.run(SRV._p2p_onchain_ronda())
+    ronda_alle(dep_t + 16 * 60)
     prova("a meta' tempo il promemoria a chi ha depositato, col tempo che resta; a chi "
           "compra niente", (True, False),
           (detto_a(999, "Hai ancora 14 minuti per scrivere dove vuoi gli euro"),
            detto_a(888, "Hai ancora")))
     banco.DETTO.clear()
-    asyncio.run(SRV._p2p_onchain_ronda())
+    ronda_alle(dep_t + 16 * 60 + 30)
     prova("...la ronda dopo non lo ripete", False, detto_a(999, "Hai ancora"))
     indietro_oc(o5t["id"], 15 * 60)
     banco.DETTO.clear()
-    asyncio.run(SRV._p2p_onchain_ronda())
+    ronda_alle(dep_t + 16 * 60 + 60)
     ot = uno(999, o5t["id"])
     prova("finito il tempo senza recapito: annullato, e Barattolo ha firmato il rimborso "
           "verso chi ha depositato, detto a tutt'e due",

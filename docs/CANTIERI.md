@@ -92905,3 +92905,23 @@ rosso; a 60 s dalla fine UN messaggio nuovo rosso, il giro dopo niente),
 nuovo con le parole on-chain, non rosso). Controprove: soglia a 45 minuti,
 colore tolto, finestra del minuto a 10 secondi, timbro tolto → rosse.
 
+## Il collaudo del recapito on-chain che diventava rosso per l'orologio (20 nov 2026, cantiere collaudo-orologio-recapito; trovato nel giro dei collaudi di tasto-rosso-conto, curato su richiesta)
+
+IL GUASTO. In `collaudo_p2p_onchain`, sezione «“dove vuoi gli euro” nel
+tempo scelto», la ronda on-chain leggeva l'ora vera: dopo `indietro_oc`
+di 16 minuti il promemoria doveva dire «Hai ancora 14 minuti», ma bastava
+UN secondo fra la conferma del deposito e la ronda (coi collaudi in
+parallelo succede) perché `_durata_detta_p2p` arrotondasse a «13». Rosso
+una volta su due giri completi, verde da solo.
+
+LA CURA, nella prova e non nel server: le tre ronde della sezione girano
+a un'ora DETTA, contata dal `depositato_il` letto dopo lo spostamento
+(`ronda_alle`): il modulo del server vede un `time` il cui `time()` è
+fermo (`OrologioFermo`, il resto delegato al modulo vero; asyncio usa il
+suo orologio e non se ne accorge). Scartati: attese o ritentativi, e un
+«13 o 14» nell'attesa (nasconderebbe un conto sbagliato di un minuto).
+
+PROVATO. Il collaudo verde; con due secondi di sonno messi apposta prima
+della ronda resta verde; con l'orologio finto rimesso all'ora vera e gli
+stessi due secondi diventa rosso proprio su quella riga.
+
