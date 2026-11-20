@@ -361,7 +361,18 @@ async def giro_intero():
     prova("col recapito nasce anche il conto alla rovescia di chi compra, con la stessa "
           "fine, non ancora mandato", [(PRENDE, t + 60 + 3600, 0)],
           [tuple(x) for x in conto])
-    await SRV._giro_conto_p2p()
+    # (20 nov 2026, tasto-rosso-conto) il bot si ascolta: con un'ora il bottone e' rosso
+    mandati = []
+    vero_bot = SRV.bot_api
+
+    async def bot_che_ascolta(metodo, dati):
+        mandati.append((metodo, json.loads(json.dumps(dati))))
+        return await vero_bot(metodo, dati)
+    SRV.bot_api = bot_che_ascolta
+    try:
+        await SRV._giro_conto_p2p()
+    finally:
+        SRV.bot_api = vero_bot
     con = banco.con_db()
     conto = con.execute("SELECT messaggio, detto, finito FROM p2p_conto_rovescia WHERE "
                         "chiave LIKE ?", (f"ln:{UNA}:%",)).fetchone()
@@ -369,6 +380,30 @@ async def giro_intero():
     prova("...il giro lo manda (un id salvato) col tempo che resta, e corre ancora",
           (True, True, 0), (bool(conto and conto[0]), bool(conto) and "Tempo per pagare: "
                             "mancano" in conto[1], conto[2] if conto else -1))
+    suo = [d for m, d in mandati if m == "sendMessage" and d.get("chat_id") == PRENDE
+           and "Tempo per pagare" in str(d.get("text"))]
+    tasto = (((suo[-1].get("reply_markup") or {}).get("inline_keyboard") or [[{}]])[0][0]
+             if suo else {})
+    prova("IL TASTO ROSSO (20 nov 2026, Andrea: «quel messaggio lì deve avere il tasto sotto "
+          "rosso»): un tempo di un'ora ha il bottone dello scambio con `style` danger",
+          (1, "danger", True), (len(suo), tasto.get("style"),
+                                f"scambio={UNA}" in str(tasto.get("url"))))
+    # L'AVVISO A UN MINUTO (20 nov 2026, Andrea: «metti il messaggio che manca un
+    # minuto»): un giro a 60 secondi dalla fine manda un messaggio NUOVO, una volta
+    SRV.bot_api = bot_che_ascolta
+    try:
+        n0 = len(mandati)
+        await SRV._giro_conto_p2p(t + 60 + 3600 - 60)
+        await SRV._giro_conto_p2p(t + 60 + 3600 - 30)
+    finally:
+        SRV.bot_api = vero_bot
+    nuovi = [d for m, d in mandati[n0:] if m == "sendMessage" and d.get("chat_id") == PRENDE]
+    tasto1 = (((nuovi[0].get("reply_markup") or {}).get("inline_keyboard") or [[{}]])[0][0]
+              if nuovi else {})
+    prova("A UN MINUTO dalla fine: UN messaggio nuovo (che suona) «⏰ Manca 1 minuto», col "
+          "bottone rosso dello scambio; il giro dopo non lo ripete", (1, True, "danger"),
+          (len(nuovi), bool(nuovi) and str(nuovi[0].get("text")).startswith(
+              "⏰ Manca 1 minuto: hai già mandato gli euro?"), tasto1.get("style")))
 
     print("\n5) il tempo finisce col recapito detto presto (il nodo di ieri, che annulla)")
     # passa l'ora (la rotta vuole eventi di adesso: si sposta la cronaca)

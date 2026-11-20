@@ -74654,20 +74654,82 @@ def _conto_solo_nostr_p2p(con, tg_id: int) -> bool:
         return False
 
 
-async def _conto_scrivi_p2p(riga, testo: str, bottone) -> tuple:
+# IL TASTO ROSSO (20 nov 2026, cantiere tasto-rosso-conto; Andrea, col
+# messaggio «Tempo per pagare: mancano 10 minuti» davanti: «è perfetto
+# quello lì. Quel messaggio lì deve avere il tasto sotto rosso»). Finche'
+# il tempo CORRE il bottone dello scambio e' rosso: e' il momento in cui
+# si rischiano i soldi. Fermato o finito torna normale. Il colore e' il
+# campo `style` dei bottoni (Bot API 9.4): le app Telegram vecchie lo
+# ignorano e mostrano il bottone di sempre. E se l'API un giorno lo
+# rifiutasse (400), il messaggio riparte SENZA colore: il conto non si
+# ferma mai per un colore.
+# SOLO GLI ORDINI A TEMPO CORTO (Andrea: «la soglia di un'ora va bene»): un
+# tempo per pagare fino a `P2P_CONTO_ROSSO_FINO_MIN` minuti compresi. Sopra,
+# il bottone di sempre.
+P2P_CONTO_STILE_TASTO = "danger"
+P2P_CONTO_ROSSO_FINO_MIN = 60
+
+
+# L'AVVISO CHE SUONA A UN MINUTO (20 nov 2026, cantiere tasto-rosso-conto;
+# Andrea, a uno scambio vero: «manca un minuto allo scadere dello scambio,
+# ma non è arrivato il messaggio a chi doveva compiere l'azione», poi «Sì,
+# metti il messaggio che manca un minuto»). Il conto alla rovescia scrive
+# «manca 1 minuto» ma si riscrive SENZA suonare, e l'ultimo promemoria era
+# a cinque minuti. Parte da QUI, dal battito del conto (ogni minuto), e non
+# dalle attese: l'on-chain ha la ronda ogni due minuti, che lo farebbe
+# arrivare a tempo finito. Un messaggio NUOVO (che suona), col bottone del
+# conto (rosso fino a un'ora), quando restano al piu' `P2P_CONTO_UN_MINUTO_S`
+# secondi: con un battito al minuto almeno un giro ci cade dentro. Una volta
+# sola per conto: il timbro in `p2p_avvisi`, PRIMA dell'invio. Le parole
+# sono quelle dell'avviso a cinque minuti, del Lightning e dell'on-chain.
+P2P_CONTO_UN_MINUTO_S = 90
+
+
+def testo_manca_un_minuto_p2p(onchain: bool) -> str:
+    """PURA: l'avviso a un minuto, scritto per gli euro (la valuta la
+    traduce chi chiama, come il conto)."""
+    if onchain:
+        return (f"{P2P_ONCHAIN_SEGNO} ⏰ Manca 1 minuto: hai già mandato gli euro? "
+                "Tocca subito «Ho inviato gli euro». Senza il bottone, allo scadere "
+                "chi vende può aprire una disputa anche se hai già pagato.")
+    return SOLLECITO_TEMPO_PAGARE_ULTIMO.format(resto="1 minuto").replace(
+        "Mancano 1 minuto", "Manca 1 minuto")
+
+
+def un_minuto_dovuto_p2p(stato: str, resto_s: int) -> bool:
+    """PURA: tocca adesso l'avviso a un minuto? Solo col tempo che corre e
+    al piu' `P2P_CONTO_UN_MINUTO_S` secondi dalla fine."""
+    return stato == "corre" and 0 < int(resto_s) <= int(P2P_CONTO_UN_MINUTO_S)
+
+
+def conto_rosso_p2p(stato: str, minuti: int) -> bool:
+    """PURA: il bottone del conto e' rosso? Solo mentre il tempo CORRE e
+    solo con un tempo per pagare fino a un'ora compresa."""
+    m = int(minuti or 0)
+    return stato == "corre" and 0 < m <= int(P2P_CONTO_ROSSO_FINO_MIN)
+
+
+async def _conto_scrivi_p2p(riga, testo: str, bottone, rosso: bool = False) -> tuple:
     """Manda (la prima volta) o riscrive il messaggio. Torna `(messaggio,
     vivo)`: `vivo` False = il messaggio non c'e' piu' (cancellato da chi
-    lo riceve, bot bloccato), e il conto si ferma."""
+    lo riceve, bot bloccato), e il conto si ferma. `rosso`: il bottone
+    col colore del tempo che corre (`P2P_CONTO_STILE_TASTO`)."""
     tastiera = None
     if bottone:
-        tastiera = {"inline_keyboard": [[{
-            "text": bottone[0], "url": _link_dentro_telegram(bottone[1])}]]}
+        tasto = {"text": bottone[0], "url": _link_dentro_telegram(bottone[1])}
+        if rosso and P2P_CONTO_STILE_TASTO:
+            tasto["style"] = P2P_CONTO_STILE_TASTO
+        tastiera = {"inline_keyboard": [[tasto]]}
     dati = {"chat_id": int(riga["tg_id"]), "text": testo, "parse_mode": "HTML"}
     if tastiera:
         dati["reply_markup"] = tastiera
     mid = int(riga["messaggio"] or 0)
     if not mid:
         r = await bot_api("sendMessage", dati) or {}
+        if (not r.get("ok") and int(r.get("error_code") or 0) == 400
+                and "style" in json.dumps(tastiera or {})):
+            # il colore rifiutato: lo stesso messaggio, col bottone di sempre
+            return await _conto_scrivi_p2p(riga, testo, bottone, False)
         if r.get("ok"):
             return int((r.get("result") or {}).get("message_id") or 0), True
         # 403 (bot bloccato o mai avviato): niente conto, e non si riprova
@@ -74678,9 +74740,37 @@ async def _conto_scrivi_p2p(riga, testo: str, bottone) -> tuple:
     descr = str(r.get("description") or "")
     if "not modified" in descr:
         return mid, True
+    if int(r.get("error_code") or 0) == 400 and "style" in json.dumps(tastiera or {}):
+        return await _conto_scrivi_p2p(riga, testo, bottone, False)
     if int(r.get("error_code") or 0) in (400, 403):
         return mid, False
     return mid, True          # rete: si riprova al giro dopo
+
+
+async def _conto_un_minuto_p2p(r, testo: str, bottone, minuti: int,
+                              adesso: int) -> None:
+    """Manda UNA volta l'avviso a un minuto: il timbro in `p2p_avvisi`
+    prima dell'invio (un giro che muore a meta' al peggio lo perde, mai lo
+    raddoppia). Fail-open: un intoppo non tocca il conto."""
+    try:
+        con = db()
+        try:
+            scritto = con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, tg_id, "
+                "quando, fonte) VALUES(?,?,?,?,?,'conto')",
+                (str(r["ordine"]), "manca_un_minuto:" + str(r["chiave"]),
+                 int(r["giro"] or 0), int(r["tg_id"]), int(adesso))).rowcount
+            con.commit()
+        finally:
+            con.close()
+        if scritto:
+            await _conto_scrivi_p2p({"tg_id": r["tg_id"], "messaggio": 0}, testo,
+                                    bottone, rosso=conto_rosso_p2p("corre", minuti))
+            print(f"⏰ Conto P2P: {r['chiave']} avviso a un minuto a {r['tg_id']}",
+                  flush=True)
+    except Exception as e:
+        print(f"⚠️ Conto P2P: {r['chiave']} avviso a un minuto saltato "
+              f"({type(e).__name__})", flush=True)
 
 
 async def _giro_conto_p2p(adesso: int = 0) -> str:
@@ -74737,6 +74827,11 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
                 testo = _p2p_onchain_parole(o, testo_conto_p2p(
                     stato, fine - adesso)) if o else testo_conto_p2p(stato)
                 bottone = _p2p_onchain_bottone(o) if o else None
+                # i minuti per il tasto rosso: quelli dell'ordine, non la
+                # nascita del conto (che puo' arrivare un giro dopo)
+                minuti = int(_p2p_onchain_minuti(o) or 0) if o else 0
+                uno = (_p2p_onchain_parole(o, testo_manca_un_minuto_p2p(True))
+                       if o and un_minuto_dovuto_p2p(stato, fine - adesso) else "")
             else:
                 momenti = [dict(m) for m in con.execute(
                     "SELECT momento, quando, giro FROM p2p_momenti WHERE ordine=?",
@@ -74747,11 +74842,19 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
                 testo = _conto_parole_ln_p2p(con, str(r["ordine"]),
                                              testo_conto_p2p(stato, fine - adesso))
                 bottone = _bottone_scambio_p2p(r["ordine"])
-            lavoro.append((dict(r), stato, testo, bottone))
+                # nel Lightning il conto nasce all'inizio esatto del tempo
+                # (`_attese_tempo_pagare_p2p`): fine meno inizio = i minuti
+                minuti = (fine - int(r["quando"] or 0)) // 60
+                uno = (_conto_parole_ln_p2p(con, str(r["ordine"]),
+                                            testo_manca_un_minuto_p2p(False))
+                       if un_minuto_dovuto_p2p(stato, fine - adesso) else "")
+            lavoro.append((dict(r), stato, testo, bottone, minuti, uno))
     finally:
         con.close()
     mandati = riscritti = chiusi = 0
-    for r, stato, testo, bottone in lavoro:
+    for r, stato, testo, bottone, minuti, uno in lavoro:
+        if uno and int(r["messaggio"] or 0):
+            await _conto_un_minuto_p2p(r, uno, bottone, minuti, adesso)
         finale = stato != "corre"
         if finale and not int(r["messaggio"] or 0):
             mid, vivo = 0, True       # mai partito: si chiude in silenzio
@@ -74759,7 +74862,10 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
             mid, vivo = int(r["messaggio"] or 0), True
         else:
             try:
-                mid, vivo = await _conto_scrivi_p2p(r, testo, bottone)
+                # rosso finche' il tempo corre, fino a un'ora (20 nov 2026,
+                # tasto-rosso-conto)
+                mid, vivo = await _conto_scrivi_p2p(
+                    r, testo, bottone, rosso=conto_rosso_p2p(stato, minuti))
             except Exception as e:
                 print(f"⚠️ Conto P2P: {r['chiave']} non scritto "
                       f"({type(e).__name__})", flush=True)

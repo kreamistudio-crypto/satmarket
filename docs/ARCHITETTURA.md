@@ -38060,6 +38060,18 @@ mai il kind 0 di nessuno: regola ferrea 2).
   silenzio un conto mai partito, si ferma se il messaggio non c'è più
   (400/403). Solo Telegram: chi ha scelto i soli DM Nostr non lo riceve.
   Leva `P2P_CONTO_ALLA_ROVESCIA`, accesa di serie.
+  IL TASTO ROSSO E L'AVVISO A UN MINUTO (20 nov 2026, cantiere
+  tasto-rosso-conto): finché il tempo corre e se il tempo per pagare è
+  fino a un'ora (`conto_rosso_p2p`, `P2P_CONTO_ROSSO_FINO_MIN = 60`) il
+  bottone porta `style: "danger"` (Bot API 9.4; le app vecchie lo
+  ignorano; un 400 sul colore rimanda lo stesso messaggio senza colore).
+  E quando restano al più `P2P_CONTO_UN_MINUTO_S` (90) secondi, il giro
+  manda UN messaggio NUOVO, che suona, «⏰ Manca 1 minuto…» (le parole
+  dell'avviso a cinque minuti, `testo_manca_un_minuto_p2p`), col bottone
+  del conto, timbrato in `p2p_avvisi` (momento `manca_un_minuto:<chiave>`)
+  prima dell'invio. Sta nel battito del conto e non nelle attese perché la
+  ronda on-chain gira ogni due minuti; vale per chi ha il conto (non chi
+  ha scelto i soli DM Nostr).
 - «↩️ RIPRENDI I SATS» ON-CHAIN A TEMPO FINITO (19 nov 2026, stesso
   cantiere): `POST /api/p2p/onchain/{oid}/riprendi-scaduto`, solo chi ha
   depositato, col giudice puro `p2p_onchain_riprendi_scaduto_perche`

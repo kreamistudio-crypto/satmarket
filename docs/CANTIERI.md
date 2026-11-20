@@ -92862,3 +92862,46 @@ che scende al passo, pagina di chi aspetta). Sull'albero di develop
 (senza coincurve) e nostr-tools@2.25.2: `PROVE_SEVERE=1 python prove.py`
 30.762 passate, 0 fallite; collaudi della CI 162 verdi, 0 rossi. Resta da
 guardare dal vivo: un ordine a tempo corto, dai due lati.
+
+## Il tasto rosso sotto «Tempo per pagare» e l'avviso che suona a un minuto (20 nov 2026, cantiere tasto-rosso-conto; Andrea: «Quando prendi un ordine a tempo, è possibile ricevere un messaggio su Telegram … il tasto rosso che fa capire che devi stare attento adesso», poi «il messaggio col tasto rosso arrivasse nel momento in cui l'altra persona indica dove ricevere euro», poi davanti al conto alla rovescia: «È perfetto quello lì. Quel messaggio lì deve avere il tasto sotto rosso», «la soglia di un'ora va bene»; a uno scambio vero con un minuto alla fine: «non è arrivato il messaggio a chi doveva compiere l'azione», e «Sì, metti il messaggio che manca un minuto»)
+
+DECISO. (1) Il messaggio del conto alla rovescia (`_giro_conto_p2p`) resta
+com'è nel testo; finché il tempo CORRE e il tempo per pagare è fino a
+un'ora compresa, il suo bottone «Apri lo scambio» è ROSSO (`style:
+"danger"` dei bottoni Telegram, Bot API 9.4). Fermato o finito torna
+normale; sopra l'ora resta normale. Nel Lightning i minuti sono fine meno
+inizio del conto (nasce all'inizio esatto del tempo), nell'on-chain quelli
+dell'ordine (`_p2p_onchain_minuti`: il conto può nascere un giro dopo).
+(2) A un minuto dalla fine un messaggio NUOVO, che suona: «⏰ Manca 1
+minuto: hai già mandato gli euro? …», le parole dell'avviso a cinque
+minuti (Lightning e on-chain, ognuno le sue), tradotte nella valuta
+dell'ordine come il conto, col bottone del conto (rosso fino a un'ora).
+Parte dal battito del conto (60 s) quando restano al più 90 secondi, una
+volta per conto (timbro in `p2p_avvisi` prima dell'invio), solo a chi il
+conto l'ha già ricevuto.
+
+SCARTATO. Un messaggio alla PRESA («Hai preso un ordine a tempo»): era la
+prima richiesta, Andrea l'ha corretta lui (il rischio c'è solo da quando
+parte il timer, cioè dal recapito); e la regola della patch 0007 «mai
+avvisare chi ha fatto il gesto» resta. Riscrivere il messaggio del
+recapito con un'allerta nuova: Andrea ha scelto il conto alla rovescia
+così com'è, col solo tasto rosso. L'avviso a un minuto nelle attese
+(`_intervalli_tempo_pagare_p2p`): nel Lightning sarebbe puntuale, ma
+l'on-chain le scarica dalla ronda ogni due minuti, e «manca 1 minuto»
+arriverebbe a tempo finito; una strada sola, nel battito del conto.
+
+LIMITI DETTI. Chi ha scelto i soli DM Nostr non ha il conto e quindi
+nemmeno l'avviso a un minuto (aveva già quello a cinque). Il rosso si
+vede solo sulle app Telegram aggiornate; se l'API rifiutasse il campo
+(400) il messaggio riparte senza colore, il conto non si ferma.
+
+PROVATO. `prove_conto_alla_rovescia_p2p` (+4: il bottone col bot finto,
+rosso/normale, il 400 senza colore, il 403 non ritentato; la soglia
+15/30/60 sì, 75 e 24 ore no, pagato/scaduto/chiuso mai; il testo «Manca
+1 minuto» mai «Mancano»; una volta sola, timbro prima dell'invio). Nei
+collaudi: `collaudo_tempo_pagare` (scambio Lightning di un'ora: bottone
+rosso; a 60 s dalla fine UN messaggio nuovo rosso, il giro dopo niente),
+`collaudo_p2p_onchain` (tempo di ore: bottone normale; a 60 s UN messaggio
+nuovo con le parole on-chain, non rosso). Controprove: soglia a 45 minuti,
+colore tolto, finestra del minuto a 10 secondi, timbro tolto → rosse.
+

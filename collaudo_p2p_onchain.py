@@ -2593,6 +2593,16 @@ def main():
                "Tempo per pagare: mancano" in mie()[0][1]["text"],
                "?scambio=bar-onchain-" in json.dumps(mie()[0][1].get("reply_markup")),
                riga["messaggio"] if riga else 0))
+        # (20 nov 2026, tasto-rosso-conto) il rosso e' solo fino a un'ora: questo
+        # scambio ha il tempo di sempre, e il bottone resta quello normale
+        con_oc = SRV._p2p_onchain_db()
+        try:
+            minuti_o5c = SRV._p2p_onchain_minuti(SRV._p2p_onchain_carica(con_oc, o5c["id"]))
+        finally:
+            con_oc.close()
+        prova("un tempo per pagare di ore: il bottone NON e' rosso (il rosso e' fino a "
+              "un'ora)", (True, False),
+              (minuti_o5c > 60, '"style"' in json.dumps(mie()[0][1].get("reply_markup"))))
         asyncio.run(SRV._giro_conto_p2p())
         prova("un giro subito dopo, stesso minuto: niente di nuovo (non si riscrive "
               "un testo uguale)", 1, len(mie()))
@@ -2623,6 +2633,32 @@ def main():
         asyncio.run(SRV._giro_conto_p2p())
         prova("a leva spenta nessun messaggio", prima, len(chiamate))
         gesto(999, o5d["id"], "chiedi-annullo")
+        SRV.P2P_CONTO_ALLA_ROVESCIA = True
+        o5e = pubblica(999).json()
+        mie_e = lambda: [c for c in chiamate if o5e["ordine"] in json.dumps(c[1])]
+        gesto(888, o5e["id"], "prendi")
+        paga(uno(999, o5e["id"]))
+        gesto(999, o5e["id"], "controlla")
+        asyncio.run(SRV._giro_conto_p2p())
+        # (20 nov 2026) l'avviso che suona a un minuto dalla fine, una volta sola
+        con_oc = SRV._p2p_onchain_db()
+        try:
+            fine_o5c = SRV.p2p_onchain_paga_entro(SRV._p2p_onchain_carica(con_oc, o5e["id"]))
+        finally:
+            con_oc.close()
+        n_prima = len(mie_e())
+        asyncio.run(SRV._giro_conto_p2p(fine_o5c - 60))
+        asyncio.run(SRV._giro_conto_p2p(fine_o5c - 20))
+        uno_min = [c for c in mie_e()[n_prima:] if c[0] == "sendMessage"]
+        prova("A UN MINUTO dalla fine: UN messaggio nuovo (che suona) «Manca 1 minuto» con "
+              "le parole dell'on-chain e il bottone dello scambio (non rosso: tempo di ore); "
+              "il giro dopo non lo ripete", (1, True, True, False),
+              (len(uno_min), bool(uno_min) and "⏰ Manca 1 minuto: hai già mandato gli"
+               in uno_min[0][1]["text"],
+               bool(uno_min) and "?scambio=bar-onchain-" in json.dumps(
+                   uno_min[0][1].get("reply_markup")),
+               bool(uno_min) and '"style"' in json.dumps(uno_min[0][1].get("reply_markup"))))
+        gesto(999, o5e["id"], "chiedi-annullo")
     finally:
         SRV.bot_api = vecchio_bot
         SRV.P2P_CONTO_ALLA_ROVESCIA = True

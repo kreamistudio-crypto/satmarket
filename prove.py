@@ -216394,6 +216394,92 @@ def prove_conto_alla_rovescia_p2p():
            'elif testo == (r["detto"] or ""):' in giro,
            "if finale and not int(r[\"messaggio\"] or 0):" in giro,
            'dati["reply_markup"] = tastiera' in scrivi])
+    # IL TASTO ROSSO (20 nov 2026, cantiere tasto-rosso-conto; Andrea: «quel
+    # messaggio lì deve avere il tasto sotto rosso»): il bottone si scrive
+    # davvero con un bot finto, e si guarda cosa parte
+    import asyncio as _aio
+    import json as _json
+    chiamate = []
+    risposte = []
+
+    async def bot_finto(metodo, dati):
+        chiamate.append((metodo, _json.loads(_json.dumps(dati))))
+        return risposte.pop(0) if risposte else {"ok": True, "result": {"message_id": 77}}
+    amb_t = {"bot_api": bot_finto, "json": _json, "_link_dentro_telegram": lambda u: u,
+             "P2P_CONTO_STILE_TASTO": "danger"}
+    exec("\n".join(l for l in src[src.index("\nP2P_CONTO_STILE_TASTO = "):].split("\n")[:2]), amb_t)
+    exec("async " + pezzo("_conto_scrivi_p2p"), amb_t)
+    W = amb_t["_conto_scrivi_p2p"]
+    tasto = lambda c: c[1]["reply_markup"]["inline_keyboard"][0][0]
+    bott = ("⚡ Apri lo scambio", "https://x/p2p?scambio=abc")
+    e1 = _aio.run(W({"tg_id": 5, "messaggio": 0}, "t", bott, rosso=True))
+    e2 = _aio.run(W({"tg_id": 5, "messaggio": 77}, "t2", bott, rosso=False))
+    risposte.append({"ok": False, "error_code": 400, "description": "Bad Request: style"})
+    n0 = len(chiamate)
+    e3 = _aio.run(W({"tg_id": 5, "messaggio": 0}, "t3", bott, rosso=True))
+    dopo = chiamate[n0:]
+    risposte.append({"ok": False, "error_code": 403, "description": "blocked"})
+    n1 = len(chiamate)
+    e4 = _aio.run(W({"tg_id": 5, "messaggio": 0}, "t4", bott, rosso=True))
+    prova("IL TASTO ROSSO: col tempo che corre il bottone porta `style` danger (stesso testo, "
+          "stesso link); fermato o finito torna normale; il colore di serie e' «danger»; un "
+          "400 sul colore rimanda lo STESSO messaggio senza colore (il conto non si ferma); "
+          "un 403 (bot bloccato) non si ritenta",
+          [("danger", "⚡ Apri lo scambio", "https://x/p2p?scambio=abc"), (77, True),
+           None, "danger", ((77, True), 2, "danger", None),
+           ((0, False), 1)],
+          [(tasto(chiamate[0]).get("style"), tasto(chiamate[0])["text"],
+            tasto(chiamate[0])["url"]), e1,
+           tasto(chiamate[1]).get("style") if e2 == (77, True) else "rotto",
+           amb_t["P2P_CONTO_STILE_TASTO"],
+           (e3, len(dopo), tasto(dopo[0]).get("style"), tasto(dopo[-1]).get("style")),
+           (e4, len(chiamate) - n1)])
+    amb_r = {}
+    exec("\n".join(l for l in src[src.index("\nP2P_CONTO_ROSSO_FINO_MIN = "):].split("\n")[:2]), amb_r)
+    exec(pezzo("conto_rosso_p2p"), amb_r)
+    R = amb_r["conto_rosso_p2p"]
+    prova("...e il giro lo accende SOLO mentre il tempo corre e SOLO fino a un'ora "
+          "compresa (Andrea: «la soglia di un'ora va bene»): 15, 30, 60 rossi; 75, 24 ore "
+          "e nessun tempo no; pagato, scaduto, chiuso mai",
+          [60, True, True, True, False, False, False, False, False, False, True, True],
+          [amb_r["P2P_CONTO_ROSSO_FINO_MIN"], R("corre", 15), R("corre", 30), R("corre", 60),
+           R("corre", 75), R("corre", 1440), R("corre", 0), R("pagato", 15),
+           R("scaduto", 15), R("chiuso", 15),
+           "rosso=conto_rosso_p2p(stato, minuti))" in giro,
+           'minuti = (fine - int(r["quando"] or 0)) // 60' in giro
+           and "minuti = int(_p2p_onchain_minuti(o) or 0) if o else 0" in giro])
+    # L'AVVISO CHE SUONA A UN MINUTO (20 nov 2026, Andrea: «Sì, metti il
+    # messaggio che manca un minuto»)
+    amb_u = {"P2P_ONCHAIN_SEGNO": "🟠"}
+    for nome in ("\nSOLLECITO_TEMPO_PAGARE_ULTIMO = (", "\nP2P_CONTO_UN_MINUTO_S = "):
+        i = src.index(nome) + 1
+        exec(src[i:src.index("\n\n", i)], amb_u)
+    exec(pezzo("testo_manca_un_minuto_p2p"), amb_u)
+    exec(pezzo("un_minuto_dovuto_p2p"), amb_u)
+    U, D = amb_u["testo_manca_un_minuto_p2p"], amb_u["un_minuto_dovuto_p2p"]
+    prova("A UN MINUTO: «Manca 1 minuto» (mai «Mancano 1 minuto») con le parole "
+          "dell'avviso a cinque minuti, del Lightning e dell'on-chain; parte solo col "
+          "tempo che corre e negli ultimi 90 secondi",
+          [True, True, False, True, True, True, False, False, False, False],
+          [U(False).startswith("⏰ Manca 1 minuto: hai già mandato gli euro? Tocca subito "
+                               "«Ho inviato gli euro»"),
+           "i sats tornano a chi vende, anche se hai già pagato" in U(False),
+           "Mancano" in U(False) + U(True),
+           U(True).startswith("🟠 ⏰ Manca 1 minuto: hai già mandato gli euro?"),
+           "aprire una disputa anche se hai già pagato" in U(True),
+           D("corre", 60) and D("corre", 90) and D("corre", 1),
+           D("corre", 91), D("corre", 0), D("pagato", 60), D("scaduto", 30)])
+    un = src[src.index("async def _conto_un_minuto_p2p("):]
+    un = un[:un.index("\n\n\nasync def ")]
+    prova("...UNA volta per conto (il timbro in p2p_avvisi PRIMA dell'invio), come "
+          "messaggio NUOVO (che suona) col bottone del conto, e solo a chi il conto "
+          "l'ha gia' ricevuto",
+          [True, True, True, True],
+          ["INSERT OR IGNORE INTO p2p_avvisi" in un
+           and un.index("INSERT OR IGNORE") < un.index("_conto_scrivi_p2p("),
+           '"manca_un_minuto:" + str(r["chiave"])' in un,
+           '{"tg_id": r["tg_id"], "messaggio": 0}' in un,
+           'if uno and int(r["messaggio"] or 0):' in giro])
     att = src[src.index("def _attese_tempo_pagare_p2p("):]
     att = att[:att.index("\n\n\ndef ")]
     prova("I GANCI: il Lightning nasce dove nascono i promemoria del tempo (stessa fine), "
