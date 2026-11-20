@@ -33821,6 +33821,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   vecchio. ⚠️ Il Lightning si rifà solo quando un telefono si apre:
   a telefono spento l'ordine resta fuori dal libro (scelta di Andrea,
   «Dal telefono, all'apertura»). Prove: `prove_ripubblica_p2p`.
+  «VUOI RIPUBBLICARLO? SÌ / NO» (20 nov 2026, cantiere
+  `ripubblica-semplice`; il perché in CANTIERI). Il foglio chiede solo
+  «Vuoi ripubblicarlo?», «No» (di serie) o «Sì»: i due prezzi non ci sono
+  più. Il «Sì» viaggia come l'intervallo più largo che si può scrivere,
+  1–`P2P_RIPUBBLICA_MAX` (`capiRipubblicaNuovoP2P`; lo riconoscono
+  `sempreRipubblicaP2P` e `_sempre_ripubblica_p2p`): niente colonne,
+  rotte né stati nuovi, e gli ordini già pubblicati con un intervallo
+  vero si giudicano come prima. IL RANGE DI UN «SÌ» È IL PARACADUTE,
+  ANCORATO AL PRIMO GIORNO: `_giudica_ripubblica_p2p` (alla scadenza, nei
+  `pronti` del telefono, nel lucchetto `prendo`, nella passata on-chain)
+  misura BTC in euro contro le soglie `su`/`giu` dalla `partenza` del
+  paracadute (`_para_ripubblica_p2p` legge `p2p_paracadute`; l'on-chain
+  le sue colonne `para_*`): oltre → `saltato`/`fuori`, e gli avvisi dicono
+  «oltre il tuo paracadute»; senza prezzo fresco non si giudica. Senza
+  paracadute (o con la partenza a 0) un «Sì» si rifà SEMPRE, anche senza
+  prezzo. La partenza non si sposta con le ripubblicazioni: l'on-chain
+  resta lo stesso ordine; sul Lightning il telefono dichiara il
+  paracadute dell'ordine rifatto col `da` (`ripubblicatoDa`, l'ordine di
+  prima) e `_dichiara_paracadute_p2p` copia la partenza dalla SUA riga di
+  quell'ordine, solo se è di chi dichiara (il telefono nomina un ordine,
+  mai un numero). Il «🔁 Ripubblica al prezzo nuovo» del paracadute è
+  una pubblicazione nuova: lì la partenza riparte.
 
 - LA CASSA DI RISONANZA SU X (9 ott 2026). I post di Barattolo su Nostr
   escono anche su X, dal server: un orologio in sottofondo

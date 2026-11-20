@@ -265,20 +265,19 @@ Il paracadute degli ordini P2P: nel foglio «Pubblica», dopo la pausa, la sezio
 <!-- pezzo libro-028 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (7/23)
 
-La ripubblica (dal 16 novembre 2026): gli ordini nel libro durano un tempo fissato, una settimana, sia quelli Lightning sia quelli on-chain (dal 16 novembre 2026; prima gli on-chain 24 ore), e poi scadono se nessuno li ha presi. Nel foglio «Pubblica», sotto il paracadute, c'è la sezione «🔁 Ripubblica»: scrivi due prezzi di un bitcoin, da X a Y, nella valuta dell'ordine (euro, franchi, o dollari per gli USDT; per gli ordini in ETH, Monero o USDe il prezzo di BTC è in euro). Quando l'ordine scade, se in quel momento BTC è fra quei due prezzi (anche esattamente su uno dei due), l'ordine viene ripubblicato uguale: stessa cifra, a prezzo fisso gli stessi sats, a mercato lo stesso premio o sconto, stessi metodi, zona e paracadute. Succede a ogni scadenza, finché BTC resta dentro. Se lasci i campi vuoti non si ripubblica niente, e il foglio riparte sempre vuoto. Il bot ti avvisa ogni volta, nel messaggio della scadenza: «Lo ripubblico uguale» oppure «Non l'ho ripubblicato», col prezzo di BTC di quel momento. Gli ordini Lightning li ripubblica il tuo telefono appena apri Barattolo (su qualunque pagina, senza fare niente): finché non lo apri l'ordine resta fuori dal libro, e se nel frattempo BTC è uscito dall'intervallo non si ripubblica. Gli ordini on-chain li ripubblica Barattolo subito, anche a telefono spento, per un'altra settimana. Per smettere: nella pagina del tuo ordine tocca «Non ripubblicarlo più». Sulla card del tuo ordine c'è la riga «🔁 Ripubblica da… a…». Non vale per Barattozon in «Vendi BTC» (il PayCode scade da solo); vale invece per Barattozon in «Compra BTC», dove il PayCode lo scrive chi prende l'ordine (dal 16 novembre 2026), e per gli ordini in ETH, Monero o USDe. Barattolo decide solo con un prezzo di BTC aggiornato, mai con uno vecchio.
+La ripubblica (dal 16 novembre 2026; semplificata il 20 novembre 2026): gli ordini nel libro durano una settimana, sia quelli Lightning sia quelli on-chain, e poi scadono se nessuno li ha presi. Nel foglio «Pubblica», al passo «3. Regole», sotto il paracadute, c'è la sezione «🔁 Ripubblica» con la domanda «Vuoi ripubblicarlo?» e due scelte, «No» (di serie, e il foglio riparte sempre da «No») e «Sì». Con «Sì», quando l'ordine scade senza che nessuno l'abbia preso, torna nel libro uguale: stessa cifra, a prezzo fisso gli stessi sats, a mercato lo stesso premio o sconto, stessi metodi, zona e paracadute. Succede a ogni scadenza. Il limite di prezzo lo fa il paracadute: se l'hai messo, l'ordine si ripubblica solo se BTC è ancora dentro le soglie misurate dal prezzo del giorno in cui l'hai pubblicato la prima volta, e quelle soglie non si spostano con le ripubblicazioni. Esempio: BTC a 100.000 € con paracadute 5% se sale e 5% se scende = fra 95.000 e 105.000 €, per sempre; se alla scadenza BTC è a 106.000 €, non si ripubblica. Con «se scende: Nessuna» in discesa non c'è limite. Senza paracadute, con «Sì» si ripubblica sempre, a qualunque prezzo. Il bot ti avvisa ogni volta, nel messaggio della scadenza: «Lo ripubblico uguale» oppure «Non l'ho ripubblicato: BTC è a…, oltre il tuo paracadute». Gli ordini Lightning li ripubblica il tuo telefono appena apri Barattolo (su qualunque pagina, senza fare niente): finché non lo apri l'ordine resta fuori dal libro. Gli ordini on-chain li ripubblica Barattolo subito, anche a telefono spento, per un'altra settimana. Per smettere: nella pagina del tuo ordine tocca «Non ripubblicarlo più». Sulla card del tuo ordine, che vedi solo tu, c'è la riga «🔁 Si ripubblica alla scadenza». Gli ordini pubblicati prima del 20 novembre con due prezzi «da… a…» vanno avanti come prima (card «🔁 Ripubblica fra… e…»). Non vale per Barattozon in «Vendi BTC» (il PayCode scade da solo); vale invece per Barattozon in «Compra BTC» e per gli ordini in ETH, Monero o USDe. Paracadute e ripubblica sono due cose diverse: il paracadute toglie l'ordine PRIMA, se BTC si muove troppo mentre aspetta nel libro; la ripubblica lo rimette DOPO, quando scade. Un ordine tolto dal paracadute non si ripubblica da solo: si rifà col tasto «🔁 Ripubblica al prezzo nuovo».
 
 La disputa nel P2P: si apre solo coi sats già in garanzia, col bottone «⚠️ Apri una disputa» in fondo alla pagina dello scambio (nella scheda «📋 Passi»). Ferma lo scambio e chiama un moderatore, che potrà leggere la chat di quello scambio. Se è solo una domanda o un ritardo, prima scrivi all'altra persona nella chat. Chi vende può sempre liberare i sats anche a disputa aperta, e la disputa si chiude.
 
 La chat dello scambio: da quando l'ordine è preso a quando lo scambio finisce c'è una chat fra voi due, cifrata, con foto e PDF. A fine scambio si cancella. Barattolo non ti scrive mai nella chat dello scambio: chi lì si presenta come «assistenza» è l'altra persona.
 
+<!-- pezzo libro-029 | libro -->
+## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (8/23)
+
 Contanti di persona (metodo «Contanti»): ci si incontra, chi compra sats porta le banconote, chi vende le conta e libera i sats lì, davanti all'altro. Le regole:
 - i contanti si consegnano solo quando chi vende preme «Libera i sats» davanti a te, e si va via solo con lo scambio concluso;
 - vedetevi in un posto pubblico e di giorno, contate insieme, mai grosse cifre da soli;
 - chi vende fissa l'appuntamento (giorno, ora, luogo) dentro lo scambio;
-
-<!-- pezzo libro-029 | libro -->
-## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (8/23)
-
 - all'arrivo ognuno può toccare «📍 Sono qui»: registra ora e, se il telefono la dà, la posizione. È facoltativo ma aiuta nelle dispute;
 - c'è un tetto in euro per scambio (vedi i NUMERI DI OGGI); sopra si divide in più ordini. Chi prende un ordine in contanti può dover bloccare una piccola cauzione.
 
@@ -2710,3 +2709,11 @@ frase: Barattolo Negozio diventa un'app Android tutta sua, con la sua icona (la 
 dove: Zapstore → «Barattolo Negozio» (accanto a Barattolo, stesso firmatario).
 leva: CASSA_ATTIVA (accesa di serie)
 pubblico: no
+
+<!-- pezzo novita-146 | novita -->
+## Novità · 2026-11-20 · ripubblica-semplice
+
+frase: La ripubblica degli ordini P2P è più semplice: pubblicando ti chiediamo solo «Vuoi ripubblicarlo?». Con Sì, se nessuno prende l'ordine nei suoi 7 giorni, alla scadenza torna nel libro uguale, da solo, ogni volta. Se hai messo il paracadute, si ripubblica solo finché BTC resta dentro le soglie del giorno in cui l'hai pubblicato.
+dove: P2P → il + → «Pubblica» → «3. Regole» → «🔁 Ripubblica».
+leva: P2P_RIPUBBLICA (accesa di serie)
+pubblico: sì

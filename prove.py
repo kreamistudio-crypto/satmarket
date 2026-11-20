@@ -191211,6 +191211,20 @@ def prove_paracadute_p2p():
           [dich(con, P, {g1: {"su": 20, "giu": 5}, g2: {"su": 10, "giu": 0}, g3: 20,
                          g4: {"su": 0, "giu": 0}, g5: {"su": 7, "giu": "x"}}, t[0], 100000),
            para2(g1), para2(g2), para2(g3), para2(g4), para2(g5)])
+    # LA RIPUBBLICA SI PORTA DIETRO LA PARTENZA (20 nov 2026, ripubblica-semplice)
+    g7, g8, g9, g10 = ordine(), ordine(), ordine(), ordine()
+    con.execute("INSERT INTO p2p_paracadute(ordine, tg_id, soglia, partenza, creato, su, giu) "
+                "VALUES(?,?,?,?,?,?,?)", (o_altrui, 333, 5, 50000.0, t[0], 5, 5))
+    prova("L'ORDINE RIFATTO DALLA RIPUBBLICA (`da`) tiene la partenza del suo ordine di prima; "
+          "un `da` storto, senza riga o di un altro prende il cambio di adesso",
+          [4, (5, 5, 5, 100000.0), (5, 5, 5, 120000.0), (5, 5, 5, 120000.0), (5, 5, 5, 120000.0)],
+          [dich(con, P, {g7: {"su": 5, "giu": 5, "da": g1}, g8: {"su": 5, "giu": 5, "da": "x"},
+                         g9: {"su": 5, "giu": 5, "da": g5},
+                         g10: {"su": 5, "giu": 5, "da": o_altrui}}, t[0], 120000),
+           para2(g7), para2(g8), para2(g9), para2(g10)])
+    prova("...e il telefono lo dice solo per la riga rifatta, col nome dell'ordine di prima",
+          [True, True], ["fuori[id].da = String(riga.ripubblicatoDa);" in mini,
+                         "creato: adesso, aggiornato: adesso, ripubblicatoDa: o.id" in mini])
     prova("...e chi l'ha pubblicato le rilegge fra i suoi, una per verso",
           [{"soglia": 20, "su": 20, "giu": 5}, {"soglia": 10, "su": 10, "giu": 0}],
           [{k: miei(con, P)[g1][k] for k in ("soglia", "su", "giu")},
@@ -191335,6 +191349,15 @@ def prove_ripubblica_p2p():
         exec(src[j:src.index("\n", j)].split("  #")[0], amb)
     MONETE = {}
     amb["p2p_coin_ordine"] = lambda c, o: MONETE.get(o, "")
+    # il paracadute fa da range al «Sì» (20 nov 2026, ripubblica-semplice)
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_paracadute(")
+    con.executescript(src[i:src.index("ON p2p_paracadute(tg_id);", i)] + "ON p2p_paracadute(tg_id);")
+    j = src.index("\nP2P_PARACADUTE_SOGLIE = (") + 1
+    exec(src[j:src.index(")\n", j) + 2], amb)
+    for f in ("_soglia_paracadute_p2p", "_versi_riga_paracadute_p2p", "_scarto_paracadute_p2p",
+              "_sempre_ripubblica_p2p", "_dentro_paracadute_p2p", "_para_valido_p2p",
+              "_giudica_ripubblica_p2p", "_para_ripubblica_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
     for f in ("_metodi_lista_p2p", "p2p_chf_ordine", "p2p_usdt_ordine", "_intervallo_ripubblica_p2p",
               "_valuta_ripubblica_p2p", "_dentro_ripubblica_p2p", "_prezzo_ripubblica_p2p",
               "_valuta_ordine_ripubblica_p2p", "_dichiara_ripubblica_p2p",
@@ -191485,6 +191508,79 @@ def prove_ripubblica_p2p():
     prova("le mie per la card: niente fatti ne' tolti", sorted([D, E, F, G]),
           sorted(amb["_miei_ripubblica_p2p"](con, 111)))
 
+    # IL «SÌ» (20 nov 2026, cantiere ripubblica-semplice, scheda «Solo Sì/No,
+    # paracadute fisso»): viaggia come 1–P2P_RIPUBBLICA_MAX; il range e' il
+    # paracadute del primo giorno; senza paracadute si ripubblica sempre
+    sempre = amb["_sempre_ripubblica_p2p"]
+    prova("il «Sì» e' l'intervallo piu' largo, e solo quello; il server lo accetta gia'",
+          [True, False, False, False, (1, 100_000_000)],
+          [sempre(1, 100_000_000), sempre(2, 100_000_000), sempre(1, 99_999_999),
+           sempre(90000, 100000), iv({"minimo": 1, "massimo": 100_000_000})])
+    dpar = amb["_dentro_paracadute_p2p"]
+    prova("dentro il paracadute: al filo si', un euro oltre no; un verso a 0 non guarda",
+          [True, True, False, True, False, True, True],
+          [dpar(5, 5, 100000, 105000), dpar(5, 5, 100000, 95000), dpar(5, 5, 100000, 105001),
+           dpar(5, 0, 100000, 40000), dpar(5, 0, 100000, 105001), dpar(0, 0, 100000, 1),
+           dpar(5, 5, 100000, 100000)])
+    giud = amb["_giudica_ripubblica_p2p"]
+    prova("il giudizio: intervallo vero com'era; «Sì» senza paracadute sempre dentro, anche "
+          "senza prezzo; «Sì» col paracadute sulle soglie in euro, e senza prezzo fresco muto; "
+          "un paracadute senza partenza non e' un range",
+          [("dentro", 95000.0, False), ("muto", 0.0, False), ("dentro", 0.0, False),
+           ("dentro", 88000.0, True), ("fuori", 88000.0, True), ("muto", 0.0, True),
+           ("dentro", 95000.0, False)],
+          [giud(90000, 100000, "eur", None, PREZZI, ORA - 60, ORA),
+           giud(90000, 100000, "eur", None, PREZZI, ORA - 3600, ORA),
+           giud(1, 100_000_000, "eur", None, PREZZI, ORA - 3600, ORA),
+           giud(1, 100_000_000, "chf", (5, 5, 92000.0), PREZZI, ORA - 60, ORA),
+           giud(1, 100_000_000, "chf", (5, 0, 90000.0), PREZZI, ORA - 60, ORA),
+           giud(1, 100_000_000, "eur", (5, 5, 92000.0), PREZZI, ORA - 3600, ORA),
+           giud(1, 100_000_000, "eur", (5, 5, 0), PREZZI, ORA - 60, ORA)])
+    H, K, L = ("0199b7c1-2d3e-4f50-a1b2-c3d4e5f6b00" + n for n in "123")
+    for oid in (H, K, L):
+        ordine(oid, 111)
+    dich(con, 111, {H: {"minimo": 1, "massimo": 100_000_000},
+                    K: {"minimo": 1, "massimo": 100_000_000},
+                    L: {"minimo": 1, "massimo": 100_000_000}}, ORA)
+    # K col paracadute «sale 5%» da 89.000 (BTC adesso 95.000: fuori), L «scende 5%» da 98.000
+    con.execute("INSERT INTO p2p_paracadute(ordine, tg_id, soglia, partenza, creato, su, giu) "
+                "VALUES(?,?,?,?,?,?,?)", (K, 111, 5, 89000.0, ORA, 5, 0))
+    con.execute("INSERT INTO p2p_paracadute(ordine, tg_id, soglia, partenza, creato, su, giu) "
+                "VALUES(?,?,?,?,?,?,?)", (L, 111, 5, 98000.0, ORA, 0, 5))
+    rH, rK, rL = scade(H, PREZZI, eta=3600), scade(K, PREZZI), scade(L, PREZZI)
+    prova("ALLA SCADENZA: «Sì» senza paracadute `pronto` anche senza prezzo fresco; col "
+          "paracadute oltre la soglia `saltato`, dentro `pronto`",
+          [("pronto", None), ("saltato", True), ("pronto", True)],
+          [(rH[1], rH[0].get("paracadute")), (rK[1], rK[0].get("paracadute")),
+           (rL[1], rL[0].get("paracadute"))])
+    frase = amb["_frase_ripubblica_p2p"]
+    prova("...e il bot lo dice senza intervallo: lo ripubblico, o «oltre il tuo paracadute» "
+          "(testi approvati da Andrea)",
+          ["🔁 <b>Lo ripubblico uguale</b> appena apri Barattolo, non devi fare niente.",
+           "🔁 <b>Non l'ho ripubblicato</b>: BTC è a 95.000 €, oltre il tuo paracadute. "
+           "Puoi ripubblicarlo quando vuoi.",
+           "🔁 <b>Lo ripubblico uguale</b> appena apri Barattolo, non devi fare niente."],
+          [frase(rH[0]), frase(rK[0]), frase(rL[0])])
+    prova("QUANDO IL TELEFONO CHIEDE: senza prezzo fresco parte solo il «Sì» senza "
+          "paracadute; il lucchetto lo prende anche cosi'",
+          [([H], []), {"ok": True, "stato": "in_corso"}],
+          [pronti(con, 111, PREZZI, ORA - 3600, ORA),
+           gesto(con, 111, H, "prendo", PREZZI, ORA - 3600, ORA)])
+    p, s = pronti(con, 111, {"eur": 92000.0}, ORA - 60, ORA)
+    prova("...BTC sceso oltre il paracadute di L (da 98.000 a 92.000): `saltato`, detto col "
+          "segno del paracadute", [[], [L], [True]],
+          [p, [x["ordine"] for x in s], [x.get("paracadute") for x in s]])
+    M = "0199b7c1-2d3e-4f50-a1b2-c3d4e5f6b004"
+    con.execute("INSERT INTO p2p_ripubblica(ordine, tg_id, minimo, massimo, creato, stato) "
+                "VALUES(?,?,?,?,?,?)", (M, 111, 1, 100_000_000, ORA, "pronto"))
+    con.execute("INSERT INTO p2p_paracadute(ordine, tg_id, soglia, partenza, creato, su, giu) "
+                "VALUES(?,?,?,?,?,?,?)", (M, 111, 5, 80000.0, ORA, 5, 5))
+    prova("...e il lucchetto non prende un «Sì» oltre il paracadute: lo salta e lo dice",
+          [{"ok": False, "motivo": "prezzo"},
+           {"ok": False, "motivo": "fuori", "prezzo": 95000.0, "paracadute": True}, "saltato"],
+          [gesto(con, 111, M, "prendo", PREZZI, ORA - 3600, ORA), g(M, "prendo"),
+           con.execute("SELECT stato FROM p2p_ripubblica WHERE ordine=?", (M,)).fetchone()[0]])
+
     # --- 3) L'ON-CHAIN: la ronda rimette nel libro ------------------------
     oc = sqlite3.connect(":memory:")
     oc.row_factory = sqlite3.Row
@@ -191519,6 +191615,35 @@ def prove_ripubblica_p2p():
     prova("...senza un prezzo fresco non rifa' niente e non dice niente", [[], [7]],
           [amb["_p2p_onchain_passata_ripubblica"](oc, [7], PREZZI, ORA - 3600, ORA), [7]])
     testi = [amb["_p2p_onchain_testo_ripubblica"](a) for a in rif]
+    # il «Sì» on-chain (20 nov 2026): senza paracadute sempre, anche senza prezzo
+    # fresco; col paracadute sulle soglie della partenza, che non si sposta
+    for col in ("paracadute INTEGER DEFAULT 0", "para_su INTEGER DEFAULT -1",
+                "para_giu INTEGER DEFAULT -1", "para_partenza REAL DEFAULT 0"):
+        oc.execute("ALTER TABLE p2p_onchain_ordini ADD COLUMN " + col)
+    for oid, para, su, giu, partenza in ((5, 0, -1, -1, 0.0), (6, 5, 5, 0, 89000.0),
+                                         (7, 5, 0, 5, 98000.0)):
+        oc.execute("INSERT INTO p2p_onchain_ordini(id, ordine, lato, maker_id, euro_cent, metodi,"
+                   " stato, scade, aggiornato, rip_minimo, rip_massimo, paracadute, para_su,"
+                   " para_giu, para_partenza) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                   (oid, f"bar-onchain-{oid}", "sell", 111, 10000, '["SEPA"]', "pending", ORA - 1,
+                    ORA - 9, 1, 100_000_000, para, su, giu, partenza))
+    sc_muto = [5, 6, 7]
+    muti = amb["_p2p_onchain_passata_ripubblica"](oc, sc_muto, PREZZI, ORA - 3600, ORA)
+    sc_vivo = [6, 7]
+    vivi = amb["_p2p_onchain_passata_ripubblica"](oc, sc_vivo, PREZZI, ORA - 60, ORA)
+    prova("IL «SÌ» ON-CHAIN: senza paracadute rifatto anche senza prezzo fresco; col "
+          "paracadute muto non si giudica, poi oltre la soglia scade e dentro resta",
+          [[6, 7], {5: "rifatto"}, [6], {6: "fuori", 7: "rifatto"}],
+          [sc_muto, {a["id"]: a["esito"] for a in muti}, sc_vivo,
+           {a["id"]: a["esito"] for a in vivi}])
+    t_oc = {a["id"]: amb["_p2p_onchain_testo_ripubblica"](a) for a in muti + vivi}
+    prova("...e gli avvisi lo dicono senza intervallo (testi approvati da Andrea)",
+          ["🟠 🔁 <b>Ho ripubblicato il tuo ordine on-chain di vendita da 100,00 €</b>: era "
+           "scaduto. Resta nel libro altri 7 giorni, uguale.",
+           "🟠 ⏰ <b>Il tuo ordine on-chain di vendita da 100,00 € è scaduto</b> e non l'ho "
+           "ripubblicato: BTC è a 95.000 €, oltre il tuo paracadute. Puoi ripubblicarlo quando "
+           "vuoi dal libro degli ordini."],
+          [t_oc.get(5), t_oc.get(6)])
     prova("...e i due avvisi lo dicono, coi soldi giusti", [True, True, True],
           ["🔁 <b>Ho ripubblicato il tuo ordine on-chain di vendita da 50,00 €</b>: era scaduto e "
            "BTC è a 95.000 €, dentro il tuo intervallo (90.000–100.000 €)." in testi[0],
@@ -191550,9 +191675,10 @@ def prove_ripubblica_p2p():
           # (16 nov 2026, mappa-recenti) col percorso di chi VENDE, non col
           # metodo: Barattozon in compra ha la sua sezione
           ["sezioneRipubblicaNuovoP2P(tab) : '';" in fn("function renderNuovoOrdineP2P(){"),
-           "ripMin: typeof p2pNuovoRipMin === 'string' ? p2pNuovoRipMin : ''," in fn("function campiNuovoP2P(){"),
+           "ripMin: typeof capiRipubblicaNuovoP2P === 'function' ? capiRipubblicaNuovoP2P(p2pNuovoRipSi === true)[0] : '',"
+           in fn("function campiNuovoP2P(){"),
            "if (ripOrd) ord.ripubblica = ripOrd;" in fn("async function inviaNuovoOrdineP2P(confermato){"),
-           "p2pNuovoRipMin = ''; p2pNuovoRipMax = '';" in fn("function apriNuovoOrdineP2P(metodo){"),
+           "p2pNuovoRipSi = false;" in fn("function apriNuovoOrdineP2P(metodo){"),
            "if (ripOc) corpo.ripubblica = ripOc;" in fn("async function pubblicaOnchainDalFoglioP2P(confermato){")])
     prova("...l'intervallo storto si dice PRIMA di pubblicare, nei due fogli", 2,
           m.count("if (noRip) { toast(noRip, 6000);"))
@@ -191615,16 +191741,24 @@ c.intero = ['95.000', '95 000', '95000', '95000,4', 'x', '', '-5', '1e5'].map(in
 c.iv = [intervalloRipubblicaP2P('', ''), intervalloRipubblicaP2P('90.000', '100.000'),
         intervalloRipubblicaP2P('90000', ''), intervalloRipubblicaP2P('100000', '90000'),
         intervalloRipubblicaP2P('1', '200000000')];
-c.frasi = [fraseRipubblicaNuovoP2P('', '', 'EUR'), fraseRipubblicaNuovoP2P('90000', '100000', 'EUR'),
-           fraseRipubblicaNuovoP2P('90000', '', 'CHF'), fraseRipubblicaNuovoP2P('80000', '90000', 'CHF')];
+c.frasi = fraseRipubblicaNuovoP2P();
+/* «Vuoi ripubblicarlo?» (20 nov 2026): No di serie, niente campi */
+const sezNo = sezioneRipubblicaNuovoP2P(false);
+c.sezNo = [(sezNo.match(/<input/g) || []).length, sezNo.indexOf('Vuoi ripubblicarlo?') > 0,
+           sezNo.indexOf('aria-pressed="true" data-si="0"') > 0, sezNo.indexOf('>No</button>') > 0,
+           sezNo.indexOf('>Sì</button>') > 0];
+p2pNuovoRipSi = true;
 const sez = sezioneRipubblicaNuovoP2P(false);
-c.sezione = [sez.split('§')[0], (sez.match(/<input/g) || []).length, sez.indexOf('>€<') > 0];
+c.sezione = [sez.split('§')[0], (sez.match(/<input/g) || []).length, sez.indexOf('aria-pressed="true" data-si="1"') > 0];
+c.capi = [capiRipubblicaNuovoP2P(false), capiRipubblicaNuovoP2P(true)];
+c.sempre = [sempreRipubblicaP2P({minimo: 1, massimo: 100000000}), sempreRipubblicaP2P({minimo: 2, massimo: 100000000}),
+            sempreRipubblicaP2P({minimo: 90000, massimo: 100000}), sempreRipubblicaP2P(null),
+            ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '1', ripMax: '100000000'})];
 const conTab = sezioneRipubblicaNuovoP2P(true);
 VALUTA_FOGLIO = 'ETH'; const inMoneta = sezioneRipubblicaNuovoP2P(false); VALUTA_FOGLIO = 'EUR';
 LEVE = {ripubblica: false}; const spenta = sezioneRipubblicaNuovoP2P(false); LEVE = {ripubblica: true};
 /* in moneta si' dal 16 nov 2026 (ricevi-mercato), e BTC si misura in euro */
-c.fuori = [conTab, inMoneta.indexOf('🔁 Ripubblica') === 0 && inMoneta.indexOf('>€<') > 0
-  && inMoneta.indexOf('BTC adesso: 95.000 €') > 0, spenta];
+c.fuori = [conTab, inMoneta.indexOf('🔁 Ripubblica') === 0, spenta];
 c.daCampi = [ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '90000', ripMax: '100000'}),
              ripubblicaDaCampiP2P({metodi: ['SEPA'], valuta: 'EUR', ripMin: '', ripMax: ''}),
              ripubblicaDaCampiP2P({metodi: ['Contanti al tabacchino'], valuta: 'EUR', ripMin: '1', ripMax: '2'}),
@@ -191642,6 +191776,16 @@ MIE[ID3] = {id: ID3, mio: true, stato: 'annullato', lato: 'compro', sats: 0, eur
             premium: 2, metodi: ['Revolut'], fiat: 'CHF', ripubblica: {minimo: 80000, massimo: 90000},
             creato: Date.now() / 1000};
 c.dichiara = ripubblicaDaDichiarareP2P([ID, ID2, ID3]);
+/* il «Sì» sulla card e nella pagina del mio ordine (20 nov 2026) */
+const ID4 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60004';
+MIE[ID4] = {id: ID4, mio: true, stato: 'pubblicato', lato: 'vendo', fiat: 'EUR',
+            ripubblica: {minimo: 1, massimo: 100000000}};
+c.sempreCard = [segnoRipubblicaP2P(MIE[ID4]), riquadroRipubblicaP2P(MIE[ID4]).indexOf(
+  '>🔁 Quando scade, se nessuno l\'ha preso, si ripubblica uguale.</div>') > 0,
+  riquadroRipubblicaP2P(MIE[ID4]).indexOf('Non ripubblicarlo più') > 0];
+p2pMieRipubbliche[ID4] = {minimo: 1, massimo: 100000000, stato: 'pronto'};
+c.sempreCard.push(riquadroRipubblicaP2P(MIE[ID4]).indexOf('>🔁 È scaduto: lo sto ripubblicando uguale.</div>') > 0);
+delete MIE[ID4]; delete p2pMieRipubbliche[ID4];
 c.segno = [segnoRipubblicaP2P(MIE[ID]), segnoRipubblicaP2P(MIE[ID3])];
 const uguale = campiRipubblicaUgualeP2P(MIE[ID], 1790000000);
 const range = campiRipubblicaUgualeP2P(MIE[ID3], 1790000000);
@@ -191687,18 +191831,25 @@ console.log(JSON.stringify(c));
            {"errore": "Scrivi tutti e due i prezzi di BTC, il minimo e il massimo, o lasciali vuoti"},
            {"errore": "Il prezzo minimo di BTC deve essere più basso del massimo"},
            {"errore": "Questo prezzo di BTC è troppo alto: controlla gli zeri"}], c.get("iv"))
-    prova("la riga sotto i campi: cosa fa, col prezzo di adesso nella valuta del foglio",
-          ["Quando l'ordine scade, se BTC è fra questi due prezzi lo ripubblichiamo uguale, da "
-           "solo. Vuoto = non si ripubblica. BTC adesso: 95.000 €.",
-           "Alla scadenza, se BTC è fra 90.000 e 100.000 €, l'ordine si ripubblica uguale, ogni "
-           "volta che scade. Parte appena apri Barattolo. BTC adesso: 95.000 €.",
-           "⚠️ Scrivi tutti e due i prezzi di BTC, il minimo e il massimo, o lasciali vuoti.",
-           "Alla scadenza, se BTC è fra 80.000 e 90.000 CHF, l'ordine si ripubblica uguale, ogni "
-           "volta che scade. Parte appena apri Barattolo. BTC adesso: 88.000 CHF."], c.get("frasi"))
-    prova("la sezione: «🔁 Ripubblica», due campi e il simbolo; mai con Barattozon o a leva spenta; "
-          "in moneta SI' (16 nov 2026, ricevi-mercato), coi prezzi di BTC in euro",
-          [["🔁 Ripubblica", 2, True], ["", True, ""]],
-          [c.get("sezione"), c.get("fuori")])
+    prova("la riga sotto la sezione (testo approvato da Andrea il 20 nov 2026)",
+          "Un ordine resta nel libro 7 giorni. Con Sì, se nessuno lo prende, alla scadenza torna "
+          "nel libro uguale, da solo, ogni volta. Se hai messo il paracadute, solo finché BTC "
+          "resta dentro le soglie di oggi.", c.get("frasi"))
+    prova("«Vuoi ripubblicarlo?»: No e Sì, di serie No, niente campi da scrivere",
+          [0, True, True, True, True], c.get("sezNo"))
+    prova("la sezione col Sì: «🔁 Ripubblica», nessun campo; mai con Barattozon o a leva "
+          "spenta; in moneta SI' (16 nov 2026, ricevi-mercato)",
+          [["🔁 Ripubblica", 0, True], ["", True, ""]], [c.get("sezione"), c.get("fuori")])
+    prova("i capi che partono: No = vuoti; Sì = 1–100.000.000, l'intervallo piu' largo",
+          [["", ""], ["1", "100000000"]], c.get("capi"))
+    prova("...il «Sì» si riconosce come sul server, e parte come un intervallo buono",
+          [True, False, False, False, {"minimo": 1, "massimo": 100000000}], c.get("sempre"))
+    prova("...e sulla card e nella pagina del mio ordine si dice senza prezzi (testi approvati)",
+          ['<div class="p2p-box p2p-paracadute">🔁 Si ripubblica alla scadenza</div>', True, True, True],
+          c.get("sempreCard"))
+    prova("...e gli avvisi nell'app dicono il paracadute quando e' lui a fermarla",
+          [True, True], ["(s.paracadute ? ', oltre il tuo paracadute' : ', fuori dal tuo intervallo')"
+                         in chiede, "+ ', oltre il tuo paracadute'" in chiede])
     prova("dai campi all'ordine: solo un intervallo buono, mai Barattozon in vendita (in compra si'); "
           "l'errore si dice",
           [{"minimo": 90000, "massimo": 100000}, None, None, None, {"minimo": 90000, "massimo": 100000},

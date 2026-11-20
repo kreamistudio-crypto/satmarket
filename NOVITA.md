@@ -908,3 +908,10 @@ frase: Barattolo Negozio diventa un'app Android tutta sua, con la sua icona (la 
 dove: Zapstore → «Barattolo Negozio» (accanto a Barattolo, stesso firmatario).
 leva: CASSA_ATTIVA (accesa di serie)
 pubblico: no
+
+## 2026-11-20 · ripubblica-semplice
+frase: La ripubblica degli ordini P2P è più semplice: pubblicando ti chiediamo solo «Vuoi ripubblicarlo?». Con Sì, se nessuno prende l'ordine nei suoi 7 giorni, alla scadenza torna nel libro uguale, da solo, ogni volta. Se hai messo il paracadute, si ripubblica solo finché BTC resta dentro le soglie del giorno in cui l'hai pubblicato.
+dove: P2P → il + → «Pubblica» → «3. Regole» → «🔁 Ripubblica».
+leva: P2P_RIPUBBLICA (accesa di serie)
+pubblico: sì
+
