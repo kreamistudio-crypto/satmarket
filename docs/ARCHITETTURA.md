@@ -38090,3 +38090,20 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `P2P_ONCHAIN_RIPRENDI_SCADUTO` (accesa) e
   `P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN` (chiusa: solo i moderatori),
   il flag `riprendi_scaduto` nella pagina dello scambio.
+- LE SESSIONI ATTIVE (20 nov 2026, cantiere audit-giro4; Alan: «come fa
+  telegram»): `GET /api/me/sessioni-attive` e `POST
+  /api/me/sessioni-attive/chiudi` (freno `sessioni_attive`). Le sessioni
+  web vive dell'account (`sessioni`, dalla più vecchia) col nome del
+  dispositivo, che nasce in `crea_sessione` dallo user agent
+  (`nome_dispositivo`, due elenchi chiusi: browser e sistema; il conto
+  della richiesta porta `ua`) nella tabella laterale
+  `dispositivi_sessione` (token_hash → nome; mai lo user agent intero).
+  LA REGOLA, nel giudice `_sessioni_attive_di`: da una sessione web si
+  chiudono solo quelle PIÙ GIOVANI (`creato` maggiore), mai la propria
+  (per quella c'è «Esci»); la Mini App vale come la più vecchia — ma
+  solo con l'initData del PROPRIO Telegram (`_chi_guarda_sessioni`), un
+  account scelto dentro la Mini App è una sessione web come le altre.
+  Fuori esce solo un id corto (16 cifre dell'hash del token); la
+  chiusura è un `DELETE` con `tg_id` nel `WHERE` e la traccia «logout».
+  Nella pagina: Profilo → «💻 Sessioni attive» (`apriSessioniAttive`,
+  `renderSessioniAttive`, foglio `sessioniSheet`).

@@ -860,3 +860,9 @@ frase: Negli scambi P2P col tempo per pagare, anche chi vende riceve su Telegram
 dove: Telegram, chat del bot: quando parte il tempo per pagare di chi compra (Lightning e on-chain), il messaggio «⏳ Chi compra ha ancora … per pagare» col bottone dello scambio.
 leva: P2P_CONTO_ALLA_ROVESCIA (accesa di serie)
 pubblico: sì
+
+## 2026-11-20 · sessioni-attive
+frase: Nel Profilo c'è «💻 Sessioni attive»: vedi dove è aperto il tuo account (la Mini App e ogni browser in cui sei entrato) e chiudi quelle che non riconosci. Come su Telegram, da una sessione chiudi solo quelle aperte dopo; dalla Mini App le chiudi tutte.
+dove: Profilo → gruppo «Impostazioni» → «💻 Sessioni attive».
+leva: nessuna
+pubblico: sì

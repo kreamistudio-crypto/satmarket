@@ -496,7 +496,7 @@ Il nome verificato su Nostr (se nelle REGOLAZIONI del pannello «Nome verificato
 Su Nostr risponde anche Tappo: si può scrivere un DM al profilo «Barattolo» (npub19ea0u0u6lrpaeyxkazk27ht64yn22ncvytcu24tswvyuqk07svds63txqy) oppure rispondere sotto le sue note, e Tappo risponde come su Telegram. Ai bot e allo spam non risponde, e se qualcuno dello staff sta già seguendo quella conversazione lascia parlare lui. Per un problema con un ordine, in pubblico Tappo invita a scrivergli in privato.
 
 <!-- pezzo libro-051 | libro -->
-## Libro · I tuoi dati, in breve
+## Libro · I tuoi dati, in breve (1/2)
 
 Barattolo sa di te pochissimo: niente email, password o telefono. Da Telegram riceve il numero identificativo, il nome e lo username; da Nostr solo la chiave pubblica. L'indirizzo di spedizione è cifrato e si cancella quando confermi di aver ricevuto. Niente tracciamento, niente pubblicità, niente cookie di terzi. Tutto è spiegato nella pagina «I tuoi dati» (barattolo.store/privacy).
 
@@ -504,19 +504,24 @@ L'indirizzo IP: come ogni server, quello di Barattolo vede l'IP di chi si colleg
 
 Tor: Barattolo ha anche un sito .onion, lo stesso Barattolo dentro la rete Tor. Da lì il server non vede il tuo IP e non lo scrive da nessuna parte. L'indirizzo esatto è nella pagina «I tuoi dati», e quando apri barattolo.store con Tor Browser la barra degli indirizzi ti propone da sola la versione .onion («.onion disponibile»). Con un .onion conta ogni carattere: usa solo quello ufficiale.
 
+Sessioni attive: nel Profilo, nel gruppo «Impostazioni» accanto a «🔐 I tuoi dati», c'è «💻 Sessioni attive». Mostra dove è aperto il tuo account: la Mini App di Telegram e ogni browser in cui sei entrato dal sito (per esempio «Chrome su Windows»), con la data. Come su Telegram, da una sessione chiudi solo quelle aperte DOPO di lei, mai una più vecchia; dalla Mini App di Telegram le chiudi tutte. La sessione da cui stai guardando non si chiude da lì: per quella c'è «Esci». Se vedi un browser che non riconosci, chiudilo dalla Mini App.
+
 Cancellare l'account: nel Profilo, nel gruppo «Impostazioni» accanto a «🔐 I tuoi dati», c'è «🗑 Cancella il mio account» (se la voce non c'è, oggi non è disponibile). Si può fare solo quando non hai niente in corso: se c'è un ordine non concluso, un pagamento in arrivo, sats ancora da ricevere, un'asta con puntate o uno scambio P2P aperto, il foglio te lo elenca e il bottone non compare finché non è tutto chiuso. Poi il foglio dice cosa sparisce e cosa resta; per confermare scrivi CANCELLA e tocchi «🗑 Cancella per sempre». Non si può annullare.
 - Spariscono il profilo (nome, foto, Lightning address, chiave Nostr collegata), i preferiti, gli avvisi, gli indirizzi salvati e le chat; gli annunci in vetrina vengono ritirati, anche da Nostr e dai canali; le recensioni ricevute, i punti e l'eventuale posto da pioniere si perdono.
 - Restano, senza il tuo nome, gli ordini conclusi e i pagamenti (per la contabilità e le contestazioni: chi ha fatto affari con te vede «Utente cancellato») e le recensioni che hai scritto, senza firma.
 - Di te Barattolo tiene solo un'impronta del numero dell'account (non il numero, e mai il telefono) con la data, e le eventuali penalità degli scambi P2P: se rientri con lo stesso account parti da zero, e tornano solo quelle. La chat col bot la togli tu da Telegram, e i messaggi Nostr firmati da te restano tuoi.
 
+<!-- pezzo libro-052 | libro -->
+## Libro · I tuoi dati, in breve (2/2)
+
 Questo assistente: la tua domanda e le ultime battute arrivano ad Anthropic, l'azienda dell'intelligenza artificiale che risponde, ma mai il tuo nome, il tuo account o i tuoi ordini. Le conversazioni non vengono conservate: in chat privata l'assistente ricorda le domande e le risposte della giornata, per seguire il filo del discorso, e a mezzanotte spariscono.
 
-<!-- pezzo libro-052 | libro -->
+<!-- pezzo libro-053 | libro -->
 ## Libro · Se Barattolo sparisse
 
 Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma i sats del deposito stanno su un nodo Lightning separato, con la seed custodita offline; gli annunci restano su Nostr; lo storico è salvato ogni giorno con copie cifrate anche fuori dal server.
 
-<!-- pezzo libro-053 | libro | sempre -->
+<!-- pezzo libro-054 | libro | sempre -->
 ## Libro · Sicurezza e truffe
 
 - Nessuno di Barattolo ti chiederà mai la seed, le parole di recupero, la nsec, una chiave privata o una password. Chi le chiede è un truffatore. Se le hai date a qualcuno, considerale esposte e sposta subito i fondi su un wallet nuovo.
@@ -526,7 +531,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 - Paga sempre dentro Barattolo: un pagamento fuori dal deposito di garanzia non è protetto.
 - Nel P2P, libera i sats solo quando gli euro sono arrivati davvero sul tuo conto, non prima e non sulla fiducia di una ricevuta.
 
-<!-- pezzo libro-054 | libro | sempre -->
+<!-- pezzo libro-055 | libro | sempre -->
 ## Libro · Parlare con una persona (1/2)
 
 Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
@@ -535,7 +540,7 @@ Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla 
 
 I livelli: ogni persona ha un livello che sale con gli XP (li danno solo gli acquisti e le vendite concluse, più una quota per chi inviti) e con il numero di affari conclusi: Nuovo arrivato, Bottega avviata, Mercante pratico, Mercante esperto, Maestro del banco. Lo trovi nel Profilo, nel cassetto «🎖 Livello e titolo». Dal 17 novembre 2026 i livelli si sfogliano come tessere, scorrendo col dito: sulla tua c'è l'anello con i tuoi XP sulla soglia del prossimo e quanto manca, i livelli già passati hanno la spunta, quelli davanti il lucchetto; sotto ci sono i vantaggi del livello che stai guardando, ✅ se già tuoi, 🔒 se ancora da sbloccare (sconto sul banner del negozio, link del negozio a scelta, il titolo da mettere sotto il nome, lo sconto sulle commissioni P2P dal livello 5). Il livello si vede anche sul tuo negozio e in classifica, accanto al titolo.
 
-<!-- pezzo libro-055 | libro | sempre -->
+<!-- pezzo libro-056 | libro | sempre -->
 ## Libro · Parlare con una persona (2/2)
 
 Rotta per la Luna (pronta dal 17 novembre 2026, ma PER ORA SPENTA: nel Profilo non c'è ancora, e se qualcuno la chiede si risponde che arriverà presto; nei primi giorni si chiamava «la stradina»). Quando sarà accesa: nel Profilo, nel cassetto «Livello e recensioni», c'è «🚀 Rotta per la Luna», un tabellone lunghissimo che vede solo chi lo apre, dalla Terra (in basso) alla Luna (in cima), su una mappa disegnata in otto zone: «Primi passi», «Il mercatino», «Il porto», «Il bosco dei sats», «La scala d'oro», «La vetta», «In orbita», «Verso la Luna». All'ingresso di ogni zona Tappo racconta in una frase cosa si impara lì (per esempio al porto: mettere al sicuro i sats con un wallet on-chain e la firma Nostr). La storia è quella del razzo di bulloni, la stessa del gioco di Tappo: Tappo costruisce un razzo per la Luna, un pezzo per zona (piedini, serbatoio, motore, ali, oblò, punta, antenna), il Tarlo e la Gazza dispettosi provano a rubargli i bulloni, e all'halving del 2028 il razzo parte. Ogni casella è una competenza di Barattolo e di bitcoin, dalla più facile alla più difficile: mettere un articolo nel barattolo, la foto, seguire un venditore, attivare l'incasso automatico in Lightning (l'indirizzo Lightning nel Profilo); poi il primo annuncio, il primo acquisto, la prima recensione, collegare la chiave Nostr, invitare una persona col proprio link; poi la prima vendita, creare il wallet on-chain, verificare la chiave Nostr con una nota pubblica, la doppia configurazione Telegram + Nostr, il primo scambio P2P; poi le soglie che crescono (fino a 100 vendite e 10 milioni di sats incassati) e le caselle a tempo («Un mese con Barattolo», sei mesi, un anno, un anno e mezzo, due anni). L'ultima casella prima della Luna è «Arriva all'halving del 2028» (circa aprile 2028): nessuno arriva in cima prima di allora. Le caselle si spuntano da sole quando la cosa è fatta e diventano monete d'oro; Tappo è la tua pedina e cammina in fila: sta sulla prima casella che manca, quella da fare adesso (quelle fatte più su restano accese), e quando la fai cammina fino alla successiva. La prima volta Tappo si presenta e racconta il razzo (si rivede col tasto «❓ Come funziona» in cima). Toccando la casella da fare, la scheda in basso dice a cosa serve, con «Come funziona?» e i passi (per esempio il primo acquisto spiega il deposito di garanzia); sulle caselle già fatte la scheda non esce. Il bottone «Vai» porta dritto al posto giusto (il cassetto del Profilo, la vetrina, un negozio da seguire, «Vendi») e un riflettore, come nei tutorial dell'app, indica cosa toccare; appena la cosa è fatta l'app torna da sola alla Rotta per la Luna. Quando finisci una zona compare il razzo che prende il pezzo nuovo; toccando il razzo in cima lo si rivede. I gradini della scala dei livelli sono barattoli che si accendono quando si sale di livello. Gli amici (i venditori che segui e chi ha concluso uno scambio con te) stanno come pedine sul loro livello, e in fondo c'è «La gara fra amici». La strada si scopre camminando: si vede la zona dove sei e quella dopo, grigia e spenta, con le caselle ancora misteriose (un cerchio col punto di domanda); quando fai una casella, la prossima si accende e il suo nome compare, con un suono; più su c'è un lucchetto, e il pezzo successivo si apre finendo la zona dove sei. In cima, in fondo alla barra, c'è il razzo di Tappo, che cresce di un pezzo a ogni zona (otto pezzi, dalla pedana ai motori accesi). Il tasto «🗺 Vedi tutta», in alto a destra, mostra il viaggio intero in una schermata (le zone ancora chiuse hanno il lucchetto); toccando una zona si torna lì. Ci sono anche dei suoni, che si spengono col tasto 🔊 in cima. Le caselle NON danno XP e non danno sats: sono la mappa, non un premio. Chi ha scelto «Non mostrarmi in classifica» non compare fra gli amici di nessuno.
@@ -1157,6 +1162,7 @@ Auto
  ogni dispositivo.
 🆔Nostr e identità▾
 🔐I tuoi dati›
+💻Sessioni attiveDove è aperto il tuo account.›
 📄Esporta i tuoi datiIl CSV dei tuoi affari conclusi, comodo per la contabilità.›
 🧅Sito Tor▾
 🗑Cancella il mio account›
@@ -1415,6 +1421,8 @@ Annulla
 Annulla
 ## 👥 I tuoi account
 🚪 Esci da tutti
+Chiudi
+## 💻 Sessioni attive
 Chiudi
 ## 🗑 Cancella il mio account
 Per confermare scrivi CANCELLA
@@ -2622,4 +2630,12 @@ pubblico: sì
 frase: Negli scambi P2P col tempo per pagare, anche chi vende riceve su Telegram un messaggio che si aggiorna da solo ogni minuto, «⏳ Chi compra ha ancora … per pagare»: sai quanto manca senza aprire l'app.
 dove: Telegram, chat del bot: quando parte il tempo per pagare di chi compra (Lightning e on-chain), il messaggio «⏳ Chi compra ha ancora … per pagare» col bottone dello scambio.
 leva: P2P_CONTO_ALLA_ROVESCIA (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-138 | novita -->
+## Novità · 2026-11-20 · sessioni-attive
+
+frase: Nel Profilo c'è «💻 Sessioni attive»: vedi dove è aperto il tuo account (la Mini App e ogni browser in cui sei entrato) e chiudi quelle che non riconosci. Come su Telegram, da una sessione chiudi solo quelle aperte dopo; dalla Mini App le chiudi tutte.
+dove: Profilo → gruppo «Impostazioni» → «💻 Sessioni attive».
+leva: nessuna
 pubblico: sì

@@ -230,3 +230,4 @@ collaudo_sottocategorie_vetrina.py
 collaudo_vetrina_pulita.py
 collaudo_tempo_pagare.py
 collaudo_avvisi_bz_metodo.py
+collaudo_sessioni_attive.py

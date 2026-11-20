@@ -17030,6 +17030,13 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" class="acc-h" onclick="apriPrivacy()"><span class="em">🔐</span>I tuoi dati<span class="fr">›</span></button>
       </div>
 
+      <!-- 💻 SESSIONI ATTIVE (20 nov 2026, audit giro 4; Alan: «come fa
+           telegram»): dove e' aperto l'account, e da qui si chiudono solo
+           le sessioni piu' giovani. Il foglio lo scrive renderSessioniAttive. -->
+      <div class="acc voce-porta" id="vocSessioni">
+        <button type="button" class="acc-h" onclick="apriSessioniAttive()"><span class="em">💻</span><span class="tit2">Sessioni attive<small>Dove è aperto il tuo account.</small></span><span class="fr">›</span></button>
+      </div>
+
       <div class="acc voce-porta" id="vocEsporta">
         <button type="button" class="acc-h" onclick="esportaDati()"><span class="em">📄</span><span class="tit2">Esporta i tuoi dati<small>Il CSV dei tuoi affari conclusi, comodo per la contabilità.</small></span><span class="fr">›</span></button>
       </div>
@@ -18602,6 +18609,18 @@ document.getElementById('cartello')?.remove();</script>
          che chiude anche gli account su cui non si sta. -->
     <button class="btn ghost" id="accountEsciTutti" style="display:none"
       onclick="esciDaTutti()">🚪 Esci da tutti</button>
+    <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
+  </div>
+
+  <!-- ============ SHEET SESSIONI ATTIVE (20 nov 2026) ============
+       Le righe le scrive renderSessioniAttive(), l'unico posto che le
+       disegna. -->
+  <div class="sheet" id="sessioniSheet" role="dialog" aria-modal="true"
+       aria-labelledby="sessioniTit">
+    <div class="grab"></div>
+    <h3 id="sessioniTit">💻 Sessioni attive</h3>
+    <div id="sessioniLista"></div>
+    <div id="sessioniNota" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:10px"></div>
     <button class="btn ghost" onclick="navIndietro()">Chiudi</button>
   </div>
 
@@ -39079,6 +39098,7 @@ function closeSheet(){
   el('corrieriSheet').classList.remove('open');
   el('accountSheet').classList.remove('open');
   el('cancellaSheet').classList.remove('open');
+  el('sessioniSheet').classList.remove('open');
   el('botEntraSheet').classList.remove('open');
   el('pickerSheet').classList.remove('open');
   /* il focus torna al campo-bottone che ha aperto il picker (vale per
@@ -64518,6 +64538,72 @@ function chiudiBarraWeb(){
    chiudendo la Mini App (o, sul web, tornando alla vetrina). */
 let myCancellabile = false;
 let cancellaInfo = null;
+
+/* SESSIONI ATTIVE (20 nov 2026, audit giro 4; Alan: «da una sessione piu
+   vecchia si possono chiudere le sessioni piu giovani e si possono sempre
+   vedere le sessioni attive»). Il server dice chi si puo' chiudere
+   (`chiudibile`): qui si disegna e basta. */
+async function apriSessioniAttive(){
+  haptic();
+  el('sessioniLista').textContent = 'Controllo dove è aperto il tuo account…';
+  el('sessioniNota').textContent = '';
+  el('sheetBg').classList.add('open');
+  el('sessioniSheet').classList.add('open');
+  await caricaSessioniAttive();
+}
+
+async function caricaSessioniAttive(){
+  try {
+    const r = await fetch(`${API_BASE}/me/sessioni-attive`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      el('sessioniLista').textContent = typeof d.detail === 'string'
+        ? d.detail : 'Non riesco a leggerle: riprova tra poco';
+      return;
+    }
+    renderSessioniAttive(d);
+  } catch(e) { el('sessioniLista').textContent = 'Rete assente: riprova'; }
+}
+
+function renderSessioniAttive(d){
+  const quando = t => new Date((t || 0) * 1000).toLocaleDateString('it-IT',
+    {day:'numeric', month:'short', year:'numeric'});
+  const riga = (em, nome, sotto, destra) =>
+    `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)">`
+    + `<span style="font-size:20px">${em}</span>`
+    + `<div style="flex:1;min-width:0"><div style="font-weight:800">${esc(nome)}</div>`
+    + `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600">${esc(sotto)}</div></div>`
+    + destra + `</div>`;
+  const righe = [];
+  if (d.mini) righe.push(riga('📱', 'Mini App di Telegram', 'Questa', ''));
+  for (const s of (d.sessioni || [])) {
+    const btn = s.chiudibile
+      ? `<button class="btn ghost" style="width:auto;margin:0;padding:6px 12px" onclick="chiudiSessioneAttiva(this, '${esc(s.id)}')">Chiudi</button>`
+      : '';
+    righe.push(riga('🌐', s.dispositivo || 'Browser',
+      (s.questa ? 'Questa · ' : '') + 'dal ' + quando(s.dal), btn));
+  }
+  el('sessioniLista').innerHTML = righe.length ? righe.join('')
+    : '<div style="font-weight:600;color:var(--ink-soft)">Nessuna sessione aperta nel browser.</div>';
+  el('sessioniNota').textContent = d.mini
+    ? 'Dalla Mini App di Telegram puoi chiudere tutte le sessioni aperte nel browser.'
+    : 'Da qui chiudi solo le sessioni aperte dopo questa. Dalla Mini App di Telegram le chiudi tutte.';
+}
+
+async function chiudiSessioneAttiva(btn, id){
+  haptic();
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${API_BASE}/me/sessioni-attive/chiudi`, {method:'POST',
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({id})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { btn.disabled = false; return toast(d.detail || 'Non è riuscito, riprova', 5000); }
+    toast('Sessione chiusa', 3000);
+  } catch(e) { btn.disabled = false; return toast('Rete assente: riprova', 4000); }
+  await caricaSessioniAttive();
+}
 
 async function apriCancellaAccount(){
   haptic();

@@ -3158,6 +3158,7 @@ FRENI = {
     "wallet_unico": (20, 3600),       # registrare l'impronta del wallet, per persona
     "wallet_casa": (20, 3600),        # dire dove sta una copia delle parole (19 nov 2026)
     "wallet_cassetta": (30, 3600),    # la cassetta della Mini App: chiave, busta, ritiro (19 nov 2026)
+    "sessioni_attive": (30, 3600),    # chiudere una sessione da «Sessioni attive» (20 nov 2026)
     "wallet_numero": (120, 3600),     # il numero di un cambio, per persona
     "onchain_indirizzo": (20, 3600),  # un indirizzo di prova fra due ammessi, per persona
     # la tappa 3 (23 ott 2026): il «controlla adesso» chiede a mempool,
@@ -3414,7 +3415,9 @@ async def segna_host(request, call_next):
     conto = {
         "init": request.headers.get("x-tg-init-data", ""),
         "conto": request.headers.get("x-barattolo-conto", ""),
-        "cookie": dict(request.cookies)}
+        "cookie": dict(request.cookies),
+        # il nome del dispositivo delle «Sessioni attive» (20 nov 2026)
+        "ua": request.headers.get("user-agent", "")[:400]}
     _CONTO_RICHIESTA.set(conto)
     risposta = await call_next(request)
     if conto.get("rinnovate"):
@@ -7270,6 +7273,14 @@ def init_db():
         tg_id INTEGER,
         creato INTEGER,
         scade INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS dispositivi_sessione(
+        -- SESSIONI ATTIVE (20 nov 2026): accanto alla sessione web, il
+        -- NOME del dispositivo («Chrome su Windows»), ricavato dallo
+        -- user agent quando la sessione nasce. Solo il nome, mai lo user
+        -- agent intero; la riga di una sessione chiusa non si mostra piu'
+        token_hash TEXT PRIMARY KEY,
+        dispositivo TEXT DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS sfide_login(
         -- le sfide del login Nostr (19 ott 2026, cantiere logout-apk):
@@ -12247,9 +12258,36 @@ def crea_sessione(tg_id: int) -> str:
         "VALUES(?,?,?,?)",
         (hashlib.sha256(token.encode()).hexdigest(), tg_id, adesso,
          adesso + GIORNI_SESSIONE_WEB * 86400))
+    # SESSIONI ATTIVE (20 nov 2026): il nome del dispositivo, se la
+    # richiesta lo dice. Un database senza la tabella non ferma il login
+    try:
+        conto = _CONTO_RICHIESTA.get() or {}
+        con.execute("INSERT OR REPLACE INTO dispositivi_sessione(token_hash, "
+                    "dispositivo) VALUES(?,?)",
+                    (hashlib.sha256(token.encode()).hexdigest(),
+                     nome_dispositivo(conto.get("ua", ""))))
+    except Exception:
+        pass
     con.commit()
     con.close()
     return token
+
+
+def nome_dispositivo(ua) -> str:
+    """PURA: dallo user agent un nome che una persona riconosce, «Chrome
+    su Windows». Solo il browser e il sistema, da due elenchi chiusi: lo
+    user agent intero non si tiene. Sconosciuto = «Browser»."""
+    ua = str(ua or "")
+    browser = next((nome for spia, nome in (
+        ("Edg/", "Edge"), ("OPR/", "Opera"), ("Opera", "Opera"),
+        ("SamsungBrowser", "Samsung Internet"), ("Firefox/", "Firefox"),
+        ("Chrome/", "Chrome"), ("CriOS/", "Chrome"), ("FxiOS/", "Firefox"),
+        ("Safari/", "Safari")) if spia in ua), "Browser")
+    sistema = next((nome for spia, nome in (
+        ("Android", "Android"), ("iPhone", "iPhone"), ("iPad", "iPad"),
+        ("Windows", "Windows"), ("Macintosh", "Mac"), ("CrOS", "ChromeOS"),
+        ("Linux", "Linux")) if spia in ua), "")
+    return f"{browser} su {sistema}" if sistema else browser
 
 
 # LA TRACCIA DELLE CHIUSURE (19 ott 2026, cantiere logout-apk, richiesta
@@ -13240,6 +13278,112 @@ def logout_tutti(response: Response, x_tg_init_data: str = Header(""),
     imposta_cookie_portachiavi(response, [])
     response.delete_cookie("barattolo_sessione", path="/")
     return {"ok": True, "chiusi": n, "attivo": None}
+
+
+# ═══ LE SESSIONI ATTIVE (20 nov 2026, audit del venerdi' giro 4; Alan:
+# «ogni utente è responsabile delle proprie sessioni attive, però possiamo
+# dare consapevolezza e buona amministrazione come fa telegram, per cui da
+# una sessione piu vecchia si possono chiudere le sessioni piu giovani e si
+# possono sempre vedere le sessioni attive»; Andrea: «Tutti e due») ═══════
+# Chi ruba un cookie del sito entra come quella persona finche' la sessione
+# vive. Qui la persona VEDE dove il suo account e' aperto e chiude quelle
+# che non riconosce. LA REGOLA DI TELEGRAM: da una sessione si chiudono
+# solo quelle PIU' GIOVANI, mai una piu' vecchia — cosi' chi entra con un
+# cookie rubato non butta fuori il proprietario. La Mini App di Telegram
+# (initData del proprio Telegram) vale come la piu' vecchia: chiude tutte
+# le sessioni web. La propria si chiude con «Esci», non da qui.
+# Fuori dal browser esce solo l'id corto (16 cifre dell'hash del token):
+# basta a scegliere la riga, non a entrare.
+_FORMA_ID_SESSIONE = re.compile(r"^[0-9a-f]{16}$")
+
+
+def _sessioni_attive_di(con, tg_id: int, mia_hash: str, mini: bool,
+                        adesso: int) -> list:
+    """Le sessioni web vive di `tg_id`, dalla piu' vecchia: per ognuna il
+    nome del dispositivo, da quando, se e' QUESTA e se chi guarda la puo'
+    chiudere (Mini App: tutte; una sessione web: solo le piu' giovani)."""
+    try:
+        righe = con.execute(
+            "SELECT s.token_hash, s.creato, COALESCE(d.dispositivo, '') AS dispositivo "
+            "FROM sessioni s LEFT JOIN dispositivi_sessione d ON d.token_hash=s.token_hash "
+            "WHERE s.tg_id=? AND s.scade>? ORDER BY s.creato, s.token_hash",
+            (int(tg_id), int(adesso))).fetchall()
+    except sqlite3.OperationalError:
+        righe = con.execute(
+            "SELECT token_hash, creato, '' AS dispositivo FROM sessioni "
+            "WHERE tg_id=? AND scade>? ORDER BY creato, token_hash",
+            (int(tg_id), int(adesso))).fetchall()
+    mio = next((int(r["creato"] or 0) for r in righe if r["token_hash"] == mia_hash), None)
+    fuori = []
+    for r in righe:
+        questa = r["token_hash"] == mia_hash
+        fuori.append({
+            "id": r["token_hash"][:16], "dispositivo": r["dispositivo"] or "Browser",
+            "dal": int(r["creato"] or 0), "questa": questa,
+            "chiudibile": (not questa) and (mini or (
+                mio is not None and int(r["creato"] or 0) > mio))})
+    return fuori
+
+
+def _chi_guarda_sessioni(x_tg_init_data: str, barattolo_sessione: str):
+    """(utente, mini, hash della sessione web di chi guarda). `mini` solo
+    con l'initData del PROPRIO Telegram: un account scelto dentro la Mini
+    App (piu' account) e' una sessione web come le altre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    mini = False
+    if x_tg_init_data:
+        try:
+            mini = int(_utente_da_initdata(x_tg_init_data)["id"]) == int(user["id"])
+        except Exception:
+            mini = False
+    mia = ("" if mini or not barattolo_sessione
+           else hashlib.sha256(barattolo_sessione.encode()).hexdigest())
+    return user, mini, mia
+
+
+@app.get("/api/me/sessioni-attive")
+def sessioni_attive(x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """Dove e' aperto il mio account: la Mini App (se guardo da li') e le
+    sessioni web vive, con chi posso chiudere."""
+    user, mini, mia = _chi_guarda_sessioni(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        return {"mini": mini, "sessioni": _sessioni_attive_di(
+            con, int(user["id"]), mia, mini, int(time.time()))}
+    finally:
+        con.close()
+
+
+@app.post("/api/me/sessioni-attive/chiudi")
+async def sessioni_attive_chiudi(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """Chiude UNA sessione web del mio account, se la regola lo permette
+    (`_sessioni_attive_di`): la riga sparisce dal database, e quel
+    dispositivo dovra' rifare l'accesso."""
+    user, mini, mia = _chi_guarda_sessioni(x_tg_init_data, barattolo_sessione)
+    _frena("sessioni_attive", user["id"])
+    d = await leggi_json(req)
+    sid = d.get("id") if isinstance(d, dict) else ""
+    sid = sid.strip().lower() if isinstance(sid, str) else ""
+    if not _FORMA_ID_SESSIONE.match(sid):
+        raise HTTPException(400, "Richiesta non valida")
+    adesso = int(time.time())
+    con = db()
+    try:
+        scelta = [s for s in _sessioni_attive_di(con, int(user["id"]), mia, mini, adesso)
+                  if s["id"] == sid]
+        if len(scelta) != 1:
+            raise HTTPException(404, "Questa sessione non c'è più")
+        if not scelta[0]["chiudibile"]:
+            raise HTTPException(403, "Da qui si chiudono solo le sessioni aperte dopo questa")
+        n = con.execute("DELETE FROM sessioni WHERE tg_id=? AND substr(token_hash, 1, 16)=?",
+                        (int(user["id"]), sid)).rowcount
+        con.commit()
+    finally:
+        con.close()
+    traccia_chiusura("logout", n)
+    return {"ok": True, "chiuse": n}
 
 
 # --- Login Nostr: le fondamenta della verifica -----------------------
@@ -63148,8 +63292,16 @@ def _riconcilia_parti_p2p(con, ordine: str, adesso: int) -> list:
                          f"{ordine[:8]} ma mostrod dice {taker or 'un altro client'}: "
                          f"dichiarazione buttata")
     if tg_id != maker:
+        # (20 nov 2026, audit giro 4) col posto se ne va anche IL TEMPO PER
+        # PAGARE che quel posto aveva scritto: era la parola di chi non ha
+        # pubblicato l'ordine, e il server non lo darebbe piu' al nodo
         con.execute("UPDATE p2p_ordini SET tg_id=?, maker=? WHERE ordine=? AND tg_id=?",
                     (maker, 1 if maker else 0, ordine, tg_id))
+        try:
+            con.execute("UPDATE p2p_ordini SET minuti_pagare=0 WHERE ordine=? "
+                        "AND tg_id=?", (ordine, maker))
+        except sqlite3.OperationalError:
+            pass                  # un database senza la colonna: nessun tempo
         righe.append(f"⛔ Libro P2P: {ordine[:8]} era intestato a {tg_id} ma per mostrod "
                      f"l'ha pubblicato {maker or 'un altro client'}: intestazione "
                      f"{'corretta' if maker else 'tolta'}")
@@ -65661,9 +65813,17 @@ def _dichiara_minuti_pagare_p2p(con, tg_id: int, mappa) -> int:
         minuti = _minuti_pagare_scelta_p2p(v)
         if not minuti:
             continue
+        # (20 nov 2026, audit giro 4) e SOLO PRIMA DELLA PRESA: chi prende
+        # deve aver letto il tempo sulla card, quindi un ordine gia' preso
+        # (stato del libro, presa scritta, scambio o momento «preso» del
+        # coordinatore) non riceve un tempo che prima non aveva
         scritti += con.execute(
             "UPDATE p2p_ordini SET minuti_pagare=? WHERE ordine=? AND tg_id=? "
-            "AND maker=1 AND (minuti_pagare IS NULL OR minuti_pagare=0)",
+            "AND maker=1 AND (minuti_pagare IS NULL OR minuti_pagare=0) "
+            "AND COALESCE(stato, '') IN ('', 'pending') AND COALESCE(preso_da, 0)=0 "
+            "AND NOT EXISTS (SELECT 1 FROM p2p_scambi s WHERE s.ordine=p2p_ordini.ordine) "
+            "AND NOT EXISTS (SELECT 1 FROM p2p_momenti m WHERE m.ordine=p2p_ordini.ordine "
+            "AND m.momento='preso')",
             (minuti, ordine, int(tg_id))).rowcount
     if scritti:
         con.commit()
@@ -115972,9 +116132,44 @@ async def p2p_onchain_cauzioni_passata(adesso: int | None = None) -> dict:
                 nuovo, perche = "tornata", "tornata da sola dal nodo"
             elif lnd:
                 nuovo = "guardata"
-        elif await _p2p_onchain_cauzione_annulla(r["hash"]):
-            nuovo = "tornata"
-            perche = ("scambio chiuso" if int(r["in_gioco"] or 0) else "non usata")
+        else:
+            # (20 nov 2026, audit giro 4) UNA TENUTA NON USATA SI PRENOTA
+            # PRIMA DELLA CANCEL: la fotografia del giro e' di prima delle
+            # chiamate al nodo, e mentre la cancel aspetta LND una presa
+            # poteva metterla in gioco — lo scambio partiva senza cauzione.
+            # Scritta «tornata» adesso, la presa non la trova piu' viva e
+            # chiede di bloccarne una; se la cancel non passa, torna tenuta
+            prenotata = False
+            if r["stato"] == "tenuta" and not int(r["in_gioco"] or 0):
+                con = _p2p_onchain_db()
+                try:
+                    cur = con.execute(
+                        "UPDATE p2p_onchain_cauzioni SET stato='tornata', chiusa_il=?,"
+                        " perche='non usata' WHERE id=? AND stato='tenuta'"
+                        " AND COALESCE(in_gioco, 0)=0", (t, r["id"]))
+                    con.commit()
+                finally:
+                    con.close()
+                if not cur.rowcount:
+                    continue          # presa nel frattempo: resta in gioco
+                prenotata = True
+            if await _p2p_onchain_cauzione_annulla(r["hash"]):
+                if prenotata:
+                    conto["tornate"] += 1
+                    avvisa_tornata.append(r)
+                    continue
+                nuovo = "tornata"
+                perche = ("scambio chiuso" if int(r["in_gioco"] or 0) else "non usata")
+            elif prenotata:
+                con = _p2p_onchain_db()
+                try:
+                    con.execute("UPDATE p2p_onchain_cauzioni SET stato='tenuta', chiusa_il=0,"
+                                " perche='' WHERE id=? AND stato='tornata' AND chiusa_il=?",
+                                (r["id"], t))
+                    con.commit()
+                finally:
+                    con.close()
+                continue
         if not nuovo:
             continue
         con = _p2p_onchain_db()
@@ -124742,6 +124937,32 @@ async def _raccolta_firma_uscite(rid: int) -> int:
     return len(firmate)
 
 
+async def _raccolta_depositi_ancora_li(rid: int, scade: int):
+    """Gli id dei depositi «depositato» (confermati entro `scade`) che
+    sulla rete hanno ANCORA almeno l'importo in monete confermate. None se
+    la rete non risponde: chi chiama non decide su un conto a meta'."""
+    con = _raccolta_depositi_db()
+    try:
+        righe = con.execute(
+            "SELECT d.id, d.importo_sats, i.indirizzo AS dove FROM raccolta_depositi d"
+            " JOIN onchain_indirizzi i ON i.id=d.indirizzo_id WHERE d.raccolta_id=?"
+            " AND d.stato='depositato' AND d.depositato_il>0 AND d.depositato_il<=?",
+            (int(rid), int(scade))).fetchall()
+    finally:
+        con.close()
+    vivi = set()
+    for o in righe:
+        try:
+            utxo = await onchain_mempool_utxo(o["dove"])
+        except Exception:
+            return None
+        confermati = sum(int(u.get("value") or 0) for u in (utxo or [])
+                         if (u.get("status") or {}).get("confirmed"))
+        if confermati >= int(o["importo_sats"] or 0):
+            vivi.add(int(o["id"]))
+    return vivi
+
+
 async def _raccolta_chiudi(rid: int, adesso: int) -> str:
     """La scadenza di una raccolta attiva: 'chiusa' con l'esito
     (`raccolta_esito`), e gli avvisi a chi raccoglie. Torna l'esito ('' se
@@ -124749,13 +124970,35 @@ async def _raccolta_chiudi(rid: int, adesso: int) -> str:
     con = _raccolta_depositi_db()
     try:
         r = con.execute("SELECT * FROM raccolte WHERE id=?", (int(rid),)).fetchone()
+    finally:
+        con.close()
+    if not r or r["stato"] != "attiva":
+        return ""
+    # (20 nov 2026, audit giro 4) UN DEPOSITO CONTATO E' ANCORA LI'? Il
+    # 2-di-3 di una raccolta ha la chiave di chi deposita e quella di chi
+    # raccoglie: se sono la stessa persona (un secondo account), dopo la
+    # conferma le monete possono uscire senza Barattolo, e la riga resta
+    # «depositato». Alla chiusura si rilegge la rete: conta solo chi ha
+    # ancora le monete confermate; rete muta = si riprova al giro dopo
+    vivi = None
+    if r["garantita"]:
+        vivi = await _raccolta_depositi_ancora_li(int(r["id"]), int(r["scade"]))
+        if vivi is None:
+            print(f"⏳ Raccolta #{int(rid)}: la rete non risponde, la chiusura "
+                  "aspetta il giro dopo", flush=True)
+            return ""
+    con = _raccolta_depositi_db()
+    try:
+        r = con.execute("SELECT * FROM raccolte WHERE id=?", (int(rid),)).fetchone()
         if not r or r["stato"] != "attiva":
             return ""
         # i depositi contano se confermati ENTRO la scadenza
-        garantiti = con.execute(
-            "SELECT COALESCE(SUM(prezzo_sats),0) FROM raccolta_depositi WHERE "
+        contati = con.execute(
+            "SELECT id, prezzo_sats FROM raccolta_depositi WHERE "
             "raccolta_id=? AND stato='depositato' AND depositato_il>0 AND "
-            "depositato_il<=?", (r["id"], int(r["scade"]))).fetchone()[0]
+            "depositato_il<=?", (r["id"], int(r["scade"]))).fetchall()
+        garantiti = sum(int(x["prezzo_sats"] or 0) for x in contati
+                        if vivi is None or int(x["id"]) in vivi)
         zap = _raccolta_conti(con, [r["id"]]).get(int(r["id"]), {}).get("zap", 0)
         esito = raccolta_esito(bool(r["garantita"]), r["obiettivo_sats"],
                                garantiti, zap)
@@ -125323,7 +125566,12 @@ async def _cassa_conia(v, metodo: str) -> dict:
         if not dest:
             raise HTTPException(400, "Per incassare on-chain scegli dove ricevere: "
                                      "Profilo → «Incassi on-chain»")
-        indice = (_onchain_prossimo_esterno(con, v["venditore_id"], dest["valore"])
+        # (20 nov 2026, audit giro 4) LA FILA INTERA: anche gli incassi del
+        # P2P on-chain e le mete dei cambi automatici, che la fila del
+        # mercatino non conta — sennò la cassa poteva dare l'indirizzo di
+        # un incasso P2P in attesa, e quell'incasso segnava pagata la vendita
+        _p2p_onchain_prepara(con)
+        indice = (_p2p_onchain_prossimo_esterno(con, v["venditore_id"], dest["valore"])
                   if dest["tipo"] == "xpub" else -1)
         indirizzo = onchain_indirizzo_esterno(dest["tipo"], dest["valore"],
                                               max(indice, 0))

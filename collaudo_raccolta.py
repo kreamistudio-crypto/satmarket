@@ -557,6 +557,28 @@ def main():
            firme(111)[D5["id"]]["proposta"]["verso"]))
     prova("...e chi raccoglie legge il perche'", True,
           scheda(888, R5).json().get("perche", "").startswith("Segnalata"))
+    # (20 nov 2026, audit giro 4) UN DEPOSITO USCITO SENZA BARATTOLO non
+    # conta: chi deposita e chi raccoglie, se sono la stessa persona, hanno
+    # due chiavi su tre. Alla chiusura si rilegge la rete
+    print("\n[il deposito contato ma uscito dalla rete prima della scadenza]")
+    r = apri(888, titolo="La fontana della piazza", euro=100, garantita=True)
+    R6 = r.json()["id"]
+    admin(999, R6, "via")
+    come(111)
+    D6 = c.post(f"/api/raccolte/{R6}/deposito", json={"euro": 100}).json()
+    paga(D6)
+    ronda()
+    prova("il deposito pari all'obiettivo e' confermato", "depositato",
+          firme(111)[D6["id"]]["stato"])
+    MONETE[D6["indirizzo"]["indirizzo"]] = []          # speso fuori da Barattolo
+    invecchia(R6)
+    banco.DETTO.clear()
+    ronda()
+    s6 = scheda(111, R6).json()
+    prova("a scadenza le monete non ci sono piu': mancata, e nessuna firma verso "
+          "chi raccoglie", ("chiusa", "mancata", False),
+          (s6["stato"], s6["esito"],
+           (firme(111)[D6["id"]].get("proposta") or {}).get("verso") == "venditore"))
     print("\n[il deposito arrivato dopo la scadenza]")
     r = apri(888, titolo="Le luci di Natale", euro=60, garantita=True)
     R6 = r.json()["id"]

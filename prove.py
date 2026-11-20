@@ -126104,8 +126104,9 @@ def prove_profilo_elegante():
         "grpLivello": ["accRecensioni", "accLivello", "accInviti", "accDistintivi", "vocStradina", "vocCaccia"],
         # (17 nov 2026) «Avvisi e aspetto» e «Privacy» sono una sola
         # «Impostazioni», con dentro anche l'export dei dati
+        # (20 nov 2026, audit giro 4) le sessioni attive, dopo «I tuoi dati»
         "grpImpostazioni": ["accAvvisi", "accAspetto", "accIdentita", "vocPrivacy",
-                            "vocEsporta", "accTor", "vocCancella"],
+                            "vocSessioni", "vocEsporta", "accTor", "vocCancella"],
         # (16 nov 2026, Andrea: «un menu a parte») Tappo e l'assistenza in
         # app, che prima stava in «Privacy» con «I tuoi dati»; dal 17 nov
         # si chiama «Aiuto» e accoglie il pagamento protetto
@@ -156270,7 +156271,7 @@ def prove_freni():
            "onchain_xpub": (5, 3600), "onchain_indirizzo": (20, 3600),
            # il wallet unico (2 nov 2026 sera): registrare l'impronta 20
            # all'ora, prenotare il numero di un cambio 120 all'ora
-           "wallet_unico": (20, 3600), "wallet_casa": (20, 3600), "wallet_cassetta": (30, 3600), "wallet_numero": (120, 3600),
+           "wallet_unico": (20, 3600), "wallet_casa": (20, 3600), "wallet_cassetta": (30, 3600), "sessioni_attive": (30, 3600), "wallet_numero": (120, 3600),
            # la tappa 3 (23 ott 2026): «controlla adesso» 60 all'ora,
            # proposte e co-firme 30 all'ora
            "onchain_controlla": (60, 3600), "onchain_firma": (30, 3600),
@@ -211020,7 +211021,10 @@ def prove_onchain_cauzione():
           (True, False, True),
           ("if not _p2p_onchain_cauzione_macaroon():\n        return conto" in passata,
            "p2p_onchain_cauzione_accesa()" in passata,
-           "elif await _p2p_onchain_cauzione_annulla(r[\"hash\"]):" in passata))
+           # (20 nov 2026, audit giro 4) la tenuta non usata prenotata prima
+           # della cancel torna «tenuta» se la cancel non passa
+           "if await _p2p_onchain_cauzione_annulla(r[\"hash\"]):" in passata
+           and "elif prenotata:" in passata))
     i_a = src.index("CANCELLA_ANONIMIZZA = (")
     prova("chi cancella l'account non porta via la riga di una cauzione (una hold viva deve "
           "poter tornare): resta, senza il suo nome",
@@ -212343,6 +212347,27 @@ def prove_audit_tornata_tutto():
           0 < rr.find('if o["stato"] == "depositato" and prima.strip() and not testo:')
           < rr.find("raise HTTPException(409, \"Dopo il deposito il recapito non si \"")
           < rr.find("UPDATE p2p_onchain_ordini SET recapito=?"))
+    # (20 nov 2026, audit giro 4, gli altri) le sentinelle dei cinque invisibili
+    cp = codice(pezzo("p2p_onchain_cauzioni_passata"))
+    prova("cauzione on-chain: la tenuta NON usata si prenota «tornata» PRIMA della cancel (una "
+          "presa nel frattempo la trova gia' chiusa), e torna tenuta se la cancel non passa", True,
+          0 < cp.find("AND COALESCE(in_gioco, 0)=0\", (t, r[\"id\"]))")
+          < cp.find("if await _p2p_onchain_cauzione_annulla(r[\"hash\"]):")
+          < cp.find("UPDATE p2p_onchain_cauzioni SET stato='tenuta', chiusa_il=0,"))
+    prova("P2P: chi corregge l'intestazione di un ordine toglie anche il tempo per pagare "
+          "scritto da quel posto", True,
+          "UPDATE p2p_ordini SET minuti_pagare=0 WHERE ordine=? " in pezzo("_riconcilia_parti_p2p"))
+    cc = codice(pezzo("_cassa_conia"))
+    prova("cassa on-chain: l'indice viene dalla fila intera (P2P e cambi automatici "
+          "compresi), non da quella del solo mercatino", (True, False),
+          ("_p2p_onchain_prossimo_esterno(con, v[\"venditore_id\"]" in cc,
+           "= (_onchain_prossimo_esterno(con, v[\"venditore_id\"]" in cc))
+    rc = codice(pezzo("_raccolta_chiudi"))
+    prova("raccolta garantita: alla chiusura conta solo chi ha ancora le monete sulla rete, "
+          "e a rete muta la chiusura aspetta", True,
+          0 < rc.find("vivi = await _raccolta_depositi_ancora_li(")
+          < rc.find("UPDATE raccolte SET stato='chiusa'")
+          and "if vivi is None or int(x[\"id\"]) in vivi" in rc)
 
     # ---- 3. il deposito on-chain -----------------------------------------
     amb = {}
@@ -215455,6 +215480,10 @@ def prove_tempo_pagare_p2p():
     i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
     con.executescript(src[i:src.index("ON p2p_ordini(tg_id);", i)] + "ON p2p_ordini(tg_id);")
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN minuti_pagare INTEGER DEFAULT 0")
+    # (20 nov 2026, audit giro 4) la dichiarazione guarda anche la presa
+    for tabella in ("p2p_scambi", "p2p_momenti"):
+        i = src.index(f"CREATE TABLE IF NOT EXISTS {tabella}(")
+        con.executescript(src[i:src.index("\n    );", i) + len("\n    );")])
     O = ["7e3a0000-0000-4a2b-9c3d-00000000000%d" % n for n in range(7)]
     # O[0] col bonifico ordinario (lento), O[1] col SEPA Instant (veloce)
     for o, chi, lato, maker, metodi in ((O[0], 1, "sell", 1, ["SEPA"]),
@@ -215475,6 +215504,23 @@ def prove_tempo_pagare_p2p():
     dich(con, 1, {O[0]: 1440})
     prova("LA PRIMA RESTA", 60, con.execute("SELECT minuti_pagare FROM p2p_ordini WHERE ordine=?",
                                            (O[0],)).fetchone()[0])
+    # (20 nov 2026, audit giro 4) SOLO PRIMA DELLA PRESA: un ordine gia' preso
+    # (stato del libro, scambio, momento «preso», presa scritta) non riceve
+    # un tempo che chi ha preso non ha letto sulla card
+    P = ["7e3a0000-0000-4a2b-9c3d-0000000001%02d" % n for n in range(5)]
+    for n, o in enumerate(P):
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, metodi, "
+                    "preso_da) VALUES(?,1,0,?,'sell',1,'[\"SEPA Instant\"]',?)",
+                    (o, "in-progress" if n == 0 else "pending", 7 if n == 3 else 0))
+    con.execute("INSERT INTO p2p_scambi(ordine) VALUES(?)", (P[1],))
+    con.execute("INSERT INTO p2p_momenti(ordine, momento, quando) VALUES(?, 'preso', 1)", (P[2],))
+    prova("dopo la presa il tempo non si aggiunge: preso nel libro, con uno scambio, col "
+          "momento «preso», con la presa scritta; il quinto, ancora nel libro, si'",
+          (1, [0, 0, 0, 0, 30]),
+          (dich(con, 1, {o: 30 for o in P}),
+           [con.execute("SELECT minuti_pagare FROM p2p_ordini WHERE ordine=?", (o,)).fetchone()[0]
+            for o in P]))
+    con.execute("DELETE FROM p2p_ordini WHERE ordine IN (%s)" % ",".join("?" * len(P)), P)
     prova("i volti: solo dove un tempo ha senso (la dichiarazione dell'acquisto e del "
           "PayCode c'e', ma non esce), e l'ora chiesta sul bonifico ordinario esce come 24 ore",
           {O[0]: 1440, O[1]: 240}, amb["_minuti_pagare_p2p"](con, O[:6]))
