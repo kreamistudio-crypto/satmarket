@@ -3290,6 +3290,39 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `sudo cp router.conf.prima-di-zapstore router.conf` e lo stesso
   `up -d --force-recreate specchio`; le copie già prese restano nel db
   finché non si tolgono con `strfry delete`.
+- LA SECONDA APP: «BARATTOLO NEGOZIO» (20 nov 2026, cantiere
+  app-negozio-apk; Andrea: «ugualmente a quella di Barattolo pubblica su
+  zapstore dallo stesso firmatario di Barattolo»). Un secondo involucro
+  TWA, uguale al primo in tutto tranne quattro righe del
+  `twa-manifest.json`: `packageId` **`store.barattolo.negozio`** (due app
+  non possono avere lo stesso pacchetto), `name` «Barattolo Negozio»,
+  `launcherName` «Negozio», `startUrl` **`/?app=negozio`** (la porta
+  diretta della cassa: vedi ARCHITETTURA, «Barattolo Negozio»). Versioni
+  sue: si parte da 1.0 / versionCode 1.
+  LO STESSO FIRMATARIO, DUE VOLTE. (1) Android: lo STESSO keystore di
+  Barattolo, `C:\Users\Andrea\Documents\barattolo-twa\barattolo.keystore`,
+  alias `barattolo` — NON si copia: il `signingKey.path` del secondo
+  progetto punta a quel file. Quindi la stessa impronta `2F:3F:…:C2:3C`,
+  e `.well-known/assetlinks.json` ha DUE voci (la sentinella in
+  `prove_app_android` le vuole tutte e due, con la stessa impronta).
+  (2) Zapstore: la stessa npub delle release. Il legame C1 è del
+  certificato, quindi vale per tutte e due le app.
+  IL PROGETTO STA ACCANTO AL PRIMO, fuori dal repo:
+  `C:\Users\Andrea\Documents\barattolo-negozio-twa`. L'ordine è quello
+  di Barattolo (update, `python genera_icone_apk.py <progetto>`, build,
+  i tre controlli sull'APK, la prova sul telefono); il primo giro nasce
+  copiando il `twa-manifest.json` di Barattolo e cambiando le quattro
+  righe più `signingKey.path`, `appVersionName` e `appVersionCode`, poi
+  `bubblewrap update --skipVersionUpgrade` genera il progetto.
+  LA RELEASE: stesso repo pubblico `barattolo-releases`, ma tag
+  **`negozio-vX.Y`** e file **`barattolo-negozio-X.Y.apk`** (+ `.sha256`);
+  la scheda Zapstore è **`negozio/zapstore.yaml`**, e lo `zsp publish` si
+  lancia DA QUELLA CARTELLA. Le due schede si filtrano a vicenda
+  (`release_filter` e `match`): senza filtro, lo `zsp publish` di
+  Barattolo prenderebbe la release più recente del repo, che potrebbe
+  essere quella del Negozio. Il guscio arancio dell'avvio (la classe
+  `app-android`) per ora si accende solo col referrer di
+  `store.barattolo.app`: nel Negozio l'app si apre come la pagina web.
 - DOVE SI LEGGE IL GIRO DEI NEGOZI COLLEGATI (set 2026): il giro
   dell'ora stampa una riga per annuncio nato (`🏪 Titolo — prezzo €
   [categoria]`, con ` · digitale` sui virtuali), una per consegna

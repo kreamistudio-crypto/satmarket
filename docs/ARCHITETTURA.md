@@ -34303,6 +34303,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   governa solo `con-pacco`), col bottone riscritto da `barraCassa` in
   «Incassa» → `cassaIncassa` e rimesso a «Controlla e paga» uscendo.
   Accesa sul conto della scheda Cassa, spenta sul QR e fuori.
+  L'APP ANDROID DEL NEGOZIO (20 nov 2026, cantiere app-negozio-apk):
+  un secondo involucro TWA, `store.barattolo.negozio`, con `startUrl`
+  `/?app=negozio` e lo stesso certificato di Barattolo; `assetlinks.json`
+  ha due voci. Procedura in PRODUZIONE, «LA SECONDA APP».
   LA CASSA IN PRESENZA (20 nov 2026, cantiere cassa-presenza). Lo
   schermo per il cliente è `#cassaCliente`, fuori dal foglio, fixed e su
   bianco fisso: `mostraAlCliente` / `chiudiSchermoCliente` /

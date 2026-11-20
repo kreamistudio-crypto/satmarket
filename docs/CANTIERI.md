@@ -93716,3 +93716,10 @@ verdi, e `collaudi_ci.py --elenco ci/collaudi.txt` senza le variabili del
 proxy 163 verdi, 0 rossi. Dopo il rebase su 17767c04 (foglio «Pubblica» a
 passi e wallet da Telegram per Android, di altri, nessuna delle due
 funzioni toccate) di nuovo le tre sezioni.
+
+
+## L'app Android «Barattolo Negozio» (20 nov 2026, cantiere app-negozio-apk, Andrea: «ok produci l'app», «ugualmente a quella di Barattolo pubblica su zapstore dallo stesso firmatario di Barattolo»)
+COSA. Una seconda app Android, involucro TWA come Barattolo, che apre barattolo.store sulla porta diretta della cassa (`/?app=negozio`). In questo commit il lato sito: `assetlinks.json` con la seconda voce (`store.barattolo.negozio`, stessa impronta) e la sentinella di `prove_app_android` allargata; la procedura in PRODUZIONE, «LA SECONDA APP». Il progetto Bubblewrap, la build firmata (password di Andrea), la release GitHub e lo `zsp publish` (nsec di Andrea in WSL) si fanno sul suo PC, un gesto alla volta.
+DECISIONI E PERCHÉ. Pacchetto nuovo (Android non ammette due app con lo stesso), keystore e npub gli stessi («dallo stesso firmatario»): il keystore non si copia, il secondo progetto lo indica. Stesso repo delle release con tag `negozio-v*` e scheda in `negozio/zapstore.yaml`, e le due schede filtrate a vicenda. La stessa icona del barattolo, col nome «Negozio» sotto. Il guscio dell'avvio resta della sola app di Barattolo: allargarlo vuol dire toccare tre sentinelle e il ramo del referrer, e non è stato chiesto.
+SCARTATI. Un repo nuovo per le release (non si può creare da qui, e uno basta coi filtri); una seconda keystore (non sarebbe lo stesso firmatario).
+PROVATO. `prove_app_android` con le due voci. DA FARE: tutto quel che vive sul PC di Andrea, più la prova sul telefono.

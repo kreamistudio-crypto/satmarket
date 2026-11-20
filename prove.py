@@ -138933,7 +138933,16 @@ def prove_app_android():
                 "0E:22:37:15:F3:A8:E6:4F:2C:49:38:BC:D5:A2:C2:3C")
     dati = json.load(open(os.path.join(".well-known", "assetlinks.json"),
                           encoding="utf-8"))
-    prova("il file dice UNA cosa sola", 1, len(dati))
+    # (20 nov 2026, cantiere app-negozio-apk) DUE app, stesso certificato:
+    # Barattolo e Barattolo Negozio, la cassa (Andrea: «ugualmente a quella
+    # di Barattolo pubblica su zapstore dallo stesso firmatario»)
+    prova("il file dice DUE cose: le due app", 2, len(dati))
+    prova("...Barattolo e Barattolo Negozio", ["store.barattolo.app", "store.barattolo.negozio"],
+          [x["target"]["package_name"] for x in dati])
+    prova("...con la stessa delega e la stessa impronta (stesso firmatario)", True,
+          dati[1]["relation"] == dati[0]["relation"]
+          and dati[1]["target"]["namespace"] == "android_app"
+          and dati[1]["target"]["sha256_cert_fingerprints"] == dati[0]["target"]["sha256_cert_fingerprints"])
     voce = dati[0]
     prova("...ed e' la delega di tutti gli URL del dominio",
           ["delegate_permission/common.handle_all_urls"], voce["relation"])
