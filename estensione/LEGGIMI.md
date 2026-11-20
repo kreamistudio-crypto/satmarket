@@ -37,10 +37,27 @@ Il percorso si vede fin dall'inizio, col marchio Barattozon:
 Non preme MAI «Acquista ora» (con l'1-Click ordinerebbe da solo) né il
 bottone che invia l'ordine.
 
+## Dentro Barattolo (dal 20 nov 2026, versione 0.4.0)
+
+1. Su un prodotto (o nel carrello) tocca **«Compra con Barattozon»**.
+2. Alla cassa i contanti sono già scelti. Conferma il metodo e fai
+   l'ordine come sempre. (Su un acquisto qualunque l'estensione non tocca
+   la cassa.)
+3. Sulla pagina del PayCode scrivi la **commissione** e tocca **«Crea
+   l'ordine su Barattozon»**.
+4. Si apre barattolo.store **nel tuo account** (la sessione di questo
+   browser) e l'ordine si pubblica da solo. Se non sei entrato, entra con
+   Telegram: l'ordine parte subito dopo.
+
+I pezzi: `amazon.js` su Amazon, `ponte.js` (lo sfondo, che tiene i dati
+in memoria finché il browser è aperto) e `barattolo.js` su
+barattolo.store. Un link scritto da altri non pubblica mai niente da solo.
+
 ## Cosa NON fa (e non deve mai fare)
 
-- Non parla con nessun server: niente rete, niente cookie, niente
-  memoria. Nessun permesso oltre a www.amazon.it.
+- Non parla con nessun server: niente rete, niente cookie. Solo la
+  memoria di sessione del browser (permesso `storage`), e nessun sito
+  oltre a www.amazon.it e barattolo.store.
 - Non mette link affiliati (Amazon li vieta nelle estensioni).
 - Non manda il PayCode al server di Barattolo: viaggia dopo il «#»
   dell'indirizzo, che il browser non spedisce.

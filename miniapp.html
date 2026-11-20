@@ -77251,6 +77251,7 @@ let p2pNuovoReteChiesta = ''; // 'onchain' per la prossima apertura del foglio
    estensione-bz): li prende la PROSSIMA apertura del foglio e li spegne,
    come `p2pNuovoReteChiesta`. Forma di `datiBzDaFrammentoP2P`, o null */
 let p2pNuovoPrecompilato = null;
+const P2P_BZ_AUTO_MS = 1200;   // il foglio dell'estensione si apre, poi l'ordine parte da solo
 /* ...e il foglio aperto da quel link che passa davanti al tour della
    prima volta: stato '' | 'volo' | 'aperto' (vedi `bzDavantiP2P`) */
 let p2pBzDavanti = {stato: '', visto: false};
@@ -103075,6 +103076,16 @@ function apriNuovoOrdineP2P(metodo){
     /* la commissione scelta nell'estensione: col PayCode, l'importo e la
        scadenza buoni il percorso si apre gia' al passo 5, «Pubblica» */
     p2pNuovoPremioTab = pre.premio || '';
+    /* DALL'ESTENSIONE SI PUBBLICA DA SOLO (20 nov 2026): la commissione
+       l'ha gia' scelta li', e l'ordine parte appena il foglio e' a posto
+       (la morfosi lo apre in un attimo). `inviaNuovoOrdineP2P(true)`
+       salta il riepilogo ma NON i giudici: un PayCode sotto il minimo o
+       scaduto ferma tutto e il foglio resta aperto con la sua frase */
+    if (pre.auto === true) setTimeout(() => {
+      /* ...se nel frattempo nessuno ha cambiato strada (foglio chiuso e
+         riaperto su un altro metodo, o l'altro lato) */
+      if (p2pLato === 'vendo' && tabacchinoP2P(p2pNuovoMetodi)) inviaNuovoOrdineP2P(true);
+    }, P2P_BZ_AUTO_MS);
   }
   /* LA RETE (30 ott 2026, cantiere oc-identico): 'onchain', chiesta da
      `apriPubblicaOnchainP2P` per questa sola apertura, apre questo stesso
@@ -120045,10 +120056,55 @@ function prendiBzDaLinkP2P(){
     if (v.d && v.d.scade) q.set('scade', String(v.d.scade));
     if (v.d && v.d.barre) q.set('barre', String(v.d.barre));
     if (v.d && v.d.premio) q.set('premio', String(v.d.premio));
-    return datiBzDaFrammentoP2P('barattozon?' + q.toString());
+    const d = datiBzDaFrammentoP2P('barattozon?' + q.toString());
+    /* l'«auto» dell'estensione (20 nov 2026) torna con lui: in questa
+       memoria scrive solo questa pagina, e solo da `riceviBzDaEstensioneP2P` */
+    if (d && v.d && v.d.auto === true) d.auto = true;
+    return d;
   } catch(e) { return null; }
 }
-const P2P_BZ_LINK = prendiBzDaLinkP2P();
+let P2P_BZ_LINK = prendiBzDaLinkP2P();
+/* ══ BARATTOZON DALL'ESTENSIONE, NELLA TUA SESSIONE (20 nov 2026,
+   cantiere bz-integrata; Andrea: «vorrei che si integrasse proprio in
+   barattolo, quindi nella stessa sessione del browser [...]
+   automaticamente deve inserire il paycode in barattozon, deve solamente
+   chiedere la commissione e così si crea l'ordine») ═══════════════
+   L'estensione «Barattolo per Amazon» apre questa pagina su
+   `/p2p#barattozon-estensione` e, quando la pagina dice
+   `barattozon:pronto`, le consegna i dati con `barattozon:ordine` (testo
+   JSON). Li porta il suo ponte, e SOLO alla scheda che il ponte stesso
+   ha aperto dopo un tocco su «Crea l'ordine» nella pagina del PayCode:
+   per questo, e solo per questo, l'ordine si pubblica DA SOLO (`auto`).
+   Un link scritto da fuori (`#barattozon?…`) apre il foglio compilato
+   come sempre e aspetta «Pubblica»: chiunque puo' scriverne uno.
+   I dati passano dalla STESSA dogana del link; la commissione e' gia'
+   il premio col suo segno. Vale la sessione di questo browser: chi non
+   e' entrato riceve l'invito, e i dati aspettano in sessionStorage come
+   quelli del link, auto compreso. */
+function riceviBzDaEstensioneP2P(ev){
+  let v = null;
+  try { v = JSON.parse(String(ev && ev.detail || '')); } catch(e) { return; }
+  if (!v || typeof v !== 'object') return;
+  const q = new URLSearchParams();
+  if (v.pc) q.set('paycode', String(v.pc).replace(/[-\s]/g, ''));
+  for (const k of ['importo', 'scade', 'barre', 'premio']) if (v[k]) q.set(k, String(v[k]));
+  const d = datiBzDaFrammentoP2P('barattozon?' + q.toString());
+  if (!d || !d.pc) return;
+  d.auto = true;
+  P2P_BZ_LINK = d;
+  try { sessionStorage.setItem(P2P_BZ_SESSIONE, JSON.stringify({t: Math.floor(Date.now() / 1000), d})); } catch(e) {}
+  if (location.hash === '#barattozon-estensione') {
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch(e) {}
+  }
+  /* la pagina e' gia' sul P2P (il ponte risponde dopo il caricamento):
+     il foglio si apre adesso; se no lo apre `apriP2PDaUrl` col link */
+  if (typeof p2pApertoDaUrl !== 'undefined' && p2pApertoDaUrl
+      && !P2P_SCAMBIO_URL && !P2P_ORDINE_URL) apriBarattozonDaLinkP2P();
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('barattozon:ordine', riceviBzDaEstensioneP2P);
+  try { window.dispatchEvent(new Event('barattozon:pronto')); } catch(e) {}
+}
 /* il foglio «Pubblica» di «Vendi BTC» col percorso gia' compilato. A
    leva spenta niente (si resta sul coming soon, come le sorelle); chi
    non e' entrato riceve l'invito di sempre da `apriNuovoOrdineP2P`, e i

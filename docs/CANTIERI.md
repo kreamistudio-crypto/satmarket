@@ -93731,6 +93731,71 @@ COSA. Una seconda app Android, involucro TWA come Barattolo, che apre barattolo.
 DECISIONI E PERCHÉ. Pacchetto nuovo (Android non ammette due app con lo stesso), keystore e npub gli stessi («dallo stesso firmatario»): il keystore non si copia, il secondo progetto lo indica. Stesso repo delle release con tag `negozio-v*` e scheda in `negozio/zapstore.yaml`, e le due schede filtrate a vicenda. La stessa icona del barattolo, col nome «Negozio» sotto. Il guscio dell'avvio resta della sola app di Barattolo: allargarlo vuol dire toccare tre sentinelle e il ramo del referrer, e non è stato chiesto.
 SCARTATI. Un repo nuovo per le release (non si può creare da qui, e uno basta coi filtri); una seconda keystore (non sarebbe lo stesso firmatario).
 PROVATO. `prove_app_android` con le due voci. DA FARE: tutto quel che vive sul PC di Andrea, più la prova sul telefono.
+## Barattozon dentro Barattolo: l'ordine si crea da solo dalla pagina del PayCode, nella tua sessione (20 nov 2026, cantiere bz-integrata; Andrea: «non sta funzionando bene, attualmente è solo una aggiunta grafica, invece vorrei che si integrasse proprio in barattolo, quindi nella stessa sessione del browser, se si è loggati si è in quell'account. Quando si crea un ordine su Amazon con Barattozon, automaticamente deve inserire contanti come metodo di pagamento, automaticamente deve inserire il paycode in barattozon, deve solamente chiedere la commissione e così si crea l'ordine»)
+COSA: l'estensione (0.4.0) ha un PONTE (`estensione/ponte.js`, lo sfondo)
+e una porta su barattolo.store (`estensione/barattolo.js`). (1) «Compra
+con Barattozon» su prodotto o carrello dice al ponte l'INTENTO (tre ore):
+alla cassa cartello e contanti scelti SOLO per quell'acquisto, un acquisto
+qualunque su Amazon resta com'e' (prima li sceglieva su ogni cassa). (2)
+Sulla pagina del PayCode il riquadro chiede solo la commissione e il
+bottone e' «Crea l'ordine su Barattozon»: i dati vanno al ponte, che apre
+`https://barattolo.store/p2p#barattozon-estensione` e li tiene per QUELLA
+scheda (il suo id), mezz'ora, una volta. (3) La porta, solo in quella
+scheda, li chiede al ponte e li consegna alla pagina con l'evento
+`barattozon:ordine` quando la pagina ha detto `barattozon:pronto`. (4)
+Barattolo (`riceviBzDaEstensioneP2P`) li passa dalla dogana di sempre,
+li segna `auto`, apre il foglio di Barattozon compilato nella sessione di
+QUEL browser e dopo un attimo (`P2P_BZ_AUTO_MS`) chiama
+`inviaNuovoOrdineP2P(true)`: salta il riepilogo, non i giudici (un PayCode
+sotto il minimo o scaduto ferma tutto col foglio aperto). Chi non e'
+entrato riceve l'invito; i dati aspettano in sessionStorage con l'auto, e
+dopo «Entra con Telegram» l'ordine parte da solo.
+PERCHE' IL PONTE (e non piu' solo il link): il 17 l'auto-pubblicazione era
+scartata perche' un link lo scrive chiunque. Il ponte la rende sicura: un
+dato arriva alla pagina solo dalla scheda che il ponte ha aperto dopo un
+tocco su «Crea l'ordine»; un `#barattozon?…` scritto da fuori (anche con
+`auto=1`) apre il foglio e aspetta «Pubblica» come prima. La firma resta
+di Barattolo, con la chiave del dispositivo (regola ferrea 2): il ponte
+non vede chiavi ne' sessioni, non parla con nessun server.
+ROVESCIA, SAPENDOLO, due righe di ieri e del 16: «l'estensione non ha
+rete, memoria, cookie né messaggi» diventa «niente rete, niente cookie;
+la memoria di sessione del browser e i messaggi fra i suoi pezzi sì»
+(permesso `storage`, che non mostra avvisi all'installazione); «nessun
+host oltre a www.amazon.it» diventa amazon.it + barattolo.store.
+LE SCELTE: `storage.session` (sparisce chiudendo il browser) e non la
+memoria del service worker, che Chrome spegne dopo trenta secondi;
+`background` con `service_worker` E `scripts` (Chrome usa il primo,
+Firefox il secondo); la porta a `document_start`, cosi' ascolta prima che
+la pagina dica «pronta»; il dettaglio dell'evento e' TESTO JSON (gli
+oggetti fra i due mondi in Firefox vorrebbero `cloneInto`); il ponte
+pulisce i campi (solo i cinque noti, 60 caratteri), il giudice vero resta
+la dogana; senza ponte (un browser che non lo regge) il bottone ripiega
+sul link di prima.
+SCARTATE: la pubblicazione dal ponte stesso (vorrebbe la chiave
+nell'estensione); leggere il cookie di Barattolo dall'estensione alla
+Bitpost (il permesso `cookies` e una sessione fuori dal suo posto); un
+token nell'indirizzo (lo sostituisce l'id della scheda, che una pagina
+non puo' falsificare).
+PROVATO: `prove_estensione_barattozon` riscritta nelle sentinelle (il
+manifest nuovo; nessun pezzo con rete/cookie/codice iniettato; amazon.js
+parla solo da `ponteBz`; il ponte usa solo messaggi, memoria di sessione e
+una scheda; la consegna solo alla scheda sua; l'auto solo dall'evento e
+dalla memoria scritta da lui) e in node il ponte con un browser di cartone
+(intento e sua scadenza, crea, scheda giusta/altrui/assente, una volta,
+mezz'ora) e la ricezione (dogana, auto, barra pulita, foglio aperto,
+dettagli rotti, `auto=1` dal link ignorato). DAL VIVO in Chromium con
+l'estensione vera e la `miniapp.html` VERA servita su barattolo.store: la
+cassa senza intento intatta; il tocco sul prodotto vero salvato il 17; la
+cassa con intento col contanti scelto; la pagina del PayCode, commissione
+3, «Crea l'ordine» → la scheda nuova, `P2P_BZ_LINK` con premio −3 e auto,
+il segno tolto dalla barra, i dati in memoria per l'ingresso (non entrato).
+DA GUARDARE: la pubblicazione vera da entrato (serve Telegram e il
+coordinatore: la prova di Andrea); la cassa e la pagina del PayCode VERE
+di Amazon; Firefox dal vivo. «Non sta funzionando bene»: Andrea non ha
+detto cosa; se e' la pagina del PayCode non riconosciuta serve uno
+screenshot.
+
+
 
 
 ## Il «Rileggi» della Pubblica a passi: tasti più bassi e «Pubblica» su una riga (20 nov 2026, sera, cantiere rileggi-tasti; Andrea sulla foto del passo on-chain in produzione: «In basso i tasti, fammeli più piccoli, come piuttosto elimina ordine e lascia solo pubblica, così rimane su una riga tutto»)

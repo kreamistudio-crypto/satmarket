@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Barattolo per Amazon",
   "short_name": "Barattolo",
-  "description": "Compra su amazon.it con Barattozon: paghi in contanti con un PayCode, lo pubblichi su Barattolo e te lo salda chi compra i tuoi sats.",
-  "version": "0.3.0",
+  "description": "Compra su amazon.it con Barattozon: i contanti scelti alla cassa, il PayCode portato su Barattolo nella tua sessione, l'ordine creato chiedendoti solo la commissione.",
+  "version": "0.4.0",
   "homepage_url": "https://barattolo.store",
   "icons": {
     "16": "icone/16.png",
@@ -11,12 +11,33 @@
     "48": "icone/48.png",
     "128": "icone/128.png"
   },
-  "permissions": [],
+  "permissions": [
+    "storage"
+  ],
+  "background": {
+    "service_worker": "ponte.js",
+    "scripts": [
+      "ponte.js"
+    ]
+  },
   "content_scripts": [
     {
-      "matches": ["https://www.amazon.it/*"],
-      "js": ["amazon.js"],
+      "matches": [
+        "https://www.amazon.it/*"
+      ],
+      "js": [
+        "amazon.js"
+      ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://barattolo.store/*"
+      ],
+      "js": [
+        "barattolo.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "browser_specific_settings": {
@@ -24,7 +45,9 @@
       "id": "estensione@barattolo.store",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["websiteContent"]
+        "required": [
+          "websiteContent"
+        ]
       }
     }
   }

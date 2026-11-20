@@ -197119,32 +197119,61 @@ def prove_estensione_barattozon():
     ext = open("estensione/amazon.js", encoding="utf-8").read()
     man = json.load(open("estensione/manifest.json", encoding="utf-8"))
     ext_codice = re.sub(r"/\*[\s\S]*?\*/", "", ext)
+    # (20 nov 2026, cantiere bz-integrata) il ponte e la porta su Barattolo
+    ponte = open("estensione/ponte.js", encoding="utf-8").read()
+    porta_ext = open("estensione/barattolo.js", encoding="utf-8").read()
+    ponte_codice = re.sub(r"/\*[\s\S]*?\*/", "", ponte)
+    porta_codice = re.sub(r"/\*[\s\S]*?\*/", "", porta_ext)
 
     def _in_ordine(t, *pezzi):
         ii = [t.find(x) for x in pezzi]
         return all(k >= 0 for k in ii) and ii == sorted(ii)
 
     # --- 1) L'ESTENSIONE NON PARLA CON NESSUNO --------------------------------
-    prova("il manifest: v3, nessun permesso, nessun host oltre a www.amazon.it, nessuno sfondo",
-          [3, [], None, None, [["https://www.amazon.it/*"]], [["amazon.js"]]],
+    prova("il manifest: v3, il solo permesso della memoria di sessione, nessun host in piu', il ponte come sfondo, "
+          "amazon.it e barattolo.store e nient'altro",
+          [3, ["storage"], None, {"service_worker": "ponte.js", "scripts": ["ponte.js"]},
+           [["https://www.amazon.it/*"], ["https://barattolo.store/*"]], [["amazon.js"], ["barattolo.js"]],
+           ["document_idle", "document_start"]],
           [man.get("manifest_version"), man.get("permissions"), man.get("host_permissions"),
            man.get("background"), [c.get("matches") for c in man.get("content_scripts", [])],
-           [c.get("js") for c in man.get("content_scripts", [])]])
+           [c.get("js") for c in man.get("content_scripts", [])],
+           [c.get("run_at") for c in man.get("content_scripts", [])]])
     prova("...e per Firefox l'id e la dichiarazione dei dati (il contenuto della pagina)",
           ["estensione@barattolo.store", ["websiteContent"]],
           [man.get("browser_specific_settings", {}).get("gecko", {}).get("id"),
            man.get("browser_specific_settings", {}).get("gecko", {})
               .get("data_collection_permissions", {}).get("required")])
-    prova("il codice dell'estensione non ha rete, memoria, cookie ne' messaggi", [],
-          [x for x in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "cookie", "localStorage",
-                       "sessionStorage", "indexedDB", "chrome.", "browser.", "eval(", "new Function",
-                       "innerHTML", "insertAdjacentHTML", "tag=", "postMessage")
-           if x in ext_codice])
-    prova("...apre Barattolo col PayCode DOPO il «#», con noopener e noreferrer, e l'ombra e' chiusa",
+    _vietati = ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "cookie", "localStorage",
+                "sessionStorage", "indexedDB", "eval(", "new Function", "innerHTML", "insertAdjacentHTML",
+                "tag=", "postMessage", "executeScript", "scripting.", "webRequest", "cookies.", "history.")
+    prova("nessun pezzo dell'estensione ha rete, cookie, memorie della pagina o codice iniettato",
+          [[], [], []], [[x for x in _vietati if x in c] for c in (ext_codice, ponte_codice, porta_codice)])
+    _pb = pezzo_js(ext_codice, "function ponteBz(msg){", "\n}\n")
+    prova("amazon.js parla SOLO col ponte, da `ponteBz`: un sendMessage e nessun'altra API del browser",
+          [1, 1, 0],
+          [ext_codice.count("runtime.sendMessage("), _pb.count("runtime.sendMessage("),
+           len(re.findall(r"\b(?:chrome|browser)\.", ext_codice.replace(_pb, "")))])
+    prova("il ponte usa solo i messaggi, la memoria di sessione e l'apertura di UNA scheda su barattolo.store",
+          [[], True, True],
+          [sorted(set(re.findall(r"API\.(\w+\.\w+)", ponte_codice)) - {"runtime.onMessage", "storage.session", "tabs.create"}),
+           "const BARATTOLO_BZ = 'https://barattolo.store/p2p#barattozon-estensione';" in ponte_codice,
+           "await API.tabs.create({url: BARATTOLO_BZ});" in ponte_codice])
+    prova("...consegna l'ordine SOLO alla scheda che ha aperto, entro mezz'ora, una volta", True,
+          _in_ordine(ponte_codice, "if (tipo === 'prendi') {",
+                     "if (!o || !chi.tab || chi.tab.id !== o.scheda || adesso() - o.t > ORDINE_S) return {d: null};",
+                     "await API.storage.session.remove('ordine');", "return {d: o.d};"))
+    prova("la porta su barattolo.store: solo nella scheda del ponte, chiede, e consegna a pagina pronta con un evento",
+          True, _in_ordine(porta_codice, "if (location.hash !== '#barattozon-estensione') return;",
+                           "if (consegnato || !dati || !pronta) return;",
+                           "window.dispatchEvent(new CustomEvent('barattozon:ordine', {detail: JSON.stringify(dati)}));",
+                           "window.addEventListener('barattozon:pronto',",
+                           "API.runtime.sendMessage({tipo: 'prendi'})"))
+    prova("...senza ponte apre Barattolo col PayCode DOPO il «#», con noopener e noreferrer, e l'ombra e' chiusa",
           [1, True, True, True],
           [ext_codice.count("const BARATTOLO_P2P = 'https://barattolo.store/p2p';"),
            "return BARATTOLO_P2P + '#barattozon' + (s ? '?' + s : '');" in ext_codice,
-           "a.rel = 'noopener noreferrer';" in ext_codice,
+           "if (l) window.open(l, '_blank', 'noopener,noreferrer');" in ext_codice,
            "attachShadow({mode: 'closed'})" in ext_codice])
     prova("il link del PDF e' lo stesso nei due posti: host e percorso uguali a quelli di Barattolo",
           [True, True],
@@ -197175,13 +197204,34 @@ def prove_estensione_barattozon():
                            "if (!pallino.checked) pallino.click();"))
     prova("...il riquadro del PayCode chiede la commissione e la manda come premio col meno; storta, il link si spegne",
           True, _in_ordine(ext_codice, "function aggiorna(){", "const c = commissioneBz(campo.value);",
-                           "if (c.storto) {", "link.removeAttribute('href');",
-                           "link.href = linkBarattozonBz(Object.assign({}, dati, {premio: premioBz(c.n)}));"))
+                           "if (c.storto) {", "link.removeAttribute('data-link');",
+                           "link.dataset.link = linkBarattozonBz(Object.assign({}, dati, {premio: premioBz(c.n)}));"))
+    prova("...«Crea l'ordine» manda al ponte i dati col premio; senza ponte ripiega sul link", True,
+          _in_ordine(ext_codice, "a.addEventListener('click', () => {", "if (c.storto) return;",
+                     "ponteBz({tipo: 'crea', d: Object.assign({}, dati, {premio: premioBz(c.n)})})",
+                     "}).catch(() => {", "if (l) window.open(l, '_blank', 'noopener,noreferrer');"))
+    prova("...il tocco su «Compra con Barattozon» dice l'intento al ponte, POI preme il bottone di Amazon", True,
+          "ponteBz({tipo: 'intento'}).catch(() => {}).finally(() => { if (x) x.click(); });" in ext_codice)
+    _rbz = pezzo_js(mini, "function riceviBzDaEstensioneP2P(ev){", "\n}\n")
+    prova("Barattolo: i dati dell'estensione passano dalla dogana, e SOLO loro diventano «auto»", True,
+          _in_ordine(_rbz, "try { v = JSON.parse(String(ev && ev.detail || '')); } catch(e) { return; }",
+                     "const d = datiBzDaFrammentoP2P('barattozon?' + q.toString());",
+                     "if (!d || !d.pc) return;", "d.auto = true;", "P2P_BZ_LINK = d;"))
+    prova("...ascolta `barattozon:ordine` e poi dice `barattozon:pronto`", True,
+          _in_ordine(mini, "window.addEventListener('barattozon:ordine', riceviBzDaEstensioneP2P);",
+                     "window.dispatchEvent(new Event('barattozon:pronto'));"))
+    prova("...dalla memoria dell'ingresso l'auto torna solo se e' vero com'era scritto", True,
+          "if (d && v.d && v.d.auto === true) d.auto = true;" in pezzo_js(mini, "function prendiBzDaLinkP2P(){", "\n}\n"))
+    prova("...e il foglio pubblica da solo SOLO con l'auto, coi giudici (salta solo il riepilogo)", True,
+          _in_ordine(pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"),
+                     "p2pNuovoPremioTab = pre.premio || '';", "if (pre.auto === true) setTimeout(() => {",
+                     "if (p2pLato === 'vendo' && tabacchinoP2P(p2pNuovoMetodi)) inviaNuovoOrdineP2P(true);",
+                     "}, P2P_BZ_AUTO_MS);"))
     prova("...e Barattolo la mette nel premio del passo 4, dopo l'importo", True,
           _in_ordine(pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"),
                      "p2pNuovoEuro = pre.importo || '';", "p2pNuovoPremioTab = pre.premio || '';"))
-    prova("...alla cassa il cartello, poi il contorno e la scelta sulla riga del contanti", True,
-          "if (tipo === 'cassa') {\n      if (!messo) messo = cartello();\n      segnaContanti();\n      return;\n    }"
+    prova("...alla cassa SOLO per un acquisto Barattozon: il cartello, poi il contorno e la scelta", True,
+          "if (tipo === 'cassa') {\n      \n      if (intento !== true) return;\n      if (!messo) messo = cartello();\n      segnaContanti();\n      return;\n    }"
           in ext_codice)
     _logo = re.search(r"const LOGO_BZ = 'data:image/webp;base64,([A-Za-z0-9+/=]+)';", ext_codice)
     import base64 as _b64
@@ -197201,7 +197251,7 @@ def prove_estensione_barattozon():
                      "history.replaceState(history.state, '', location.pathname + location.search);",
                      "sessionStorage.setItem(P2P_BZ_SESSIONE"))
     prova("...e quel che torna dalla memoria ripassa dalla dogana", True,
-          "return datiBzDaFrammentoP2P('barattozon?' + q.toString());" in prende)
+          "const d = datiBzDaFrammentoP2P('barattozon?' + q.toString());" in prende)
     apri = pezzo_js(mini, "function apriP2PDaUrl(){", "\n}\n")
     prova("la porta del P2P apre Barattozon dopo il velo, e scambio, ordine e pausa vincono", True,
           _in_ordine(apri, "arrivoP2PFatto();\n  if (pausa) apriPausaP2P();",
@@ -197244,7 +197294,9 @@ def prove_estensione_barattozon():
              + re.search(r"const P2P_BZ_SESSIONE = [^\n]*", mini).group(0) + "\n"
              + re.search(r"const P2P_BZ_SESSIONE_S = [^\n]*", mini).group(0) + "\n"
              + prende + "\n}\n"
-             + pezzo_js(mini, "function bzDavantiP2P(){", "\n}\n") + "\n}\n")
+             + pezzo_js(mini, "function bzDavantiP2P(){", "\n}\n") + "\n}\n"
+             + "let P2P_BZ_LINK = null;\n"
+             + pezzo_js(mini, "function riceviBzDaEstensioneP2P(ev){", "\n}\n") + "\n}\n")
     prog = (pura_ext + "\n" + "const esc = s => String(s);\n" + porta + r"""
 /* il mondo di cartone della porta: indirizzo, storia, memoria della scheda */
 let location = {pathname: '/p2p', search: '', hash: ''};
@@ -197337,6 +197389,21 @@ APERTO = false; r.davanti.push(bzDavantiP2P(), bzDavantiP2P(), p2pBzDavanti.stat
 /* la commissione fa il giro intero, anche dalla memoria dell'ingresso */
 MEM_ROTTA = false; MEM = {};
 r.portaPremio = [giro(r.linkPremio.slice(r.linkPremio.indexOf('#'))).d, giro('').d];
+/* DALL'ESTENSIONE (20 nov 2026): l'evento del ponte, la dogana, l'auto */
+let p2pApertoDaUrl = true; const P2P_SCAMBIO_URL = null, P2P_ORDINE_URL = null;
+let APERTURE = 0; function apriBarattozonDaLinkP2P(){ APERTURE++; }
+MEM = {}; location.hash = '#barattozon-estensione'; STORIA.length = 0;
+riceviBzDaEstensioneP2P({detail: JSON.stringify({pc: '212-802-988', importo: '35,61', scade: String(pdf.scade),
+                                                 barre: N, premio: '-3', altro: '<b>'})});
+r.est = {link: P2P_BZ_LINK, aperture: APERTURE, hash: location.hash, storia: STORIA.slice()};
+r.estRicarica = giro('').d;
+P2P_BZ_LINK = null; APERTURE = 0;
+['{rotto', '"testo"', JSON.stringify({importo: '35,61'}), JSON.stringify({pc: '12'}), ''].forEach(x =>
+  riceviBzDaEstensioneP2P({detail: x}));
+r.estNo = [P2P_BZ_LINK, APERTURE];
+r.autoDaLink = datiBzDaFrammentoP2P('#barattozon?paycode=479868518&auto=1&importo=30');
+MEM = {}; MEM[P2P_BZ_SESSIONE] = JSON.stringify({t: ORA, d: {pc: '479-868-518', auto: 'true'}});
+r.autoStorto = giro('').d;
 console.log(JSON.stringify(r));
 """)
     out = _node_banco(prog)
@@ -197363,6 +197430,15 @@ console.log(JSON.stringify(r));
           [out["premi"], out["linkPremio"].endswith("&premio=-3"), out["arrivoPremio"]])
     prova("...un premio storto o zero dal link resta vuoto (fuori fascia, decimale, zero, lettere); il + passa",
           ["", "", "", "", "4"], out["premiStorti"])
+    _est = dict(pdfP, importo="35,61", premio="-3", auto=True)
+    prova("dall'estensione: la dogana tiene i campi buoni, butta il resto, segna l'auto, toglie il segno dalla barra e apre il foglio",
+          [_est, 1, "", ["/p2p"]], [out["est"]["link"], out["est"]["aperture"], out["est"]["hash"], out["est"]["storia"]])
+    prova("...dopo l'ingresso con Telegram torna dalla memoria con l'auto", _est, out["estRicarica"])
+    prova("...un dettaglio rotto o senza PayCode non apre niente", [None, 0], out["estNo"])
+    prova("...e un link scritto da fuori non diventa mai auto, nemmeno con `auto=1`; ne' un auto storto in memoria",
+          [{"pc": "479-868-518", "importo": "30,00", "scade": 0, "barre": "", "premio": ""},
+           {"pc": "479-868-518", "importo": "", "scade": 0, "barre": "", "premio": ""}],
+          [out["autoDaLink"], out["autoStorto"]])
     prova("...e regge il giro dell'ingresso: torna dalla memoria col suo premio",
           [dict(pdfP, premio="-3")] * 2, out["portaPremio"])
     prova("un link del PDF storto non si crede: http, host finto, porta, percorso, credenziali, PayCode corto",
@@ -197404,6 +197480,53 @@ console.log(JSON.stringify(r));
           pdfP, out["senzaMemoria"])
     prova("il tour aspetta: niente link no; in volo si'; nella morfosi si'; aperto si'; chiuso no, e la bandierina cade",
           [False, True, True, True, False, False, ""], out["davanti"])
+
+    # --- 4) IL PONTE IN NODE, con un browser di cartone ------------------
+    prog_ponte = r"""
+let ORA = 1800000000;
+const _now = Date.now; Date.now = () => ORA * 1000;
+const MEMS = {}; const SCHEDE = []; let ASCOLTA = null;
+const chrome = {
+  runtime: {onMessage: {addListener(f){ ASCOLTA = f; }}},
+  storage: {session: {
+    async set(o){ Object.assign(MEMS, JSON.parse(JSON.stringify(o))); },
+    async get(k){ return k in MEMS ? {[k]: MEMS[k]} : {}; },
+    async remove(k){ delete MEMS[k]; }}},
+  tabs: {async create(o){ SCHEDE.push(o.url); return {id: 40 + SCHEDE.length}; }}};
+""" + ponte + r"""
+const manda = (msg, tab) => new Promise(ok => { ASCOLTA(msg, {tab}, ok); });
+(async () => {
+  const r = {};
+  r.intento0 = await manda({tipo: 'intento?'});
+  await manda({tipo: 'intento'});
+  r.intento1 = await manda({tipo: 'intento?'});
+  ORA += 3 * 3600 + 1; r.intentoScaduto = await manda({tipo: 'intento?'}); ORA -= 3 * 3600 + 1;
+  r.creaSenzaPc = await manda({tipo: 'crea', d: {importo: '30'}});
+  await manda({tipo: 'intento'});
+  r.crea = await manda({tipo: 'crea', d: {pc: '212-802-988', importo: '35,61', premio: '-3', strano: 'x', barre: 'y'.repeat(99)}});
+  r.schede = SCHEDE.slice();
+  r.intentoDopo = await manda({tipo: 'intento?'});
+  r.altraScheda = await manda({tipo: 'prendi'}, {id: 99});
+  r.senzaScheda = await manda({tipo: 'prendi'});
+  r.giusta = await manda({tipo: 'prendi'}, {id: 41});
+  r.seconda = await manda({tipo: 'prendi'}, {id: 41});
+  await manda({tipo: 'crea', d: {pc: '479-868-518'}});
+  ORA += 1801; r.tardi = await manda({tipo: 'prendi'}, {id: 42});
+  console.log(JSON.stringify(r));
+})();
+"""
+    outp = _node_banco(prog_ponte)
+    if outp is None:
+        salta("il banco del ponte di Barattozon", "serve node")
+        return
+    prova("il ponte: l'intento nasce al tocco e vale tre ore", [False, True, False],
+          [outp["intento0"]["intento"], outp["intento1"]["intento"], outp["intentoScaduto"]["intento"]])
+    prova("...«crea» senza PayCode non apre niente; col PayCode apre UNA scheda su barattolo.store e chiude l'intento",
+          [False, True, ["https://barattolo.store/p2p#barattozon-estensione"], False],
+          [outp["creaSenzaPc"]["ok"], outp["crea"]["ok"], outp["schede"], outp["intentoDopo"]["intento"]])
+    prova("...consegna solo alla scheda sua, una volta, coi soli campi noti tagliati a 60; dopo mezz'ora niente",
+          [None, None, {"pc": "212-802-988", "importo": "35,61", "premio": "-3", "barre": "y" * 60}, None, None],
+          [outp["altraScheda"]["d"], outp["senzaScheda"]["d"], outp["giusta"]["d"], outp["seconda"]["d"], outp["tardi"]["d"]])
 
 
 def prove_allegati_da_telegram():

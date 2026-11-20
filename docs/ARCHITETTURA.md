@@ -29424,6 +29424,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `p2pNuovoPremioTab`: il foglio si apre al passo 5, un tocco a
   «Pubblica» (mai da solo). Il verbale: CANTIERI,
   «Compra con Barattozon: il bottone col marchio su prodotto, carrello e cassa».
+  BARATTOZON DENTRO BARATTOLO (20 nov 2026, cantiere bz-integrata).
+  L'estensione 0.4.0 ha tre pezzi: `amazon.js` (Amazon), `ponte.js` (lo
+  sfondo, `storage.session`) e `barattolo.js` (barattolo.store,
+  `document_start`). L'intento di «Compra con Barattozon» vive nel ponte
+  tre ore e decide la cassa; «Crea l'ordine» sulla pagina del PayCode
+  manda i dati al ponte, che apre `/p2p#barattozon-estensione` e li
+  consegna SOLO a quella scheda (id), una volta, entro mezz'ora; la porta
+  li gira alla pagina con `barattozon:ordine` (testo JSON) dopo
+  `barattozon:pronto`. `riceviBzDaEstensioneP2P` → dogana
+  (`datiBzDaFrammentoP2P`) → `auto: true` → `apriBarattozonDaLinkP2P`;
+  in `apriNuovoOrdineP2P` `pre.auto === true` chiama
+  `inviaNuovoOrdineP2P(true)` dopo `P2P_BZ_AUTO_MS`. Il link a frammento
+  non e' mai auto. Il verbale: CANTIERI, «Barattozon dentro Barattolo».
   IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
   il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
   della barra scende A TENDINA la sua continuazione (`#navBarattozon`):

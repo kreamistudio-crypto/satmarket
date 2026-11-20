@@ -196,6 +196,18 @@ const BLU_BZ = '#191D29';
    pagina); `innerText`, il testo che si vede, si chiede solo se la
    parola «PayCode» c'e'. Mai innerHTML con dati della pagina: il
    bottone si costruisce con textContent. */
+/* IL PONTE (20 nov 2026, cantiere bz-integrata): l'unica porta verso
+   il resto dell'estensione, `ponte.js`. Due domande e due avvisi:
+   'intento' (si compra con Barattozon), 'intento?' (alla cassa), 'crea'
+   (i dati dell'ordine, dalla pagina del PayCode). Nient'altro passa di
+   qui: niente rete, e il ponte non parla con nessun server */
+function ponteBz(msg){
+  const api = (typeof browser !== 'undefined' && browser.runtime) ? browser
+            : (typeof chrome !== 'undefined' && chrome.runtime) ? chrome : null;
+  if (!api) return Promise.reject(new Error('senza ponte'));
+  return api.runtime.sendMessage(msg);
+}
+
 (function(){
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
   let ospite = null, link = null, sotto = null, attesa = 0;
@@ -220,14 +232,14 @@ const BLU_BZ = '#191D29';
   function aggiorna(){
     const c = commissioneBz(campo.value);
     if (c.storto) {
-      link.removeAttribute('href');
+      link.removeAttribute('data-link');
       link.setAttribute('aria-disabled', 'true');
       riga.textContent = 'Scrivi un numero intero da 0 a ' + COMMISSIONE_MAX_BZ + '.';
       riga.className = 'storto';
       return;
     }
     link.removeAttribute('aria-disabled');
-    link.href = linkBarattozonBz(Object.assign({}, dati, {premio: premioBz(c.n)}));
+    link.dataset.link = linkBarattozonBz(Object.assign({}, dati, {premio: premioBz(c.n)}));
     riga.textContent = c.n
       ? 'Chi paga il PayCode riceve il ' + c.n + '% di sats in più del cambio.'
       : 'Nessuna commissione: chi paga riceve i sats al cambio pieno.';
@@ -250,10 +262,11 @@ const BLU_BZ = '#191D29';
         + 'input{width:52px;padding:6px 8px;border-radius:8px;border:1px solid #F7931A;background:#fff;color:#111;'
         + 'font:700 15px system-ui,sans-serif;text-align:center}'
         + 'p{margin:2px 0 10px;font-size:12px;opacity:.85}p.storto{color:#ff9b8a;opacity:1}'
-        + 'a{display:block;text-align:center;padding:10px 14px;border-radius:20px;background:#F7931A;color:' + BLU_BZ + ';'
-        + 'font:700 15px/1.2 system-ui,sans-serif;text-decoration:none;cursor:pointer}'
-        + 'a:hover{background:#ffa733}a:focus-visible{outline:3px solid #fff;outline-offset:2px}'
-        + 'a[aria-disabled]{opacity:.45;cursor:not-allowed}';
+        + 'button{all:unset;box-sizing:border-box;width:100%;display:block;text-align:center;padding:10px 14px;'
+        + 'border-radius:20px;background:#F7931A;color:' + BLU_BZ + ';font:700 15px/1.2 system-ui,sans-serif;cursor:pointer}'
+        + 'button:hover{background:#ffa733}button:focus-visible{outline:3px solid #fff;outline-offset:2px}'
+        + 'button[aria-disabled]{opacity:.45;cursor:not-allowed}'
+        + 'p.fatto{color:#8fe3a1;opacity:1;font-weight:700}';
       const s = document.createElement('section');
       const icona = document.createElement('img');
       icona.src = LOGO_BZ;
@@ -273,12 +286,32 @@ const BLU_BZ = '#191D29';
       etichetta.append(parola, campo, pc);
       riga = document.createElement('p');
       riga.setAttribute('aria-live', 'polite');
-      const a = document.createElement('a');
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = 'Pubblica su Barattozon';
-      /* un link spento non apre niente, nemmeno col tocco */
-      a.addEventListener('click', ev => { if (a.hasAttribute('aria-disabled')) ev.preventDefault(); });
+      /* «CREA L'ORDINE» (20 nov 2026): i dati vanno al ponte, che apre
+         barattolo.store nella tua sessione e li consegna a QUELLA scheda;
+         Barattolo pubblica da solo. Senza ponte (un browser che non lo
+         regge) resta la strada di prima: il link col foglio compilato,
+         da rileggere e pubblicare a mano */
+      const a = document.createElement('button');
+      a.type = 'button';
+      a.textContent = 'Crea l\'ordine su Barattozon';
+      a.addEventListener('click', () => {
+        if (a.hasAttribute('aria-disabled')) return;
+        const c = commissioneBz(campo.value);
+        if (c.storto) return;
+        a.setAttribute('aria-disabled', 'true');
+        campo.disabled = true;
+        ponteBz({tipo: 'crea', d: Object.assign({}, dati, {premio: premioBz(c.n)})}).then(r => {
+          if (!r || !r.ok) throw new Error('no');
+          riga.textContent = '✓ Sto creando l\'ordine su Barattolo, nella scheda che si è aperta.';
+          riga.className = 'fatto';
+          a.textContent = 'Ordine inviato a Barattolo';
+        }).catch(() => {
+          a.removeAttribute('aria-disabled');
+          campo.disabled = false;
+          const l = a.dataset.link;
+          if (l) window.open(l, '_blank', 'noopener,noreferrer');
+        });
+      });
       campo.addEventListener('input', aggiorna);
       s.append(icona, sotto, etichetta, riga, a);
       ombra.append(stile, s);
@@ -287,7 +320,7 @@ const BLU_BZ = '#191D29';
     }
     dati = d;
     sotto.textContent = 'PayCode ' + d.pc + (d.importo ? ' · ' + d.importo + ' €' : '');
-    link.setAttribute('aria-label', 'Pubblica il PayCode ' + d.pc + ' su Barattozon, in una scheda nuova');
+    link.setAttribute('aria-label', 'Crea l\'ordine Barattozon col PayCode ' + d.pc + ', in una scheda nuova di Barattolo');
     aggiorna();
   }
 
@@ -311,6 +344,11 @@ const BLU_BZ = '#191D29';
   const tipo = paginaBz(location.pathname);
   if (!tipo || tipo === 'grazie') return;
   let messo = null, attesa = 0, segnata = null, scelto = false, primoPasso = null;
+  /* alla cassa: e' un acquisto partito da «Compra con Barattozon»? Lo
+     sa il ponte; finche' non risponde si aspetta, e senza ponte no */
+  let intento = tipo === 'cassa' ? null : false;
+  if (tipo === 'cassa') ponteBz({tipo: 'intento?'}).then(r => { intento = !!(r && r.intento); guarda(); },
+                                                        () => { intento = false; });
 
   function vesti(ombra, extra){
     const stile = document.createElement('style');
@@ -347,7 +385,12 @@ const BLU_BZ = '#191D29';
     parole.textContent = 'Compra con';
     b.append(parole, marchio());
     b.setAttribute('aria-label', 'Compra con Barattozon: ' + nota);
-    b.addEventListener('click', () => { const x = premi(); if (x) x.click(); });
+    /* il tocco dice al ponte «si compra con Barattozon» (alla cassa i
+       contanti si scelgono solo cosi'), poi preme il bottone di Amazon */
+    b.addEventListener('click', () => {
+      const x = premi();
+      ponteBz({tipo: 'intento'}).catch(() => {}).finally(() => { if (x) x.click(); });
+    });
     const p = document.createElement('p');
     p.textContent = nota;
     ombra.append(b, p);
@@ -382,7 +425,7 @@ const BLU_BZ = '#191D29';
     const ol = document.createElement('ol');
     for (const r of ['Come pagamento scegli «Paga in Contanti nel Punto Vendita più vicino» (la prima volta sta in «Aggiungi una modalità di pagamento»).',
                      'Completa l\'ordine: Amazon ti dà un PayCode, valido 72 ore.',
-                     'Sulla pagina del PayCode tocca «Pubblica su Barattozon»: chi compra i tuoi sats lo paga in contanti.']) {
+                     'Sulla pagina del PayCode scegli la commissione e tocca «Crea l\'ordine su Barattozon»: Barattolo lo pubblica nel tuo account.']) {
       const li = document.createElement('li');
       li.textContent = r;
       ol.append(li);
@@ -433,6 +476,9 @@ const BLU_BZ = '#191D29';
     attesa = 0;
     if (!document.body) return;
     if (tipo === 'cassa') {
+      /* SOLO PER UN ACQUISTO BARATTOZON (20 nov 2026): la cassa di un
+         acquisto qualunque resta com'e' — niente cartello, niente scelta */
+      if (intento !== true) return;
       if (!messo) messo = cartello();
       segnaContanti();
       return;
@@ -446,7 +492,7 @@ const BLU_BZ = '#191D29';
     } else if (tipo === 'carrello') {
       const ptc = document.getElementById('sc-buy-box-ptc-button');
       if (ptc) messo = bottone(ptc, () => document.querySelector('input[name="proceedToRetailCheckout"]'),
-        'Vai alla cassa: lì scegli «Paga in contanti», e il PayCode lo pubblichi su Barattozon.');
+        'Vai alla cassa: i contanti li scelgo io, e il PayCode finisce da solo su Barattozon.');
     }
   }
 
