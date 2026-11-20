@@ -72805,6 +72805,15 @@ def _attese_tempo_pagare_p2p(con, ordine: str, giro: int, compra: int,
         try:
             _nasce(con, f"ln:{ordine}:{int(giro or 0)}", ordine, giro, compra,
                    dal + int(minuti) * 60, dal)
+            # ...e quello di chi aspetta, chi vende (20 nov 2026, conto-chi-
+            # aspetta): stessa fine, la chiave con «:v»
+            vende = int(_parti_scambio_p2p(con, ordine).get("venditore") or 0) \
+                if globals().get("_parti_scambio_p2p") else 0
+            if vende and vende != int(compra) and not globals().get(
+                    "_conto_solo_nostr_p2p", lambda c, t: False)(con, vende):
+                _nasce(con, f"ln:{ordine}:{int(giro or 0)}"
+                       + globals().get("P2P_CONTO_CODA_ATTESA", ":v"),
+                       ordine, giro, vende, dal + int(minuti) * 60, dal)
         except Exception as e:
             print(f"⚠️ Conto P2P: {corto} non messo ({type(e).__name__})",
                   flush=True)
@@ -74570,6 +74579,47 @@ def testo_conto_p2p(stato: str, resto_s: int = 0) -> str:
             "<i>Questo messaggio si aggiorna da solo ogni minuto.</i>")
 
 
+# IL CONTO ANCHE A CHI ASPETTA (20 nov 2026, cantiere conto-chi-aspetta;
+# Andrea, che vendeva on-chain col «Deposito confermato… Chi compra ha 30
+# minuti» fermo in chat mentre ad Alan ne restavano 16: «il tempo può
+# aggiornarsi da solo in modo tale da sapere solamente già da Telegram
+# quanto manca?», e alla proposta «Sì, perfetto»). Accanto al conto di chi
+# paga ne nasce un secondo per chi vende, con la stessa fine: la chiave e'
+# quella di chi paga con «:v» in coda. Un messaggio solo, riscritto ogni
+# minuto come l'altro (le modifiche non suonano); senza il tasto rosso e
+# senza l'avviso a un minuto, che sono di chi deve fare il gesto.
+P2P_CONTO_CODA_ATTESA = ":v"
+
+
+def conto_di_chi_aspetta_p2p(chiave: str) -> bool:
+    """PURA: questo conto e' quello di chi aspetta il pagamento?"""
+    return str(chiave or "").endswith(P2P_CONTO_CODA_ATTESA)
+
+
+def testo_conto_attesa_p2p(stato: str, resto_s: int = 0) -> str:
+    """PURA: il testo che scorre per CHI ASPETTA gli euro (chi vende),
+    scritto per gli euro come `testo_conto_p2p`."""
+    if stato == "pagato":
+        return ("✅ <b>Chi compra ha toccato «Ho inviato gli euro»</b>: il tempo "
+                "per pagare si è fermato. Controlla il conto e, se gli euro ci "
+                "sono, libera i sats.")
+    if stato == "scaduto":
+        return ("⏰ <b>Il tempo per pagare di chi compra è finito</b> senza «Ho "
+                "inviato gli euro». Apri lo scambio per vedere cosa puoi fare.")
+    if stato == "chiuso":
+        return ("⏹ Lo scambio non aspetta più il pagamento: il conto alla "
+                "rovescia si è fermato.")
+    s = max(0, int(resto_s or 0))
+    if s < 60:
+        quanto = "meno di un minuto"
+    else:
+        quanto = _durata_detta_p2p(((s + 59) // 60) * 60)
+    return (f"⏳ <b>Chi compra ha ancora {quanto} per pagare</b>\n\n"
+            "Quando tocca «Ho inviato gli euro» ti avviso io: allora controlla "
+            "il conto e libera i sats. Mai prima.\n\n"
+            "<i>Questo messaggio si aggiorna da solo ogni minuto.</i>")
+
+
 def stato_conto_ln_p2p(momenti, giro: int, dal: int, fine: int,
                        adesso: int) -> str:
     """PURA: a che punto e' il tempo per pagare di uno scambio Lightning,
@@ -74797,7 +74847,14 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
                             con, int(o["ricevente_id"] or 0)):
                         _conto_nasce_p2p(con, f"oc:{o['id']}", str(o["ordine"]),
                                          0, int(o["ricevente_id"] or 0), fine, adesso)
-                vivi_oc = [int(str(r[0]).split(":", 1)[1]) for r in con.execute(
+                    # ...e quello di chi aspetta gli euro, chi ha depositato
+                    # (20 nov 2026, conto-chi-aspetta)
+                    if stato == "corre" and not _conto_solo_nostr_p2p(
+                            con, int(o["depositante_id"] or 0)):
+                        _conto_nasce_p2p(con, f"oc:{o['id']}{P2P_CONTO_CODA_ATTESA}",
+                                         str(o["ordine"]), 0,
+                                         int(o["depositante_id"] or 0), fine, adesso)
+                vivi_oc = [int(str(r[0]).split(":")[1]) for r in con.execute(
                     "SELECT chiave FROM p2p_conto_rovescia WHERE finito=0 AND "
                     "chiave LIKE 'oc:%'")]
                 for oid in vivi_oc:
@@ -74817,15 +74874,18 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
         lavoro = []
         for r in righe:
             chiave = str(r["chiave"])
+            # (20 nov 2026, conto-chi-aspetta) il conto di chi vende
+            attesa = conto_di_chi_aspetta_p2p(chiave)
+            testo_di = testo_conto_attesa_p2p if attesa else testo_conto_p2p
             if chiave.startswith("oc:"):
-                o = oc.get(int(chiave.split(":", 1)[1]))
+                o = oc.get(int(chiave.split(":")[1]))
                 if not o:
                     stato, fine = "chiuso", int(r["fine"])
                 else:
                     stato, fine = stato_conto_oc_p2p(o, adesso)
                     fine = fine or int(r["fine"])
-                testo = _p2p_onchain_parole(o, testo_conto_p2p(
-                    stato, fine - adesso)) if o else testo_conto_p2p(stato)
+                testo = _p2p_onchain_parole(o, testo_di(
+                    stato, fine - adesso)) if o else testo_di(stato)
                 bottone = _p2p_onchain_bottone(o) if o else None
                 # i minuti per il tasto rosso: quelli dell'ordine, non la
                 # nascita del conto (che puo' arrivare un giro dopo)
@@ -74840,7 +74900,7 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
                 stato = stato_conto_ln_p2p(momenti, int(r["giro"] or 0),
                                            int(r["quando"] or 0), fine, adesso)
                 testo = _conto_parole_ln_p2p(con, str(r["ordine"]),
-                                             testo_conto_p2p(stato, fine - adesso))
+                                             testo_di(stato, fine - adesso))
                 bottone = _bottone_scambio_p2p(r["ordine"])
                 # nel Lightning il conto nasce all'inizio esatto del tempo
                 # (`_attese_tempo_pagare_p2p`): fine meno inizio = i minuti
@@ -74848,6 +74908,9 @@ async def _giro_conto_p2p(adesso: int = 0) -> str:
                 uno = (_conto_parole_ln_p2p(con, str(r["ordine"]),
                                             testo_manca_un_minuto_p2p(False))
                        if un_minuto_dovuto_p2p(stato, fine - adesso) else "")
+            if attesa:
+                # il rosso e l'avviso a un minuto sono di chi deve pagare
+                minuti, uno = 0, ""
             lavoro.append((dict(r), stato, testo, bottone, minuti, uno))
     finally:
         con.close()

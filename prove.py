@@ -216496,6 +216496,47 @@ def prove_riprendi_scaduto_onchain():
            "Chi vende ha messo i sats nel deposito di garanzia 2-di-3 ✓</b> \"" in ctl])
 
 
+def prove_conto_chi_aspetta():
+    """IL CONTO ANCHE A CHI ASPETTA (20 nov 2026, cantiere conto-chi-aspetta;
+    Andrea, che vendeva on-chain col «Chi compra ha 30 minuti per pagare»
+    fermo in chat mentre ad Alan ne restavano 16: «il tempo può aggiornarsi
+    da solo in modo tale da sapere solamente già da Telegram quanto manca?»,
+    poi «Sì, perfetto»). Qui la forma: i testi di chi aspetta, la chiave con
+    «:v», niente rosso e niente avviso a un minuto per lui. La prova dal vivo
+    sulle rotte sta in collaudo_p2p_onchain e collaudo_tempo_pagare."""
+    print("\n[il conto alla rovescia anche per chi aspetta il pagamento]")
+    amb = {"time": time}
+    k = _SORGENTE.index("\nP2P_CONTO_CODA_ATTESA = ") + 1
+    exec(_SORGENTE[k:_SORGENTE.index("\n", k)], amb)
+    for f in ("_durata_detta_p2p", "conto_di_chi_aspetta_p2p", "testo_conto_attesa_p2p"):
+        exec(pezzo(f), amb)
+    T, A = amb["testo_conto_attesa_p2p"], amb["conto_di_chi_aspetta_p2p"]
+    prova("IL TESTO di chi aspetta: «Chi compra ha ancora 16 minuti per pagare» per eccesso, "
+          "le ore, «meno di un minuto», «mai prima» e l'aggiornamento; i finali senza",
+          [True, True, True, True, True, False, False, False],
+          ["Chi compra ha ancora 16 minuti per pagare" in T("corre", 959),
+           "ha ancora 1 ora per pagare" in T("corre", 3600),
+           "ha ancora meno di un minuto" in T("corre", 30),
+           "Mai prima" in T("corre", 600) and "si aggiorna da solo" in T("corre", 600),
+           "Chi compra ha toccato «Ho inviato gli euro»" in T("pagato"),
+           "si aggiorna" in T("pagato"), "si aggiorna" in T("scaduto"), "si aggiorna" in T("chiuso")])
+    prova("LA CHIAVE: «:v» in coda e' il conto di chi aspetta, quella di chi paga no",
+          [True, True, False, False],
+          [A("oc:7:v"), A("ln:abc:2:v"), A("oc:7"), A("ln:abc:2")])
+    giro = pezzo("_giro_conto_p2p")
+    prova("IL GIRO: nasce accanto a quello di chi paga (on-chain per chi ha depositato, "
+          "Lightning per chi vende), legge il numero dello scambio anche con la coda, e a "
+          "chi aspetta niente rosso ne' avviso a un minuto",
+          (True, True, True, True),
+          ('_conto_nasce_p2p(con, f"oc:{o[\'id\']}{P2P_CONTO_CODA_ATTESA}",' in giro
+           and 'int(o["depositante_id"] or 0), fine, adesso)' in giro,
+           'int(chiave.split(":")[1])' in giro and 'int(str(r[0]).split(":")[1])' in giro,
+           "if attesa:\n                # il rosso e l'avviso a un minuto sono di chi deve pagare\n"
+           "                minuti, uno = 0, \"\"" in giro,
+           'globals().get("P2P_CONTO_CODA_ATTESA", ":v"),' in pezzo("_attese_tempo_pagare_p2p")
+           and '_parti_scambio_p2p(con, ordine).get("venditore")' in pezzo("_attese_tempo_pagare_p2p")))
+
+
 def prove_conto_alla_rovescia_p2p():
     """IL CONTO ALLA ROVESCIA NEL BOT (19 nov 2026, cantiere regole-sulla-card;
     Andrea: «una notifica con un timer che scorre», poi «Ah, ok, allora va
@@ -217804,7 +217845,7 @@ CATEGORIE = {
     onchain_tempo_deposito
     recapito_nel_tempo
     riprendi_scaduto_onchain
-    conto_alla_rovescia_p2p
+    conto_alla_rovescia_p2p conto_chi_aspetta
     meta_cauzione_auto
     """.split(),
     "mercatino": """
@@ -219064,6 +219105,7 @@ def main():
               prove_recapito_nel_tempo,
               prove_riprendi_scaduto_onchain,
               prove_conto_alla_rovescia_p2p,
+              prove_conto_chi_aspetta,
               prove_meta_cauzione_auto,
               prove_avvisi_barattolo,
               prove_serie_giorni,

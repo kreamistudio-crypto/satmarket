@@ -356,10 +356,13 @@ async def giro_intero():
     # insieme ai promemoria, con la stessa fine, e il giro lo manda
     con = banco.con_db()
     conto = con.execute("SELECT tg_id, fine, messaggio FROM p2p_conto_rovescia WHERE "
-                        "chiave LIKE ?", (f"ln:{UNA}:%",)).fetchall()
+                        "chiave LIKE ? ORDER BY chiave", (f"ln:{UNA}:%",)).fetchall()
     con.close()
+    # (20 nov 2026, cantiere conto-chi-aspetta) ...e quello di chi vende,
+    # che aspetta gli euro: stessa fine, la chiave con «:v»
     prova("col recapito nasce anche il conto alla rovescia di chi compra, con la stessa "
-          "fine, non ancora mandato", [(PRENDE, t + 60 + 3600, 0)],
+          "fine, non ancora mandato, e accanto quello di chi vende",
+          [(PRENDE, t + 60 + 3600, 0), (PUBBLICA, t + 60 + 3600, 0)],
           [tuple(x) for x in conto])
     # (20 nov 2026, tasto-rosso-conto) il bot si ascolta: con un'ora il bottone e' rosso
     mandati = []
@@ -375,7 +378,7 @@ async def giro_intero():
         SRV.bot_api = vero_bot
     con = banco.con_db()
     conto = con.execute("SELECT messaggio, detto, finito FROM p2p_conto_rovescia WHERE "
-                        "chiave LIKE ?", (f"ln:{UNA}:%",)).fetchone()
+                        "chiave LIKE ? AND chiave NOT LIKE '%:v'", (f"ln:{UNA}:%",)).fetchone()
     con.close()
     prova("...il giro lo manda (un id salvato) col tempo che resta, e corre ancora",
           (True, True, 0), (bool(conto and conto[0]), bool(conto) and "Tempo per pagare: "
@@ -384,6 +387,14 @@ async def giro_intero():
            and "Tempo per pagare" in str(d.get("text"))]
     tasto = (((suo[-1].get("reply_markup") or {}).get("inline_keyboard") or [[{}]])[0][0]
              if suo else {})
+    suo_v = [d for m, d in mandati if m == "sendMessage" and d.get("chat_id") == PUBBLICA]
+    tasto_v = (((suo_v[-1].get("reply_markup") or {}).get("inline_keyboard") or [[{}]])[0][0]
+               if suo_v else {})
+    prova("A CHI VENDE il suo messaggio «Chi compra ha ancora … per pagare», col bottone "
+          "dello scambio NON rosso (il rosso e' di chi paga)",
+          (1, True, None, True),
+          (len(suo_v), bool(suo_v) and "Chi compra ha ancora " in str(suo_v[0].get("text")) and " per pagare</b>" in str(suo_v[0].get("text")),
+           tasto_v.get("style"), f"scambio={UNA}" in str(tasto_v.get("url"))))
     prova("IL TASTO ROSSO (20 nov 2026, Andrea: «quel messaggio lì deve avere il tasto sotto "
           "rosso»): un tempo di un'ora ha il bottone dello scambio con `style` danger",
           (1, "danger", True), (len(suo), tasto.get("style"),

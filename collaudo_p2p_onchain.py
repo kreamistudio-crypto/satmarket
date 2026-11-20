@@ -2599,10 +2599,14 @@ def main():
         # di prima compresi): qui si contano solo le chiamate di questo
         asyncio.run(SRV._giro_conto_p2p())
         o5c = pubblica(999).json()
-        mie = lambda: [c for c in chiamate if o5c["ordine"] in json.dumps(c[1])]
+        # a chi paga (888); dal 20 nov 2026 (conto-chi-aspetta) anche chi ha
+        # depositato (999) ha il suo conto, contato a parte
+        tutte_o5c = lambda: [c for c in chiamate if o5c["ordine"] in json.dumps(c[1])]
+        mie = lambda: [c for c in tutte_o5c() if c[1].get("chat_id") == 888]
+        sue = lambda: [c for c in tutte_o5c() if c[1].get("chat_id") == 999]
         gesto(888, o5c["id"], "prendi")
         asyncio.run(SRV._giro_conto_p2p())
-        prova("prima del deposito il tempo non corre: nessun messaggio", [], mie())
+        prova("prima del deposito il tempo non corre: nessun messaggio", [], tutte_o5c())
         paga(uno(999, o5c["id"]))
         gesto(999, o5c["id"], "controlla")
         asyncio.run(SRV._giro_conto_p2p())
@@ -2627,6 +2631,21 @@ def main():
         prova("un tempo per pagare di ore: il bottone NON e' rosso (il rosso e' fino a "
               "un'ora)", (True, False),
               (minuti_o5c > 60, '"style"' in json.dumps(mie()[0][1].get("reply_markup"))))
+        # IL CONTO ANCHE A CHI ASPETTA (20 nov 2026, cantiere conto-chi-aspetta;
+        # Andrea: «il tempo può aggiornarsi da solo in modo tale da sapere
+        # solamente già da Telegram quanto manca?»)
+        con = SRV.db()
+        riga_v = con.execute("SELECT * FROM p2p_conto_rovescia WHERE chiave=?",
+                             (f"oc:{o5c['id']}:v",)).fetchone()
+        con.close()
+        prova("...e a chi ha depositato (999) il SUO messaggio «Chi compra ha ancora … per "
+              "pagare», col bottone dello scambio, mai rosso, con la stessa fine",
+              (1, "sendMessage", True, True, False, True),
+              (len(sue()), sue()[0][0] if sue() else "",
+               bool(sue()) and "Chi compra ha ancora" in sue()[0][1]["text"],
+               bool(sue()) and "?scambio=bar-onchain-" in json.dumps(sue()[0][1].get("reply_markup")),
+               bool(sue()) and '"style"' in json.dumps(sue()[0][1].get("reply_markup")),
+               bool(riga_v) and bool(riga) and int(riga_v["fine"]) == int(riga["fine"])))
         asyncio.run(SRV._giro_conto_p2p())
         prova("un giro subito dopo, stesso minuto: niente di nuovo (non si riscrive "
               "un testo uguale)", 1, len(mie()))
@@ -2648,6 +2667,14 @@ def main():
                int(riga["finito"]) > 0))
         asyncio.run(SRV._giro_conto_p2p(int(time.time()) + 1200))
         prova("...e dopo non si tocca piu'", 3, len(mie()))
+        prova("...e a chi ha depositato lo stesso giro: riscritto dieci minuti dopo, poi "
+              "«Chi compra ha toccato «Ho inviato gli euro»», chiuso, e non si tocca piu'",
+              (3, "editMessageText", True, True),
+              (len(sue()), sue()[1][0] if len(sue()) > 1 else "",
+               bool(sue()) and "Chi compra ha toccato «Ho inviato gli euro»" in sue()[-1][1]["text"],
+               (lambda c: bool(c) and int(c["finito"]) > 0)(
+                   (lambda k: k.execute("SELECT finito FROM p2p_conto_rovescia WHERE chiave=?",
+                                        (f"oc:{o5c['id']}:v",)).fetchone())(SRV.db()))))
         SRV.P2P_CONTO_ALLA_ROVESCIA = False
         prima = len(chiamate)
         o5d = pubblica(999).json()
@@ -2673,7 +2700,8 @@ def main():
         n_prima = len(mie_e())
         asyncio.run(SRV._giro_conto_p2p(fine_o5c - 60))
         asyncio.run(SRV._giro_conto_p2p(fine_o5c - 20))
-        uno_min = [c for c in mie_e()[n_prima:] if c[0] == "sendMessage"]
+        uno_min = [c for c in mie_e()[n_prima:] if c[0] == "sendMessage"
+                   and c[1].get("chat_id") == 888]
         prova("A UN MINUTO dalla fine: UN messaggio nuovo (che suona) «Manca 1 minuto» con "
               "le parole dell'on-chain e il bottone dello scambio (non rosso: tempo di ore); "
               "il giro dopo non lo ripete", (1, True, True, False),
@@ -2682,6 +2710,9 @@ def main():
                bool(uno_min) and "?scambio=bar-onchain-" in json.dumps(
                    uno_min[0][1].get("reply_markup")),
                bool(uno_min) and '"style"' in json.dumps(uno_min[0][1].get("reply_markup"))))
+        prova("...e a chi aspetta (999) l'avviso a un minuto NON arriva: e' di chi paga",
+              [], [c for c in mie_e()[n_prima:] if c[0] == "sendMessage"
+                   and c[1].get("chat_id") == 999])
         gesto(999, o5e["id"], "chiedi-annullo")
     finally:
         SRV.bot_api = vecchio_bot

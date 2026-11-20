@@ -854,3 +854,9 @@ frase: Negli scambi P2P col tempo per pagare, anche chi vende ha quel tempo per 
 dove: P2P → «I miei scambi» → lo scambio preso, sotto lo stato: «Hai ancora … per toccare «Indica dove ricevere gli euro»» (a chi compra: «Chi vende ha ancora …»); nel riquadro della presa, il primo passo dice anche il tempo di chi vende.
 leva: P2P_RECAPITO_NEL_TEMPO (accesa di serie)
 pubblico: sì
+
+## 2026-11-20 · conto-chi-aspetta
+frase: Negli scambi P2P col tempo per pagare, anche chi vende riceve su Telegram un messaggio che si aggiorna da solo ogni minuto, «⏳ Chi compra ha ancora … per pagare»: sai quanto manca senza aprire l'app.
+dove: Telegram, chat del bot: quando parte il tempo per pagare di chi compra (Lightning e on-chain), il messaggio «⏳ Chi compra ha ancora … per pagare» col bottone dello scambio.
+leva: P2P_CONTO_ALLA_ROVESCIA (accesa di serie)
+pubblico: sì
