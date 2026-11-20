@@ -14255,7 +14255,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = '0e8d85eaf6';
+const LINGUA_VER = 'e978b46cb6';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -79061,8 +79061,13 @@ async function p2pOnchainCofirmeInAttesa(parole){
    (con la morfosi del +), quello di Barattozon. Torna falso — e il +
    fa quel che ha sempre fatto — a chi non e' ammesso all'on-chain:
    una scelta con una strada sola e' un tocco in piu' per niente. */
-function apriSceltaPubblicaP2P(){
+/* `bz` (20 nov 2026): la scelta aperta dalla tendina di Barattozon — il
+   tocco su una rete riprende la sua discesa invece di aprire i fogli di
+   sempre (vedi LA RETE SI SCEGLIE ANCHE QUI) */
+let p2pSceltaBz = false;
+function apriSceltaPubblicaP2P(bz){
   if (!myP2POnchain || DEMO || VETRINA || !myTgId) return false;
+  p2pSceltaBz = !!bz;
   haptic();
   const vendo = p2pLato === 'vendo';
   const tit = el('p2pSceltaTit');
@@ -79140,6 +79145,11 @@ function sceltaReteP2P(rete){
      tasto della scelta: lo stesso orologio di `toccaPiu` */
   if (typeof p2pPiuGestoAt === 'number' && performance.now() - p2pPiuGestoAt < 700) return;
   chiudiFoglioP2P('p2pSceltaSheet');
+  if (p2pSceltaBz) {
+    p2pSceltaBz = false;
+    p2pBzRete = rete === 'onchain' ? 'onchain' : 'ln';
+    return toccaTendinaP2P();
+  }
   if (rete === 'onchain') return apriPubblicaOnchainP2P(p2pLato === 'vendo' ? 'sell' : 'buy');
   apriNuovoOrdineP2P();
 }
@@ -98436,8 +98446,21 @@ function scadenzaPayCodeDaLibroP2P(scadeLibro, nato){
    gemello di `testoBarattozonP2P`, senza lo scontrino (lo dicono i gesti) */
 function testoBarattozonOcP2P(mio){
   return (mio
-    ? 'Chi prende l\'ordine paga in contanti al tabacchino un tuo ordine Amazon. Vede il PayCode solo a deposito confermato, mai nome, indirizzo o cosa hai comprato.'
+    ? 'Chi prende l\'ordine paga in contanti al tabacchino un tuo ordine Amazon, solo quando la pagina dice «Sats depositati». Non vede mai nome, indirizzo o cosa hai comprato.'
     : 'Paghi in contanti al tabacchino un ordine Amazon di chi vende, solo a sats confermati. Non vedi nome, indirizzo o cosa ha comprato.');
+}
+/* IL CAPPELLO DEL FOGLIO «PUBBLICA», UNO PER LE DUE RETI (20 nov 2026,
+   cantiere barattozon-testi; Andrea: «perche' quando cerco di pubblicare
+   un ordine Barattozon i testi cambiano?», e sulla card la scelta «tutti
+   e due corti»). Il corto dell'on-chain era nato il 17 nov («i testi
+   pero' sono troppo lunghi»), il Lightning era rimasto lungo: ora la
+   frase e' la stessa, e cambia solo la scritta che la pagina dello
+   scambio mostra quando si puo' pagare — «Sats in garanzia» sul
+   Lightning, «Sats depositati» on-chain (P2P_ONCHAIN_STATI.depositato).
+   Le frasi intere, non cucite: il dizionario inglese le cerca cosi'. */
+function cappelloBzPubblicaP2P(oc){
+  return oc ? testoBarattozonOcP2P(true)
+    : 'Chi prende l\'ordine paga in contanti al tabacchino un tuo ordine Amazon, solo quando la pagina dice «Sats in garanzia». Non vede mai nome, indirizzo o cosa hai comprato.';
 }
 function testoBarattozonP2P(mio, senzaScontrino){
   const cosa = mio
@@ -102319,8 +102342,31 @@ function vestiTastoBzP2P(){
                                       : 'Vendi con Barattozon: contanti al tabacchino');
   t.setAttribute('title', compro ? 'Compra con Barattozon' : 'Vendi con Barattozon');
 }
+/* LA RETE SI SCEGLIE ANCHE QUI (20 nov 2026, cantiere barattozon-testi,
+   Andrea: «non mi viene chiesto come voglio inviare i sats, cioe' se
+   on-chain o lighting, come succede con gli ordini normali»): a chi ha
+   Barattozon anche on-chain la tendina apre prima lo STESSO foglio della
+   scelta del + — stesse parole, stessi due tasti —, e la rete scelta
+   apre il foglio di Barattozon su quella rete. Agli altri il foglio si
+   apre subito, in Lightning, come prima. Col typeof: i banchi che
+   ritagliano questa funzione da sola restano quelli di ieri. */
 function apriBarattozonP2P(){
+  if (typeof reteBzP2P === 'function' && !reteBzP2P()) return;
   apriNuovoOrdineP2P(P2P_TABACCHINO);
+}
+/* la rete scelta nel foglio della scelta per la PROSSIMA apertura di
+   Barattozon: '' | 'ln' | 'onchain'. Si spegne appena letta, e la spegne
+   anche una discesa del + interrotta (annullaTrascinoP2P) */
+let p2pBzRete = '';
+/* vero = il foglio si apre adesso (e, se e' on-chain, lo chiede);
+   falso = e' uscita la scelta, e il foglio aspetta il tocco su una rete */
+function reteBzP2P(){
+  const rete = p2pBzRete;
+  p2pBzRete = '';
+  if (rete === 'onchain') { p2pNuovoReteChiesta = 'onchain'; return true; }
+  if (rete === 'ln') return true;
+  if (!myP2POnchain || DEMO || VETRINA || !myTgId || !bzOnchainP2P()) return true;
+  return !apriSceltaPubblicaP2P(true);
 }
 
 /* ====== IL TRASCINO DEL + SULLA TENDINA (24 set 2026, richiesta di
@@ -102482,6 +102528,9 @@ function lasciaSulLogoP2P(){
    ferma e riporta a casa il + (annullaTrascinoP2P). */
 function toccaTendinaP2P(){
   if (p2pDiscesaTimer || p2pTrascino) return;
+  /* la scelta della rete viene PRIMA della discesa (20 nov 2026): il +
+     scende e diventa il bottone dopo il tocco su una rete */
+  if (typeof reteBzP2P === 'function' && !p2pBzRete && !reteBzP2P()) return;
   const guida = !DEMO && !VETRINA && myTgId && morfoPuoiP2P(true) && trascinoPuoiP2P()
     ? misuraGuidaP2P() : null;
   if (!guida || !(guida.max > 0)) { apriBarattozonP2P(); return; }
@@ -102567,6 +102616,8 @@ function annullaTrascinoP2P(){
     p2pDiscesaTimer = null;
     document.body.classList.remove('p2p-sopra');
     rientraCursoreP2P();
+    /* ...e la rete scelta per quella discesa non resta per la prossima */
+    if (typeof p2pBzRete !== 'undefined') p2pBzRete = '';
   }
   if (p2pTrascino) trascinoFineP2P(false);
 }
@@ -103824,8 +103875,12 @@ function renderNuovoOrdineP2P(){
         /* a rete on-chain la moneta arancio al posto del fulmine (30 ott
            2026, oc-identico); l'una e l'altro in rilievo, accanto alla
            scritta (vedi L'ICONA IN RILIEVO) */
+        /* ⚠️ E IL LOGO SE NE VA ANCHE DA QUI (20 nov 2026, cantiere
+           barattozon-testi, Andrea: «non ci va la B, ci va l'icona del
+           fulmine come al solito»): l'icona dice la RETE, come la moneta
+           dell'on-chain, e il blu dice gia' Barattozon */
         (oc ? '<span class="p2p-invia-oc">' + P2P_OC_MONETA + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</span></button>'
-          : (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '<span class="p2p-invia-ico">⚡</span>Pubblica ordine') + '</button>') +
+          : '<span class="p2p-invia-ico">⚡</span>' + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</button>') +
     '</div>';
 }
 /* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
@@ -104029,7 +104084,7 @@ function percorsoTabacchinoP2P(val){
        serviva la cosa che nessun'altra riga diceva: che chi paga vede
        il codice e basta, e che alla cassa non gli chiedono un
        documento. */
-    '<div class="hint">🧾 ' + esc(typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && typeof testoBarattozonOcP2P === 'function' ? testoBarattozonOcP2P(true) : testoBarattozonP2P(true)) + '</div>' +
+    '<div class="hint">🧾 ' + esc(cappelloBzPubblicaP2P(typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc)) + '</div>' +
     /* I PASSI 1 E 2 COME IL 3 (9 ott 2026, sera): righe di casa che
        aprono il loro foglio. Tengono l'id (ogni «manca» del giudice le
        trova) e il `value` (che `cambiaTabP2P` e `cambiaCampoNuovoP2P`

@@ -93051,3 +93051,63 @@ PROVATO. `prove_timer_deposito_oc` (categoria p2p): la riga coi minuti, l'anello
 COSA. Nel foglio «Pubblica» del P2P (Vendi e Compra BTC, Lightning e on-chain) la tendina dei metodi mostrava subito SEPA, Revolut, Satispay e Contanti, e SEPA Instant stava sotto «Altri metodi ▾» (lista corta del 2 nov). Tolto da `P2P_METODI_ALTRI`: si vede subito, e il posto subito sotto SEPA glielo dà l'ordine di `P2P_METODI` (`'SEPA', 'SEPA Instant', …`), che `vociTendinaMetodiP2P` rispetta. La lista è UNA per Lightning e on-chain (`metodiOnchainP2P` filtra `metodiPubblicabiliP2P`); il filtro del libro (`metodiFiltroP2P`) e le scelte degli avvisi (`P2P_AVVISI_METODI`) avevano già SEPA Instant subito dopo SEPA, e non si toccano. In franchi la lista è quella svizzera, senza SEPA. Nessun testo nuovo nell'app.
 TAPPO. `assistente/sapere.md` diceva «SEPA Instant… si aprono toccando "Altri metodi ▾"»: ora lo elenca fra quelli che si vedono subito; `conoscenza.md` rigenerato.
 PROVATO. `prove_lista_corta_metodi` (chiusa: SEPA, SEPA Instant, Revolut, Satispay, Contanti; più la prova nuova «SEPA Instant mai fra gli altri, e nel vocabolario subito dopo SEPA») e la lista corta delle monete in «ETH, Monero e USDe» aggiornate. Controprova: rimesso SEPA Instant fra gli altri, 4 rosse. Nel venv con le sole dipendenze della CI (senza coincurve), su 57e7387 più questo cantiere: suite severa 30719 passate, 0 fallite, 2 saltate (nostr-tools, cartella sbagliata), rigirate le due sezioni con nostr-tools@2.25.2 più la lista corta: 114 passate, 0 fallite, 0 saltate; collaudi della CI 162 verdi, 0 rossi (con le variabili del proxy del cloud; il cantiere tocca solo la Mini App e il libro). Dopo il rebase su fcec7b5 (sei commit d'altri: 0626500, bb5f370, 00f85b8, faab7a3, 1b7444b, fcec7b5; nessun simbolo in comune, conflitto solo in coda a CANTIERI): `prove.py --dai-file=origin/develop` severo, 272 sezioni, 12356 passate, 0 fallite, 0 saltate; collaudo_p2p_onchain e collaudo_tempo_pagare verdi; `conoscenza.md` già aggiornato. Ultimo rebase su 3c30c15 (anche lui senza simboli in comune): rigirate la lista corta, le monete e la base di Tappo, verdi. Da guardare dal vivo: il foglio «Pubblica» sul telefono, in euro, Lightning e on-chain.
+
+## Barattozon, la stessa frase sulle due reti, il ⚡ sul bottone e la scelta della rete (20 nov 2026, cantiere barattozon-testi; Andrea: «perché quando cerco di pubblicare un ordine Barattozon i testi cambiano? […] lightning non ci va la B, ci va l'icona del fulmine come al solito», e «non mi viene chiesto come voglio inviare i sats, cioè se on-chain o lighting, come succede con gli ordini normali»)
+
+IL PERCHÉ DEI DUE TESTI. Il cappello del «Passo 1 di 4 · Il PayCode» on-chain
+era stato accorciato il 17 nov su richiesta di Andrea (cantiere
+barattozon-oc-corto, «i testi però sono troppo lunghi»), e solo lui: il
+Lightning era rimasto lungo. Messe davanti le due strade (A, tutti e due
+lunghi; B, tutti e due corti), Andrea ha scelto B sulla card (09:12 UTC).
+
+COSA. (1) `cappelloBzPubblicaP2P(oc)` è il cappello del foglio, uno per le
+due reti: la stessa frase corta, e cambia solo la scritta che la pagina
+dello scambio mostra quando si può pagare, «Sats in garanzia» sul
+Lightning e «Sats depositati» on-chain (quella di
+`P2P_ONCHAIN_STATI.depositato`). Le due frasi intere, non cucite, perché
+il dizionario inglese le cerca così (lingua/en.js: la corta on-chain di
+ieri cambiata, la Lightning nuova). `testoBarattozonP2P` resta quello del
+riquadro del PayCode e della pagina Info (il ramo `mio` non lo chiama più
+nessuno, lasciato com'è). (2) Il bottone «Rileggi e pubblica» col
+tabacchino in Lightning porta il ⚡ del solito «Pubblica ordine» al posto
+del logo Barattozon (era del 24 set); on-chain la moneta di sempre.
+(3) La tendina di Barattozon sotto il +, a chi ha Barattozon on-chain
+(`myP2POnchain` e `bzOnchainP2P()`), apre prima lo STESSO foglio della
+scelta del + (`apriSceltaPubblicaP2P(true)`: stesso titolo, stessi due
+tasti, nessuna scritta nuova); il tocco su una rete (`sceltaReteP2P`, col
+segno `p2pSceltaBz`) mette `p2pBzRete` e riprende `toccaTendinaP2P`: il +
+scende, diventa il bottone e il foglio si apre su quella rete
+(`reteBzP2P` la legge e la spegne; on-chain passa da
+`p2pNuovoReteChiesta`, la strada di `apriPubblicaOnchainP2P`). Il trascino
+fino al logo: il + torna a casa, esce la scelta, poi la stessa discesa.
+Agli altri la tendina apre subito il Lightning, come prima. Il link
+dell'estensione (`P2P_BZ_LINK`) non passa dalla tendina e non cambia.
+L'interruttore in cima al foglio resta.
+
+SCARTATO. Aprire il foglio Barattozon senza rete scelta e far scegliere
+dentro: avrebbe voluto un terzo stato del foglio e dei giudici. Una
+scelta nuova con scritte sue (il marchio Barattozon nel titolo): la
+regola delle scritte nuove, e la scelta del + già dice tutto.
+
+PROVATO. Suite severa intera 30.744 passate, 0 fallite, 2 saltate
+(nostr-tools, che nel cloud non c'è) sull'albero rebasato su 1b7444bb;
+collaudi della CI nel venv senza coincurve 162 verdi, 0 rossi prima dei
+rebase, e dopo i cinque vicini (p2p_onchain, _usdt, _commissione,
+_barattozon, lingua) verdi. Commit arrivati nel frattempo, non miei,
+nessuno con simboli in comune: recapito-fisso, timer-card-scambi,
+tasto-rosso-conto, collaudo-orologio-recapito, bottoni-fissi, poi
+tocca-a-te on-chain, tempo per depositare, sepa-instant (sull'ultimo
+rebase, su 7ed37a0b, il giro mirato: le sezioni toccate e quelle che
+leggono i documenti). Rifatti LINGUA_VER e
+conoscenza.md. Sentinelle del bottone e del cappello
+riscritte; prova nuova «la stessa frase corta in Lightning e on-chain»;
+banco nuovo `banco_rete_barattozon.js` (prove_tasto_barattozon, 6bis)
+con le funzioni vere: la tendina apre la scelta, «On-chain» e
+«Lightning» aprono Barattozon su quella rete, il + di sempre dopo una
+scelta lasciata a metà apre i fogli di sempre, senza on-chain subito
+Lightning. Controprova: tolto il ritorno della scelta in `reteBzP2P`, il
+banco diventa rosso.
+
+DA GUARDARE. Sul telefono (collaudo): la discesa del + dopo il tocco
+sulla rete, col foglio della scelta che si chiude nello stesso momento;
+il ⚡ sul blu del bottone.

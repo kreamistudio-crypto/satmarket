@@ -74651,10 +74651,14 @@ def prove_nav_p2p():
     # lascia il posto al logo di BARATTOZON in piccolo, sul blu della
     # capsula: e' il marchio del percorso, non quello dello scambio — il
     # divieto resta sul 🔁, che arancio su arancio era una macchia
+    # (20 nov 2026, cantiere barattozon-testi, Andrea: «non ci va la B, ci
+    # va l'icona del fulmine come al solito») il logo se ne va: col
+    # tabacchino in Lightning il ⚡ di sempre, on-chain la moneta
     prova("...e il bottone che pubblica non porta il marchio", True,
           '\'onclick="inviaNuovoOrdineP2P()">\' +' in mini
           # (30 ott 2026, 18:57) il fulmine nel suo span, a sinistra sul nero
-          and "(tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '<span class=\"p2p-invia-ico\">⚡</span>Pubblica ordine') + '</button>'" in mini
+          and ": '<span class=\"p2p-invia-ico\">⚡</span>' + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine') + '</button>') +" in mini
+          and "LOGO_BZ_HTML + 'Rileggi e pubblica'" not in mini
           and "🔁 Pubblica" not in mini
           and "🔁 Invia" not in mini)
     # e la seconda uscita non c'e' piu': dal foglio a pieno schermo si
@@ -76509,6 +76513,79 @@ console.log(JSON.stringify(out));
                         "p2pNuovoSheet open"], "metodi": []}, out["piu"])
     prova("...e le guardie del + valgono anche per la tendina",
           [["toast"], ["invito"]], [out["demo"], out["vetrina"]])
+
+    # --- 6bis) LA RETE SI SCEGLIE ANCHE DALLA TENDINA (20 nov 2026) ------
+    # Andrea: «non mi viene chiesto come voglio inviare i sats, cioe' se
+    # on-chain o lighting, come succede con gli ordini normali». A chi ha
+    # Barattozon anche on-chain la tendina apre prima il foglio della
+    # scelta del + (`apriSceltaPubblicaP2P(true)`), e il tocco su una rete
+    # riprende la discesa e apre Barattozon su QUELLA rete. Le funzioni
+    # vere; attorno, il foglio della scelta e il foglio «Pubblica» di
+    # cartone (la discesa no: senza morfosi la tendina apre subito).
+    banco2 = (_riga("P2P_TABACCHINO") + "\n"
+              + "let p2pBzRete = '';\nlet p2pSceltaBz = false;\n"
+              + "".join(_una(f) for f in (
+                  "function apriBarattozonP2P(){", "function reteBzP2P(){",
+                  "function apriSceltaPubblicaP2P(bz){", "function sceltaReteP2P(rete){",
+                  "function toccaTendinaP2P(){"))
+              + r"""
+let DEMO = false, VETRINA = false, myTgId = 111, p2pLato = 'vendo', myP2POnchain = true;
+let bzOc = true, p2pNuovoReteChiesta = '', p2pPiuGestoAt = -1e9, p2pDiscesaTimer = null, p2pTrascino = null;
+let passi = [];
+const P2P_OC_MONETA = '', P2P_LN_MONETA = '';
+function bzOnchainP2P(){ return bzOc; }
+function haptic(){}
+function morfoPuoiP2P(){ return false; }
+function trascinoPuoiP2P(){ return false; }
+function misuraGuidaP2P(){ return null; }
+const fogli = {};
+function el(id){ return fogli[id] || (fogli[id] = {textContent: '', innerHTML: '',
+  classList: {add(c){ passi.push(id + ' ' + c); }}}); }
+function chiudiFoglioP2P(id){ passi.push('chiudi ' + id); }
+function apriNuovoOrdineP2P(m){ passi.push('foglio:' + (m || '') + ':' + (p2pNuovoReteChiesta || 'ln'));
+  p2pNuovoReteChiesta = ''; }
+function apriPubblicaOnchainP2P(l){ passi.push('onchain:' + l); }
+const out = {};
+function caso(nome, f){ passi = []; p2pBzRete = ''; p2pSceltaBz = false;
+  try { out[nome] = f(); } catch(e) { out[nome] = 'ESPLOSO: ' + e.message; } }
+caso('scelta', () => { toccaTendinaP2P(); return passi.slice(); });
+caso('oc', () => { toccaTendinaP2P(); passi = []; sceltaReteP2P('onchain');
+  return {passi, resta: p2pBzRete, bz: p2pSceltaBz}; });
+caso('ln', () => { apriBarattozonP2P(); passi = []; sceltaReteP2P('ln');
+  return {passi, resta: p2pBzRete}; });
+/* il + di sempre dopo una scelta Barattozon lasciata a meta' */
+caso('piu', () => { apriBarattozonP2P(); apriSceltaPubblicaP2P(); passi = []; sceltaReteP2P('onchain');
+  return passi; });
+caso('spenta', () => { bzOc = false; toccaTendinaP2P(); bzOc = true; return passi; });
+caso('senzaoc', () => { myP2POnchain = false; apriBarattozonP2P(); myP2POnchain = true; return passi; });
+console.log(JSON.stringify(out));
+""")
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco_rete_barattozon.js")
+        open(p, "w", encoding="utf-8").write(banco2)
+        r = _sp.run([node, p], capture_output=True,
+                    encoding="utf-8", timeout=60)
+        out = (_json.loads(r.stdout.strip().splitlines()[-1])
+               if r.returncode == 0 else None)
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    if out is None:
+        prova("il banco della rete di Barattozon gira", "",
+              (r.stderr or "")[-600:])
+        return
+    prova("la tendina di Barattozon apre prima la scelta della rete del +",
+          ["sheetBg open", "p2pSceltaSheet open"], out["scelta"])
+    prova("...«On-chain» apre Barattozon on-chain, e la scelta non resta per dopo",
+          {"passi": ["chiudi p2pSceltaSheet", "foglio:" + T + ":onchain"],
+           "resta": "", "bz": False}, out["oc"])
+    prova("...«Lightning» lo apre in Lightning",
+          {"passi": ["chiudi p2pSceltaSheet", "foglio:" + T + ":ln"], "resta": ""}, out["ln"])
+    prova("...e il + di sempre, dopo, apre i fogli di sempre",
+          ["chiudi p2pSceltaSheet", "onchain:sell"], out["piu"])
+    prova("...senza Barattozon on-chain (leva spenta o non ammesso) la tendina "
+          "apre subito il Lightning, come prima",
+          [["foglio:" + T + ":ln"], ["foglio:" + T + ":ln"]], [out["spenta"], out["senzaoc"]])
 
     # --- 7) IL BANCO DEL TRASCINO: le funzioni VERE, il dito finto ------
     # (24 set 2026, richiesta di Andrea) Il gesto gira coi pezzi veri —
@@ -84627,8 +84704,9 @@ def prove_p2p_pubblica():
           any(e in _sez for e in ("💶", "💳", "💲", "⚡", "🏳️")))
     # (23 set 2026) l'etichetta e' un ternario — col tabacchino dice
     # «Rileggi e pubblica» — e il ⚡ resta UNO, sul bottone
+    # (20 nov 2026) uno anche col tabacchino: l'etichetta e' dopo lo span
     prova("...e il ⚡ che arriva a schermo e' solo quello del bottone",
-          1, nuovo.count("'<span class=\"p2p-invia-ico\">⚡</span>Pubblica ordine'"))
+          1, nuovo.count("'<span class=\"p2p-invia-ico\">⚡</span>' + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine')"))
     prova("...e vestono come quelle della nav", True,
           'class="p2p-ico" viewBox="2 2 20 20"'
           in pezzo_js(mini, "function icoNuovoP2P(nome){", "\n}\n")
@@ -96442,8 +96520,9 @@ DOM = null;
           "const percorso = !tab ? '' : percorsoTabacchinoP2P(val);" in _fog
           # (30 set 2026) col tabacchino la leva del prezzo sta prima del percorso
           and "valuta + metodi + zona + importo + (tab ? tipo + percorso : percorso + tipo)" in _fog
-          # (24 set 2026) col logo di Barattozon al posto della ricevuta
-          and "(tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '<span class=\"p2p-invia-ico\">⚡</span>Pubblica ordine')" in _fog
+          # (24 set 2026) col logo di Barattozon al posto della ricevuta;
+          # (20 nov 2026) col ⚡ di sempre, il logo se n'e' andato
+          and "'<span class=\"p2p-invia-ico\">⚡</span>' + (tab ? 'Rileggi e pubblica' : 'Pubblica ordine')" in _fog
           and "const importo = tab ? '' : sezioneNuovoP2P({" in _fog
           and "const premio = (p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({" in _fog)
     _per = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
@@ -96550,7 +96629,8 @@ DOM = null;
           and "Per pagare non serve alcun documento." in _MIO
           and "Per pagare non serve alcun documento." in _SUO)
     prova("il cappello del passo 4 le CHIAMA, con la 🧾, e non le ribatte", True,
-          "🧾 ' + esc(typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc && typeof testoBarattozonOcP2P === 'function' ? testoBarattozonOcP2P(true) : testoBarattozonP2P(true))" in _per
+          # (20 nov 2026) una frase per le due reti, `cappelloBzPubblicaP2P`
+          "🧾 ' + esc(cappelloBzPubblicaP2P(typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc))" in _per
           and "fai pagare in contanti" not in _per
           and "Prima genera su Amazon" not in mini)
     _rq = pezzo_js(mini, "function riquadroPayCodeP2P(o, adesso){", "\n}\n")
@@ -97126,6 +97206,8 @@ def prove_pubblica_metodo_prima():
         "function leggiDataTabacchinoP2P(testo){", "function campoDaScadeP2P(epoch){",
         "function finestraGaranziaP2P(info){",
         "function testoBarattozonP2P(mio, senzaScontrino){",
+        # (20 nov 2026) il cappello del percorso, uno per le due reti
+        "function testoBarattozonOcP2P(mio){", "function cappelloBzPubblicaP2P(oc){",
         "function percorsoTabacchinoP2P(val){", "function rigaVivaTabP2P(){",
         "function aggiornaPercorsoTabP2P(){", "function tabacchinoP2P(metodi){",
         "function metodoBaseP2P(m){", "function vesteMetodoP2P(m){",
@@ -169449,7 +169531,8 @@ const MEMORIA = {}, localStorage = {rotto: false,
 """ + monete + "\n" + pezzo_js(mini, "function segnoReteP2P(rete){", "\n}\n") + "\n}\n" \
         + mini[mini.index("let p2pOcTutorialTimer = null;"):mini.index("function carteOnchainLibroP2P(k, sotto, senzaCarte){")] \
         + pezzo_js(mini, "function carteOnchainLibroP2P(k, sotto, senzaCarte){", "\n}\n") + "\n}\n" \
-        + pezzo_js(mini, "function apriSceltaPubblicaP2P(){", "\n}\n") + "\n}\n" \
+        + "let p2pSceltaBz = false, p2pBzRete = '';\n" \
+        + pezzo_js(mini, "function apriSceltaPubblicaP2P(bz){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function sceltaReteP2P(rete){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function interruttoreReteP2P(attiva, soloLn){", "\n}\n") + "\n}\n" \
         + foglio + pezzo_js(mini, "function cambiaReteP2P(rete){", "\n}\n") + "\n}\n" + """
@@ -196435,9 +196518,25 @@ def prove_barattozon_onchain():
            mini.count("corpo.tabacchino = {paycode: payCodeP2P(tB.ordine).replace(/-/g, ''),")])
     prova("il cappello di Barattozon on-chain non dice «cifrati», ed e' corto (17 nov 2026, «troppo lungo»)",
           [1, False, True],
-          [mini.count("p2pNuovoOc && typeof testoBarattozonOcP2P === 'function' ? testoBarattozonOcP2P(true) : testoBarattozonP2P(true))"),
+          [mini.count("esc(cappelloBzPubblicaP2P(typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc))"),
            "cifrat" in pezzo_js(mini, "function testoBarattozonOcP2P(mio){", "\n}\n"),
            len(pezzo_js(mini, "function testoBarattozonOcP2P(mio){", "\n}\n")) < 420])
+    # UNA FRASE PER LE DUE RETI (20 nov 2026, cantiere barattozon-testi;
+    # Andrea: «perche' quando cerco di pubblicare un ordine Barattozon i
+    # testi cambiano?», poi «tutti e due corti» sulla card): il cappello
+    # del Lightning e quello on-chain sono la STESSA frase, e cambia solo
+    # la scritta della pagina dello scambio quando si puo' pagare
+    _cap = pezzo_js(mini, "function cappelloBzPubblicaP2P(oc){", "\n}\n")
+    _oc = pezzo_js(mini, "function testoBarattozonOcP2P(mio){", "\n}\n")
+    _CAP_LN = ("Chi prende l\\'ordine paga in contanti al tabacchino un tuo ordine Amazon, "
+               "solo quando la pagina dice «Sats in garanzia». Non vede mai nome, indirizzo "
+               "o cosa hai comprato.")
+    prova("il cappello di Barattozon: la stessa frase corta in Lightning e on-chain, "
+          "cambia solo «Sats in garanzia» / «Sats depositati»",
+          [True, True, True],
+          ["oc ? testoBarattozonOcP2P(true)" in _cap,
+           _CAP_LN in _cap,
+           _CAP_LN.replace("«Sats in garanzia»", "«Sats depositati»") in _oc])
     prova("la scheda: «Ho pagato al tabacchino» al posto degli euro, il riquadro del PayCode al posto "
           "del recapito, il terzo passo e' il PayCode",
           [1, 1, 1],
