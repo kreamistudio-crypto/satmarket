@@ -177075,10 +177075,25 @@ def prove_apri_nel_wallet():
            "const intent = strada === 'android' ? intentWallet('lightning:' + bolt11) : '';"
            in fn("function avvisaWalletMuto(a, bolt11, tentativo, strada){"),
            'id="walletRiprova" href="\' + intent + \'" onclick="riprovaWalletMuto(this)"' in blocco])
+    # EMENDATA (20 nov 2026, cantiere apri-wallet-telegram): dentro
+    # Telegram per Android il link nudo rompe la Mini App
+    # (net::ERR_UNKNOWN_URL_SCHEME, Oppo Find X5 di Andrea): li' il tocco
+    # si previene e mette subito l'avviso. I preventDefault diventano due.
     prova("dentro Telegram NIENTE openLink (rifiuta gli schemi non http: WebAppTgUrlInvalid) ne' openInvoice: "
-          "il link nudo come sempre, e l'unico preventDefault e' quello del link `#`",
-          [False, False, 1],
-          ["openLink" in codice, "openInvoice" in codice, anw.count("preventDefault")])
+          "i preventDefault sono quello del link `#` e quello di Telegram per Android",
+          [False, False, 2, True],
+          ["openLink" in codice, "openInvoice" in codice, anw.count("preventDefault"),
+           "if (strada === 'telegram' && walletChiusoTelegram(true, navigator.userAgent, tg && tg.platform)) {" in anw])
+    rete = nudo(fn("function reteWalletTelegram(ev){"))
+    prova("LA RETE (20 nov 2026): in cattura su tutta la pagina, ferma lightning:/bitcoin:/intent: solo dentro "
+          "Telegram per Android, lascia fare alla porta che ha il suo onclick, e copia coi toast di sempre",
+          [1, True, True, True, True, True],
+          [mini.count("document.addEventListener('click', reteWalletTelegram, true);"),
+           "/^(lightning|bitcoin|intent):([^?#]*)/i" in rete,
+           "walletChiusoTelegram(!!(tg && tg.initData), navigator.userAgent, tg && tg.platform)" in rete,
+           "if (typeof a.onclick === 'function') return 'porta';" in rete,
+           "copiaLink(m[2], 'Fattura copiata 📋')" in rete,
+           "copiaLink(m[2], '📋 Indirizzo copiato')" in rete])
     att = nudo(fn("function attendiWallet(giro, poi){"))
     prova("il cane da guardia ascolta visibilitychange, pagehide e blur, e li toglie quando ha finito",
           [3, 3, True],
@@ -177108,8 +177123,9 @@ def prove_apri_nel_wallet():
     prova("nessun pagamento parte da solo: niente pay_invoice ne' fetch nel blocco",
           [False, False], ["pay_invoice" in blocco, "fetch(" in blocco])
     for spia in ("el(", "document", "navigator", "tg", "Date.now"):
-        prova(f"`stradaWallet` e `intentWallet` sono pure: nessun `{spia}`", False,
-              spia in nudo(fn("function stradaWallet(dentroTelegram, ua){")) + nudo(fn("function intentWallet(url){")))
+        prova(f"`stradaWallet`, `intentWallet` e `walletChiusoTelegram` sono pure: nessun `{spia}`", False,
+              spia in nudo(fn("function stradaWallet(dentroTelegram, ua){")) + nudo(fn("function intentWallet(url){"))
+              + nudo(fn("function walletChiusoTelegram(dentroTelegram, ua, piattaformaTg){")))
 
     # --- 2) IL BANCO -------------------------------------------------
     node = _sh.which("node")
@@ -177139,6 +177155,8 @@ def prove_apri_nel_wallet():
         "const haptic = () => haptics++;",
         mini[mini.index("const WALLET_ATTIMO_MS"):mini.index("/* PURA: la strada per aprire il wallet")],
         fn("function stradaWallet(dentroTelegram, ua){"), fn("function intentWallet(url){"),
+        fn("function walletChiusoTelegram(dentroTelegram, ua, piattaformaTg){"),
+        fn("function reteWalletTelegram(ev){"),
         fn("function apriNelWallet(a, ev, tentativo){"), fn("function attendiWallet(giro, poi){"),
         fn("function avvisaWalletMuto(a, bolt11, tentativo, strada){"), fn("function copiaWalletMuto(){"),
         fn("function riprovaWalletMuto(link){"),
@@ -177228,7 +177246,9 @@ a.onclick(ev()); a.onclick(ev());
 const pendenti = timers.length;
 scatta();
 out.dueTocchi = {pendenti, inseriti: f.inseriti.length, avviso: !!f.avviso, timers: timers.length};
-/* 4) TELEGRAM: il link nativo (non prevenuto), openLink MAI chiamata, l'avviso SENZA Riprova */
+/* 4) TELEGRAM (sul computer: dal 20 nov 2026 quello per Android ha la sua strada, 4b):
+   il link nativo (non prevenuto), openLink MAI chiamata, l'avviso SENZA Riprova */
+navigator.userAgent = V.pc;
 const aperti = [];
 tg = {initData: 'query_id=1', openLink: u => { aperti.push(u); throw new Error('WebAppTgUrlInvalid'); }};
 ({f, a} = foglioFinto());
@@ -177244,6 +177264,58 @@ portaWallet(a, V.bolt);
 a.onclick(ev());
 emetti('pagehide'); scatta();
 out.telegramAperto = {avviso: !!f.avviso};
+/* 4b) (20 nov 2026) TELEGRAM PER ANDROID: il link NON parte (prevenuto), l'avviso SUBITO, niente attimo ne' Riprova */
+for (const [nome, ua, piat] of [['tgAndroid', V.and, 'android'], ['tgAndroidX', V.pc, 'android_x'], ['tgSoloUa', V.and, '']]) {
+  navigator.userAgent = ua;
+  tg = {initData: 'query_id=1', platform: piat, openLink: u => { aperti.push(u); throw new Error('WebAppTgUrlInvalid'); }};
+  timers.splice(0);
+  ({f, a} = foglioFinto());
+  const g4 = [];
+  portaWallet(a, V.bolt, x => g4.push(x));
+  const e = ev();
+  const s = a.onclick(e);
+  out[nome] = {strada: s, prevenuto: e.prevenuto, timers: timers.length, avviso: !!f.avviso,
+    testo: !!f.avviso && f.avviso.html.includes('Non si è aperto nessun wallet: copia la fattura'),
+    riprova: riprova(f.avviso && f.avviso.html), gesti: g4, aperti: aperti.length};
+  copiato = [];
+  copiaWalletMuto();
+  out[nome].copia = copiato.slice();
+}
+/* ...Telegram per iPhone: come prima, il link nativo */
+navigator.userAgent = V.ios;
+tg = {initData: 'query_id=1', platform: 'ios'};
+({f, a} = foglioFinto());
+portaWallet(a, V.bolt);
+const e4c = ev();
+out.tgIos = {strada: a.onclick(e4c), prevenuto: e4c.prevenuto, timers: timers.length};
+scatta();
+/* ...LA RETE: i link senza porta dentro Telegram per Android si copiano, quelli con la porta li lascia a lei */
+const nodoLink = (href, onclick) => { const l = {getAttribute: n => n === 'href' ? href : null, onclick: onclick || null};
+  l.closest = sel => sel === 'a[href]' ? l : null; return l; };
+const tocca = (bersaglio) => { const e = ev(); e.target = bersaglio; return [reteWalletTelegram(e), e.prevenuto]; };
+copiato = [];
+navigator.userAgent = V.and; tg = {initData: 'query_id=1', platform: 'android'};
+out.rete = {
+  btc: tocca(nodoLink('bitcoin:bc1qabc?amount=0.00010000')),
+  btcMaiuscolo: tocca(nodoLink('BITCOIN:BC1QABC?AMOUNT=0.0001')),
+  ln: tocca(nodoLink('lightning:' + V.bolt)),
+  porta: tocca(nodoLink('lightning:' + V.bolt, () => 'x')),
+  intent: tocca(nodoLink('intent://' + V.bolt + '#Intent;scheme=lightning;end')),
+  https: tocca(nodoLink('https://barattolo.store/')),
+  cancelletto: tocca(nodoLink('#')),
+  nessunLink: tocca({closest: () => null}),
+  nessunBersaglio: tocca(null),
+  copiato: null};
+out.rete.copiato = copiato.slice();
+copiato = [];
+tg = {initData: 'query_id=1', platform: 'ios'}; navigator.userAgent = V.ios;
+out.reteIos = tocca(nodoLink('bitcoin:bc1qabc?amount=0.0001'));
+tg = null; navigator.userAgent = V.and;
+out.reteChrome = tocca(nodoLink('bitcoin:bc1qabc?amount=0.0001'));
+out.reteCopiatoFuori = copiato.length;
+out.chiuso = [walletChiusoTelegram(false, V.and, 'android'), walletChiusoTelegram(true, V.ios, 'ios'),
+  walletChiusoTelegram(true, V.pc, 'tdesktop'), walletChiusoTelegram(true, V.pc, 'android'),
+  walletChiusoTelegram(true, V.and, 'weba'), walletChiusoTelegram(true, null, null)];
 /* 5) IPHONE e ALTRO: il link nudo, l'avviso al primo attimo, senza Riprova */
 tg = null;
 for (const [nome, ua] of [['ios', V.ios], ['altro', V.pc]]) {
@@ -177324,11 +177396,33 @@ console.log(JSON.stringify(out));
     prova("due tocchi di fila: due attimi armati, il primo tace, un avviso solo",
           {"pendenti": 2, "inseriti": 1, "avviso": True, "timers": 0}, o["dueTocchi"])
     v = o["telegram"]
-    prova("TELEGRAM: il link nativo dal tocco (non prevenuto), openLink MAI chiamata, un attimo",
+    prova("TELEGRAM (sul computer): il link nativo dal tocco (non prevenuto), openLink MAI chiamata, un attimo",
           ["telegram", [], False, 1], [v["strada"], v["aperti"], v["prevenuto"], v["timers"]])
     prova("...pagina a schermo dopo l'attimo: l'avviso, e MAI il Riprova intent:// dentro Telegram",
           {"avviso": True, "riprova": None, "timers": 0}, o["telegramMuto"])
     prova("...se qualcosa passa davanti, niente avviso", {"avviso": False}, o["telegramAperto"])
+    for nome, cosa in (("tgAndroid", "piattaforma android"), ("tgAndroidX", "piattaforma android_x"),
+                       ("tgSoloUa", "solo lo user agent Android")):
+        prova(f"TELEGRAM PER ANDROID ({cosa}): il link NON parte (prevenuto: la Mini App non si rompe), "
+              "l'avviso SUBITO col suo testo, niente attimo, niente Riprova, openLink mai, il tentativo detto, "
+              "e il Copia copia la stessa bolt11",
+              {"strada": "telegram", "prevenuto": True, "timers": 0, "avviso": True, "testo": True,
+               "riprova": None, "gesti": ["wallet", "copiata"], "aperti": 0,
+               "copia": [[BOLT, "Fattura copiata 📋"]]}, o[nome])
+    prova("TELEGRAM PER IPHONE: niente cambia, il link nativo e l'attimo",
+          {"strada": "telegram", "prevenuto": False, "timers": 1}, o["tgIos"])
+    v = o["rete"]
+    prova("LA RETE in Telegram per Android: bitcoin: copia l'indirizzo senza la cifra, lightning: la bolt11, "
+          "la porta col suo onclick fa da se', intent: fermo; https, `#` e i tocchi fuori da un link passano",
+          [["indirizzo", True], ["indirizzo", True], ["fattura", True], ["porta", True], ["fermo", True],
+           ["niente", False], ["niente", False], ["niente", False], ["niente", False],
+           [["bc1qabc", "📋 Indirizzo copiato"], ["BC1QABC", "📋 Indirizzo copiato"], [BOLT, "Fattura copiata 📋"]]],
+          [v["btc"], v["btcMaiuscolo"], v["ln"], v["porta"], v["intent"], v["https"], v["cancelletto"],
+           v["nessunLink"], v["nessunBersaglio"], v["copiato"]])
+    prova("...in Telegram per iPhone e in Chrome la rete non tocca niente: il link parte come sempre",
+          [["niente", False], ["niente", False], 0], [o["reteIos"], o["reteChrome"], o["reteCopiatoFuori"]])
+    prova("walletChiusoTelegram: solo dentro Telegram, e solo Android (piattaforma o user agent)",
+          [False, False, False, True, True, False], o["chiuso"])
     prova("IPHONE: il link nudo dal tocco, l'avviso al primo attimo, senza Riprova",
           {"strada": "ios", "prevenuto": False, "primaTimers": 1, "avviso": True, "riprova": None, "timers": 0}, o["ios"])
     prova("ALTRO (un PC): lo stesso",

@@ -93356,3 +93356,81 @@ comune; conflitto solo in coda a CANTIERI): sezioni toccate, la sua
 con `node --check`. Resta da
 guardare dal vivo sul telefono di Andrea: la riga «1099,00 USDT ≈ N sats»
 su una riga sola.
+
+## «Apri nel wallet» non rompe più la Mini App su Android (20 nov 2026, cantiere apri-wallet-telegram; Andrea, con due schermate dal suo Oppo Find X5: «nella mini app quando clicco su apri nel wallet mi compare quell'errore lì, devo chiudere la mini app e riaprirla e quel tasto lì non funziona»)
+
+IL CASO. Foglio della cauzione Lightning, tocco su «⚡ Apri nel wallet»:
+la Mini App intera diventa la pagina d'errore di Telegram, «Ops...
+Impossibile caricare Barattolo. net::ERR_UNKNOWN_URL_SCHEME», e si
+esce solo chiudendo e riaprendo.
+
+LA DIAGNOSI, letta nel client e non indovinata. Il cantiere
+«apri-nel-wallet» del 10 ott lasciava partire dentro Telegram il link
+`lightning:` nudo «come sempre». Nel sorgente di Telegram per Android
+(DrKLO/Telegram, `BotWebViewContainer.shouldOverrideUrlLoading`, master
+letto il 20 nov 2026) gli schemi che non sono http/https vanno al
+sistema SOLO nel ramo `!bot`, cioè nel browser interno; per una Mini
+App la funzione torna `false` e la WebView prova a caricare il link da
+sé: quell'errore. Non dipende dal telefono né dal wallet installato.
+Nessuna strada ufficiale apre lo schema: `openLink` lo rifiuta già
+nello script (`WebAppTgUrlInvalid`, 10 ott), e l'evento
+`web_app_open_link` lo lascia passare solo se lo schema sta in
+`webAppAllowedProtocols`, una lista che decide il server di Telegram.
+Gli errori di un sottoframe invece NON mostrano la pagina «Ops»
+(`onReceivedError` guarda `isForMainFrame`), ma il sottoframe non apre
+il wallet lo stesso: strada scartata.
+
+COSA SI È FATTO. Dentro Telegram per Android
+(`walletChiusoTelegram`, pura: `tg.platform` android/android_x, o lo
+user agent) il link non parte MAI:
+- la porta del Lightning (`apriNelWallet`, otto fogli: mercatino,
+  garanzia e cauzione P2P, cauzione del contanti on-chain, deposito
+  on-chain pagato in Lightning, mancia, zap alla raccolta, fattura
+  dell'instradatore) previene il tocco e mette SUBITO l'avviso del
+  wallet muto, coi suoi testi e il suo «📋 Copia la fattura», senza
+  l'attimo d'attesa e senza il Riprova `intent://`; il tentativo P2P
+  resta detto ('wallet', poi 'copiata');
+- gli altri link (le porte `bitcoin:` del mercatino, del deposito P2P
+  on-chain e della presa on-chain, la fattura nuda dell'instradatore
+  quando non passa dalla porta) li ferma una rete in cattura su
+  `document`, `reteWalletTelegram`: previene e copia la bolt11
+  («Fattura copiata 📋») o l'indirizzo senza la cifra («📋 Indirizzo
+  copiato»), i toast dei bottoni Copia di sempre.
+iPhone, computer, Chrome e app sulla Home: niente cambia.
+
+LE DECISIONI. Niente testi nuovi (regola del 20 nov): solo frasi che
+c'erano già. Scartata per ora la strada che APRE davvero il wallet da
+Telegram per Android: `openLink` verso una paginetta https nostra che
+rimbalza sul `lightning:` dal browser di Telegram (lì `!bot`, e il
+sistema lo passa al wallet). Vorrebbe una rotta nuova con la sua
+whitelist e un testo nuovo: si propone ad Andrea, non si fa da soli.
+
+PROVATO. `prove_apri_nel_wallet` emendata: i preventDefault di
+`apriNelWallet` diventano due, il caso Telegram del banco gira con lo
+user agent del computer, e nuovi casi node: Telegram per Android con
+piattaforma android, android_x e solo user agent (prevenuto, avviso
+subito, niente attimo né Riprova, openLink mai, la copia della stessa
+bolt11), Telegram per iPhone invariato, la rete (bitcoin maiuscolo e
+minuscolo, lightning, la porta che fa da sé, intent fermo, https e `#`
+che passano, iPhone e Chrome intoccati), il giudice puro. Un giro in
+Chromium vero (Playwright) con le due funzioni vere: il tocco su
+un'icona DENTRO il link è preso, la pagina non si muove, le due copie
+giuste. CONTROPROVE: lo user agent tolto dal giudice e la riga della
+porta tolta dalla rete, sei rosse; rimesso il codice, verdi.
+GIRATO, nel venv con le sole dipendenze del workflow (senza coincurve),
+sull'albero origin/develop 0cc0fb35 più questo cantiere: `PROVE_SEVERE=1
+python prove.py` 30797 passate, 0 rosse, 2 saltate per nostr-tools
+assente (`prove_annuncio_identita` e `prove_relay_di_barattolo` rigirate
+con `IDENTITA_NODE_MODULES`: 97 passate, 0 saltate);
+`collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2`: 163 verdi, 0
+rossi. Dopo il rebase su 4b76be9 (dettaglio-schede e via-riassunto, di
+altri, nessun simbolo in comune) il giro mirato: questa sezione, le 35
+che leggono i documenti (1977 passate, 0 saltate) e i tre collaudi coi
+fogli di pagamento vicini (deposito_ln_p2p, presa_ln_p2p, cambio_libero).
+DA GUARDARE dopo la promozione, dal vivo sull'Oppo dentro Telegram: il
+tocco su «⚡ Apri nel wallet» mette l'avviso e la Mini App resta in
+piedi; su iPhone e da Chrome il wallet si apre come prima. Non provato
+dal vivo: Telegram Desktop e Telegram Web, dove niente è cambiato.
+FUORI DA QUESTO CANTIERE, notato: «Apri Amber» (nostrconnect://) dentro
+Telegram per Android passa dalla stessa strada e con ogni probabilità
+rompe la Mini App allo stesso modo.

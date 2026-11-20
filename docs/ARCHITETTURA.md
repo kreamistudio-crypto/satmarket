@@ -1395,6 +1395,21 @@
   cauzione) dicono nel primo riquadro che nel wallet il pagamento resta
   «in sospeso» finché lo scambio non finisce: è la hold, non un
   pagamento inceppato (10 ott 2026, prova-wallet).
+  LA STRADA CHIUSA (20 nov 2026, «apri-wallet-telegram»): dentro
+  Telegram per Android (`walletChiusoTelegram`, pura: `tg.platform`
+  android/android_x o lo user agent) un link `lightning:`, `bitcoin:` o
+  `intent:` NON parte mai. Il client per una Mini App non passa gli
+  schemi non http al sistema (`BotWebViewContainer.shouldOverrideUrlLoading`,
+  ramo `!bot` solo per il browser interno) e la WebView li carica da
+  sé: «net::ERR_UNKNOWN_URL_SCHEME», Mini App da chiudere e riaprire
+  (Oppo Find X5 di Andrea). Lì `apriNelWallet` previene il tocco e
+  mette SUBITO l'avviso del wallet muto (stessi testi, niente attimo,
+  niente Riprova); per i link senza porta (le porte `bitcoin:`, la
+  fattura nuda dell'instradatore) la rete `reteWalletTelegram`, in
+  cattura su `document`, previene e copia: la bolt11 («Fattura copiata
+  📋») o l'indirizzo senza la cifra («📋 Indirizzo copiato»). iPhone,
+  computer e fuori da Telegram: come prima. CANTIERI, «"Apri nel
+  wallet" non rompe più la Mini App su Android».
   IL FATTO SU WALLET OF SATOSHI (10 ott 2026, sera, provato da Andrea
   su /prova-wallet con WoS self-custodial dall'app sulla Home): il link
   `lightning:` nudo su una fattura normale apre la conferma; lo stesso

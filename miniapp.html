@@ -38457,6 +38457,52 @@ function intentWallet(url){
   const m = /^lightning:(.+)$/i.exec(String(url || '').trim());
   return m ? 'intent://' + m[1] + '#Intent;scheme=lightning;end' : '';
 }
+/* LA STRADA CHIUSA (20 nov 2026, cantiere «apri-wallet-telegram»;
+   Andrea, Oppo Find X5: «quando clicco su apri nel wallet mi compare
+   quell'errore lì, devo chiudere la mini app e riaprirla»). Dentro
+   Telegram per Android il tocco su un link `lightning:` (o `bitcoin:`,
+   o `intent:`) porta la Mini App INTERA su quel link, e Telegram mostra
+   «Ops... Impossibile caricare Barattolo. net::ERR_UNKNOWN_URL_SCHEME»:
+   si esce solo chiudendo e riaprendo. Il perche' sta nel client: in
+   `BotWebViewContainer.shouldOverrideUrlLoading` (DrKLO/Telegram,
+   master letto il 20 nov 2026) gli schemi che non sono http/https
+   vanno al sistema SOLO nel browser interno (`!bot`); per una Mini App
+   si torna `false` e la WebView prova a caricarli da se'. Nessuna
+   strada di Telegram li apre: `openLink` li rifiuta gia' nello script
+   (vedi sopra) e `web_app_open_link` li lascia passare solo se lo
+   schema sta in `webAppAllowedProtocols`, che decide il server di
+   Telegram. Quindi li' il link non deve partire MAI: per la porta del
+   Lightning (`apriNelWallet`) subito l'avviso col Copia, gli stessi
+   testi del wallet muto; per gli altri link (le porte `bitcoin:`, la
+   fattura dell'instradatore) la RETE qui sotto copia quel che il link
+   porta, coi toast dei bottoni Copia di sempre. Su iPhone, sul PC e
+   fuori da Telegram niente cambia.
+   PURA: vero se siamo dentro Telegram su Android (la piattaforma che
+   dichiara Telegram, o lo user agent) */
+function walletChiusoTelegram(dentroTelegram, ua, piattaformaTg){
+  if (!dentroTelegram) return false;
+  return ['android', 'android_x'].includes(String(piattaformaTg || '')) || /Android/i.test(String(ua || ''));
+}
+/* LA RETE: ogni tocco su un link `lightning:`/`bitcoin:`/`intent:`
+   dentro Telegram per Android si ferma qui, in cattura, prima che la
+   WebView ci vada. Se il link ha la sua porta (`apriNelWallet`, che
+   mette l'avviso) fa lei; se no si copia: la bolt11, o l'indirizzo
+   senza la cifra (lo stesso dei bottoni «Copia l'indirizzo»). */
+function reteWalletTelegram(ev){
+  const t = ev && ev.target;
+  const a = t && typeof t.closest === 'function' ? t.closest('a[href]') : null;
+  if (!a) return 'niente';
+  const url = String(a.getAttribute('href') || '').trim();
+  const m = /^(lightning|bitcoin|intent):([^?#]*)/i.exec(url);
+  if (!m || !walletChiusoTelegram(!!(tg && tg.initData), navigator.userAgent, tg && tg.platform)) return 'niente';
+  ev.preventDefault();
+  if (typeof a.onclick === 'function') return 'porta';
+  const schema = m[1].toLowerCase();
+  if (schema === 'lightning' && m[2]) { haptic(); copiaLink(m[2], 'Fattura copiata 📋'); return 'fattura'; }
+  if (schema === 'bitcoin' && m[2]) { haptic(); copiaLink(m[2], '📋 Indirizzo copiato'); return 'indirizzo'; }
+  return 'fermo';
+}
+if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('click', reteWalletTelegram, true);
 /* il tocco su «⚡ Apri nel wallet»: dice la strada presa */
 function apriNelWallet(a, ev, tentativo){
   const url = String((a && a.getAttribute) ? a.getAttribute('href') : (a && a.href) || '');
@@ -38466,8 +38512,16 @@ function apriNelWallet(a, ev, tentativo){
   if (typeof tentativo === 'function') { try { tentativo('wallet'); } catch(e){} }
   const strada = stradaWallet(!!(tg && tg.initData), navigator.userAgent);
   const giro = ++walletGiro;
-  /* il link nudo parte dal tocco, nativo, su ogni strada: l'evento non
-     si tocca (dentro Telegram compreso: vedi sopra, openLink rifiuta) */
+  /* (20 nov 2026) dentro Telegram su Android il link NON parte: la
+     Mini App si romperebbe (vedi «LA STRADA CHIUSA» qui sotto). Subito
+     l'avviso col Copia, senza attimo: si sa gia' che non si apre niente */
+  if (strada === 'telegram' && walletChiusoTelegram(true, navigator.userAgent, tg && tg.platform)) {
+    if (ev) ev.preventDefault();
+    avvisaWalletMuto(a, bolt11, tentativo, strada);
+    return strada;
+  }
+  /* il link nudo parte dal tocco, nativo, su ogni altra strada: l'evento
+     non si tocca (dentro Telegram compreso: vedi sopra, openLink rifiuta) */
   attendiWallet(giro, aperto => { if (!aperto) avvisaWalletMuto(a, bolt11, tentativo, strada); });
   return strada;
 }
