@@ -335,4 +335,194 @@ RACCONTI_NEGOZI = {
              "p": "Katia e Luca, Dro (TN)"},
         ],
     },
+    "andreai-bitcoin-on": {
+        # IL LEGAME COL VENDITORE E' IL TG_ID, la stessa eccezione
+        # dichiarata delle due pagine qui sopra (20 nov 2026, decisione di
+        # Andrea): il negozio AndreAI sta sul suo account principale, e
+        # vende l'abbonamento al canale Telegram «Bitcoin On» (Cantieri,
+        # «L'abbonamento al canale»). La strada del ritorno e' la stessa:
+        # letto il codice nel cassetto del pannello, lo si scrive in
+        # `negozio` e si toglie `venditore_tg`. I TESTI SONO QUELLI
+        # APPROVATI DA ANDREA il 20 nov 2026, riga per riga.
+        "negozio": "",
+        "venditore_tg": 1879103467,
+        "emoji": "⚡",
+        "titolo": "AndreAI · Bitcoin ON",
+        "sottotitolo": ("Il mio canale Telegram privato su Bitcoin, a metà "
+                        "prezzo in sats."),
+        "intro": ("Sono Andrea, AndreAI su YouTube. Ogni settimana incrocio "
+                  "dati macro, liquidità e on-chain per capire dove sta "
+                  "andando Bitcoin. Bitcoin ON è il canale privato dove "
+                  "racconto, giorno per giorno, cosa guardo e cosa faccio "
+                  "io: i livelli, il piano, anche gli errori."),
+        # LE FOTO SONO SCHERMATE VERE DEL CANALE, composte a scena (sfondo
+        # scuro e bagliore arancio, il telefono, le card dei post): WebP
+        # senza metadati, mai oltre 1360 di lato. Il ritratto e' quello
+        # mandato da Andrea, e sta solo nella copertina: da solo sotto
+        # «CHI SONO» faceva il doppione (20 nov 2026, Andrea: «sono troppo
+        # simili»).
+        #   andreai-bitcoin-on-cop.webp  il ritratto col telefono, 21:9
+        #   andreai-bitcoin-on-1.webp    tesi, settimana in arrivo e Fed
+        #   andreai-bitcoin-on-2.webp    quattro video riservati
+        #   andreai-bitcoin-on-3.webp    il telefono coi video
+        #   andreai-bitcoin-on-4.webp    il telefono coi grafici
+        #   andreai-bitcoin-on-5.webp    i tre post di «cosa avevo scritto»
+        #   andreai-bitcoin-on-6.webp    il telefono con la tesi
+        #   andreai-bitcoin-on-7.webp    grafici, tabella del rischio e tesi
+        "foto": True,
+        # il logo della card «Consigliati»: il volto del ritratto in un
+        # tondo trasparente, al 92% del riquadro
+        #   python prepara_logo_consigliato.py logo-tondo.png andreai-bitcoin-on 0.92
+        "logo": True,
+        # il banner della card nella pagina «Consigliati» e dello spazio
+        # sponsorizzato di «Da scoprire», 1040x498, col nome nel disegno
+        "banner": True,
+        "blocchi": [
+            {"t": "testo", "h": "CHI SONO",
+             "p": ("Sono nato come «Agente Crypto». Poi i mercati sono "
+                   "cambiati e ho fatto un passo avanti: oggi uso "
+                   "l'intelligenza artificiale per incrociare centinaia di "
+                   "variabili, tassi, liquidità, debito e dati on-chain, e "
+                   "costruire un quadro chiaro. Dietro l'AI c'è una persona "
+                   "vera, che ogni giorno sceglie solo l'essenziale.")},
+            {"t": "testo", "h": "COS'È",
+             "p": ("Un canale Telegram riservato agli abbonati, per chi "
+                   "segue Bitcoin anche a livello speculativo. Su YouTube "
+                   "trovi le analisi lunghe; qui trovi il dietro le quinte "
+                   "in tempo reale: quando il prezzo si muove, scrivo "
+                   "subito cosa vedo e come mi muovo.")},
+            {"t": "foto", "n": 1, "etichetta": "tesi e settimana",
+             "alt": ("La tesi della settimana, la settimana in arrivo e la "
+                     "Fed nel canale Bitcoin ON")},
+            {"t": "punti", "h": "COSA TROVI DENTRO", "voci": [
+                {"e": "🎬", "h": "Video riservati",
+                 "p": ("Video pensati solo per gli abbonati, con il link "
+                       "diretto nel canale.")},
+                {"e": "📌", "h": "La tesi della settimana",
+                 "p": ("Ogni venerdì il quadro della settimana. Cosa è "
+                       "successo, cosa mi aspetto e cosa mi farebbe "
+                       "cambiare idea.")},
+                {"e": "📉", "h": "I livelli che guardo",
+                 "p": ("I prezzi che seguo, i minimi del range, il rischio "
+                       "on-chain e le date che contano.")},
+                {"e": "🧭", "h": "La mia strategia",
+                 "p": ("Il piano scritto prima, non dopo. Compro a rate, "
+                       "niente leva, niente vendite nel panico. Quando il "
+                       "prezzo arriva a un livello, lo scrivo.")},
+                {"e": "📅", "h": "La settimana in arrivo",
+                 "p": ("Il calendario macro con Fed, inflazione e i dati "
+                       "che possono muovere il prezzo.")},
+                {"e": "💬", "h": "Commenti e sondaggi",
+                 "p": ("Sotto ogni post si discute, e ogni tanto vi chiedo "
+                       "cosa ne pensate.")},
+            ]},
+            {"t": "foto", "n": 2, "etichetta": "video riservati",
+             "alt": "Quattro video riservati del canale Bitcoin ON"},
+            {"t": "tappe", "h": "UNA SETTIMANA DENTRO BITCOIN ON", "voci": [
+                {"h": "Inizio settimana",
+                 "p": ("La settimana in arrivo, con le date macro da "
+                       "segnare e cosa possono fare al prezzo.")},
+                {"h": "Ogni giorno",
+                 "p": ("I grafici che contano, Bitcoin, altcoin, oro e "
+                       "borsa, con due righe su cosa sto guardando.")},
+                {"h": "Quando il prezzo si muove",
+                 "p": ("Un post subito, col livello toccato e cosa faccio "
+                       "io, che si tratti di comprare, aspettare o non fare "
+                       "niente.")},
+                {"h": "Quando serve",
+                 "p": ("Il video riservato, con l'analisi completa e il "
+                       "link diretto.")},
+                {"h": "Venerdì",
+                 "p": ("La tesi della settimana, il riassunto di tutto con "
+                       "lo scenario che mi aspetto.")},
+            ]},
+            {"t": "foto", "n": 3, "etichetta": "telefono coi video",
+             "alt": "Il canale Bitcoin ON sul telefono, coi video"},
+            {"t": "testo", "h": "PERCHÉ SERVE A CHI SPECULA",
+             "p": ("Chi fa trading su Bitcoin vive di tempismo e di "
+                   "livelli. Qui hai un punto di vista basato sui dati, "
+                   "aggiornato quando il mercato si muove, con il piano "
+                   "scritto prima. Non ti dico cosa comprare: ti mostro "
+                   "cosa guardo io e perché, così decidi tu con più "
+                   "elementi.")},
+            {"t": "foto", "n": 4, "etichetta": "telefono coi grafici",
+             "alt": "Il canale Bitcoin ON sul telefono, coi grafici"},
+            # I FATTI SONO DEI POST VERI DEL CANALE (24 giugno, 23 settembre,
+            # 12 e 20 novembre 2026), e la foto qui sotto li mostra: la
+            # sezione l'ha chiesta Andrea il 20 nov e ne ha approvato i testi.
+            # Il post del 6 luglio (il minimo a ottobre) resta fuori: non e'
+            # andata cosi'.
+            {"t": "tappe", "h": "COSA AVEVO SCRITTO, E COM'È ANDATA", "voci": [
+                {"h": "24 giugno, Bitcoin a 60.300 $",
+                 "p": ("Avevo scritto che mi aspettavo un rally a fine "
+                       "estate e poi un calo nel quarto trimestre, per "
+                       "segnare il fondo del ciclo. È andata così: a "
+                       "settembre Bitcoin ha superato i massimi di maggio, "
+                       "poi è arrivato il calo, e il 20 novembre è sotto i "
+                       "60.000 $.")},
+                {"h": "23 settembre, il livello degli 83.000 $",
+                 "p": ("L'ho scritto chiaro, mi aspettavo più debolezza e il "
+                       "mercato mi stava smentendo. Il livello da guardare "
+                       "era 83.000 $: tornando sotto, c'era il rischio di "
+                       "una trappola per chi comprava sulla rottura e di una "
+                       "correzione nel quarto trimestre. Bitcoin è tornato "
+                       "sotto: il 12 novembre era a 71.400 $, il 20 novembre "
+                       "sotto i 60.000 $.")},
+            ]},
+            {"t": "testo", "h": "",
+             "p": ("Non ci prendo sempre, e quando sbaglio lo scrivo. I "
+                   "risultati passati non garantiscono quelli futuri.")},
+            {"t": "foto", "n": 5, "etichetta": "cosa avevo scritto",
+             "alt": ("I post del canale del 24 giugno, del 23 settembre e "
+                     "del 12 novembre")},
+            {"t": "elenco", "h": "PER CHI È", "voci": [
+                ("Per chi segue Bitcoin ogni giorno e vuole un secondo "
+                 "parere basato sui dati."),
+                ("Per chi specula e vuole sapere quali livelli contano, "
+                 "prima che il prezzo ci arrivi."),
+                ("Per chi accumula a rate e vuole capire quando il mercato "
+                 "è più caro o più conveniente."),
+                ("Per chi è già iscritto al canale YouTube e vuole il "
+                 "dietro le quinte, ogni giorno."),
+            ]},
+            {"t": "elenco", "h": "PER CHI NON È", "voci": [
+                ("Per chi cerca segnali da copiare a occhi chiusi: qui si "
+                 "ragiona, non si promette niente."),
+                ("Per chi cerca guadagni facili con la leva: io la leva non "
+                 "la uso."),
+            ]},
+            {"t": "foto", "n": 6, "etichetta": "telefono con la tesi",
+             "alt": "Il canale Bitcoin ON sul telefono, con la tesi"},
+            {"t": "tappe", "h": "COME FUNZIONA", "voci": [
+                {"h": "Paghi in sats",
+                 "p": ("25 € al mese in sats, il 50% in meno dei 50 € del "
+                       "livello Bitcoin On su YouTube.")},
+                {"h": "Entri col tuo link",
+                 "p": ("Dopo il pagamento ricevi un link personale, che "
+                       "vale solo per il tuo account Telegram.")},
+                {"h": "Un mese pieno",
+                 "p": ("L'abbonamento dura 30 giorni. Tre giorni prima "
+                       "della scadenza ti arriva il promemoria per "
+                       "rinnovare.")},
+                {"h": "Se non rinnovi",
+                 "p": ("Esci dal canale in automatico. Quando vuoi, ti "
+                       "riabboni e rientri.")},
+            ]},
+            {"t": "foto", "n": 7, "etichetta": "grafici e rischio",
+             "alt": "Grafici, tabella del rischio e tesi del canale"},
+            {"t": "elenco", "h": "IN BREVE", "voci": [
+                "Canale Telegram privato, solo per abbonati",
+                "Video riservati, post e tesi della settimana",
+                "Livelli, strategia e calendario macro",
+                "Commenti e sondaggi con chi è dentro",
+                "25 € al mese in sats: −50% rispetto a YouTube",
+                "Ingresso automatico col link personale",
+            ]},
+            {"t": "testo", "h": "AVVERTENZA",
+             "p": ("⚠️ Niente di quello che trovi nel canale è un consiglio "
+                   "finanziario: sono le mie analisi, a scopo didattico.")},
+            {"t": "firma", "h": "Smetti di indovinare, inizia a capire.",
+             "p": "Andrea, AndreAI · Intelligence Finanziaria"},
+        ],
+    },
 }

@@ -74,7 +74,8 @@ COMPRATORE = {"X-Tg-Init-Data": "collaudo:111:Compratore"}
 MODERATORE = {"X-Tg-Init-Data": "collaudo:999:Admin"}
 # il nome dell'identita' di collaudo del venditore di ogni pagina: fa
 # anche lo username (in minuscolo), da cui si riapre il negozio
-NOMI = {"una-garlanda": "Manuele", "un-tempo-per-te": "Luca"}
+NOMI = {"una-garlanda": "Manuele", "un-tempo-per-te": "Luca",
+        "andreai-bitcoin-on": "Andrea"}
 
 
 def main():
