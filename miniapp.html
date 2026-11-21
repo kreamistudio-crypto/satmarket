@@ -3720,6 +3720,9 @@
   .gc-durate button.attiva{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
   .gc-titolo{margin:16px 2px 6px;font-weight:700;font-size:14px}
   #gcQuota{width:100%;margin-top:6px}
+  #gcQuotaV{width:100%;margin-top:6px}
+  /* il modulo non finisce sotto la testata attaccata del P2P quando ci si scorre */
+  #gcModulo{scroll-margin-top:150px}
   /* 🎁 le gift card di Bitpost (20 nov 2026): la pagina di prova */
   .gc-schede{display:flex;gap:8px;margin:8px 0}
   .gc-schede button{flex:1 1 0;min-height:40px;border-radius:12px;border:1px solid var(--line,#ddd);
@@ -23722,7 +23725,7 @@ function toccaPiu(){
   if (performance.now() - p2pPiuGestoAt < 700) return;
   /* 🎁 in gift card il + e' «Chiedi gift card» (21 nov 2026) */
   if (document.body.classList.contains('nav-p2p') && typeof giftModoP2P === 'function'
-      && giftModoP2P()) { apriGiftP2P(); gcNuovaP2P(); return; }
+      && giftModoP2P()) { apriGiftP2P(); gcPiuP2P(); return; }
   if (piuNeutroP2P()) { libroDaPiuP2P(); return; }
   /* la scelta On-chain / Lightning (30 ott 2026): solo a chi e' ammesso
      all'on-chain, e lo dice lei — se torna falso si va avanti come sempre */
@@ -103620,7 +103623,7 @@ function apriVietato(){
 
 function apriNuovoOrdineP2P(metodo){
   /* 🎁 nessun ordine di Mostro in gift card (21 nov 2026) */
-  if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcNuovaP2P(); return; }
+  if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcPiuP2P(); return; }
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
@@ -122328,6 +122331,8 @@ function setMerceP2P(m){
   try { localStorage.setItem('p2pMerce', g ? 'giftcard' : 'btc'); } catch(e) {}
   haptic();
   gcNuova = false;
+  gcOffri = false;
+  gcOffertaAperta = 0;
   vestiMerceP2P();
   renderP2P();
 }
@@ -122406,6 +122411,137 @@ async function caricaGiftP2P(){
   if (giftModoP2P() && el('view-p2p')?.classList.contains('active')) gcDisegnaGiftP2P();
 }
 
+/* il + in gift card: «Chiedi» da Compra, «Offri» da Vendi */
+function gcPiuP2P(){
+  if (p2pLato === 'vendo') gcOffriP2P(); else gcNuovaP2P();
+}
+
+let gcOffri = false;          // il modulo dell'annuncio «Vendi» aperto
+let gcOffertaAperta = 0;      // l'annuncio di chi vende che sto comprando
+
+function gcOffriP2P(){
+  if (p2pLato !== 'vendo') setLatoP2P('vendo', true);
+  gcOffri = true;
+  gcDisegnaGiftP2P();
+  el('gcModulo')?.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'});
+}
+
+function gcTetto(){
+  const c = gcStato.catalogo || {};
+  return Math.min(c.max_order_price || Infinity, gcStato.max_euro ? gcStato.max_euro * 100 : Infinity);
+}
+
+function gcMinimo(){
+  return ((gcStato.catalogo || {}).networks || []).find(n => n.network === 'Bitcoin')?.min_order_price || 0;
+}
+
+/* «VENDI GIFT CARD» (21 nov 2026, tappa 2): l'annuncio di chi vende. Qui
+   si sceglie fino a quanto, la PROPRIA parte di commissione e la durata;
+   la chiave del conto con cui incasserai parte adesso (numero riservato). */
+function gcOffriHTML(){
+  const tot = Number(gcStato.quota_totale || 0), tetto = gcTetto();
+  const q = Math.min(tot, Math.max(0, Number(el('gcQuotaV')?.value ?? Math.floor(tot / 2))));
+  return `<div class="gc-box" id="gcModulo">
+    <p class="hint">Pubblichi che vendi carte <b>Shoppy Code</b>: chi compra tocca il tuo
+      annuncio, paga il deposito on-chain e tu compri le carte coi tuoi euro, poi incassi i sats.</p>
+    <label class="gc-campo">Fino a quanto vendi (€)
+      <input id="gcMassimo" type="number" min="${Math.ceil(gcMinimo() / 100)}" max="${Math.floor(tetto / 100)}"
+        value="${Math.floor(Math.min(tetto, 10000) / 100)}" inputmode="numeric"></label>
+    <label class="gc-campo">La tua parte della commissione
+      <input id="gcQuotaV" type="range" min="0" max="${tot}" step="25" value="${q}" oninput="gcQuotaVDetta()">
+      <span class="hint" id="gcQuotaVDetta">${gcQuotaVParole(q, tot)}</span></label>
+    <div class="gc-campo">Resta aperto
+      <div class="gc-durate" role="radiogroup">${(gcStato.durate_ore || [24]).map(h =>
+        `<button type="button" role="radio" aria-checked="${h === gcDurata}" class="${h === gcDurata ? 'attiva' : ''}"
+          onclick="gcScegliDurata(${Number(h)}, this)">${esc(gcDurataTesto(h))}</button>`).join('')}</div></div>
+    <button type="button" class="btn orange" onclick="gcPubblicaOfferta(this)">🎁 Pubblica l'annuncio</button>
+    <button type="button" class="btn ghost" onclick="gcOffri=false;gcDisegnaGiftP2P()">Chiudi</button>
+  </div>`;
+}
+
+function gcQuotaVParole(q, tot){
+  return `Paghi tu ${gcPct(q)}, chi compra ${gcPct(tot - q)}. `
+    + (q <= tot * 0.25 ? 'Molto conveniente per chi compra: lo prendono prima.'
+       : q >= tot * 0.75 ? 'Conveniente per te: potrebbe volerci di più.' : 'Metà e metà.');
+}
+
+function gcQuotaVDetta(){
+  const tot = Number(gcStato?.quota_totale || 0), q = Number(el('gcQuotaV')?.value || 0);
+  if (el('gcQuotaVDetta')) el('gcQuotaVDetta').textContent = gcQuotaVParole(q, tot);
+}
+
+async function gcPubblicaOfferta(btn){
+  if (gcOccupato) return;
+  const massimo = Math.round(Number(el('gcMassimo')?.value || 0) * 100);
+  const quota = Number(el('gcQuotaV')?.value || 0), durata_ore = gcDurata;
+  const tot = Number(gcStato.quota_totale || 0);
+  if (!(massimo > 0)) { toast('Scrivi fino a quanto vendi'); return; }
+  chiediConferma({titolo: 'Pubblichi l\'annuncio?', soldi: true,
+    corpo: `Vendi gift card Shoppy Code fino a ${gcEuro(massimo)}.\nCommissione: paghi tu ${gcPct(quota)}, chi compra ${gcPct(tot - quota)}.\nResta aperto ${gcDurataTesto(durata_ore)}.\n\nQuando qualcuno compra, dopo il suo deposito hai 5 giorni per comprare le carte coi tuoi euro.`,
+    etichetta: 'Pubblica', poi: async () => {
+      gcOccupato = true;
+      try {
+        const indice = gcStato.prossimo_indice;
+        const xpub = await gcXpub(indice);
+        await gcApi('/offerte', 'POST', {massimo, quota, durata_ore, xpub, indice});
+        toast('🎁 Annuncio pubblicato');
+        gcOffri = false;
+        await caricaGiftP2P();
+      } catch(e){ toast('⚠️ ' + e.message, 5000); }
+      finally { gcOccupato = false; }
+    }});
+}
+
+function gcOfferteHTML(lista, mie){
+  if (!lista.length) return `<p class="hint">${mie ? 'Nessun annuncio aperto.' : 'Nessuno vende adesso: puoi chiedere tu qui sopra.'}</p>`;
+  const tot = Number(gcStato.quota_totale || 0);
+  return lista.map(f => {
+    const aperta = !mie && gcOffertaAperta === f.id;
+    const tagli = ((gcStato.catalogo || {}).denominations || []).filter(d => d <= f.massimo);
+    return `<div class="gc-riga${aperta ? ' gc-aperta' : ''}">
+      <div><b>Fino a ${esc(gcEuro(f.massimo))}</b>
+        <small>${mie ? `paghi tu ${esc(gcPct(f.quota))}` : `commissione per te ${esc(gcPct(tot - f.quota))}`}${gcScadeTesto({scade: f.scade, status: {id: 1}})}</small></div>
+      ${mie ? `<button type="button" class="btn ghost" onclick="gcRitiraOfferta(${Number(f.id)})">Ritira</button>`
+        : aperta ? '' : `<button type="button" class="btn ghost" onclick="gcOffertaAperta=${Number(f.id)};gcDisegnaGiftP2P()">Compra</button>`}
+    </div>${aperta ? `<div class="gc-box">
+      <label class="gc-campo">Taglio
+        <select id="gcTaglioF">${tagli.map(d => `<option value="${d}"${d === gcTaglioDiSerie(tagli, gcMinimo()) ? ' selected' : ''}>${esc(gcEuro(d))}</option>`).join('')}</select></label>
+      <label class="gc-campo">Quante carte
+        <input id="gcQuantiF" type="number" min="1" max="50" value="1" inputmode="numeric"></label>
+      <button type="button" class="btn orange" onclick="gcCompraOfferta(${Number(f.id)}, this)">🎁 Compra</button>
+      <button type="button" class="btn ghost" onclick="gcOffertaAperta=0;gcDisegnaGiftP2P()">Chiudi</button>
+    </div>` : ''}`;
+  }).join('');
+}
+
+async function gcRitiraOfferta(id){
+  try { await gcApi(`/offerte/${id}/ritira`, 'POST'); toast('Annuncio ritirato'); }
+  catch(e){ toast('⚠️ ' + e.message, 5000); }
+  await caricaGiftP2P();
+}
+
+async function gcCompraOfferta(id, btn){
+  if (gcOccupato) return;
+  const f = (gcStato.offerte || []).find(x => x.id === id);
+  if (!f) return;
+  const taglio = Number(el('gcTaglioF')?.value), quanti = Number(el('gcQuantiF')?.value);
+  const tot = Number(gcStato.quota_totale || 0);
+  chiediConferma({titolo: 'Compri queste gift card?', soldi: true,
+    corpo: `${quanti} carta/e da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nLa tua commissione: ${gcPct(tot - f.quota)}.\n\nSubito dopo paghi il deposito on-chain, in sats veri.`,
+    etichetta: 'Compra', poi: async () => {
+      gcOccupato = true;
+      try {
+        const indice = gcStato.prossimo_indice;
+        const xpub = await gcXpub(indice);
+        const d = await gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice});
+        toast(d.agganciato ? '🎁 Fatto: ora paga il deposito' : '🎁 Richiesta creata: chi vende non ha risposto, resta in bacheca un\'ora');
+        gcOffertaAperta = 0;
+        gcApriDettaglio(d.ordine.id);
+      } catch(e){ toast('⚠️ ' + e.message, 5000); }
+      finally { gcOccupato = false; }
+    }});
+}
+
 function gcNuovaP2P(){
   if (p2pLato !== 'compro') setLatoP2P('compro', true);
   gcNuova = true;
@@ -122435,8 +122571,13 @@ function gcDisegnaGiftP2P(box){
       ? `<div id="gcModulo">${gcCompraHTML()}
            <button type="button" class="btn ghost" onclick="gcNuova=false;gcDisegnaGiftP2P()">Chiudi</button></div>`
       : `<button type="button" class="btn orange" onclick="gcNuovaP2P()">＋ Chiedi gift card</button>`;
+    h += `<div class="gc-titolo">Chi vende gift card</div>${gcOfferteHTML(gcStato.offerte || [], false)}`;
     h += `<div class="gc-titolo">Le tue richieste</div>${gcListaHTML(miei.filter(o => o.ruolo === 'compratore'), false)}`;
   } else {
+    h += gcOffri ? gcOffriHTML()
+      : `<button type="button" class="btn orange" onclick="gcOffriP2P()">＋ Offri gift card</button>`;
+    if ((gcStato.mie_offerte || []).length)
+      h += `<div class="gc-titolo">I tuoi annunci</div>${gcOfferteHTML(gcStato.mie_offerte, true)}`;
     h += `<div class="gc-titolo">Richieste da servire</div>${gcListaHTML(gcStato.bacheca || [], true)}`;
     h += `<div class="gc-titolo">Le tue vendite</div>${gcListaHTML(miei.filter(o => o.ruolo === 'bitworker'), false)}`;
   }

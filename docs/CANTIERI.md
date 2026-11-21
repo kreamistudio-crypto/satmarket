@@ -94148,3 +94148,33 @@ non chiude niente. `prove_bitpost_gift_card` sezione 6 (la riga della
 merce, i tab, il corpo e il + in gift card, nessun «Bitworker» nei testi
 dell'app, negli stati e negli avvisi). A schermo, server vero col
 Bitpost finto a 390 px: compra, modulo, vendi, ritorno a «Compra BTC».
+
+## Le gift card nel P2P, tappa 2: «Vendi gift card» come annuncio di chi vende (21 nov 2026, cantiere gift-card-vendi; seguito della tappa 1, stessa richiesta di Andrea)
+
+COSA. In «Vendi gift card» c'è «＋ Offri gift card» (anche il + della nav
+da quel lato): chi vende pubblica fino a quanto vende, LA SUA parte di
+commissione (slider) e la durata. In «Compra gift card» compare «Chi
+vende gift card»: chi compra tocca «Compra», sceglie taglio e quantità
+(fino al massimo dell'annuncio) e l'ordine parte già assegnato a chi ha
+pubblicato. Chi vende vede «I tuoi annunci» col tasto «Ritira».
+
+PERCHÉ COSÌ. L'API di Bitpost fa pubblicare solo chi compra
+(`POST /shoppycode/orders`): l'annuncio sta da noi (`bitpost_offerte`), e
+al tocco il server crea l'ordine con la xpub di chi compra e
+`selected_fee` = totale − quota di chi vende, poi lo assegna (`select`)
+con la xpub che chi vende ha lasciato PUBBLICANDO. Il suo numero di conto
+è riservato da allora (`_bitpost_indice_libero` e `_bitpost_prossimo_indice`
+guardano anche gli annunci), così il telefono di chi vende ritrova la
+chiave per firmare l'incasso. Un annuncio vale un ordine: si chiude PRIMA
+di chiamare Bitpost (due dita insieme, vince la prima); se la creazione
+fallisce si riapre; se fallisce solo l'aggancio l'ordine resta una
+richiesta normale in bacheca per un'ora. Al massimo 3 annunci aperti a
+testa. L'app non riceve mai la xpub né chi ha pubblicato.
+
+PROVATO. `collaudo_bitpost_gift_card` (87): quota e tetto validati,
+numero riservato, l'annuncio fra i propri e non fra quelli da comprare,
+niente xpub né venditore nella lista, oltre il massimo no, la quota che
+resta arriva come `selected_fee`, l'aggancio con la xpub di chi vende e
+il suo numero, l'annuncio chiuso, l'avviso a chi vende, il secondo dito
+409, ritira (e non quello di un altro). A schermo a 390 px: gli annunci
+in Compra col modulo aperto, il modulo «Offri».

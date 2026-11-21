@@ -131086,6 +131086,22 @@ def _bitpost_prepara(con):
         indirizzo TEXT DEFAULT '', importo INTEGER DEFAULT 0,
         scade TEXT DEFAULT '', fatta INTEGER DEFAULT 0,
         PRIMARY KEY(ordine_id, sessione))""")
+    # «VENDI GIFT CARD» (21 nov 2026, tappa 2): l'annuncio di chi vende.
+    # L'API di Bitpost fa pubblicare solo chi compra: l'annuncio sta QUI, e
+    # al tocco di chi compra l'ordine nasce su Bitpost e si assegna subito
+    # a chi ha pubblicato, con la xpub che ha lasciato pubblicando (il suo
+    # numero di conto e' riservato da allora). Uno solo per annuncio.
+    con.execute("""CREATE TABLE IF NOT EXISTS bitpost_offerte(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        venditore_id INTEGER NOT NULL,
+        venditore_indice INTEGER NOT NULL,
+        xpub TEXT NOT NULL,
+        massimo INTEGER NOT NULL,
+        quota INTEGER NOT NULL,
+        stato TEXT DEFAULT 'aperta',
+        ordine_id INTEGER DEFAULT 0,
+        scade INTEGER DEFAULT 0,
+        creato INTEGER DEFAULT 0)""")
     # la scadenza della richiesta (21 nov 2026): 0 = nessuna
     try:
         con.execute("ALTER TABLE bitpost_ordini ADD COLUMN scade INTEGER DEFAULT 0")
@@ -131249,17 +131265,22 @@ def _bitpost_indice_libero(con, tg_id, indice) -> bool:
         return False
     if not 0 <= indice < 10 ** 6:
         return False
-    return not con.execute(
+    return not (con.execute(
         "SELECT 1 FROM bitpost_ordini WHERE (compratore_id=? AND "
         "compratore_indice=?) OR (bitworker_id=? AND bitworker_indice=?)",
         (tg_id, indice, tg_id, indice)).fetchone()
+        # ...e il numero lasciato in un annuncio «Vendi» resta suo (21 nov)
+        or con.execute("SELECT 1 FROM bitpost_offerte WHERE venditore_id=? "
+                       "AND venditore_indice=?", (tg_id, indice)).fetchone())
 
 
 def _bitpost_prossimo_indice(con, tg_id) -> int:
     r = con.execute(
         "SELECT MAX(i) FROM (SELECT compratore_indice AS i FROM bitpost_ordini"
         " WHERE compratore_id=? UNION ALL SELECT bitworker_indice FROM "
-        "bitpost_ordini WHERE bitworker_id=?)", (tg_id, tg_id)).fetchone()
+        "bitpost_ordini WHERE bitworker_id=? UNION ALL SELECT venditore_indice "
+        "FROM bitpost_offerte WHERE venditore_id=?)",
+        (tg_id, tg_id, tg_id)).fetchone()
     return (r[0] + 1) if r and r[0] is not None and r[0] >= 0 else 0
 
 
@@ -131301,9 +131322,20 @@ async def bitpost_stato(x_tg_init_data: str = Header(""),
             "AND (scade=0 OR scade>?) ORDER BY id DESC LIMIT 50",
             (user["id"], int(time.time()))).fetchall()
         prossimo = _bitpost_prossimo_indice(con, user["id"])
+        adesso_ = int(time.time())
+        offerte = con.execute(
+            "SELECT * FROM bitpost_offerte WHERE stato='aperta' AND scade>? "
+            "AND venditore_id<>? ORDER BY quota ASC, id DESC LIMIT 50",
+            (adesso_, user["id"])).fetchall()
+        mie_offerte = con.execute(
+            "SELECT * FROM bitpost_offerte WHERE venditore_id=? AND "
+            "stato='aperta' AND scade>? ORDER BY id DESC LIMIT 20",
+            (user["id"], adesso_)).fetchall()
     finally:
         con.close()
     return {"catalogo": catalogo, "max_euro": BITPOST_MAX_EURO,
+            "offerte": [bitpost_offerta_per_chi(r) for r in offerte],
+            "mie_offerte": [bitpost_offerta_per_chi(r) for r in mie_offerte],
             "strada_base": BITPOST_STRADA_BASE, "prossimo_indice": prossimo,
             "quota_totale": BITPOST_QUOTA_TOTALE,
             "durate_ore": list(BITPOST_DURATE_ORE),
@@ -131831,6 +131863,178 @@ async def bitpost_webhook(req: Request):
         except Exception as e:
             print(f"[bitpost] avviso non partito: {type(e).__name__}", flush=True)
     return {"ok": True}
+
+
+def bitpost_offerta_per_chi(riga) -> dict:
+    """L'annuncio come lo vede l'app: MAI la xpub (direbbe gli indirizzi di
+    quell'ordine prima che nasca) e mai chi l'ha pubblicato."""
+    return {"id": riga["id"], "massimo": riga["massimo"], "quota": riga["quota"],
+            "scade": riga["scade"]}
+
+
+@app.post("/api/bitpost/offerte")
+async def bitpost_offerta_nuova(req: Request, x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """«Vendi gift card»: chi vende pubblica fino a quanto vende, la SUA
+    parte di commissione e la durata, e lascia la xpub del conto con cui
+    incasserà (numero riservato da adesso)."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    _frena("bitpost", user["id"])
+    d = await leggi_json(req)
+    xpub = str(d.get("xpub") or "").strip()
+    motivo = bitpost_xpub_motivo(xpub)
+    if motivo:
+        raise HTTPException(400, motivo)
+    motivo = bitpost_quota_motivo(d.get("quota"), BITPOST_QUOTA_TOTALE)
+    if motivo:
+        raise HTTPException(400, motivo)
+    ore = d.get("durata_ore", 24)
+    if ore not in BITPOST_DURATE_ORE:
+        raise HTTPException(400, "Durata non valida")
+    try:
+        massimo = int(d.get("massimo"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Fino a quanto vendi?")
+    tetto = BITPOST_MAX_EURO * 100 if BITPOST_MAX_EURO else 90000
+    if massimo <= 0 or massimo > tetto:
+        raise HTTPException(400, f"Al massimo {_fmt_eur(tetto / 100)} per ordine")
+    adesso = int(time.time())
+    con = _bitpost_db()
+    try:
+        if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
+            raise HTTPException(409, "Numero di conto già usato: riapri la pagina")
+        aperte = con.execute("SELECT COUNT(*) FROM bitpost_offerte WHERE "
+                             "venditore_id=? AND stato='aperta' AND scade>?",
+                             (user["id"], adesso)).fetchone()[0]
+        if aperte >= 3:
+            raise HTTPException(409, "Hai già 3 annunci aperti: ritirane uno")
+        cur = con.execute(
+            "INSERT INTO bitpost_offerte(venditore_id, venditore_indice, xpub, "
+            "massimo, quota, scade, creato) VALUES (?,?,?,?,?,?,?)",
+            (user["id"], int(d["indice"]), xpub, massimo, int(d["quota"]),
+             adesso + int(ore) * 3600, adesso))
+        con.commit()
+        oid = cur.lastrowid
+    finally:
+        con.close()
+    return {"ok": True, "id": oid}
+
+
+@app.post("/api/bitpost/offerte/{fid}/ritira")
+async def bitpost_offerta_ritira(fid: int, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    con = _bitpost_db()
+    try:
+        n = con.execute("UPDATE bitpost_offerte SET stato='tolta' WHERE id=? "
+                        "AND venditore_id=? AND stato='aperta'",
+                        (fid, user["id"])).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(404, "Annuncio non trovato")
+    return {"ok": True}
+
+
+@app.post("/api/bitpost/offerte/{fid}/compra")
+async def bitpost_offerta_compra(fid: int, req: Request,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """Chi compra tocca un annuncio: l'ordine nasce su Bitpost con la SUA
+    xpub e la quota che resta (il totale meno quella di chi vende), e si
+    assegna subito a chi ha pubblicato. L'annuncio si chiude PRIMA di
+    chiamare Bitpost (due dita insieme: vince la prima)."""
+    user = _bitpost_porta(x_tg_init_data, barattolo_sessione)
+    _frena("bitpost", user["id"])
+    d = await leggi_json(req)
+    xpub = str(d.get("xpub") or "").strip()
+    motivo = bitpost_xpub_motivo(xpub)
+    if motivo:
+        raise HTTPException(400, motivo)
+    catalogo = await _bitpost_catalogo()
+    motivo = bitpost_ordine_ammesso(catalogo, d.get("taglio"), d.get("quanti"),
+                                    BITPOST_MAX_EURO)
+    if motivo:
+        raise HTTPException(400, motivo)
+    valore = int(d["taglio"]) * int(d["quanti"])
+    adesso = int(time.time())
+    con = _bitpost_db()
+    try:
+        f = con.execute("SELECT * FROM bitpost_offerte WHERE id=?", (fid,)).fetchone()
+        if not f or f["stato"] != "aperta" or f["scade"] <= adesso:
+            raise HTTPException(409, "Questo annuncio non c'è più")
+        if f["venditore_id"] == user["id"]:
+            raise HTTPException(400, "È un tuo annuncio")
+        if valore > f["massimo"]:
+            raise HTTPException(400, f"Chi vende arriva a {_fmt_eur(f['massimo'] / 100)}")
+        if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
+            raise HTTPException(409, "Numero di conto già usato: riapri la pagina")
+        if not con.execute("UPDATE bitpost_offerte SET stato='presa' WHERE id=? "
+                           "AND stato='aperta'", (fid,)).rowcount:
+            raise HTTPException(409, "L'ha appena preso qualcun altro")
+        con.commit()
+    finally:
+        con.close()
+
+    def riapri():
+        c2 = _bitpost_db()
+        try:
+            c2.execute("UPDATE bitpost_offerte SET stato='aperta' WHERE id=? "
+                       "AND stato='presa' AND ordine_id=0", (fid,))
+            c2.commit()
+        finally:
+            c2.close()
+
+    rif = "brt-" + secrets.token_hex(8)
+    corpo = {"reference": rif, "buyer_xpub": xpub,
+             "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
+             "denomination": int(d["taglio"]), "quantity": int(d["quanti"]),
+             "selected_fee": BITPOST_QUOTA_TOTALE - int(f["quota"]),
+             "expected_published_fee": BITPOST_QUOTA_TOTALE}
+    try:
+        o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
+    except HTTPException:
+        riapri()
+        raise
+    con = _bitpost_db()
+    try:
+        con.execute(
+            "INSERT INTO bitpost_ordini(id, reference, compratore_id, "
+            "compratore_indice, stato, ordine, creato, aggiornato, scade) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (int(o["id"]), rif, user["id"], int(d["indice"]),
+             int((o.get("status") or {}).get("id") or 1),
+             json.dumps(o, ensure_ascii=False), adesso, adesso, adesso + 3600))
+        con.execute("UPDATE bitpost_offerte SET ordine_id=? WHERE id=?",
+                    (int(o["id"]), fid))
+        con.commit()
+    finally:
+        con.close()
+    try:
+        o2 = await _bitpost_chiama("POST", f"/orders/{o['id']}/select",
+                                   {"bitworker_xpub": f["xpub"]})
+    except HTTPException:
+        # l'ordine esiste ma chi vende non e' riuscito ad agganciarsi: resta
+        # una richiesta normale in bacheca per un'ora (la ronda la chiude)
+        return {"ok": True, "ordine": bitpost_per_chi(o, "compratore"),
+                "agganciato": False}
+    con = _bitpost_db()
+    try:
+        con.execute("UPDATE bitpost_ordini SET bitworker_id=?, bitworker_indice=?, "
+                    "scade=0 WHERE id=?",
+                    (f["venditore_id"], f["venditore_indice"], int(o["id"])))
+        _bitpost_applica(con, o2)
+        con.commit()
+    finally:
+        con.close()
+    try:
+        await notifica(f["venditore_id"], "🎁 Qualcuno ha comprato dal tuo annuncio "
+                       "di gift card: quando paga il deposito ti avviso, poi "
+                       "hai 5 giorni per comprare le carte.")
+    except Exception:
+        pass
+    return {"ok": True, "ordine": bitpost_per_chi(o2, "compratore"), "agganciato": True}
 
 
 async def _bitpost_ronda_scadute(adesso: int = 0) -> int:
