@@ -38609,8 +38609,8 @@ def _leve_stato():
             # config (sono «mai dal pannello» per la forma del nome)
             _leva("Gift card Shoppy Code via Bitpost", "BITPOST_ATTIVO",
                   bool(BITPOST_ATTIVO),
-                  acceso="le rotte /api/bitpost/* rispondono e in Profilo → "
-                         "Amministrazione c'è «🎁 Gift card»",
+                  acceso="le rotte /api/bitpost/* rispondono e nella vetrina, "
+                         "fra Mercato e Lavoro, c'è «🎁 Gift card»",
                   spento="nessuna rotta, nessun foglio, per nessuno",
                   allarme=bool(BITPOST_ATTIVO) and not bitpost_configurato()),
             _leva("Solo gli admin", "BITPOST_SOLO_ADMIN",

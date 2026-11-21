@@ -94073,3 +94073,24 @@ PERCHÉ. Una promo promette che finisce; questa fee resta a zero stabilmente (ve
 NON TOCCATO. Il P2P: la sua pastiglia («beta», «🌱 Pioniere», «Lv. 5») la decide `cartelloFeeP2P` e dice un'altra cosa. Nessuna leva cambia: la commissione del mercatino era già a 0; la classe `.promo-tag` resta perché la usa il P2P. Il calcolo lato server è identico.
 PROVATO. `prove.py`: la prova dell'aliquota ora chiede che nel conto del mercatino non ci sia «in promo</span>» (sul codice senza commenti). Suite severa nel worktree.
 DA GUARDARE. Dopo il deploy: il foglio «Paga» di un annuncio dice «Fee Barattolo 0%», senza pillola.
+
+
+## Le gift card fra Mercato e Lavoro (21 nov 2026, cantiere gift-card-sezione; Andrea: «ci vuole un posto dedicato invece, magari tra mercato e lavoro inserire le gift card»)
+
+COSA. La porta «🎁 Gift card» sta nella fila sopra la vetrina, fra
+«🛍️ Mercato» e «💼 Lavoro»; il bottone in Amministrazione è tolto
+(«invece»). Non è una terza vetrina: è la porta della pagina delle gift
+card (`go('giftcard')`), e la nav la conta come la vetrina. La accende
+lo stesso cancello di prima (`myBitpost`, cioè leva accesa, chiave
+presente e, per ora, solo i moderatori).
+
+PERCHÉ COSÌ. La fila esisteva solo con la leva di Mercato e Lavoro: ora
+`vestiSezSeg()` la mostra se c'è Lavoro OPPURE le gift card, e ognuno
+dei due bottoni ha il suo cancello (a Lavoro spento si vedono Mercato e
+Gift card). SCARTATO: una terza sezione della vetrina con gli annunci
+(le gift card non sono annunci, hanno la loro pagina e i loro ordini).
+
+PROVATO. Server vero in locale col Bitpost finto, Chromium a 390 px:
+fila Mercato · Gift card, tocco → `view-giftcard`, nessun errore.
+`prove_bitpost_gift_card` sezione 6, `prove_leva_mercato_lavoro`
+riscritta su `vestiSezSeg`.

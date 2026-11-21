@@ -1046,8 +1046,8 @@ che c'è e che chiede la firma):
 curl -s -o /dev/null -w "%{http_code}\n" -X POST https://collaudo.barattolo.store/api/bitpost/webhook
 ```
 LA PROVA, coi due account moderatori su @barattolo_collaudo_bot (servono
-le 12 parole on-chain già al sicuro su tutt'e due): Profilo →
-Amministrazione → «🎁 Gift card». Dal primo «Compra»: una carta da 50 €
+le 12 parole on-chain già al sicuro su tutt'e due):
+nella vetrina il bottone «🎁 Gift card» fra Mercato e Lavoro. Dal primo «Compra»: una carta da 50 €
 (il minimo è 42), «Chiedi le carte». Dal secondo, scheda «Bitworker»:
 «Prendi». Dal primo, «I miei»: paga da Sparrow ESATTAMENTE i sats
 mostrati, in una transazione. Dopo le conferme il secondo vede l'email
