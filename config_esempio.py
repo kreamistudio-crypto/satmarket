@@ -1478,6 +1478,7 @@ BITPOST_API_BASE = "https://beta.bitpost.shop/api/v1/barattolo"
 BITPOST_API_KEY = "INCOLLA_QUI_LA_CHIAVE_BITPOST"
 BITPOST_WEBHOOK_SEGRETO = "INCOLLA_QUI_IL_SEGRETO_DEL_WEBHOOK"
 BITPOST_MAX_EURO = 250
+BITPOST_QUOTA_TOTALE = 500   # la commissione di Bitpost (5%): lo slider va da 0 a qui
 # ── IL PAGAMENTO ON-CHAIN (16 ott 2026): il cancello, e niente altro.
 # Lo studio — il 2-di-3 non custodial, le chiavi nel browser, la beta a
 # 250 euro — sta in docs/CANTIERI.md, «Il pagamento on-chain come

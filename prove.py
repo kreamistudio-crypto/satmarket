@@ -209121,10 +209121,10 @@ def prove_leva_mercato_lavoro():
     prova("...spenta mentre si era in Lavoro, si torna alla vetrina di "
           "sempre", (True, True),
           ("delete el('app').dataset.sez;" in am,
-           # (21 nov 2026) la fila la veste vestiSezSeg: Lavoro col suo
-           # cancello, la fila intera anche per le gift card
+           # (21 nov 2026) la fila la veste vestiSezSeg (le gift card ci
+           # sono passate per un'ora, ora stanno nel P2P)
            "vestiSezSeg();" in am
-           and "if (lav) lav.style.display = mercatoLavoro ? '' : 'none';"
+           and "seg.style.display = mercatoLavoro ? '' : 'none';"
            in pezzo_js(mini, "function vestiSezSeg(){", "\n}\n")))
 
 
@@ -219641,14 +219641,46 @@ console.log(JSON.stringify(fuori));
     prova("...la scheda nel pannello: campo password, svuotato prima di partire",
           [True, True], ['type="password"' in mini,
                          "if (campo) campo.value = '';" in mini])
-    # --- 6) il posto dedicato (21 nov 2026, Andrea: «ci vuole un posto
-    # dedicato invece, magari tra mercato e lavoro») ---------------------
-    prova("6) la porta delle gift card sta fra Mercato e Lavoro, non piu' "
-          "in Amministrazione", [True, False],
-          [mini.index("onclick=\"setSezione('mercato')\"") < mini.index('id="sezGiftcard"')
-           < mini.index("onclick=\"setSezione('lavoro')\""), 'id="admGiftcard"' in mini])
-    prova("...e la fila si vede se c'e' Lavoro OPPURE le gift card",
-          True, "seg.style.display = (mercatoLavoro || myBitpost) ? '' : 'none';" in mini)
+    _amb_q = {}
+    exec(pezzo("bitpost_quota_motivo"), _amb_q)
+    _quota = _amb_q["bitpost_quota_motivo"]
+    # --- 6) NEL P2P (21 nov 2026, Andrea: «le metterei nel P2P, perchè
+    # devono avere uno slider con le commissioni, una durata e deve esserci
+    # compra o vendi. Però le gift card solo onchain»; e «non devi chiamare
+    # bitworker o bitbuyer») ----------------------------------------------
+    prova("6) la merce del P2P: «₿ Bitcoin · 🎁 Gift card» sopra i tab, e "
+          "nessuna porta in vetrina ne' in Amministrazione",
+          [True, False, False],
+          [mini.index('id="p2pMerce"') < mini.index('id="p2pLatoCompro"'),
+           'id="sezGiftcard"' in mini, 'id="admGiftcard"' in mini])
+    vm = pezzo_js(mini, "function vestiMerceP2P(){", "\n}\n")
+    prova("...in gift card i tab dicono «Compra gift card» e «Vendi gift card»",
+          [True, True], ["'Compra gift card'" in vm, "'Vendi gift card'" in vm])
+    prova("...il libro di Mostro resta sotto: in gift card il corpo lo "
+          "disegna renderGiftP2P, e il + non apre un ordine di Mostro",
+          [True, True, True],
+          ["if (typeof giftModoP2P === 'function' && giftModoP2P()) { renderGiftP2P(box, testaBox); return; }"
+           in mini,
+           "if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcNuovaP2P(); return; }"
+           in pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"),
+           "giftModoP2P()) { apriGiftP2P(); gcNuovaP2P(); return; }"
+           in pezzo_js(mini, "function toccaPiu(){", "\n}\n")])
+    prova("...lo slider della quota e la durata viaggiano col modulo",
+          [True, True, True],
+          ['id="gcQuota" type="range"' in mini,
+           "{taglio, quanti, xpub, indice, quota, durata_ore}" in mini,
+           "gcScegliDurata(${Number(h)}, this)" in mini])
+    gb = mini[mini.index("let gcStato = null;"):]
+    gb = gb[:gb.index("\n</script>")]
+    testi = re.findall(r"`[^`]*`|'[^'\n]*'", re.sub(r"/\*.*?\*/", "", gb, flags=re.S))
+    prova("...e nei testi per chi usa l'app «Bitworker» non c'e' piu'", [],
+          [t[:60] for t in testi if "Bitworker" in t])
+    prova("...ne' negli stati e negli avvisi del server", [False, False],
+          ["Bitworker" in src[src.index("BITPOST_STATI = {"):src.index("BITPOST_INCASSABILI")],
+           "Bitworker" in src[src.index("BITPOST_AVVISI = {"):src.index("async def _bitpost_avvisa")]])
+    prova("...la quota: fra 0 e il totale di Bitpost, interi", ["", "", True, True, True],
+          [_quota(0, 500), _quota(500, 500), bool(_quota(501, 500)), bool(_quota(-1, 500)),
+           bool(_quota(2.5, 500))])
     prova("i gruppi del pannello in ordine alfabetico, senza l'emoji davanti",
           True, 'key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())'
           in pezzo("_leve_stato"))

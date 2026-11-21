@@ -94104,3 +94104,47 @@ STRADE SCARTATE. Filtrare per collezione Shopify: le collezioni non viaggiano co
 PROVATO. `collaudo_filtri_negozio` (nuovo, nella gabbia e in ci/collaudi.txt): 33 su 33 — il negozio di ieri non cambia, «tutto tranne» una categoria (panchina, non lapide, senza chiamate alla moderazione), il prodotto che vince sulla categoria (stesso id, un giudizio fresco solo per lui), «solo» per tag, modo sconosciuto rifiutato, «elimina» = panchina + eccezione che il giro rispetta, bozza e ripubblicazione, l'escluso sparito dal negozio che diventa lapide, il negozio nuovo che aspetta la prima scelta, il client di ieri che entra tutto. Verdi anche i collaudi dei connettori, categoria, negozi grandi, foto obbligatorie, scelte, catalogo esterno, negozi su Nostr, modifica in blocco, elimina esauriti, spedizione standard, numeri del negozio.
 DA GUARDARE. Dopo il deploy, su un negozio vero: «🧺 Cosa entra» si apre con le categorie del negozio, una categoria tolta va in panchina al giro che parte da solo, «↩️ Riaccogli» la riporta. Il pannello non è stato guardato a schermo su un telefono (nessuna schermata in questo cantiere). La riconsegna a Nostr di un riaccolto passa dal riallineamento di sempre (`nostr_del_negozio`), non collaudata a parte.
 
+
+## Le gift card nel P2P, tappa 1: «Compra gift card» con lo slider e la durata (21 nov 2026, cantiere gift-card-p2p; Andrea: «le gift card forse le metterei nel P2P, perchè devono avere uno slider con le commissioni, una durata e deve esserci compra o vendi. Però le gift card solo onchain», «non devi chiamare bitworker o bitbuyer. Solo compra gift card. Vendi gift card», poi sul biglietto «Sì, nel P2P, solo on-chain»)
+
+COSA. Nel P2P, sopra i due tab, la riga «₿ Bitcoin · 🎁 Gift card» (solo
+a chi ha il cancello `myBitpost`). In gift card i tab diventano «Compra
+gift card» e «Vendi gift card» e il corpo lo disegna `renderGiftP2P` al
+posto del libro di Mostro, che resta intatto sotto e torna su «₿
+Bitcoin». Compra: «＋ Chiedi gift card» (anche il + della nav) apre il
+modulo con taglio, quantità, LO SLIDER della propria quota sulla
+commissione di Bitpost e LA DURATA (1 ora, 6 ore, 1 giorno, 3 giorni);
+sotto, le proprie richieste. Vendi: le richieste da servire col tasto
+«Vendi», e le proprie vendite. Il dettaglio di un ordine resta la pagina
+«🎁 Gift card», aperta da una card (la nav la conta come P2P). Via la
+porta fra Mercato e Lavoro (durata un'ora) e quella in Amministrazione.
+
+LO SLIDER È `selected_fee`. Bitpost pubblica una commissione totale (5%
+= 500 nella leva `BITPOST_QUOTA_TOTALE`, dal pannello) e chi compra
+sceglie quanta ne paga: il resto lo paga chi vende. La richiesta manda
+anche `expected_published_fee`: se Bitpost l'ha cambiata risponde 409
+`fee_changed`, e si aggiorna la leva. Default se il telefono non manda
+niente: metà e metà.
+
+LA DURATA È NOSTRA. L'API non ne ha una: `bitpost_ordini.scade`, la
+bacheca non mostra le scadute, «Vendi» su una scaduta è 409, e la ronda
+(`_bitpost_ronda_scadute`, ogni 5 minuti, parte sempre e guarda la leva a
+ogni giro) le annulla da Bitpost come chi compra (`party: buyer`, ammesso
+in Created/Inactive) e glielo dice.
+
+I NOMI. Nei testi per chi usa l'app «Bitworker» non c'è più: «chi
+vende», «Vendi», «vendi tu». Resta nei nomi interni (colonne, ruolo
+`bitworker`), che sono dell'API.
+
+RESTA (tappa 2). «Vendi gift card» come ANNUNCIO di chi vende: l'API fa
+pubblicare solo chi compra, quindi l'annuncio sta da noi e al tocco di
+chi compra si crea l'ordine su Bitpost e lo si assegna subito a chi ha
+pubblicato (la sua xpub va presa al momento della pubblicazione).
+
+PROVATO. `collaudo_bitpost_gift_card` (75): quota e durata validate, la
+quota arriva come `selected_fee` col totale atteso, la scaduta sparisce
+dalla bacheca e non si prende, la ronda la annulla e avvisa, il giro dopo
+non chiude niente. `prove_bitpost_gift_card` sezione 6 (la riga della
+merce, i tab, il corpo e il + in gift card, nessun «Bitworker» nei testi
+dell'app, negli stati e negli avvisi). A schermo, server vero col
+Bitpost finto a 390 px: compra, modulo, vendi, ritorno a «Compra BTC».

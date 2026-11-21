@@ -38649,6 +38649,10 @@ def _leve_stato():
                   bool(BITPOST_SOLO_ADMIN),
                   acceso="le gift card le vedono solo i moderatori",
                   spento="le vede chiunque, appena la leva madre è accesa"),
+            _leva("Commissione di Bitpost (centesimi di punto)", "BITPOST_QUOTA_TOTALE",
+                  BITPOST_QUOTA_TOTALE,
+                  acceso="lo slider di chi compra va da 0 a questa; se Bitpost "
+                         "la cambia, la richiesta risponde «fee_changed»"),
             _leva("Tetto per ordine (€)", "BITPOST_MAX_EURO",
                   BITPOST_MAX_EURO,
                   acceso="il più basso fra questo e quello di Bitpost",
@@ -130826,16 +130830,31 @@ try:
     BITPOST_MAX_EURO = max(0, int(BITPOST_MAX_EURO))
 except (ImportError, TypeError, ValueError):
     BITPOST_MAX_EURO = 250
+# LA QUOTA E LA DURATA, NEL P2P (21 nov 2026, Andrea: «le gift card forse
+# le metterei nel P2P, perchè devono avere uno slider con le commissioni,
+# una durata e deve esserci compra o vendi»). La commissione la fissa
+# Bitpost (5%, cioe' 500 in centesimi di punto) e chi compra sceglie
+# quanta ne paga lui (`selected_fee`): il resto lo paga chi vende. Piu'
+# ne paghi tu, prima qualcuno prende. Se Bitpost la cambia, la creazione
+# risponde 409 `fee_changed` e la leva si aggiorna dal pannello.
+try:
+    from config import BITPOST_QUOTA_TOTALE
+    BITPOST_QUOTA_TOTALE = max(0, min(5000, int(BITPOST_QUOTA_TOTALE)))
+except (ImportError, TypeError, ValueError):
+    BITPOST_QUOTA_TOTALE = 500
+# ...e la durata e' nostra: l'API non ne ha una. Allo scadere, se nessuno
+# l'ha presa, la richiesta si annulla da sola (`_bitpost_ronda_scadute`).
+BITPOST_DURATE_ORE = (1, 6, 24, 72)
 # la strada del conto di un ordine: il numero dell'ordine e' indurito,
 # cosi' da una xpub non si arriva alle altre
 BITPOST_STRADA_BASE = 100
 BITPOST_STATI = {
-    1: "In attesa di un Bitworker", 2: "Preso: chi compra deve pagare",
-    3: "Pagamento visto, in conferma", 1000: "Pagato: il Bitworker compra le carte",
+    1: "In attesa di chi vende", 2: "Preso: chi compra deve pagare",
+    3: "Pagamento visto, in conferma", 1000: "Pagato: chi vende compra le carte",
     1001: "Arrivate alcune carte", 1002: "Carte arrivate: 36 ore per controllarle",
-    8: "Confermato: il Bitworker può incassare", 9: "In disputa: decide Bitpost",
+    8: "Confermato: chi vende può incassare", 9: "In disputa: decide Bitpost",
     10: "Concluso", 11: "Annullato", 12: "Disputa vinta da chi compra",
-    13: "Disputa vinta dal Bitworker", 14: "Rimborso a chi compra",
+    13: "Disputa vinta da chi vende", 14: "Rimborso a chi compra",
     15: "Nessuno l'ha preso", 16: "Rimborso a chi compra",
 }
 BITPOST_INCASSABILI = (8, 14, 16)
@@ -131067,6 +131086,26 @@ def _bitpost_prepara(con):
         indirizzo TEXT DEFAULT '', importo INTEGER DEFAULT 0,
         scade TEXT DEFAULT '', fatta INTEGER DEFAULT 0,
         PRIMARY KEY(ordine_id, sessione))""")
+    # la scadenza della richiesta (21 nov 2026): 0 = nessuna
+    try:
+        con.execute("ALTER TABLE bitpost_ordini ADD COLUMN scade INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+
+
+def bitpost_quota_motivo(quota, totale: int) -> str:
+    """'' se la quota di chi compra va bene: un intero fra 0 e il totale."""
+    if isinstance(quota, bool):
+        return "quota non valida"
+    try:
+        q = int(quota)
+    except (TypeError, ValueError):
+        return "quota non valida"
+    if q != quota and str(q) != str(quota):
+        return "quota non valida"
+    if q < 0 or q > totale:
+        return f"la tua quota va da 0 a {totale / 100:g}%"
+    return ""
 
 
 def _bitpost_db():
@@ -131236,6 +131275,7 @@ def _bitpost_in_lista(riga, tg_id) -> dict:
     ruolo = _bitpost_ruolo(riga, tg_id) or "bacheca"
     o = bitpost_per_chi(json.loads(riga["ordine"] or "{}"), ruolo)
     o["ruolo"] = ruolo
+    o["scade"] = int(riga["scade"] or 0) if "scade" in riga.keys() else 0
     return o
 
 
@@ -131258,12 +131298,15 @@ async def bitpost_stato(x_tg_init_data: str = Header(""),
             (user["id"], user["id"])).fetchall()
         bacheca = con.execute(
             "SELECT * FROM bitpost_ordini WHERE stato=1 AND compratore_id<>? "
-            "ORDER BY id DESC LIMIT 50", (user["id"],)).fetchall()
+            "AND (scade=0 OR scade>?) ORDER BY id DESC LIMIT 50",
+            (user["id"], int(time.time()))).fetchall()
         prossimo = _bitpost_prossimo_indice(con, user["id"])
     finally:
         con.close()
     return {"catalogo": catalogo, "max_euro": BITPOST_MAX_EURO,
             "strada_base": BITPOST_STRADA_BASE, "prossimo_indice": prossimo,
+            "quota_totale": BITPOST_QUOTA_TOTALE,
+            "durate_ore": list(BITPOST_DURATE_ORE),
             "miei": [_bitpost_in_lista(r, user["id"]) for r in miei],
             "bacheca": [_bitpost_in_lista(r, user["id"]) for r in bacheca]}
 
@@ -131284,6 +131327,15 @@ async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
                                     d.get("quanti"), BITPOST_MAX_EURO)
     if motivo:
         raise HTTPException(400, motivo)
+    # la quota (lo slider) e la durata (21 nov 2026); senza, come prima:
+    # meta' commissione a testa e 24 ore
+    quota = d.get("quota", BITPOST_QUOTA_TOTALE // 2)
+    motivo = bitpost_quota_motivo(quota, BITPOST_QUOTA_TOTALE)
+    if motivo:
+        raise HTTPException(400, motivo)
+    ore = d.get("durata_ore", 24)
+    if ore not in BITPOST_DURATE_ORE:
+        raise HTTPException(400, "Durata non valida")
     con = _bitpost_db()
     try:
         if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
@@ -131293,18 +131345,21 @@ async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
     rif = "brt-" + secrets.token_hex(8)
     corpo = {"reference": rif, "buyer_xpub": xpub,
              "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
-             "denomination": int(d["taglio"]), "quantity": int(d["quanti"])}
+             "denomination": int(d["taglio"]), "quantity": int(d["quanti"]),
+             "selected_fee": int(quota),
+             "expected_published_fee": BITPOST_QUOTA_TOTALE}
     o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
     adesso = int(time.time())
     con = _bitpost_db()
     try:
         con.execute(
             "INSERT INTO bitpost_ordini(id, reference, compratore_id, "
-            "compratore_indice, stato, ordine, creato, aggiornato) VALUES "
-            "(?,?,?,?,?,?,?,?)",
+            "compratore_indice, stato, ordine, creato, aggiornato, scade) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             (int(o["id"]), rif, user["id"], int(d["indice"]),
              int((o.get("status") or {}).get("id") or 1),
-             json.dumps(o, ensure_ascii=False), adesso, adesso))
+             json.dumps(o, ensure_ascii=False), adesso, adesso,
+             adesso + int(ore) * 3600))
         con.commit()
     finally:
         con.close()
@@ -131333,6 +131388,8 @@ async def bitpost_prendi(oid: int, req: Request,
             raise HTTPException(400, "È un tuo ordine: non puoi prenderlo tu")
         if riga["stato"] != 1:
             raise HTTPException(409, "L'ha già preso qualcun altro")
+        if riga["scade"] and riga["scade"] <= int(time.time()):
+            raise HTTPException(409, "Questa richiesta è scaduta")
         if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
             raise HTTPException(409, "Numero di conto già usato: riapri la pagina")
     finally:
@@ -131351,7 +131408,7 @@ async def bitpost_prendi(oid: int, req: Request,
         con.commit()
     finally:
         con.close()
-    await notifica(compratore, "🎁 Un Bitworker ha preso il tuo ordine di "
+    await notifica(compratore, "🎁 Qualcuno ha preso la tua richiesta di "
                    "gift card: apri Barattolo e paga il deposito on-chain.")
     return {"ok": True, "ordine": bitpost_per_chi(o, "bitworker")}
 
@@ -131774,6 +131831,65 @@ async def bitpost_webhook(req: Request):
         except Exception as e:
             print(f"[bitpost] avviso non partito: {type(e).__name__}", flush=True)
     return {"ok": True}
+
+
+async def _bitpost_ronda_scadute(adesso: int = 0) -> int:
+    """LA DURATA (21 nov 2026): le richieste nessuno ha preso entro la
+    loro scadenza si annullano da Bitpost (chi compra puo' annullare
+    finche' l'ordine e' in Created/Inactive). Torna quante ne ha chiuse;
+    un errore di una non ferma le altre (si riprova al giro dopo)."""
+    adesso = adesso or int(time.time())
+    con = _bitpost_db()
+    try:
+        righe = con.execute(
+            "SELECT id, compratore_id FROM bitpost_ordini WHERE stato IN (1, 15) "
+            "AND scade>0 AND scade<=? LIMIT 20", (adesso,)).fetchall()
+    finally:
+        con.close()
+    chiuse = 0
+    for r in righe:
+        try:
+            o = await _bitpost_chiama("POST", f"/orders/{r['id']}/cancel",
+                                      {"party": "buyer"})
+        except HTTPException:
+            continue
+        if isinstance(o, dict) and "status" in o:
+            con = _bitpost_db()
+            try:
+                _bitpost_applica(con, o)
+                con.commit()
+            finally:
+                con.close()
+            chiuse += 1
+            try:
+                await notifica(r["compratore_id"], "🎁 La tua richiesta di gift "
+                               "card è scaduta senza che nessuno la prendesse: "
+                               "l'ho annullata. Puoi rifarla con una quota più alta.")
+            except Exception:
+                pass
+    return chiuse
+
+
+_TASK_BITPOST_RONDA = None
+
+
+async def _orologio_bitpost():
+    while True:
+        await asyncio.sleep(300)
+        try:
+            if BITPOST_ATTIVO and bitpost_configurato():
+                await _bitpost_ronda_scadute()
+        except Exception as e:
+            print(f"⚠️ Gift card: la ronda delle scadute si e' fermata un giro ({e})",
+                  flush=True)
+
+
+@app.on_event("startup")
+async def avvia_ronda_bitpost():
+    """La ronda delle richieste scadute, ogni cinque minuti: parte sempre
+    (la leva si guarda a ogni giro, cosi' accenderla dal pannello basta)."""
+    global _TASK_BITPOST_RONDA
+    _TASK_BITPOST_RONDA = asyncio.create_task(_orologio_bitpost())
 
 
 # (Qui finisce il blocco delle gift card di Bitpost: la riga vuota tripla

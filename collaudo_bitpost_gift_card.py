@@ -18,6 +18,7 @@ PRIMA dell'import del server.
 
 USO:  python collaudo_bitpost_gift_card.py
 """
+import asyncio
 import hashlib
 import hmac
 import json
@@ -350,6 +351,44 @@ def main():
                      "ev-4", "2026-11-20T12:00:00Z")
     prova("un ordine che non e' nostro: 200 e basta", 200,
           c.post("/api/bitpost/webhook", content=corpo, headers=t).status_code)
+
+    print("\n[nel P2P: la quota, la durata, la ronda delle scadute (21 nov 2026)]")
+    banco.come(111, admin=True)
+    ind = c.get("/api/bitpost/stato").json()
+    prova("lo stato dice la commissione intera e le durate",
+          (500, [1, 6, 24, 72]), (ind["quota_totale"], ind["durate_ore"]))
+    base = {"taglio": 5000, "quanti": 1, "xpub": XPUB_A, "indice": ind["prossimo_indice"]}
+    prova("una quota oltre il totale: no", 400,
+          c.post("/api/bitpost/ordini", json=dict(base, quota=600)).status_code)
+    prova("...una durata fuori elenco: no", 400,
+          c.post("/api/bitpost/ordini", json=dict(base, quota=400, durata_ore=5)).status_code)
+    r = c.post("/api/bitpost/ordini", json=dict(base, quota=400, durata_ore=1))
+    oq = r.json()["ordine"]["id"]
+    corpo_q = [x[2] for x in finto.chiamate if x[1] == "/shoppycode/orders"][-1]
+    prova("la quota arriva a Bitpost come selected_fee, col totale atteso",
+          (200, 400, 500), (r.status_code, corpo_q["selected_fee"], corpo_q["expected_published_fee"]))
+    banco.come(222, admin=True)
+    in_bacheca = [o["id"] for o in c.get("/api/bitpost/stato").json()["bacheca"]]
+    prova("...chi vende la vede in bacheca, con la scadenza", True, oq in in_bacheca)
+    con = sqlite3.connect(db)
+    con.execute("UPDATE bitpost_ordini SET scade=? WHERE id=?", (int(time.time()) - 5, oq))
+    con.commit()
+    con.close()
+    prova("scaduta: sparisce dalla bacheca", False,
+          oq in [o["id"] for o in c.get("/api/bitpost/stato").json()["bacheca"]])
+    prova("...e non si puo' piu' prendere", 409,
+          c.post(f"/api/bitpost/ordini/{oq}/prendi", json={"xpub": XPUB_B, "indice": 0}).status_code)
+    banco.DETTO.clear()
+    chiuse = asyncio.run(SRV._bitpost_ronda_scadute())
+    con = sqlite3.connect(db)
+    st = con.execute("SELECT stato FROM bitpost_ordini WHERE id=?", (oq,)).fetchone()[0]
+    con.close()
+    prova("la ronda la annulla da Bitpost, come chi compra, e glielo dice",
+          (1, 11, ["buyer"], [111]),
+          (chiuse, st, [x[2]["party"] for x in finto.chiamate if x[1] == f"/orders/{oq}/cancel"],
+           [x[0] for x in banco.DETTO]))
+    prova("...e al giro dopo non c'e' piu' niente da chiudere", 0,
+          asyncio.run(SRV._bitpost_ronda_scadute()))
 
     print("\n[i due segreti dal pannello (21 nov 2026)]")
     avvisi = []
