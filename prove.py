@@ -31644,7 +31644,11 @@ def prove_pagina_acquisto():
           (True, True, True),
           ("fmt(c.commissionePct || 0)}%" in _cr,
            "c.commissionePct > 0 ? 'ctrl-costo' : ''" in _cr,
-           "promo-tag dopo" in _cr))
+           "in promo</span>" not in _cr))
+    #    ⚠️ NIENTE PIU' «IN PROMO» (21 nov 2026, Andrea: «scrivi 0,
+    #    togli in promo, tanto lo lasciamo a zero»): la fee del
+    #    mercatino resta a zero stabilmente, e una promo promette che
+    #    finisce. La riga dice «Fee Barattolo 0%» e basta.
     prova("...e la cifra della commissione e' quella del server",
           True, "cifraCtrl(c.commissione || 0" in _cr)
     #    E IL TOTALE STA NELLA STESSA SCATOLA del conto del P2P (set
