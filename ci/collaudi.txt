@@ -67,6 +67,7 @@ collaudo_spedizione_standard
 collaudo_modifica_massiva
 collaudo_catalogo_esterno
 collaudo_categoria_negozio
+collaudo_filtri_negozio
 collaudo_negozi_su_nostr
 collaudo_scelte_negozio
 collaudo_nuova_fattura

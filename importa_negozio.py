@@ -326,6 +326,7 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
             "saltato_perche": "", "titolo": "", "descrizione": "",
             "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
             "foto": [], "categoria_grezza": "", "categorie_grezze": [],
+            "categorie_negozio": [], "tag_negozio": [],
             "attivo": True, "digitale": False}
     titolo, descrizione = testo_negozio(p, "shopify")
     riga["titolo"], riga["descrizione"] = titolo, descrizione
@@ -385,6 +386,11 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
                                 [(p.get("product_type") or "").strip()]
                                 + [t.strip() for t in str(tag).split(",")]
                                 if n]
+    # IL FILTRO DEL VENDITORE (21 nov 2026) le vuole SEPARATE: su
+    # Shopify la «categoria» e' il tipo di prodotto, i tag sono tag
+    riga["categorie_negozio"] = _nomi_negozio(
+        [p.get("product_type") or ""])
+    riga["tag_negozio"] = _nomi_negozio(str(tag).split(","))
     # draft e archived non sono in vetrina sul suo negozio: non devono
     # esserlo nemmeno qui
     riga["attivo"] = (p.get("status") or "active") == "active"
@@ -429,6 +435,7 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
             "saltato_perche": "", "titolo": "", "descrizione": "",
             "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
             "foto": [], "categoria_grezza": "", "categorie_grezze": [],
+            "categorie_negozio": [], "tag_negozio": [],
             "attivo": True, "digitale": False}
     titolo, descrizione = testo_negozio(p, "woo")
     riga["titolo"], riga["descrizione"] = titolo, descrizione
@@ -496,6 +503,12 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
     # nella figlia — il server tiene la prima che combacia
     riga["categorie_grezze"] = [str(c).strip() for c in categorie
                                 if str(c).strip()]
+    # per il filtro del venditore (21 nov 2026): categorie e tag di Woo,
+    # coi nomi gia' sciolti dalle entita' HTML («Casa &amp; Giardino»)
+    riga["categorie_negozio"] = _nomi_negozio(categorie)
+    riga["tag_negozio"] = _nomi_negozio(
+        [t.get("name") for t in (p.get("tags") or [])
+         if isinstance(t, dict)])
     # DUE DOMANDE E NON UNA: `status` dice se e' pubblicato (draft,
     # pending e private non sono in vetrina da lui), `catalog_
     # visibility` se si vede nel negozio — un prodotto 'publish' ma
@@ -512,6 +525,194 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
 
 
 TRADUTTORI = {"shopify": traduci_shopify, "woo": traduci_woo}
+
+
+# --- IL FILTRO DEL CATALOGO (21 nov 2026, richiesta di Andrea) --------
+# «Barattolo e il negozio sincronizzati, ma che si possano comunque
+# personalizzare»: il venditore decide COSA entra, per categoria del
+# negozio, per tag e per singolo prodotto, all'inizio o quando vuole.
+# Il rubinetto resta aperto (il giro dell'ora non cambia), il filtro
+# decide cosa passa.
+#
+# DUE MODI E UN'ECCEZIONE, e basta:
+# · «tutto»  = entra tutto TRANNE le categorie e i tag elencati (il
+#   modo di partenza, ed e' esattamente il comportamento di ieri a
+#   liste vuote);
+# · «solo»   = entra SOLO cio' che sta in una categoria o porta un tag
+#   elencato;
+# · il PRODOTTO VINCE SEMPRE: `prodotti_fuori` non entra mai,
+#   `prodotti_dentro` entra sempre, qualunque cosa dicano categorie e
+#   tag. La chiave e' l'id del prodotto PADRE sul negozio, cosi' una
+#   maglia in tre taglie si esclude con un gesto solo.
+#
+# FUORI DAL FILTRO NON VUOL DIRE CANCELLATO: l'annuncio gia' entrato va
+# «in panchina» (stato 'escluso': fuori dalla vetrina, da Nostr e dalla
+# lista «I tuoi annunci», ma la riga resta), e il giorno che il filtro
+# lo riaccoglie torna LO STESSO annuncio, con le sue foto e i suoi
+# preferiti. E' la differenza con 'rimosso', che e' la lapide e non
+# risorge (decisione di Andrea, 21 nov 2026: anche «elimina» su un
+# annuncio di un negozio collegato diventa un'esclusione da cui si
+# torna).
+#
+# QUESTO BLOCCO E' PURO come i traduttori: niente rete, niente
+# database. Il server lo chiama sul catalogo appena tradotto
+# (`segna_esclusi`) e la riconciliazione legge solo il segno.
+FILTRO_MODI = ("tutto", "solo")
+MAX_VOCI_FILTRO = 300        # categorie o tag in una lista
+MAX_PRODOTTI_FILTRO = 5000   # eccezioni per singolo prodotto
+MAX_NOME_FILTRO = 80         # il nome di una categoria o di un tag
+# Quanti prodotti si ricordano nel «catalogo visto», la fotografia
+# che il cassetto mostra per scegliere: il tetto di lettura del giro e'
+# molto prima, quindi in pratica sono tutti.
+MAX_PRODOTTI_VISTI = 3000
+MAX_TITOLO_VISTO = 70
+
+
+def _nomi_negozio(nomi) -> list:
+    """I nomi di categorie o tag come li mostra il negozio: entita'
+    HTML sciolte (Woo manda «Casa &amp; Giardino»), spazi compressi,
+    niente vuoti e niente doppioni. L'ordine resta quello del negozio."""
+    fuori, visti = [], set()
+    for n in nomi or []:
+        t = " ".join(html.unescape(html.unescape(str(n or ""))).split())
+        t = t[:MAX_NOME_FILTRO]
+        if t and t.casefold() not in visti:
+            visti.add(t.casefold())
+            fuori.append(t)
+    return fuori
+
+
+def _chiave_filtro(nome) -> str:
+    """Il confronto non guarda maiuscole ne' spazi: «Abbigliamento» e
+    «abbigliamento » sono la stessa categoria per chi la sceglie."""
+    return " ".join(html.unescape(str(nome or "")).split()).casefold()
+
+
+def leggi_filtro(connettore) -> dict:
+    """Il filtro di un collegamento, sempre nella stessa forma anche
+    se la colonna e' vuota, storta o di ieri (= entra tutto)."""
+    try:
+        grezzo = json.loads(dict(connettore).get("filtro_regole") or "{}")
+    except (TypeError, ValueError):
+        grezzo = {}
+    if not isinstance(grezzo, dict):
+        grezzo = {}
+    try:
+        return pulisci_filtro(grezzo)
+    except ValueError:
+        return pulisci_filtro({})
+
+
+def pulisci_filtro(grezzo: dict) -> dict:
+    """Il filtro come arriva dal cassetto, ripulito: modo fra i due,
+    liste di testi corti senza doppioni, id prodotto come stringhe.
+    Alza ValueError su un modo sconosciuto o liste troppo lunghe — il
+    server lo trasforma in un 400 col motivo."""
+    if not isinstance(grezzo, dict):
+        raise ValueError("filtro non leggibile")
+    modo = str(grezzo.get("modo") or "tutto")
+    if modo not in FILTRO_MODI:
+        raise ValueError("modo sconosciuto")
+
+    def lista(chiave, tetto, nomi):
+        v = grezzo.get(chiave) or []
+        if not isinstance(v, list):
+            raise ValueError(f"{chiave}: serve una lista")
+        if len(v) > tetto:
+            raise ValueError(f"{chiave}: al massimo {tetto}")
+        if nomi:
+            return _nomi_negozio(v)
+        fuori = []
+        for x in v:
+            x = str(x if x is not None else "").strip()[:40]
+            if x and x not in fuori:
+                fuori.append(x)
+        return fuori
+    filtro = {"modo": modo,
+              "categorie": lista("categorie", MAX_VOCI_FILTRO, True),
+              "tag": lista("tag", MAX_VOCI_FILTRO, True),
+              "prodotti_fuori": lista("prodotti_fuori",
+                                      MAX_PRODOTTI_FILTRO, False),
+              "prodotti_dentro": lista("prodotti_dentro",
+                                       MAX_PRODOTTI_FILTRO, False)}
+    # un prodotto non sta in tutt'e due: vince l'ultima parola, che il
+    # cassetto scrive in `prodotti_dentro` (il «riaccogli»)
+    dentro = set(filtro["prodotti_dentro"])
+    filtro["prodotti_fuori"] = [p for p in filtro["prodotti_fuori"]
+                                if p not in dentro]
+    return filtro
+
+
+def entra_nel_filtro(prodotto: str, categorie, tag, filtro: dict) -> bool:
+    """IL GIUDICE UNICO del filtro: entra o no? Lo stesso per il giro,
+    per l'anteprima del cassetto e per il conto dei «resterebbero
+    fuori». Il gemello in JavaScript (`entraNelFiltro` in miniapp.html)
+    fa la stessa domanda mentre il venditore sceglie, ma a decidere e'
+    questo."""
+    prodotto = str(prodotto or "")
+    if prodotto and prodotto in filtro.get("prodotti_fuori", ()):
+        return False
+    if prodotto and prodotto in filtro.get("prodotti_dentro", ()):
+        return True
+    scelte = {_chiave_filtro(c) for c in filtro.get("categorie", ())}
+    scelti = {_chiave_filtro(t) for t in filtro.get("tag", ())}
+    tocca = (any(_chiave_filtro(c) in scelte for c in categorie or ())
+             or any(_chiave_filtro(t) in scelti for t in tag or ()))
+    return tocca if filtro.get("modo") == "solo" else not tocca
+
+
+def prodotto_di(r: dict) -> str:
+    """L'id del prodotto PADRE di una riga tradotta: le varianti
+    `pid:vid` si escludono tutte insieme col padre."""
+    return str(r.get("_padre") or
+               str(r.get("origine_chiave") or "").split(":")[0])
+
+
+def segna_esclusi(righe: list, connettore) -> int:
+    """Mette `escluso=True` sulle righe che il filtro tiene fuori, e
+    torna quante sono. Non toglie niente dalla lista, ed e' la regola
+    di `viste` in `riconcilia_connettore`: una riga esclusa sul negozio
+    C'E', e non deve passare per sparita."""
+    filtro = leggi_filtro(connettore)
+    n = 0
+    for r in righe:
+        fuori = not entra_nel_filtro(prodotto_di(r),
+                                     r.get("categorie_negozio") or [],
+                                     r.get("tag_negozio") or [], filtro)
+        r["escluso"] = fuori
+        n += fuori
+    return n
+
+
+def catalogo_visto(righe: list) -> dict:
+    """La fotografia del catalogo che il cassetto mostra per scegliere:
+    le categorie e i tag coi loro conti, e i prodotti (uno per padre,
+    col titolo del padre) con le loro categorie e tag. Si rifa' a ogni
+    giro, quindi una categoria nuova sul negozio compare da sola.
+    Conta i PRODOTTI e non le righe: una maglia in tre taglie e' uno."""
+    prodotti, cat, tag = {}, Counter(), Counter()
+    for r in righe:
+        pid = prodotto_di(r)
+        if not pid or pid in prodotti:
+            continue
+        categorie = r.get("categorie_negozio") or []
+        tags = r.get("tag_negozio") or []
+        cat.update(categorie)
+        tag.update(tags)
+        if len(prodotti) < MAX_PRODOTTI_VISTI:
+            prodotti[pid] = {
+                "id": pid,
+                "t": str(r.get("_titolo_padre") or r.get("titolo")
+                         or "")[:MAX_TITOLO_VISTO],
+                "c": categorie, "g": tags,
+                # bozza o nascosto sul negozio: qui non entra comunque
+                "a": 1 if r.get("attivo", True) else 0}
+    return {"quando": int(time.time()),
+            "categorie": [[n, k] for n, k in cat.most_common()],
+            "tag": [[n, k] for n, k in tag.most_common()],
+            "prodotti": list(prodotti.values()),
+            "totale": len({prodotto_di(r) for r in righe
+                           if prodotto_di(r)})}
 
 
 # --- LE VARIANTI (set 2026) -------------------------------------------
@@ -662,6 +863,9 @@ def esplodi_woo(p: dict) -> list:
             "manage_stock": gestito, "stock_quantity": scorte,
             "stock_status": v.get("stock_status") or p.get("stock_status"),
             "images": foto, "categories": p.get("categories") or [],
+            # i tag sono del padre come le categorie (21 nov 2026: li
+            # legge il filtro del venditore)
+            "tags": p.get("tags") or [],
             "virtual": bool(v.get("virtual")) or bool(p.get("virtual")),
             "downloadable": (bool(v.get("downloadable"))
                              or bool(p.get("downloadable"))),
@@ -1763,7 +1967,11 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
              # (11 ott 2026, cantiere foto-obbligatorie) i prodotti mai
              # entrati che sul negozio non hanno nemmeno un'immagine:
              # un conto anche loro, e non nascono finche' non ne hanno
-             "senza_foto": 0}
+             "senza_foto": 0,
+             # (21 nov 2026, il filtro del venditore) i prodotti che il
+             # suo filtro tiene fuori, quelli che questo giro ha messo in
+             # panchina e quelli che ha riaccolto
+             "esclusi": 0, "in_panchina": 0, "riaccolti": 0}
     viste = set()
     # i padri le cui figlie questo giro non le ha VISTE ne' le ha
     # cercate: sul negozio ci sono, e non si spengono (vedi sotto)
@@ -1797,7 +2005,10 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
             intatte.add(r["origine_chiave"])
             esito["varianti_al_prossimo"] += 1
             continue
-        if r.get("saltato_perche"):
+        # IL FILTRO VIENE PRIMA DEI SALTATI (21 nov 2026): a chi ha
+        # escluso un prodotto non interessa sapere che non sarebbe
+        # passato per altro — e la panchina va fatta anche li'
+        if r.get("saltato_perche") and not r.get("escluso"):
             esito["saltati"].append({"titolo": r.get("titolo", "")[:60],
                                      "perche": r["saltato_perche"]})
             continue
@@ -1848,7 +2059,8 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
         lotto_dal = time.monotonic()
         for riga in con.execute(
                 "SELECT id, titolo, origine_chiave FROM annunci "
-                "WHERE connettore_id=? AND stato IN ('attivo','revisione')",
+                "WHERE connettore_id=? AND stato IN "
+                "('attivo','revisione','escluso')",
                 (cid,)).fetchall():
             if riga["origine_chiave"] in viste:
                 continue
@@ -1911,6 +2123,22 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
         esito["saltati"].append({"titolo": r["titolo"][:60],
                                  "perche": "gia' rimosso qui: "
                                            "non si ricrea da solo"})
+        return
+
+    # --- LA PANCHINA (21 nov 2026, il filtro del venditore) -----------
+    # Una riga che il filtro tiene fuori non nasce, e se c'e' gia' esce
+    # dalla vetrina come 'escluso' — non 'rimosso': da li' si torna.
+    # Gli ordini mai pagati si annullano (il patto di `spegni_annuncio`),
+    # quelli pagati vanno avanti: la riga resta, e ci si appoggiano.
+    # Niente foto e niente aggiornamenti mentre sta fuori: al giorno del
+    # ritorno `_aggiorna` la rimette in pari in un colpo solo.
+    if r.get("escluso"):
+        esito["esclusi"] += 1
+        if gia and gia["stato"] in ("attivo", "venduto", "revisione"):
+            spegni_annuncio(con, gia["id"], "escluso")
+            con.commit()
+            esito["in_panchina"] += 1
+            print(f"    🪑 in panchina (filtro): {r['titolo'][:50]}")
         return
 
     # --- LE FOTO PRIMA DI OGNI SCRITTURA (1 ott 2026) -----------------
@@ -2158,15 +2386,36 @@ def _aggiorna(con, gia, r: dict, connettore: dict, foto: str, marchio,
         print(f"    ↔ consegna corretta ({cons['consegna'] or 'cassetto'}): "
               f"{r['titolo'][:50]}")
     # --- lo stato -----------------------------------------------------
-    if marchio:
+    if gia["stato"] == "escluso" and r["attivo"]:
+        # IL RITORNO DALLA PANCHINA (21 nov 2026): il filtro lo
+        # riaccoglie, o il negozio lo ha ripubblicato. Ci arriva SOLO
+        # dopo un giudizio fresco (`_righe_da_giudicare` lo manda
+        # sempre alla moderazione): cosi' da qui non rientra mai niente
+        # che nessuno ha guardato, nemmeno cio' che era in revisione il
+        # giorno che e' uscito. Il marchio lo rimanda in revisione,
+        # l'invariante di casa lo fa nascere venduto se e' esaurito.
+        torna = ("revisione" if marchio else
+                 "venduto" if quantita == 0 else "attivo")
+        con.execute("UPDATE annunci SET stato=? WHERE id=?",
+                    (torna, gia["id"]))
+        esito["riaccolti"] += 1
+        if marchio:
+            esito["in_revisione"] += 1
+        print(f"    ↩️ di nuovo dentro ({torna}): {r['titolo'][:50]}")
+    elif marchio:
         # il testo e' cambiato e la moderazione non sa piu' approvarlo:
         # torna in attesa, come una modifica fatta dal form
         con.execute("UPDATE annunci SET stato='revisione' "
                     "WHERE id=? AND stato='attivo'", (gia["id"],))
         esito["in_revisione"] += 1
     elif not r["attivo"]:
-        if gia["stato"] != "rimosso":
-            spegni_annuncio(con, gia["id"], "rimosso")
+        # BOZZA O NASCOSTO SUL NEGOZIO = PANCHINA (21 nov 2026, decisione
+        # di Andrea): fino a ieri era la lapide, e il prodotto
+        # ripubblicato dal negoziante non tornava piu'. Adesso esce come
+        # 'escluso' e torna da solo al giro in cui il negozio lo rimette
+        # in vetrina (il ramo del ritorno, qui sopra)
+        if gia["stato"] not in ("rimosso", "escluso"):
+            spegni_annuncio(con, gia["id"], "escluso")
             esito["spenti"] += 1
     elif gia["stato"] == "venduto" and (quantita or 0) > 0:
         con.execute("UPDATE annunci SET stato='attivo' WHERE id=?",

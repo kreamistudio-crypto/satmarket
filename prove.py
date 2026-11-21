@@ -114529,6 +114529,12 @@ def prove_connettore_interrompibile():
         mod = type("M", (), {})()
         mod.LETTORI = {"finto": lettore}
         mod.traduci = lambda prodotti, fonte, cambio: []
+
+        # (21 nov 2026) la fotografia del catalogo per il filtro: qui non
+        # ferma il giro (il negozio ha gia' scelto cosa entra)
+        async def _foto_finta(c, righe, esclusi):
+            return False
+        g["_fotografa_catalogo"] = _foto_finta
         mod.riconcilia_connettore = riconcilia
         g.update({"_APRITORE_API": Apritore(),
                   "url_api_ammesso": lambda u: True,
@@ -114738,6 +114744,12 @@ def prove_lettore_negozi_in_tempo():
         mod = type("M", (), {})()
         mod.LETTORI = {"woo": lettore}
         mod.traduci = lambda prodotti, fonte, cambio: []
+
+        # (21 nov 2026) la fotografia del catalogo per il filtro: qui non
+        # ferma il giro (il negozio ha gia' scelto cosa entra)
+        async def _foto_finta(c, righe, esclusi):
+            return False
+        g["_fotografa_catalogo"] = _foto_finta
         mod.riconcilia_connettore = lambda *a, **k: {"saltati": []}
         g.update({"_connettore_in_errore": in_errore,
                   "_chiudi_giro_connettore": chiudi,
@@ -120201,7 +120213,8 @@ def prove_connettori_categoria():
     prova("il cassetto passa dal giudice della categoria", True,
           "_categoria_negozio(d, vecchio)" in salva)
     prova("...la scrive alla nascita e nei ritocchi", True,
-          "tariffe_da_dire,categoria,creato" in salva
+          # (21 nov 2026) col filtro: la prima scelta viaggia accanto
+          "tariffe_da_dire,categoria,filtro_scelto,creato" in salva
           and "categoria=? WHERE id=? AND tg_id=?" in salva)
     prova("...e la fa scendere sulle righe PRIMA del commit", True,
           0 <= salva.find("_sposta_categoria_negozio(")
@@ -140144,7 +140157,8 @@ def prove_catalogo_esterno():
     # le due scritture portano anche la categoria del negozio
     prova("...e si scrivono in tutt'e due le strade", True,
           "zona=?, tariffe_da_dire=?, " in salva
-          and "tariffe_da_dire,categoria,creato)" in salva
+          # (21 nov 2026) e il filtro: la prima scelta accanto
+          and "tariffe_da_dire,categoria,filtro_scelto,creato)" in salva
           # e il ritocco scrive il VALUE giudicato, non uno zero: un
           # aggiornamento senza costi lascerebbe entrare il catalogo
           and "*tariffe, zona, da_dire,\n                 categoria, cid,"
@@ -157398,7 +157412,10 @@ def prove_negozi_grandi():
         for nome in ("_righe_da_giudicare", "_nuovi_per_giro", "_segno_varianti",
                      "motivo_parole"):
             exec(pezzo(nome), g)
-        for nome in ("_modera_righe_negozio", "_un_connettore"):
+        # (21 nov 2026) la fotografia del catalogo per il filtro e' quella
+        # vera: un negozio che ha gia' scelto non si ferma li'
+        for nome in ("_modera_righe_negozio", "_un_connettore",
+                     "_fotografa_catalogo"):
             exec("async " + pezzo(nome), g)
         mod = types.SimpleNamespace(LETTORI={"woo": lettore}, traduci=ne.traduci,
                                     riconcilia_connettore=ne.riconcilia_connettore)
@@ -175583,6 +175600,8 @@ def prove_esauriti_eliminabili():
                "ritira_da_nostr": _ritira, "promo_rimuovi": _ritira,
                "asyncio": asyncio, "time": time}
         exec(pezzo("_ordini_vivi_annuncio"), amb)
+        # (21 nov 2026) chi arriva da un negozio collegato si esclude
+        exec(pezzo("dal_negozio_collegato"), amb)
         exec("async " + pezzo("rimuovi_annuncio"), amb)
 
         async def giro():
@@ -198627,7 +198646,9 @@ def prove_modifica_massiva():
                  "_sped_std_escluso", "senza_condizione", "_mm_ids",
                  "_mm_intero", "_mm_euro", "_mm_percento", "_mm_parametri",
                  "_mm_percento_su", "_mm_escluso", "_mm_gesto",
-                 "_mm_toccato_dopo", "_mm_annullabile"):
+                 "_mm_toccato_dopo", "_mm_annullabile",
+                 # (21 nov 2026) Elimina su un negozio collegato esclude
+                 "dal_negozio_collegato"):
         exec(pezzo(nome), amb)
     exec("async " + pezzo("_mm_nuovi"), amb)
     amb["sottocategoria_valida"] = lambda c, s: ""

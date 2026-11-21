@@ -915,3 +915,9 @@ dove: P2P → il + → «Pubblica» → «3. Regole» → «🔁 Ripubblica».
 leva: P2P_RIPUBBLICA (accesa di serie)
 pubblico: sì
 
+
+## 2026-11-21 · filtri-negozio
+frase: Se hai collegato il tuo negozio WooCommerce o Shopify, adesso scegli tu cosa entra su Barattolo: tutto tranne alcune categorie o tag, solo quelli che vuoi, o prodotto per prodotto. Il negozio resta sincronizzato ogni ora, e quello che togli non si cancella: va in panchina e lo riaccogli quando vuoi, con lo stesso annuncio.
+dove: Profilo → «📥 Carica tanti annunci insieme / catalogo esterno» → il tuo negozio → «🧺 Cosa entra».
+leva: CONNETTORI_NEGOZIO_APERTI (il cassetto dei negozi collegati)
+pubblico: sì

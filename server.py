@@ -4854,7 +4854,7 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
                         tg_id, tg_id),
         # niente 'revisione': un annuncio mai approvato non apre bottega
         annunci=q("SELECT COUNT(*) FROM annunci WHERE venditore_id=? "
-                  "AND stato NOT IN ('rimosso','revisione')", tg_id),
+                  "AND stato NOT IN ('rimosso','revisione','escluso')", tg_id),
         fb_ricevuti=fb["n"], fb_media=fb["media"] or 0,
         fb_lasciati=q("SELECT COUNT(*) FROM feedback WHERE da_tg_id=?",
                       tg_id),
@@ -9489,6 +9489,15 @@ def init_db():
         -- venditore come la consegna: '' = decide il negozio (la sua
         -- categoria, se combacia con una nostra, sennò «Altro»)
         categoria TEXT DEFAULT '',
+        -- IL FILTRO DEL VENDITORE (21 nov 2026): cosa entra, per
+        -- categoria e tag del negozio e per singolo prodotto (JSON, lo
+        -- legge `importa_negozio.leggi_filtro`; '' = entra tutto).
+        -- `filtro_scelto` = 0 tiene fuori tutto finche' il venditore
+        -- non fa la prima scelta; `catalogo_visto` e' la fotografia del
+        -- catalogo (categorie, tag, prodotti) su cui sceglie.
+        filtro_regole TEXT DEFAULT '',
+        filtro_scelto INTEGER DEFAULT 1,
+        catalogo_visto TEXT DEFAULT '',
         ultimo_giro INTEGER DEFAULT 0,
         ultimo_esito TEXT DEFAULT '',     -- JSON del report dell'ultimo giro
         ultimo_errore TEXT DEFAULT '',
@@ -10197,6 +10206,16 @@ def init_db():
                     "categoria TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
+    # IL FILTRO DEL VENDITORE (21 nov 2026). Le righe di ieri nascono a
+    # filtro vuoto e GIA' SCELTO (1): i negozi collegati continuano a
+    # far entrare tutto, come prima del deploy.
+    for colonna in ("filtro_regole TEXT DEFAULT ''",
+                    "filtro_scelto INTEGER DEFAULT 1",
+                    "catalogo_visto TEXT DEFAULT ''"):
+        try:
+            con.execute(f"ALTER TABLE connettori ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
     # I DOPPIONI SENZA MAIUSCOLE (18 nov 2026): lo stesso negozio non si
     # collega due volte nemmeno scritto «SWAG» invece di «swag». Un
     # indice e non una colonna nuova: il giudice e' lo stesso database,
@@ -33365,7 +33384,17 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
                                  "vincolante: si chiude da sola alla "
                                  "scadenza (per i casi seri c'è la "
                                  "moderazione)")
-    con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?", (annuncio_id,))
+    if dal_negozio_collegato(a):
+        # DAL NEGOZIO COLLEGATO NON SI CANCELLA, SI ESCLUDE (21 nov 2026,
+        # decisione di Andrea): la lapide teneva fuori per sempre un
+        # prodotto vero del negozio, anche il giorno che il venditore
+        # lo rivoleva. Adesso va in panchina e si riaccoglie dal
+        # cassetto; per il resto il gesto e' lo stesso (ordini mai
+        # pagati annullati, piazza Nostr e canali ritirati).
+        _escludi_dal_negozio(con, a)
+    else:
+        con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?",
+                    (annuncio_id,))
     # Anche i SET 'creato' che contengono il pezzo: una invoice viva
     # non deve poter pagare un annuncio appena rimosso.
     con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
@@ -33378,7 +33407,10 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     asyncio.create_task(ritira_da_nostr(annuncio_id))
     # E anche i post automatici dei canali si ritirano da soli
     asyncio.create_task(promo_rimuovi(annuncio_id))
-    return {"ok": True}
+    # (21 nov 2026) il client dice «messo da parte» e non «eliminato»
+    # (solo li': le risposte di sempre restano {"ok": True})
+    return {"ok": True, "escluso": True} if dal_negozio_collegato(a) \
+        else {"ok": True}
 
 
 async def _avvisa_offerte_esaurito(compratori: list, titolo: str):
@@ -56774,7 +56806,10 @@ async def _mm_nuovi(a, azione: str, par: dict, cambio: float, std,
             a, nuovi["spedizione_sats"], nuovi["spedizione_eur"])
         extra["convertito"] = convertito
         return nuovi, "", extra
-    return {"stato": "rimosso"}, "", extra
+    # dal negozio collegato Elimina ESCLUDE (21 nov 2026): la panchina,
+    # come il gesto singolo (`_escludi_dal_negozio`)
+    return {"stato": "escluso" if dal_negozio_collegato(a) else "rimosso"}, \
+        "", extra
 
 
 def _mm_vista(a, azione: str, nuovi: dict, extra: dict) -> dict:
@@ -56912,7 +56947,9 @@ def _mm_scrivi(con, a, nuovi: dict, adesso: int) -> list:
         sql += ", modificato=?"
         valori.append(adesso)
     con.execute(sql + " WHERE id=?", (*valori, a["id"]))
-    if nuovi.get("stato") == "rimosso":
+    if nuovi.get("stato") == "escluso":
+        _escludi_dal_negozio(con, a)
+    if nuovi.get("stato") in ("rimosso", "escluso"):
         con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
                     "WHERE stato='creato' AND (annuncio_id=? OR id IN "
                     "(SELECT ordine_id FROM ordine_righe WHERE "
@@ -56929,7 +56966,7 @@ def _mm_gesto(stato_prima: str, nuovi: dict) -> str:
     'aggiorna' (l'evento rilanciato coi numeri nuovi), '' (niente: le
     scorte non stanno nell'evento, e la ricarica non lo rilancia)."""
     dopo = nuovi.get("stato", stato_prima)
-    if dopo == "rimosso":
+    if dopo in ("rimosso", "escluso"):
         return "ritira"
     if stato_prima == "attivo" and dopo == "venduto":
         return "sold"
@@ -103205,6 +103242,12 @@ def _righe_da_giudicare(righe: list, connettore: dict,
     nuove, note = [], []
     presi = 0
     for r in righe:
+        # IL FILTRO DEL VENDITORE (21 nov 2026): cio' che tiene fuori non
+        # entra, quindi non si giudica e non prende un posto — sta fra le
+        # note come la bozza, e la riconciliazione lo mette in panchina
+        if r.get("escluso"):
+            note.append(r)
+            continue
         if r.get("saltato_perche"):
             continue
         riga = con.execute(
@@ -103225,6 +103268,12 @@ def _righe_da_giudicare(righe: list, connettore: dict,
                 if not controlla_vietato(r["titolo"], r["descrizione"]):
                     presi += 1                   # un posto per chi puo' nascere
             nuove.append(r)                      # mai vista: si giudica
+        elif riga["stato"] == "escluso" and r.get("attivo", True):
+            # TORNA DALLA PANCHINA (21 nov 2026): si giudica SEMPRE, anche
+            # col testo di ieri — puo' essere uscita mentre aspettava un
+            # moderatore, e il ritorno non e' una scorciatoia per saltarlo.
+            # Non prende un posto: non e' un ingresso nuovo, e' un ritorno
+            nuove.append(r)
         elif riga["stato"] != "attivo":
             note.append(r)                       # gia' decisa, o in attesa
         elif (riga["titolo"], riga["descrizione"]) == (r["titolo"],
@@ -103495,6 +103544,19 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
         # LA CATEGORIA DI OGNI RIGA (16 nov 2026): quella del cassetto,
         # o quella del negozio quando combacia con una nostra
         categorie_righe_negozio(righe, c)
+        # IL FILTRO DEL VENDITORE (21 nov 2026): la fotografia del
+        # catalogo per il cassetto, a ogni giro, e il segno su cio' che
+        # il filtro tiene fuori. Un collegamento NUOVO aspetta la prima
+        # scelta (`filtro_scelto` = 0): il catalogo si legge e si
+        # fotografa, ma non entra niente finche' il venditore non dice
+        # cosa vuole — e' il «prima che entri qualcosa» promesso.
+        # IL GIUDICE E' QUELLO DEL MODULO VERO, sempre: e' puro e non fa
+        # rete, quindi non c'e' niente da fingere — e chi passa un modulo
+        # di cartone (le prove del giro) non deve saperne niente
+        import importa_negozio as _filtro
+        esclusi = _filtro.segna_esclusi(righe, c)
+        if await _fotografa_catalogo(c, righe, esclusi):
+            return
         # I POSTI DI QUESTO GIRO, un conto solo per chi giudica e per chi
         # fa nascere (1 ott 2026): il secchio del rodaggio o il regime —
         # None = nessun tetto, 0 = l'ora del rodaggio e' piena
@@ -103567,6 +103629,63 @@ async def _un_connettore(c: dict, cambio: dict, importa_negozio):
         await nostr_del_negozio(c["id"])
     finally:
         _CONNETTORI_IN_CORSO.discard(c["id"])
+
+
+async def _fotografa_catalogo(c: dict, righe: list, esclusi: int) -> bool:
+    """Scrive la fotografia del catalogo (`catalogo_visto`) e torna True
+    se il giro si ferma qui perche' il collegamento aspetta ancora la
+    prima scelta del venditore (21 nov 2026, il filtro).
+
+    LA PRIMA FOTOGRAFIA SI DICE: il venditore ha appena collegato il
+    negozio e aspetta di vedere qualcosa; un messaggio, UNA volta, gli
+    dice che il catalogo e' pronto da scegliere. I giri dopo la
+    rifanno in silenzio (le categorie nuove compaiono da sole).
+    LA FOTOGRAFIA E' SOLO LETTURA: niente annunci toccati, e un
+    collegamento in attesa non conta come errore."""
+    import importa_negozio
+    foto = importa_negozio.catalogo_visto(righe)
+    foto["esclusi"] = esclusi
+    in_attesa = not dict(c).get("filtro_scelto", 1)
+    # FAIL-OPEN SULLA FOTOGRAFIA: un intoppo nello scriverla non ferma il
+    # giro di chi ha gia' scelto (la vetrina conta piu' della foto); chi
+    # aspetta la scelta resta fermo comunque — senza scelta non entra
+    # niente, foto o non foto
+    prima = None
+    try:
+        con = db()
+        try:
+            prima = con.execute("SELECT catalogo_visto FROM connettori "
+                                "WHERE id=?", (c["id"],)).fetchone()
+            con.execute("UPDATE connettori SET catalogo_visto=? WHERE id=?",
+                        (json.dumps(foto, ensure_ascii=False), c["id"]))
+            if in_attesa:
+                con.execute(
+                    "UPDATE connettori SET ultimo_giro=?, ultimo_errore='', "
+                    "errori_di_fila=0, ultimo_esito=? WHERE id=?",
+                    (int(time.time()),
+                     json.dumps({"in_attesa_scelta": True,
+                                 "totale": foto["totale"]}), c["id"]))
+            con.commit()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Connettore #{c['id']}: fotografia del catalogo non "
+              f"scritta: {e}")
+        return in_attesa
+    if in_attesa and not (prima and prima["catalogo_visto"]):
+        n_cat = len(foto["categorie"])
+        await notifica(
+            c["tg_id"],
+            f"🏪 <b>Ho letto il catalogo di "
+            f"{html.escape(c['url_negozio'])}</b>\n\n"
+            f"{foto['totale']} prodotti"
+            + (f" in {n_cat} categorie" if n_cat else "") + ". "
+            f"Prima di metterli in vetrina scegli tu cosa entra: dal "
+            f"Profilo, in «📥 Carica tanti annunci insieme / catalogo "
+            f"esterno», tocca «🧺 Cosa entra». Puoi far entrare tutto, "
+            f"solo alcune categorie, o togliere i singoli prodotti — e "
+            f"cambiare idea quando vuoi.")
+    return in_attesa
 
 
 async def _connettore_in_errore(c: dict, errore: str):
@@ -103738,11 +103857,18 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
             f"ripartito da solo, e i tuoi annunci tornano ad aggiornarsi "
             f"ogni ora.")
     if not (esito["nuovi"] or esito["spenti"] or esito["in_revisione"]
-            or esito["falliti"] or esito.get("consegna_corretta")):
+            or esito["falliti"] or esito.get("consegna_corretta")
+            or esito.get("in_panchina") or esito.get("riaccolti")):
         return
     pezzi = []
     if esito["nuovi"]:
         pezzi.append(f"{esito['nuovi']} in vetrina")
+    # (21 nov 2026) il filtro del venditore: chi esce e chi torna
+    if esito.get("riaccolti"):
+        pezzi.append(f"{esito['riaccolti']} di nuovo in vetrina")
+    if esito.get("in_panchina"):
+        pezzi.append(f"{esito['in_panchina']} messi da parte dal tuo "
+                     f"filtro (li riaccogli quando vuoi)")
     # (set 2026) la consegna corretta si dice: e' il giro che rimette
     # a posto un corso online importato come pacco, e il venditore
     # deve sapere che da adesso quel prodotto lo consegna lui,
@@ -103751,7 +103877,8 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
         pezzi.append(f"{esito['consegna_corretta']} con la consegna "
                      f"corretta")
     if esito["spenti"]:
-        pezzi.append(f"{esito['spenti']} tolti (non sono più sul negozio)")
+        pezzi.append(f"{esito['spenti']} tolti (non sono più in vendita "
+                     f"sul negozio)")
     if esito["in_revisione"]:
         pezzi.append(f"{esito['in_revisione']} in revisione")
     if esito["falliti"]:
@@ -103872,6 +103999,11 @@ def _connettore_pubblico(con, c) -> dict:
     quanti = con.execute(
         "SELECT COUNT(*) AS n FROM annunci WHERE connettore_id=? "
         "AND stato IN ('attivo','revisione')", (c["id"],)).fetchone()["n"]
+    panchina = con.execute(
+        "SELECT COUNT(*) AS n FROM annunci WHERE connettore_id=? "
+        "AND stato='escluso'", (c["id"],)).fetchone()["n"]
+    import importa_negozio
+    filtro = importa_negozio.leggi_filtro(c)
     return {
         "id": c["id"],
         "fonte": c["fonte"],
@@ -103895,6 +104027,15 @@ def _connettore_pubblico(con, c) -> dict:
         # il catalogo aspetta i costi di spedizione (set 2026): il
         # cassetto li chiede su questa riga, e il giro non la legge
         "tariffe_da_dire": bool(c["tariffe_da_dire"]),
+        # il filtro (21 nov 2026): se aspetta la prima scelta, il modo e
+        # quante regole ha — il dettaglio sta in /filtro, che porta il
+        # catalogo intero e qui peserebbe a ogni apertura
+        "filtro_scelto": bool(c["filtro_scelto"]),
+        "filtro_modo": filtro["modo"],
+        "filtro_regole": (len(filtro["categorie"]) + len(filtro["tag"])
+                          + len(filtro["prodotti_fuori"])
+                          + len(filtro["prodotti_dentro"])),
+        "in_panchina": panchina,
         "ultimo_giro": c["ultimo_giro"],
         "ultimo_errore": c["ultimo_errore"],
         "errori_di_fila": c["errori_di_fila"],
@@ -104747,10 +104888,16 @@ async def salva_connettore(req: Request,
                 "spedizione_punto_eur,spedizione_punto_sats,"
                 "spedizione_punto_dichiarata,spedizione_extra_eur,"
                 "spedizione_extra_sats,tariffe_valuta,zona,"
-                "tariffe_da_dire,categoria,creato) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "tariffe_da_dire,categoria,filtro_scelto,creato) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (user["id"], fonte, url, blob, consegna, *tariffe, zona,
-                 da_dire, categoria, adesso))
+                 da_dire, categoria,
+                 # PRIMA SI SCEGLIE COSA ENTRA (21 nov 2026): il cassetto
+                 # nuovo lo chiede con `scegli_prima`, e il primo giro
+                 # fotografa il catalogo senza far entrare niente. Un
+                 # client di ieri non lo manda, e il suo negozio entra
+                 # tutto com'e' sempre stato.
+                 0 if d.get("scegli_prima") else 1, adesso))
             cid = cur.lastrowid
     except sqlite3.IntegrityError:
         con.close()
@@ -104936,6 +105083,143 @@ async def sincronizza_uno_a_mano(conn_id: int,
                                  f"aggiorna comunque da solo ogni ora)")
     asyncio.create_task(_sync_uno(conn_id))
     return {"ok": True}
+
+
+# --- IL FILTRO DEL CATALOGO, DAL CASSETTO (21 nov 2026) --------------
+# «🧺 Cosa entra»: il venditore sceglie per categoria, tag e prodotto
+# (il giudice e' `importa_negozio.entra_nel_filtro`). Due rotte: una
+# porta il filtro, la fotografia del catalogo e la panchina; l'altra
+# salva. Il filtro NON SI APPLICA QUI: lo applica il giro, che e' il
+# solo a conoscere categorie e tag di ogni riga — e parte subito dopo
+# il salvataggio, cosi' il venditore vede l'effetto in un minuto e non
+# all'ora tonda.
+
+def dal_negozio_collegato(a) -> int:
+    """L'id del collegamento da cui arriva una riga di `annunci`, 0 se
+    nata qui (21 nov 2026). Tollera la riga che non porta la colonna (una
+    SELECT stretta, un banco di prova): non e' un connettore."""
+    try:
+        return int(a["connettore_id"] or 0)
+    except (KeyError, IndexError, TypeError, ValueError):
+        return 0
+
+
+def _rigira_dopo_filtro(c) -> bool:
+    """Fa partire il giro di un collegamento dopo un cambio di filtro,
+    se si puo' (attivo, costi detti, nessun giro gia' in corso). Il
+    freno del «🔄 Aggiorna ora» qui non vale: il filtro e' un gesto
+    nostro sui nostri annunci, non una domanda in piu' al negozio
+    dell'altro fatta per curiosita' — e i cambi di filtro sono pochi.
+    Torna se e' partito."""
+    if c["stato"] != "attivo" or c["tariffe_da_dire"] \
+            or c["id"] in _CONNETTORI_IN_CORSO:
+        return False
+    asyncio.create_task(_sync_uno(c["id"]))
+    return True
+
+
+@app.get("/api/me/connettori/{conn_id}/filtro")
+async def filtro_connettore(conn_id: int, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Il filtro di un collegamento, con quello che serve per sceglierlo:
+    la fotografia del catalogo (categorie e tag coi conti, i prodotti) e
+    la panchina — gli annunci gia' entrati che adesso stanno fuori."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    import importa_negozio
+    con = db()
+    c = con.execute("SELECT * FROM connettori WHERE id=? AND tg_id=?",
+                    (conn_id, user["id"])).fetchone()
+    if not c:
+        con.close()
+        raise HTTPException(400, "Collegamento non trovato")
+    try:
+        catalogo = json.loads(c["catalogo_visto"] or "{}")
+    except ValueError:
+        catalogo = {}
+    panchina = [{"id": r["id"], "titolo": r["titolo"],
+                 "prodotto": str(r["origine_chiave"] or "").split(":")[0]}
+                for r in con.execute(
+                    "SELECT id, titolo, origine_chiave FROM annunci "
+                    "WHERE connettore_id=? AND stato='escluso' "
+                    "ORDER BY titolo LIMIT 1000", (conn_id,))]
+    # i prodotti che sono in vetrina adesso, per padre: il cassetto li
+    # segna, cosi' chi esclude vede cosa sta togliendo
+    in_vetrina = sorted({str(r[0] or "").split(":")[0] for r in con.execute(
+        "SELECT origine_chiave FROM annunci WHERE connettore_id=? "
+        "AND stato IN ('attivo','venduto','revisione')", (conn_id,))})
+    con.close()
+    return {"filtro": importa_negozio.leggi_filtro(c),
+            "filtro_scelto": bool(c["filtro_scelto"]),
+            "catalogo": catalogo, "panchina": panchina,
+            "in_vetrina": in_vetrina,
+            "in_corso": conn_id in _CONNETTORI_IN_CORSO}
+
+
+@app.post("/api/me/connettori/{conn_id}/filtro")
+async def salva_filtro_connettore(conn_id: int, req: Request,
+                                  x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """Salva il filtro (e, alla prima volta, la scelta che apre la
+    porta: `filtro_scelto` = 1). Torna quanti prodotti del catalogo
+    fotografato resterebbero fuori, contati dallo stesso giudice del
+    giro, e se il giro e' partito."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    import importa_negozio
+    d = await leggi_json(req)
+    try:
+        filtro = importa_negozio.pulisci_filtro(d.get("filtro") or {})
+    except ValueError as e:
+        raise HTTPException(400, f"Filtro non valido: {e}")
+    con = db()
+    c = con.execute("SELECT * FROM connettori WHERE id=? AND tg_id=?",
+                    (conn_id, user["id"])).fetchone()
+    if not c:
+        con.close()
+        raise HTTPException(400, "Collegamento non trovato")
+    con.execute("UPDATE connettori SET filtro_regole=?, filtro_scelto=1 "
+                "WHERE id=?",
+                (json.dumps(filtro, ensure_ascii=False), conn_id))
+    con.commit()
+    c = con.execute("SELECT * FROM connettori WHERE id=?",
+                    (conn_id,)).fetchone()
+    try:
+        prodotti = json.loads(c["catalogo_visto"] or "{}").get(
+            "prodotti") or []
+    except (ValueError, AttributeError):
+        prodotti = []
+    fuori = sum(1 for p in prodotti
+                if not importa_negozio.entra_nel_filtro(
+                    p.get("id"), p.get("c") or [], p.get("g") or [], filtro))
+    pubblico = _connettore_pubblico(con, c)
+    con.close()
+    partito = _rigira_dopo_filtro(c)
+    return {"ok": True, "filtro": filtro, "fuori": fuori,
+            "totale": len(prodotti), "giro_partito": partito,
+            "connettore": pubblico}
+
+
+def _escludi_dal_negozio(con, a) -> None:
+    """«Elimina» su un annuncio di un negozio collegato (21 nov 2026,
+    decisione di Andrea): non la lapide ma la panchina. L'annuncio esce
+    dalla vetrina come 'escluso' e il suo prodotto entra fra le
+    eccezioni del filtro (`prodotti_fuori`), cosi' il giro dopo non lo
+    rimette dentro — e il venditore lo riaccoglie dal cassetto quando
+    vuole. Dentro la transazione del chiamante: il commit e' suo."""
+    import importa_negozio
+    c = con.execute("SELECT * FROM connettori WHERE id=?",
+                    (a["connettore_id"],)).fetchone()
+    con.execute("UPDATE annunci SET stato='escluso' WHERE id=?", (a["id"],))
+    if not c:
+        return
+    filtro = importa_negozio.leggi_filtro(c)
+    pid = str(a["origine_chiave"] or "").split(":")[0]
+    if pid:
+        filtro["prodotti_dentro"] = [p for p in filtro["prodotti_dentro"]
+                                     if p != pid]
+        if pid not in filtro["prodotti_fuori"]:
+            filtro["prodotti_fuori"].append(pid)
+        con.execute("UPDATE connettori SET filtro_regole=? WHERE id=?",
+                    (json.dumps(filtro, ensure_ascii=False), c["id"]))
 
 
 def pulisci_import():

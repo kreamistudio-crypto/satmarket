@@ -50728,7 +50728,10 @@ function riepilogoGiroConnettore(e){
      un'immagine (11 ott 2026, cantiere foto-obbligatorie): un conto,
      come lo manda il server — e il perche', che e' anche il rimedio */
   const senzaFoto = Number(e.senza_foto) || 0;
-  if (!entrati.length && !saltati.length && !corrette && !senzaFoto) return '';
+  /* il filtro del venditore (21 nov 2026): chi e' uscito e chi e' tornato */
+  const panchina = Number(e.in_panchina) || 0, riaccolti = Number(e.riaccolti) || 0;
+  if (!entrati.length && !saltati.length && !corrette && !senzaFoto
+      && !panchina && !riaccolti) return '';
   const st = 'font-size:12px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px';
   const voce = t => `<div style="padding-left:10px">• ${t}</div>`;
   let h = `<div style="${st}">`;
@@ -50740,6 +50743,8 @@ function riepilogoGiroConnettore(e){
     if ((e.nuovi || entrati.length) > 5) h += voce(`…e altri ${fmt((e.nuovi || entrati.length) - 5)}`);
   }
   if (corrette) h += `<div>${fmt(corrette)} con la consegna corretta (digitale ⇄ del cassetto)</div>`;
+  if (riaccolti) h += `<div>${fmt(riaccolti)} di nuovo in vetrina</div>`;
+  if (panchina) h += `<div>${fmt(panchina)} messi in panchina dal tuo filtro</div>`;
   if (senzaFoto) h += `<div>${fmt(senzaFoto)} senza foto: ${senzaFoto === 1 ? 'entra appena sul negozio ne ha' : 'entrano appena sul negozio ne hanno'} una</div>`;
   if (saltati.length){
     h += `<div>Saltati (${fmt(saltati.length)}):</div>`;
@@ -50815,7 +50820,11 @@ async function renderConnettori(){
        «mai letto» che sembrerebbe un guasto */
     const daDire = !!c.tariffe_da_dire;
     const colore = rotto ? 'var(--danger)' : pausa ? 'var(--muted)' : 'var(--ink)';
+    /* un negozio nuovo aspetta la prima scelta di cosa entra (21 nov 2026) */
+    const daScegliere = !daDire && c.filtro_scelto === false;
     const stato = daDire ? '⏳ aspetta i costi di spedizione'
+                : daScegliere ? (c.esito && c.esito.in_attesa_scelta
+                    ? '🧺 catalogo letto: scegli cosa entra' : '🔄 lo sto leggendo…')
                 : rotto ? '⚠️ non risponde · riprovo da solo ogni giorno' : pausa ? '⏸ in pausa'
                 : c.in_corso ? '🔄 lo sto leggendo…' : quandoGiro(c.ultimo_giro);
     return `<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
@@ -50832,11 +50841,14 @@ async function renderConnettori(){
           <span style="font-weight:600;color:var(--muted)">${fmt(c.annunci)} ${c.annunci === 1 ? 'annuncio' : 'annunci'} in vetrina · ${esc(stato)}</span>
         </div>
         ${pausa || rotto || daDire ? '' : `<button style="${az}" title="Aggiorna ora" onclick="sincronizzaConnettore(${c.id})">🔄</button>`}
+        ${daDire ? '' : `<button style="${az}" title="Cosa entra" onclick="apriFiltroConnettore(${c.id})">🧺</button>`}
         <button style="${az}" title="Modifica" onclick="modificaConnettore(${c.id})">✏️</button>
         <button style="${az}" title="${c.stato==='attivo'?'Metti in pausa':'Riattiva'}" onclick="pausaConnettore(${c.id})">${c.stato==='attivo'?'⏸':'▶️'}</button>
         <button style="${az}" title="Scollega" onclick="scollegaConnettore(${c.id})">🔌</button>
       </div>
       ${c.ultimo_errore ? `<div style="font-size:12px;color:var(--danger);font-weight:700;margin-top:4px;line-height:1.4">${esc(c.ultimo_errore)}</div>` : ''}
+      ${daScegliere ? `<button class="btn orange" style="margin-top:8px" onclick="apriFiltroConnettore(${c.id})">🧺 Scegli cosa entra</button>`
+        : (c.filtro_regole || c.in_panchina) ? `<div style="font-size:12px;color:var(--ink-soft);font-weight:600;margin-top:4px;line-height:1.45">🧺 ${c.filtro_modo === 'solo' ? 'Entra solo quel che hai scelto' : 'Entra tutto tranne quel che hai escluso'}${c.in_panchina ? ` · ${fmt(c.in_panchina)} in panchina` : ''}</div>` : ''}
       ${riepilogoGiroConnettore(c.esito)}
     </div>`;
   };
@@ -50852,6 +50864,7 @@ async function renderConnettori(){
       aggiorni tu — te lo ricordiamo a ogni vendita.</div>
     <div id="connettoriErrore"></div>
     ${myConnettori.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun negozio collegato, per ora.</div>'}
+    <div id="connFiltro"></div>
     ${pieno ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:12px">Hai già ${tetto} negozi collegati: scollegane uno per aggiungerne un altro.</div>` : `
     <div class="section-label" style="margin-top:14px">${inMod ? 'Modifica il collegamento' : 'Collega un negozio'}</div>
     <div id="connPilloleFonte" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${connPillole('fonte')}</div>
@@ -50939,6 +50952,241 @@ async function renderConnettori(){
       ${connCampoCosto('connExtra', b.extra || '', '0 = niente supplemento', false)}</div></div>`}
     <button class="btn orange" onclick="salvaConnettore(this)">${inMod ? (inMod.tariffe_da_dire ? '💾 Salva e leggi il catalogo' : '💾 Salva le modifiche') : '🏪 Collega il negozio'}</button>
     ${inMod ? `<button class="btn ghost" onclick="annullaModificaConnettore()">Annulla la modifica</button>` : ''}`}`;
+  /* il pannello «🧺 Cosa entra», se aperto, sopravvive al ridisegno */
+  renderFiltroConnettore();
+}
+
+/* «🧺 COSA ENTRA» (21 nov 2026, richiesta di Andrea): il filtro del
+   catalogo. Il negozio resta sincronizzato ogni ora, e il venditore
+   decide cosa passa — per categoria del negozio, per tag e per singolo
+   prodotto, all'inizio (un collegamento nuovo aspetta questa scelta
+   prima di far entrare qualcosa) o quando vuole. Chi esce va in
+   panchina e si riaccoglie da qui, con lo stesso annuncio.
+   Tutto resta LOCALE finche' non si preme Salva: un tocco su una
+   categoria non deve far partire un giro sul negozio. */
+let filtroConn = null;          /* {id, url, filtro, catalogo, panchina, inVetrina, cerca, tuttiTag} */
+
+/* Il gemello del giudice `importa_negozio.entra_nel_filtro`: la stessa
+   domanda, mentre si sceglie. A decidere davvero e' il server, al giro. */
+function chiaveFiltro(t){ return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function entraNelFiltro(p, f){
+  const pid = String(p.id || '');
+  if (pid && (f.prodotti_fuori || []).includes(pid)) return false;
+  if (pid && (f.prodotti_dentro || []).includes(pid)) return true;
+  const cat = new Set((f.categorie || []).map(chiaveFiltro));
+  const tag = new Set((f.tag || []).map(chiaveFiltro));
+  const tocca = (p.c || []).some(c => cat.has(chiaveFiltro(c)))
+             || (p.g || []).some(g => tag.has(chiaveFiltro(g)));
+  return f.modo === 'solo' ? tocca : !tocca;
+}
+
+async function apriFiltroConnettore(id){
+  haptic();
+  const c = (myConnettori || []).find(x => x.id === id);
+  try {
+    const r = await fetch(`${API_BASE}/me/connettori/${id}/filtro`,
+                          {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito', 6000); return; }
+    filtroConn = {id, url: c ? c.url_negozio : '', filtro: d.filtro,
+                  primaVolta: !d.filtro_scelto, catalogo: d.catalogo || {},
+                  panchina: d.panchina || [], inVetrina: new Set(d.in_vetrina || []),
+                  inCorso: !!d.in_corso, cerca: '', tuttiTag: false};
+    renderFiltroConnettore();
+    el('connFiltro')?.scrollIntoView({block:'start'});
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+function chiudiFiltroConnettore(){
+  haptic();
+  filtroConn = null;
+  renderFiltroConnettore();
+}
+
+function filtroPillola(attivo, testo, azione){
+  return `<button type="button" onclick="${azione}" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${attivo?'var(--sats)':'var(--line)'};background:${attivo?'var(--sats)':'transparent'};color:${attivo?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer;max-width:100%;overflow-wrap:anywhere;text-align:left">${testo}</button>`;
+}
+
+function renderFiltroConnettore(){
+  const box = el('connFiltro');
+  if (!box) return;
+  const F = filtroConn;
+  if (!F) { box.innerHTML = ''; return; }
+  const f = F.filtro, cat = F.catalogo || {};
+  const prodotti = Array.isArray(cat.prodotti) ? cat.prodotti : [];
+  const st = 'font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px';
+  let h = `<div class="section-label" style="margin-top:16px">🧺 Cosa entra da ${esc(F.url)}</div>`;
+  if (!prodotti.length){
+    box.innerHTML = h + `<div style="${st}">Sto ancora leggendo il catalogo:
+      appena finisco qui compaiono le categorie e i prodotti. Ci vuole
+      di solito un minuto.</div>
+      <button class="btn ghost" onclick="apriFiltroConnettore(${F.id})">🔄 Guarda di nuovo</button>
+      <button class="btn ghost" onclick="chiudiFiltroConnettore()">Chiudi</button>`;
+    return;
+  }
+  const solo = f.modo === 'solo';
+  const entrano = prodotti.filter(p => p.a !== 0 && entraNelFiltro(p, f)).length;
+  const pubblicati = prodotti.filter(p => p.a !== 0).length;
+  h += `<div style="${st}">${F.primaVolta
+      ? 'Prima che entri qualcosa, scegli cosa vuoi in vetrina. Il negozio resta collegato: prezzi e giacenze si aggiornano da soli, e queste scelte le cambi quando vuoi.'
+      : 'Il negozio resta collegato: queste scelte decidono solo cosa passa. Chi esce va in panchina e lo riaccogli quando vuoi.'}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      ${filtroPillola(!solo, 'Tutto, tranne…', "filtroModo('tutto')")}
+      ${filtroPillola(solo, 'Solo questi…', "filtroModo('solo')")}</div>
+    <div style="${st}">${solo
+      ? 'Entra <b style="color:var(--ink)">solo</b> quello che sta in una categoria o porta un tag che tocchi qui sotto.'
+      : 'Entra <b style="color:var(--ink)">tutto</b>, tranne le categorie e i tag che tocchi qui sotto.'}</div>`;
+  const elenco = (voci, quale, scelti) => {
+    const sc = new Set((scelti || []).map(chiaveFiltro));
+    return voci.map(([nome, n], i) => filtroPillola(sc.has(chiaveFiltro(nome)),
+      `${solo ? (sc.has(chiaveFiltro(nome)) ? '✅ ' : '') : (sc.has(chiaveFiltro(nome)) ? '🚫 ' : '')}${esc(nome)} <span style="opacity:.75">(${fmt(n)})</span>`,
+      `filtroVoce('${quale}',${i})`)).join('');
+  };
+  const cats = Array.isArray(cat.categorie) ? cat.categorie : [];
+  const tags = Array.isArray(cat.tag) ? cat.tag : [];
+  if (cats.length) h += `<div class="section-label" style="margin-top:12px">Categorie del negozio</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${elenco(cats, 'categorie', f.categorie)}</div>`;
+  if (tags.length){
+    const vedi = F.tuttiTag ? tags : tags.slice(0, 24);
+    h += `<div class="section-label" style="margin-top:12px">Tag</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${elenco(vedi, 'tag', f.tag)}</div>
+      ${tags.length > vedi.length ? `<button type="button" class="btn ghost" style="margin-top:6px" onclick="filtroConn.tuttiTag=true;renderFiltroConnettore()">Mostra tutti i ${fmt(tags.length)} tag</button>` : ''}`;
+  }
+  if (!cats.length && !tags.length)
+    h += `<div style="${st}">Il tuo negozio non usa categorie né tag: puoi scegliere prodotto per prodotto qui sotto.</div>`;
+  h += `<div style="margin-top:12px;font-size:13.5px;font-weight:800;color:var(--ink)">Entrano ${fmt(entrano)} prodotti su ${fmt(pubblicati)}</div>`;
+  if (pubblicati < prodotti.length)
+    h += `<div style="${st}">${fmt(prodotti.length - pubblicati)} sono in bozza o nascosti sul tuo negozio: entrano solo quando li pubblichi là.</div>`;
+  /* I SINGOLI PRODOTTI: l'eccezione che vince sulle categorie */
+  const q = chiaveFiltro(F.cerca);
+  const trovati = prodotti.filter(p => !q || chiaveFiltro(p.t).includes(q));
+  const eccezione = p => (f.prodotti_fuori || []).includes(String(p.id))
+                      || (f.prodotti_dentro || []).includes(String(p.id));
+  h += `<div class="section-label" style="margin-top:12px">Prodotto per prodotto</div>
+    <div style="${st}">Un prodotto scelto qui vale più delle categorie: puoi togliere
+      una sola cosa, o far entrare un prodotto di una categoria esclusa.</div>
+    <div class="field" style="margin-top:8px"><input id="connFiltroCerca" autocomplete="off"
+      placeholder="Cerca un prodotto…" value="${esc(F.cerca)}" oninput="filtroCerca(this.value)"></div>
+    <div id="connFiltroProdotti">${filtroRigheProdotti(trovati, eccezione)}</div>`;
+  /* LA PANCHINA: gli annunci gia' entrati che adesso stanno fuori */
+  if (F.panchina.length){
+    h += `<div class="section-label" style="margin-top:12px">In panchina (${fmt(F.panchina.length)})</div>
+      <div style="${st}">Erano in vetrina e adesso stanno fuori, ma non sono
+        cancellati: riaccolti, tornano gli stessi annunci.</div>`;
+    h += F.panchina.slice(0, 60).map(a => {
+      const dentro = (f.prodotti_dentro || []).includes(String(a.prodotto));
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
+        <div style="flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.5px;font-weight:700">${esc(a.titolo)}</div>
+        ${dentro ? '<span style="font-size:12px;font-weight:700;color:var(--muted)">torna al salvataggio</span>'
+          : `<button type="button" class="btn ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12.5px" onclick="filtroRiaccogli('${esc(a.prodotto)}')">↩️ Riaccogli</button>`}
+      </div>`;}).join('');
+    if (F.panchina.length > 60) h += `<div style="${st}">…e altri ${fmt(F.panchina.length - 60)}: cercali qui sopra per nome.</div>`;
+  }
+  h += `<div id="connFiltroErrore"></div>
+    <button class="btn orange" style="margin-top:12px" onclick="salvaFiltroConnettore(this)">${F.primaVolta ? `✅ Fai entrare questi ${fmt(entrano)} prodotti` : '💾 Salva e applica'}</button>
+    <button class="btn ghost" onclick="chiudiFiltroConnettore()">${F.primaVolta ? 'Decido dopo' : 'Annulla'}</button>`;
+  box.innerHTML = h;
+}
+
+function filtroRigheProdotti(trovati, eccezione){
+  const F = filtroConn, f = F.filtro;
+  const righe = trovati.slice(0, 40).map(p => {
+    const pid = String(p.id);
+    const sul = p.a !== 0;
+    const entra = sul && entraNelFiltro(p, f);
+    const segno = !sul ? '📝' : entra ? '✅' : '🚫';
+    const nota = !sul ? 'in bozza sul negozio' : eccezione(p) ? 'scelto a mano' :
+                 (entra ? 'entra' : 'resta fuori') + (F.inVetrina.has(pid) && !entra ? ' · va in panchina' : '');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)">
+      <div style="flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.5px;font-weight:700">${segno} ${esc(p.t || '—')}
+        <div style="font-weight:600;color:var(--muted)">${esc(nota)}</div></div>
+      ${eccezione(p) ? `<button type="button" title="Torna a seguire categorie e tag" style="font:inherit;background:none;border:none;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)" onclick="filtroProdotto('${esc(pid)}','regole')">↺</button>` : ''}
+      ${sul ? `<button type="button" class="btn ghost" style="width:auto;margin:0;padding:4px 10px;font-size:12.5px" onclick="filtroProdotto('${esc(pid)}','${entra ? 'fuori' : 'dentro'}')">${entra ? 'Togli' : 'Fai entrare'}</button>` : ''}
+    </div>`;}).join('');
+  const resto = trovati.length > 40
+    ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:6px">…e altri ${fmt(trovati.length - 40)}: scrivi un pezzo del nome per trovarli.</div>` : '';
+  return (righe || '<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:6px">Nessun prodotto con questo nome.</div>') + resto;
+}
+
+function filtroModo(modo){
+  haptic();
+  if (!filtroConn) return;
+  /* CAMBIARE MODO SVUOTA LE LISTE: «tranne Abbigliamento» e «solo
+     Abbigliamento» sono l'opposto, e tenerle direbbe il contrario di
+     quel che il venditore ha scelto. Le eccezioni per prodotto restano. */
+  if (filtroConn.filtro.modo !== modo){
+    filtroConn.filtro.modo = modo;
+    filtroConn.filtro.categorie = [];
+    filtroConn.filtro.tag = [];
+  }
+  renderFiltroConnettore();
+}
+
+function filtroVoce(quale, i){
+  haptic();
+  const F = filtroConn;
+  if (!F) return;
+  const voci = (F.catalogo[quale === 'tag' ? 'tag' : 'categorie'] || []);
+  const nome = (voci[i] || [])[0];
+  if (!nome) return;
+  const lista = F.filtro[quale] || [];
+  const k = chiaveFiltro(nome);
+  F.filtro[quale] = lista.some(x => chiaveFiltro(x) === k)
+    ? lista.filter(x => chiaveFiltro(x) !== k) : lista.concat([nome]);
+  renderFiltroConnettore();
+}
+
+function filtroProdotto(pid, dove){
+  haptic();
+  const f = filtroConn && filtroConn.filtro;
+  if (!f) return;
+  f.prodotti_fuori = (f.prodotti_fuori || []).filter(x => x !== pid);
+  f.prodotti_dentro = (f.prodotti_dentro || []).filter(x => x !== pid);
+  if (dove === 'fuori') f.prodotti_fuori.push(pid);
+  if (dove === 'dentro') f.prodotti_dentro.push(pid);
+  renderFiltroConnettore();
+}
+
+function filtroRiaccogli(pid){ filtroProdotto(String(pid), 'dentro'); }
+
+/* la ricerca ridisegna SOLO l'elenco, cosi' la tastiera non si chiude */
+function filtroCerca(v){
+  const F = filtroConn;
+  if (!F) return;
+  F.cerca = v;
+  const q = chiaveFiltro(v), f = F.filtro;
+  const prodotti = (F.catalogo.prodotti || []).filter(p => !q || chiaveFiltro(p.t).includes(q));
+  const ecc = p => (f.prodotti_fuori || []).includes(String(p.id))
+                || (f.prodotti_dentro || []).includes(String(p.id));
+  if (el('connFiltroProdotti')) el('connFiltroProdotti').innerHTML = filtroRigheProdotti(prodotti, ecc);
+}
+
+async function salvaFiltroConnettore(btn){
+  haptic();
+  const F = filtroConn;
+  if (!F) return;
+  const ripristina = bottoneInAttesa(btn, '💾 Salvo…');
+  try {
+    const r = await fetch(`${API_BASE}/me/connettori/${F.id}/filtro`, {method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({filtro: F.filtro})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      const dove = el('connFiltroErrore');
+      if (dove) dove.innerHTML = `<div class="trust-note" style="margin-top:10px">⚠️ ${esc(d.detail || 'Non ci sono riuscito, riprova')}</div>`;
+      return;
+    }
+    filtroConn = null;
+    myConnettori = null;
+    await renderConnettori();
+    /* NON E' GIA' FATTO: il filtro lo applica il giro, che parte adesso
+       (o al prossimo giro, se ne sta gia' girando uno) */
+    const entrano = Math.max(0, (d.totale || 0) - (d.fuori || 0));
+    toast(d.giro_partito
+      ? `🧺 Salvato: entrano ${fmt(entrano)} prodotti, sto aggiornando la vetrina`
+      : `🧺 Salvato: entrano ${fmt(entrano)} prodotti, la vetrina si aggiorna al prossimo giro`, 6000);
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
 }
 
 /* Le voci della categoria del negozio (16 nov 2026): «Decide il
@@ -51099,6 +51347,9 @@ async function salvaConnettore(btn){
                  consegna: b.consegna, zona: b.zona || '',
                  /* '' = decide il negozio (16 nov 2026) */
                  categoria: b.categoria || ''};
+  /* un negozio NUOVO aspetta che si scelga cosa entra (21 nov 2026):
+     il primo giro fotografa il catalogo senza far entrare niente */
+  if (!connInModifica) corpo.scegli_prima = true;
   /* LE TARIFFE PARTONO SOLO DAL MODULO CHE LE MOSTRA (set 2026): nel
      collegamento nuovo i campi non ci sono, e mandare uno zero vorrebbe
      dire «spedisco gratis» detto da noi — senza la chiave il server
@@ -51246,6 +51497,7 @@ function scollegaConnettore(id){
             6000);
     }});
 }
+
 
 /* «🎀 PREMI FEDELTA'» (17 nov 2026): la proposta di un negozio vero —
    «chi compra da me sale di punteggio: a 100 € il pacco dopo ha la
@@ -61693,15 +61945,25 @@ async function deleteListing(id, dalDettaglio){
   const l = (myListings || []).find(x => x.id === id)
     || (listings || []).find(x => x.id === id);
   const esa = !!l && esaurito(l);
+  /* DAL NEGOZIO COLLEGATO SI ESCLUDE, NON SI CANCELLA (21 nov 2026,
+     decisione di Andrea): l'annuncio va in panchina e il giro dell'ora
+     non lo rimette dentro; si riaccoglie da «🧺 Cosa entra» */
+  const dalNegozio = !!l && !!l.connettore_id;
   chiediConferma({
-    titolo: esa ? 'Non lo rifornirai più?' : 'Elimini questo annuncio?',
-    corpo: esa
+    titolo: dalNegozio ? 'Togli questo prodotto da Barattolo?'
+          : esa ? 'Non lo rifornirai più?' : 'Elimini questo annuncio?',
+    corpo: dalNegozio
+      ? 'Arriva dal tuo negozio collegato: esce dal mercatino, da Nostr '
+        + 'e dal canale, e il catalogo non lo rimette dentro. Sul tuo '
+        + 'negozio resta com\'è. Se cambi idea lo riaccogli da «🧺 Cosa '
+        + 'entra», nel riquadro del negozio, e torna lo stesso annuncio.'
+      : esa
       ? 'Sparisce dal tuo negozio e dai tuoi annunci, anche da Nostr e '
         + 'dal canale. Gli ordini e le recensioni restano. Se un giorno '
         + 'ne avessi un altro, dovrai ripubblicarlo.'
       : 'Sparisce dal mercatino, da Nostr e dal canale. Per '
         + 'rimetterlo in vendita dovrai ripubblicarlo.',
-    etichetta: '🗑 Elimina',
+    etichetta: dalNegozio ? '🪑 Togli da Barattolo' : '🗑 Elimina',
     poi: async () => {
       if (DEMO) {
         listings = listings.filter(l=>l.id!==id);
@@ -61715,7 +61977,9 @@ async function deleteListing(id, dalDettaglio){
       }
       await loadMyListings();
       renderMyListings(); renderGrid();
-      toast('🗑 Annuncio eliminato');
+      if (dalNegozio) myConnettori = null;   /* il conto della panchina */
+      toast(dalNegozio ? '🪑 Messo da parte: lo riaccogli da «🧺 Cosa entra»'
+                       : '🗑 Annuncio eliminato');
       if (dalDettaglio) go('profilo');   /* la lista dei tuoi annunci ora vive lì */
     }});
 }
