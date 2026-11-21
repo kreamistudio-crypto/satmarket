@@ -37087,16 +37087,19 @@ def _elenco(valori):
 
 
 def _leve_stato():
-    """Il censimento, raggruppato per cantiere e ordinato per
-    conseguenza: prima cio' che apre porte o muove soldi, poi le regole
-    del mercatino, in fondo i limiti e gli avvisi di servizio."""
+    """Il censimento, raggruppato per cantiere, coi gruppi in ordine
+    alfabetico (dal 21 nov 2026; prima era per conseguenza)."""
     # Il ritmo del canale si chiede al GIUDICE e non alle costanti:
     # dall'ago 2026 lo decide `/vetrina` dal bot e il config e' solo il
     # valore di partenza — leggere le costanti direbbe lo stato di
     # ieri, che e' esattamente la trappola che questo pannello esiste
     # per non far ricadere (la stessa gia' dichiarata per il canale).
     rit_giorni, rit_max_ora, rit_soglia = ritmo_vetrina()
-    return [
+    # IN ORDINE ALFABETICO (21 nov 2026, Andrea: «i gruppi devono essere
+    # almeno ordinati in ordine alfabetico»): con piu' di quaranta gruppi
+    # l'ordine per conseguenza non si ritrovava piu'. Si ordina sul nome
+    # SENZA l'emoji davanti (la prima parola), maiuscole e minuscole uguali.
+    return sorted([
         {"gruppo": "🚦 Sicurezza", "voci": [
             _leva("Modalità collaudo", "MODALITA_COLLAUDO",
                   bool(MODALITA_COLLAUDO), allarme=bool(MODALITA_COLLAUDO),
@@ -38618,11 +38621,13 @@ def _leve_stato():
                   BITPOST_MAX_EURO,
                   acceso="il più basso fra questo e quello di Bitpost",
                   spento="vale solo il tetto di Bitpost (900 €)"),
-            _leva("Chiave API e segreto del webhook", "BITPOST_API_KEY",
-                  "impostati" if bitpost_configurato() and BITPOST_WEBHOOK_SEGRETO
-                  else "mancano",
-                  allarme=bool(BITPOST_ATTIVO) and not (
-                      bitpost_configurato() and BITPOST_WEBHOOK_SEGRETO)),
+            # dal 21 nov 2026 si scrivono da qui (porta loro, mai rimostrati)
+            dict(_leva("Chiave API e segreto del webhook", "BITPOST_API_KEY",
+                       "impostati" if bitpost_configurato()
+                       and bitpost_segreto_webhook() else "mancano",
+                       allarme=bool(BITPOST_ATTIVO) and not (
+                           bitpost_configurato() and bitpost_segreto_webhook())),
+                 segreti_bitpost=bitpost_segreti_origine()),
         ]},
         {"gruppo": "₿ Pagamento on-chain", "voci": [
             # IL CANCELLO E LA SUA PORTICINA (16 ott 2026): due leve
@@ -39111,7 +39116,7 @@ def _leve_stato():
                          "sicuro, con più pezzi del sapere "
                          "(claude-sonnet-5-5)"),
         ]},
-    ]
+    ], key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())
 
 
 # I NUMERI DAL PANNELLO (11 nov 2026, cantiere tappo-sa-tutto): il
@@ -130552,9 +130557,100 @@ BITPOST_STATI = {
 BITPOST_INCASSABILI = (8, 14, 16)
 
 
+# I DUE SEGRETI DAL PANNELLO (21 nov 2026, Andrea: «i segreti non li puoi
+# mettere nel gruppo config di bitpost gift card?», poi sul biglietto
+# «Collaudo e produzione»). Andrea non entra nella VM, e chiave e segreto
+# erano le sole righe che lo obbligavano. NON passano dalla macchina delle
+# leve generiche, che mostra i valori nella storia, nel registro, nel
+# backup in chat e nel ripristino: hanno una tabella loro, una porta loro,
+# e da qui ESCONO SOLO come «impostato / manca» con la provenienza. Il
+# pannello vince sul config; «Torna al config» cancella la riga. Ogni
+# cambio lascia una riga nel registro (senza valore) e un avviso a tutti
+# i moderatori: chi l'ha cambiato, cosa, mai il valore.
+# Quel che resta vero: un telefono admin rubato può RISCRIVERE i due
+# segreti (non leggerli). Con la chiave sbagliata gli ordini si fermano;
+# col segreto suo potrebbe firmare avvisi finti di Bitpost, che però non
+# muovono sats (l'incasso vuole la firma sul telefono e quella di
+# Bitpost). Per questo l'avviso ai moderatori parte sempre.
+BITPOST_SEGRETI = {"api_key": "la chiave API", "webhook": "il segreto del webhook"}
+
+
+def _bitpost_segreti_tabella(con):
+    con.execute("""CREATE TABLE IF NOT EXISTS bitpost_segreti(
+        nome TEXT PRIMARY KEY,
+        valore TEXT NOT NULL,
+        chi INTEGER NOT NULL,
+        quando INTEGER NOT NULL)""")
+
+
+def _bitpost_segreto_dal_pannello(nome: str) -> str:
+    """Il valore scritto dal pannello, o "" (anche a database muto: vale
+    il config, come per le altre leve)."""
+    try:
+        con = db()
+        try:
+            _bitpost_segreti_tabella(con)
+            r = con.execute("SELECT valore FROM bitpost_segreti WHERE nome=?",
+                            (nome,)).fetchone()
+        finally:
+            con.close()
+    except Exception:
+        return ""
+    return str(r["valore"]) if r else ""
+
+
+def _bitpost_segreto_buono(v) -> bool:
+    v = str(v or "")
+    return bool(v) and not v.startswith("INCOLLA")
+
+
+def bitpost_chiave() -> str:
+    """La chiave API viva: quella del pannello, sennò il config."""
+    return _bitpost_segreto_dal_pannello("api_key") or str(BITPOST_API_KEY or "")
+
+
+def bitpost_segreto_webhook() -> str:
+    """Il segreto del webhook vivo: quello del pannello, sennò il config."""
+    return (_bitpost_segreto_dal_pannello("webhook")
+            or str(BITPOST_WEBHOOK_SEGRETO or ""))
+
+
+def bitpost_segreto_motivo(valore) -> str:
+    """'' se il valore si può scrivere, sennò il perché. Si incolla da una
+    chat: niente spazi, niente a capo, caratteri stampabili, 16-256."""
+    if not isinstance(valore, str):
+        return "serve un testo"
+    v = valore.strip()
+    if not v:
+        return "è vuoto"
+    if v.startswith("INCOLLA"):
+        return "è il segnaposto dell'esempio, non il valore vero"
+    if len(v) < 16:
+        return "troppo corto: incollalo intero"
+    if len(v) > 256:
+        return "troppo lungo: hai incollato anche altro?"
+    if any(c.isspace() or not (33 <= ord(c) <= 126) for c in v):
+        return "ci sono spazi o caratteri strani: incolla solo il valore"
+    return ""
+
+
+def bitpost_segreti_origine() -> dict:
+    """Per ognuno dei due: 'pannello', 'config' o 'manca'. Mai il valore."""
+    dal_config = {"api_key": BITPOST_API_KEY, "webhook": BITPOST_WEBHOOK_SEGRETO}
+    esito = {}
+    for nome in BITPOST_SEGRETI:
+        if _bitpost_segreto_buono(_bitpost_segreto_dal_pannello(nome)):
+            esito[nome] = "pannello"
+        elif _bitpost_segreto_buono(dal_config[nome]):
+            esito[nome] = "config"
+        else:
+            esito[nome] = "manca"
+    return esito
+
+
 def bitpost_configurato() -> bool:
-    return bool(BITPOST_API_KEY and BITPOST_API_BASE
-                and not str(BITPOST_API_KEY).startswith("INCOLLA"))
+    chiave = bitpost_chiave()
+    return bool(chiave and BITPOST_API_BASE and not chiave.startswith("INCOLLA"))
 
 
 def bitpost_ammesso(tg_id) -> bool:
@@ -130741,7 +130837,7 @@ async def _bitpost_chiama(metodo: str, percorso: str, corpo=None,
         testate = {}
     else:
         url = BITPOST_API_BASE + percorso
-        testate = {"Authorization": f"Bearer {BITPOST_API_KEY}"}
+        testate = {"Authorization": f"Bearer {bitpost_chiave()}"}
     try:
         async with httpx.AsyncClient(timeout=20) as c:
             r = await c.request(metodo, url, json=corpo, data=dati,
@@ -131252,6 +131348,55 @@ async def _bitpost_avvisa(riga, stato):
                                   "gift card: apri Barattolo.")
 
 
+@app.post("/api/admin/bitpost/segreti")
+async def bitpost_segreti_admin(req: Request, x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: {nome: 'api_key'|'webhook', valore} scrive uno dei due
+    segreti di Bitpost; {nome, torna_al_config: true} cancella la riga.
+    Risponde con la provenienza, MAI col valore (vedi «I DUE SEGRETI DAL
+    PANNELLO»)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _frena("leva_pannello", user["id"])
+    d = await leggi_json(req)
+    nome = d.get("nome")
+    if nome not in BITPOST_SEGRETI:
+        raise HTTPException(400, "Segreto sconosciuto")
+    al_config = bool(d.get("torna_al_config"))
+    if not al_config:
+        motivo = bitpost_segreto_motivo(d.get("valore"))
+        if motivo:
+            raise HTTPException(400, f"{BITPOST_SEGRETI[nome].capitalize()}: {motivo}")
+    con = db()
+    try:
+        _bitpost_segreti_tabella(con)
+        if al_config:
+            con.execute("DELETE FROM bitpost_segreti WHERE nome=?", (nome,))
+        else:
+            con.execute(
+                "INSERT INTO bitpost_segreti(nome, valore, chi, quando) "
+                "VALUES (?,?,?,?) ON CONFLICT(nome) DO UPDATE SET "
+                "valore=excluded.valore, chi=excluded.chi, quando=excluded.quando",
+                (nome, d["valore"].strip(), user["id"], int(time.time())))
+        con.commit()
+    finally:
+        con.close()
+    origine = bitpost_segreti_origine()
+    gesto = "tolto dal pannello (vale il config)" if al_config else "cambiato dal pannello"
+    registra_moderazione("leva", "cambiata",
+                         f"Bitpost: {BITPOST_SEGRETI[nome]} {gesto} "
+                         "(il valore non si scrive)", deciso_da=user["id"])
+    try:
+        await notifica_admin(f"🔑 Gift card Bitpost: {BITPOST_SEGRETI[nome]} è stato "
+                             f"{gesto} dal moderatore {user['id']}. Se non sei "
+                             "stato tu né un altro moderatore, avvisa subito.",
+                             argomento="moderazione")
+    except Exception:
+        pass
+    return {"ok": True, "origine": origine}
+
+
 @app.post("/api/bitpost/webhook")
 async def bitpost_webhook(req: Request):
     """IL WEBHOOK DI BITPOST: aperto a tutti (anche sulla prova privata,
@@ -131261,7 +131406,7 @@ async def bitpost_webhook(req: Request):
     e' un 200 e basta; un ordine non nostro anche."""
     corpo = await req.body()
     if not bitpost_firma_valida(corpo, req.headers.get("x-bitpost-signature", ""),
-                                BITPOST_WEBHOOK_SEGRETO, int(time.time())):
+                                bitpost_segreto_webhook(), int(time.time())):
         raise HTTPException(401, "Firma non valida")
     try:
         ev = json.loads(corpo)

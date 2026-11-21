@@ -37139,6 +37139,8 @@ def _censimento(acceso, dopo=None):
     amb["onchain_ln_rete_ok"] = lambda fornitore=None: bool(acceso)
     # ...e quella delle gift card di Bitpost (20 nov 2026): ottava
     amb["bitpost_configurato"] = lambda: bool(acceso)
+    amb["bitpost_segreto_webhook"] = lambda: "s" if acceso else ""
+    amb["bitpost_segreti_origine"] = lambda: {"api_key": "manca", "webhook": "manca"}
     # I due che dipendono da un pacchetto oltre che dalla chiave.
     amb["Fernet"] = object() if acceso else None
     amb["_NOSTR"] = ("chiave", "pubkey") if acceso else None
@@ -38975,9 +38977,12 @@ def prove_leve():
     # all'API di un negozio di qualcun altro con le sue credenziali in
     # mano. I numeri stanno in un gruppo loro, che e' un'altra cosa:
     # sono limiti, non interruttori.
-    prova("la porta dei negozi sta nel primo gruppo", True,
+    # (21 nov 2026: i gruppi vanno in ordine alfabetico, quindi «primo»
+    # vuol dire il gruppo della Sicurezza, cercato per nome)
+    prova("la porta dei negozi sta nel gruppo della Sicurezza", True,
           any(v["chiave"] == "CONNETTORI_NEGOZIO_APERTI"
-              for v in gruppi_on[0]["voci"]))
+              for g in gruppi_on if g["gruppo"].endswith("Sicurezza")
+              for v in g["voci"]))
     prova("...e spiega cosa comporta l'accensione", True,
           "credenziali" in voci_on["CONNETTORI_NEGOZIO_APERTI"].get("nota", ""))
     prova("...e da spenta non dice niente", False,
@@ -47746,8 +47751,9 @@ def prove_fogli_di_casa():
           "… per pagare» alla presa, Lightning e on-chain; «Ti riprendi i "
           "sats?» on-chain a tempo finito; dal 20 nov le sei delle gift "
           "card di Bitpost: chiedi, prendi, funzionano, disputa, annulla, "
-          "firma l'incasso)",
-          138, solo_codice(mini).count("chiediConferma({"))
+          "firma l'incasso; dal 21 nov «🔑 … di Bitpost» dei segreti dal "
+          "pannello)",
+          139, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -88966,13 +88972,11 @@ def prove_p2p_server():
     prova("il gruppo dello scambio P2P esiste", True,
           any(g["gruppo"].startswith("🔁") and len(g["voci"]) >= 3
               for g in gruppi_on))
-    prova("...e sta fra le porte aperte e gli avvisi di servizio",
-          True, [g["gruppo"] for g in gruppi_on].index(
-              next(g["gruppo"] for g in gruppi_on
-                   if g["gruppo"].startswith("🔁")))
-          < [g["gruppo"] for g in gruppi_on].index(
-              next(g["gruppo"] for g in gruppi_on
-                   if g["gruppo"].startswith("🔔"))))
+    # (21 nov 2026, Andrea: i gruppi in ordine alfabetico) prima stava
+    # «fra le porte aperte e gli avvisi di servizio»; ora vale l'alfabeto
+    nomi_ = [g["gruppo"].split(" ", 1)[-1].casefold() for g in gruppi_on]
+    prova("...e i gruppi stanno in ordine alfabetico, senza l'emoji",
+          sorted(nomi_), nomi_)
     prova("la leva accesa dice cosa comporta", True,
           "campanello" in voci_on["P2P_ATTIVO"].get("nota", "")
           and voci_on["P2P_ATTIVO"]["valore"] is True)
@@ -186455,8 +186459,10 @@ def prove_canale_admin():
           # finito: un'altra firma di Barattolo da sola, nella moderazione
           # (20 nov 2026, abbonamento-canale) il bot dell'abbonamento senza
           # i permessi nel canale: negli errori
+          # (21 nov 2026, leve-ordine-segreti) un segreto di Bitpost
+          # cambiato dal pannello: nella moderazione
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 38,
-           "liquidita": 5, "moderazione": 26, "riepiloghi": 27}, per_stanza)
+           "liquidita": 5, "moderazione": 27, "riepiloghi": 27}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -186516,7 +186522,8 @@ def prove_canale_admin():
           "annullato; e la cauzione on-chain chiesta da chi vende, persa da sola; "
           "dal 19 nov «Riprendi i sats» on-chain a tempo finito, e la meta' "
           "di una cauzione P2P ferma nel registro; dal 20 nov il bot "
-          "dell'abbonamento a un canale senza i permessi)", 118,
+          "dell'abbonamento a un canale senza i permessi; dal 21 nov un "
+          "segreto di Bitpost cambiato dal pannello)", 119,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -219573,6 +219580,41 @@ console.log(JSON.stringify(fuori));
           "qui, e mostra tutte le uscite prima", [True, True],
           ["Questa transazione non paga il tuo indirizzo" in mini,
            "Altre uscite:" in mini])
+
+    # --- 5) i due segreti dal pannello (21 nov 2026) ----------------------
+    # QUEL CHE SI ROMPE IN SILENZIO: un segreto che esce nella risposta, nel
+    # registro, nell'avviso; il server che continua a leggere la costante
+    # del config e ignora il pannello; i gruppi che tornano in disordine.
+    rotta = pezzo("bitpost_segreti_admin")
+    prova("5) la porta dei segreti risponde con la provenienza, mai col valore",
+          [True, False],
+          ['return {"ok": True, "origine": origine}' in rotta,
+           "{d['valore']" in rotta or '{d["valore"]' in rotta])
+    prova("...registro e avviso non nominano il valore", [False, False],
+          [('d["valore"]' in s_ or "d.get(" in s_) for s_ in (
+              rotta[rotta.index("registra_moderazione("):rotta.index("deciso_da=user")],
+              rotta[rotta.index("notifica_admin("):rotta.index('argomento="moderazione"')])])
+    prova("...la chiamata a Bitpost e il webhook leggono i segreti VIVI",
+          [True, True, False, False],
+          ['f"Bearer {bitpost_chiave()}"' in pezzo("_bitpost_chiama"),
+           "bitpost_segreto_webhook(), int(time.time())" in pezzo("bitpost_webhook"),
+           "Bearer {BITPOST_API_KEY}" in src,
+           "BITPOST_WEBHOOK_SEGRETO, int(time.time())" in src])
+    amb = {}
+    exec(pezzo("bitpost_segreto_motivo"), amb)
+    m = amb["bitpost_segreto_motivo"]
+    prova("...il giudice: buono, vuoto, segnaposto, corto, spazi, non testo",
+          ["", "è vuoto", True, True, True, "serve un testo"],
+          [m("bpk_live_0123456789abcdef"), m("   "),
+           "segnaposto" in m("INCOLLA_QUI_LA_CHIAVE_BITPOST"),
+           "corto" in m("bpk_123"), "spazi" in m("bpk live 0123456789abcdef"),
+           m(None)])
+    prova("...la scheda nel pannello: campo password, svuotato prima di partire",
+          [True, True], ['type="password"' in mini,
+                         "if (campo) campo.value = '';" in mini])
+    prova("i gruppi del pannello in ordine alfabetico, senza l'emoji davanti",
+          True, 'key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())'
+          in pezzo("_leve_stato"))
 
 
 def prove_categorie_delle_prove():

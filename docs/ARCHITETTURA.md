@@ -38330,3 +38330,13 @@ mai il kind 0 di nessuno: regola ferrea 2).
   casella `sellAbbo` in Vendi (`myAbboCanale` da `/api/me`
   «abbonamento_canale»), la nota `notaAbbonamento` nella scheda al posto
   di quella del codice, `qtaMassimaAnnuncio` = 1.
+
+- I DUE SEGRETI DI BITPOST DAL PANNELLO (21 nov 2026): tabella
+  `bitpost_segreti(nome, valore, chi, quando)`, porta
+  `POST /api/admin/bitpost/segreti` (solo admin, `_frena("leva_pannello")`),
+  letti VIVI da `bitpost_chiave()` e `bitpost_segreto_webhook()` (pannello,
+  sennò config). Escono solo come provenienza (`bitpost_segreti_origine`,
+  campo `segreti_bitpost` della riga del censimento); mai in storia,
+  registro, backup o ripristino delle leve. Ogni cambio: riga nel registro
+  senza valore e `notifica_admin(..., argomento="moderazione")`. I gruppi
+  di `_leve_stato` escono in ordine alfabetico sul nome senza emoji.

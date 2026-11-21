@@ -21,6 +21,7 @@ USO:  python collaudo_bitpost_gift_card.py
 import hashlib
 import hmac
 import json
+import sqlite3
 import sys
 import time
 
@@ -349,6 +350,58 @@ def main():
                      "ev-4", "2026-11-20T12:00:00Z")
     prova("un ordine che non e' nostro: 200 e basta", 200,
           c.post("/api/bitpost/webhook", content=corpo, headers=t).status_code)
+
+    print("\n[i due segreti dal pannello (21 nov 2026)]")
+    avvisi = []
+    async def _avvisa(testo, *a, **k):
+        avvisi.append((testo, k.get("argomento")))
+    SRV.notifica_admin = _avvisa
+    NUOVA = "bpk_dal_pannello_0123456789abcdef"
+    NUOVO = "whsec_dal_pannello_0123456789abcdef"
+    banco.come(222, admin=False)
+    SRV.ADMIN_IDS = [111, 999]
+    prova("chi non e' moderatore non scrive", 403,
+          c.post("/api/admin/bitpost/segreti", json={"nome": "api_key", "valore": NUOVA}).status_code)
+    SRV.ADMIN_IDS = [111, 222, 999]
+    prova("prima: tutt'e due dal config", {"api_key": "config", "webhook": "config"},
+          SRV.bitpost_segreti_origine())
+    r = c.post("/api/admin/bitpost/segreti", json={"nome": "api_key", "valore": "corta"})
+    prova("una chiave corta si rifiuta col perche'", (400, True),
+          (r.status_code, "corto" in r.json()["detail"]))
+    r = c.post("/api/admin/bitpost/segreti", json={"nome": "api_key", "valore": "bpk con spazi 0123456789"})
+    prova("...con gli spazi anche", 400, r.status_code)
+    prova("...un nome che non e' dei due: no", 400,
+          c.post("/api/admin/bitpost/segreti", json={"nome": "BOT_TOKEN", "valore": NUOVA}).status_code)
+    r = c.post("/api/admin/bitpost/segreti", json={"nome": "api_key", "valore": "  " + NUOVA + "\n"})
+    prova("la chiave scritta: torna la provenienza, MAI il valore",
+          (200, "pannello", False), (r.status_code, r.json()["origine"]["api_key"], NUOVA in r.text))
+    prova("...vale subito, ripulita dagli spazi", NUOVA, SRV.bitpost_chiave())
+    prova("...e tutti i moderatori lo sanno, nella stanza della moderazione, senza valore",
+          (1, "moderazione", False), (len(avvisi), avvisi[0][1], NUOVA in avvisi[0][0]))
+    leve = c.get("/api/admin/leve").text
+    prova("il pannello dice «da qui» e non la mostra", (True, False),
+          ('"api_key": "pannello"' in leve.replace('":"', '": "'), NUOVA in leve))
+    prova("...ne' la storia ne' il backup delle leve la conoscono", (False, False),
+          (NUOVA in c.get("/api/admin/leve-storia").text,
+           NUOVA in c.get("/api/admin/leve-backup").text))
+    c.post("/api/admin/bitpost/segreti", json={"nome": "webhook", "valore": NUOVO})
+    corpo, t = busta("order.status_changed", {"order": {"id": 1, "status": {"id": 8}}},
+                     "ev-5", "2026-11-20T13:00:00Z")
+    prova("il webhook col segreto vecchio non passa piu'", 401,
+          c.post("/api/bitpost/webhook", content=corpo, headers=t).status_code)
+    corpo, t = busta("order.status_changed", {"order": {"id": 1, "status": {"id": 8}}},
+                     "ev-6", "2026-11-20T13:00:00Z", segreto=NUOVO)
+    prova("...col segreto del pannello si'", 200,
+          c.post("/api/bitpost/webhook", content=corpo, headers=t).status_code)
+    r = c.post("/api/admin/bitpost/segreti", json={"nome": "webhook", "torna_al_config": True})
+    prova("«Torna al config» cancella la riga", "config", r.json()["origine"]["webhook"])
+    prova("...e il segreto vivo e' di nuovo quello del config", SEGRETO, SRV.bitpost_segreto_webhook())
+    con = sqlite3.connect(db)
+    righe = con.execute("SELECT motivo FROM moderazione_log WHERE strato='leva'").fetchall()
+    con.close()
+    prova("il registro ha i cambi, senza i valori", (True, False),
+          (any("Bitpost" in r[0] for r in righe), any(NUOVA in r[0] or NUOVO in r[0] for r in righe)))
+    c.post("/api/admin/bitpost/segreti", json={"nome": "api_key", "torna_al_config": True})
 
     print("\n[il ponte vero: l'indirizzo e gli errori di Bitpost]")
     prova("in collaudo una base fuori casa non e' ammessa", False,
