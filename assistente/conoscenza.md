@@ -1182,7 +1182,6 @@ Amministrazione▾
 ⚖️ Moderazione P2P
 💬 Assistenza clienti
 On-chain
-🎁 Gift card
 Tutorial
 Esci
 

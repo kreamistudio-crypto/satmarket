@@ -209100,7 +209100,11 @@ def prove_leva_mercato_lavoro():
     prova("...spenta mentre si era in Lavoro, si torna alla vetrina di "
           "sempre", (True, True),
           ("delete el('app').dataset.sez;" in am,
-           "el('sezSeg').style.display = mercatoLavoro ? '' : 'none';" in am))
+           # (21 nov 2026) la fila la veste vestiSezSeg: Lavoro col suo
+           # cancello, la fila intera anche per le gift card
+           "vestiSezSeg();" in am
+           and "if (lav) lav.style.display = mercatoLavoro ? '' : 'none';"
+           in pezzo_js(mini, "function vestiSezSeg(){", "\n}\n")))
 
 
 def _banco_assistente(**leve):
@@ -219616,6 +219620,14 @@ console.log(JSON.stringify(fuori));
     prova("...la scheda nel pannello: campo password, svuotato prima di partire",
           [True, True], ['type="password"' in mini,
                          "if (campo) campo.value = '';" in mini])
+    # --- 6) il posto dedicato (21 nov 2026, Andrea: «ci vuole un posto
+    # dedicato invece, magari tra mercato e lavoro») ---------------------
+    prova("6) la porta delle gift card sta fra Mercato e Lavoro, non piu' "
+          "in Amministrazione", [True, False],
+          [mini.index("onclick=\"setSezione('mercato')\"") < mini.index('id="sezGiftcard"')
+           < mini.index("onclick=\"setSezione('lavoro')\""), 'id="admGiftcard"' in mini])
+    prova("...e la fila si vede se c'e' Lavoro OPPURE le gift card",
+          True, "seg.style.display = (mercatoLavoro || myBitpost) ? '' : 'none';" in mini)
     prova("i gruppi del pannello in ordine alfabetico, senza l'emoji davanti",
           True, 'key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())'
           in pezzo("_leve_stato"))
