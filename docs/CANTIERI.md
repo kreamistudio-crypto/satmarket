@@ -94067,3 +94067,9 @@ riscritte sull'alfabeto (la porta dei negozi «nel primo gruppo» ora è
 DA GUARDARE. Sul telefono vero: la scheda coi due campi password e il
 foglio di conferma. In produzione, alla promozione: le gift card restano
 spente lì finché non si accende la leva.
+## Fee del mercatino a 0 senza «in promo» (21 nov 2026, cantiere fee-zero-senza-promo)
+COSA. Andrea: «fee barattolo del mercatino, scrivi 0. Togli in promo, perché tanto lo lasciamo a zero». Nel conto del mercatino (foglio «Paga» e carrello, una funzione sola) la riga ora dice «Fee Barattolo 0%» e basta: via la pillola «in promo». Lo zero resta grigio; se un giorno la leva salisse sopra zero, la percentuale torna rossa da sé, sempre dal server (`commissione_percento`), mai cablata.
+PERCHÉ. Una promo promette che finisce; questa fee resta a zero stabilmente (vedi anche «Via la "i" della fee dinamica», 14 nov).
+NON TOCCATO. Il P2P: la sua pastiglia («beta», «🌱 Pioniere», «Lv. 5») la decide `cartelloFeeP2P` e dice un'altra cosa. Nessuna leva cambia: la commissione del mercatino era già a 0; la classe `.promo-tag` resta perché la usa il P2P. Il calcolo lato server è identico.
+PROVATO. `prove.py`: la prova dell'aliquota ora chiede che nel conto del mercatino non ci sia «in promo</span>» (sul codice senza commenti). Suite severa nel worktree.
+DA GUARDARE. Dopo il deploy: il foglio «Paga» di un annuncio dice «Fee Barattolo 0%», senza pillola.

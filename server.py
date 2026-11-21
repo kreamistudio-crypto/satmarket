@@ -42538,7 +42538,7 @@ def _conto_ordine(articolo: int, sped: int, prot_percento: int,
     """Le righe del conto: protezione col floor (//100) sul solo
     articolo, mai un sat piu' del promesso. La commissione e' una riga
     INFORMATIVA e NON entra nel totale del compratore: oggi e' sospesa
-    (leva a 0, la riga dice «in promo»), e anche accesa resta
+    (leva a 0, la riga dice «0%» e basta), e anche accesa resta
     sottrattiva sull'incasso del venditore — il totale della invoice
     e' netto + spedizione + protezione, identico a compra().
     LO SCONTO CARRELLO (ago 2026) e' una voce di TESTATA che entra qui
@@ -47421,8 +47421,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "commissione_sats": conto["commissione"],
             # LA PERCENTUALE VIVA, accanto alla sua cifra (set 2026):
             # il conto la scrive attaccata al nome della voce («Fee
-            # Barattolo 3%»), e finche' e' a zero al suo posto sta la
-            # pillola «in promo». Senza questa chiave il client
+            # Barattolo 3%»), e a zero dice «0%» senza pillole (21 nov
+            # 2026: la fee resta a zero, niente «in promo»). Senza questa chiave il client
             # dovrebbe cablare un numero che vive nel config del VPS,
             # cioe' la trappola che il pannello delle leve esiste per
             # non far ricadere.
@@ -47981,8 +47981,8 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             "commissione_sats": conto["commissione"],
             # LA PERCENTUALE VIVA, accanto alla sua cifra (set 2026):
             # il conto la scrive attaccata al nome della voce («Fee
-            # Barattolo 3%»), e finche' e' a zero al suo posto sta la
-            # pillola «in promo». Senza questa chiave il client
+            # Barattolo 3%»), e a zero dice «0%» senza pillole (21 nov
+            # 2026: la fee resta a zero, niente «in promo»). Senza questa chiave il client
             # dovrebbe cablare un numero che vive nel config del VPS,
             # cioe' la trappola che il pannello delle leve esiste per
             # non far ricadere.

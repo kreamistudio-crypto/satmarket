@@ -32866,11 +32866,14 @@ function contoRighe(c){
        un'anteprima di una fee che non si paga confondeva. La riga dice
        solo «Fee Barattolo 0% in promo». Il calcolo lato server
        (`fee_dinamica` nel preventivo) resta com'e', non letto qui. */
+    /* ⚠️ NIENTE PIU' «IN PROMO» (21 nov 2026, decisione di Andrea:
+       «fee barattolo del mercatino, scrivi 0. Togli in promo, perche'
+       tanto lo lasciamo a zero»): una promo promette che finisce, e
+       questa fee resta a zero. La riga dice solo «Fee Barattolo 0%»,
+       grigia; sopra lo zero torna rossa da se', senza pillole. */
     + r('Fee Barattolo'
         + ` <b class="${c.commissionePct > 0 ? 'ctrl-costo' : ''}">`
-        + `${fmt(c.commissionePct || 0)}%</b>`
-        + (c.commissionePct > 0
-            ? '' : '<span class="promo-tag dopo">in promo</span>'),
+        + `${fmt(c.commissionePct || 0)}%</b>`,
         cifraCtrl(c.commissione || 0, c.circa, c.commissioneEur))
     /* La spedizione a zero su una via che SPEDISCE si dice a parole:
        «0 sats» e' vero ma non e' una notizia, «gratuita» sì. E' la
@@ -34818,7 +34821,7 @@ function renderAcquisto(){
                             scontoOrigine: p.sconto_origine||'',
                             /* la commissione: la sua CIFRA e la sua
                                ALIQUOTA, tutt'e due dal server — a zero
-                               la riga porta «in promo» come sempre */
+                               la riga dice «0%», senza pillole */
                             commissione: p.commissione_sats||0,
                             commissionePct: p.commissione_percento||0,
                             /* l'accordo sul carrello: la riga gemella
