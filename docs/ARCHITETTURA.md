@@ -27452,6 +27452,58 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   La ricerca segue da sola (il trigger su `categoria` invalida l'indice),
   e le proposte della coda «🗂 Categorie da sistemare» su una riga che si
   è spostata spariscono da sole (la coda legge `a.categoria=p.categoria_ora`).
+- IL FILTRO DEL CATALOGO E LA PANCHINA (21 nov 2026, cantiere
+  filtri-negozio, richiesta di Andrea: «Barattolo e questi shop
+  sincronizzati, ma che si possano comunque customizzare»). Il giro
+  dell'ora non cambia; il venditore decide COSA passa, da «🧺 Cosa
+  entra» nel riquadro del negozio.
+  LA REGOLA, un giudice solo: `importa_negozio.entra_nel_filtro`. Due
+  modi — «tutto» (entra tutto TRANNE le categorie e i tag elencati, il
+  default, cioè ieri a liste vuote) e «solo» (entra solo ciò che sta in
+  una categoria o porta un tag elencato) — e un'eccezione che vince
+  sempre: `prodotti_fuori` / `prodotti_dentro`, per id del prodotto
+  PADRE (le varianti `pid:vid` vanno col padre). Categorie e tag sono
+  quelli del negozio (`categorie_negozio`, `tag_negozio` sulle righe
+  tradotte: Woo categorie e tag; Shopify il tipo di prodotto e i tag),
+  confrontati senza maiuscole né spazi. Il gemello JavaScript
+  `entraNelFiltro` serve solo mentre si sceglie: decide il server.
+  LO STATO 'escluso' (la PANCHINA) è il terzo modo di stare fuori dalla
+  vetrina, accanto a 'venduto' e 'rimosso': come 'rimosso' è invisibile
+  dappertutto (vetrina, scheda pubblica, «I tuoi annunci», negozio,
+  Nostr), ma NON È LA LAPIDE: il giro lo riaccende quando il prodotto
+  torna a passare il filtro ed è pubblicato sul negozio. Ci si entra in
+  quattro modi: il filtro (`segna_esclusi` → `_una_riga`), la bozza o
+  il nascosto sul negozio (fino a ieri era 'rimosso', e il prodotto
+  ripubblicato non tornava più), «Elimina» su un annuncio di un negozio
+  collegato (`_escludi_dal_negozio`: panchina + id in `prodotti_fuori`,
+  anche dalla modifica in blocco), e nient'altro. Si esce in due: il
+  ritorno (al giro, SEMPRE dopo un giudizio fresco della moderazione:
+  `_righe_da_giudicare` manda in `nuove` ogni escluso che rientra, anche
+  a testo invariato, perché può essere uscito mentre era in revisione;
+  il marchio lo rimanda in revisione, la giacenza zero lo fa tornare
+  venduto) o la sparizione dal negozio, che resta la lapide ('rimosso').
+  Gli ordini mai pagati si annullano all'ingresso in panchina (il patto
+  di `spegni_annuncio`); quelli pagati vanno avanti sulla riga, che
+  resta. Il moderatore che rimuove scrive ancora 'rimosso'.
+  LA PRIMA SCELTA. Un collegamento nato dal cassetto di oggi manda
+  `scegli_prima` e nasce con `filtro_scelto` = 0: il giro legge e
+  fotografa il catalogo (`_fotografa_catalogo`, una notifica la prima
+  volta) e si ferma prima della moderazione, senza far entrare niente,
+  finché il venditore non salva il filtro (che mette `filtro_scelto` =
+  1 e fa partire il giro). I negozi di ieri e i client in cache non lo
+  mandano: entrano tutto come sempre.
+  LA FOTOGRAFIA (`connettori.catalogo_visto`, `importa_negozio.
+  catalogo_visto`) si rifà a ogni giro: categorie e tag coi conti per
+  PRODOTTO (non per variante), e i prodotti (id padre, titolo, categorie,
+  tag, pubblicato o no), al più MAX_PRODOTTI_VISTI. Esce solo da
+  `GET /api/me/connettori/{id}/filtro` (con la panchina e i prodotti in
+  vetrina), mai dalla lista dei collegamenti, che si legge a ogni
+  apertura. `POST .../filtro` salva (`pulisci_filtro`: modo noto, liste
+  corte, un prodotto mai in tutt'e due), torna quanti resterebbero fuori
+  contati dallo stesso giudice, e fa partire il giro senza il freno del
+  «🔄 Aggiorna ora» (`_rigira_dopo_filtro`): il filtro lo APPLICA IL
+  GIRO, l'unico che conosce categorie e tag di ogni riga.
+  Il perché in CANTIERI, «Il filtro del catalogo».
 - I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi ci sono
   le TAPPE 1 e 2: schema, giudice, censimento, il modulo col
   traduttore Shopify e il giro orario a leva spenta. Il resto è
