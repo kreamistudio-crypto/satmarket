@@ -94015,3 +94015,7 @@ I PERCHÉ. La pagina di AndreAI vende una cosa sola; il negozio sotto resta un n
 STRADE SCARTATE. Nascondere gli altri annunci del negozio sotto la storia: toglie la vetrina a un negozio normale. Un id fisso nel catalogo (vedi sopra).
 PROVATO. Banco in node in `prove_link_invito_canale`: un abbonamento fra le card → la sua scheda; nessuno, due, uno fuori dalle card, `'true'` fra virgolette → si scende alla merce.
 DA GUARDARE. Dopo il deploy: dalla vetrina di AndreAI «Acquista» apre la scheda dell'abbonamento.
+
+## La prova del PayCode prima del deposito non legge più l'orologio (21 nov 2026, mattina, cura dalla promozione 2b34994f)
+COSA. La CI della promozione 2b34994f è stata rossa su una sola prova, «a chi paga, prima del deposito: un titolo e il tempo che batte, niente codice» (`prove_barattozon_onchain`). La prova cercava «212» (l'inizio del PayCode finto 212802988) nella scatola prima del deposito, ma la scatola porta `data-fine` = ora vera + 2 ore: alle 08:00:12 UTC il numero era 1795255212 e conteneva «212». Il codice dell'app era giusto; la prova era un caso dell'orologio (un secondo su mille circa). Ora cerca il PayCode intero (212802988 o 212-802-988).
+PROVATO. Verde col codice di oggi; controprova col PayCode messo apposta nella scatola prima del deposito → rossa; con l'orologio fermato a 1795248012 (08:00:12 UTC) la prova vecchia è rossa e la nuova verde. La CI della promozione è passata rilanciando il solo job rosso.
