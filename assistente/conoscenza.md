@@ -563,6 +563,8 @@ Un solo messaggio, il giorno che arriva.
 <!-- pezzo schermata-002 | schermata -->
 ## Schermata «P2P, libro ordini»
 
+₿ Bitcoin
+🎁 Gift card
 Compra BTC
  Sei su Compra BTC. Tocca per passare a Vendi BTC
  Sei su Vendi BTC. Tocca per passare a Compra BTC
