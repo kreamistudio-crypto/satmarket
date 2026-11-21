@@ -1004,6 +1004,18 @@ collaudo qui parla col Bitpost VERO (beta.bitpost.shop) e coi SATS VERI
 sono finiti in chiaro in chat: prima di questi passi chiedigli una
 coppia nuova (regola ferrea 1). I passi, un comando alla volta.
 
+**DAL 21 NOV 2026 BASTA IL PANNELLO, niente ssh** (Andrea: «i segreti
+non li puoi mettere nel gruppo config di bitpost gift card?»). Sul
+collaudo, dalla Mini App: Profilo → Amministrazione → «⚙️ Stato delle
+leve» → gruppo «🎁 Gift card Bitpost». Lì: incolla la chiave API e tocca
+«Salva», poi il segreto del webhook e «Salva» (non si rivedono più; a
+ogni salvataggio arriva un avviso ai moderatori), poi accendi «Gift card
+Shoppy Code via Bitpost» lasciando acceso «Solo gli admin». Se la leva
+dice «dal prossimo riavvio», vale al prossimo aggiornamento di develop.
+A Gabriele va detto l'indirizzo del webhook del collaudo:
+`https://collaudo.barattolo.store/api/bitpost/webhook`. I comandi qui
+sotto restano la strada dal VPS, per chi preferisce il config.
+
 La copia del config, prima di toccarlo:
 ```
 sudo cp -p /srv/collaudo/barattolo/config.py /srv/collaudo/barattolo/config.py.prima-bitpost

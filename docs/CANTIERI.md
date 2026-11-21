@@ -94019,3 +94019,51 @@ DA GUARDARE. Dopo il deploy: dalla vetrina di AndreAI «Acquista» apre la sched
 ## La prova del PayCode prima del deposito non legge più l'orologio (21 nov 2026, mattina, cura dalla promozione 2b34994f)
 COSA. La CI della promozione 2b34994f è stata rossa su una sola prova, «a chi paga, prima del deposito: un titolo e il tempo che batte, niente codice» (`prove_barattozon_onchain`). La prova cercava «212» (l'inizio del PayCode finto 212802988) nella scatola prima del deposito, ma la scatola porta `data-fine` = ora vera + 2 ore: alle 08:00:12 UTC il numero era 1795255212 e conteneva «212». Il codice dell'app era giusto; la prova era un caso dell'orologio (un secondo su mille circa). Ora cerca il PayCode intero (212802988 o 212-802-988).
 PROVATO. Verde col codice di oggi; controprova col PayCode messo apposta nella scatola prima del deposito → rossa; con l'orologio fermato a 1795248012 (08:00:12 UTC) la prova vecchia è rossa e la nuova verde. La CI della promozione è passata rilanciando il solo job rosso.
+
+## I segreti di Bitpost dal pannello, e i gruppi delle leve in ordine alfabetico (21 nov 2026, cantiere leve-ordine-segreti; Andrea: «i segreti non li puoi mettere nel gruppo config di bitpost gift card? Inoltre i gruppi devono essere almeno ordinati in ordine alfabetico», poi sul biglietto «Collaudo e produzione»)
+
+COSA. La chiave API e il segreto del webhook di Bitpost si scrivono dalla
+scheda «🔑 Chiave API e segreto del webhook» del gruppo «🎁 Gift card
+Bitpost», su ogni istanza. Il pannello vince sul config; «Torna al config»
+cancella la riga. E `_leve_stato` rende i gruppi in ordine alfabetico sul
+nome senza l'emoji (prima erano «per conseguenza»: con più di quaranta
+gruppi non si ritrovava più niente).
+
+PERCHÉ COSÌ. Andrea non entra nella VM, e chiave e segreto erano le sole
+righe del cantiere delle gift card che lo obbligavano. I due NON passano
+dalla macchina delle leve generiche: quella mostra i valori nella storia
+(prima/dopo), nel registro della moderazione, nel backup che il bot manda
+in chat e nell'anteprima del ripristino. Hanno una tabella loro
+(`bitpost_segreti`), una porta loro (`POST /api/admin/bitpost/segreti`)
+e da qui escono SOLO come provenienza (pannello / config / manca). Il
+nome resta chiuso per `_LEVA_DI_NOME_CHIUSO` (_KEY$, WEBHOOK): la rete
+delle «mai» non si allarga, si aggiunge una porta per DUE nomi.
+
+LA DECISIONE. Biglietto con tre scelte (solo collaudo / collaudo e
+produzione / restano sulla VM); consigliavo il solo collaudo, Andrea ha
+scelto «Collaudo e produzione». Il rischio detto: un telefono admin
+rubato può RISCRIVERE i due segreti (non leggerli). Con la chiave
+sbagliata gli ordini si fermano; col segreto suo potrebbe firmare avvisi
+finti di Bitpost, che però non muovono sats (l'incasso vuole la firma sul
+telefono e quella di Bitpost). Il contrappeso: ogni cambio avvisa TUTTI i
+moderatori (stanza «moderazione»), col numero di chi l'ha fatto.
+
+SCARTATI. Aprire i due nomi alla leva generica (i valori finirebbero in
+storia, registro e backup in chat). Cifrarli nella tabella (la chiave
+starebbe accanto, sullo stesso server: un teatro; il database esce già
+cifrato nei backup). Mostrare le ultime quattro cifre (non serve, e un
+pezzo di segreto è già un indizio).
+
+PROVATO. `collaudo_bitpost_gift_card` (da 51 a 66 controlli): non admin
+403; corta, con spazi, nome estraneo 400; la risposta, il pannello, la
+storia e il backup delle leve non contengono il valore; vale subito
+(chiave viva, webhook col segreto vecchio 401 e col nuovo 200); «Torna al
+config»; il registro senza valori; l'avviso ai moderatori nella stanza
+giusta. `prove_bitpost_gift_card` sezione 5 (le sentinelle sul sorgente,
+il giudice); `prove_leve`/`prove_relay_leva`/`prove_p2p_server`
+riscritte sull'alfabeto (la porta dei negozi «nel primo gruppo» ora è
+«nel gruppo della Sicurezza», cercato per nome).
+
+DA GUARDARE. Sul telefono vero: la scheda coi due campi password e il
+foglio di conferma. In produzione, alla promozione: le gift card restano
+spente lì finché non si accende la leva.

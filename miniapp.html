@@ -60856,7 +60856,7 @@ function renderListaLeve(){
     const trovate = tutteLeLeve().filter(v => [v.nome, v.chiave, v.nota]
       .some(t => String(t || '').toLowerCase().includes(q)));
     posto.innerHTML = trovate.length
-      ? trovate.map(v => v.scrivibile ? schedaLevaCambiabile(v) : rigaLevaSoloLettura(v)).join('')
+      ? trovate.map(v => v.scrivibile ? schedaLevaCambiabile(v) : v.segreti_bitpost ? schedaSegretiBitpost(v) : rigaLevaSoloLettura(v)).join('')
       : '<div class="leve-spiega">Nessuna leva con questo nome.</div>';
     return;
   }
@@ -60907,11 +60907,13 @@ function vistaGruppoLeve(){
     const g = admLeve[Number(leveVista.slice(7))] || {gruppo: '', voci: []};
     titolo = esc(g.gruppo); voci = g.voci || [];
   }
-  const qui = voci.filter(v => v.scrivibile), solo = voci.filter(v => !v.scrivibile);
+  const segreti = voci.filter(v => !v.scrivibile && v.segreti_bitpost);
+  const qui = voci.filter(v => v.scrivibile), solo = voci.filter(v => !v.scrivibile && !v.segreti_bitpost);
   return `
     <button class="leva-link leve-indietro" onclick="vaiLeve('sezioni')">← Tutte le sezioni</button>
     <div class="leve-sezione-tit">${titolo}</div>
     ${qui.map(schedaLevaCambiabile).join('')}
+    ${segreti.map(schedaSegretiBitpost).join('')}
     ${solo.length ? `<div class="leve-titolo">🔒 Solo dal VPS</div>
       <div class="leve-spiega">Segreti, indirizzi e serrature: si cambiano nel config del VPS, con un riavvio.</div>
       ${solo.map(rigaLevaSoloLettura).join('')}` : ''}
@@ -60931,6 +60933,58 @@ function rigaLevaSoloLettura(v){
       </div>
       <div class="leva-val">${val}</div>
     </div>`;
+}
+
+/* ---- 🔑 I due segreti di Bitpost (21 nov 2026, Andrea: «i segreti non
+   li puoi mettere nel gruppo config di bitpost gift card?») ----
+   Si SCRIVONO e basta: il server non li rimanda mai, la scheda dice solo
+   da dove arrivano (pannello, config, manca). Il campo è una password,
+   si svuota appena partito, e il cambio avvisa tutti i moderatori. */
+const SEGRETI_BITPOST = {api_key: 'Chiave API', webhook: 'Segreto del webhook'};
+const ORIGINE_SEGRETO = {pannello: '✅ impostato da qui', config: '✅ impostato nel config del VPS', manca: '⚠️ manca'};
+
+function schedaSegretiBitpost(v){
+  const o = v.segreti_bitpost || {};
+  return `
+    <div class="leva-riga${v.allarme ? ' allarme' : ''}" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div class="leva-testo">
+        <div class="leva-nome">🔑 ${esc(v.nome)}</div>
+        <div class="leva-nota">Si incollano qui e non si rivedono più, nemmeno da qui. Ogni cambio avvisa tutti i moderatori.</div>
+      </div>
+      ${Object.keys(SEGRETI_BITPOST).map(n => `
+        <div>
+          <div class="leva-chiave">${SEGRETI_BITPOST[n]}: ${ORIGINE_SEGRETO[o[n]] || '—'}</div>
+          <div class="leva-numero">
+            <input id="segretoBp_${n}" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+              placeholder="Incolla ${SEGRETI_BITPOST[n].toLowerCase()}">
+            <button class="btn orange" onclick="salvaSegretoBitpost('${n}')">Salva</button>
+          </div>
+          ${o[n] === 'pannello' ? `<button class="leva-link" onclick="salvaSegretoBitpost('${n}', true)">Torna al config</button>` : ''}
+        </div>`).join('')}
+    </div>`;
+}
+
+function salvaSegretoBitpost(nome, alConfig){
+  const campo = el('segretoBp_' + nome);
+  const valore = alConfig ? '' : (campo?.value || '').trim();
+  if (!alConfig && !valore) { toast('Incolla prima il valore'); return; }
+  chiediConferma({
+    titolo: `🔑 ${SEGRETI_BITPOST[nome]} di Bitpost`,
+    corpo: alConfig
+      ? 'Si cancella il valore scritto da qui e torna a valere quello del config del VPS (se c\'è).'
+      : 'Il valore nuovo sostituisce quello di adesso, vale subito e non si potrà più rileggere. Tutti i moderatori ricevono un avviso.',
+    etichetta: alConfig ? 'Torna al config' : 'Salva',
+    poi: async () => {
+      if (campo) campo.value = '';
+      try {
+        const r = await fetch(`${API_BASE}/admin/bitpost/segreti`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify(alConfig ? {nome, torna_al_config: true} : {nome, valore})});
+        const x = await r.json().catch(() => ({}));
+        toast(r.ok ? '✅ Salvato: non si rivedrà più' : '⚠️ ' + (x.detail || 'non salvato'), 5000);
+      } catch(e) { toast('Rete assente: riprova'); }
+      await ricaricaLeve();
+    }});
 }
 
 /* ---- ✏️ Le schede delle leve che si cambiano (27 ott 2026) ----
