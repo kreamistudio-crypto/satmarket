@@ -47756,8 +47756,9 @@ def prove_fogli_di_casa():
           "sats?» on-chain a tempo finito; dal 20 nov le sei delle gift "
           "card di Bitpost: chiedi, prendi, funzionano, disputa, annulla, "
           "firma l'incasso; dal 21 nov «🔑 … di Bitpost» dei segreti dal "
-          "pannello)",
-          139, solo_codice(mini).count("chiediConferma({"))
+          "pannello, e delle gift card nel P2P l'annuncio di chi vende e il "
+          "comprare da un annuncio)",
+          141, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -118639,7 +118640,8 @@ def prove_piu_account_ovunque():
     prova("il filo dell'account scelto e' montato su fetch", True,
           "window.fetch = fetchColConto(fetchCheRiprova(" in mini)
     # (20 nov 2026) +3: le gift card di Bitpost (chiedi, prendi, firma l'incasso)
-    prova("i gesti coi soldi chiedono il volto (soldi: true)", 9,
+    # (21 nov 2026) +2: l'annuncio «Vendi gift card» e il comprare da un annuncio
+    prova("i gesti coi soldi chiedono il volto (soldi: true)", 11,
           mini.count("soldi: true,"))
     prova("...e i due fogli di pagamento hanno il loro posto", 2,
           mini.count('<div class="conto-in-vista" data-conto-in-vista'))
@@ -219661,9 +219663,9 @@ console.log(JSON.stringify(fuori));
           [True, True, True],
           ["if (typeof giftModoP2P === 'function' && giftModoP2P()) { renderGiftP2P(box, testaBox); return; }"
            in mini,
-           "if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcNuovaP2P(); return; }"
+           "if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcPiuP2P(); return; }"
            in pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"),
-           "giftModoP2P()) { apriGiftP2P(); gcNuovaP2P(); return; }"
+           "giftModoP2P()) { apriGiftP2P(); gcPiuP2P(); return; }"
            in pezzo_js(mini, "function toccaPiu(){", "\n}\n")])
     prova("...lo slider della quota e la durata viaggiano col modulo",
           [True, True, True],
@@ -219678,6 +219680,13 @@ console.log(JSON.stringify(fuori));
     prova("...ne' negli stati e negli avvisi del server", [False, False],
           ["Bitworker" in src[src.index("BITPOST_STATI = {"):src.index("BITPOST_INCASSABILI")],
            "Bitworker" in src[src.index("BITPOST_AVVISI = {"):src.index("async def _bitpost_avvisa")]])
+    prova("...«Vendi gift card»: l'annuncio di chi vende, e il comprare da un annuncio",
+          [True, True, True, True],
+          ["gcApi('/offerte', 'POST', {massimo, quota, durata_ore, xpub, indice})" in mini,
+           "gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice})" in mini,
+           "if (p2pLato === 'vendo') gcOffriP2P(); else gcNuovaP2P();" in mini,
+           'return {"id": riga["id"], "massimo": riga["massimo"], "quota": riga["quota"],'
+           in pezzo("bitpost_offerta_per_chi")])
     prova("...la quota: fra 0 e il totale di Bitpost, interi", ["", "", True, True, True],
           [_quota(0, 500), _quota(500, 500), bool(_quota(501, 500)), bool(_quota(-1, 500)),
            bool(_quota(2.5, 500))])

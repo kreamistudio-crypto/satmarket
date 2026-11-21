@@ -390,6 +390,63 @@ def main():
     prova("...e al giro dopo non c'e' piu' niente da chiudere", 0,
           asyncio.run(SRV._bitpost_ronda_scadute()))
 
+    print("\n[«Vendi gift card»: l'annuncio di chi vende (21 nov 2026)]")
+    banco.come(222, admin=True)
+    s2 = c.get("/api/bitpost/stato").json()
+    iv = s2["prossimo_indice"]
+    av = {"massimo": 10000, "quota": 100, "durata_ore": 6, "xpub": XPUB_B, "indice": iv}
+    prova("una quota fuori misura: no", 400,
+          c.post("/api/bitpost/offerte", json=dict(av, quota=900)).status_code)
+    prova("...oltre il nostro tetto di 250 €: no", 400,
+          c.post("/api/bitpost/offerte", json=dict(av, massimo=30000)).status_code)
+    r = c.post("/api/bitpost/offerte", json=av)
+    fid = r.json().get("id")
+    prova("l'annuncio nasce, e il suo numero di conto e' riservato", (200, iv + 1),
+          (r.status_code, c.get("/api/bitpost/stato").json()["prossimo_indice"]))
+    prova("...chi l'ha pubblicato lo vede fra i suoi, non fra quelli da comprare",
+          ([fid], []), ([f["id"] for f in c.get("/api/bitpost/stato").json()["mie_offerte"]],
+                        [f["id"] for f in c.get("/api/bitpost/stato").json()["offerte"]]))
+    banco.come(111, admin=True)
+    s1 = c.get("/api/bitpost/stato").json()
+    viste = {f["id"]: f for f in s1["offerte"]}
+    prova("chi compra lo vede, senza la xpub e senza chi l'ha pubblicato",
+          (True, ["id", "massimo", "quota", "scade"]),
+          (fid in viste, sorted(viste.get(fid, {}))))
+    ib = s1["prossimo_indice"]
+    prova("oltre il massimo dell'annuncio: no", 400,
+          c.post(f"/api/bitpost/offerte/{fid}/compra",
+                 json={"taglio": 5000, "quanti": 3, "xpub": XPUB_A, "indice": ib}).status_code)
+    banco.DETTO.clear()
+    r = c.post(f"/api/bitpost/offerte/{fid}/compra",
+               json={"taglio": 5000, "quanti": 1, "xpub": XPUB_A, "indice": ib})
+    nuovo_id = r.json()["ordine"]["id"]
+    corpo_f = [x[2] for x in finto.chiamate if x[1] == "/shoppycode/orders"][-1]
+    sel = [x[2] for x in finto.chiamate if x[1] == f"/orders/{nuovo_id}/select"]
+    prova("compra: l'ordine nasce con la quota che resta, e si aggancia a chi vende",
+          (200, True, 400, [XPUB_B], 2),
+          (r.status_code, r.json()["agganciato"], corpo_f["selected_fee"],
+           [x["bitworker_xpub"] for x in sel], finto.ordini[nuovo_id]["status"]["id"]))
+    con = sqlite3.connect(db)
+    riga = con.execute("SELECT bitworker_id, bitworker_indice FROM bitpost_ordini WHERE id=?",
+                       (nuovo_id,)).fetchone()
+    stf = con.execute("SELECT stato, ordine_id FROM bitpost_offerte WHERE id=?", (fid,)).fetchone()
+    con.close()
+    prova("...chi vende incassera' col numero lasciato pubblicando, e l'annuncio e' chiuso",
+          ((222, iv), ("presa", nuovo_id)), (tuple(riga), tuple(stf)))
+    prova("...e chi vende lo sa", [222], [x[0] for x in banco.DETTO])
+    prova("un secondo dito sullo stesso annuncio: non c'e' piu'", 409,
+          c.post(f"/api/bitpost/offerte/{fid}/compra",
+                 json={"taglio": 5000, "quanti": 1, "xpub": XPUB_A, "indice": ib + 1}).status_code)
+    banco.come(222, admin=True)
+    r = c.post("/api/bitpost/offerte", json=dict(av, indice=c.get("/api/bitpost/stato").json()["prossimo_indice"]))
+    f2 = r.json()["id"]
+    prova("ritira: l'annuncio sparisce", (200, []),
+          (c.post(f"/api/bitpost/offerte/{f2}/ritira").status_code,
+           [f["id"] for f in c.get("/api/bitpost/stato").json()["mie_offerte"]]))
+    banco.come(111, admin=True)
+    prova("...e non si ritira quello di un altro", 404,
+          c.post(f"/api/bitpost/offerte/{f2}/ritira").status_code)
+
     print("\n[i due segreti dal pannello (21 nov 2026)]")
     avvisi = []
     async def _avvisa(testo, *a, **k):
