@@ -197376,7 +197376,10 @@ console.log(JSON.stringify(r));
     prova("a chi paga, prima del deposito: un titolo e il tempo che batte, niente codice",
           [True, True, False], ["arriva coi sats confermati" in out["primaDelDeposito"],
                                 'id="p2pTabPayResta"' in out["primaDelDeposito"],
-                                "212" in out["primaDelDeposito"]])
+                                # il codice intero, non «212»: il data-fine e'
+                                # l'ora vera piu' due ore, e alle 08:00:12 UTC
+                                # del 21 nov 2026 (1795255212) conteneva «212»
+                                any(c in out["primaDelDeposito"] for c in ("212802988", "212-802-988"))])
     # CORTO (17 nov 2026, Andrea: «i testi però sono troppo lunghi,
     # semplificali, anche la grafica»): la scatola di cassa sua, tre
     # gesti, niente spiegazioni in fondo
