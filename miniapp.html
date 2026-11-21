@@ -12501,6 +12501,9 @@
     font-size:14px;font-weight:600;line-height:1.55;color:var(--ink);
     white-space:pre-wrap;overflow-wrap:anywhere;
     user-select:text;-webkit-user-select:text}
+  /* il link d'invito dell'abbonamento (21 nov 2026): l'arancio dei link
+     di casa, sottolineato, leggibile nei due temi */
+  .codice-blocco a{color:var(--sats);font-weight:700;text-decoration:underline}
   /* L'IMPULSO DELLA RIVELAZIONE: un anello arancio si allarga dal
      piatto e svanisce — mezzo secondo, UNA VOLTA SOLA. E' l'anello
      dell'impulso dello scatto, con la sua stessa ragione: sta FUORI
@@ -21074,6 +21077,9 @@ function mapOrder(o){
     /* consegna digitale (lug 2026): il contenuto NON viaggia mai in
        /api/orders — solo il flag, il testo lo serve /contenuto */
     contenutoPresente:!!o.contenuto_presente,
+    /* l'ordine di un ABBONAMENTO a un canale (21 nov 2026): il suo link
+       d'invito lo scrive il server, e qui diventa toccabile */
+    abbonamento:o.abbonamento === true,
     /* della FOTO del contenuto arrivano il solo flag e il conto delle
        correzioni: i byte stanno dietro la loro rotta, e il nome del
        file e' la maniglia sul disco — non serve a nessun client */
@@ -27000,7 +27006,7 @@ function apriConsigliati(){ go('consigliati'); }
 function renderConsigliati(){
   const box = el('consigliatiLista');
   if (!box) return;
-  const voci = consigliatiPubblicati();
+  const voci = ordineConsigliatiPagina(consigliatiPubblicati());
   if (!voci.length) {
     box.innerHTML = `<div class="cons-vuoto">Per ora qui non c'è nessun
       negozio consigliato: torna a trovarci.</div>`;
@@ -27018,6 +27024,22 @@ function renderConsigliati(){
            decoding="async" onerror="this.remove()">${esc(v.titolo)}</span
       >`}
     </div>`).join('');
+}
+/* L'ORDINE DELLA PAGINA SEGUE «Da scoprire» (21 nov 2026, chiesto da
+   Andrea: la sua vetrina era prima in «Da scoprire» e ultima qui). I
+   negozi con lo spazio in vetrina ACCESO vanno in testa, nell'ordine
+   delle card di «Da scoprire» (`sponsorizzati`, l'ordine deciso col
+   pannello o con `/sponsor ordine`); gli altri dopo, nell'ordine di
+   prima. Lo spazio decide l'ORDINE, mai CHI entra: spento, il negozio
+   resta qui, solo torna al suo posto di serie. Solo la PAGINA: la card
+   della home fa girare i loghi a caso, e la fila non si tocca. */
+function ordineConsigliatiPagina(voci){
+  const fila = (Array.isArray(sponsorizzati) ? sponsorizzati : [])
+    .map(s => String((s && s.slug) || ''));
+  const posto = v => { const i = fila.indexOf(v.slug); return i < 0 ? fila.length : i; };
+  return voci.map((v, i) => [v, i])
+    .sort((a, b) => posto(a[0]) - posto(b[0]) || a[1] - b[1])
+    .map(x => x[0]);
 }
 /* il tocco: il negozio col racconto APERTO, come la card dello spazio in
    vetrina — chi tocca ha toccato per la storia. Il codice si ripesca
@@ -29153,7 +29175,22 @@ function toggleRacconto(btn){
    casa (il calco di svelaOfferta), spento da reduced-motion; l'ancora
    e' l'etichetta della vetrina e non la griglia, che vuota non ha un
    box su cui atterrare. */
+/* L'ABBONAMENTO SI APRE DIRITTO (21 nov 2026, Andrea: «bisognerebbe
+   mostrare solamente quell'annuncio»): se fra gli annunci del negozio
+   c'e' UN abbonamento a un canale, e' quella la cosa che la pagina
+   vende, e «Acquista» apre la sua scheda invece di scendere a tutta la
+   vetrina. Con zero o piu' di uno, o se la scheda non e' fra quelli
+   caricati, la strada di sempre: si scende alla merce. */
+function annuncioAbbonamentoNegozio(){
+  const ids = [...document.querySelectorAll('#negozioGrid .card[data-vid]')]
+    .map(c => Number(c.dataset.vid));
+  const abbo = ids.map(id => listings.find(l => l.id === id))
+    .filter(l => l && l.abbonamento === true);
+  return abbo.length === 1 ? abbo[0].id : 0;
+}
 function acquistaDalRacconto(){
+  const abbo = annuncioAbbonamentoNegozio();
+  if (abbo) { openDetail(abbo); return; }
   const t = el('negozioVetrinaTit');
   if (t) t.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth',
                            block: 'start'});
@@ -54956,7 +54993,8 @@ function pannelloContenutoDigitale(o){
       <h4>💾 Contenuto consegnato</h4>
       <div class="hint">${testa}</div>
       ${resaCodice(testo, {copia: 'copiaContenuto()',
-                           aria: 'Copia il contenuto'})}
+                           aria: 'Copia il contenuto',
+                           linkCanale: o.abbonamento === true})}
       ${bloccoFotoContenuto(o, c)}
       ${correggibile ? `<button class="btn ghost" style="margin-top:10px" onclick="apriCorrezioneContenuto(this)">✏️ Correggi</button>` : ''}
     </div>`;
@@ -56351,10 +56389,34 @@ function resaCodice(testo, o){
       <button type="button" class="btn codice-piatto${op.svelato?' codice-svelato':''}"
         style="margin-top:10px" aria-label="${esc(op.aria||'Copia')}"
         onclick="${copia}"><span class="mono codice-cifre">${esc(testo)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
+  const corpo = op.linkCanale ? linkCanaleToccabile(esc(testo)) : esc(testo);
   return `
-      <div class="codice-blocco">${esc(testo)}</div>
+      <div class="codice-blocco">${corpo}</div>
       <button class="btn ghost" style="margin-top:8px"
         onclick="${copia}">📋 Copia tutto</button>`;
+}
+
+/* IL LINK D'INVITO DELL'ABBONAMENTO SI TOCCA (21 nov 2026, Andrea: «il
+   link non è cliccabile, devo copiarlo e aprirlo»). SOLO sugli ordini di
+   un abbonamento, dove il testo lo scrive il server e chi vende non lo
+   puo' riscrivere (MSG_ABBONAMENTO_DA_SOLO): sul digitale di tutti gli
+   altri i link restano testo, come ha deciso la lista bianca delle
+   descrizioni. E SOLO la forma di un invito Telegram, https://t.me/+…:
+   si lavora sul testo GIA' passato da esc(), e quella forma non ha
+   caratteri che esc() cambi, quindi l'href e' il link intero e basta.
+   Dentro Telegram si apre con openTelegramLink, che porta dritto alla
+   richiesta d'ingresso; fuori, il link normale. */
+const RE_INVITO_CANALE = /https:\/\/t\.me\/\+[A-Za-z0-9_-]{8,64}(?![A-Za-z0-9_-])/g;
+function linkCanaleToccabile(testoEsc){
+  return String(testoEsc || '').replace(RE_INVITO_CANALE, u =>
+    `<a href="${u}" target="_blank" rel="noopener noreferrer" onclick="return apriInvitoCanale(this.href)">${u}</a>`);
+}
+function apriInvitoCanale(url){
+  if (!/^https:\/\/t\.me\/\+[A-Za-z0-9_-]{8,64}$/.test(String(url || ''))) return false;
+  if (tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(url); return false; } catch(e){}
+  }
+  return true;
 }
 
 /* Codice vuoto = niente piatto: c'e' il caso vero del venditore che

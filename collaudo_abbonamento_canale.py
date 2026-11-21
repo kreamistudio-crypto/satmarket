@@ -315,6 +315,14 @@ def scena_incasso(aid):
     testo = SRV._decifra_contenuto(o["contenuto_digitale"])
     prova("il contenuto e' il link, col nome vero del canale",
           (True, True), (link in testo, "«Bitcoin On»" in testo))
+    # IL LINK TOCCABILE (21 nov 2026): la lista degli ordini dice SI'
+    # o NO, a chi compra e a chi vende, e l'id del canale non esce
+    for chi in (111, 222):
+        banco.come(chi)
+        r = {x["id"]: x for x in SRV.miei_ordini(0, "", "")}.get(oid) or {}
+        prova(f"la lista ordini di {chi}: abbonamento vero, senza l'id "
+              f"del canale", (True, False),
+              (r.get("abbonamento"), "abbonamento_canale" in r))
     prova("lo stock non scala", stock,
           db_uno("SELECT quantita FROM annunci WHERE id=?", aid)[0])
     prova("chi compra sa che e' pagato, e che entrare chiude l'acquisto",

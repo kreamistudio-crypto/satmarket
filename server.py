@@ -97234,6 +97234,12 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
             r["stato"], r["consegna_scelta"], r.get("pagato_il"),
             r["creato"], r.get("punto_obiettato_il"))
         r["contenuto_presente"] = bool(r.pop("contenuto_digitale", ""))
+        # L'ABBONAMENTO (21 nov 2026, Andrea: il link d'invito «non e'
+        # cliccabile»): il client lo sa da un SI' o NO, e solo su questi
+        # ordini rende toccabile il link t.me che il server ha scritto
+        # (chi vende non lo puo' riscrivere: MSG_ABBONAMENTO_DA_SOLO).
+        # Esce il booleano, mai l'id del canale.
+        r["abbonamento"] = bool(int(r.pop("abbonamento_canale", 0) or 0))
         # I PUNTI PROPOSTI escono come LISTA e non come stringa JSON:
         # in colonna sono JSON perche' SQLite non ha un tipo lista, ma
         # quella e' una scelta dello schema e il client non deve

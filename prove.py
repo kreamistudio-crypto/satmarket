@@ -142567,6 +142567,120 @@ const aspetta = () => new Promise(r => setTimeout(r, 0));
               True, _diff < 3)
 
 
+def prove_link_invito_canale():
+    """IL LINK D'INVITO DELL'ABBONAMENTO SI TOCCA (21 nov 2026, Andrea:
+    «il link non è cliccabile, devo copiarlo e aprirlo»): solo sugli
+    ordini di un abbonamento, solo la forma https://t.me/+…, e il resto
+    del digitale resta testo. Il banco in node gira i pezzi veri."""
+    print("\n[il link d'invito dell'abbonamento si tocca]")
+    import shutil as _sh
+    import subprocess as _sp
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = open("server.py", encoding="utf-8").read()
+    prova("la lista ordini dice abbonamento SI' o NO, senza l'id del canale",
+          True, 'r["abbonamento"] = bool(int(r.pop("abbonamento_canale", 0) '
+          'or 0))' in src)
+    prova("il client legge il vero booleano", True,
+          "abbonamento:o.abbonamento === true," in mini)
+    prova("il pannello del contenuto passa il link toccabile solo "
+          "all'abbonamento", True,
+          "linkCanale: o.abbonamento === true})}" in mini)
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del link d'invito", "serve node")
+        return
+    js = (pezzo_js(mini, "const esc = s =>", "\n") + "\n"
+          + pezzo_js(mini, "  c => ({'&'", "\n") + "\n"
+          + "const tg = globalThis.TG || null;\n"
+          + pezzo_js(mini, "const SOGLIA_PIATTO = 42;", "\n") + "\n"
+          + pezzo_js(mini, "function formaCodice(testo){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function resaCodice(testo, o){", "\n}\n")
+          + "\n}\n"
+          + pezzo_js(mini, "const RE_INVITO_CANALE = ", "\n") + "\n"
+          + pezzo_js(mini, "function linkCanaleToccabile(testoEsc){",
+                     "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function apriInvitoCanale(url){", "\n}\n")
+          + "\n}\n" + r"""
+const L = 'https://t.me/+AbC_d-12345xyz';
+const testo = `Il tuo link per entrare in «Bitcoin On»: ${L}\n\nToccalo.`;
+const si = resaCodice(testo, {copia: 'c()', linkCanale: true});
+const no = resaCodice(testo, {copia: 'c()'});
+const a = `<a href="${L}" target="_blank" rel="noopener noreferrer" onclick="return apriInvitoCanale(this.href)">${L}</a>`;
+const out = {
+  si: si.includes(a), no: no.includes('<a '),
+  copia: si.includes('📋 Copia tutto'),
+  altri: resaCodice('vai su https://t.me/canale e https://evil.example/+x', {copia: 'c()', linkCanale: true}).includes('<a '),
+  attacco: linkCanaleToccabile('https://t.me/+abcdefgh"onmouseover=x'),
+  troppo: linkCanaleToccabile('https://t.me/+abc'),
+  aperto: [apriInvitoCanale(L), apriInvitoCanale('https://evil.example/+abcdefgh'),
+           apriInvitoCanale(L + '/x')],
+};
+globalThis.TG = null;
+console.log(JSON.stringify(out));
+""")
+    r = _sp.run([node, "-e", js], capture_output=True, text=True,
+                encoding="utf-8", errors="replace")
+    try:
+        out = json.loads((r.stdout or "").strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        prova("il banco del link d'invito gira", "", r.stderr[-400:])
+        return
+    prova("sull'abbonamento il link t.me/+ diventa un <a> che si apre",
+          True, out["si"])
+    prova("...e la copia resta", True, out["copia"])
+    prova("senza l'abbonamento resta testo", False, out["no"])
+    prova("...e anche sull'abbonamento un link che non e' un invito resta "
+          "testo", False, out["altri"])
+    prova("il link si prende dal testo gia' escapato: le virgolette non "
+          "escono dall'attributo", False, '"onmouseover' in out["attacco"]
+          and 'href="https://t.me/+abcdefgh"onmouseover' in out["attacco"])
+    prova("...e un invito troppo corto non si tocca", False,
+          "<a " in out["troppo"])
+    prova("fuori da Telegram il link si apre da se', e una forma storta no",
+          [True, False, False], out["aperto"])
+
+    # «ACQUISTA» DALLA VETRINA APRE L'ABBONAMENTO (21 nov 2026, Andrea:
+    # «bisognerebbe mostrare solamente quell'annuncio»): con UN
+    # abbonamento fra le card del negozio si apre la sua scheda, sennò
+    # si scende alla merce come sempre
+    print("\n[«Acquista» dalla vetrina apre l'abbonamento]")
+    js2 = (pezzo_js(mini, "function annuncioAbbonamentoNegozio(){", "\n}\n")
+           + "\n}\n"
+           + pezzo_js(mini, "function acquistaDalRacconto(){", "\n}\n")
+           + "\n}\n" + r"""
+let CARD = [], listings = [], fatti = [];
+const document = {querySelectorAll: sel =>
+  sel === '#negozioGrid .card[data-vid]' ? CARD.map(v => ({dataset: {vid: String(v)}})) : []};
+const el = id => id === 'negozioVetrinaTit'
+  ? {scrollIntoView: () => fatti.push('scendi')} : null;
+const tourRidotto = () => false;
+const openDetail = id => fatti.push('scheda:' + id);
+const giro = (card, lst) => { CARD = card; listings = lst; fatti = [];
+  acquistaDalRacconto(); return fatti.join(','); };
+console.log(JSON.stringify({
+  uno: giro([1, 2, 3], [{id: 1}, {id: 2, abbonamento: true}, {id: 3}]),
+  nessuno: giro([1, 3], [{id: 1}, {id: 3}]),
+  due: giro([1, 2], [{id: 1, abbonamento: true}, {id: 2, abbonamento: true}]),
+  fuori: giro([1], [{id: 1}, {id: 9, abbonamento: true}]),
+  storto: giro([2], [{id: 2, abbonamento: 'true'}]),
+}));
+""")
+    r = _sp.run([node, "-e", js2], capture_output=True, text=True,
+                encoding="utf-8", errors="replace")
+    try:
+        out = json.loads((r.stdout or "").strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        prova("il banco di «Acquista» gira", "", r.stderr[-400:])
+        return
+    prova("con un abbonamento fra le card «Acquista» apre la sua scheda",
+          "scheda:2", out["uno"])
+    prova("...senza abbonamento scende alla merce", "scendi", out["nessuno"])
+    prova("...con due non sceglie: scende alla merce", "scendi", out["due"])
+    prova("...un abbonamento che non e' fra le card del negozio non conta",
+          "scendi", out["fuori"])
+    prova("...e vuole il vero booleano", "scendi", out["storto"])
+
+
 def prove_consigliati():
     """LA CARD «CONSIGLIATI» E LA SUA PAGINA (set 2026).
 
@@ -144123,6 +144237,33 @@ caso('la pagina', () => {
        + 'non apre niente',
        ['negozio:cd34ef56:aperto', 'negozio:' + CODICE_TTM + ':aperto'],
        scritte);
+});
+
+/* L'ORDINE DELLA PAGINA SEGUE «Da scoprire» (21 nov 2026, Andrea): gli
+   spazi accesi in testa nell'ordine delle card, gli altri dopo come
+   prima; lo spazio decide l'ordine e mai chi entra. */
+caso('la pagina nell ordine di Da scoprire', () => {
+  RACCONTI['to-the-moon'].consigliato = true;
+  consigliatiServer = [BOTTEGA, TERZA];
+  const fila = () => {
+    renderConsigliati();
+    return nodi['consigliatiLista'].innerHTML.split('class="scoprire-card"')
+      .slice(1).map(c => (c.match(/data-slug="([^"]+)"/) || [])[1]);
+  };
+  sponsorizzati = [];
+  dice('senza spazi accesi l ordine di serie: prima il catalogo di casa',
+       ['to-the-moon', 'bottega-di-prova', 'terza-bottega'], fila());
+  sponsorizzati = [{slug: 'terza-bottega'}, {slug: 'to-the-moon'}];
+  dice('con gli spazi accesi in testa, nell ordine di Da scoprire',
+       ['terza-bottega', 'to-the-moon', 'bottega-di-prova'], fila());
+  sponsorizzati = [{slug: 'mai-visto'}, null, {slug: 'bottega-di-prova'}];
+  dice('...uno spazio che qui non c e non aggiunge niente, e uno storto '
+       + 'si salta', ['bottega-di-prova', 'to-the-moon', 'terza-bottega'],
+       fila());
+  sponsorizzati = 'storto';
+  dice('...e una busta storta lascia l ordine di serie',
+       ['to-the-moon', 'bottega-di-prova', 'terza-bottega'], fila());
+  sponsorizzati = [];
 });
 
 /* IL BANNER DI UNA PAGINA DEL SERVER (set 2026, «Un tempo per te»): con
@@ -220565,6 +220706,7 @@ def main():
               prove_racconti_bozza,
               prove_storia_dal_link,
               prove_consigliati,
+              prove_link_invito_canale,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore, prove_condividi_col_link,
