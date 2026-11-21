@@ -56389,7 +56389,8 @@ function resaCodice(testo, o){
       <button type="button" class="btn codice-piatto${op.svelato?' codice-svelato':''}"
         style="margin-top:10px" aria-label="${esc(op.aria||'Copia')}"
         onclick="${copia}"><span class="mono codice-cifre">${esc(testo)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
-  const corpo = op.linkCanale ? linkCanaleToccabile(esc(testo)) : esc(testo);
+  const scappato = esc(testo);
+  const corpo = op.linkCanale ? linkCanaleToccabile(scappato) : scappato;
   return `
       <div class="codice-blocco">${corpo}</div>
       <button class="btn ghost" style="margin-top:8px"

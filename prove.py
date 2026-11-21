@@ -219849,7 +219849,7 @@ CATEGORIE = {
     promesse_badge promesse_raggiungibili percentuale_della_promessa
     verde_e_filtri prezzo_accordo scoprire scoprire_quadra strisce_web sponsor
     numeri_negozio racconto_girato racconti_bozza storia_dal_link
-    consigliati guardia_is_bot altri_scorrimento widget ricerca
+    consigliati link_invito_canale guardia_is_bot altri_scorrimento widget ricerca
     condivisione_venditore condividi_col_link link_dentro_telegram
     zona_comune_in_modifica cassa_strada_chiusa casa_vuota_gratis
     spedizione_standard cambio_converte paga_ora apri_nel_wallet
