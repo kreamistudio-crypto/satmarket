@@ -48590,8 +48590,11 @@ def prove_sollecito_a_comando():
           in det)
     prova("...e nella colonna non resta un solo rosso testuale",
           False, "danger-ghost" in det)
+    # EMENDATA (22 nov 2026): il testo lo scrive `etichettaElimina`, che
+    # sugli annunci di un negozio collegato dice «Rimuovi da qui»
     prova("...e il testo dice solo cosa fa", True,
-          "🗑 Elimina l'annuncio</button>" in det
+          "${etichettaElimina(l, true)}</button>" in det
+          and "'🗑 Elimina l\\'annuncio'" in mini
           and "Questo è un tuo annuncio — eliminalo" not in mini)
 
 
@@ -140196,7 +140199,8 @@ def prove_catalogo_esterno():
           "database nuovo l'ALTER non cade nel vuoto", True, 0 <= _cr < _al)
     _err = codice(pezzo("_connettore_in_errore"))
     prova("l'avviso del negozio muto manda al posto nuovo", [True, False],
-          ["«📥 Carica tanti annunci insieme / catalogo esterno»" in _err,
+          # EMENDATA (22 nov 2026): la sezione si chiama «Carica prodotti»
+          ["«📥 Carica prodotti» → il tuo negozio" in _err,
            "«🏪 Il tuo negozio»" in _err])
 
     # ---- 3) il client: il posto ---------------------------------------
@@ -140212,7 +140216,8 @@ def prove_catalogo_esterno():
           'id="importTitolo"' in mini)
     rc = pezzo_js(mini, "async function renderConnettori(", "\n}\n")
     prova("...e dice «/ catalogo esterno» solo a chi la vede", True,
-          "'Carica tanti annunci insieme / catalogo esterno' : 'Carica tanti annunci insieme'"
+          # EMENDATA (22 nov 2026, le tre porte): «Carica prodotti»
+          "'Carica prodotti' : 'Carica tanti annunci insieme'"
           in rc)
     prova("il client cuce la risposta per persona nelle leve", True,
           "visibile: !!me.connettori_visibile" in mini)
@@ -140277,14 +140282,23 @@ const C = extra => Object.assign({id: 7, fonte: "shopify", nome_fonte: "Shopify"
 async function caso(nome, prep){
   try {
     NODI = {connettoriBlocco: {innerHTML: ""}, accConnettori: {style: {}},
-            connettoriConta: {textContent: ""}, importTitolo: {textContent: ""}};
+            connettoriConta: {textContent: ""}, importTitolo: {textContent: ""},
+            importScelta: {innerHTML: "", style: {}},
+            importCsvVista: {style: {}}, importIndietroCsv: {style: {}}};
     DEMO = false; VETRINA = false; connettoriLeve = LEVE();
     myConnettori = []; connInModifica = 0; bozzaConn = null;
+    // (22 nov 2026) le tre porte: i casi del modulo stanno dietro quella
+    // di Shopify; «scelta» guarda le porte
+    importVista = "shopify";
     prep();
     await renderConnettori();
     out[nome] = {html: NODI.connettoriBlocco.innerHTML,
                  display: NODI.accConnettori.style.display,
-                 titolo: NODI.importTitolo.textContent};
+                 titolo: NODI.importTitolo.textContent,
+                 scelta: NODI.importScelta.innerHTML,
+                 vista: [NODI.importScelta.style.display,
+                         NODI.importCsvVista.style.display,
+                         NODI.importIndietroCsv.style.display]};
   } catch(e) { out[nome] = {esploso: String(e)}; }
 }
 (async () => {
@@ -140303,6 +140317,12 @@ async function caso(nome, prep){
   await caso("nascosta", () => { connettoriLeve.visibile = false; });
   await caso("ponte_spento", () => { connettoriLeve.attivo = false; });
   await caso("demo", () => { DEMO = true; });
+  await caso("scelta", () => { importVista = "scelta";
+    myConnettori = [C({fonte: "woo", nome_fonte: "WooCommerce"})]; });
+  await caso("porta_csv", () => { importVista = "csv"; });
+  await caso("porta_woo", () => { importVista = "woo";
+    myConnettori = [C(), C({id: 8, fonte: "woo", nome_fonte: "WooCommerce",
+                            url_negozio: "https://bottega.test"})]; });
   console.log(JSON.stringify(out));
 })();
 """
@@ -140347,10 +140367,33 @@ async function caso(nome, prep){
                'title="Aggiorna ora"' in h("riga_da_dire")])
         prova("...mentre una riga attiva il suo 🔄 ce l'ha", True,
               'title="Aggiorna ora"' in h("riga_attiva"))
+        # EMENDATA (22 nov 2026, le tre porte): dietro la porta di una
+        # piattaforma; il titolo e' «Carica prodotti»
         prova("la sezione si vede, e il titolo la nomina",
-              ["", "Carica tanti annunci insieme / catalogo esterno"],
+              ["", "Carica prodotti"],
               [(o.get("nuovo") or {}).get("display"),
                (o.get("nuovo") or {}).get("titolo")])
+        # LE TRE PORTE (22 nov 2026, richiesta di Andrea)
+        _sc = o.get("scelta") or {}
+        prova("le porte: CSV, Shopify e WooCommerce, e il negozio collegato "
+              "si conta sulla sua", [True, True, True, True, "none"],
+              ["importVai('csv')" in _sc.get("scelta", ""),
+               "importVai('shopify')" in _sc.get("scelta", ""),
+               "importVai('woo')" in _sc.get("scelta", ""),
+               "1 negozio collegato" in _sc.get("scelta", ""),
+               _sc.get("display")])
+        prova("...e sulle porte non si vedono ne' il CSV ne' i negozi",
+              ["", "none", ""], _sc.get("vista"))
+        _pc = o.get("porta_csv") or {}
+        prova("la porta del CSV: il CSV, col suo «Indietro», senza negozi",
+              [["none", "", ""], "none"], [_pc.get("vista"), _pc.get("display")])
+        _pw = o.get("porta_woo") or {}
+        prova("la porta di WooCommerce: solo i negozi Woo, e il modulo "
+              "senza la scelta della piattaforma", [True, False, True, ""],
+              ["bottega.test" in _pw.get("html", ""),
+               "miele.myshopify.com" in _pw.get("html", ""),
+               'id="connPilloleFonte" style="display:none' in _pw.get("html", ""),
+               _pw.get("display")])
         for k in ("nascosta", "ponte_spento", "demo"):
             prova(f"«{k}»: nascosta, e il titolo resta quello di sempre",
                   ["none", "Carica tanti annunci insieme", ""],
@@ -175696,7 +175739,10 @@ def prove_esauriti_eliminabili():
     del_js = fn("async function deleteListing(id, dalDettaglio){")
     prog = ("const esc = s => String(s);\n"
             + "function astaE(l){ return !!(l && l.asta); }\n"
-            + fn("function esaurito(l){") + blocco
+            + fn("function esaurito(l){")
+            # (22 nov 2026) l'etichetta: «Rimuovi da qui» dal negozio collegato
+            + fn("function daNegozioCollegato(l){")
+            + fn("function etichettaElimina(l, lunga){") + blocco
             + "let myListings = [], listings = [], DEMO = true, chiesto = null;\n"
             + "function haptic(){}\nfunction chiediConferma(o){ chiesto = o; }\n"
             + del_js + r"""
@@ -175713,6 +175759,11 @@ deleteListing(7, true); fuori.esa = [chiesto.titolo, chiesto.corpo];
 deleteListing(8); fuori.att = chiesto.titolo;
 deleteListing(9); fuori.asta = chiesto.titolo;
 deleteListing(99); fuori.ignoto = chiesto.titolo;
+myListings.push({id: 10, stato: 'attivo', connettore_id: 3});
+deleteListing(10); fuori.negozio = [chiesto.titolo, chiesto.etichetta,
+  /NON dal tuo e-commerce/.test(chiesto.corpo),
+  bloccoMioEsaurito({id: 10}).includes('🪑 Rimuovi da qui'),
+  bloccoMioEsaurito({id: 7}).includes("🗑 Elimina l'annuncio")];
 console.log(JSON.stringify(fuori));
 """)
     out = _node_banco(prog)
@@ -175729,6 +175780,12 @@ console.log(JSON.stringify(fuori));
         prova("...l'attivo, l'asta conclusa e lo sconosciuto tengono la frase di sempre",
               ["Elimini questo annuncio?"] * 3,
               [out.get("att"), out.get("asta"), out.get("ignoto")])
+        # (22 nov 2026, Andrea: «invece di elimina metti proprio rimuovi
+        # da qui»)
+        prova("dal negozio collegato: «Rimuovi da qui», e il foglio dice che "
+              "sul suo e-commerce resta", ["Rimuovi da Barattolo?",
+                                           "🪑 Rimuovi da qui", True, True, True],
+              out.get("negozio"))
 
     # --- 4) IL CLIENT: la zona proposta nel form di Vendi -----------------
     pz = mini[mini.index("let myZonaVendi = '';"):]

@@ -14397,7 +14397,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'c3fbdd5db9';
+const LINGUA_VER = 'c9f6817d2e';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -16768,6 +16768,16 @@ document.getElementById('cartello')?.remove();</script>
              sarebbe la promessa di una cosa che non c'e' -->
         <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span><span id="importTitolo">Carica tanti annunci insieme</span><span class="fr">▾</span></button>
         <div class="acc-b">
+          <!-- LA SCELTA PRIMA DI TUTTO (22 nov 2026, richiesta di Andrea:
+               «carica prodotti, scegli se tramite CSV, Shopify o
+               WooCommerce; cliccando si apre il sottomenu, e si torna
+               indietro»). A chi vede il catalogo esterno il cassetto apre
+               su tre porte (`importSceltaHTML`), e ognuna ha il suo
+               «‹ Indietro»; a chi ha solo il CSV niente porte, il CSV
+               com'era (`importVista`, deciso in renderConnettori). -->
+          <div id="importScelta" style="display:none"></div>
+          <div id="importCsvVista">
+          <div id="importIndietroCsv" style="display:none"><button type="button" class="import-indietro" onclick="importVai('scelta')" style="font:inherit;font-size:13.5px;font-weight:800;color:var(--sats);background:none;border:none;padding:2px 0 8px;cursor:pointer">‹ Indietro</button></div>
           <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
             Hai un catalogo grande? Compila il modello CSV (una riga = un
             annuncio, massimo 500 per volta) e caricalo qui. Ogni riga
@@ -16785,6 +16795,7 @@ document.getElementById('cartello')?.remove();</script>
           <div id="importEsito"></div>
           <div id="importProgresso"></div>
           <div id="importReport"></div>
+          </div>
           <!-- IL CATALOGO ESTERNO, cioe' il negozio collegato (ago 2026,
                tappa 5; qui DENTRO dal set 2026): chi ha gia' un
                e-commerce collega il catalogo e i suoi prodotti compaiono
@@ -16803,7 +16814,8 @@ document.getElementById('cartello')?.remove();</script>
                vetrina sparisce, e sparisce a ponte spento, che una porta
                su un muro e' peggio di nessuna porta. -->
           <div id="accConnettori" class="catalogo-esterno" style="display:none">
-            <div class="section-label">🏪 Catalogo esterno <span class="conta" id="connettoriConta"></span></div>
+            <button type="button" class="import-indietro" onclick="importVai('scelta')" style="font:inherit;font-size:13.5px;font-weight:800;color:var(--sats);background:none;border:none;padding:2px 0 8px;cursor:pointer">‹ Indietro</button>
+            <div class="section-label">🏪 <span id="connettoriTitolo">Catalogo esterno</span> <span class="conta" id="connettoriConta"></span></div>
             <div id="connettoriBlocco"></div>
           </div>
         </div>
@@ -30600,7 +30612,7 @@ const bloccoMioEsaurito = l => `
        Stesso vestito velato dell'«Elimina» dell'annuncio attivo, e
        sotto la CTA: il gesto per cui la pagina esiste resta il primo.
        Vale anche per importati e servizi — il server archivia tutti. */''}
-  <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`;
+  <button class="btn allarme" onclick="deleteListing(${l.id}, true)">${etichettaElimina(l, true)}</button>`;
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
    badge dice la sola percentuale), quindi qui si aggiorna in-place
@@ -37084,7 +37096,7 @@ function openDetail(id){
         : `<b>L'asta si è chiusa senza offerte.</b> Puoi rilanciarla o convertirla a prezzo fisso alla base.`}</span></div>
            ${astaDeserta ? `<button class="btn ghost" onclick="rilanciaAsta(${l.id})">🔨 Rilancia l'asta</button>
            <button class="btn ghost" onclick="convertiAsta(${l.id})">🏷 Converti a prezzo fisso</button>` : ''}
-           <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`;
+           <button class="btn allarme" onclick="deleteListing(${l.id}, true)">${etichettaElimina(l, true)}</button>`;
   /* IL GIUDICE DEL PREZZO, una volta sola per la scheda: dice la
      vista (accordo, lampo o listino) e CHI ha vinto. Sugli stati che
      non si comprano non si giudica, come in card. */
@@ -37240,7 +37252,7 @@ function openDetail(id){
                 cosa fa: «Questo è un tuo annuncio» lo diceva gia' la
                 riga verde sopra, e in mezzo a Modifica e Lampo non
                 serviva ripeterlo. -->
-           <button class="btn allarme" onclick="deleteListing(${l.id}, true)">🗑 Elimina l'annuncio</button>`
+           <button class="btn allarme" onclick="deleteListing(${l.id}, true)">${etichettaElimina(l, true)}</button>`
         : esa
             ? `<div class="trust-note"><span><b>Per ora è esaurito.</b> L'annuncio resta qui e non va da nessuna parte: se il venditore rimette dei pezzi torna comprabile da solo. Intanto puoi metterlo nel barattolo 🫙 per ritrovarlo al volo.</span></div>`
         : ferie
@@ -50798,12 +50810,22 @@ async function renderConnettori(){
   const mostra = !DEMO && !VETRINA && !!(connettoriLeve
     && connettoriLeve.attivo && connettoriLeve.visibile);
   if (el('importTitolo')) el('importTitolo').textContent = mostra
-    ? 'Carica tanti annunci insieme / catalogo esterno' : 'Carica tanti annunci insieme';
+    ? 'Carica prodotti' : 'Carica tanti annunci insieme';
+  /* LE TRE PORTE (22 nov 2026): chi vede il catalogo esterno sceglie
+     prima da dove (CSV, Shopify, WooCommerce); chi no ha il solo CSV,
+     senza porte e senza «Indietro» */
+  const vista = mostra ? importVista : 'csv';
+  const fonteVista = vista !== 'scelta' && vista !== 'csv' ? vista : '';
+  const mostraNodo = (id, si) => { const n = el(id); if (n) n.style.display = si ? '' : 'none'; };
+  mostraNodo('importScelta', vista === 'scelta');
+  mostraNodo('importCsvVista', vista === 'csv');
+  mostraNodo('importIndietroCsv', mostra);
   if (!mostra){
     if (sez) sez.style.display = 'none';
+    if (el('importScelta')) el('importScelta').innerHTML = '';
     box.innerHTML = ''; return;
   }
-  if (sez) sez.style.display = '';
+  if (sez) sez.style.display = fonteVista ? '' : 'none';
   if (!myConnettori) {
     try {
       const r = await fetch(`${API_BASE}/me/connettori`,
@@ -50815,6 +50837,11 @@ async function renderConnettori(){
   }
   const tetto = connettoriLeve.max || 3;
   el('connettoriConta').textContent = `(${myConnettori.length} di ${tetto})`;
+  if (el('importScelta') && vista === 'scelta') el('importScelta').innerHTML = importSceltaHTML();
+  const nomeFonte = ((connettoriLeve.fonti || []).find(f => f.id === fonteVista) || {}).nome;
+  if (el('connettoriTitolo')) el('connettoriTitolo').textContent = nomeFonte || 'Catalogo esterno';
+  /* dentro la porta di una piattaforma il modulo e' gia' di quella */
+  if (fonteVista && !connInModifica) bozzaCon().fonte = fonteVista;
   const b = bozzaCon();
   const woo = b.fonte === 'woo';
   const az = 'font:inherit;background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px';
@@ -50872,11 +50899,11 @@ async function renderConnettori(){
       non lo scrive</b>: quando vendi qui, il magazzino di là lo
       aggiorni tu — te lo ricordiamo a ogni vendita.</div>
     <div id="connettoriErrore"></div>
-    ${myConnettori.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun negozio collegato, per ora.</div>'}
+    ${myConnettori.filter(c => !fonteVista || c.fonte === fonteVista).map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun negozio collegato, per ora.</div>'}
     <div id="connFiltro"></div>
     ${pieno ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:12px">Hai già ${tetto} negozi collegati: scollegane uno per aggiungerne un altro.</div>` : `
     <div class="section-label" style="margin-top:14px">${inMod ? 'Modifica il collegamento' : 'Collega un negozio'}</div>
-    <div id="connPilloleFonte" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${connPillole('fonte')}</div>
+    <div id="connPilloleFonte" style="display:${fonteVista ? 'none' : 'flex'};gap:6px;flex-wrap:wrap;margin-top:6px">${connPillole('fonte')}</div>
     <div class="field" style="margin-top:10px"><label for="connUrl">Indirizzo del negozio</label>
       <input id="connUrl" autocomplete="off" placeholder="${woo ? 'https://ilmionegozio.it' : 'ilmionegozio.myshopify.com'}"
         value="${esc(b.url || '')}">
@@ -50963,6 +50990,38 @@ async function renderConnettori(){
     ${inMod ? `<button class="btn ghost" onclick="annullaModificaConnettore()">Annulla la modifica</button>` : ''}`}`;
   /* il pannello «🧺 Cosa entra», se aperto, sopravvive al ridisegno */
   renderFiltroConnettore();
+}
+
+/* LA PORTA APERTA DEL CASSETTO «Carica prodotti» (22 nov 2026):
+   'scelta' (le tre porte), 'csv', o l'id di una piattaforma. Si
+   riparte sempre dalle porte: e' una pagina di passaggio, non una
+   preferenza da ricordare. */
+let importVista = 'scelta';
+function importVai(v){
+  haptic();
+  importVista = v;
+  if (v !== 'shopify' && v !== 'woo') { filtroConn = null; }
+  /* cambiando piattaforma una modifica a meta' non segue */
+  if (connInModifica) {
+    const c = (myConnettori || []).find(x => x.id === connInModifica);
+    if (!c || c.fonte !== v) { connInModifica = 0; bozzaConn = null; }
+  } else if (bozzaConn && bozzaConn.fonte !== v) { bozzaConn = null; }
+  renderConnettori();
+  el('accImport')?.scrollIntoView({block:'start'});
+}
+function importSceltaHTML(){
+  const n = f => (myConnettori || []).filter(c => c.fonte === f).length;
+  const voce = (v, ico, nome, riga) => `<button type="button" onclick="importVai('${v}')" style="display:flex;width:100%;align-items:center;gap:12px;text-align:left;font:inherit;border:1px solid var(--line);border-radius:12px;background:transparent;padding:12px;margin-top:8px;cursor:pointer;color:var(--ink)">
+      <span style="font-size:22px" aria-hidden="true">${ico}</span>
+      <span style="flex:1;min-width:0"><b style="display:block;font-size:14px">${nome}</b>
+        <span style="display:block;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.4">${riga}</span></span>
+      <span style="font-size:18px;color:var(--muted)" aria-hidden="true">›</span></button>`;
+  const ico = {shopify: '🛍️', woo: '🛒'};
+  return `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">Da dove arrivano i tuoi prodotti?</div>`
+    + voce('csv', '📄', 'Da un file CSV', 'Compili il modello, fino a 500 annunci per volta. Una volta sola: dopo non si aggiornano.')
+    + ((connettoriLeve && connettoriLeve.fonti) || []).map(f => voce(f.id, ico[f.id] || '🏪', esc(f.nome),
+        n(f.id) ? `${fmt(n(f.id))} ${n(f.id) === 1 ? 'negozio collegato' : 'negozi collegati'}: prezzi e giacenze si aggiornano ogni ora`
+                : 'Colleghi il tuo negozio e i prodotti restano in pari da soli, ogni ora')).join('');
 }
 
 /* «🧺 COSA ENTRA» (21 nov 2026, richiesta di Andrea): il filtro del
@@ -51327,6 +51386,7 @@ function modificaConnettore(id){
   if (!c) return;
   haptic();
   connInModifica = id;
+  importVista = c.fonte;          /* la porta della sua piattaforma */
   /* le caselle nella valuta in cui il negozio le ha salvate: i sats
      fissi dalle colonne dei sats, l'euro dalle sue (set 2026) */
   const inSats = c.tariffe_valuta === 'sats';
@@ -58112,7 +58172,7 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
              tornera', il pezzo usato venduto una volta. Il secondo
              restava qui per sempre col solo «Rifornisci». Il server lo
              archivia ('rimosso'): ordini e recensioni restano. */''}
-        <span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🗑 Elimina</span>
+        <span class="badge az-btn" onclick="deleteListing(${l.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">${etichettaElimina(l, false)}</span>
       </div>
       ${/* fuori da .mio-azioni e su una riga sua: quella e' flex-wrap
             e a 320px i due badge la riempiono gia' tutta — un terzo
@@ -61945,6 +62005,22 @@ async function trattamiDaNuovo(){
   toast('🧽 Fatto: per gli hint sei di nuovo un nuovo arrivato');
 }
 
+/* L'ANNUNCIO CHE ARRIVA DA UN NEGOZIO COLLEGATO (22 nov 2026, Andrea:
+   «invece di elimina metti proprio rimuovi da qui»): il gesto lo toglie
+   da Barattolo e non dal suo e-commerce, e il bottone lo dice. La scheda
+   pubblica non porta `connettore_id`: lo si cerca anche fra i propri
+   annunci, dove c'e' (CAMPI_MIEI = a.*). */
+function daNegozioCollegato(l){
+  if (!l) return false;
+  if (l.connettore_id) return true;
+  const mio = (myListings || []).find(x => x.id === l.id);
+  return !!(mio && mio.connettore_id);
+}
+function etichettaElimina(l, lunga){
+  return daNegozioCollegato(l) ? '🪑 Rimuovi da qui'
+       : lunga ? '🗑 Elimina l\'annuncio' : '🗑 Elimina';
+}
+
 async function deleteListing(id, dalDettaglio){
   haptic();
   /* L'ESAURITO HA LA SUA FRASE (16 nov 2026): dal mercatino e' gia'
@@ -61957,22 +62033,22 @@ async function deleteListing(id, dalDettaglio){
   /* DAL NEGOZIO COLLEGATO SI ESCLUDE, NON SI CANCELLA (21 nov 2026,
      decisione di Andrea): l'annuncio va in panchina e il giro dell'ora
      non lo rimette dentro; si riaccoglie da «🧺 Cosa entra» */
-  const dalNegozio = !!l && !!l.connettore_id;
+  const dalNegozio = daNegozioCollegato(l);
   chiediConferma({
-    titolo: dalNegozio ? 'Togli questo prodotto da Barattolo?'
+    titolo: dalNegozio ? 'Rimuovi da Barattolo?'
           : esa ? 'Non lo rifornirai più?' : 'Elimini questo annuncio?',
     corpo: dalNegozio
-      ? 'Arriva dal tuo negozio collegato: esce dal mercatino, da Nostr '
-        + 'e dal canale, e il catalogo non lo rimette dentro. Sul tuo '
-        + 'negozio resta com\'è. Se cambi idea lo riaccogli da «🧺 Cosa '
-        + 'entra», nel riquadro del negozio, e torna lo stesso annuncio.'
+      ? 'Sparisce da Barattolo (mercatino, Nostr e canale), ma NON dal '
+        + 'tuo e-commerce: lì resta com\'è, e il collegamento non lo '
+        + 'rimette dentro. Se cambi idea lo riaccogli da «🧺 Cosa entra», '
+        + 'sul tuo negozio in «📥 Carica prodotti», e torna lo stesso annuncio.'
       : esa
       ? 'Sparisce dal tuo negozio e dai tuoi annunci, anche da Nostr e '
         + 'dal canale. Gli ordini e le recensioni restano. Se un giorno '
         + 'ne avessi un altro, dovrai ripubblicarlo.'
       : 'Sparisce dal mercatino, da Nostr e dal canale. Per '
         + 'rimetterlo in vendita dovrai ripubblicarlo.',
-    etichetta: dalNegozio ? '🪑 Togli da Barattolo' : '🗑 Elimina',
+    etichetta: dalNegozio ? '🪑 Rimuovi da qui' : '🗑 Elimina',
     poi: async () => {
       if (DEMO) {
         listings = listings.filter(l=>l.id!==id);

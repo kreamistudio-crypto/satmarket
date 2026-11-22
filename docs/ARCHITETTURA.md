@@ -27452,6 +27452,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   La ricerca segue da sola (il trigger su `categoria` invalida l'indice),
   e le proposte della coda «🗂 Categorie da sistemare» su una riga che si
   è spostata spariscono da sole (la coda legge `a.categoria=p.categoria_ora`).
+- «CARICA PRODOTTI» A TRE PORTE (22 nov 2026, cantiere
+  carica-prodotti-menu, richiesta di Andrea): a chi vede il catalogo
+  esterno il cassetto `accImport` apre sulle porte CSV / Shopify /
+  WooCommerce (`importSceltaHTML`), e `importVista` decide in
+  `renderConnettori` cosa si vede (il CSV in `#importCsvVista`, oppure
+  `#accConnettori` coi soli negozi di quella piattaforma e il modulo
+  fissato su di lei), con «‹ Indietro» verso le porte. Senza catalogo
+  esterno la vista e' sempre il CSV, senza porte. Sugli annunci di un
+  negozio collegato «Elimina» si chiama «🪑 Rimuovi da qui»
+  (`etichettaElimina`, `daNegozioCollegato`): e' l'esclusione della
+  panchina qui sotto. Il perche' in CANTIERI, «Carica prodotti a tre porte».
 - IL FILTRO DEL CATALOGO E LA PANCHINA (21 nov 2026, cantiere
   filtri-negozio, richiesta di Andrea: «Barattolo e questi shop
   sincronizzati, ma che si possano comunque customizzare»). Il giro
