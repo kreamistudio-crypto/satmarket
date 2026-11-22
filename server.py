@@ -10183,7 +10183,15 @@ def init_db():
                     # ...e lo sfondo dietro a Tappo nella pagina del
                     # gioco (un oggetto di tipo «palco»; '' = la notte
                     # di casa).
-                    "tappo_palco TEXT DEFAULT ''"):
+                    "tappo_palco TEXT DEFAULT ''",
+                    # LE RECENSIONI NASCOSTE DAL PROFILO PUBBLICO (22 nov
+                    # 2026, cantiere recensioni-nascondibili): 1 = quelle
+                    # del mercatino / quelle degli scambi P2P non escono
+                    # dalla rotta del negozio verso gli altri. Di serie 0:
+                    # si vedono tutte, come prima. Escono da /api/me col
+                    # SELECT *. Il giudice e' `_recensioni_nascoste_di`.
+                    "recensioni_mercatino_nascoste INTEGER DEFAULT 0",
+                    "recensioni_p2p_nascoste INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -32774,6 +32782,59 @@ def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
         con.close()
 
 
+# LE RECENSIONI NASCONDIBILI (22 nov 2026, cantiere recensioni-
+# nascondibili; un utente: «tra le sue recensioni posso vedere se ha
+# fatto acquisti P2P, di conseguenza so che lui possiede Bitcoin»).
+# Decisione di Andrea: UNA SCELTA PER UTENTE, di serie si vede tutto
+# come prima; ognuno puo' nascondere dal profilo pubblico le recensioni
+# del mercatino, quelle degli scambi P2P, o tutte e due.
+# COSA RESTA: le stelle e il numero di recensioni, che contano anche
+# quelle nascoste — altrimenti chi riceve un voto brutto lo nasconde e
+# la media sale. Nascondere toglie il RACCONTO, mai il voto.
+# CHI LE VEDE LO STESSO: il proprietario (il suo cassetto «Recensioni
+# ricevute» legge questa stessa rotta) e i moderatori, che da qui
+# hanno il bottone «rimuovi».
+# Scartata «togliere la provenienza a tutti» (la prima proposta):
+# Andrea vuole lasciare la scelta a chi e' recensito.
+def _recensioni_nascoste_di(riga, chi_guarda: int = 0) -> tuple:
+    """PURA: `(mercatino, p2p)` — quali recensioni di questo profilo
+    NON si mostrano a `chi_guarda`. A leva spenta, al proprietario e ai
+    moderatori niente e' nascosto. `riga` e' la riga di `utenti` (con
+    `tg_id` e le due colonne; una colonna assente vale 0)."""
+    if not RECENSIONI_NASCONDIBILI:
+        return (False, False)
+    try:
+        io = int(chi_guarda or 0)
+        suo = int(riga["tg_id"] or 0)
+    except (TypeError, ValueError, KeyError, IndexError):
+        io, suo = 0, 0
+    if io and (io == suo or e_admin(io)):
+        return (False, False)
+
+    def _col(nome):
+        try:
+            return bool(int(riga[nome] or 0))
+        except (TypeError, ValueError, KeyError, IndexError):
+            return False
+    return (_col("recensioni_mercatino_nascoste"),
+            _col("recensioni_p2p_nascoste"))
+
+
+def _sql_recensioni_visibili(mercatino: bool, p2p: bool) -> str:
+    """PURA: il pezzo di WHERE (sulla tabella `feedback` col nome `f`)
+    che toglie le recensioni nascoste. Le P2P sono quelle con `scambio`
+    pieno — lo stesso ramo che le chiama «scambio» nel CASE del ruolo —,
+    tutte le altre sono del mercatino. Niente da nascondere, stringa
+    vuota; tutte e due, nessuna riga."""
+    if mercatino and p2p:
+        return " AND 0"
+    if p2p:
+        return " AND COALESCE(f.scambio,'')=''"
+    if mercatino:
+        return " AND f.scambio<>''"
+    return ""
+
+
 @app.get("/api/negozio/{chi}")
 def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
             vista: int = 0,
@@ -32808,6 +32869,11 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
                      "sped_gratis_valuta, premi_fedelta, "
                      "premi_fedelta_valuta, "
                      "banner_stato, banner_foto, banner_link, "
+                     # (22 nov 2026) le recensioni nascoste dal profilo
+                     # pubblico: si leggono qui e si TOLGONO prima di
+                     # partire, come i campi grezzi del banner
+                     "recensioni_mercatino_nascoste, "
+                     "recensioni_p2p_nascoste, "
                      "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                      "END) AS avatar FROM utenti ")
     # IL LINK A SCELTA SI PROVA SULLA STRINGA INTERA (set 2026), PRIMA
@@ -32949,6 +33015,13 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # loro regole (npub solo dal possesso dimostrato). Un contatto in
     # piu' qui sarebbe una seconda porta da tenere allineata.
     # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
+    # LE RECENSIONI NASCOSTE (22 nov 2026, recensioni-nascondibili): chi
+    # ha spento quelle del mercatino e/o quelle degli scambi P2P, agli
+    # altri non le mostra — le stelle e il conteggio restano interi
+    # (vedi `_recensioni_nascoste_di`).
+    nasc_merc, nasc_p2p = _recensioni_nascoste_di(
+        v, user["id"] if user else 0)
+    filtro_fb = _sql_recensioni_visibili(nasc_merc, nasc_p2p)
     feedback = [] if cursore else [dict(r) for r in con.execute(
         # `da_tg_id` serve SOLO al bollino Staff qui sotto, e si toglie
         # prima di partire: chi ha scritto esce col nome e col codice
@@ -32974,7 +33047,7 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         " ELSE au.avatar END) AS da_avatar "
         "FROM feedback f LEFT JOIN ordini o ON o.id=f.ordine_id "
         "LEFT JOIN utenti au ON au.tg_id=f.da_tg_id "
-        "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT ?",
+        f"WHERE f.per_tg_id=?{filtro_fb} ORDER BY f.creato DESC LIMIT ?",
         (v["tg_id"], TETTO_FEEDBACK_NEGOZIO))]
     for f in feedback:
         f["foto"] = foto_recensione(f["foto"])
@@ -33034,6 +33107,13 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # ...e quanti scambi P2P ha completato (10 ott 2026, feedback-p2p)
     venditore["scambi_completati"] = scambi_completati
     venditore["risponde_in_fretta"] = risponde_in_fretta
+    # (22 nov 2026, recensioni-nascondibili) chi nasconde le recensioni
+    # P2P nasconde anche questi due: dicono la stessa cosa, «usa il
+    # P2P». I marchi «non completati» e «dispute perse» RESTANO, per
+    # decisione di Andrea: proteggono chi ci scambia (10 ott 2026).
+    if nasc_p2p:
+        venditore["scambi_completati"] = 0
+        venditore["risponde_in_fretta"] = False
     venditore["distintivi"] = [
         dict(id=d["id"], emoji=d["emoji"], nome=d["nome"],
              descrizione=d["descrizione"])
@@ -33120,6 +33200,10 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     del venditore["banner_stato"], venditore["banner_foto"]
     del venditore["banner_link"]
     del venditore["xp"], venditore["acquisti_ok"]
+    # le scelte sulle recensioni non escono: dire «nasconde le P2P»
+    # direbbe proprio quel che nasconde
+    del venditore["recensioni_mercatino_nascoste"]
+    del venditore["recensioni_p2p_nascoste"]
     # il bollino 🛡️ Staff (6 ott 2026): il si' esce, il tg_id no
     venditore["staff"] = e_staff(v["tg_id"])
     del venditore["tg_id"]         # il profilo che esce e' solo roba pubblica
@@ -39011,6 +39095,18 @@ def _leve_stato():
                   spento="nel cassetto e nella testata del Profilo solo "
                          "le vendite; i moderatori non vedono gli acquisti; "
                          "i contatori di livello e distintivi non cambiano"),
+        ]},
+        {"gruppo": "⭐ Recensioni nascondibili", "voci": [
+            # (22 nov 2026, cantiere recensioni-nascondibili): accesa di
+            # serie, nessun segreto
+            _leva("Recensioni nascondibili dal profilo pubblico",
+                  "RECENSIONI_NASCONDIBILI", RECENSIONI_NASCONDIBILI,
+                  acceso="in «Recensioni ricevute» ognuno sceglie se "
+                         "mostrare sul profilo pubblico le recensioni del "
+                         "mercatino e quelle degli scambi P2P; stelle e "
+                         "numero di recensioni restano sempre",
+                  spento="si vedono tutte le recensioni, come prima; le "
+                         "scelte restano salvate"),
         ]},
         {"gruppo": "🚀 Rotta per la Luna", "voci": [
             # IL TABELLONE (17 nov 2026, cantiere stradina): spento di
@@ -54732,6 +54828,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Gli acquisti nella testata del Profilo (17 nov 2026 sera, privacy):
     # la leva VIVA. `acquisti_ok` esce lo stesso, serve al livello.
     profilo["acquisti_nel_profilo"] = ACQUISTI_NEL_PROFILO
+    # Le recensioni nascondibili (22 nov 2026): la leva VIVA, perche' i due
+    # interruttori in «Recensioni ricevute» nascano solo quando la loro
+    # rotta risponde. Le due scelte escono col SELECT * di sempre.
+    profilo["recensioni_nascondibili"] = RECENSIONI_NASCONDIBILI
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
@@ -59834,6 +59934,31 @@ async def scegli_classifica_nascosta(req: Request,
     _classifica_cache["quando"] = 0.0
     await premia_reputazione_nostr(user["id"])
     return {"ok": True, "nascosta": bool(nascosta)}
+
+
+@app.post("/api/me/recensioni-nascoste")
+async def scegli_recensioni_nascoste(req: Request,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """Le recensioni sul profilo pubblico (22 nov 2026, cantiere
+    recensioni-nascondibili): due si' o no, «mostra quelle del
+    mercatino» e «mostra quelle degli scambi P2P», dal cassetto
+    «⭐ Recensioni ricevute». Arrivano INSIEME, come le dice la pagina:
+    una chiave assente vale «mostra». Vale subito, alla prossima
+    apertura del profilo. A leva spenta 404, come le rotte sorelle."""
+    if not RECENSIONI_NASCONDIBILI:
+        raise HTTPException(404, "Non disponibile")
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    merc = 0 if d.get("mercatino", True) else 1
+    p2p = 0 if d.get("p2p", True) else 1
+    con = db()
+    con.execute("UPDATE utenti SET recensioni_mercatino_nascoste=?, "
+                "recensioni_p2p_nascoste=? WHERE tg_id=?",
+                (merc, p2p, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "mercatino": not merc, "p2p": not p2p}
 
 
 @app.post("/api/me/avviso-trasporto")
@@ -121988,6 +122113,20 @@ try:
 except ImportError:
     ACQUISTI_NEL_PROFILO = False
 ACQUISTI_NEL_PROFILO = bool(ACQUISTI_NEL_PROFILO)
+# LA LEVA DELLE RECENSIONI NASCONDIBILI: RECENSIONI_NASCONDIBILI (22 nov
+# 2026, cantiere recensioni-nascondibili; un utente: «posso vedere se ha
+# fatto acquisti P2P, di conseguenza so che lui possiede Bitcoin»).
+# ACCESA di serie. Accesa, ognuno sceglie nel cassetto «⭐ Recensioni
+# ricevute» se mostrare sul profilo pubblico le recensioni del mercatino
+# e/o quelle degli scambi P2P (di serie si vedono tutte, come prima).
+# Spenta, le scelte restano salvate ma non contano: si vede tutto, e la
+# rotta della scelta risponde 404. Il perche' accanto a
+# `_recensioni_nascoste_di`.
+try:
+    from config import RECENSIONI_NASCONDIBILI
+except ImportError:
+    RECENSIONI_NASCONDIBILI = True
+RECENSIONI_NASCONDIBILI = bool(RECENSIONI_NASCONDIBILI)
 # LA LEVA DI AMBER CHE SI APRE DA SOLO: NOSTRCONNECT_APRI_APP (18 nov
 # 2026, cantiere amber-da-solo; un utente: «in nostrich il login con
 # remote signer apre automaticamente un popup di amber [...] su

@@ -30854,6 +30854,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `passaFiltroP2P` gli ordini di Mostro, «solo Lightning» lascia fuori
   in `carteOnchainLibroP2P` le card on-chain (il rettangolo resta).
 
+- LE RECENSIONI NASCONDIBILI (22 nov 2026, cantiere recensioni-
+  nascondibili): nel cassetto «⭐ Recensioni ricevute» due interruttori,
+  accesi di serie, per mostrare o no sul profilo pubblico le recensioni
+  del mercatino e quelle degli scambi P2P (`utenti.recensioni_mercatino_
+  nascoste`, `utenti.recensioni_p2p_nascoste`, rotta POST
+  `/api/me/recensioni-nascoste`). Il giudice è `_recensioni_nascoste_di`
+  (al proprietario e ai moderatori niente è nascosto), il filtro
+  `_sql_recensioni_visibili` sta nella SELECT della rotta del negozio,
+  prima del tetto. STELLE E NUMERO RESTANO, su tutte: nascondere toglie
+  il racconto, mai il voto. Con le P2P nascoste escono anche
+  `scambi_completati` (0) e `risponde_in_fretta` (falso); i marchi dei
+  non completati e delle dispute perse restano. Le due scelte non escono
+  mai dalla risposta del negozio. Leva `RECENSIONI_NASCONDIBILI`, accesa.
+  Il verbale in CANTIERI, «Le recensioni nascondibili».
+
 - LE RECENSIONI DEGLI SCAMBI (set 2026, richiesta di Andrea): a
   scambio P2P concluso le due parti si recensiscono come nel
   mercatino — stelle e commento — e quel voto finisce nella STESSA

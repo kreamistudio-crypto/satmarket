@@ -180657,7 +180657,7 @@ def prove_recensioni_ricevute():
               "function toggleFeedbackAltri(b){",
               "function fotoRecensioneHTML(",
               "function bollinoStaff(",
-              "function recensioniRicevuteHTML(feedback, nFeedback){"))
+              "function recensioniRicevuteHTML(feedback, nFeedback, qualcunaNascosta){"))
           + r"""
 const fb = n => Array.from({length: n}, (_, k) => ({id: k + 1, voto: 4, commento: 'c' + k,
   creato: 1790000000 - k * 86400, ruolo: ['acquirente', 'venditore', 'scambio', 'utente'][k % 4],
@@ -180676,6 +180676,9 @@ c.rimuovi = [mio.includes('rimuoviFeedback'), neg.includes('rimuoviFeedback')];
 c.id = [mio.includes('<div id="fbAltriMie" hidden>'), mio.includes('aria-controls="fbAltriMie"'),
         mio.includes('id="fbAltri"'), neg.includes('<div id="fbAltri" hidden>')];
 c.nota = mio.includes('Così le vedono tutti nel tuo negozio.');
+/* (22 nov 2026, recensioni-nascondibili) con qualcosa di nascosto la
+   frase tace: non sarebbe piu' vera */
+c.notaNascoste = recensioniRicevuteHTML(fb(5), 5, true).includes('Così le vedono tutti');
 const mie = {hidden: true}, loro = {hidden: true};
 DOM.fbAltriMie = mie; DOM.fbAltri = loro;
 const b = {dataset: {apri: 'x'}, attr: {'aria-controls': 'fbAltriMie'}, textContent: 'x',
@@ -180699,8 +180702,127 @@ console.log(JSON.stringify(c));
     prova("il blocco nascosto ha un id suo (il negozio puo' essere nel DOM)",
           [True, True, False, True], c.get("id"))
     prova("...e sotto l'elenco si dice che e' quello pubblico", True, c.get("nota"))
+    prova("...ma non quando ne hai nascosta qualcuna (22 nov 2026)", False,
+          c.get("notaNascoste"))
     prova("«Mostra tutti» del Profilo apre il SUO blocco, non quello del negozio",
           [False, True], c.get("tocco"))
+
+
+def prove_recensioni_nascondibili():
+    """LE RECENSIONI NASCONDIBILI DAL PROFILO PUBBLICO (22 nov 2026,
+    cantiere recensioni-nascondibili; un utente: dalle recensioni P2P
+    «so che lui possiede Bitcoin»). Decisione di Andrea: una scelta per
+    utente, di serie tutto visibile; si nascondono quelle del mercatino,
+    quelle degli scambi P2P o tutte e due. Stelle e numero restano.
+    Il giro su un database vero e' `collaudo_recensioni_nascoste.py`.
+
+    QUEL CHE SI ROMPE IN SILENZIO: il proprietario o il moderatore che non
+    vedono piu' le loro; le due scelte che escono dalla risposta del
+    negozio (dire «nasconde le P2P» direbbe quel che nasconde); le stelle
+    ricalcolate sulle sole visibili (chi riceve un voto brutto lo
+    nasconde); «✅ scambi P2P» che resta e tradisce; la leva che non si
+    spegne; gli interruttori nati con un server di ieri."""
+    import subprocess as _sp
+    print("\n[recensioni-nascondibili: la scelta di chi e' recensito]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) I DUE GIUDICI PURI, sui casi che decidono -------------------
+    amb = {"RECENSIONI_NASCONDIBILI": True, "e_admin": lambda t: t == 999}
+    for f in ("_recensioni_nascoste_di", "_sql_recensioni_visibili"):
+        exec(pezzo(f), amb)
+    nasc, sql = amb["_recensioni_nascoste_di"], amb["_sql_recensioni_visibili"]
+    riga = {"tg_id": 222, "recensioni_mercatino_nascoste": 1,
+            "recensioni_p2p_nascoste": 1}
+    prova("l'estraneo e l'anonimo non vedono quel che e' nascosto",
+          [(True, True), (True, True)], [nasc(riga, 333), nasc(riga, 0)])
+    prova("...il proprietario e il moderatore vedono tutto",
+          [(False, False), (False, False)], [nasc(riga, 222), nasc(riga, 999)])
+    prova("una riga senza le colonne (un database di ieri) vale «mostra»",
+          (False, False), nasc({"tg_id": 222}, 333))
+    prova("...e una scelta sola resta sola", (False, True),
+          nasc({"tg_id": 222, "recensioni_mercatino_nascoste": 0,
+                "recensioni_p2p_nascoste": 1}, 333))
+    amb["RECENSIONI_NASCONDIBILI"] = False
+    prova("a leva spenta niente e' nascosto", (False, False), nasc(riga, 333))
+    prova("il filtro: niente, solo le P2P, solo il mercatino, tutte",
+          ["", " AND COALESCE(f.scambio,'')=''", " AND f.scambio<>''", " AND 0"],
+          [sql(False, False), sql(False, True), sql(True, False), sql(True, True)])
+
+    # --- 2) LA ROTTA DEL NEGOZIO ---------------------------------------
+    neg = codice(pezzo("negozio"))
+    prova("il negozio legge le due scelte...", True,
+          '"recensioni_mercatino_nascoste, "' in neg
+          and '"recensioni_p2p_nascoste, "' in neg)
+    prova("...le passa al giudice con chi guarda...", True,
+          'nasc_merc, nasc_p2p = _recensioni_nascoste_di(\n        v, user["id"] if user else 0)' in neg)
+    prova("...filtra l'elenco nella sua SELECT, prima del tetto", True,
+          'f"WHERE f.per_tg_id=?{filtro_fb} ORDER BY f.creato DESC LIMIT ?"' in neg)
+    prova("...spegne «scambi P2P» e «risponde in fretta» con le P2P nascoste",
+          True, 'if nasc_p2p:\n        venditore["scambi_completati"] = 0\n'
+                '        venditore["risponde_in_fretta"] = False' in neg)
+    prova("...e le due scelte non escono", True,
+          'del venditore["recensioni_mercatino_nascoste"]' in neg
+          and 'del venditore["recensioni_p2p_nascoste"]' in neg)
+    prova("le stelle non guardano le scelte: si ricalcolano su tutte", False,
+          "nascoste" in codice(pezzo("_ricalcola_rating")))
+
+    # --- 3) LA ROTTA DELLA SCELTA, LA LEVA, /api/me ---------------------
+    sc = codice(pezzo("scegli_recensioni_nascoste"))
+    prova("la rotta della scelta c'e', e a leva spenta e' un 404", True,
+          '@app.post("/api/me/recensioni-nascoste")' in src
+          and "if not RECENSIONI_NASCONDIBILI:\n        raise HTTPException(404" in sc)
+    prova("...una chiave assente vale «mostra»", True,
+          'd.get("mercatino", True)' in sc and 'd.get("p2p", True)' in sc)
+    prova("...e scrive solo sulla riga di chi chiede", True,
+          "verifica_utente(" in sc and 'WHERE tg_id=?",' in sc)
+    prova("la leva nasce ACCESA nel codice e nell'esempio", True,
+          "    RECENSIONI_NASCONDIBILI = True\n" in src
+          and "\nRECENSIONI_NASCONDIBILI = True\n" in es)
+    prova("...sta nel pannello delle leve", True,
+          '"RECENSIONI_NASCONDIBILI", RECENSIONI_NASCONDIBILI,' in src)
+    prova("...e /api/me la dice viva", True,
+          'profilo["recensioni_nascondibili"] = RECENSIONI_NASCONDIBILI' in src)
+    prova("le due colonne nascono a 0 (di serie si vede tutto)", True,
+          '"recensioni_mercatino_nascoste INTEGER DEFAULT 0"' in src
+          and '"recensioni_p2p_nascoste INTEGER DEFAULT 0"' in src)
+
+    # --- 4) IL CLIENT: gli interruttori, in node ------------------------
+    prova("gli interruttori stanno nel cassetto «Recensioni ricevute»", True,
+          '<div id="recensioniBlocco"></div><div id="recensioniVisibili"></div>' in mini)
+    prova("...la leva si legge col ===, un server di ieri non li accende",
+          True, "recensioniNascondibili = me.recensioni_nascondibili === true;" in mini)
+    js = ("let recensioniNascondibili = true, myRecMercNascoste = false, "
+          "myRecP2pNascoste = true;\n"
+          + _fn_js(mini, "function recensioniVisibiliHTML(){")
+          + r"""
+const c = {};
+const h = recensioniVisibiliHTML();
+c.scritte = [h.includes('Mostra sul profilo pubblico le recensioni del mercatino'),
+             h.includes('Mostra sul profilo pubblico le recensioni degli scambi P2P'),
+             h.includes('Le stelle e il numero di recensioni restano sempre visibili.')];
+c.stati = (h.match(/>\s*(Attivo|Spento)<\/button>/g) || []).map(x => /(Attivo|Spento)/.exec(x)[1]);
+c.gesti = [h.includes("setRecensioniVisibili('mercatino', false, this)"),
+           h.includes("setRecensioniVisibili('p2p', true, this)")];
+recensioniNascondibili = false;
+c.spenta = recensioniVisibiliHTML();
+console.log(JSON.stringify(c));
+""")
+    c = _node_banco(js)
+    if c is None:
+        salta("gli interruttori delle recensioni in node", "node non c'e'")
+        return
+    prova("le tre scritte approvate da Andrea", [True, True, True], c.get("scritte"))
+    prova("...mercatino «Attivo» (si mostra), P2P «Spento» (nascosta)",
+          ["Attivo", "Spento"], c.get("stati"))
+    prova("...e il tocco chiede il contrario di com'e'", [True, True], c.get("gesti"))
+    prova("a leva spenta niente interruttori", "", c.get("spenta"))
+    car = _fn_js(mini, "async function caricaRecensioniRicevute(){")
+    prova("il cassetto disegna gli interruttori e passa alla frase se "
+          "qualcosa e' nascosto", True,
+          "renderRecensioniVisibili();" in car
+          and "recensioniNascondibili && (myRecMercNascoste || myRecP2pNascoste)" in car)
 
 
 def prove_feedback_modificabile():
@@ -220246,7 +220368,7 @@ CATEGORIE = {
     meta_cauzione_auto
     """.split(),
     "mercatino": """
-    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
@@ -221430,6 +221552,7 @@ def main():
               prove_feedback_p2p,
               prove_feedback_modificabile,
               prove_recensioni_ricevute,
+              prove_recensioni_nascondibili,
               prove_x_risonanza,
               prove_indirizzo_lightning,
               prove_indirizzo_swap,

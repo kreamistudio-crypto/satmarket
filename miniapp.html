@@ -17120,7 +17120,7 @@ document.getElementById('cartello')?.remove();</script>
            SPENTO: in DEMO e in vetrina non c'e' un negozio vero. -->
       <div class="acc" id="accRecensioni" style="display:none">
         <button class="acc-h" onclick="toggleRecensioniRicevute()"><span class="em">⭐</span>Recensioni ricevute <span class="conta" id="recensioniConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="recensioniBlocco"></div></div>
+        <div class="acc-b"><div id="recensioniBlocco"></div><div id="recensioniVisibili"></div></div>
       </div>
 
       <div class="acc" id="accLivello">
@@ -45266,6 +45266,10 @@ let myLivello = null;            // il grado DERIVATO dal server
 let myScalaLivelli = [];         // i gradini coi loro vantaggi (ott 2026)
 let myClassifica = false;        // la leva della classifica, dal server
 let myClassificaNascosta = false; // «Non mostrarmi in classifica», dal server
+/* LE RECENSIONI NASCONDIBILI (22 nov 2026): la leva viva e le due scelte,
+   da /api/me. Un server di ieri non manda niente: niente interruttori */
+let recensioniNascondibili = false;
+let myRecMercNascoste = false, myRecP2pNascoste = false;
 let myAnnunciSulProfilo = true;  // «Pubblica i miei annunci anche sul mio profilo Nostr», dal server (di serie si')
 /* IL NOME VERIFICATO SU NOSTR (17 nov 2026, cantiere nip05-utenti): lo
    stato da /api/me (`nip05`), null a leva spenta o con un server di ieri
@@ -47621,16 +47625,70 @@ function apriRecensioniRicevute(){
 /* PURA: l'elenco, o la frase quando non ce n'e' ancora nessuna. «Le
    ultime N» quando il server ne manda meno di quante sono davvero
    (`feedbackNegozioHTML` lo dice gia' sul bottone «Mostra») */
-function recensioniRicevuteHTML(feedback, nFeedback){
+function recensioniRicevuteHTML(feedback, nFeedback, qualcunaNascosta){
   if (!feedback || !feedback.length)
     return '<div class="hint">Ancora nessuna recensione. Arrivano quando chi ha comprato da te, '
       + 'chi ti ha venduto qualcosa o chi ha scambiato sats con te lascia un voto.</div>';
+  /* «Così le vedono tutti» e' vero solo se non ne hai nascosta nessuna
+     (22 nov 2026, recensioni-nascondibili): con un interruttore spento
+     la frase tace, e gli interruttori qui sotto dicono come stanno */
   return feedbackNegozioHTML(feedback, nFeedback, true)
-    + '<div class="hint" style="margin-top:8px">Così le vedono tutti nel tuo negozio.</div>';
+    + (qualcunaNascosta ? ''
+       : '<div class="hint" style="margin-top:8px">Così le vedono tutti nel tuo negozio.</div>');
+}
+/* I DUE INTERRUTTORI (22 nov 2026, cantiere recensioni-nascondibili; un
+   utente: dalle recensioni P2P «so che lui possiede Bitcoin»). Di serie
+   accesi, cioe' tutto visibile come prima; spento, quelle recensioni non
+   escono piu' dal profilo pubblico (le filtra il server, che a te e ai
+   moderatori le mostra sempre). Stelle e numero restano. La pillola e'
+   quella di «Non mostrarmi in classifica»: «Attivo» = si mostrano.
+   Scritte approvate da Andrea il 22 nov 2026 alle 18:53.
+   PURA: legge le tre variabili qui sopra. */
+function recensioniVisibiliHTML(){
+  if (!recensioniNascondibili) return '';
+  const riga = (chiave, testo, mostra) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+      <div style="min-width:0;flex:1;font-size:13.5px;font-weight:800">${testo}</div>
+      <button onclick="setRecensioniVisibili('${chiave}', ${mostra ? 'false' : 'true'}, this)"
+        aria-pressed="${mostra ? 'true' : 'false'}"
+        style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${mostra?'var(--sats)':'var(--line)'};background:${mostra?'var(--sats)':'transparent'};color:${mostra?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+        ${mostra ? 'Attivo' : 'Spento'}</button>
+    </div>`;
+  return `
+    <div style="margin-top:16px;padding-top:4px;border-top:1px solid var(--line)">
+      ${riga('mercatino', 'Mostra sul profilo pubblico le recensioni del mercatino', !myRecMercNascoste)}
+      ${riga('p2p', 'Mostra sul profilo pubblico le recensioni degli scambi P2P', !myRecP2pNascoste)}
+      <div style="margin-top:8px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+        Le stelle e il numero di recensioni restano sempre visibili.</div>
+    </div>`;
+}
+function renderRecensioniVisibili(){
+  const box = el('recensioniVisibili');
+  if (box) box.innerHTML = recensioniVisibiliHTML();
+}
+async function setRecensioniVisibili(chiave, mostra, btn){
+  haptic();
+  if (DEMO) return;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const merc = chiave === 'mercatino' ? mostra : !myRecMercNascoste;
+  const p2p = chiave === 'p2p' ? mostra : !myRecP2pNascoste;
+  try {
+    const r = await fetch(`${API_BASE}/me/recensioni-nascoste`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({mercatino: merc, p2p})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myRecMercNascoste = d.mercatino === false;
+    myRecP2pNascoste = d.p2p === false;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  finally { renderRecensioniVisibili(); }
+  /* la frase «Così le vedono tutti» dipende da queste scelte */
+  caricaRecensioniRicevute();
 }
 async function caricaRecensioniRicevute(){
   const box = el('recensioniBlocco');
   if (!box || !myNegozio || DEMO || VETRINA) return;
+  renderRecensioniVisibili();
   if (!box.innerHTML) box.innerHTML = '<div class="hint">Un attimo…</div>';
   try {
     const r = await fetch(`${API_BASE}/negozio/${encodeURIComponent(myNegozio)}?limit=1`,
@@ -47639,7 +47697,8 @@ async function caricaRecensioniRicevute(){
     const d = await r.json();
     const v = d.venditore || {};
     box.innerHTML = recensioniRicevuteHTML(d.feedback || [],
-      Number(v.n_feedback) || Number(myNFeedback) || 0);
+      Number(v.n_feedback) || Number(myNFeedback) || 0,
+      recensioniNascondibili && (myRecMercNascoste || myRecP2pNascoste));
   } catch (e) {
     box.innerHTML = '<div class="hint">Non riesco a leggere le recensioni adesso: riprova tra poco.</div>';
   }
@@ -121732,6 +121791,9 @@ async function avvia(){
     cacciaAperta = cacciaAttiva && me.tappo_caccia === true;
     vestiCaccia();
     myClassificaNascosta = !!me.classifica_nascosta;
+    recensioniNascondibili = me.recensioni_nascondibili === true;
+    myRecMercNascoste = !!me.recensioni_mercatino_nascoste;
+    myRecP2pNascoste = !!me.recensioni_p2p_nascoste;
     myAnnunciSulProfilo = me.annunci_su_profilo_nostr == null ? true : !!me.annunci_su_profilo_nostr;
     myNip05 = (me.nip05 && typeof me.nip05 === 'object') ? me.nip05 : null;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);

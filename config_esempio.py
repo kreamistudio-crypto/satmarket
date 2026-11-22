@@ -1323,6 +1323,13 @@ STRADINA_ATTIVA = False
 # Andrea («gli acquisti non li aggiungere»): nel cassetto restano le
 # vendite, come prima. True li mostra; i contatori non cambiano mai.
 ACQUISTI_NEL_PROFILO = False
+# LE RECENSIONI NASCONDIBILI ⭐ (22 nov 2026, cantiere recensioni-
+# nascondibili): nel cassetto «Recensioni ricevute» ognuno sceglie se
+# mostrare sul profilo pubblico le recensioni del mercatino e/o quelle
+# degli scambi P2P (di serie tutte visibili). Stelle e numero di
+# recensioni restano sempre. ACCESA di serie; False mostra tutto come
+# prima, e le scelte restano salvate.
+RECENSIONI_NASCONDIBILI = True
 # AMBER CHE SI APRE DA SOLO 📲 (18 nov 2026, cantiere amber-da-solo): su
 # Android «Entra con nostrconnect» apre il firmatario del telefono
 # (Amber) col link nostrconnect://, invece di far copiare e incollare la

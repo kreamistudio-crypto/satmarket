@@ -94383,3 +94383,55 @@ collaudo).
 NON PROVATO dal vivo: un acquisto vero sopra 500 €; il foglio si guarda
 sul collaudo, che segue develop (se il config della vm-2050 ha una riga
 `ONCHAIN_MAX_EURO` vince lei: sopra quel tetto il Lightning resta).
+
+## Le recensioni nascondibili dal profilo pubblico: mercatino, P2P o tutte e due (22 nov 2026, cantiere recensioni-nascondibili; un utente, inoltrato da Andrea: «tra le sue recensioni posso vedere se ha fatto acquisti P2P, di conseguenza so che lui possiede Bitcoin»; Andrea: «io darei la possibilità di scegliere di mostrare le proprie recensioni o no. Di default rimane come adesso [...] sia peer-to-peer che nel mercatino», poi «Perfetto, così va bene»)
+
+COSA. Nel cassetto «⭐ Recensioni ricevute» del Profilo due interruttori,
+accesi di serie (cioè tutto visibile, come prima): «Mostra sul profilo
+pubblico le recensioni del mercatino» e «... degli scambi P2P», con sotto
+«Le stelle e il numero di recensioni restano sempre visibili.» (le tre
+scritte approvate da Andrea). La pillola è quella di «Non mostrarmi in
+classifica» («Attivo» = si mostrano). Spento, quelle recensioni non escono
+più dalla rotta del negozio verso gli altri: profilo pubblico e riquadro
+«Chi ha pubblicato» del P2P. Il proprietario e i moderatori le vedono
+sempre. Con le P2P nascoste escono dal profilo anche «✅ N scambi P2P» e
+«⚡ Risponde in fretta». Server: due colonne in `utenti` (0 di serie), il
+giudice puro `_recensioni_nascoste_di`, il filtro `_sql_recensioni_visibili`
+dentro la SELECT dei feedback (prima del tetto), la rotta POST
+`/api/me/recensioni-nascoste` (una chiave assente vale «mostra»), la leva
+`RECENSIONI_NASCONDIBILI` accesa di serie, nel pannello e in /api/me.
+Nel cassetto la frase «Così le vedono tutti nel tuo negozio.» tace quando
+qualcosa è nascosto, perché non sarebbe più vera.
+
+PERCHÉ COSÌ. Stelle e numero restano, contando anche le nascoste: se
+nascondere togliesse il voto, chi riceve un voto brutto lo nasconderebbe e
+la media salirebbe. «Non completati» e «dispute perse» restano per la
+decisione del 10 ott (proteggono chi ci scambia). Le due scelte non escono
+dalla risposta del negozio: dire «nasconde le P2P» direbbe proprio quel che
+nasconde. Il moderatore vede tutto perché da lì ha il bottone «rimuovi».
+
+SCARTATO. La prima proposta, togliere la provenienza («da uno scambio
+P2P», «ha comprato qui») a tutti di serie, senza scelta: Andrea vuole
+lasciare la scelta a chi è recensito, e di serie com'è oggi. Nascondere
+solo la riga della provenienza delle P2P: chi guarda capirebbe lo stesso
+dall'assenza.
+
+PROVATO. `collaudo_recensioni_nascoste.py` (nuovo, in CI): sul database
+vero e con la rotta vera, di serie tutto visibile e le scelte assenti
+dalla risposta; P2P nascoste per estraneo, anonimo e chi l'ha scritta (via
+la recensione, «scambi P2P» a 0, «risponde in fretta» falso, stelle e
+numero intatti, il marchio dei non completati resta); proprietario e
+moderatore vedono tutto; mercatino nascosto, tutte e due, corpo vuoto =
+tutto visibile; leva spenta: tutto visibile, rotta 404, scelte salvate.
+30 su 30. `prove_recensioni_nascondibili` (nuova): i due giudici puri sui
+casi, le sentinelle della rotta del negozio, la rotta della scelta, la
+leva, gli interruttori in node con le tre scritte. In
+`prove_recensioni_ricevute` la frase che tace. Controprove: col filtro
+spento e con lo spegnimento dei numeri P2P tolto il collaudo diventa rosso
+(6 rosse); col proprietario tolto dal giudice, 2 rosse; con la leva tolta
+dal client, la prova in node rossa.
+
+DA GUARDARE. Dal telefono, in collaudo: spegnere «P2P» nel cassetto e
+aprire il proprio negozio da un secondo account (la recensione dello
+scambio e «✅ scambi P2P» spariti, le stelle uguali). NOVITA.md e la riga
+per Tappo NON scritte: testi nuovi solo con l'ok di Andrea.
