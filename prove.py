@@ -211845,6 +211845,10 @@ def prove_onchain_cauzione():
     k = src.index("\nP2P_ONCHAIN_CAUZIONE_MEMO = ") + 1
     exec(src[k:src.index("\n", src.index("\n", k) + 1)], amb)
     amb["P2P_ONCHAIN_CAUZIONE_A_SCELTA"] = True
+    # il tetto (22 nov 2026): il default scritto nel ramo senza config
+    amb["P2P_ONCHAIN_CAUZIONE_TETTO_SATS"] = int(re.search(
+        r"except \(ImportError, TypeError, ValueError\):\n    P2P_ONCHAIN_CAUZIONE_TETTO_SATS = (\d+)\n",
+        src).group(1))
     for f in ("_metodi_libro", "_p2p_onchain_campo", "_p2p_onchain_metodi", "_p2p_onchain_solo_contanti",
               "_p2p_onchain_contanti", "p2p_onchain_cauzione_sats", "p2p_onchain_metodo_presa",
               "p2p_onchain_cauzione_chiesta", "_p2p_onchain_ha_dove_pagare",
@@ -211859,8 +211863,17 @@ def prove_onchain_cauzione():
           (amb["P2P_ONCHAIN_CAUZIONE_PCT"], amb["P2P_ONCHAIN_CAUZIONE_BASE_SATS"],
            amb["P2P_ONCHAIN_CAUZIONE_FINESTRA_S"], amb["P2P_ONCHAIN_CAUZIONE_CLTV"]))
     prova("quanti sats: il 3% col mezzo che sale, mai sotto il minimo, e una cifra storta fa 0",
-          [3000, 1000, 1000, 1001, 30000, 0, 0, 0],
-          [S(100000), S(10000), S(33334), S(33350), S(1000000), S(0), S(-5), S("x")])
+          [3000, 1000, 1000, 1001, 0, 0, 0],
+          [S(100000), S(10000), S(33334), S(33350), S(0), S(-5), S("x")])
+    # IL TETTO (22 nov 2026, cantiere tetto-cauzione; Andrea: «Mettiamo un
+    # tetto massimo a 50000 sats»): il 3% scatta contro il tetto da 1.666.667
+    prova("il tetto di serie e' 50.000 sats, e il 3% non lo supera mai",
+          [50000, 48000, 49998, 50000, 50000],
+          [amb["P2P_ONCHAIN_CAUZIONE_TETTO_SATS"], S(1600000), S(1666600), S(1666667), S(2000000)])
+    amb["P2P_ONCHAIN_CAUZIONE_TETTO_SATS"] = 0
+    prova("...con 0 nel config il tetto si spegne: il 3% di prima",
+          [60000, 48000, 3000], [S(2000000), S(1600000), S(100000)])
+    amb["P2P_ONCHAIN_CAUZIONE_TETTO_SATS"] = 50000
     solo = {"metodi": '["Contanti"]'}
     misto = {"metodi": '["Bonifico", "Contanti"]'}
     online = {"metodi": '["Bonifico", "Revolut"]'}
@@ -212213,7 +212226,7 @@ let p2pOnchainLibro = {cauzione: null};
 const zonaDettP2P = o => (o.metodi || []).indexOf('Contanti') >= 0 && o.zona ? '[zona ' + o.zona + ']' : '';
 const regolaContantiFoglioP2P = (m, max, lato) => '[regola ' + lato + ' ' + max + ']';
 const maxEuroContantiP2P = () => 250;
-const REGOLA = {accesa: true, pct: 3, base: 1000, finestra: 900};
+const REGOLA = {accesa: true, pct: 3, base: 1000, tetto: 50000, finestra: 900};
 const solo = {id: 1, metodi: ['Contanti'], zona: 'Milano centro', sats: 100000, lato: 'sell'};
 const misto = {id: 2, metodi: ['Bonifico', 'Contanti'], zona: 'Milano centro', sats: 100000, lato: 'sell'};
 const online = {id: 3, metodi: ['Bonifico', 'Revolut'], sats: 100000, lato: 'sell'};
@@ -212222,6 +212235,14 @@ out.scelta = [sceltaMetodoOcP2P(solo), sceltaMetodoOcP2P(misto), sceltaMetodoOcP
 out.sats = [cauzioneOcSatsP2P(100000, REGOLA), cauzioneOcSatsP2P(10000, REGOLA), cauzioneOcSatsP2P(33334, REGOLA),
             cauzioneOcSatsP2P(33350, REGOLA), cauzioneOcSatsP2P(1000000, REGOLA), cauzioneOcSatsP2P(0, REGOLA),
             cauzioneOcSatsP2P(100000, null)];
+/* il tetto (22 nov 2026): senza (server di ieri, o 0) il 3% pieno */
+const SENZA = {...REGOLA, tetto: 0};
+out.tetto = [cauzioneOcSatsP2P(2000000, REGOLA), cauzioneOcSatsP2P(1666600, REGOLA), cauzioneOcSatsP2P(2000000, SENZA),
+             cauzioneOcSatsP2P(2000000, {accesa: true, pct: 3, base: 1000}),
+             rigaCauzioneOcP2P({sats: 0, stima: 0}, SENZA).includes('il 3%, almeno 1000 sats, in Lightning.'),
+             notaCauzioneNuovoP2P(SENZA).includes('(il 3%, almeno 1000 sats), che torna'),
+             notaCauzioneNuovoP2P(REGOLA).includes('(il 3%, almeno 1000 sats, al massimo 50000 sats), che torna'),
+             rigaCauzioneOcP2P({sats: 2000000}, REGOLA).includes('circa <b>50000 sats</b>')];
 out.metodo0 = [metodoPresaOcP2P(solo), metodoPresaOcP2P(misto)];
 /* leva spenta: le pillole ci sono, la cauzione no */
 const h0 = metodiPresaOcHtmlP2P(misto, true);
@@ -212238,7 +212259,7 @@ const h2 = metodiPresaOcHtmlP2P(misto, true);
 /* (20 nov 2026, bottoni-fissi; Andrea: «Troppo testo») la riga corta */
 out.accesa = [cauzioneOcServeP2P(misto), h2.includes('cauzione-regola'), h2.includes('circa <b>3000 sats</b> in Lightning'),
               h2.includes('<b>Tornano a fine scambio</b>'), h2.includes('li perdi se non ti presenti all\'incontro.'),
-              rigaCauzioneOcP2P({id: 2, metodi: ['Contanti']}, REGOLA).includes('🔐 <b>Cauzione:</b> il 3%, almeno 1000 sats, in Lightning.')];
+              rigaCauzioneOcP2P({id: 2, metodi: ['Contanti']}, REGOLA).includes('🔐 <b>Cauzione:</b> il 3%, almeno 1000 sats, al massimo 50000 sats, in Lightning.')];
 p2pOcPresaMetodo = {id: 2, metodo: 'Bonifico'};
 const h3 = metodiPresaOcHtmlP2P(misto, true);
 out.bonifico = [cauzioneOcServeP2P(misto), h3.includes('cauzione-regola'), h3.includes('[zona'), h3.includes('[regola')];
@@ -212325,6 +212346,9 @@ console.log(JSON.stringify(out));
           [False, True, False], out.get("scelta"))
     prova("i sats della cauzione sul telefono sono quelli del server, cifra per cifra",
           [S(100000), S(10000), S(33334), S(33350), S(1000000), 0, 0], out.get("sats"))
+    prova("...anche col tetto: 50.000 al massimo; senza tetto dal server il 3% pieno; la regola "
+          "senza cifra dice «al massimo 50000 sats» solo se il tetto c'e' (testo di Andrea)",
+          [50000, 49998, 60000, 60000, True, True, True, True], out.get("tetto"))
     prova("un metodo solo e' gia' scelto; fra piu' metodi si parte senza scelta",
           ["Contanti", ""], out.get("metodo0"))
     prova("senza scelta: due pillole spente, la frase del metodo fisso, e ne' zona ne' regola ne' cauzione",

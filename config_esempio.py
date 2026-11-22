@@ -228,6 +228,9 @@ P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN = True
 # on-chain puo' chiederla a chiunque lo prenda, con qualunque metodo.
 # Accesa di serie; vale solo con la cauzione on-chain accesa qui sopra.
 P2P_ONCHAIN_CAUZIONE_A_SCELTA = True
+# Il tetto della cauzione on-chain (22 nov 2026): il 3% non sale oltre
+# questi sats. Di serie 50000 anche senza la riga; 0 = nessun tetto.
+P2P_ONCHAIN_CAUZIONE_TETTO_SATS = 50000
 # Il deposito col tempo di chi pubblica (19 nov 2026, cantiere onchain-tempo-
 # deposito): chi vende on-chain col suo tempo per pagare deve INVIARE il
 # deposito entro quel tempo (al piu' sei ore), sennò la ronda annulla lo

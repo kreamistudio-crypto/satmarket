@@ -5142,6 +5142,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   Il journal dice «🔐 cauzione on-chain: scambio #N, X sats BRUCIATI dal
   moderatore M; metà da mandare a mano: Y». Una riga rimasta `saldando`
   più di due minuti la chiude il giro, chiedendo a LND.
+  IL TETTO (22 nov 2026, cantiere tetto-cauzione): la cifra è il 3% con
+  minimo 1.000 sats e, di serie anche SENZA riga, al massimo 50.000
+  (`P2P_ONCHAIN_CAUZIONE_TETTO_SATS`). Per cambiarlo: la riga con un altro
+  numero in coda al config e il riavvio; `= 0` lo spegne (il 3% pieno,
+  come prima). Vale per le cauzioni coniate dopo il riavvio. Il journal
+  all'avvio lo dice in coda alla riga «🔐 Cauzione del contanti on-chain:
+  …, 3% con minimo 1.000 sats e tetto 50.000 sats».
 - L'INDIRIZZO LIGHTNING DI CASA (10 ott 2026; perché in CANTIERI,
   «L'indirizzo Lightning di casa: zap@barattolo.store»; com'è fatto in
   ARCHITETTURA, stesso titolo). `zap@barattolo.store`, per ricevere gli

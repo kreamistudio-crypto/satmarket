@@ -74484,6 +74484,8 @@ function accogliLibroOnchainP2P(busta){
        e la regola del server; null = spenta, o server di ieri */
     cauzione: busta.cauzione && busta.cauzione.accesa === true
       ? {accesa: true, pct: Number(busta.cauzione.pct) || 0, base: Number(busta.cauzione.base) || 0,
+         /* (22 nov 2026) il tetto in sats, 0 = nessuno (o server di ieri) */
+         tetto: Number(busta.cauzione.tetto) || 0,
          finestra: Number(busta.cauzione.finestra) || 900,
          /* (18 nov 2026) chi pubblica puo' chiederla a chiunque prenda */
          aScelta: busta.cauzione.aScelta === true} : null};
@@ -76342,11 +76344,13 @@ function metodoPresaOcP2P(o){
   return s && m.indexOf(s) >= 0 ? s : '';
 }
 /* PURA: i sats della cauzione, con la formula del server
-   (`p2p_onchain_cauzione_sats`): max(round(pct × sats), base) */
+   (`p2p_onchain_cauzione_sats`): max(round(pct × sats), base), e mai
+   oltre il tetto (22 nov 2026), se c'e' */
 function cauzioneOcSatsP2P(sats, c){
   const s = Math.floor(Number(sats) || 0);
   if (!c || !(s > 0)) return 0;
-  return Math.max(Math.floor((c.pct * s + 50) / 100), c.base);
+  const n = Math.max(Math.floor((c.pct * s + 50) / 100), c.base);
+  return c.tetto > 0 ? Math.min(n, c.tetto) : n;
 }
 /* a chi prende QUEST'ordine col metodo scelto serve la cauzione? In
    contanti, o dove l'ha chiesta chi pubblica (18 nov 2026) */
@@ -76365,7 +76369,9 @@ function rigaCauzioneOcP2P(o, c){
      complicato»; testi proposti e approvati da lui: «Ok, va bene»). Senza
      la stima (cifra non ancora nota) la regola al posto della cifra. */
   const quanto = stima > 0 ? 'circa <b>' + fmt(stima) + ' sats</b>'
-    : 'il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats,' : '');
+    : 'il ' + esc(String(c.pct).replace('.', ',')) + '%' + (c.base > 0 ? ', almeno ' + fmt(c.base) + ' sats,' : '')
+      /* (22 nov 2026, testo approvato da Andrea: «Al massimo 20000», tetto poi a 50000) */
+      + (c.tetto > 0 ? (c.base > 0 ? '' : ',') + ' al massimo ' + fmt(c.tetto) + ' sats,' : '');
   const testa = '<div class="hint cauzione-regola">🔐 <b>Cauzione:</b> ' + quanto
     + ' in Lightning. <b>Tornano a fine scambio</b>; ';
   if (o && o.cauzione_chiesta === true && metodoPresaOcP2P(o) !== 'Contanti')
@@ -100519,8 +100525,10 @@ function sezioneCauzioneNuovoP2P(){
 function notaCauzioneNuovoP2P(c){
   const pct = c && c.pct ? String(c.pct).replace('.', ',') : '3';
   const base = c && c.base ? fmt(c.base) : '1.000';
+  /* il tetto (22 nov 2026, testo approvato da Andrea) */
+  const tetto = c && c.tetto > 0 ? ', al massimo ' + fmt(c.tetto) + ' sats' : '';
   return 'Chi prende il tuo ordine blocca prima una piccola cauzione in Lightning (il ' + pct
-    + '%, almeno ' + base + ' sats), che torna a fine scambio. La perde se rinuncia dopo il tuo deposito '
+    + '%, almeno ' + base + ' sats' + tetto + '), che torna a fine scambio. La perde se rinuncia dopo il tuo deposito '
     + 'o se lascia scadere il tempo per pagare senza «Ho inviato»: in quel caso metà va a te, per coprire '
     + 'le commissioni di rete.';
 }

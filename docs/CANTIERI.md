@@ -94244,3 +94244,42 @@ Shopify vende solo questa carta, da 1 a 2000 €. I marchi (Conad,
 carburante…) stanno su shoppycode.com, dove la carta si spende. «Non è
 rivendibile, se non previa autorizzazione da parte dell'emittente»: è scritto
 nei termini della carta.
+
+## Il tetto della cauzione on-chain: il 3%, ma al massimo 50.000 sats (22 nov 2026, cantiere tetto-cauzione; Andrea: «un annuncio di JJ da 1k chiede 50k sats di cauzione, non è detto che tutti li abbiamo in LN», poi «Si bene 20000 sats come tetto» e, a lavoro iniziato, «Mettiamo un tetto massimo a 50000 sats»)
+
+COSA. La cauzione che chi prende un ordine P2P on-chain blocca in Lightning
+(nei contanti, o quando l'ha chiesta chi pubblica) resta il 3% con minimo
+1.000 sats, ma non sale oltre `P2P_ONCHAIN_CAUZIONE_TETTO_SATS`: 50.000 di
+serie, anche senza riga nel config (regola delle leve nuove accese). Con 0
+il tetto si spegne. Un solo giudice, `p2p_onchain_cauzione_sats`, che conia
+la hold; il libro manda il tetto al telefono (`cauzione.tetto`) e
+`cauzioneOcSatsP2P` ripete lo stesso conto per la cifra «circa X sats».
+Le due scritte che dicono la regola senza cifra (la riga della presa a
+prezzo di mercato senza stima e la nota sotto «🔐 Chiedila» nel foglio
+Pubblica) aggiungono «, al massimo 50.000 sats» (testo approvato da Andrea:
+«Al massimo 20000», poi il numero a 50000). Un server di ieri non manda il
+tetto: il telefono conta il 3% pieno, come prima.
+
+PERCHÉ COSÌ. Sugli ordini on-chain grandi il 3% diventa una cifra che non
+tutti hanno in un wallet Lightning. Un tetto fisso è la regola più
+semplice; il minimo resta quello del nodo. Prima 20.000, poi Andrea l'ha
+portato a 50.000 durante il cantiere: col 3% il tetto scatta da 1.666.667
+sats in su (l'ordine di JJ, circa 48.000, resta sotto; detto ad Andrea).
+Le cauzioni già coniate non cambiano: la cifra sta nella riga di
+`p2p_onchain_cauzioni`, e la metà persa la conta da lì.
+
+SCARTATO. Il Lightning (la cauzione di Mostro, `compute_bond_amount` sul
+nodo): Andrea ha chiarito che nel Lightning di Barattolo la cauzione non si
+chiede mai, c'è solo quella on-chain. Niente patch al nodo.
+
+PROVATO. `prove_onchain_cauzione`: il default 50.000 letto dal sorgente, il
+3% che si ferma a 50.000 (1.666.600 → 49.998, 1.666.667 e 2 milioni →
+50.000, 1,6 milioni → 48.000), con 0 il 3% pieno (60.000); sul telefono la
+stessa cifra del server, il server di ieri senza tetto, le due scritte con
+e senza tetto, la riga «circa 50000 sats». `collaudo_p2p_onchain`: il
+server vero, senza riga nel config, tiene il tetto di serie. Controprova:
+col `min` tolto dal server e dal telefono le prove nuove diventano rosse.
+
+DA GUARDARE. Sul telefono, da moderatore, un ordine on-chain sopra 1,7
+milioni di sats con «🔐 Chiedila»: la cifra del foglio di chi prende deve
+dire 50.000 sats, e così la richiesta col QR.

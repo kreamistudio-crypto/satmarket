@@ -38415,7 +38415,7 @@ def _leve_stato():
                   "P2P_ONCHAIN_CAUZIONE", P2P_ONCHAIN_CAUZIONE,
                   acceso="chi prende in contanti un ordine on-chain blocca "
                          "prima una cauzione in Lightning (3%, minimo 1000 "
-                         "sats) che torna a fine scambio; vale solo se nel "
+                         "sats, tetto P2P_ONCHAIN_CAUZIONE_TETTO_SATS) che torna a fine scambio; vale solo se nel "
                          "config c'e' anche LND_PONTE_MACAROON_CAUZIONE",
                   spento="il contanti on-chain si prende senza cauzione; "
                          "per accenderla servono la riga nel config e il "
@@ -115405,6 +115405,8 @@ def _p2p_onchain_libro(chi: int) -> dict:
                           "aScelta": P2P_ONCHAIN_CAUZIONE_A_SCELTA is True,
                           "pct": P2P_ONCHAIN_CAUZIONE_PCT,
                           "base": P2P_ONCHAIN_CAUZIONE_BASE_SATS,
+                          # (22 nov 2026) il tetto, 0 = nessuno
+                          "tetto": int(P2P_ONCHAIN_CAUZIONE_TETTO_SATS or 0),
                           "finestra": P2P_ONCHAIN_CAUZIONE_FINESTRA_S},
              # il tetto in euro degli scambi on-chain (12 nov 2026, Andrea:
              # «p2p onchain metti 500»): quello dell'on-chain, non del P2P
@@ -116775,6 +116777,16 @@ def _p2p_onchain_commissioni(con, dep: int, ric: int, prezzo: int, fee) -> tuple
 # nella richiesta e nella presa. Si apre a tutti scrivendo False.
 P2P_ONCHAIN_CAUZIONE_PCT = 3            # per cento dei sats dello scambio
 P2P_ONCHAIN_CAUZIONE_BASE_SATS = 1000   # il minimo
+# IL TETTO DELLA CAUZIONE (22 nov 2026, cantiere tetto-cauzione; Andrea:
+# «un annuncio di JJ da 1k chiede 50k sats di cauzione, non è detto che
+# tutti li abbiamo in LN», poi «Mettiamo un tetto massimo a 50000 sats»):
+# il 3% sale col prezzo, ma oltre questi sats non va. Leva accesa di serie; 0 nel config = nessun tetto, come prima.
+# Vale per le cauzioni coniate da qui in poi: quelle gia' chieste restano.
+try:
+    from config import P2P_ONCHAIN_CAUZIONE_TETTO_SATS
+    P2P_ONCHAIN_CAUZIONE_TETTO_SATS = max(int(P2P_ONCHAIN_CAUZIONE_TETTO_SATS), 0)
+except (ImportError, TypeError, ValueError):
+    P2P_ONCHAIN_CAUZIONE_TETTO_SATS = 50000
 P2P_ONCHAIN_CAUZIONE_FINESTRA_S = 900   # il tempo per pagare la richiesta
 P2P_ONCHAIN_CAUZIONE_CLTV = 576         # i blocchi dell'HTLC, come Mostro
 P2P_ONCHAIN_CAUZIONE_PRESA_S = 900      # tenuta ma non usata: poi torna
@@ -116868,15 +116880,19 @@ def p2p_onchain_cauzione_accesa(tg_id=0) -> bool:
 def p2p_onchain_cauzione_sats(sats) -> int:
     """PURA: quanti sats di cauzione su uno scambio di `sats`, con la
     formula del coordinatore (`compute_bond_amount`): max(round(pct ×
-    sats), base). In interi, col mezzo che sale. 0 = cifra storta."""
+    sats), base). In interi, col mezzo che sale. 0 = cifra storta. Poi
+    il tetto (22 nov 2026): mai oltre `P2P_ONCHAIN_CAUZIONE_TETTO_SATS`,
+    se non e' 0."""
     try:
         s = int(sats or 0)
     except (TypeError, ValueError):
         return 0
     if s <= 0:
         return 0
-    return max((P2P_ONCHAIN_CAUZIONE_PCT * s + 50) // 100,
+    sats = max((P2P_ONCHAIN_CAUZIONE_PCT * s + 50) // 100,
                P2P_ONCHAIN_CAUZIONE_BASE_SATS)
+    tetto = int(P2P_ONCHAIN_CAUZIONE_TETTO_SATS or 0)
+    return min(sats, tetto) if tetto > 0 else sats
 
 
 def p2p_onchain_metodo_presa(o, chiesto) -> str:
@@ -117836,7 +117852,9 @@ async def avvia_cauzioni_onchain():
              else "ACCESA SOLO PER I MODERATORI" if P2P_ONCHAIN_CAUZIONE_SOLO_ADMIN is not False
              else "ACCESA PER TUTTI")
           + f", {P2P_ONCHAIN_CAUZIONE_PCT}% con minimo "
-          f"{_fmt_sats(P2P_ONCHAIN_CAUZIONE_BASE_SATS)} sats", flush=True)
+          f"{_fmt_sats(P2P_ONCHAIN_CAUZIONE_BASE_SATS)} sats"
+          + (f" e tetto {_fmt_sats(P2P_ONCHAIN_CAUZIONE_TETTO_SATS)} sats"
+             if P2P_ONCHAIN_CAUZIONE_TETTO_SATS > 0 else ", senza tetto"), flush=True)
     asyncio.create_task(_ciclo_cauzioni_onchain())
 
 
