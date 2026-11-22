@@ -103685,8 +103685,8 @@ async def _fotografa_catalogo(c: dict, righe: list, esclusi: int) -> bool:
             f"{foto['totale']} prodotti"
             + (f" in {n_cat} categorie" if n_cat else "") + ". "
             f"Prima di metterli in vetrina scegli tu cosa entra: dal "
-            f"Profilo, in «📥 Carica tanti annunci insieme / catalogo "
-            f"esterno», tocca «🧺 Cosa entra». Puoi far entrare tutto, "
+            f"Profilo, in «📥 Carica prodotti» → il tuo negozio, tocca "
+            f"«🧺 Cosa entra». Puoi far entrare tutto, "
             f"solo alcune categorie, o togliere i singoli prodotti — e "
             f"cambiare idea quando vuoi.")
     return in_attesa
@@ -103722,8 +103722,8 @@ async def _connettore_in_errore(c: dict, errore: str):
             f"risponde il collegamento riparte, e te lo dico.\n\n"
             f"Se invece hai cambiato le chiavi, controlla il collegamento "
             f"dal Profilo, in "
-            f"«📥 Carica tanti annunci insieme / catalogo esterno»: se il "
-            f"token è scaduto basta rifarlo.")
+            f"«📥 Carica prodotti» → il tuo negozio: se il token è "
+            f"scaduto basta rifarlo.")
 
 
 async def nostr_del_negozio(connettore_id: int,

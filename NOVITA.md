@@ -921,3 +921,10 @@ frase: Se hai collegato il tuo negozio WooCommerce o Shopify, adesso scegli tu c
 dove: Profilo → «📥 Carica tanti annunci insieme / catalogo esterno» → il tuo negozio → «🧺 Cosa entra».
 leva: CONNETTORI_NEGOZIO_APERTI (il cassetto dei negozi collegati)
 pubblico: sì
+
+## 2026-11-22 · carica-prodotti-menu
+frase: «Carica prodotti» è più semplice: scegli prima da dove arrivano i tuoi prodotti, da un file CSV, da Shopify o da WooCommerce, e si apre solo quello che ti serve, con «‹ Indietro» per cambiare. E sugli annunci che arrivano dal tuo negozio collegato il bottone dice «Rimuovi da qui»: spariscono da Barattolo, non dal tuo e-commerce.
+dove: Profilo → «📥 Carica prodotti».
+leva: CONNETTORI_NEGOZIO_APERTI (il cassetto dei negozi collegati)
+pubblico: sì
+
