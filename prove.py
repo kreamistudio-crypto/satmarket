@@ -69742,7 +69742,9 @@ def prove_p2p_libro():
           # ci si aggiungono le card on-chain dello stesso lato, quelle
           # che si disegnano mescolate alle altre
           and '<em>${contoPillola}<span class="p2p-filtro-parola"> ' in _rp
-          and "const contoPillola = elenco.length\n    + (typeof righeOnchainLibroP2P === 'function' ? righeOnchainLibroP2P(k).length : 0);" in _rp
+          # (22 nov 2026, gift-card-metodo-p2p) ...e le gift card dello
+          # stesso lato, card del libro anche loro
+          and "const contoPillola = elenco.length\n    + (typeof righeOnchainLibroP2P === 'function' ? righeOnchainLibroP2P(k).length : 0)\n    + (typeof righeGiftLibroP2P === 'function' ? righeGiftLibroP2P(k).length : 0);" in _rp
           and "elenco.concat(righeOnchainLibroP2P(k)" in _rp
           and "elenco.map(rigaOrdineP2P)" in _rp
           and "const elenco = conMappa ? elencoMappaP2P(mostrati) : mostrati;" in _rp)
@@ -71537,7 +71539,8 @@ console.log(JSON.stringify(out));
     prova("...e renderP2P le mescola con qualunque criterio, anche «Piu' recenti»", (True, True, True),
           ("const misti = typeof vistaOrdinamentoOcP2P === 'function';" in _rp_oc,
            "carteOnchainLibroP2P(k, usdtNovita, misti)" in _rp_oc,
-           ".map(x => x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))" in _rp_oc))
+           # (22 nov 2026) con le gift card davanti: vedi `vistaOrdinamentoGiftP2P`
+           ".map(x => x.gift ? rigaGiftP2P(x.gift) : x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))" in _rp_oc))
     _ord_js = pezzo_js(mini, "function ordinaLibroP2P(righe, lato, criterio){", "\n}\n")
     prova("il metro della convenienza e' `premioCardP2P`, mai `premium` nudo",
           # (16 nov 2026, ricevi-mercato) dentro `metroCard`, che alla card
@@ -219650,28 +219653,37 @@ console.log(JSON.stringify(fuori));
     # devono avere uno slider con le commissioni, una durata e deve esserci
     # compra o vendi. Però le gift card solo onchain»; e «non devi chiamare
     # bitworker o bitbuyer») ----------------------------------------------
-    prova("6) la merce del P2P: «₿ Bitcoin · 🎁 Gift card» sopra i tab, e "
-          "nessuna porta in vetrina ne' in Amministrazione",
-          [True, False, False],
-          [mini.index('id="p2pMerce"') < mini.index('id="p2pLatoCompro"'),
-           'id="sezGiftcard"' in mini, 'id="admGiftcard"' in mini])
-    vm = pezzo_js(mini, "function vestiMerceP2P(){", "\n}\n")
-    prova("...in gift card i tab dicono «Compra gift card» e «Vendi gift card»",
-          [True, True], ["'Compra gift card'" in vm, "'Vendi gift card'" in vm])
-    prova("...il libro di Mostro resta sotto: in gift card il corpo lo "
-          "disegna renderGiftP2P, e il + non apre un ordine di Mostro",
-          [True, True, True],
-          ["if (typeof giftModoP2P === 'function' && giftModoP2P()) { renderGiftP2P(box, testaBox); return; }"
-           in mini,
-           "if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcPiuP2P(); return; }"
-           in pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"),
-           "giftModoP2P()) { apriGiftP2P(); gcPiuP2P(); return; }"
-           in pezzo_js(mini, "function toccaPiu(){", "\n}\n")])
-    prova("...lo slider della quota e la durata viaggiano col modulo",
-          [True, True, True],
-          ['id="gcQuota" type="range"' in mini,
-           "{taglio, quanti, xpub, indice, quota, durata_ore}" in mini,
-           "gcScegliDurata(${Number(h)}, this)" in mini])
+    # --- 6-bis) LA GIFT CARD E' UN METODO DEL P2P (22 nov 2026, Andrea:
+    # «Gift card deve essere un metodo di acquisto P2P, tipo alternativo a
+    # Barattozon»; lo slider «stessa grafica del p2p», «Tu paghi, ricevi»).
+    # QUEL CHE SI ROMPE IN SILENZIO: la riga della merce che torna, le card
+    # che escono dal libro, il verso che si rovescia fra i tab, lo slider
+    # che perde il vestito del Premio. -----------------------------------
+    prova("6) niente piu' riga della merce ne' corpo a parte: le gift card "
+          "sono card del libro, e nessuna porta in vetrina o in Amministrazione",
+          [False, False, False, False, False, True],
+          ['id="p2pMerce"' in mini, "giftModoP2P" in mini, "renderGiftP2P" in mini,
+           'id="sezGiftcard"' in mini, 'id="admGiftcard"' in mini,
+           "giftRighe.map(vistaOrdinamentoGiftP2P)), p2pLato, critLibro)" in mini])
+    rg = pezzo_js(mini, "function righeGiftLibroP2P(k){", "\n}\n")
+    prova("...il verso del P2P: in «Compra BTC» (k=sell) le richieste, in "
+          "«Vendi BTC» gli annunci di chi vende",
+          [True, True], ["if (k === 'sell') {" in rg and "gcStato.bacheca" in rg,
+                         "gcStato.offerte" in rg])
+    fp = pezzo_js(mini, "function giftPassaFiltroP2P(f){", "\n}\n")
+    prova("...solo on-chain e in euro: un filtro Lightning o in franchi le toglie",
+          [True, True, True], ["if (f.rete === 'ln') return false;" in fp,
+                               "v.indexOf('EUR') < 0" in fp, "/gift/i" in fp])
+    prova("...la voce «🎁 Gift card» in fondo ai metodi del foglio «Pubblica», "
+          "nel verso del tab", [True, True],
+          ["(typeof voceGiftNuovoP2P === 'function' ? voceGiftNuovoP2P() : '')" in mini,
+           "gcModo = p2pLato === 'vendo' ? 'chiedi' : 'offri';" in mini])
+    sl = pezzo_js(mini, "function gcSliderHTML(altro){", "\n}\n")
+    prova("...lo slider col vestito del Premio, e il conto «Tu paghi / Ricevi»",
+          [True, True, True, True],
+          ["'<div class=\"p2p-premio\">'" in sl, "p2p-premio-capi" in sl,
+           "r('Tu paghi', esc(n(totale)), 'tot sats') + r('Ricevi', esc(euro), 'tot euro')" in mini,
+           "{taglio, quanti, xpub, indice, quota, durata_ore}" in mini])
     gb = mini[mini.index("let gcStato = null;"):]
     gb = gb[:gb.index("\n</script>")]
     testi = re.findall(r"`[^`]*`|'[^'\n]*'", re.sub(r"/\*.*?\*/", "", gb, flags=re.S))
@@ -219684,7 +219696,7 @@ console.log(JSON.stringify(fuori));
           [True, True, True, True],
           ["gcApi('/offerte', 'POST', {massimo, quota, durata_ore, xpub, indice})" in mini,
            "gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice})" in mini,
-           "if (p2pLato === 'vendo') gcOffriP2P(); else gcNuovaP2P();" in mini,
+           "gcModo = tipo === 'richiesta' ? 'prendi' : mio ? 'mia-offerta' : 'compra';" in mini,
            'return {"id": riga["id"], "massimo": riga["massimo"], "quota": riga["quota"],'
            in pezzo("bitpost_offerta_per_chi")])
     prova("...la quota: fra 0 e il totale di Bitpost, interi", ["", "", True, True, True],

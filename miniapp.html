@@ -3711,18 +3711,21 @@
   .p2p-schede{position:sticky;top:0;z-index:3;display:flex;gap:8px;
     margin:0 calc(-1 * var(--pad)) 10px;padding:6px var(--pad) 8px;background:var(--bg)}
   .p2p-schede[hidden]{display:none}
-  /* 🎁 le gift card nel P2P (21 nov 2026): la riga della merce sopra i tab,
-     e in gift card via quel che parla solo del libro di Mostro */
-  .sez-seg.p2p-merce{margin:0 0 8px}
-  body.p2p-gift #p2pFeeBanner, body.p2p-gift #p2pAggiorno, body.p2p-gift #p2pOrdineSparito{display:none!important}
+  /* 🎁 la gift card, metodo del P2P (22 nov 2026): la 🎁 all'angolo della
+     tessera dell'euro, la voce in fondo ai metodi del foglio «Pubblica»,
+     taglio × quante in riga, e il titolo del modulo */
+  .p2p-tessera .p2p-gift-badge{display:grid;place-items:center;background:var(--card);
+    font-size:10px;line-height:1;width:17px;height:17px;top:-6px;right:-7px}
+  .p2p-voce-gift small{color:var(--muted);font-weight:600}
+  .gc-carte{display:flex;align-items:center;gap:10px}
+  .gc-carte select{flex:1 1 auto;min-width:0}
+  .gc-carte input{flex:0 0 76px;width:76px;text-align:center}
+  .gc-modo-tit{margin:6px 2px 4px;font-size:17px}
+  .gc-tua{cursor:default}
   .gc-durate{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .gc-durate button{flex:1 1 0;min-width:64px;padding:8px 6px;border-radius:12px;border:1px solid var(--line);background:none;color:inherit;font:inherit}
   .gc-durate button.attiva{background:var(--ink);color:var(--on-ink);border-color:var(--ink)}
   .gc-titolo{margin:16px 2px 6px;font-weight:700;font-size:14px}
-  #gcQuota{width:100%;margin-top:6px}
-  #gcQuotaV{width:100%;margin-top:6px}
-  /* il modulo non finisce sotto la testata attaccata del P2P quando ci si scorre */
-  #gcModulo{scroll-margin-top:150px}
   /* 🎁 le gift card di Bitpost (20 nov 2026): la pagina di prova */
   .gc-schede{display:flex;gap:8px;margin:8px 0}
   .gc-schede button{flex:1 1 0;min-height:40px;border-radius:12px;border:1px solid var(--line,#ddd);
@@ -15031,13 +15034,6 @@ document.getElementById('cartello')?.remove();</script>
            pari a mano. #p2pTesta e' vuoto nel markup e lo riempie
            renderP2P — e' l'unica ragione per cui la pillola ha un
            contenitore suo invece di stare in cima a #p2pCorpo. -->
-      <!-- 🎁 LA MERCE (21 nov 2026): Bitcoin o gift card; la riga la vede
-           solo chi ha il cancello delle gift card (`vestiMerceP2P`). Sta
-           FUORI dal blocco attaccato, che si apre sui tab -->
-      <div class="sez-seg p2p-merce" id="p2pMerce" role="tablist" aria-label="Cosa scambi" style="display:none">
-        <button type="button" role="tab" data-merce="btc" class="active" aria-selected="true" onclick="setMerceP2P('btc')">₿ Bitcoin</button>
-        <button type="button" role="tab" data-merce="giftcard" aria-selected="false" onclick="setMerceP2P('giftcard')">🎁 Gift card</button>
-      </div>
       <div class="p2p-sticky">
         <!-- IL VELO QUI NON C'E' (22 set 2026, sera): per un'ora la
              testata ha avuto dietro lo stesso velo di «I miei scambi»,
@@ -22060,7 +22056,7 @@ let sezioneVetrina = 'mercato';
    `sezione` si manda lo stesso: a leva spenta il server la ignora. */
 let mercatoLavoro = false;
 /* LA FILA SOPRA LA VETRINA: Mercato e Lavoro. Le gift card ci sono state
-   per un'ora il 21 nov 2026, poi sono andate nel P2P (`vestiMerceP2P`). */
+   per un'ora il 21 nov 2026, poi sono andate nel P2P (`righeGiftLibroP2P`). */
 function vestiSezSeg(){
   const seg = el('sezSeg');
   if (!seg) return;
@@ -23723,9 +23719,6 @@ function toccaPiu(){
      foglio si aprirebbe due volte. Tastiera e lettore di schermo non
      passano dal gesto, e restano su questa strada. */
   if (performance.now() - p2pPiuGestoAt < 700) return;
-  /* 🎁 in gift card il + e' «Chiedi gift card» (21 nov 2026) */
-  if (document.body.classList.contains('nav-p2p') && typeof giftModoP2P === 'function'
-      && giftModoP2P()) { apriGiftP2P(); gcPiuP2P(); return; }
   if (piuNeutroP2P()) { libroDaPiuP2P(); return; }
   /* la scelta On-chain / Lightning (30 ott 2026): solo a chi e' ammesso
      all'on-chain, e lo dice lei — se torna falso si va avanti come sempre */
@@ -85322,9 +85315,6 @@ function renderP2P(){
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
-  /* 🎁 IN GIFT CARD il corpo e' loro (21 nov 2026): il libro di Mostro
-     resta com'e' e torna al ritorno su «₿ Bitcoin» */
-  if (typeof giftModoP2P === 'function' && giftModoP2P()) { renderGiftP2P(box, testaBox); return; }
   /* IL TOUR NON ASPETTA PIU' IL LIBRO (26 set 2026, «IL LIBRO
      SUBITO»): si apre all'ingresso, sopra un fondo pieno che della
      pagina non lascia vedere niente, e il libro intanto si prepara
@@ -85463,7 +85453,8 @@ function renderP2P(){
      lato stanno mescolate alle altre. Le righe sono quelle che si
      disegnano, col filtro gia' passato (`righeOnchainLibroP2P`). */
   const contoPillola = elenco.length
-    + (typeof righeOnchainLibroP2P === 'function' ? righeOnchainLibroP2P(k).length : 0);
+    + (typeof righeOnchainLibroP2P === 'function' ? righeOnchainLibroP2P(k).length : 0)
+    + (typeof righeGiftLibroP2P === 'function' ? righeGiftLibroP2P(k).length : 0);
   const pillola = `<button type="button" class="p2p-filtro${
       filtroAccesoP2P(p2pFiltro) ? ' acceso' : ''}" onclick="apriFiltroP2P()">`
     + `<span class="p2p-filtro-sx">` + icoFiltroP2P() + `<b>Filtro</b></span>`
@@ -85605,10 +85596,15 @@ function renderP2P(){
   const critLibro = ordineLibroP2P();
   const misti = typeof vistaOrdinamentoOcP2P === 'function';
   const onchainCarte = typeof carteOnchainLibroP2P === 'function' ? carteOnchainLibroP2P(k, usdtNovita, misti) : '';
+  /* 🎁 LE GIFT CARD SONO CARD DEL LIBRO (22 nov 2026, Andrea: «Gift card
+     deve essere un metodo di acquisto P2P»): entrano nello stesso
+     ordinamento, travestite come le on-chain (`vistaOrdinamentoGiftP2P`) */
+  const giftRighe = typeof righeGiftLibroP2P === 'function' ? righeGiftLibroP2P(k) : [];
   const carteLibro = misti
-    ? ordinaLibroP2P(elenco.concat(righeOnchainLibroP2P(k).map(vistaOrdinamentoOcP2P)), p2pLato, critLibro)
-        .map(x => x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))
-    : elenco.map(rigaOrdineP2P);
+    ? ordinaLibroP2P(elenco.concat(righeOnchainLibroP2P(k).map(vistaOrdinamentoOcP2P),
+                                   giftRighe.map(vistaOrdinamentoGiftP2P)), p2pLato, critLibro)
+        .map(x => x.gift ? rigaGiftP2P(x.gift) : x.oc ? rigaOnchainP2P(x.oc) : rigaOrdineP2P(x))
+    : elenco.map(rigaOrdineP2P).concat(giftRighe.map(rigaGiftP2P));
   if (typeof rinfrescaOnchainP2P === 'function') rinfrescaOnchainP2P();
   box.innerHTML = avvisi
     /* l'avviso di chi e' su Tor (11 ott 2026): una riga, sopra il libro */
@@ -103622,8 +103618,6 @@ function apriVietato(){
 }
 
 function apriNuovoOrdineP2P(metodo){
-  /* 🎁 nessun ordine di Mostro in gift card (21 nov 2026) */
-  if (typeof giftModoP2P === 'function' && giftModoP2P()) { gcPiuP2P(); return; }
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
@@ -105068,6 +105062,8 @@ function renderNuovoOrdineP2P(){
         (vociMetodi.nascosti
           ? '<button type="button" class="p2p-voce p2p-voce-altri" onclick="altriMetodiP2P()">'
             + '<b aria-hidden="true"></b>Altri metodi ▾</button>' : '') +
+        /* 🎁 la gift card in fondo (22 nov 2026): porta al suo modulo */
+        (typeof voceGiftNuovoP2P === 'function' ? voceGiftNuovoP2P() : '') +
         '</div>'
       : '')
       /* LA REGOLA DEL CONTANTI STA SUL METODO (30 set 2026): la riga
@@ -121370,7 +121366,6 @@ async function avvia(){
     myOnchain = !!me.onchain;
     myBitpost = !!me.bitpost;
     vestiSezSeg();
-    vestiMerceP2P();
     myAbboCanale = !!me.abbonamento_canale;
     myOnchainRete = me.onchain_rete || '';
     /* ...e la scelta della rete al «Paga» (2 nov 2026, MERCATINO_SCELTA_RETE) */
@@ -122252,102 +122247,198 @@ function gcDisegna(){
      forse le metterei nel P2P»): questa pagina e' il DETTAGLIO di un
      ordine, aperto da una card del P2P; senza un ordine aperto mostra i
      propri, e la porta per tornare a comprare e vendere. */
+  /* ...e dal 22 nov 2026 anche il MODULO di una card o della voce
+     «🎁 Gift card» del foglio «Pubblica» (`gcModo`) */
   let h = '';
   if (gcAperto) h += gcDettaglioHTML();
-  else h += `<p class="hint">Le gift card si comprano e si vendono dal P2P.</p>
-    <button type="button" class="btn orange" onclick="apriGiftP2P()">🎁 Vai alle gift card del P2P</button>
+  else if (gcModo) h += gcModuloHTML();
+  else h += `<p class="hint">Le gift card si comprano e si vendono dal P2P: sono card del libro, e col + scegli «🎁 Gift card» fra i metodi.</p>
+    <button type="button" class="btn orange" onclick="go('p2p')">Vai al P2P</button>
     <div class="gc-titolo">I tuoi ordini</div>${gcListaHTML(gcStato.miei, false)}`;
   box.innerHTML = h;
   if (gcAperto?.pagamento) disegnaQr(el('gcQr'), gcAperto.pagamento.destination);
+  if (!gcAperto && gcModo) gcContoDetta();
 }
 
-function gcCompraHTML(){
-  const c = gcStato.catalogo;
-  if (!c) return '<p class="hint">⚠️ Il catalogo di Bitpost non risponde: riprova fra poco.</p>';
-  const tetto = Math.min(c.max_order_price || Infinity, gcStato.max_euro ? gcStato.max_euro * 100 : Infinity);
-  const minimo = (c.networks || []).find(n => n.network === 'Bitcoin')?.min_order_price || 0;
-  const tagli = (c.denominations || []).filter(d => d <= tetto);
-  return `<div class="gc-box">
-    <p class="hint">Carte regalo <b>Shoppy Code</b> pagate in sats, solo on-chain.
-      Chi vende le compra per te; i tuoi sats restano in un deposito di garanzia
-      2-di-3 di Bitpost finché non le ricevi. ⚠️ Sats veri, rete Bitcoin.</p>
-    <label class="gc-campo">Taglio
-      <select id="gcTaglio" onchange="gcTotale()">${tagli.map(d =>
-        `<option value="${d}"${d === gcTaglioDiSerie(tagli, minimo) ? ' selected' : ''}>${esc(gcEuro(d))}</option>`).join('')}</select></label>
-    <label class="gc-campo">Quante carte
-      <input id="gcQuanti" type="number" min="1" max="50" value="1" inputmode="numeric" oninput="gcTotale()"></label>
-    <p class="hint" id="gcTotale"></p>
-    ${gcQuotaHTML()}
-    <div class="gc-campo">Resta aperta
-      <div class="gc-durate" role="radiogroup">${(gcStato.durate_ore || [24]).map(h =>
-        `<button type="button" role="radio" aria-checked="${h === gcDurata}" class="${h === gcDurata ? 'attiva' : ''}"
-          onclick="gcScegliDurata(${Number(h)}, this)">${esc(gcDurataTesto(h))}</button>`).join('')}</div></div>
-    <p class="hint">Minimo per ordine ${esc(gcEuro(minimo))}, massimo ${esc(gcEuro(tetto))}.
-      Se nessuno la prende entro la durata si annulla da sola.</p>
-    <button type="button" class="btn orange" onclick="gcCrea(this)">🎁 Pubblica la richiesta</button>
+/* ---- 🎁 LA GIFT CARD E' UN METODO DEL P2P (22 nov 2026, Andrea: «Gift
+   card deve essere un metodo di acquisto P2P, tipo alternativo a
+   Barattozon, di modo che poi sia chiaro che nella stessa card P2P cosa
+   compri e cosa ricevi»; e lo slider «deve avere la stessa grafica del
+   p2p … e si deve spiegare bene cosa significa, "Tu paghi, ricevi"»).
+   Il giro del 21 nov (una riga «₿ Bitcoin · 🎁 Gift card» che cambiava la
+   MERCE e un corpo suo al posto del libro) se n'e' andato: le gift card
+   sono CARD DEL LIBRO, nei due tab di sempre, accanto a quelle di Mostro e
+   dell'on-chain, collo stesso vestito (`p2p-ord`), la stessa coppia in alto
+   a destra e lo stesso ordinamento.
+   IL VERSO E' QUELLO DEL P2P, per chi guarda:
+   • «Compra BTC»: chi CHIEDE una gift card manda sats. Chi prende la sua
+     richiesta compra le carte coi propri euro e riceve i sats — sulla card
+     «Invia 50 € in gift card / Ricevi ≈ … sats», coppia €🎁 → ₿.
+   • «Vendi BTC»: chi VENDE gift card ha pubblicato un annuncio. Chi lo
+     prende manda sats e riceve le carte — «Ricevi fino a 100 € in gift
+     card / Invia ≈ … sats», coppia ₿ → €🎁.
+   Il + pubblica dallo stesso foglio di sempre: «🎁 Gift card» e' una voce
+   dei metodi (`voceGiftNuovoP2P`), e sceglierla porta al modulo della
+   pagina «🎁 Gift card» nel verso del tab — da «Vendi BTC» la richiesta,
+   da «Compra BTC» l'annuncio. Sempre on-chain: il deposito e' il 2-di-3
+   di Bitpost, e un filtro «solo Lightning» le toglie dal libro.
+   LO SLIDER E' QUELLO DEL PREMIO (`.p2p-premio`): la pillola col numero,
+   la barra che si accende dal CENTRO verso il pallino (a meta' meta' e
+   meta', tutta spenta), verde dove conviene a te, rosso dove conviene
+   all'altra parte; e sotto il CONTO del P2P, «Tu paghi / Ricevi» (le parole di
+   Andrea), rifatto
+   a ogni scatto senza ridisegnare la pagina. ---- */
+let gcModo = '';              // il modulo della pagina: '' | chiedi | offri | compra | prendi | mia-offerta
+let gcModoId = 0;             // l'annuncio (compra, mia-offerta) o la richiesta (prendi)
+let gcDurata = 24;            // ore, la scelta del modulo
+let gcQuotaScelta = -1;       // la mia parte della commissione; -1 = meta'
+let gcStatoAt = 0;            // quando e' arrivato (o caduto) l'ultimo /bitpost/stato
+let gcCaricoP2P = false;
+
+function giftVistoP2P(){ return !!myBitpost; }
+
+/* lo stato delle gift card per il libro: una domanda alla volta, al piu'
+   ogni mezzo minuto (anche quando cade, o il render la richiederebbe a
+   ogni giro); arrivata, il libro si ridisegna se e' lui a schermo */
+async function caricaGiftP2P(){
+  if (gcCaricoP2P) return;
+  gcCaricoP2P = true;
+  try { gcStato = await gcApi('/stato'); }
+  catch(e){ /* il libro resta quello di Mostro; si riprova al giro dopo */ }
+  finally { gcCaricoP2P = false; gcStatoAt = Date.now(); }
+  if (el('view-p2p')?.classList.contains('active')) renderP2P();
+}
+
+/* PURA sul filtro: le gift card sono in euro e solo on-chain, e passano
+   un filtro dei metodi solo se c'e' la gift card */
+function giftPassaFiltroP2P(f){
+  if (!f) return true;
+  if (f.rete === 'ln') return false;
+  const v = Array.isArray(f.valute) ? f.valute : [];
+  if (v.length && v.indexOf('EUR') < 0) return false;
+  const m = Array.isArray(f.metodi) ? f.metodi : [];
+  return !m.length || m.some(x => /gift/i.test(String(x)));
+}
+
+/* le righe del libro per il lato `k` (quello di Mostro: 'sell' in «Compra
+   BTC», 'buy' in «Vendi BTC»); le mie in cima, come «È il tuo ordine» */
+function righeGiftLibroP2P(k){
+  if (!giftVistoP2P()) return [];
+  if (!gcStato || Date.now() - gcStatoAt > 30000) caricaGiftP2P();
+  if (!gcStato || !giftPassaFiltroP2P(typeof p2pFiltro !== 'undefined' ? p2pFiltro : null)) return [];
+  const ora = Date.now() / 1000;
+  const viva = x => !Number(x.scade) || Number(x.scade) > ora;
+  if (k === 'sell') {
+    const mie = (gcStato.miei || []).filter(o => o.ruolo === 'compratore' && Number(o.status?.id) === 1 && viva(o));
+    return mie.map(o => ({gc: 'richiesta', x: o, mio: true}))
+      .concat((gcStato.bacheca || []).filter(viva).map(o => ({gc: 'richiesta', x: o, mio: false})));
+  }
+  return (gcStato.mie_offerte || []).map(f => ({gc: 'offerta', x: f, mio: true}))
+    .concat((gcStato.offerte || []).filter(viva).map(f => ({gc: 'offerta', x: f, mio: false})));
+}
+
+/* la riga vista dall'ordinamento del libro, come `vistaOrdinamentoOcP2P`:
+   la data e' `creato`, l'importo il valore delle carte (o il massimo), e
+   un premio di mercato non c'e' (null: in fondo, coi pari per data) */
+function vistaOrdinamentoGiftP2P(r){
+  const x = r.x;
+  return {gift: r, id: 'gc-' + r.gc + '-' + Number(x.id), lato: r.gc === 'richiesta' ? 'sell' : 'buy',
+          premioOc: null, creato: Number(x.creato) || 0,
+          euro: (r.gc === 'richiesta' ? Number(x.denomination) * Number(x.quantity) : Number(x.massimo)) / 100,
+          euroMax: 0};
+}
+
+/* i sats di `cent` euro al cambio di adesso, con `fee` (centesimi di
+   punto, col segno: + chi paga la sua parte sopra, − chi la lascia dal
+   suo incasso); 0 a cambio muto, mai un numero inventato */
+function gcSatsDa(cent, fee){
+  if (!(cambioVivo && eurPerSat > 0) || !(cent > 0)) return 0;
+  return Math.round(cent / 100 / eurPerSat * (1 + (Number(fee) || 0) / 10000));
+}
+
+/* la coppia in alto a destra: l'euro con la 🎁 all'angolo (si paga in
+   euro, si consegna una gift card) e la ₿ arancio dell'on-chain */
+function coppiaGiftP2P(invii){
+  const eur = typeof tesseraValutaP2P === 'function' ? tesseraValutaP2P('EUR', []) : '<span class="p2p-tessera p2p-tessera-eur"></span>';
+  const g = eur.replace(/<\/span>$/, '<span class="p2p-rete-badge p2p-gift-badge" aria-hidden="true">🎁</span></span>');
+  const r = typeof tesseraReteP2P === 'function' ? tesseraReteP2P('btc') : '';
+  const aria = invii ? 'Invia euro in gift card, ricevi bitcoin on-chain' : 'Invia bitcoin on-chain, ricevi euro in gift card';
+  return '<span class="p2p-coppia" role="img" aria-label="' + aria + '" title="' + aria + '">'
+    + (invii ? g : r)
+    + '<svg class="p2p-freccia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M14 7l5 5-5 5"/></svg>'
+    + (invii ? r : g) + '</span>';
+}
+
+/* LA CARD: le stesse righe della card di Lightning, in seconda persona per
+   chi la PRENDEREBBE (anche sulla mia, come le card on-chain) */
+function rigaGiftP2P(r){
+  const x = r.x, richiesta = r.gc === 'richiesta';
+  const tot = Number(gcStato?.quota_totale || 0);
+  const invii = richiesta;
+  const valore = richiesta ? Number(x.denomination) * Number(x.quantity) : Number(x.massimo);
+  const minimo = richiesta ? 0 : Math.min(gcMinimo(), valore);
+  /* la commissione di chi prende, e la mia sulla mia */
+  const perChiPrende = richiesta ? Number(x.bitworker_fee || 0) : tot - Number(x.quota || 0);
+  const mia = richiesta ? Number(x.buyer_fee || 0) : Number(x.quota || 0);
+  const s = c => gcSatsDa(c, richiesta ? -perChiPrende : perChiPrende);
+  const a = s(minimo || valore), b = minimo && minimo < valore ? s(valore) : 0;
+  const sats = a ? '≈ ' + capiP2P(fmt(a), b ? fmt(b) : '') + ' sats' : 'sats';
+  const eurTxt = (minimo && minimo < valore ? capiP2P(esc(gcEuro(minimo)), esc(gcEuro(valore))) : esc(gcEuro(valore)))
+    + ' in gift card' + (richiesta ? '' : ', scegli tu');
+  const rigaEuro = '<span class="p2p-grande p2p-euro">' + (invii ? 'Invia ' : 'Ricevi ') + eurTxt + '</span>';
+  const rigaSats = '<span class="p2p-piccola p2p-sats"><span class="p2p-verbo">' + (invii ? 'Ricevi ' : 'Invia ')
+    + '</span>' + esc(sats) + '</span>';
+  const fee = r.mio ? mia : perChiPrende;
+  const badge = '<span class="p2p-badge">' + (r.mio ? 'la tua commissione ' : 'commissione per te ')
+    + '<b class="' + (fee * 2 <= tot ? 'p2p-affare' : 'p2p-avviso') + '">' + esc(gcPct(fee)) + '</b></span>';
+  const paga = '<div class="p2p-box p2p-paga p2p-paga-gift">🎁 Gift card Shoppy Code'
+    + (richiesta ? ' · ' + Number(x.quantity) + ' × ' + esc(gcEuro(x.denomination)) : '') + '</div>';
+  const barra = Number(x.scade) && Number(x.creato) && typeof barraScadenzaP2P === 'function'
+    ? barraScadenzaP2P({scade: Number(x.scade), creato: Number(x.creato)}) : '';
+  return `<div class="p2p-ord p2p-gift${invii ? ' lato-compro' : ' lato-vendo'}${barra ? ' con-barra' : ''}${r.mio ? ' p2p-mio' : ''}" data-id="gc-${r.gc}-${Number(x.id)}" data-gc="${r.gc}" data-n="${Number(x.id)}" data-mio="${r.mio ? 1 : 0}" role="button" tabindex="0"
+    onclick="apriGiftCardP2P(this.dataset.gc, Number(this.dataset.n), this.dataset.mio === '1')">
+    <div class="p2p-testa">${invii ? rigaEuro : rigaSats}${coppiaGiftP2P(invii)}</div>
+    ${invii ? rigaSats : rigaEuro}
+    <div class="p2p-badge-riga">${badge}</div>
+    ${paga}
+    ${r.mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
+    ${barra}
   </div>`;
 }
 
-/* ---- 🎁 LE GIFT CARD NEL P2P (21 nov 2026, Andrea: «le metterei nel P2P,
-   perchè devono avere uno slider con le commissioni, una durata e deve
-   esserci compra o vendi. Però le gift card solo onchain»; e «non devi
-   chiamare bitworker o bitbuyer. Solo compra gift card. Vendi gift
-   card»). Nel P2P una riga «₿ Bitcoin · 🎁 Gift card» sopra i due tab
-   cambia la MERCE: in gift card i tab diventano «Compra gift card» e
-   «Vendi gift card» e il corpo lo disegna `renderGiftP2P` al posto del
-   libro di Mostro (che resta sotto, intatto). Lo slider e' la quota di
-   chi compra sulla commissione di Bitpost (`selected_fee`): piu' paghi
-   tu, prima qualcuno prende. La durata e' nostra (la ronda del server
-   annulla allo scadere). Il dettaglio di un ordine resta la pagina
-   «🎁 Gift card» (`view-giftcard`), che il dito apre da una card. ---- */
-let p2pGift = false;
-try { p2pGift = localStorage.getItem('p2pMerce') === 'giftcard'; } catch(e) {}
-let gcNuova = false;          // il modulo della richiesta aperto nel P2P
-let gcDurata = 24;            // ore, la scelta del modulo
-let gcStatoAt = 0;            // quando e' arrivato l'ultimo /bitpost/stato
-let gcErrore = '';
-let gcCaricoP2P = false;
-
-function giftModoP2P(){ return !!(p2pGift && myBitpost); }
-
-function vestiMerceP2P(){
-  const riga = el('p2pMerce');
-  if (riga) riga.style.display = myBitpost ? '' : 'none';
-  const g = giftModoP2P();
-  riga?.querySelectorAll('button').forEach(b => {
-    const on = (b.dataset.merce === 'giftcard') === g;
-    b.classList.toggle('active', on);
-    b.setAttribute('aria-selected', on ? 'true' : 'false');
-  });
-  if (el('p2pLatoCompro')) el('p2pLatoCompro').textContent = g ? 'Compra gift card' : 'Compra BTC';
-  if (el('p2pLatoVendo')) el('p2pLatoVendo').textContent = g ? 'Vendi gift card' : 'Vendi BTC';
-  document.body.classList.toggle('p2p-gift', g);
-}
-
-function setMerceP2P(m){
-  const g = m === 'giftcard';
-  if (g === p2pGift) return;
-  p2pGift = g;
-  try { localStorage.setItem('p2pMerce', g ? 'giftcard' : 'btc'); } catch(e) {}
+/* il tocco su una card: la mia richiesta apre il suo dettaglio; il resto
+   il modulo della pagina «🎁 Gift card» */
+function apriGiftCardP2P(tipo, id, mio){
   haptic();
-  gcNuova = false;
-  gcOffri = false;
-  gcOffertaAperta = 0;
-  vestiMerceP2P();
-  renderP2P();
+  if (tipo === 'richiesta' && mio) { gcApriDettaglio(id); return; }
+  gcModo = tipo === 'richiesta' ? 'prendi' : mio ? 'mia-offerta' : 'compra';
+  gcModoId = Number(id);
+  gcAperto = null;
+  go('giftcard');
 }
 
-/* la porta da fuori (la pagina del dettaglio, i tutorial): P2P in gift card */
-function apriGiftP2P(){
-  p2pGift = true;
-  try { localStorage.setItem('p2pMerce', 'giftcard'); } catch(e) {}
+/* LA VOCE DEL FOGLIO «PUBBLICA»: in fondo ai metodi, solo in euro e a chi
+   ha il cancello delle gift card; non e' un metodo di Mostro, quindi non
+   entra in `p2pNuovoMetodi` — porta al modulo nel verso del tab */
+function voceGiftNuovoP2P(){
+  if (!giftVistoP2P()) return '';
+  if (typeof valutaFoglioP2P === 'function' && valutaFoglioP2P() !== 'EUR') return '';
+  return '<button type="button" class="p2p-voce p2p-voce-gift" onclick="gcDaNuovoP2P()">'
+    + '<b aria-hidden="true"></b>🎁 Gift card Shoppy Code <small>· solo on-chain</small></button>';
+}
+
+function gcDaNuovoP2P(){
+  haptic();
+  if (typeof chiudiFoglioP2P === 'function') chiudiFoglioP2P('p2pNuovoSheet');
+  gcModo = p2pLato === 'vendo' ? 'chiedi' : 'offri';
+  gcModoId = 0;
   gcAperto = null;
-  go('p2p');
-  vestiMerceP2P();
-  renderP2P();
+  gcQuotaScelta = -1;
+  go('giftcard');
 }
 
 function gcApriDettaglio(id){
+  gcModo = '';
   go('giftcard');
   gcApri(id);
 }
@@ -122382,102 +122473,208 @@ function gcTaglioDiSerie(tagli, minimo){
   return tagli.find(d => d >= minimo) ?? tagli[tagli.length - 1];
 }
 
-function gcQuotaHTML(){
-  const tot = Number(gcStato.quota_totale || 0);
-  if (!tot) return '';
-  const q = Math.min(tot, Math.max(0, Number(el('gcQuota')?.value ?? Math.floor(tot / 2))));
-  return `<label class="gc-campo">La tua parte della commissione
-      <input id="gcQuota" type="range" min="0" max="${tot}" step="25" value="${q}" oninput="gcQuotaDetta()">
-      <span class="hint" id="gcQuotaDetta">${gcQuotaParole(q, tot)}</span></label>`;
-}
-
-function gcQuotaParole(q, tot){
-  return `Paghi tu ${gcPct(q)}, chi vende ${gcPct(tot - q)}. `
-    + (q >= tot * 0.75 ? 'Molto conveniente per chi vende: la prendono prima.'
-       : q <= tot * 0.25 ? 'Conveniente per te: potrebbe volerci di più.' : 'Metà e metà.');
-}
-
-function gcQuotaDetta(){
-  const tot = Number(gcStato?.quota_totale || 0), q = Number(el('gcQuota')?.value || 0);
-  if (el('gcQuotaDetta')) el('gcQuotaDetta').textContent = gcQuotaParole(q, tot);
-}
-
-async function caricaGiftP2P(){
-  if (gcCaricoP2P) return;
-  gcCaricoP2P = true;
-  try { gcStato = await gcApi('/stato'); gcStatoAt = Date.now(); gcErrore = ''; }
-  catch(e){ gcErrore = e.message; }
-  finally { gcCaricoP2P = false; }
-  if (giftModoP2P() && el('view-p2p')?.classList.contains('active')) gcDisegnaGiftP2P();
-}
-
-/* il + in gift card: «Chiedi» da Compra, «Offri» da Vendi */
-function gcPiuP2P(){
-  if (p2pLato === 'vendo') gcOffriP2P(); else gcNuovaP2P();
-}
-
-let gcOffri = false;          // il modulo dell'annuncio «Vendi» aperto
-let gcOffertaAperta = 0;      // l'annuncio di chi vende che sto comprando
-
-function gcOffriP2P(){
-  if (p2pLato !== 'vendo') setLatoP2P('vendo', true);
-  gcOffri = true;
-  gcDisegnaGiftP2P();
-  el('gcModulo')?.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'});
-}
-
 function gcTetto(){
   const c = gcStato.catalogo || {};
   return Math.min(c.max_order_price || Infinity, gcStato.max_euro ? gcStato.max_euro * 100 : Infinity);
 }
 
 function gcMinimo(){
-  return ((gcStato.catalogo || {}).networks || []).find(n => n.network === 'Bitcoin')?.min_order_price || 0;
+  return ((gcStato?.catalogo || {}).networks || []).find(n => n.network === 'Bitcoin')?.min_order_price || 0;
 }
 
-/* «VENDI GIFT CARD» (21 nov 2026, tappa 2): l'annuncio di chi vende. Qui
-   si sceglie fino a quanto, la PROPRIA parte di commissione e la durata;
-   la chiave del conto con cui incasserai parte adesso (numero riservato). */
-function gcOffriHTML(){
-  const tot = Number(gcStato.quota_totale || 0), tetto = gcTetto();
-  const q = Math.min(tot, Math.max(0, Number(el('gcQuotaV')?.value ?? Math.floor(tot / 2))));
-  return `<div class="gc-box" id="gcModulo">
-    <p class="hint">Pubblichi che vendi carte <b>Shoppy Code</b>: chi compra tocca il tuo
-      annuncio, paga il deposito on-chain e tu compri le carte coi tuoi euro, poi incassi i sats.</p>
-    <label class="gc-campo">Fino a quanto vendi (€)
-      <input id="gcMassimo" type="number" min="${Math.ceil(gcMinimo() / 100)}" max="${Math.floor(tetto / 100)}"
-        value="${Math.floor(Math.min(tetto, 10000) / 100)}" inputmode="numeric"></label>
-    <label class="gc-campo">La tua parte della commissione
-      <input id="gcQuotaV" type="range" min="0" max="${tot}" step="25" value="${q}" oninput="gcQuotaVDetta()">
-      <span class="hint" id="gcQuotaVDetta">${gcQuotaVParole(q, tot)}</span></label>
-    <div class="gc-campo">Resta aperto
-      <div class="gc-durate" role="radiogroup">${(gcStato.durate_ore || [24]).map(h =>
-        `<button type="button" role="radio" aria-checked="${h === gcDurata}" class="${h === gcDurata ? 'attiva' : ''}"
-          onclick="gcScegliDurata(${Number(h)}, this)">${esc(gcDurataTesto(h))}</button>`).join('')}</div></div>
-    <button type="button" class="btn orange" onclick="gcPubblicaOfferta(this)">🎁 Pubblica l'annuncio</button>
-    <button type="button" class="btn ghost" onclick="gcOffri=false;gcDisegnaGiftP2P()">Chiudi</button>
-  </div>`;
+/* ---- lo slider della commissione, col vestito del Premio ---- */
+function gcQuotaAttuale(){
+  const tot = Number(gcStato?.quota_totale || 0);
+  const q = gcQuotaScelta < 0 ? Math.floor(tot / 2 / 25) * 25 : gcQuotaScelta;
+  return Math.max(0, Math.min(tot, q));
 }
 
-function gcQuotaVParole(q, tot){
-  return `Paghi tu ${gcPct(q)}, chi compra ${gcPct(tot - q)}. `
-    + (q <= tot * 0.25 ? 'Molto conveniente per chi compra: lo prendono prima.'
-       : q >= tot * 0.75 ? 'Conveniente per te: potrebbe volerci di più.' : 'Metà e metà.');
+/* le tre variabili del CSS di `.p2p-premio`: la fascia dal CENTRO al
+   pallino, verde se la mia parte e' sotto la meta' (conviene a me), rossa
+   sopra (conviene all'altra parte), spenta a meta' */
+function gcStileQuota(q, tot){
+  const dove = tot ? q / tot : 0.5;
+  const tinta = q * 2 === tot ? 'var(--muted)' : q * 2 < tot ? 'var(--trust)' : 'var(--rosso-p2p)';
+  return '--da:' + bordoPremioP2P(Math.min(0.5, dove)) + ';--a:' + bordoPremioP2P(Math.max(0.5, dove))
+    + ';--tinta:' + tinta;
 }
 
-function gcQuotaVDetta(){
-  const tot = Number(gcStato?.quota_totale || 0), q = Number(el('gcQuotaV')?.value || 0);
-  if (el('gcQuotaVDetta')) el('gcQuotaVDetta').textContent = gcQuotaVParole(q, tot);
+function gcGiudizioQuota(q, tot){
+  return q * 2 === tot ? '' : q * 2 < tot ? ' affare' : ' avviso';
+}
+
+function gcQuotaNota(q, tot, altro){
+  const parti = `Della commissione di Bitpost (${gcPct(tot)}) paghi tu <b>${gcPct(q)}</b>, ${altro} <b>${gcPct(tot - q)}</b>. `;
+  return parti + (q * 2 === tot ? 'Metà e metà, come nel P2P.'
+    : q * 2 < tot ? 'Conviene a te, ma è meno appetibile: potrebbe volerci di più perché qualcuno la prenda.'
+    : `Più appetibile per ${altro}: la prendono prima.`);
+}
+
+function gcSliderHTML(altro){
+  const tot = Number(gcStato.quota_totale || 0), q = gcQuotaAttuale();
+  return '<div class="p2p-premio">'
+    + '<div class="p2p-premio-val"><span class="p2p-premio-cifra' + gcGiudizioQuota(q, tot) + '" id="gcQuotaPil">'
+    + esc(gcPct(q)) + '</span></div>'
+    + '<input type="range" id="gcQuota" min="0" max="' + tot + '" step="25" value="' + q + '" '
+    + 'style="' + gcStileQuota(q, tot) + '" data-altro="' + esc(altro) + '" '
+    + 'oninput="gcQuotaCambia(this.value, this)" aria-label="La tua parte della commissione">'
+    + '</div>'
+    + '<div class="p2p-premio-pie"><span class="p2p-premio-mod gc-tua">tua parte</span>'
+    + '<span class="p2p-premio-capi"><span style="color:var(--trust)">0%</span>'
+    + '<span style="color:var(--rosso-p2p-testo)">' + esc(gcPct(tot)) + '</span></span></div>'
+    + '<div class="hint" id="gcQuotaNota">' + gcQuotaNota(q, tot, altro) + '</div>';
+}
+
+/* IL CURSORE NON RIDISEGNA LA PAGINA (la lezione del Premio): si
+   riscrivono pillola, fascia, nota e conto, mai il nodo sotto il dito */
+function gcQuotaCambia(v, da){
+  const tot = Number(gcStato?.quota_totale || 0);
+  gcQuotaScelta = Math.max(0, Math.min(tot, Math.round(Number(v) || 0)));
+  const q = gcQuotaScelta, pil = el('gcQuotaPil');
+  if (pil) { pil.textContent = gcPct(q); pil.className = 'p2p-premio-cifra' + gcGiudizioQuota(q, tot); }
+  if (da) da.style.cssText = gcStileQuota(q, tot);
+  if (el('gcQuotaNota')) el('gcQuotaNota').innerHTML = gcQuotaNota(q, tot, da?.dataset.altro || 'l\'altra parte');
+  gcContoDetta();
+}
+
+/* ---- IL CONTO «Tu paghi / Ricevi», quello del P2P ---- */
+function gcContoDati(){
+  const tot = Number(gcStato?.quota_totale || 0);
+  const carte = () => ({taglio: Number(el('gcTaglio')?.value || 0), quanti: Math.max(0, Number(el('gcQuanti')?.value || 0))});
+  if (gcModo === 'chiedi') {
+    const c = carte();
+    return {mandoSats: true, valore: c.taglio * c.quanti, c, mia: gcQuotaAttuale(), tot};
+  }
+  if (gcModo === 'compra') {
+    const f = (gcStato.offerte || []).find(x => x.id === gcModoId);
+    const c = carte();
+    return f ? {mandoSats: true, valore: c.taglio * c.quanti, c, mia: tot - Number(f.quota), tot} : null;
+  }
+  if (gcModo === 'offri') {
+    return {mandoSats: false, valore: Math.round(Number(el('gcMassimo')?.value || 0) * 100), fino: true,
+            mia: gcQuotaAttuale(), tot};
+  }
+  if (gcModo === 'prendi') {
+    const o = (gcStato.bacheca || []).find(x => x.id === gcModoId);
+    return o ? {mandoSats: false, valore: Number(o.denomination) * Number(o.quantity),
+                c: {taglio: Number(o.denomination), quanti: Number(o.quantity)}, mia: Number(o.bitworker_fee || 0), tot} : null;
+  }
+  if (gcModo === 'mia-offerta') {
+    const f = (gcStato.mie_offerte || []).find(x => x.id === gcModoId);
+    return f ? {mandoSats: false, valore: Number(f.massimo), fino: true, mia: Number(f.quota), tot} : null;
+  }
+  return null;
+}
+
+function gcContoHTML(){
+  const d = gcContoDati();
+  if (!d) return '';
+  const r = (t, v, cls) => '<div class="ctrl-riga' + (cls ? ' ' + cls : '') + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
+  const satsValore = gcSatsDa(d.valore, 0);
+  const satsFee = gcSatsDa(d.valore, d.mia) - satsValore;
+  const totale = gcSatsDa(d.valore, d.mandoSats ? d.mia : -d.mia);
+  const n = x => x ? '≈ ' + fmt(x) + ' sats' : '— sats';
+  const carte = d.c && d.c.quanti ? `${d.c.quanti} ${d.c.quanti === 1 ? 'carta' : 'carte'} da ${gcEuro(d.c.taglio)}` : '';
+  const euro = (d.fino ? 'fino a ' : '') + gcEuro(d.valore) + ' in gift card';
+  return '<div class="ctrl-conto conto-p2p ' + (d.mandoSats ? 'lato-vendo' : 'lato-compro') + '" id="gcContoBox">'
+    + r('Valore delle carte' + (carte ? ' <span class="ctrl-nota">' + esc(carte) + '</span>' : ''), esc(gcEuro(d.valore)))
+    + r('Al cambio di adesso', esc(n(satsValore)))
+    + r('La tua commissione <span class="ctrl-costo">' + esc(gcPct(d.mia)) + '</span>',
+        satsFee ? (d.mandoSats ? '+' : '−') + esc(fmt(satsFee)) + ' sats' : '—')
+    + '<div class="ctrl-chiusa">'
+    + (d.mandoSats
+      ? r('Tu paghi', esc(n(totale)), 'tot sats') + r('Ricevi', esc(euro), 'tot euro')
+      : r('Tu paghi', esc(euro), 'tot euro') + r('Ricevi', esc(n(totale)), 'tot sats'))
+    + '</div></div>'
+    + '<p class="hint">' + (d.mandoSats
+      ? 'I sats vanno nel deposito di garanzia 2-di-3 di Bitpost, on-chain: la cifra esatta la vedi quando paghi. Restano lì finché le carte non arrivano.'
+      : 'Le carte le compri tu su Shoppy Code coi tuoi euro, dopo il deposito di chi compra; i sats li incassi quando chi compra conferma che funzionano.')
+    + '</p>';
+}
+
+function gcContoDetta(){
+  const box = el('gcConto');
+  if (box) box.innerHTML = gcContoHTML();
+}
+
+function gcDurateHTML(){
+  return '<div class="gc-durate" role="radiogroup">' + (gcStato.durate_ore || [24]).map(h =>
+    `<button type="button" role="radio" aria-checked="${h === gcDurata}" class="${h === gcDurata ? 'attiva' : ''}"
+      onclick="gcScegliDurata(${Number(h)}, this)">${esc(gcDurataTesto(h))}</button>`).join('') + '</div>';
+}
+
+function gcCarteHTML(massimo){
+  const tetto = Math.min(gcTetto(), massimo || Infinity), minimo = gcMinimo();
+  const tagli = ((gcStato.catalogo || {}).denominations || []).filter(d => d <= tetto);
+  return '<div class="gc-carte"><select id="gcTaglio" onchange="gcContoDetta()" aria-label="Taglio">'
+    + tagli.map(d => `<option value="${d}"${d === gcTaglioDiSerie(tagli, minimo) ? ' selected' : ''}>${esc(gcEuro(d))}</option>`).join('')
+    + '</select><span>×</span><input id="gcQuanti" type="number" min="1" max="50" value="1" inputmode="numeric" '
+    + 'oninput="gcContoDetta()" aria-label="Quante carte"></div>'
+    + `<div class="hint">Minimo per ordine ${esc(gcEuro(minimo))}, massimo ${esc(gcEuro(tetto))}.</div>`;
+}
+
+/* IL MODULO, nel verso del P2P: sezioni come il foglio «Pubblica», lo
+   slider del Premio e il conto in fondo, sopra il bottone */
+function gcModuloHTML(){
+  const c = gcStato.catalogo;
+  if (!c) return '<p class="hint">⚠️ Il catalogo di Bitpost non risponde: riprova fra poco.</p>';
+  const sez = (titolo, corpo) => sezioneNuovoP2P({ico: '', titolo, corpo});
+  const via = '<button type="button" class="btn ghost" onclick="navIndietro()">Torna al P2P</button>';
+  const sparito = '<p class="hint">Questo ordine non c\'è più: qualcuno l\'ha preso, o è scaduto.</p>' + via;
+  let h = '';
+  if (gcModo === 'chiedi') {
+    h = '<h4 class="gc-modo-tit">Vendi BTC, ricevi una gift card</h4>'
+      + '<p class="hint">Chiedi carte <b>Shoppy Code</b> pagando in sats on-chain: chi prende la tua richiesta le compra per te coi suoi euro.</p>'
+      + sez('Che carte vuoi', gcCarteHTML())
+      + sez('La tua parte della commissione (%)', gcSliderHTML('chi vende'))
+      + sez('Resta aperta', gcDurateHTML() + '<div class="hint">Se nessuno la prende entro questo tempo si annulla da sola.</div>')
+      + '<div id="gcConto"></div>'
+      + '<button type="button" class="btn orange" onclick="gcCrea(this)">🎁 Pubblica la richiesta</button>';
+  } else if (gcModo === 'offri') {
+    const tetto = gcTetto();
+    h = '<h4 class="gc-modo-tit">Compra BTC, paghi con una gift card</h4>'
+      + '<p class="hint">Pubblichi che vendi carte <b>Shoppy Code</b>: chi tocca il tuo annuncio paga il deposito on-chain, tu compri le carte coi tuoi euro e incassi i suoi sats.</p>'
+      + sez('Fino a quanto vendi (€)', `<input id="gcMassimo" type="number" min="${Math.ceil(gcMinimo() / 100)}" max="${Math.floor(tetto / 100)}"
+          value="${Math.floor(Math.min(tetto, 10000) / 100)}" inputmode="numeric" oninput="gcContoDetta()">`)
+      + sez('La tua parte della commissione (%)', gcSliderHTML('chi compra'))
+      + sez('Resta aperto', gcDurateHTML())
+      + '<div id="gcConto"></div>'
+      + '<button type="button" class="btn orange" onclick="gcPubblicaOfferta(this)">🎁 Pubblica l\'annuncio</button>';
+  } else if (gcModo === 'compra') {
+    const f = (gcStato.offerte || []).find(x => x.id === gcModoId);
+    if (!f) return sparito;
+    h = '<h4 class="gc-modo-tit">Vendi BTC, ricevi una gift card</h4>'
+      + `<p class="hint">Chi vende ti compra carte <b>Shoppy Code</b> fino a ${esc(gcEuro(f.massimo))}${gcScadeTesto({scade: f.scade, status: {id: 1}})}.</p>`
+      + sez('Che carte vuoi', gcCarteHTML(f.massimo))
+      + '<div id="gcConto"></div>'
+      + `<button type="button" class="btn orange" onclick="gcCompraOfferta(${Number(f.id)}, this)">🎁 Compra</button>`;
+  } else if (gcModo === 'prendi') {
+    const o = (gcStato.bacheca || []).find(x => x.id === gcModoId);
+    if (!o) return sparito;
+    h = '<h4 class="gc-modo-tit">Compra BTC, paghi con una gift card</h4>'
+      + `<p class="hint">Qualcuno chiede ${Number(o.quantity)} ${Number(o.quantity) === 1 ? 'carta' : 'carte'} <b>Shoppy Code</b> da ${esc(gcEuro(o.denomination))}${gcScadeTesto(o)}. Dopo il suo deposito le compri tu e le regali all'email che ti diamo: hai 5 giorni.</p>`
+      + '<div id="gcConto"></div>'
+      + `<button type="button" class="btn orange" onclick="gcPrendi(${Number(o.id)}, this)">🎁 Vendi le carte</button>`;
+  } else if (gcModo === 'mia-offerta') {
+    const f = (gcStato.mie_offerte || []).find(x => x.id === gcModoId);
+    if (!f) return sparito;
+    h = '<h4 class="gc-modo-tit">Il tuo annuncio</h4>'
+      + `<p class="hint">Vendi carte Shoppy Code fino a ${esc(gcEuro(f.massimo))}${gcScadeTesto({scade: f.scade, status: {id: 1}})}.</p>`
+      + '<div id="gcConto"></div>'
+      + `<button type="button" class="btn ghost" onclick="gcRitiraOfferta(${Number(f.id)})">Ritira l'annuncio</button>`;
+  }
+  return h + via;
 }
 
 async function gcPubblicaOfferta(btn){
   if (gcOccupato) return;
   const massimo = Math.round(Number(el('gcMassimo')?.value || 0) * 100);
-  const quota = Number(el('gcQuotaV')?.value || 0), durata_ore = gcDurata;
+  const quota = gcQuotaAttuale(), durata_ore = gcDurata;
   const tot = Number(gcStato.quota_totale || 0);
   if (!(massimo > 0)) { toast('Scrivi fino a quanto vendi'); return; }
+  const ricevi = gcSatsDa(massimo, -quota);
   chiediConferma({titolo: 'Pubblichi l\'annuncio?', soldi: true,
-    corpo: `Vendi gift card Shoppy Code fino a ${gcEuro(massimo)}.\nCommissione: paghi tu ${gcPct(quota)}, chi compra ${gcPct(tot - quota)}.\nResta aperto ${gcDurataTesto(durata_ore)}.\n\nQuando qualcuno compra, dopo il suo deposito hai 5 giorni per comprare le carte coi tuoi euro.`,
+    corpo: `Tu paghi: carte Shoppy Code fino a ${gcEuro(massimo)}, comprate coi tuoi euro.\nRicevi: ${ricevi ? '≈ ' + fmt(ricevi) + ' sats' : 'i sats'} per una vendita da ${gcEuro(massimo)}.\nCommissione: paghi tu ${gcPct(quota)}, chi compra ${gcPct(tot - quota)}.\nResta aperto ${gcDurataTesto(durata_ore)}.\n\nQuando qualcuno compra, dopo il suo deposito hai 5 giorni per comprare le carte.`,
     etichetta: 'Pubblica', poi: async () => {
       gcOccupato = true;
       try {
@@ -122485,109 +122682,42 @@ async function gcPubblicaOfferta(btn){
         const xpub = await gcXpub(indice);
         await gcApi('/offerte', 'POST', {massimo, quota, durata_ore, xpub, indice});
         toast('🎁 Annuncio pubblicato');
-        gcOffri = false;
-        await caricaGiftP2P();
+        gcModo = '';
+        gcStatoAt = 0;
+        go('p2p');
       } catch(e){ toast('⚠️ ' + e.message, 5000); }
       finally { gcOccupato = false; }
     }});
 }
 
-function gcOfferteHTML(lista, mie){
-  if (!lista.length) return `<p class="hint">${mie ? 'Nessun annuncio aperto.' : 'Nessuno vende adesso: puoi chiedere tu qui sopra.'}</p>`;
-  const tot = Number(gcStato.quota_totale || 0);
-  return lista.map(f => {
-    const aperta = !mie && gcOffertaAperta === f.id;
-    const tagli = ((gcStato.catalogo || {}).denominations || []).filter(d => d <= f.massimo);
-    return `<div class="gc-riga${aperta ? ' gc-aperta' : ''}">
-      <div><b>Fino a ${esc(gcEuro(f.massimo))}</b>
-        <small>${mie ? `paghi tu ${esc(gcPct(f.quota))}` : `commissione per te ${esc(gcPct(tot - f.quota))}`}${gcScadeTesto({scade: f.scade, status: {id: 1}})}</small></div>
-      ${mie ? `<button type="button" class="btn ghost" onclick="gcRitiraOfferta(${Number(f.id)})">Ritira</button>`
-        : aperta ? '' : `<button type="button" class="btn ghost" onclick="gcOffertaAperta=${Number(f.id)};gcDisegnaGiftP2P()">Compra</button>`}
-    </div>${aperta ? `<div class="gc-box">
-      <label class="gc-campo">Taglio
-        <select id="gcTaglioF">${tagli.map(d => `<option value="${d}"${d === gcTaglioDiSerie(tagli, gcMinimo()) ? ' selected' : ''}>${esc(gcEuro(d))}</option>`).join('')}</select></label>
-      <label class="gc-campo">Quante carte
-        <input id="gcQuantiF" type="number" min="1" max="50" value="1" inputmode="numeric"></label>
-      <button type="button" class="btn orange" onclick="gcCompraOfferta(${Number(f.id)}, this)">🎁 Compra</button>
-      <button type="button" class="btn ghost" onclick="gcOffertaAperta=0;gcDisegnaGiftP2P()">Chiudi</button>
-    </div>` : ''}`;
-  }).join('');
-}
-
 async function gcRitiraOfferta(id){
   try { await gcApi(`/offerte/${id}/ritira`, 'POST'); toast('Annuncio ritirato'); }
-  catch(e){ toast('⚠️ ' + e.message, 5000); }
-  await caricaGiftP2P();
+  catch(e){ toast('⚠️ ' + e.message, 5000); return; }
+  gcModo = '';
+  gcStatoAt = 0;
+  go('p2p');
 }
 
 async function gcCompraOfferta(id, btn){
   if (gcOccupato) return;
   const f = (gcStato.offerte || []).find(x => x.id === id);
   if (!f) return;
-  const taglio = Number(el('gcTaglioF')?.value), quanti = Number(el('gcQuantiF')?.value);
-  const tot = Number(gcStato.quota_totale || 0);
+  const taglio = Number(el('gcTaglio')?.value), quanti = Number(el('gcQuanti')?.value);
+  const tot = Number(gcStato.quota_totale || 0), mia = tot - Number(f.quota);
+  const invii = gcSatsDa(taglio * quanti, mia);
   chiediConferma({titolo: 'Compri queste gift card?', soldi: true,
-    corpo: `${quanti} carta/e da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nLa tua commissione: ${gcPct(tot - f.quota)}.\n\nSubito dopo paghi il deposito on-chain, in sats veri.`,
+    corpo: `Tu paghi: ${invii ? '≈ ' + fmt(invii) + ' sats' : 'i sats'} nel deposito on-chain, in sats veri.\nRicevi: ${quanti} ${quanti === 1 ? 'carta' : 'carte'} Shoppy Code da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nLa tua commissione: ${gcPct(mia)}.`,
     etichetta: 'Compra', poi: async () => {
       gcOccupato = true;
       try {
         const indice = gcStato.prossimo_indice;
         const xpub = await gcXpub(indice);
         const d = await gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice});
-        toast(d.agganciato ? '🎁 Fatto: ora paga il deposito' : '🎁 Richiesta creata: chi vende non ha risposto, resta in bacheca un\'ora');
-        gcOffertaAperta = 0;
+        toast(d.agganciato ? '🎁 Fatto: ora paga il deposito' : '🎁 Richiesta creata: chi vende non ha risposto, resta nel P2P un\'ora');
         gcApriDettaglio(d.ordine.id);
       } catch(e){ toast('⚠️ ' + e.message, 5000); }
       finally { gcOccupato = false; }
     }});
-}
-
-function gcNuovaP2P(){
-  if (p2pLato !== 'compro') setLatoP2P('compro', true);
-  gcNuova = true;
-  gcDisegnaGiftP2P();
-  el('gcModulo')?.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block: 'start'});
-}
-
-function renderGiftP2P(box, testaBox){
-  if (testaBox) testaBox.innerHTML = '';
-  if (!gcStato || Date.now() - gcStatoAt > 30000) caricaGiftP2P();
-  gcDisegnaGiftP2P(box);
-}
-
-function gcDisegnaGiftP2P(box){
-  box = box || el('p2pCorpo');
-  if (!box || !giftModoP2P()) return;
-  if (!gcStato) {
-    box.innerHTML = gcErrore ? `<p class="hint">⚠️ ${esc(gcErrore)}</p>
-      <button class="btn ghost" onclick="caricaGiftP2P()">↻ Riprova</button>`
-      : '<p class="hint">Carico le gift card…</p>';
-    return;
-  }
-  const miei = gcStato.miei || [];
-  let h = '';
-  if (p2pLato === 'compro') {
-    h += gcNuova
-      ? `<div id="gcModulo">${gcCompraHTML()}
-           <button type="button" class="btn ghost" onclick="gcNuova=false;gcDisegnaGiftP2P()">Chiudi</button></div>`
-      : `<button type="button" class="btn orange" onclick="gcNuovaP2P()">＋ Chiedi gift card</button>`;
-    h += `<div class="gc-titolo">Chi vende gift card</div>${gcOfferteHTML(gcStato.offerte || [], false)}`;
-    h += `<div class="gc-titolo">Le tue richieste</div>${gcListaHTML(miei.filter(o => o.ruolo === 'compratore'), false)}`;
-  } else {
-    h += gcOffri ? gcOffriHTML()
-      : `<button type="button" class="btn orange" onclick="gcOffriP2P()">＋ Offri gift card</button>`;
-    if ((gcStato.mie_offerte || []).length)
-      h += `<div class="gc-titolo">I tuoi annunci</div>${gcOfferteHTML(gcStato.mie_offerte, true)}`;
-    h += `<div class="gc-titolo">Richieste da servire</div>${gcListaHTML(gcStato.bacheca || [], true)}`;
-    h += `<div class="gc-titolo">Le tue vendite</div>${gcListaHTML(miei.filter(o => o.ruolo === 'bitworker'), false)}`;
-  }
-  box.innerHTML = h;
-  if (gcNuova) gcTotale();
-}
-
-function gcTotale(){
-  const t = Number(el('gcTaglio')?.value || 0) * Number(el('gcQuanti')?.value || 0);
-  if (el('gcTotale')) el('gcTotale').textContent = 'Valore delle carte: ' + gcEuro(t);
 }
 
 function gcListaHTML(lista, bacheca){
@@ -122605,10 +122735,11 @@ function gcListaHTML(lista, bacheca){
 async function gcCrea(btn){
   if (gcOccupato) return;
   const taglio = Number(el('gcTaglio')?.value), quanti = Number(el('gcQuanti')?.value);
-  const quota = Number(el('gcQuota')?.value ?? Math.floor((gcStato.quota_totale || 0) / 2));
+  const quota = gcQuotaAttuale();
   const durata_ore = gcDurata;
+  const invii = gcSatsDa(taglio * quanti, quota);
   chiediConferma({titolo: 'Pubblichi la richiesta?', soldi: true,
-    corpo: `${quanti} carta/e da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nCommissione: paghi tu ${gcPct(quota)}, chi vende ${gcPct((gcStato.quota_totale || 0) - quota)}.\nResta aperta ${gcDurataTesto(durata_ore)}.\n\nQuando qualcuno la prende paghi il deposito on-chain, in sats veri.`,
+    corpo: `Tu paghi: ${invii ? '≈ ' + fmt(invii) + ' sats' : 'i sats'} nel deposito on-chain, in sats veri, quando qualcuno la prende.\nRicevi: ${quanti} ${quanti === 1 ? 'carta' : 'carte'} Shoppy Code da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nCommissione: paghi tu ${gcPct(quota)}, chi vende ${gcPct((gcStato.quota_totale || 0) - quota)}.\nResta aperta ${gcDurataTesto(durata_ore)}.`,
     etichetta: 'Pubblica', poi: async () => {
       gcOccupato = true;
       try {
@@ -122616,7 +122747,6 @@ async function gcCrea(btn){
         const xpub = await gcXpub(indice);
         const d = await gcApi('/ordini', 'POST', {taglio, quanti, xpub, indice, quota, durata_ore});
         toast('🎁 Richiesta pubblicata: aspettiamo chi vende');
-        gcNuova = false;
         gcApriDettaglio(d.ordine.id);
       } catch(e){ toast('⚠️ ' + e.message, 5000); }
       finally { gcOccupato = false; }
@@ -122627,8 +122757,9 @@ async function gcPrendi(id, btn){
   if (gcOccupato) return;
   const o = gcStato.bacheca.find(x => x.id === id);
   if (!o) return;
+  const ricevi = gcSatsDa(Number(o.denomination) * Number(o.quantity), -Number(o.bitworker_fee || 0));
   chiediConferma({titolo: 'Vendi queste gift card?', soldi: true,
-    corpo: `Compri tu ${o.quantity} carta/e Shoppy Code da ${gcEuro(o.denomination)} coi tuoi euro, quando chi le chiede ha pagato il deposito, e incassi i suoi sats. Hai 5 giorni dal pagamento.\n\nLa tua commissione: ${gcPct(o.bitworker_fee)}.`,
+    corpo: `Tu paghi: ${o.quantity} ${Number(o.quantity) === 1 ? 'carta' : 'carte'} Shoppy Code da ${gcEuro(o.denomination)}, comprate coi tuoi euro quando chi le chiede ha pagato il deposito. Hai 5 giorni dal pagamento.\nRicevi: ${ricevi ? '≈ ' + fmt(ricevi) + ' sats' : 'i suoi sats'}.\n\nLa tua commissione: ${gcPct(o.bitworker_fee)}.`,
     etichetta: 'Vendi', poi: async () => {
       gcOccupato = true;
       try {
