@@ -121661,6 +121661,18 @@ def asset_barattozon():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/gift-card-shoppy.webp")
+def asset_gift_card_shoppy():
+    """LA CARTA SHOPPY CODE (22 nov 2026, Andrea: «l'icona non dovrebbe
+    essere euro con il pacco regalo, ma proprio quale gift card»): la
+    foto della carta che si compra davvero, «THE GIFT CARD», dal negozio
+    di Shoppy Code (l'immagine del prodotto, 216x142 ritagliata sull'alpha,
+    5,6 KB). E' la tessera delle card gift nel libro P2P. Rotta esplicita:
+    mai un mount (regola 3)."""
+    return FileResponse("assets/gift-card-shoppy.webp", media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/barattozon-scuro.webp")
 def asset_barattozon_scuro():
     """IL MARCHIO SCURO (17 set 2026, col marchio nel testo del tour):
