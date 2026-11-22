@@ -131297,6 +131297,9 @@ def _bitpost_in_lista(riga, tg_id) -> dict:
     o = bitpost_per_chi(json.loads(riga["ordine"] or "{}"), ruolo)
     o["ruolo"] = ruolo
     o["scade"] = int(riga["scade"] or 0) if "scade" in riga.keys() else 0
+    # la data di nascita, per la barra del tempo e il «Piu' recenti» della
+    # card nel libro P2P (22 nov 2026)
+    o["creato"] = int(riga["creato"] or 0)
     return o
 
 
@@ -131869,7 +131872,7 @@ def bitpost_offerta_per_chi(riga) -> dict:
     """L'annuncio come lo vede l'app: MAI la xpub (direbbe gli indirizzi di
     quell'ordine prima che nasca) e mai chi l'ha pubblicato."""
     return {"id": riga["id"], "massimo": riga["massimo"], "quota": riga["quota"],
-            "scade": riga["scade"]}
+            "scade": riga["scade"], "creato": riga["creato"]}
 
 
 @app.post("/api/bitpost/offerte")

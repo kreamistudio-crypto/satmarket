@@ -410,7 +410,7 @@ def main():
     s1 = c.get("/api/bitpost/stato").json()
     viste = {f["id"]: f for f in s1["offerte"]}
     prova("chi compra lo vede, senza la xpub e senza chi l'ha pubblicato",
-          (True, ["id", "massimo", "quota", "scade"]),
+          (True, ["creato", "id", "massimo", "quota", "scade"]),
           (fid in viste, sorted(viste.get(fid, {}))))
     ib = s1["prossimo_indice"]
     prova("oltre il massimo dell'annuncio: no", 400,

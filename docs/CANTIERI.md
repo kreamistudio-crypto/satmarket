@@ -94178,3 +94178,58 @@ resta arriva come `selected_fee`, l'aggancio con la xpub di chi vende e
 il suo numero, l'annuncio chiuso, l'avviso a chi vende, il secondo dito
 409, ritira (e non quello di un altro). A schermo a 390 px: gli annunci
 in Compra col modulo aperto, il modulo «Offri».
+
+## La gift card diventa un metodo del P2P: card nel libro, slider del Premio, conto «Tu paghi / Ricevi» (22 nov 2026, cantiere gift-card-metodo-p2p; richiesta di Andrea)
+
+COSA. Andrea: «Gift card deve essere un metodo di acquisto P2P, tipo
+alternativo a Barattozon, di modo che poi sia chiaro che nella stessa card
+P2P cosa compri e cosa ricevi»; lo slider «deve avere la stessa grafica del
+p2p … "Tu paghi, ricevi"». La riga «₿ Bitcoin · 🎁 Gift card» delle tappe 1
+e 2 se n'è andata, e con lei il corpo a parte e i tab rinominati. Le gift
+card sono CARD DEL LIBRO (`rigaGiftP2P`, vestito `p2p-ord`), nello stesso
+ordinamento di Mostro e dell'on-chain (`vistaOrdinamentoGiftP2P`), contate
+dalla pillola del filtro:
+- «Compra BTC»: le RICHIESTE di chi vuole una gift card. «Invia 100 € in
+  gift card / Ricevi ≈ … sats», coppia €🎁 → ₿, «commissione per te».
+- «Vendi BTC»: gli ANNUNCI di chi vende gift card. «Invia ≈ da … a … sats /
+  Ricevi da 42 € a 150 € in gift card, scegli tu», coppia ₿ → €🎁.
+- La mia richiesta e il mio annuncio stanno lì con «È il tuo ordine».
+Il + pubblica dal foglio di sempre: «🎁 Gift card Shoppy Code · solo
+on-chain» è l'ultima voce dei metodi (solo in euro, solo col cancello). Non
+entra in `p2pNuovoMetodi`: chiude il foglio e apre il modulo nel verso del
+tab, da «Vendi BTC» la richiesta, da «Compra BTC» l'annuncio. Il tocco su una
+card apre il modulo nella pagina «🎁 Gift card» (`gcModo`: chiedi, offri,
+compra, prendi, mia-offerta). Il modulo usa le sezioni del foglio
+«Pubblica», lo slider della commissione col vestito di `.p2p-premio`
+(pillola, fascia dal centro, verde se la mia parte è sotto la metà, rossa
+sopra, capi 0% e 5%) e sotto il conto del P2P (`ctrl-conto conto-p2p`):
+valore, cambio, la tua commissione, poi «Tu paghi / Ricevi» in evidenza.
+Si rifà a ogni scatto senza ridisegnare la pagina. Anche le conferme dicono
+«Tu paghi: … / Ricevi: …».
+
+PERCHÉ COSÌ. Un metodo e non una merce: chi compra o vende BTC deve trovare
+la gift card dove trova Barattozon, nel verso giusto. Le due API (richiesta
+e annuncio) restano quelle delle tappe 1 e 2: cambia solo dove si vedono. La
+coppia mette la 🎁 all'angolo della tessera dell'euro, l'«Euro → Gift card»
+di Andrea: si paga in euro e si consegna una carta. Un filtro «solo
+Lightning», o in un'altra valuta, toglie le gift card, che sono on-chain e
+in euro. Il server aggiunge solo `creato` alla riga dell'ordine e
+dell'annuncio, per la barra del tempo e il «Più recenti».
+
+SCARTATO. «🎁 Gift card» come vero metodo di Mostro: un ordine di Mostro non
+c'entra, e i giudici del foglio (importo, intervallo, tetti) dovrebbero
+imparare un caso che non pubblicano mai. Lo slider a parte della tappa 1 (un
+range nudo): Andrea l'ha bocciato.
+
+PROVATO. `prove_bitpost_gift_card` sezione 6 riscritta: niente riga della
+merce, card nel libro, verso dei tab, filtro, voce del foglio, slider col
+vestito del Premio, conto «Tu paghi / Ricevi». `collaudo_bitpost_gift_card`
+verde, con `creato` fra i campi dell'annuncio. A schermo a 390 px, server
+vero col Bitpost finto: le card nei due tab, il modulo «Compra» da un
+annuncio, la voce nel foglio «Pubblica», il modulo della richiesta con lo
+slider.
+
+DA GUARDARE. Le card si vedono solo quando il libro di Mostro ha risposto: a
+relay giù il libro mostra il suo errore e niente gift card. Il riscatto
+automatico in carte Conad e simili, e il catalogo Shoppy Code, aspettano la
+scelta di Andrea (un browser sul server o un canale ufficiale).
