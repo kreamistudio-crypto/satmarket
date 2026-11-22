@@ -1858,6 +1858,11 @@ def main():
           (SRV.p2p_onchain_cauzione_sats(100000), SRV.p2p_onchain_cauzione_sats(10000),
            SRV.p2p_onchain_cauzione_sats(33350), SRV.p2p_onchain_cauzione_sats(0),
            SRV.p2p_onchain_cauzione_sats("x")))
+    # IL TETTO (22 nov 2026, cantiere tetto-cauzione): di serie, senza riga
+    prova("...e mai oltre il tetto di serie di 50.000 sats",
+          (50000, 50000, 49998, 48000),
+          (SRV.P2P_ONCHAIN_CAUZIONE_TETTO_SATS, SRV.p2p_onchain_cauzione_sats(2000000),
+           SRV.p2p_onchain_cauzione_sats(1666600), SRV.p2p_onchain_cauzione_sats(1600000)))
     # -- a leva SPENTA: la scelta del metodo c'e', la cauzione no
     SRV.P2P_ONCHAIN_CAUZIONE, SRV.LND_PONTE_MACAROON_CAUZIONE = False, MAC_C
     # la porticina degli admin resta CHIUSA, com'e' di serie e come sara'
