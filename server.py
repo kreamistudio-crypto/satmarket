@@ -38836,6 +38836,14 @@ def _leve_stato():
                          "Lightning avvisa che una cifra così spesso non passa; "
                          "l'on-chain si offre solo fino al tetto qui sopra",
                   spento="nessun consiglio: la cassa è quella di ieri"),
+            # (22 nov 2026, cantiere onchain-prodotti-costosi)
+            _leva("Sopra la soglia solo on-chain", "ONCHAIN_SOLO_SOPRA_SOGLIA",
+                  ONCHAIN_SOLO_SOPRA_SOGLIA,
+                  acceso="sopra la soglia del consiglio l'oggetto si paga solo "
+                         "on-chain e chi vende riceve on-chain (dove l'on-chain "
+                         "per quella coppia si può); carrello, offerte e codici "
+                         "sconto restano col Lightning",
+                  spento="sopra la soglia il Lightning resta, col solo consiglio"),
             # la prima leva che si cambia anche da qui (27 ott 2026)
             _leva_scrivibile_riga(_leva(
                 "Quota fissa di Barattolo (sats)", "ONCHAIN_QUOTA_FISSA_SATS",
@@ -48945,6 +48953,21 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                                         if _indirizzo_confermato(d, ind)
                                         else 0),
             "cambio_ordine": cambio_misura or cambio_noto_ora()})
+    # SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+    # onchain-prodotti-costosi): niente fattura Lightning se questo oggetto
+    # si puo' pagare on-chain — una fattura da milioni di sats non passa
+    # ne' da chi compra ne' verso chi vende. Solo dove l'on-chain c'e'
+    # davvero (chi compra lo vede, la porta di chi vende e' aperta, il
+    # tetto lo lascia): sennò il Lightning resta, con l'avviso. Offerta e
+    # codice sconto restano col Lightning, come dice il no qui sopra.
+    if not off and not cod_id and onchain_ammesso(user["id"]):
+        cambio_ora = cambio_noto_ora()
+        if (onchain_solo(totale, cambio_ora)
+                and not _onchain_porta_chiusa(user["id"], a["venditore_id"])[0]
+                and not onchain_sopra_il_tetto(totale, cambio_ora)):
+            con.close()
+            raise HTTPException(409, f"Sopra {onchain_solo_soglia()} € si "
+                                     "paga solo on-chain.")
     cf = cassaforte_nuova()
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}",
@@ -53766,7 +53789,15 @@ def _segna_incasso_venditori(righe):
     dal CODICE del negozio, pubblico — e qui non esce nessun id."""
     for r in righe:
         r["venditore_incasso"] = ""
-    if not righe or not SWAP_AUTO_ATTIVO or not EMBIT:
+    # SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+    # onchain-prodotti-costosi): l'annuncio grosso dice «on-chain» se chi
+    # vende l'on-chain ce l'ha, qualunque cosa abbia scelto — prima, sopra
+    # il tetto dello swap, diceva «Lightning» anche a chi aveva scelto
+    # on-chain (il «Sofone» da 2 BTC). Il cambio che si sa senza la rete.
+    cambio = cambio_noto_ora() if ONCHAIN_SOLO_SOPRA_SOGLIA else 0
+    grossi = [r for r in righe
+              if cambio and onchain_solo(int(r.get("prezzo_sats") or 0), cambio)]
+    if not righe or not ((SWAP_AUTO_ATTIVO or grossi) and EMBIT):
         return
     con = db()
     try:
@@ -53788,7 +53819,15 @@ def _segna_incasso_venditori(righe):
             f"AND id IN ({','.join('?' * len(ids))})", ids)} if ids else {}
     finally:
         con.close()
-    for r in righe:
+    for r in grossi:
+        tg = (r.get("venditore_id") if "venditore_id" in r
+              else da_negozio.get(r.get("venditore_negozio")))
+        if tg and onchain_ammesso(tg):
+            r["venditore_incasso"] = "onchain"
+    # chi vende senza on-chain torna alla regola di prima, come i piccoli
+    resto = [r for r in righe if r["venditore_incasso"] != "onchain"
+             or not any(r is g for g in grossi)]
+    for r in (resto if SWAP_AUTO_ATTIVO else []):
         tg = (r.get("venditore_id") if "venditore_id" in r
               else da_negozio.get(r.get("venditore_negozio")))
         if not tg or not swap_auto_per(tg):
@@ -54588,6 +54627,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # tasti grandi (2 nov 2026, MERCATINO_SCELTA_RETE): solo a chi vede
     # l'on-chain, agli altri non c'e' niente da scegliere
     profilo["scelta_rete"] = bool(MERCATINO_SCELTA_RETE and profilo["onchain"])
+    # ...e la soglia sopra la quale si riceve solo on-chain (22 nov 2026,
+    # ONCHAIN_SOLO_SOPRA_SOGLIA): il foglio di chi pubblica la confronta col
+    # prezzo; 0 = regola spenta, o l'on-chain per questa persona non c'e'
+    profilo["onchain_solo_sopra_euro"] = (onchain_solo_soglia()
+                                          if profilo["onchain"] else 0)
     # ...e le gift card di Bitpost (20 nov 2026): il loro cancello
     profilo["bitpost"] = bitpost_ammesso(user["id"])
     # ...e chi puo' pubblicare e prendere scambi P2P con la garanzia
@@ -61812,13 +61856,18 @@ ONCHAIN_QUOTA_TETTO = 5000
 # rete. Il cambio e' quello del momento: se non c'e', l'on-chain dice di
 # no invece di indovinare. 0 = nessun tetto; storta = 250, mai spento da
 # un refuso (qui un refuso che spegne vorrebbe dire sats senza limite).
+# NESSUN TETTO DI SERIE (22 nov 2026, cantiere onchain-prodotti-costosi,
+# Andrea: «per l'onchain nel mercatino non mettiamo tetti», «il tetto è
+# solo nell'onchain p2p»): senza riga e' 0. Sopra la soglia del consiglio
+# il mercatino si paga SOLO on-chain (`onchain_solo`), e un tetto qui
+# lascerebbe gli oggetti grossi senza nessuna strada per pagarli.
 try:
     from config import ONCHAIN_MAX_EURO
     ONCHAIN_MAX_EURO = int(ONCHAIN_MAX_EURO)
     if ONCHAIN_MAX_EURO < 0:
         raise ValueError("un tetto negativo non e' un tetto")
 except ImportError:
-    ONCHAIN_MAX_EURO = 250
+    ONCHAIN_MAX_EURO = 0
 except (TypeError, ValueError):
     ONCHAIN_MAX_EURO = 250
     print("[onchain] ONCHAIN_MAX_EURO non e' un numero intero: il tetto "
@@ -61863,6 +61912,21 @@ except (TypeError, ValueError):
     ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
     print("[onchain] ONCHAIN_CONSIGLIATO_SOPRA_EURO non e' un numero intero: "
           "la soglia resta 500 €")
+# SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+# onchain-prodotti-costosi; Andrea, con l'annuncio «Sofone» da 2 BTC
+# «Preferisce ricevere in Lightning»: «per prodotti così costosi uno non
+# può ricevere lightning»): sopra ONCHAIN_CONSIGLIATO_SOPRA_EURO (la
+# stessa soglia, un numero solo) l'oggetto si paga solo on-chain, dove
+# l'on-chain per quella coppia si puo' davvero (sennò il Lightning resta,
+# con l'avviso), e chi vende riceve on-chain. Carrello, offerta accettata
+# e codice sconto restano col Lightning: li' l'on-chain non c'e'.
+# ACCESA DI SERIE (regola del 14 nov); `False` nel config = il consiglio
+# di ieri, Lightning compreso.
+try:
+    from config import ONCHAIN_SOLO_SOPRA_SOGLIA
+    ONCHAIN_SOLO_SOPRA_SOGLIA = bool(ONCHAIN_SOLO_SOPRA_SOGLIA)
+except ImportError:
+    ONCHAIN_SOLO_SOPRA_SOGLIA = True
 # IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin,
 # Andrea: «potremo davvero sfruttarlo come PayJoin»): il link di
 # pagamento del mercatino porta `pj=`, e il wallet di chi compra che lo
@@ -61916,6 +61980,57 @@ def onchain_consigliato(prezzo_sats: int, cambio_eur: float) -> bool:
     if not soglia or not cambio_eur or cambio_eur <= 0:
         return False
     return int(prezzo_sats or 0) * cambio_eur / 100_000_000 > soglia
+
+
+def onchain_solo(prezzo_sats: int, cambio_eur: float) -> bool:
+    """Vero se questo prezzo si paga SOLO on-chain (22 nov 2026,
+    `ONCHAIN_SOLO_SOPRA_SOGLIA`): la leva accesa e la soglia del
+    consiglio superata. Il giudice unico della regola: lo chiedono
+    /onchain/pronto, la cassa del Lightning, la pillola dell'annuncio e
+    il foglio di chi pubblica (dalla soglia di /api/me). Se l'on-chain per
+    quella coppia si possa davvero lo dice `_onchain_porta_chiusa`."""
+    return bool(ONCHAIN_SOLO_SOPRA_SOGLIA) and onchain_consigliato(
+        prezzo_sats, cambio_eur)
+
+
+def onchain_solo_soglia() -> int:
+    """La soglia in euro della regola «solo on-chain», per le parole del
+    telefono; 0 = la regola e' spenta."""
+    return _onchain_soglia_consiglio() if ONCHAIN_SOLO_SOPRA_SOGLIA else 0
+
+
+def _onchain_porta_chiusa(compratore_id, venditore_id) -> tuple[str, bool]:
+    """Si puo' pagare on-chain QUESTO venditore? ('', io_acceso) se si',
+    (il perche', False) se no. I no di /onchain/pronto, nello stesso
+    ordine e con le stesse parole, senza il tetto (che vuole il cambio,
+    e lo chiede chi chiama). `io_acceso`: chi compra ha gia' la sua
+    chiave. Il cancello di chi compra lo guarda chi chiama."""
+    if not EMBIT:
+        return "manca la libreria embit", False
+    # (30 ott 2026, cantiere onchain-mainnet) la terza chiave che manca o
+    # non e' di questa rete spegne la porta ⛓️ PRIMA del tocco, con le
+    # parole del giudice: su mainnet senza la chiave di Barattolo non
+    # nasce nessun indirizzo
+    try:
+        onchain_xpub_barattolo()
+    except ValueError as e:
+        return str(e), False
+    if not onchain_ammesso(venditore_id):
+        return "questo venditore non riceve on-chain", False
+    con = _onchain_db()
+    try:
+        x = {r["tg_id"] for r in con.execute(
+            "SELECT tg_id FROM onchain_xpub WHERE tg_id IN (?,?)",
+            (int(compratore_id), int(venditore_id)))}
+    finally:
+        con.close()
+    if int(venditore_id) not in x:
+        # si accende da solo all'apertura dell'app (27 ott 2026): chi
+        # non ce l'ha e' chi non l'ha ancora aperta da allora
+        return ("il venditore non ha ancora aperto Barattolo da "
+                "quando l'on-chain c'e': si accende da solo appena "
+                "lo apre"), False
+    return "", int(compratore_id) in x
 
 
 async def _avviso_importo_grosso(fuori):  # async: le tre uscite la aspettano gia'
@@ -111967,32 +112082,12 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     # resta dov'era, solo per il tetto (17 nov 2026 sera, la gabbia)
     sopra = {"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio_noto_ora()),
              "consigliato_sopra_euro": _onchain_soglia_consiglio()}
-    if not EMBIT:
-        return {**sopra, "pronto": False, "motivo": "manca la libreria embit"}
-    # (30 ott 2026, cantiere onchain-mainnet) la terza chiave che manca o
-    # non e' di questa rete spegne la porta ⛓️ PRIMA del tocco, con le
-    # parole del giudice: su mainnet senza la chiave di Barattolo non
-    # nasce nessun indirizzo
-    try:
-        onchain_xpub_barattolo()
-    except ValueError as e:
-        return {**sopra, "pronto": False, "motivo": str(e)}
-    if not onchain_ammesso(venditore_id):
-        return {**sopra, "pronto": False, "motivo": "questo venditore non riceve on-chain"}
-    con = _onchain_db()
-    try:
-        x = {r["tg_id"] for r in con.execute(
-            "SELECT tg_id FROM onchain_xpub WHERE tg_id IN (?,?)",
-            (user["id"], int(venditore_id)))}
-    finally:
-        con.close()
-    if int(venditore_id) not in x:
-        # si accende da solo all'apertura dell'app (27 ott 2026): chi
-        # non ce l'ha e' chi non l'ha ancora aperta da allora
-        return {**sopra, "pronto": False,
-                "motivo": "il venditore non ha ancora aperto Barattolo da "
-                          "quando l'on-chain c'e': si accende da solo appena "
-                          "lo apre"}
+    # i no della porta (libreria, terza chiave, chi vende, la sua chiave):
+    # un giudice solo con la cassa del Lightning (22 nov 2026), che li
+    # chiede per sapere se toglie il Lightning sopra la soglia
+    chiusa, io_acceso = _onchain_porta_chiusa(user["id"], venditore_id)
+    if chiusa:
+        return {**sopra, "pronto": False, "motivo": chiusa}
     # (chi vende senza un wallet suo si paga lo stesso, 27 ott 2026: la
     # scelta serve solo all'uscita, e la fa dopo)
     # e il tetto della beta, se la cassa dice la cifra (`sats`, il totale
@@ -112004,7 +112099,11 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
             return {**sopra, "pronto": False, "motivo": troppo}
     # la quota fissa di Barattolo, detta PRIMA di pagare (regola ferrea
     # 10): la cassa la scrive accanto al margine per la rete
-    return {**sopra, "pronto": True, "motivo": "", "io_acceso": user["id"] in x,
+    # SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026): detto solo qui, a porta
+    # aperta — a on-chain impossibile il Lightning resta, con l'avviso
+    return {**sopra, "pronto": True, "motivo": "", "io_acceso": io_acceso,
+            "solo_onchain": sats > 0 and onchain_solo(int(sats), cambio_noto_ora()),
+            "solo_onchain_sopra_euro": onchain_solo_soglia(),
             "quota_sats": onchain_quota_sats()}
 
 

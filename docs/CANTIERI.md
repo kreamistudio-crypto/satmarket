@@ -94291,3 +94291,95 @@ I PERCHÉ. Il cassetto metteva in fila il CSV e il catalogo esterno, e chi cerca
 PROVATO. In `prove_catalogo_esterno` il banco in node gira dietro la porta di Shopify (EMENDATA) e tre casi nuovi: le porte (tre, col conto del negozio collegato, niente CSV né negozi sotto), la porta del CSV (col suo Indietro, senza negozi), la porta di WooCommerce (solo i negozi Woo, il modulo senza pillole). In `prove_esauriti_eliminabili` il foglio e l'etichetta dell'annuncio di un negozio collegato. Le sentinelle del titolo e degli avvisi emendate.
 DA GUARDARE. In collaudo dal telefono: le tre porte, «‹ Indietro», e un annuncio di un negozio collegato col suo «🪑 Rimuovi da qui».
 
+
+## Sopra 500 € solo on-chain, e il mercatino on-chain senza tetto (22 nov 2026, cantiere onchain-prodotti-costosi; Andrea, con lo scatto dell'annuncio «Sofone» di Jj, 200.000.000 sats ≈ 110.596 €, «Preferisce ricevere in Lightning»: «per prodotti così costosi uno non può ricevere lightning... Deve inserire un ricevimento onchain», poi «per l'onchain nel mercatino non mettiamo tetti», «il tetto è solo nell'onchain p2p» e «sì, 500 e scritte ok»)
+
+COSA SUCCEDEVA. Tre cose storte insieme sul Sofone. (1) La pillola
+«Preferisce ricevere in Lightning» usciva perché `_segna_incasso_venditori`
+dice «ln» sopra `SWAP_MAX_SATS` (50.000 di serie: lo swap non regge),
+anche a chi aveva scelto on-chain. (2) Sopra `ONCHAIN_MAX_EURO` (2.000 in
+produzione) la porta on-chain era chiusa col motivo «per questo ordine
+paga con Lightning»: la fattura da 2 BTC nasceva e non sarebbe passata
+mai, cioè l'annuncio non si poteva comprare. (3) Fra 500 e 2.000 €, chi
+pagava in Lightning faceva ricevere chi vende in Lightning dal nodo (il
+«NON FATTO» di onchain-grossi-uscita).
+
+LE DECISIONI (di Andrea, sulla proposta in dieci righe). Il mercatino
+on-chain SENZA TETTO: `ONCHAIN_MAX_EURO` nasce 0 nel codice (una riga
+storta resta 250, mai spento da un refuso), il tetto resta solo al P2P
+on-chain (`P2P_ONCHAIN_MAX_EURO`, 999). Sul VPS l'ha fatto Andrea il 22
+nov alle 18:44 (riga `ONCHAIN_MAX_EURO = 0` in fondo, copia
+/root/config-prima-onchain-senza-tetto-2026-11-22.py, riavvio, salute
+200). SOPRA 500 € SOLO ON-CHAIN, la STESSA soglia del consiglio
+(`ONCHAIN_CONSIGLIATO_SOPRA_EURO`: un numero solo), con una leva nuova
+che lo accende, `ONCHAIN_SOLO_SOPRA_SOGLIA`, accesa di serie. Rovescia
+il «consiglia, non vieta» del 17 nov: Andrea l'ha scelto sapendolo. Le
+due scritte nuove le ha approvate lui: «Sopra 500 € si riceve solo
+on-chain.» (chi pubblica) e «Sopra 500 € si paga solo on-chain.» (chi
+compra). Niente indirizzo da mettere alla pubblicazione (Andrea: «Se non
+cambia niente per gli utenti va bene anche così»): i sats restano nel
+2-di-3 finché chi vende sceglie il wallet, come oggi.
+
+COME. Un giudice, `onchain_solo` (leva + `onchain_consigliato`). Un
+secondo pezzo, `_onchain_porta_chiusa`: i quattro no di `/onchain/pronto`
+(libreria, terza chiave, chi vende ammesso, la sua chiave) tolti dalla
+rotta e messi in una funzione, nello stesso ordine e con le stesse
+parole, così la rotta e la cassa li chiedono allo stesso modo; il tetto
+resta a chi chiama (la rotta chiede il cambio alla rete solo lì, la
+cassa usa `cambio_noto_ora`: la lezione della gabbia del 17 nov). Il
+Lightning si toglie SOLO dove l'on-chain c'è davvero: altrimenti un
+oggetto grosso resterebbe senza nessuna strada. Quindi:
+- `/onchain/pronto` dice `solo_onchain` e `solo_onchain_sopra_euro` solo
+  a porta aperta;
+- `compra` (la cassa Lightning) risponde 409 con la frase prima di
+  coniare la fattura, per un oggetto senza offerta né codice sconto, se
+  chi compra vede l'on-chain, la porta di chi vende è aperta e il tetto
+  (se c'è) lo lascia. Il set (carrello) e la ripresa di una fattura viva
+  non passano di lì;
+- la pillola: sopra la soglia «on-chain» se chi vende l'on-chain ce l'ha
+  (anche a swap automatico spento); chi non ce l'ha torna alla regola di
+  prima;
+- `/api/me` dà `onchain_solo_sopra_euro` a chi vede l'on-chain: il foglio
+  di chi pubblica (`incassoSoloOnchain`) lo confronta col prezzo (in € o
+  in sats col cambio del telefono), lascia solo On-chain con la frase, e
+  `incassoPayload` manda 'onchain';
+- il foglio «Come vuoi pagare?», le porte ⚡/₿ e l'interruttore in cima
+  alla fattura: ⚡ sbiadito e il tocco dice la frase (`payOcSolo`,
+  `payOcSoloFrase`); niente bollino «Consigliato» né il vecchio avviso,
+  che sarebbero un doppione.
+
+SCARTATE. Una soglia nuova (Andrea: 500, la stessa). Il divieto anche a
+porta chiusa (l'oggetto non si comprerebbe in nessun modo). Chiedere un
+wallet on-chain prima di pubblicare (un passo in più che non cambia
+niente: i sats aspettano nel 2-di-3). Pagare chi vende on-chain dal nodo
+quando l'acquisto è arrivato in Lightning (strada di soldi nuova: con la
+regola nuova sopra soglia non ci si arriva più, salvo carrello, offerta
+e codice sconto). Un messaggio a chi ha già annunci grossi (messaggi a
+utenti = gesto di Andrea; e non serve: il server guarda il prezzo, la
+regola vale da subito anche per gli annunci vecchi, senza toccare il
+database).
+
+ATTENZIONE. Senza `MERCATINO_SCELTA_RETE` (accesa in produzione) la
+cassa apre subito la fattura: sopra soglia il 409 chiude il foglio col
+toast della frase, e l'on-chain non si raggiunge da lì. Con la leva
+accesa la scelta della rete viene prima e il caso non c'è.
+
+PROVATO: `prove_onchain_solo_sopra_soglia` (il giudice eseguito a leva e
+soglia accese/spente; la porta eseguita coi suoi quattro no; la rotta e
+la cassa sul sorgente, ordine compreso; la pillola eseguita, con e senza
+swap automatico, a leva spenta; `/api/me`; il telefono in node: scelta,
+porte, interruttore, tocco su ⚡, foglio di chi pubblica a 600 €, 400 €,
+in sats, a soglia 0); `prove_onchain_tetto` e `prove_onchain_consigliato`
+ritoccate (0 senza riga e 250 storta; tre ritorni della rotta invece di
+sei). `collaudo_onchain_ordine` col server vero: il codice senza riga non
+ha tetto; sopra soglia a porta aperta `/onchain/pronto` dice «solo», la
+cassa dice 409 con la frase e nessuna fattura nasce, `/api/me` dice la
+soglia; a leva spenta il Lightning torna con l'avviso; a porta chiusa
+(tetto) il Lightning resta. CONTROPROVE, una per una, tutte rosse: la
+pillola senza il controllo on-chain di chi vende, la leva ignorata nel
+giudice, ⚡ non sbiadito nella scelta, il tocco su ⚡ senza blocco, il
+foglio di chi pubblica senza «solo», la cassa senza il 409 (rosso nel
+collaudo).
+NON PROVATO dal vivo: un acquisto vero sopra 500 €; il foglio si guarda
+sul collaudo, che segue develop (se il config della vm-2050 ha una riga
+`ONCHAIN_MAX_EURO` vince lei: sopra quel tetto il Lightning resta).

@@ -163204,8 +163204,12 @@ def prove_onchain_tetto():
           compra.index("cambio = await cambio_btc_eur()")
           < compra.index("onchain_sopra_il_tetto(prezzo, cambio)")
           < compra.index("con = _onchain_db_ordini()"))
-    prova("il codice dice 250, anche con una riga storta", 2,
-          _SORGENTE.count("    ONCHAIN_MAX_EURO = 250\n"))
+    # (22 nov 2026, cantiere onchain-prodotti-costosi, Andrea: «per
+    # l'onchain nel mercatino non mettiamo tetti») senza riga nessun tetto;
+    # la riga storta resta a 250, mai spenta da un refuso
+    prova("il codice dice 0 senza riga (nessun tetto) e 250 con una riga storta",
+          (1, 1), (_SORGENTE.count("    ONCHAIN_MAX_EURO = 0\n"),
+                   _SORGENTE.count("    ONCHAIN_MAX_EURO = 250\n")))
     # IL PAVIMENTO DEL MARGINE A 500 (28 ott 2026, Andrea: «imposta 500
     # sats»): sotto la rete cara comanda il pavimento, sopra il triplo
     amb = {"ONCHAIN_MARGINE_MIN_SATS": 500, "ONCHAIN_VBYTE_USCITA": 180,
@@ -163280,7 +163284,7 @@ def prove_onchain_consigliato():
     pronto = pronto[:pronto.index("\n@app.", 10)]
     prova("/onchain/pronto dice il consiglio in OGNI risposta, anche nei no, "
           "col cambio che si sa (senza rete); la rete solo per il tetto, dov'era",
-          (6, 0, True, 1),
+          (3, 0, True, 1),
           (pronto.count('return {**sopra, "pronto"'), pronto.count('return {"pronto"'),
            '"consigliato": sats > 0 and onchain_consigliato(int(sats), cambio_noto_ora())' in pronto,
            pronto.count("await cambio_btc_eur()")))
@@ -163407,6 +163411,224 @@ console.log(JSON.stringify(out));
           (srv.count('"grosso_ln_tolto": _onchain_grosso('),
            "const grossoNota = o.role === 'seller' && oc.grosso_ln_tolto" in mini,
            "Per una cifra così ricevi on-chain, anche se avevi scelto" in srv))
+
+
+def prove_onchain_solo_sopra_soglia():
+    """SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+    onchain-prodotti-costosi; Andrea, con l'annuncio «Sofone» da 2 BTC
+    «Preferisce ricevere in Lightning»: «per prodotti così costosi uno non
+    può ricevere lightning», poi «sì, 500 e scritte ok»). Il giudice
+    ESEGUITO, la porta eseguita coi suoi quattro no, la cassa del
+    Lightning che dice di no, la pillola eseguita, e il telefono in node."""
+    print("\n⛓️ Sopra la soglia, solo on-chain")
+    import subprocess
+    srv = _SORGENTE
+    es = open("config_esempio.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # IL GIUDICE: la soglia del consiglio e la leva
+    amb = {"ONCHAIN_CONSIGLIATO_SOPRA_EURO": 500, "ONCHAIN_SOLO_SOPRA_SOGLIA": True}
+    for f in ("_onchain_soglia_consiglio", "onchain_consigliato", "onchain_solo",
+              "onchain_solo_soglia"):
+        exec(pezzo(f), amb)
+    s = amb["onchain_solo"]
+    prova("a 100.000 €/BTC: 500 € no, 500,01 si', i 2 BTC del Sofone si', "
+          "senza cambio no; la soglia per il telefono e' 500",
+          [False, True, True, False, 500],
+          [s(500_000, 100_000.0), s(500_001, 100_000.0), s(200_000_000, 55_298.0),
+           s(200_000_000, 0), amb["onchain_solo_soglia"]()])
+    amb["ONCHAIN_SOLO_SOPRA_SOGLIA"] = False
+    prova("...a leva spenta nessun «solo on-chain», e la soglia del telefono e' 0",
+          [False, 0], [s(200_000_000, 55_298.0), amb["onchain_solo_soglia"]()])
+    amb["ONCHAIN_SOLO_SOPRA_SOGLIA"] = True
+    amb["ONCHAIN_CONSIGLIATO_SOPRA_EURO"] = 0
+    prova("...a soglia 0 (consiglio spento) niente nemmeno qui", False,
+          s(200_000_000, 55_298.0))
+    prova("leva ONCHAIN_SOLO_SOPRA_SOGLIA accesa di serie, nell'esempio, nel "
+          "pannello", (True, True, True),
+          ("    ONCHAIN_SOLO_SOPRA_SOGLIA = True\n" in srv,
+           "\nONCHAIN_SOLO_SOPRA_SOGLIA = True\n" in es,
+           '_leva("Sopra la soglia solo on-chain", "ONCHAIN_SOLO_SOPRA_SOGLIA"' in srv))
+    prova("il mercatino on-chain senza tetto anche nell'esempio", True,
+          "\nONCHAIN_MAX_EURO = 0\n" in es)
+    # LA PORTA: i quattro no, nell'ordine, con le parole di /onchain/pronto
+    class _Con:
+        def __init__(self, ids): self.ids = ids
+        def execute(self, q, a): return [{"tg_id": t} for t in a if t in self.ids]
+        def close(self): pass
+
+    def xpub_ok(): return "xpub"
+
+    def xpub_no(): raise ValueError("manca la terza chiave")
+    amb = {"EMBIT": True, "onchain_xpub_barattolo": xpub_ok,
+           "onchain_ammesso": lambda t: True, "_onchain_db": lambda: _Con({111, 222})}
+    exec(pezzo("_onchain_porta_chiusa"), amb)
+    pc = amb["_onchain_porta_chiusa"]
+    tutto = pc(111, 222)
+    amb["_onchain_db"] = lambda: _Con({222})
+    senza_mia = pc(111, 222)
+    amb["_onchain_db"] = lambda: _Con({111})
+    senza_sua = pc(111, 222)[0].startswith("il venditore non ha ancora aperto")
+    amb["onchain_ammesso"] = lambda t: t != 222
+    non_ammesso = pc(111, 222)
+    amb["onchain_xpub_barattolo"] = xpub_no
+    terza = pc(111, 222)
+    amb["EMBIT"] = False
+    embit = pc(111, 222)
+    prova("la porta: aperta (con la mia chiave e senza), poi i no di sempre "
+          "dall'ultimo al primo",
+          [("", True), ("", False), True, ("questo venditore non riceve on-chain", False),
+           ("manca la terza chiave", False), ("manca la libreria embit", False)],
+          [tutto, senza_mia, senza_sua, non_ammesso, terza, embit])
+    pronto = srv[srv.index('@app.get("/api/onchain/pronto/{venditore_id}")'):]
+    pronto = pronto[:pronto.index("\n@app.", 10)]
+    prova("/onchain/pronto passa dalla stessa porta e dice «solo on-chain» "
+          "solo a porta aperta, col cambio senza rete", (True, 1, True, True),
+          ("chiusa, io_acceso = _onchain_porta_chiusa(user[\"id\"], venditore_id)" in pronto,
+           pronto.count('"solo_onchain":'),
+           pronto.index('"solo_onchain": sats > 0 and onchain_solo(int(sats), cambio_noto_ora())')
+           > pronto.index("troppo = onchain_sopra_il_tetto("),
+           '"solo_onchain_sopra_euro": onchain_solo_soglia()' in pronto))
+    # LA CASSA DEL LIGHTNING DICE DI NO
+    compra = pezzo("compra")
+    prova("la cassa del Lightning: niente fattura sopra la soglia se l'on-chain "
+          "c'e' (giudice, porta, tetto), dopo il ramo on-chain e prima della "
+          "fattura; offerta e codice sconto restano fuori",
+          (True, True, True, True),
+          ('raise HTTPException(409, f"Sopra {onchain_solo_soglia()} € si "' in compra,
+           compra.index("return await _onchain_compra(user, a, richiesti, totale")
+           < compra.index("if not off and not cod_id and onchain_ammesso(user[\"id\"]):")
+           < compra.index("cf = cassaforte_nuova()"),
+           "and not _onchain_porta_chiusa(user[\"id\"], a[\"venditore_id\"])[0]" in compra,
+           "and not onchain_sopra_il_tetto(totale, cambio_ora)" in compra))
+    prova("...e chiude il database prima del no", True,
+          "            con.close()\n            raise HTTPException(409, f\"Sopra" in compra)
+    prova("il carrello resta col Lightning (il set non passa dal giudice)", False,
+          "onchain_solo" in pezzo("_compra_set"))
+    # LA PILLOLA: il Sofone diceva «Lightning» perche' stava sopra lo swap
+    righe = [{"id": 1, "venditore_id": 222, "prezzo_sats": 200_000_000},
+             {"id": 2, "venditore_id": 333, "prezzo_sats": 200_000_000},
+             {"id": 3, "venditore_id": 222, "prezzo_sats": 30_000}]
+
+    class _ConP:
+        def execute(self, q, a=()):
+            if "swap_auto_preferenze" in q:
+                return [{"tg_id": 222}]
+            return []
+        def close(self): pass
+    amb = {"SWAP_AUTO_ATTIVO": True, "EMBIT": True, "ONCHAIN_SOLO_SOPRA_SOGLIA": True,
+           "ONCHAIN_CONSIGLIATO_SOPRA_EURO": 500, "SWAP_MIN_SATS": 25_000,
+           "SWAP_MAX_SATS": 50_000, "cambio_noto_ora": lambda: 55_298.0,
+           "db": lambda: _ConP(), "_swap_auto_pref_prepara": lambda con: None,
+           "onchain_ammesso": lambda t: t == 222, "swap_auto_per": lambda t: True,
+           "netto_venditore": lambda x: x}
+    for f in ("_onchain_soglia_consiglio", "onchain_consigliato", "onchain_solo",
+              "_segna_incasso_venditori"):
+        exec(pezzo(f), amb)
+    amb["_segna_incasso_venditori"](righe)
+    prova("la pillola: il 2 BTC dice on-chain se chi vende l'ha; chi non l'ha "
+          "torna alla regola di prima; il piccolo resta com'era",
+          ["onchain", "ln", "onchain"], [r["venditore_incasso"] for r in righe])
+    amb["SWAP_AUTO_ATTIVO"] = False
+    for r in righe:
+        r.pop("venditore_incasso")
+    amb["_segna_incasso_venditori"](righe)
+    prova("...anche a swap automatico spento il grosso dice on-chain, il resto "
+          "niente", ["onchain", "", ""], [r["venditore_incasso"] for r in righe])
+    amb["SWAP_AUTO_ATTIVO"] = True
+    amb["ONCHAIN_SOLO_SOPRA_SOGLIA"] = False
+    amb["_segna_incasso_venditori"](righe)
+    prova("...e a leva spenta la regola di prima (sopra lo swap: Lightning)",
+          ["ln", "ln", "onchain"], [r["venditore_incasso"] for r in righe])
+    prova("/api/me dice la soglia solo a chi vede l'on-chain", True,
+          'profilo["onchain_solo_sopra_euro"] = (onchain_solo_soglia()\n'
+          '                                          if profilo["onchain"] else 0)' in srv)
+    # IL TELEFONO
+    blocco = mini[mini.index("let acqMetodo = 'ln';"):mini.index("/* L'ordine on-chain della cassa:")]
+    incasso = mini[mini.index("let incassoSell = '';"):mini.index("/* il pezzo del payload: chiave assente")]
+    banco = r"""
+const NODI = {};
+function el(id){
+  if (!NODI[id]) NODI[id] = {id, innerHTML: '', textContent: '', className: '', value: '',
+    style: {display: 'none'}, classList: {set: new Set(),
+      add(c){ this.set.add(c); }, remove(c){ this.set.delete(c); }, contains(c){ return this.set.has(c); }}};
+  return NODI[id];
+}
+let myOnchain = true, mySceltaRete = true, DEMO = false, VETRINA = false;
+let acqDati = {tipo: 'mono'}, currentOrderId = null, pollTimer = null;
+let sellValuta = 'eur', eurPerSat = 0.00055, myOnchainLn = null;
+const swapAutoAcceso = () => true, swapAuto = () => ({modo: 'ln'}), fmt = n => String(n);
+const corpoCodiceSconto = () => ({});
+const P2P_OC_MONETA = '<i>OC</i>', P2P_LN_MONETA = '<i>LN</i>';
+const esc = s => String(s).replace(/</g, '&lt;');
+const API_BASE = '/api', authHdr = () => 'x', haptic = () => {}, aggiornaPayHint = () => {};
+let creata = 0;
+async function payCreaFattura(){ creata++; }
+function fetch(u){ return new Promise(() => {}); }
+function startBuy(){}
+""" + blocco + incasso + r"""
+const out = {};
+const l = {id: 1, sellerId: 222};
+apriSceltaPagaRete(l, 200000000);
+paySceltaPronto = {pronto: true, consigliato: true, consigliato_sopra_euro: 500,
+                   solo_onchain: true, solo_onchain_sopra_euro: 500};
+renderSceltaPagaRete();
+let h = el('paySceltaCorpo').innerHTML;
+out.scelta = [/p2p-scelta-ln p2p-scelta-rete spento/.test(h), /Sopra 500 € si paga solo on-chain\./.test(h),
+              /spesso non passa/.test(h), /pay-consigliato/.test(h)];
+sceltaPagaRete('ln');
+out.toccoLn = el('paySheet').classList.contains('open');
+paySceltaPronto = {pronto: false, motivo: 'no', consigliato: true, consigliato_sopra_euro: 500,
+                   solo_onchain: true, solo_onchain_sopra_euro: 500};
+renderSceltaPagaRete(); h = el('paySceltaCorpo').innerHTML;
+out.portaChiusa = [/p2p-scelta-ln p2p-scelta-rete spento/.test(h), /solo on-chain/.test(h)];
+mySceltaRete = false;
+payMetodoPrepara(l, null, 200000000, {pronto: true, solo_onchain: true, solo_onchain_sopra_euro: 500});
+acqMetodo = 'onchain'; renderPayMetodo();
+out.porte = /class="ln spento"/.test(el('payMetodo').innerHTML);
+payPassaA('ln');
+out.passaLn = [el('payMetodoNota').innerHTML, creata];
+mySceltaRete = true; renderPayMetodo();
+out.interruttore = /p2p-rete-tasto spento"[^>]*onclick="payPassaA\('ln'\)"/.test(el('payMetodo').innerHTML.replace(/\s+/g, ' '));
+// il foglio di chi pubblica
+myOnchainSoloEuro = 500;
+el('sellPrice').value = '600'; renderIncassoForm();
+out.vende = [el('sellIncassoField').style.display, (el('sellIncassoScelta').innerHTML.match(/role="radio"/g) || []).length,
+             /On-chain/.test(el('sellIncassoScelta').innerHTML), el('sellIncassoHint').innerHTML,
+             JSON.stringify(incassoPayload())];
+el('sellPrice').value = '400'; renderIncassoForm();
+out.piccolo = [(el('sellIncassoScelta').innerHTML.match(/role="radio"/g) || []).length,
+               /solo on-chain/.test(el('sellIncassoHint').innerHTML), JSON.stringify(incassoPayload())];
+sellValuta = 'sats'; el('sellPrice').value = '200000000'; renderIncassoForm();
+out.inSats = /Sopra 500 € si riceve solo on-chain\./.test(el('sellIncassoHint').innerHTML);
+myOnchainSoloEuro = 0; renderIncassoForm();
+out.spenta = (el('sellIncassoScelta').innerHTML.match(/role="radio"/g) || []).length;
+console.log(JSON.stringify(out));
+"""
+    try:
+        r = subprocess.run(["node", "-e", banco], capture_output=True, text=True, timeout=30)
+        out = json.loads(r.stdout.strip().splitlines()[-1]) if r.returncode == 0 and r.stdout.strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        salta("il banco del «solo on-chain»", "node assente")
+        return
+    if out is None:
+        prova("il banco del «solo on-chain» gira", "", (r.stderr or "")[-600:])
+        return
+    prova("la scelta «Come vuoi pagare?» sopra la soglia: Lightning sbiadito, la "
+          "frase sola (niente doppio avviso, niente bollino)",
+          [True, True, False, False], out["scelta"])
+    prova("...il tocco su Lightning non apre la fattura", False, out["toccoLn"])
+    prova("...a porta on-chain chiusa il Lightning resta", [False, False], out["portaChiusa"])
+    prova("le porte della fattura: ⚡ sbiadita, il tocco dice la frase e non "
+          "rifa' la fattura; anche nell'interruttore",
+          (True, ["Sopra 500 € si paga solo on-chain.", 0], True),
+          (out["porte"], out["passaLn"], out["interruttore"]))
+    prova("chi pubblica a 600 €: resta solo On-chain, la frase, il salvataggio "
+          "manda onchain",
+          ["", 1, True, "Sopra 500 € si riceve solo on-chain.", '{"incasso":"onchain"}'],
+          out["vende"])
+    prova("...a 400 € le tre scelte di sempre", [3, False, '{"incasso":""}'], out["piccolo"])
+    prova("...col prezzo in sats (2 BTC) lo stesso; a soglia 0 le tre scelte",
+          (True, 3), (out["inSats"], out["spenta"]))
 
 
 def _pezzi_incasso_js(mini):
@@ -220134,7 +220356,7 @@ CATEGORIE = {
     ordine_onchain ripristino_visibile chiave_che_nasce_da_sola cassetta_telegram
     checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
-    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto onchain_consigliato payjoin
+    onchain_disputa onchain_nell_ordine onchain_pagina onchain_tetto onchain_consigliato onchain_solo_sopra_soglia payjoin
     p2p_onchain p2p_onchain_usdt p2p_onchain_tetto volto_porta_card rete_onchain_dal_pannello
     scelta_rete_mercatino cifra_btc foglio_oc_visto seconda_firma_parla
     bitpost_gift_card
@@ -221065,6 +221287,7 @@ def main():
     prove_payjoin,
     prove_onchain_tetto,
     prove_onchain_consigliato,
+    prove_onchain_solo_sopra_soglia,
     prove_chiave_che_nasce_da_sola,
     prove_cassetta_telegram,
     prove_checksum_descrittore,

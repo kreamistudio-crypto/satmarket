@@ -705,7 +705,12 @@ def main():
           controlla(999, o["id"]).json()["stato"])
 
     # il tetto della beta (27 ott 2026, cantiere onchain-tetto): 250 € sul
-    # prezzo; qui il cambio finto e' 100.000 €/BTC, quindi 250.000 sats
+    # prezzo; qui il cambio finto e' 100.000 €/BTC, quindi 250.000 sats.
+    # Dal 22 nov 2026 il codice non ha piu' un tetto di serie (Andrea: «per
+    # l'onchain nel mercatino non mettiamo tetti»): qui lo si accende a mano
+    prova("il codice, senza riga, non ha un tetto per il mercatino", 0,
+          SRV.ONCHAIN_MAX_EURO)
+    SRV.ONCHAIN_MAX_EURO = 250
     con = SRV.db()
     caro = con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
@@ -765,6 +770,48 @@ def main():
           (r2.json().get("ripresa"), r2.json().get("importo_grosso")))
     SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 0
     prova("...a soglia 0 nessun avviso", False, compra(999, caro).json().get("importo_grosso"))
+    # SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+    # onchain-prodotti-costosi): a porta aperta (tetto spento) la fattura
+    # Lightning non nasce, /onchain/pronto lo dice, l'on-chain si paga
+    SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 200
+    SRV.ONCHAIN_MAX_EURO = 0
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='annullato' WHERE annuncio_id=? "
+                "AND stato='creato'", (caro,))
+    con.commit()
+    con.close()
+    come(999)
+    x = c.get("/api/onchain/pronto/888?sats=300000").json()
+    prova("sopra la soglia, a porta aperta: /onchain/pronto dice «solo on-chain» "
+          "e la soglia", (True, True, 200),
+          (x["pronto"], x.get("solo_onchain"), x.get("solo_onchain_sopra_euro")))
+    prova("...sotto la soglia no", False,
+          c.get("/api/onchain/pronto/888?sats=100000").json().get("solo_onchain"))
+    r = compra(999, caro)
+    prova("...la cassa del Lightning dice 409 con la frase, e nessuna fattura nasce",
+          (409, "Sopra 200 € si paga solo on-chain.", 0),
+          (r.status_code, r.json().get("detail"),
+           SRV.db().execute("SELECT COUNT(*) FROM ordini WHERE annuncio_id=? "
+                            "AND stato='creato'", (caro,)).fetchone()[0]))
+    prova(".../api/me dice la soglia a chi vede l'on-chain", 200,
+          c.get("/api/me").json().get("onchain_solo_sopra_euro"))
+    SRV.ONCHAIN_SOLO_SOPRA_SOGLIA = False
+    x = c.get("/api/onchain/pronto/888?sats=300000").json()
+    r = compra(999, caro)
+    prova("...a leva spenta il Lightning torna (fattura, avviso), e niente «solo»",
+          (200, True, False, 0),
+          (r.status_code, r.json().get("importo_grosso"), x.get("solo_onchain"),
+           c.get("/api/me").json().get("onchain_solo_sopra_euro")))
+    SRV.ONCHAIN_SOLO_SOPRA_SOGLIA = True
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='annullato' WHERE annuncio_id=? "
+                "AND stato='creato'", (caro,))
+    con.commit()
+    con.close()
+    SRV.ONCHAIN_MAX_EURO = 250
+    r = compra(999, caro)
+    prova("...a porta chiusa (qui il tetto) il Lightning resta, con l'avviso",
+          (200, True), (r.status_code, r.json().get("importo_grosso")))
     SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
     SRV.cambio_noto_ora = cambio_vero
     SRV.ONCHAIN_CONSIGLIATO_SOPRA_EURO = 200

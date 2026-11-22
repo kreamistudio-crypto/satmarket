@@ -36308,7 +36308,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_payjoin` (wallet di cartone, controlli del wallet sul calco
   del BIP, controprove); collaudo `collaudo_payjoin`.
 - IL TETTO DELLA BETA ON-CHAIN (27 ott 2026, cantiere onchain-tetto):
-  `ONCHAIN_MAX_EURO` (250 nel codice, 0 = spento) sul prezzo dell'ordine,
+  `ONCHAIN_MAX_EURO` (0 = spento, il valore del codice dal 22 nov 2026;
+  una riga storta vale 250) sul prezzo dell'ordine,
   col cambio del momento; `onchain_sopra_il_tetto` lo giudica e la cassa
   (`_onchain_compra`) lo chiama prima di scrivere. Senza cambio: no.
   `GET /api/onchain/pronto/{venditore}?sats=N` lo dice prima del tocco.
@@ -36330,6 +36331,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Lightning dell'ordine dice 409 (`_onchain_da_sbloccare`). Il tetto
   degli scambi P2P on-chain è a parte: `P2P_ONCHAIN_MAX_EURO` (999 di
   serie); `ONCHAIN_MAX_EURO` vale solo per il mercatino.
+- SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+  onchain-prodotti-costosi; perché in CANTIERI, «Sopra 500 € solo
+  on-chain»). Leva `ONCHAIN_SOLO_SOPRA_SOGLIA` (accesa di serie) sulla
+  STESSA soglia del consiglio. Il giudice è `onchain_solo`; se l'on-chain
+  per una coppia si può lo dice `_onchain_porta_chiusa` (i quattro no di
+  `/onchain/pronto`, che ora passa di lì; il tetto lo guarda chi chiama).
+  Chi lo chiede: `/onchain/pronto` (`solo_onchain` e
+  `solo_onchain_sopra_euro`, SOLO a porta aperta), la cassa Lightning di
+  `compra` (409 «Sopra N € si paga solo on-chain.» prima di coniare la
+  fattura, solo per un oggetto senza offerta né codice sconto, a porta
+  aperta e sotto il tetto; il set e la ripresa non passano di lì),
+  `_segna_incasso_venditori` (la pillola dice «on-chain» sopra soglia se
+  chi vende l'on-chain ce l'ha, anche a swap automatico spento) e
+  `/api/me` (`onchain_solo_sopra_euro`, per il foglio di chi pubblica).
+  Il telefono: `payOcSolo`/`payOcSoloFrase` sbiadiscono ⚡ nella scelta,
+  nelle porte e nell'interruttore; `incassoSoloOnchain` lascia solo
+  On-chain in «Come vuoi ricevere» e `incassoPayload` manda 'onchain'.
+  Con `ONCHAIN_MAX_EURO` acceso, sopra il tetto la porta è chiusa e il
+  Lightning resta con l'avviso.
 - LA CASSA A DUE PORTE E L'INCASSO SOLO SU UN WALLET TUO (27 ott 2026,
   cantiere onchain-cassa; perché in CANTIERI, «La cassa a due porte»).
   Il foglio del pagamento (`#paySheet`) ha in cima `#payMetodo` (⚡ giallo

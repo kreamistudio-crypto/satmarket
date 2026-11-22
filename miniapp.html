@@ -62710,11 +62710,32 @@ function incassoProfiloRiassunto(){
   const oc = myOnchainLn && myOnchainLn.attivo ? (myOnchainLn.modo === 'lightning' ? 'ln' : myOnchainLn.modo || 'onchain') : 'onchain';
   return `Se ti pagano in Lightning: <b style="white-space:nowrap">${nome(ln)}</b>. Se ti pagano on-chain: <b style="white-space:nowrap">${nome(oc)}</b>.`;
 }
+/* SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+   onchain-prodotti-costosi; Andrea: «per prodotti così costosi uno non può
+   ricevere lightning»): la soglia viene da /api/me
+   (`onchain_solo_sopra_euro`, 0 = spenta), il prezzo dal campo. Sopra,
+   resta solo On-chain e il salvataggio manda 'onchain'. Il giudice che
+   fa fede e' il server (`onchain_solo`): qui solo le parole. */
+let myOnchainSoloEuro = 0;
+function incassoSoloOnchain(){
+  if (!(myOnchainSoloEuro > 0) || DEMO) return false;
+  const p = Number(el('sellPrice') && el('sellPrice').value) || 0;
+  const euro = sellValuta === 'eur' ? p
+    : (typeof eurPerSat === 'number' && eurPerSat > 0 ? p * eurPerSat : 0);
+  return euro > myOnchainSoloEuro;
+}
 function renderIncassoForm(){
   const campo = el('sellIncassoField');
   if (!campo) return;
-  if (!incassoFormAcceso()) { campo.style.display = 'none'; return; }
+  const solo = incassoSoloOnchain();
+  if (!incassoFormAcceso() && !solo) { campo.style.display = 'none'; return; }
   campo.style.display = '';
+  if (solo) {
+    el('sellIncassoScelta').innerHTML = `<div class="scelta-incasso scelta-auto" role="radiogroup" aria-label="Come vuoi ricevere per questo oggetto">`
+      + `<button type="button" role="radio" aria-checked="true" class="on">${P2P_OC_MONETA}<span class="nw">On-chain</span></button></div>`;
+    el('sellIncassoHint').innerHTML = `Sopra ${myOnchainSoloEuro} € si riceve solo on-chain.`;
+    return;
+  }
   const scelta = incassoSell || '';
   const tasto = (cosa, testo) => `<button type="button" role="radio" aria-checked="${scelta === cosa}"
       class="${scelta === cosa ? 'on' : ''}" onclick="scegliIncassoSell('${cosa}')">${testo}</button>`;
@@ -62737,6 +62758,9 @@ function scegliIncassoSell(cosa){
   renderIncassoForm();
 }
 function incassoPayload(){
+  /* sopra la soglia l'oggetto riceve on-chain (22 nov 2026): si scrive,
+     cosi' l'annuncio lo dice anche se un giorno la soglia salisse */
+  if (incassoSoloOnchain()) return {incasso: 'onchain'};
   if (incassoSell === null || !incassoFormAcceso()) return {};
   return {incasso: incassoSell || ''};
 }
@@ -73486,6 +73510,20 @@ function payAvvisoGrosso(d){
   n.style.display = 'block';
 }
 
+/* SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, cantiere
+   onchain-prodotti-costosi; Andrea: «per prodotti così costosi uno non può
+   ricevere lightning»): a giudicare e' il server, che in /onchain/pronto
+   dice `solo_onchain` solo a porta aperta (a on-chain impossibile il
+   Lightning resta), e rifiuta la fattura con la stessa frase. Qui la
+   porta ⚡ si sbiadisce e il tocco dice perche'. */
+function payOcSolo(x){
+  return !!(x && x.pronto && x.solo_onchain);
+}
+function payOcSoloFrase(x){
+  const soglia = Math.max(0, Math.floor(Number(x && x.solo_onchain_sopra_euro) || 0));
+  return 'Sopra ' + soglia + ' € si paga solo on-chain.';
+}
+
 function payMetodoSpegni(){
   if (payOcTimer) { clearInterval(payOcTimer); payOcTimer = null; }
   if (payOc && el('payQrNota'))
@@ -73541,7 +73579,7 @@ function renderPayMetodo(){
     box.className = 'pay-rete';
     box.innerHTML = '<div class="p2p-rete-scelta" role="radiogroup" aria-label="Come paghi">'
       + tasto('onchain', P2P_OC_MONETA, ocSi && payOcPronto.consigliato ? 'On-chain ✅' : 'On-chain', !ocSi)
-      + tasto('ln', P2P_LN_MONETA, 'Lightning', false) + '</div>';
+      + tasto('ln', P2P_LN_MONETA, 'Lightning', payOcSolo(payOcPronto)) + '</div>';
     box.style.display = 'block';
     return;
   }
@@ -73550,7 +73588,7 @@ function renderPayMetodo(){
     `<button type="button" role="tab" class="${cls}${acqMetodo === m ? ' attiva' : ''}${spento ? ' spento' : ''}"
        aria-selected="${acqMetodo === m}"${payMetodoOccupato ? ' aria-busy="true"' : ''}
        onclick="payPassaA('${m}')">${titolo}<small>${sotto}</small></button>`;
-  box.innerHTML = porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', false)
+  box.innerHTML = porta('ln', 'ln', '⚡ Lightning', 'subito, in un secondo', payOcSolo(payOcPronto))
     + porta('onchain', 'oc', P2P_OC_MONETA + 'On-chain 🛡️', ocSi ? (payOcPronto.consigliato ? '✅ consigliato per questa cifra' : '2-di-3, una conferma') : (payOcPronto ? 'non per questo oggetto' : 'guardo…'), !ocSi);
   box.style.display = 'flex';
 }
@@ -73597,19 +73635,28 @@ function renderSceltaPagaRete(){
      perche'; se l'on-chain qui non si puo', l'avviso resta col motivo */
   const cons = !!(paySceltaPronto && paySceltaPronto.consigliato);
   const soglia = cons ? Math.max(0, Math.floor(Number(paySceltaPronto.consigliato_sopra_euro) || 0)) : 0;
-  const consNota = !cons ? ''
+  /* SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026): il server lo dice solo a
+     porta aperta (`solo_onchain`); Lightning sbiadito e la frase sola */
+  const solo = payOcSolo(paySceltaPronto);
+  const consNota = solo ? payOcSoloFrase(paySceltaPronto)
+    : !cons ? ''
     : ocSi ? 'Sopra ' + soglia + ' € il Lightning spesso non passa: canali e wallet hanno tetti più bassi. Con l\'on-chain il pagamento arriva comunque.'
     : 'Sopra ' + soglia + ' € il Lightning spesso non passa. L\'on-chain qui non si può: ' + esc(paySceltaPronto.motivo || '') + '.';
   box.innerHTML = '<div class="p2p-scelta">'
     + tasto('p2p-scelta-oc', 'onchain', P2P_OC_MONETA + '<span>On-chain'
-            + (cons && ocSi ? '<small class="pay-consigliato">✅ Consigliato per questa cifra</small>' : '')
+            + (cons && ocSi && !solo ? '<small class="pay-consigliato">✅ Consigliato per questa cifra</small>' : '')
             + '</span>', !ocSi)
-    + tasto('p2p-scelta-ln', 'ln', P2P_LN_MONETA + '<span>Lightning</span>', false)
+    + tasto('p2p-scelta-ln', 'ln', P2P_LN_MONETA + '<span>Lightning</span>', solo)
     + '</div>'
     + (consNota ? '<div class="escrow-note pay-scelta-nota">' + consNota + '</div>' : '')
     + (paySceltaNota ? '<div class="escrow-note pay-scelta-nota">' + paySceltaNota + '</div>' : '');
 }
 function sceltaPagaRete(rete){
+  if (rete === 'ln' && payOcSolo(paySceltaPronto)) {
+    paySceltaNota = '';
+    renderSceltaPagaRete();
+    return;
+  }
   if (rete === 'onchain' && !(paySceltaPronto && paySceltaPronto.pronto)) {
     paySceltaNota = paySceltaPronto
       ? 'On-chain non disponibile: ' + esc(paySceltaPronto.motivo || '')
@@ -73625,6 +73672,10 @@ function sceltaPagaRete(rete){
 async function payPassaA(m){
   if (!payMetodoAcceso || payMetodoOccupato || m === acqMetodo) return;
   haptic();
+  if (m === 'ln' && payOcSolo(payOcPronto)) {
+    payMetodoNota(payOcSoloFrase(payOcPronto));
+    return;
+  }
   if (m === 'onchain' && !(payOcPronto && payOcPronto.pronto)) {
     payMetodoNota(payOcPronto
       ? '₿ On-chain non disponibile: ' + esc(payOcPronto.motivo || '')
@@ -121461,6 +121512,8 @@ async function avvia(){
     myOnchainRete = me.onchain_rete || '';
     /* ...e la scelta della rete al «Paga» (2 nov 2026, MERCATINO_SCELTA_RETE) */
     mySceltaRete = !!me.scelta_rete;
+    /* ...e la soglia del «solo on-chain» per chi pubblica (22 nov 2026) */
+    myOnchainSoloEuro = Math.max(0, Math.floor(Number(me.onchain_solo_sopra_euro) || 0));
     /* ...e gli scambi P2P con la garanzia 2-di-3 (30 ott 2026) */
     myP2POnchain = !!me.p2p_onchain;
     /* ...e gli ordini in USDT (1 nov 2026) */

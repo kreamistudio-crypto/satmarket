@@ -1554,8 +1554,11 @@ ONCHAIN_QUOTA_FISSA_SATS = 0
 # tetto rimane di 250 euro per un certo periodo ancora»): un ordine
 # on-chain sopra questa cifra in euro (sul prezzo, senza il margine per
 # la rete) non si paga on-chain, resta il Lightning. 0 = nessun tetto.
-# Il valore del codice e' gia' 250: la riga serve il giorno che sale.
-ONCHAIN_MAX_EURO = 250
+# DAL 22 NOV 2026 NESSUN TETTO DI SERIE (Andrea: «per l'onchain nel
+# mercatino non mettiamo tetti», «il tetto è solo nell'onchain p2p»): il
+# valore del codice e' 0, e sopra la soglia qui sotto si paga solo
+# on-chain. La riga serve solo il giorno che si vuole un tetto.
+ONCHAIN_MAX_EURO = 0
 # IL TETTO DEGLI SCAMBI P2P ON-CHAIN, A PARTE (17 nov 2026, Andrea:
 # «separalo»): fino a oggi gli scambi P2P a tre chiavi seguivano la riga
 # qui sopra, e alzare il mercatino alzava anche loro. Adesso hanno la
@@ -1571,8 +1574,16 @@ P2P_ONCHAIN_MAX_EURO = 999
 # Lightning resta. 500 perche' il nodo ha ~1,7M sats in uscita (17 nov).
 # Si cambia anche dal pannello. 0 = spento (nessun consiglio). Accesa di
 # serie: vale anche senza questa riga. ⚠️ L'on-chain si offre solo fino
-# a ONCHAIN_MAX_EURO: fra le due cifre consiglia, sopra resta l'avviso.
+# a ONCHAIN_MAX_EURO (se c'e' un tetto): sopra resta l'avviso.
 ONCHAIN_CONSIGLIATO_SOPRA_EURO = 500
+# SOPRA LA SOGLIA, SOLO ON-CHAIN (22 nov 2026, Andrea: «per prodotti così
+# costosi uno non può ricevere lightning»): sopra la cifra qui sopra
+# l'oggetto si paga solo on-chain e chi vende riceve on-chain, dove
+# l'on-chain per quella coppia si puo' (sennò il Lightning resta, con
+# l'avviso). Carrello, offerta accettata e codice sconto restano col
+# Lightning. Accesa di serie; False = il consiglio di prima, Lightning
+# compreso.
+ONCHAIN_SOLO_SOPRA_SOGLIA = True
 # IL PAYJOIN DEGLI ACQUISTI ON-CHAIN (16 nov 2026, cantiere payjoin): il
 # link di pagamento del mercatino porta `pj=` (BIP78), e il wallet di chi
 # compra che lo sa fare lascia aggiungere a Barattolo una sua moneta (le
