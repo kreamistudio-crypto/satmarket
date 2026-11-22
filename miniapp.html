@@ -3714,8 +3714,15 @@
   /* 🎁 la gift card, metodo del P2P (22 nov 2026): la 🎁 all'angolo della
      tessera dell'euro, la voce in fondo ai metodi del foglio «Pubblica»,
      taglio × quante in riga, e il titolo del modulo */
-  .p2p-tessera .p2p-gift-badge{display:grid;place-items:center;background:var(--card);
-    font-size:10px;line-height:1;width:17px;height:17px;top:-6px;right:-7px}
+  .p2p-tessera-gift{width:54px;overflow:hidden;background:#111;font-size:18px}
+  .p2p-tessera-gift img{width:54px;height:35px;object-fit:cover;display:block}
+  /* la carta e' piu' larga della tessera tonda: la riga di testa le fa
+     posto (34 + freccia + 54 e i due spazi) */
+  .p2p-ord.p2p-gift .p2p-testa{padding-right:128px}
+  @media (max-width:360px){
+    .p2p-tessera-gift,.p2p-tessera-gift img{width:46px;height:30px}
+    .p2p-ord.p2p-gift .p2p-testa{padding-right:108px}
+  }
   .p2p-voce-gift small{color:var(--muted);font-weight:600}
   .gc-carte{display:flex;align-items:center;gap:10px}
   .gc-carte select{flex:1 1 auto;min-width:0}
@@ -122273,10 +122280,10 @@ function gcDisegna(){
    IL VERSO E' QUELLO DEL P2P, per chi guarda:
    • «Compra BTC»: chi CHIEDE una gift card manda sats. Chi prende la sua
      richiesta compra le carte coi propri euro e riceve i sats — sulla card
-     «Invia 50 € in gift card / Ricevi ≈ … sats», coppia €🎁 → ₿.
+     «Invia 50 € in gift card / Ricevi ≈ … sats», coppia carta Shoppy Code → ₿.
    • «Vendi BTC»: chi VENDE gift card ha pubblicato un annuncio. Chi lo
      prende manda sats e riceve le carte — «Ricevi fino a 100 € in gift
-     card / Invia ≈ … sats», coppia ₿ → €🎁.
+     card / Invia ≈ … sats», coppia ₿ → carta (dal 22 nov la foto della carta, non l'euro col pacco).
    Il + pubblica dallo stesso foglio di sempre: «🎁 Gift card» e' una voce
    dei metodi (`voceGiftNuovoP2P`), e sceglierla porta al modulo della
    pagina «🎁 Gift card» nel verso del tab — da «Vendi BTC» la richiesta,
@@ -122356,13 +122363,16 @@ function gcSatsDa(cent, fee){
   return Math.round(cent / 100 / eurPerSat * (1 + (Number(fee) || 0) / 10000));
 }
 
-/* la coppia in alto a destra: l'euro con la 🎁 all'angolo (si paga in
-   euro, si consegna una gift card) e la ₿ arancio dell'on-chain */
+/* la coppia in alto a destra: la carta Shoppy Code e la ₿ arancio
+   dell'on-chain */
 function coppiaGiftP2P(invii){
-  const eur = typeof tesseraValutaP2P === 'function' ? tesseraValutaP2P('EUR', []) : '<span class="p2p-tessera p2p-tessera-eur"></span>';
-  const g = eur.replace(/<\/span>$/, '<span class="p2p-rete-badge p2p-gift-badge" aria-hidden="true">🎁</span></span>');
+  /* LA CARTA VERA, non l'euro col pacco (22 nov 2026, Andrea: «proprio
+     quale gift card»): la foto della carta Shoppy Code, in una tessera
+     larga come una carta */
+  const g = '<span class="p2p-tessera p2p-tessera-gift" role="img" aria-label="Gift card Shoppy Code">'
+    + '<img src="/assets/gift-card-shoppy.webp" alt="" width="54" height="35" onerror="this.replaceWith(\'🎁\')"></span>';
   const r = typeof tesseraReteP2P === 'function' ? tesseraReteP2P('btc') : '';
-  const aria = invii ? 'Invia euro in gift card, ricevi bitcoin on-chain' : 'Invia bitcoin on-chain, ricevi euro in gift card';
+  const aria = invii ? 'Invia una gift card Shoppy Code, ricevi bitcoin on-chain' : 'Invia bitcoin on-chain, ricevi una gift card Shoppy Code';
   return '<span class="p2p-coppia" role="img" aria-label="' + aria + '" title="' + aria + '">'
     + (invii ? g : r)
     + '<svg class="p2p-freccia" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M14 7l5 5-5 5"/></svg>'

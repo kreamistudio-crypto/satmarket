@@ -94233,3 +94233,14 @@ DA GUARDARE. Le card si vedono solo quando il libro di Mostro ha risposto: a
 relay giù il libro mostra il suo errore e niente gift card. Il riscatto
 automatico in carte Conad e simili, e il catalogo Shoppy Code, aspettano la
 scelta di Andrea (un browser sul server o un canale ufficiale).
+
+Ritocco dello stesso giorno (cantiere gift-card-icona). Andrea: «l'icona
+non dovrebbe essere euro con il pacco regalo, ma proprio quale gift card».
+La tessera della coppia ora è la FOTO della carta che si compra davvero,
+«THE GIFT CARD» di Shoppy Code (l'immagine del prodotto dal loro negozio,
+`assets/gift-card-shoppy.webp`, rotta esplicita). È larga come una carta, e
+la riga di testa delle card gift le fa posto. Visto dal sito: il negozio
+Shopify vende solo questa carta, da 1 a 2000 €. I marchi (Conad,
+carburante…) stanno su shoppycode.com, dove la carta si spende. «Non è
+rivendibile, se non previa autorizzazione da parte dell'emittente»: è scritto
+nei termini della carta.
