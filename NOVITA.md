@@ -933,4 +933,4 @@ pubblico: sì
 frase: Sopra 500 € gli acquisti del mercatino si pagano solo on-chain, e chi vende riceve on-chain: con cifre così il Lightning non passa. Chi pubblica un oggetto sopra 500 € lo vede già in «Come vuoi ricevere», e l'annuncio dice «Preferisce ricevere on-chain». E il mercatino on-chain non ha più un tetto: anche un oggetto da 2 BTC si compra col deposito di garanzia 2-di-3.
 dove: Mercatino: un oggetto sopra 500 €, «Acquista», foglio «Come vuoi pagare?» (Lightning spento con «Sopra 500 € si paga solo on-chain.»); Vendi, «Come vuoi ricevere per questo oggetto?» con «Sopra 500 € si riceve solo on-chain.».
 leva: ONCHAIN_SOLO_SOPRA_SOGLIA accesa di serie (soglia ONCHAIN_CONSIGLIATO_SOPRA_EURO, 500)
-pubblico: no
+pubblico: sì
