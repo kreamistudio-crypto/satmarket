@@ -1479,6 +1479,31 @@
     outline-offset:2px}
   .scoprire-card img{position:absolute;inset:0;width:100%;height:100%;
     display:block;object-fit:cover}
+  /* il logo del negozio che ha pagato la card (23 nov 2026): un tondo
+     nell'angolo in basso a sinistra, quello che la pastiglia lascia */
+  .scoprire-card img.sc-logo{inset:auto auto 8px 8px;width:34px;height:34px;
+    border-radius:50%;border:2px solid #FFF8EA;background:#FFF8EA;
+    box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  /* LA FILA «In evidenza» (23 nov 2026): le card della griglia in fila,
+     larghe 150 come due colonne del telefono a 360 */
+  .ev-strip{display:flex;gap:10px;overflow-x:auto;
+    overscroll-behavior-x:contain;scrollbar-width:none;
+    padding:6px var(--pad) 10px}
+  .ev-strip::-webkit-scrollbar{display:none}
+  .ev-strip .card{flex:0 0 150px;width:150px}
+  /* LE VOCI DI «🚀 Promuovi» (23 nov 2026): radio dentro la testata del
+     foglio di casa, una per riga, la scelta accesa in arancio ₿ */
+  .promo-scelte{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left}
+  .promo-voce{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;
+    border:1.5px solid var(--line);border-radius:12px;cursor:pointer}
+  .promo-voce input{margin:3px 0 0;accent-color:var(--sats-deep);flex:none}
+  .promo-voce b{display:block;font-size:14px;color:var(--ink);line-height:1.3}
+  .promo-voce small{display:block;font-size:12.5px;color:var(--ink-soft);
+    font-weight:600;line-height:1.4;margin-top:2px}
+  .promo-voce.spenta{opacity:.55;cursor:default}
+  /* la scelta accesa la dice il titolo in arancio, dal fratello del
+     radio: `:has()` in questo file non entra (prove_tastiera_iphone) */
+  .promo-voce input:checked + span b{color:var(--sats-deep)}
   /* IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea, che
      ROVESCIA il dondolio alla mascotte vissuto un'ora: il bottone
      resta FERMO — e con lui bersaglio, anello e :active — quindi il
@@ -1607,6 +1632,64 @@
     padding:2.6em .7em .55em;
     background:linear-gradient(0deg,#1A191C 2.7em,rgba(26,25,28,0) 4.6em)}
   .scoprire-card img ~ .sc-quadra-eti{display:flex}
+  /* «DA SCOPRIRE» COME NETFLIX, SUL TELEFONO (23 nov 2026, Andrea: «sono
+     troppo piccole, ingrandiscimele», poi la scelta fra tre prove viste
+     in video: «Netflix completo»). La card al CENTRO e' grande e accesa,
+     le vicine spuntano ai lati piu' piccole e piu' scure, e la fila
+     scorre da sola (vedi passoScoprire). Quale card e' al centro lo
+     decide il JS (`sc-centro`, vedi centroScoprire); qui solo la forma.
+     LA CARD CRESCE A GRADINI con lo schermo, e tutto quel che sta dentro
+     cresce col FATTORE della card — la regola del web qui sotto: il
+     titolo resta nella sua fascia del disegno, e la card quadrata delle
+     aste resta alta quanto le sorelle. La fila ha il margine che mette
+     la prima card al centro (e a destra quello della card quadrata,
+     che e' l'ultima ed e' piu' stretta); lo scatto (`scroll-snap`) riporta al centro
+     anche il dito. Le misure del CALCO sono quelle del video approvato.
+     SOLO SOTTO I 768px: da li' in su, fuori da Telegram, vale la fila
+     del computer, con le sue frecce. E SOLO LA FILA: la pagina dei
+     Consigliati usa la stessa card larga quanto la colonna, e non si
+     tocca. Con gli effetti ridotti niente corsa: la card al centro resta
+     grande, il cambio e' secco (lo spegne la regola universale di
+     `fx-ridotti`, in fondo al foglio). */
+  @media (max-width:767px){
+    #scoprireStrip{gap:0;padding-top:12px;padding-bottom:14px;
+      scroll-snap-type:x mandatory}
+    #scoprireStrip .scoprire-card{scroll-snap-align:center;margin:0 -10px;
+      transform:scale(.82);opacity:.55;
+      transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease}
+    #scoprireStrip .scoprire-card.sc-centro{transform:scale(1.1);opacity:1;
+      z-index:3;box-shadow:0 10px 26px rgba(0,0,0,.55)}
+    #scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}
+    #scoprireStrip .scoprire-card{width:240px}
+    #scoprireStrip .sc-titolo{left:12.4px;width:84.7px;font-size:15px}
+    #scoprireStrip .sc-lancio{font-size:14.1px}
+    #scoprireStrip .scoprire-card.sc-quadra{width:114.7px}
+    #scoprireStrip .sc-quadra-eti{font-size:14.1px}
+  }
+  @media (min-width:360px) and (max-width:767px){
+    #scoprireStrip{padding-left:calc((100vw - 264px) / 2);padding-right:calc((100vw - 126.2px) / 2)}
+    #scoprireStrip .scoprire-card{width:264px}
+    #scoprireStrip .sc-titolo{left:13.6px;width:93.2px;font-size:16.5px}
+    #scoprireStrip .sc-lancio{font-size:15.5px}
+    #scoprireStrip .scoprire-card.sc-quadra{width:126.2px}
+    #scoprireStrip .sc-quadra-eti{font-size:15.5px}
+  }
+  @media (min-width:375px) and (max-width:767px){
+    #scoprireStrip{padding-left:calc((100vw - 290px) / 2);padding-right:calc((100vw - 138.6px) / 2)}
+    #scoprireStrip .scoprire-card{width:290px}
+    #scoprireStrip .sc-titolo{left:14.9px;width:102.4px;font-size:18.1px}
+    #scoprireStrip .sc-lancio{font-size:17.1px}
+    #scoprireStrip .scoprire-card.sc-quadra{width:138.6px}
+    #scoprireStrip .sc-quadra-eti{font-size:17.1px}
+  }
+  @media (min-width:412px) and (max-width:767px){
+    #scoprireStrip{padding-left:calc((100vw - 316px) / 2);padding-right:calc((100vw - 151.0px) / 2)}
+    #scoprireStrip .scoprire-card{width:316px}
+    #scoprireStrip .sc-titolo{left:16.3px;width:111.5px;font-size:19.8px}
+    #scoprireStrip .sc-lancio{font-size:18.6px}
+    #scoprireStrip .scoprire-card.sc-quadra{width:151px}
+    #scoprireStrip .sc-quadra-eti{font-size:18.6px}
+  }
   .sc-q-pre{font-size:.7em;font-weight:800;letter-spacing:.1em;
     text-transform:uppercase;color:#FFA53D;line-height:1.1}
   .sc-q-riga{font-family:'Baloo 2',system-ui,sans-serif;font-size:1.05em;
@@ -1702,6 +1785,19 @@
      reduced-motion) e, dal lug 2026, nemmeno il countdown: in
      griglia basta la percentuale, il tempo che resta lo dice la
      scheda. */
+  /* «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento): l'etichetta
+     della promozione, nell'angolo dei badge di stato — che con lei
+     scendono di una riga, perche' un posto pagato si dice sempre — e
+     la cornice arancio ₿. La cornice sta PRIMA delle sorelle: una card
+     in lampo o in asta tiene la sua (stessa forza, vince l'ultima). */
+  .card-evidenza{position:absolute;top:8px;left:8px;z-index:3;
+    background:var(--sats-deep);color:#1b1206;border-radius:999px;
+    padding:4px 8px;font-size:10px;font-weight:800;line-height:1;
+    letter-spacing:.06em;text-transform:uppercase;
+    box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .card.ev :is(.card-lampo, .card-sconto, .card-asta, .card-ferie,
+    .card-ultimo){top:32px}
+  .card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}
   .card-lampo{position:absolute;top:8px;left:8px;z-index:2;
     background:var(--lampo);color:#fff;border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
@@ -14668,6 +14764,20 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
+    <!-- LA FILA «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento):
+         sotto «Da scoprire» e prima degli scambi P2P. Nasce spenta: la
+         accende renderEvidenza solo con annunci in evidenza e nella
+         vetrina nuda. Lo stesso guscio e le stesse frecce delle altre. -->
+    <div id="evidenzaSez" style="display:none">
+      <div class="section-label">In evidenza</div>
+      <div class="strip-wrap">
+        <div class="ev-strip" id="evidenzaFila"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('evidenzaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('evidenzaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
     <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
          Nasce spenta: la accende renderVetrinaP2P solo con la leva del
          server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
@@ -20856,6 +20966,9 @@ function mapListing(a){
     /* l'offerta lampo: percento e scadenza (unix), il resto e'
        matematica del client (lampoAttiva/conLampo) */
     lampoPct:a.lampo_percento||0, lampoFine:a.lampo_scadenza||0,
+    /* la promozione «In evidenza» (23 nov 2026): fino a quando (unix),
+       0 = nessuna. Viva la giudica il client come la lampo (inEvidenza) */
+    evidenzaFino:a.evidenza_fino||0,
     /* l'asta (ago 2026): base>0 = quest'annuncio e' un'asta; viva =
        scadenza nel futuro (giudica il client come per la lampo);
        top e conteggio sono pubblici, gli offerenti mai */
@@ -21269,6 +21382,37 @@ let p2pArrivo = null;
    nessuna strada: il server non la mette nella busta, e l'anteprima del
    moderatore la appende al negozio che ha aperto, mai a questa lista. */
 let consigliatiServer = [];
+/* LE PROMOZIONI A PAGAMENTO (23 nov 2026), dalla stessa busta:
+   `negoziPromossi` = i negozi che hanno pagato la card in «Da scoprire»
+   ({negozio, nome, banner, logo, scoprire, consigliato}: `scoprire` vero
+   finche' corrono i giorni pagati, `consigliato` vero per sempre dopo),
+   `inEvidenzaServer` = le righe d'annuncio della fila «In evidenza».
+   Le scrive SOLO loadListings, sempre per intero; chiave assente =
+   server di ieri = nessuna, un'assenza e non una bugia. */
+let negoziPromossi = [];
+let inEvidenzaServer = [];
+let promoAttive = false;      // la cassa delle promozioni e' aperta?
+/* A TURNO A OGNI APERTURA (23 nov 2026, idea di Andrea): con dieci
+   negozi pagati nessuno scorre fino al decimo, quindi ogni apertura
+   dell'app fa partire «Da scoprire» e «In evidenza» dalla card dopo —
+   a TURNO e non a caso, cosi' in dieci aperture ognuno e' stato primo
+   una volta. Il contatore lo tiene il telefono, dentro un try: dove il
+   localStorage non c'e' basta un punto di partenza a caso. Si decide
+   UNA volta per apertura: un ordine che cambiasse a ogni ridisegno
+   sarebbe una fila che si rimescola sotto gli occhi. */
+const TURNO_PROMO_CHIAVE = 'barattolo_turno_promo';
+const turnoPromo = (() => {
+  try {
+    const n = (parseInt(localStorage.getItem(TURNO_PROMO_CHIAVE) || '0', 10) || 0) + 1;
+    localStorage.setItem(TURNO_PROMO_CHIAVE, String(n % 100000));
+    return n;
+  } catch(e) { return Math.floor(Math.random() * 1000); }
+})();
+function aTurno(lista){
+  if (!Array.isArray(lista) || lista.length < 2) return lista || [];
+  const k = turnoPromo % lista.length;
+  return lista.slice(k).concat(lista.slice(0, k));
+}
 let occasioniServer = null;  // {lampo:0|1, sconto:0|1} — le card «Da
                              // scoprire»: null = server vecchio o busta
                              // mai arrivata, e la sezione non si disegna
@@ -21709,6 +21853,10 @@ async function loadListings(anonimo){
   if (j.occasioni) occasioniServer = j.occasioni;
   sponsorizzati = Array.isArray(j.sponsorizzati) ? j.sponsorizzati : [];
   consigliatiServer = Array.isArray(j.consigliati) ? j.consigliati : [];
+  /* ...e le promozioni a pagamento (23 nov 2026) */
+  negoziPromossi = Array.isArray(j.negozi_promossi) ? j.negozi_promossi : [];
+  inEvidenzaServer = Array.isArray(j.in_evidenza) ? j.in_evidenza.map(mapListing) : [];
+  if (j.promozioni_attive !== undefined) promoAttive = j.promozioni_attive === true;
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   /* i totali del like: arrivano di qui perche' e' l'unico canale che
      tocca anche gli anonimi. Si ridisegna subito — la pagina puo'
@@ -26655,8 +26803,43 @@ function toccaLancioP2P(){
    poi gli spazi in vetrina nell'ordine della busta, poi le card fisse.
    La leggono il renderer e il tocco, e nessun altro — due letture della
    stessa fila un giorno direbbero due card diverse sotto lo stesso dito. */
-const vociScoprire = () => SCOPRIRE.filter(v => v.inTesta)
-  .concat(vociSponsor(), SCOPRIRE.filter(v => !v.inTesta));
+/* I NEGOZI CHE HANNO PAGATO LA CARD (23 nov 2026, le promozioni a
+   pagamento): la card e' il LORO banner, gia' approvato da un
+   moderatore, col logo nell'angolo e la pastiglia «Consigliato» come lo
+   spazio in vetrina — e' pubblicita', e si dice. Il tocco porta al
+   negozio. Il codice si ripassa dalla forma per cintura: finisce in un
+   attributo. Un negozio che ha anche lo spazio in vetrina ha gia' la
+   sua card, e non ne prende una seconda. */
+/* il nome di un file del server, ripassato dalla forma come in
+   avatarImg: finisce in un src */
+const nomeFotoPromo = f => String(f || '').replace(/[^A-Za-z0-9_.-]/g, '');
+function vociNegoziPromossi(){
+  const gia = new Set(vociSponsor().map(v => {
+    const c = RACCONTI[v.slug];
+    return c ? c.negozio : '';
+  }).concat((Array.isArray(sponsorizzati) ? sponsorizzati : [])
+    .map(s => String((s && s.negozio) || ''))).filter(Boolean));
+  const fuori = [];
+  (Array.isArray(negoziPromossi) ? negoziPromossi : []).forEach(n => {
+    const cod = String((n && n.negozio) || '');
+    if (!n || n.scoprire !== true || !/^[A-Za-z0-9_-]{2,40}$/.test(cod)) return;
+    if (gia.has(cod) || fuori.some(v => v.negozio === cod)) return;
+    fuori.push({id: 'promo-' + cod, negozio: cod,
+      emoji: '🏪', titoloDentro: true, sponsor: true,
+      img: fotoUrl(nomeFotoPromo(n.banner)),
+      logo: nomeFotoPromo(n.logo) ? fotoUrl(nomeFotoPromo(n.logo)) : '',
+      testo: String(n.nome || ''),
+      vivo: () => true, accesa: () => false,
+      tocca: () => apriNegozio(cod)});
+  });
+  return fuori;
+}
+/* LA FILA: prima i negozi — gli spazi in vetrina e quelli che hanno
+   pagato, insieme e A TURNO (aTurno) — poi le card nostre, ferme: la
+   card «P2P in arrivo» e le fisse (23 nov 2026, le promozioni a
+   pagamento: fino a ieri il P2P stava davanti a tutto). */
+const vociScoprire = () => aTurno(vociSponsor().concat(vociNegoziPromossi()))
+  .concat(SCOPRIRE.filter(v => v.inTesta), SCOPRIRE.filter(v => !v.inTesta));
 let scoprireFirma = '';
 /* IL BATTITO SI SENTE UNA VOLTA PER APERTURA (1 ott 2026, ritocco di
    Andrea): la data della card «P2P in arrivo» batte due volte e si
@@ -26770,13 +26953,130 @@ function renderScoprire(){
          tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
          onclick="toccaScoperta(this.dataset.id)"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
-      <img src="/assets/scoprire/${file}" alt="" loading="lazy"
+      <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${pastiglia}
+      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}${pastiglia}
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');
+  armaScorriScoprire();
+}
+
+/* LO SCORRIMENTO DA SOLO DI «Da scoprire» (23 nov 2026, idea di Andrea):
+   mentre l'app resta aperta la fila passa alla card dopo ogni cinque
+   secondi, e in fondo torna alla prima. SOLO QUESTA FILA: «In evidenza»
+   resta ferma. Si ferma da sola dove non serve o darebbe fastidio —
+   - chi la TOCCA (dito, mouse, rotellina): pausa, e riparte dopo
+     SCOPRIRE_RIPOSO_MS di quiete — una fila che scappa sotto il dito
+     e' il difetto peggiore che possa avere;
+   - fuori dallo schermo o a pagina nascosta (IntersectionObserver e
+     visibilityState): un giro che nessuno vede non si fa;
+   - con gli effetti ridotti (`effettiRidotti`, chiesto a OGNI giro,
+     come il giro dei loghi dei Consigliati);
+   - a fila corta, che non scorre: niente da mostrare.
+   La card «dopo» e' la prima il cui bordo sinistro sta oltre quello di
+   adesso: le card hanno larghezze diverse (la quadrata delle aste), e
+   un passo fisso finirebbe a meta' di una. */
+/* IL MODO NETFLIX (23 nov 2026, scelto da Andrea): sul telefono la card
+   al CENTRO e' quella grande (il CSS sotto i 768px), quindi il passo
+   porta al centro la card dopo, e `sc-centro` segue lo scorrimento —
+   anche quello del dito. Sopra i 768px la fila resta quella del
+   computer, e il passo allinea a sinistra come sempre. */
+const mqNetflix = window.matchMedia ? window.matchMedia('(max-width:767px)') : {matches: false};
+function centroScoprire(){
+  const s = el('scoprireStrip');
+  if (!s) return;
+  const carte = Array.from(s.children);
+  if (!mqNetflix.matches) { carte.forEach(c => c.classList.remove('sc-centro')); return; }
+  const r = s.getBoundingClientRect(), mezzo = r.left + r.width / 2;
+  let meglio = null, dist = Infinity;
+  carte.forEach(c => {
+    const q = c.getBoundingClientRect(), d = Math.abs(q.left + q.width / 2 - mezzo);
+    if (d < dist) { dist = d; meglio = c; }
+  });
+  carte.forEach(c => c.classList.toggle('sc-centro', c === meglio));
+}
+const SCOPRIRE_PASSO_MS = 5000;
+const SCOPRIRE_RIPOSO_MS = 12000;
+let scoprireGiro = 0, scoprireFermoFino = 0, scoprireVisto = false,
+    scoprireArmato = false;
+function passoScoprire(){
+  const s = el('scoprireStrip');
+  if (!s || document.visibilityState === 'hidden' || !scoprireVisto) return;
+  if (effettiRidotti() || Date.now() < scoprireFermoFino) return;
+  if (el('scoprireSez') && el('scoprireSez').style.display === 'none') return;
+  const max = s.scrollWidth - s.clientWidth;
+  if (max <= 1) return;
+  if (mqNetflix.matches) {
+    /* al centro la card dopo quella che c'e' adesso; dall'ultima, la prima */
+    const carte = Array.from(s.children);
+    const r = s.getBoundingClientRect(), mezzo = r.left + r.width / 2;
+    const ora = carte.findIndex(c => c.classList.contains('sc-centro'));
+    const dopo = carte[(ora + 1) % carte.length];
+    const q = dopo.getBoundingClientRect();
+    s.scrollTo({left: Math.max(0, Math.min(max, s.scrollLeft + q.left + q.width / 2 - mezzo)),
+                behavior: tourRidotto() ? 'auto' : 'smooth'});
+    return;
+  }
+  /* il punto di arrivo di ogni card: dove va lo scroll perche' lei
+     stia al posto della prima (il suo bordo, meno il margine della fila) */
+  const base = s.getBoundingClientRect().left
+    + parseFloat(getComputedStyle(s).paddingLeft || '0');
+  const ora = s.scrollLeft;
+  const arrivi = Array.from(s.children)
+    .map(c => c.getBoundingClientRect().left - base + ora);
+  let dove = 0;
+  if (ora < max - 1) {
+    const dopo = arrivi.find(x => x > ora + 4);
+    dove = dopo === undefined ? 0 : Math.min(max, dopo);
+  }
+  s.scrollTo({left: dove, behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+function fermaScoprire(){ scoprireFermoFino = Date.now() + SCOPRIRE_RIPOSO_MS; }
+function armaScorriScoprire(){
+  const s = el('scoprireStrip');
+  if (!s) return;
+  if (!scoprireArmato) {
+    scoprireArmato = true;
+    ['pointerdown', 'touchstart', 'wheel', 'keydown'].forEach(t =>
+      s.addEventListener(t, fermaScoprire, {passive: true}));
+    /* la card al centro segue lo scorrimento, un ricalcolo per fotogramma */
+    let fotogramma = 0;
+    s.addEventListener('scroll', () => {
+      if (fotogramma) return;
+      fotogramma = requestAnimationFrame(() => { fotogramma = 0; centroScoprire(); });
+    }, {passive: true});
+    if (mqNetflix.addEventListener) mqNetflix.addEventListener('change', centroScoprire);
+    if ('IntersectionObserver' in window)
+      new IntersectionObserver(e => { scoprireVisto = e.some(x => x.isIntersecting); },
+                               {threshold: .5}).observe(s);
+    else scoprireVisto = true;
+  }
+  if (!scoprireGiro) scoprireGiro = setInterval(passoScoprire, SCOPRIRE_PASSO_MS);
+  centroScoprire();
+}
+
+/* ================ LA FILA «In evidenza» (23 nov 2026) ==============
+   Le promozioni a pagamento: gli annunci che hanno pagato «⭐ In
+   evidenza», in una fila sotto «Da scoprire» e prima degli scambi P2P
+   (l'ordine approvato da Andrea). Le card sono QUELLE della griglia
+   (cardHTML, con la loro etichetta e la cornice), e la fila parte a
+   TURNO a ogni apertura (aTurno). Solo nella vetrina nuda, come la fila
+   P2P: dentro un reparto, una ricerca o un filtro sarebbe una fila che
+   non c'entra con quel che si sta guardando. Ferma: lo scorrimento da
+   solo e' della sola «Da scoprire». Si ridisegna solo se cambia. */
+let evidenzaFirma = '';
+function renderEvidenza(){
+  const sez = el('evidenzaSez');
+  if (!sez) return;
+  const voci = vetrinaNuda() ? inEvidenzaServer.filter(inEvidenza) : [];
+  sez.style.display = voci.length ? '' : 'none';
+  const html = aTurno(voci).map(cardHTML).join('');
+  if (html === evidenzaFirma) return;
+  evidenzaFirma = html;
+  el('evidenzaFila').innerHTML = html;
+  aggiornaFrecce('evidenzaFila');
 }
 
 /* ================ I CONSIGLIATI (set 2026) ========================
@@ -26830,9 +27130,28 @@ function consigliatiPubblicati(){
                 banner: s.banner === true ? slug + '.webp' : '',
                 giu: s.logo_giu, pieno: s.logo_pieno === true});
   });
+  /* I NEGOZI CHE HANNO PAGATO «Da scoprire» (23 nov 2026, decisione di
+     Andrea): finiti i giorni pagati restano qui PER SEMPRE, finche' un
+     moderatore non li toglie (`/promossi`). Il banner e il logo sono i
+     loro file del server, non quelli delle cartelle di casa: `bannerUrl`
+     e `logoUrl` vincono sui nomi di file (vedi logoConsigliato). Chi c'e'
+     gia' per un'altra strada non si ripete. */
+  (Array.isArray(negoziPromossi) ? negoziPromossi : []).forEach(n => {
+    const cod = String((n && n.negozio) || '');
+    if (!n || n.consigliato !== true || !/^[A-Za-z0-9_-]{2,40}$/.test(cod)) return;
+    if (fuori.some(x => x.negozio === cod)) return;
+    const logo = nomeFotoPromo(n.logo);
+    fuori.push({slug: 'promo-' + cod, titolo: String(n.nome || ''),
+                emoji: '🏪', negozio: cod, banner: '', promo: true,
+                bannerUrl: nomeFotoPromo(n.banner) ? fotoUrl(nomeFotoPromo(n.banner)) : '',
+                logoUrl: logo ? fotoUrl(logo) : ''});
+  });
   return fuori;
 }
 const urlLogoConsigliato = slug => `/assets/consigliati/${slug}.webp`;
+/* il logo di una voce: quello del server per un negozio che ha pagato,
+   quello della cartella di casa per gli altri */
+const logoConsigliato = v => v.logoUrl || urlLogoConsigliato(v.slug);
 /* QUANTO SCENDE UN LOGO NEL QUADRATO (set 2026): `logo_giu` nel catalogo,
    in PIXEL DELLA CARD DEL TELEFONO — 84px di quadrato, e il riquadro del
    logo ne e' il 90% (`inset:5%`), cioe' 75,6 —, negativo per salire. Si
@@ -26914,13 +27233,15 @@ function mescolaConsigliati(slug, prima, caso){
    li hanno tolti tutti. Ogni logo porta il SUO `--giu`, che il CSS
    traduce in uno spostamento: girando, ognuno sta dove gli sta bene. */
 function cardConsigliati(voci){
-  const loghi = ordinaLoghiConsigliati(voci);
+  /* un negozio che ha pagato ma non mostra la sua foto non ha un logo
+     da far girare: sta nella pagina, col suo banner, e non qui */
+  const loghi = ordinaLoghiConsigliati(voci.filter(v => !v.promo || v.logoUrl));
   return `
     <a class="cat-cella cella-consigliati" data-cat="${CAT_CONSIGLIATI}" href="/consigliati"
        title="Consigliati" aria-label="Consigliati"
        onclick="apriConsigliatiDaTocco(event)">
       <span class="cat-quad"><span class="cat-fig">${loghi.map((v, k) => `<img
-           class="cons-logo${v.pieno ? ' cons-pieno' : ''}${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${urlLogoConsigliato(v.slug)}"
+           class="cons-logo${v.pieno ? ' cons-pieno' : ''}${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${esc(logoConsigliato(v))}"
            style="--giu:${giuLogoConsigliato(v.giu)}%"
            alt="" loading="lazy" decoding="async" fetchpriority="low"
            onerror="this.remove()">`).join('')}<span class="cat-emoji"
@@ -27078,11 +27399,11 @@ function renderConsigliati(){
     <div class="scoprire-card" role="button" tabindex="0" data-slug="${v.slug}"
          aria-label="${esc(v.titolo)}" onclick="apriConsigliato(this.dataset.slug)"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriConsigliato(this.dataset.slug);}">
-      ${v.banner ? `<img src="/assets/scoprire/${v.banner}" alt="" loading="lazy"
+      ${v.banner || v.bannerUrl ? `<img src="${v.bannerUrl ? esc(v.bannerUrl) : '/assets/scoprire/' + v.banner}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${esc(v.titolo)}</span
       >` : `<span class="sc-riserva cons-riserva" aria-hidden="true"><img
-           src="${urlLogoConsigliato(v.slug)}" alt="" loading="lazy"
+           src="${esc(logoConsigliato(v))}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()">${esc(v.titolo)}</span
       >`}
     </div>`).join('');
@@ -27108,7 +27429,8 @@ function ordineConsigliatiPagina(voci){
    dalla lista e non viaggia mai dentro l'onclick. */
 function apriConsigliato(slug){
   const v = consigliatiPubblicati().find(x => x.slug === slug);
-  if (v) apriNegozio(v.negozio, true);
+  /* un negozio che ha pagato non ha una storia da aprire */
+  if (v) apriNegozio(v.negozio, !v.promo);
 }
 
 /* LE DUE STRISCE SI SCORRONO COL MOUSE (ago 2026, dal campo: «col dito
@@ -27707,7 +28029,9 @@ function renderGrid(items){
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
   grigliaArrivata();
-  /* le card P2P in vetrina: la fila si accende o si spegne con la vista */
+  /* la fila «In evidenza» (23 nov 2026) e le card P2P in vetrina: le
+     due file si accendono o si spengono con la vista */
+  renderEvidenza();
   renderVetrinaP2P();
   armaViste();
   /* La griglia non ha piu' contatori da aggiornare (il badge dice
@@ -28244,6 +28568,13 @@ const cardHTML = l => {
   const rif = bottoneRifornisci(l);
   const jar = rif ? ''
     : bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
+  /* «IN EVIDENZA» (23 nov 2026): l'etichetta di una promozione PAGATA,
+     e un posto pagato si dice SEMPRE — per questo non entra nella fila
+     delle precedenze qui sopra, dove perderebbe contro una lampo: sta
+     nello stesso angolo e il badge di stato scende sotto di lei (la
+     classe `ev` sulla card, vedi il CSS). Mai sull'esaurito, che non
+     si compra e non si promuove. */
+  const ev = !esa && inEvidenza(l);
   /* LA CARD E' UN COLLEGAMENTO VERO (ago 2026): l'<a> avvolge foto e
      testo, i due BOTTONI restano fuori — contenuto interattivo dentro
      un <a> e' HTML non valido — mentre il badge di stato ${flash}, che
@@ -28253,14 +28584,14 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
+    <div class="card${ev?' ev':''}${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
         <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto||(acc&&piuBasso(g.v,l)))?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${famigliaCard(l) && l.famigliaVaria ? '<span class="price-da">da </span>' : ''}${p.big}</div><div class="price-sub">${p.small}</div></div>
-        ${flash}
+        ${ev ? '<div class="card-evidenza">In evidenza</div>' : ''}${flash}
       </div>
       <div class="info">
         <div class="title">${esc(famigliaCard(l) && l.famigliaTitolo ? l.famigliaTitolo : l.title)}</div>
@@ -30387,6 +30718,11 @@ function prezzoParte(l){
    matematica, per stime e cartellini. */
 function lampoAttiva(l){
   return (l.lampoPct||0) > 0 && (l.lampoFine||0)*1000 > Date.now();
+}
+/* «In evidenza» (23 nov 2026, le promozioni a pagamento): viva finche'
+   la scadenza pagata e' nel futuro, lo stesso giudizio della lampo */
+function inEvidenza(l){
+  return (l.evidenzaFino||0)*1000 > Date.now();
 }
 /* La vista scontata del listino: stessa forma di l, prezzi ridotti
    nella SUA valuta (floor sui sats e 2 decimali sull'euro, identici
@@ -37231,6 +37567,12 @@ function openDetail(id){
            ${!(lampoLeve && lampoLeve.attive) || inFerie(l) ? '' : (lampoAttiva(l)
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
+           ${/* «🚀 Promuovi» (23 nov 2026, le promozioni a pagamento): un
+                'occasione' come la lampo, quindi le sta accanto. Non in
+                ferie (l'annuncio si vede ma non si compra) e solo a
+                cassa aperta, che un bottone verso un muro e' peggio di
+                nessun bottone. */''}${promoAttive && !inFerie(l) && !DEMO && !VETRINA
+             ? `<button class="btn ghost" onclick="apriPromuovi(${l.id})">🚀 Promuovi</button>` : ''}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <!-- LA PORTA DEL DUPLICATO (ago 2026), e sta SUBITO DOPO
                 la modifica perche' sono i due gesti che partono da
@@ -39234,7 +39576,8 @@ async function annullaPagamento(){
   const ril = rilancioCorrente, oid = currentOrderId,
         pag = pagamentoCorrente;
   if (!ril && !oid && !pag) { navIndietro(); return; }
-  const cosa = pag ? 'questo sblocco'
+  const promo = pag && promoInCorso && promoInCorso.pid === pag;
+  const cosa = promo ? 'questa promozione' : pag ? 'questo sblocco'
              : ril ? 'questa fattura di puntata' : 'questo ordine';
   /* Il foglio di casa si apre SOPRA il paySheet, e regge per
      costruzione: sta dopo di lui nel DOM (quindi navPila lo mette in
@@ -39264,7 +39607,9 @@ async function annullaPagamento(){
          adesso con «annullato» non ha niente da aggiungere */
       if (!ril && !pag) ordineAnnullatoQui = oid;
       chiudiFoglioFattura();
-      toast(pag ? '✖️ Sblocco annullato: non è stato pagato niente'
+      if (promo) promoInCorso = null;
+      toast(pag ? (promo ? '✖️ Promozione annullata: non è stato pagato niente'
+                         : '✖️ Sblocco annullato: non è stato pagato niente')
           : ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
       if (!ril && !pag) await rileggiOrdineAnnullato(oid);
     }});
@@ -39773,7 +40118,9 @@ function sheetPaid(){
   /* il paySheet serve TRE pagamenti: l'ordine di sempre, la fattura
      di puntata e lo sblocco del banner — a dirlo e' la variabile
      -modalita' che il flusso ha valorizzato */
-  if (pagamentoCorrente) verificaSblocco(pagamentoCorrente);
+  if (pagamentoCorrente && promoInCorso && promoInCorso.pid === pagamentoCorrente)
+    verificaPromo(pagamentoCorrente);
+  else if (pagamentoCorrente) verificaSblocco(pagamentoCorrente);
   else if (rilancioCorrente) verificaPuntata(rilancioCorrente);
   else verificaOrdine(currentOrderId);
 }
@@ -52216,7 +52563,14 @@ function renderBanner(){
              style="width:100%;aspect-ratio:3/1;object-fit:cover;border-radius:var(--radius);display:block"
              onerror="this.remove()">
         <div class="ban-dominio" style="margin-top:6px">🔗 <span>${esc(b.dominio)}</span></div>
-      </div>` : ''}
+      </div>
+      ${/* LA CARD IN «Da scoprire» (23 nov 2026, le promozioni a
+           pagamento): nasce solo col banner in vetrina, che e' la card */''}${promoAttive ? `
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:12px">${
+        myPromoScoprireFino * 1000 > Date.now()
+          ? `🏪 Il tuo negozio è in «Da scoprire» fino al <b style="color:var(--ink)">${dataPromo(myPromoScoprireFino)}</b>.`
+          : '🏪 La card del tuo negozio in home, dopo l\'ok del moderatore.'}</div>
+      <button class="btn ghost" style="margin-top:8px" onclick="chiediPromoScoprire()">🚀 Promuovi</button>` : ''}` : ''}
     ${attesa ? `
       <div class="trust-note" style="margin-top:12px">⏳ <span>Il banner
         che hai caricato è in attesa: lo guarda un moderatore, di solito
@@ -52628,6 +52982,156 @@ async function verificaSlugNegozio(pid){
     }
     toast('Questo pagamento non è più in attesa', 5000);
   } catch(e) {}
+}
+
+/* ---- «🚀 Promuovi» (23 nov 2026, le promozioni a pagamento) ----
+   Tre promozioni, decise con Andrea dallo spunto di Subito: «⬆️ In
+   cima» e «⭐ In evidenza» per un annuncio (dalla sua scheda), «🏪 Il
+   negozio in Da scoprire» per il negozio (dal cassetto del banner, che
+   e' la card). I PREZZI ARRIVANO DAL SERVER (/api/promo/listino) e qui
+   non si scrivono mai a mano, il patto di `max_barattolo`; il server
+   resta il giudice di tutto — posti, 24 ore, banner — e qui si DICE
+   prima quel che direbbe lui, per non far pagare un rifiuto.
+   La scelta passa dal foglio di casa (chiediConferma): le voci sono
+   radio dentro la testata, e la prima disponibile e' gia' scelta,
+   cosi' «Paga» non e' mai un tocco a vuoto. Poi il paySheet, come il
+   banner, col suo poll sul giro GENERICO dei pagamenti. */
+let promoScelta = '';
+let promoInCorso = null;     // {pid, tipo} della fattura aperta
+const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
+  {day: 'numeric', month: 'long'});
+const oraPromo = ts => new Date(ts * 1000).toLocaleString('it-IT',
+  {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'});
+function vocePromoHTML(v, prima){
+  return `<label class="promo-voce${v.no ? ' spenta' : ''}">
+    <input type="radio" name="promoTipo" value="${esc(v.tipo)}"${v.no ? ' disabled' : ''}${prima ? ' checked' : ''}
+           onchange="promoScelta=this.value">
+    <span><b>${esc(v.titolo)}</b><small>${esc(v.no || v.testo)}</small></span></label>`;
+}
+async function apriPromuovi(aid){
+  haptic();
+  if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/promo/listino?annuncio=${encodeURIComponent(aid)}`,
+      {headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  if (!d.attive) { toast('Le promozioni non sono attive al momento', 5000); return; }
+  const voci = [];
+  const c = d.cima || {};
+  if (c.sats > 0)
+    voci.push({tipo: 'cima', titolo: `⬆️ In cima, ${fmt(c.sats)} sats`,
+      testo: 'Torna primo tra i più recenti e riesce nel canale Barattolo Vetrina.',
+      no: c.da ? `È già fra i primi: di nuovo dal ${oraPromo(c.da)}` : ''});
+  const e = d.evidenza || {};
+  const pieni = !!e.libero_da && !e.fino;
+  (Array.isArray(e.durate) ? e.durate : []).forEach(x =>
+    voci.push({tipo: 'evidenza:' + x.giorni,
+      titolo: `⭐ In evidenza, ${x.giorni} giorni ${fmt(x.sats)} sats`,
+      testo: e.fino ? `È in evidenza fino al ${dataPromo(e.fino)}: i giorni si aggiungono.`
+                    : 'Nella fila In evidenza della home, con l\'etichetta. Il primo giorno anche in cima.',
+      no: pieni ? `I posti sono tutti presi: il prossimo si libera il ${dataPromo(e.libero_da)}` : ''}));
+  const libera = voci.find(v => !v.no);
+  promoScelta = libera ? libera.tipo : '';
+  if (!voci.length) { toast('Le promozioni non sono attive al momento', 5000); return; }
+  chiediConferma({
+    titolo: '🚀 Promuovi',
+    testata: `<div class="promo-scelte">${voci.map(v =>
+      vocePromoHTML(v, libera && v.tipo === libera.tipo)).join('')}</div>`,
+    corpo: 'Si paga una volta, in sats. Non è un abbonamento.',
+    etichetta: 'Paga', soldi: true,
+    poi: () => {
+      if (!promoScelta) { toast('Per ora non c\'è una promozione libera', 5000); return; }
+      return pagaPromo(promoScelta, aid);
+    }});
+}
+/* LA FATTURA DI UNA PROMOZIONE: il calco di pagaSlugNegozio, e la regola
+   e' la sua — le altre modalita' del paySheet si spengono qui, o il suo
+   «Annulla» colpirebbe un ordine o una puntata di un giro prima. */
+async function pagaPromo(tipo, aid){
+  rilancioCorrente = null;
+  currentOrderId = null;
+  pagamentoCorrente = null;
+  promoInCorso = null;
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/promo/compra`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr(), 'Content-Type': 'application/json'},
+       body: JSON.stringify({tipo, annuncio_id: aid || 0})});
+    d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  pagamentoCorrente = d.pagamento_id;
+  promoInCorso = {pid: d.pagamento_id, tipo: String(tipo).split(':')[0]};
+  sbloccoPieno = 0; sbloccoPct = 0;
+  el('payAmount').textContent = fmt(d.importo_sats);
+  el('payScomposto').innerHTML = '';
+  const nota = el('payEurNota');
+  nota.style.display = '';
+  nota.textContent = d.ripresa
+    ? 'È la fattura che avevi già chiesto: vale ancora.'
+    : 'La fattura vale 15 minuti.';
+  el('payInvoice').textContent = d.invoice;
+  mostraQr(d.invoice);
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  aggiornaPayHint();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => verificaPromo(pagamentoCorrente), 4000);
+}
+async function verificaPromo(pid){
+  if (!pid) return;
+  try {
+    const r = await fetch(`${API_BASE}/pagamenti/${pid}/verifica`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const d = await r.json();
+    if (d.stato === 'in_attesa' || d.stato === 'creato') return;
+    const tipo = promoInCorso ? promoInCorso.tipo : '';
+    pagamentoCorrente = null;
+    promoInCorso = null;
+    closeSheet();
+    if (d.stato === 'pagato'){
+      /* le stesse parole dell'avviso che il server manda su Telegram */
+      if (tipo === 'scoprire') {
+        if (d.fino) myPromoScoprireFino = d.fino;
+        renderBanner();
+        toast(`🏪 Fatto! Il tuo negozio è in «Da scoprire» fino al ${dataPromo(d.fino || 0)}, e poi resta fra i Consigliati.`, 7000);
+      } else if (tipo === 'evidenza') {
+        toast(`⭐ Fatto! Il tuo annuncio è in evidenza fino al ${dataPromo(d.fino || 0)}, e oggi è anche in cima.`, 7000);
+      } else {
+        toast('⬆️ Fatto! Il tuo annuncio è tornato in cima.', 6000);
+      }
+      /* la vetrina si rilegge: l'annuncio e' salito, la fila e' cambiata */
+      if (typeof loadListings === 'function') loadListings().catch(() => {});
+      return;
+    }
+    toast('Questo pagamento non è più in attesa', 5000);
+  } catch(e) {}
+}
+/* IL NEGOZIO IN «Da scoprire»: dal cassetto del banner, perche' la card
+   E' il banner — senza un banner in vetrina il bottone non nasce. */
+let myPromoScoprireFino = 0;
+async function chiediPromoScoprire(){
+  haptic();
+  if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
+  let d = {};
+  try {
+    const r = await fetch(`${API_BASE}/promo/listino`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  const sc = d.scoprire || {};
+  if (!d.attive || !(sc.sats > 0)) { toast('Le promozioni non sono attive al momento', 5000); return; }
+  if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
+  chiediConferma({
+    titolo: `🏪 Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
+    corpo: 'La card del tuo negozio in home, dopo l\'ok del moderatore.'
+         + (sc.fino ? `\n\nÈ già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
+         + '\n\nSi paga una volta, in sats. Non è un abbonamento.',
+    etichetta: 'Paga', soldi: true,
+    poi: () => pagaPromo('scoprire', 0)});
 }
 
 /* ---- Avvisi di ricerca: «dimmi quando esce quello che cerco».
@@ -113377,8 +113881,15 @@ let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se
 let p2pVetrinaMiei = new Set();     // gli ordini della fotografia pubblicati da me, per il server
 
 /* La vetrina e' quella nuda? */
+/* LA VETRINA NUDA: la home senza reparto, ricerca, filtri ne' ordine.
+   La chiedono la fila P2P (vetrinaNudaP2P, che ci aggiunge la sua leva)
+   e la fila «In evidenza» (23 nov 2026): una domanda sola, o un giorno
+   le due file direbbero due vetrine diverse. */
 function vetrinaNudaP2P(){
-  if (!p2pInVetrina || DEMO) return false;
+  return !!p2pInVetrina && vetrinaNuda();
+}
+function vetrinaNuda(){
+  if (DEMO) return false;
   if (ramoVetrina !== 'esplora' || activeCat !== 'Tutto') return false;
   if (sezioneVetrina !== 'mercato') return false;
   if (vistaBarattolo || barattoloOspite || ultimaRicercaAI) return false;
@@ -121429,6 +121940,7 @@ async function avviaVetrina(){
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
+    armaFila('evidenzaFila');
     armaFila('lavStrip'); armaFila('sottoRiga');
     await fasciaPrima();
     renderGrid();
@@ -121723,6 +122235,8 @@ async function avvia(){
     // leva assente = niente cassetto, stessa regola del banner.
     slugNegozioLeve = me.negozio_slug_leve || null;
     myNegozioSlug = me.negozio_slug || '';
+    /* il negozio in «Da scoprire» (23 nov 2026): fino a quando, 0 = no */
+    myPromoScoprireFino = me.promo_scoprire_fino || 0;
     /* le cifre arrivano GREZZE, tutte e tre: e' il suo negozio, e il
        toggle deve poter ritrovare quella dell'altra valuta */
     myScontoPacco = (me.sconto_pacco_percento > 0)
@@ -121948,6 +122462,7 @@ async function avvia(){
        una prova vuole adiacenti (la fascia si disegna prima delle
        card, o le card scendono di 56px quando arriva). */
     armaFila('catStrip'); armaFila('scoprireStrip'); armaFila('p2pVetrinaFila');
+    armaFila('evidenzaFila');
     armaFila('lavStrip'); armaFila('sottoRiga');
     await fasciaPrima();
     renderGrid();

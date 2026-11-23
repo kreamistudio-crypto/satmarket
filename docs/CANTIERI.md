@@ -94556,3 +94556,72 @@ locale col catalogo vero letto da thegiftcard.shoppycode.com (la foto
 dalla CDN qui è bloccata dalla rete della sessione: messa a mano dalla
 stessa immagine). DA GUARDARE: sul VPS la prima rilettura scarica la foto
 da cdn.shopify.com; la lista vera dei marchi quando shoppycode.com riapre.
+
+## Le promozioni a pagamento, e «Da scoprire» come Netflix (23 nov 2026, cantiere promozioni; Andrea, dallo spunto di Subito: «studia le promozioni a pagamento in sats», poi «Sì, ok, scrivi il codice», e per le card «Netflix completo»)
+
+COSA. Tre promozioni pagate in sats su Lightning, dal bottone «🚀
+Promuovi» della scheda (le prime due) e dal cassetto del banner (la
+terza):
+1. «⬆️ In cima», 5.000 sats (`PROMO_IN_CIMA_SATS`): l'annuncio torna
+   primo fra i «Più recenti» (`creato` = adesso) e riesce nel NOSTRO
+   canale (`promo_in_cima_canale`). Una volta ogni 24 ore
+   (`PROMO_IN_CIMA_ORE`, giudice `in_cima_da`).
+2. «⭐ In evidenza», 7 giorni 15.000 o 15 giorni 25.000
+   (`PROMO_EVIDENZA_SATS`): la fila «In evidenza» in home, fra «Da
+   scoprire» e gli scambi P2P, l'etichetta arancione «In evidenza» con la
+   cornice sulla card, 8 posti (`PROMO_EVIDENZA_POSTI`, `posti_evidenza`),
+   il primo giorno anche in cima. Pieni: il foglio dice quando si libera
+   il prossimo. Chi allunga la sua non conta se stesso.
+3. «🏪 Il negozio in Da scoprire», 30 giorni 50.000 (`PROMO_SCOPRIRE_*`):
+   nessun tetto di posti. La card è il banner APPROVATO col logo sopra (il
+   banner serve prima di pagare: è l'ok del moderatore); finiti i giorni il
+   negozio resta in Consigliati per sempre (`promo_consigliato`), finché un
+   moderatore non lo toglie (`/promossi negozio CODICE`).
+LA ROTAZIONE: a ogni apertura dell'app «Da scoprire» e «In evidenza»
+partono dalla card dopo (`aTurno`, contatore nel telefono), a turno e non
+a caso. Le nostre card (P2P, aste) vengono DOPO i negozi.
+DA SCOPRIRE COME NETFLIX (sotto i 768px): la card al centro grande e
+accesa (`sc-centro`, scale 1.1), le vicine piccole e scure, la fila
+scorre da sola ogni 5 secondi (`passoScoprire`), si ferma 12 secondi al
+tocco, non corre fuori schermo né con gli effetti ridotti. La card cresce
+a gradini (240/264/290/316 px) e il suo contenuto col fattore. Sopra i
+768px resta la fila del computer, che scorre da sola allineando a
+sinistra.
+
+COME. Tutto sul giro GENERICO dei pagamenti (`pagamenti`, motivi
+`promo_cima`, `promo_evidenza`, `promo_scoprire`): `POST /api/promo/compra`
+fa le guardie PRIMA della fattura e nessun await fra fattura e INSERT;
+`_incassa_promo` applica, `_disfa_promo` disfa al rimborso (la promozione
+pagata che non si applica va negli errori). Il libro mastro non chiama
+più «sblocco pagato due volte» una promozione ricomprata (il controllo
+guarda solo `banner` e `negozio_slug`, anche nel gemello SQL). La busta di
+prima pagina porta `in_evidenza`, `negozi_promossi` e `promozioni_attive`
+(sempre: chi ha pagato tiene anche a cassa chiusa). `/promossi` per gli
+admin, nel gruppo e in privato. Le sette leve nel pannello. Rimborsi a
+mano, come sempre.
+
+DECISO CON ANDREA. I prezzi (alzati due volte dopo il primo studio), 8
+posti in evidenza, nessun limite ai negozi, l'ordine della home, la
+rotazione a turno, lo scorrimento solo in «Da scoprire», niente sconti.
+I testi «In evidenza», «🚀 Promuovi» e le tre voci li ha approvati. La
+pastiglia del negozio pagato resta «Consigliato» (parola che c'era).
+
+SCARTATO. L'ordine a caso (dieci aperture non garantiscono a ognuno il
+primo posto); un tetto di posti per i negozi (Andrea: «non mettere un
+limite»); Netflix «una grande alla volta» e la card solo ingrandita (viste
+in video, scelto il completo); lo scorrimento anche sulla fila «In
+evidenza» (una fila che si muove da sola basta).
+
+PROVATO. `collaudo_promozioni` (54 verdi, in CI) contro il server vero
+con LNbits di cartone: compra, incasso, 24 ore, posti pieni, rimborso,
+busta, /promossi. `prove_promozioni` (prove.py): leve, migrazioni,
+motivi, listino, posti, libro mastro e gemello SQL, guardie, la fila, il
+turno e il centro di Netflix girati in node, con controprove rosse. Le
+sentinelle che contano (fatture in entrata 8, fogli di casa 143, frecce
+12, avvisi da admin 122) e i banchi di «Da scoprire» e dei Consigliati
+aggiornati, coi negozi pagati dentro. Netflix guardato con Playwright a
+390 e 320 px.
+
+DA GUARDARE. I banner 3:1 nella card 272:130 si tagliano ai lati (la
+scritta dentro un banner può perdere i bordi). Il riposto nel canale di
+«In cima» mostra «pubblicato oggi» (è la data che il server rimette).

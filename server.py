@@ -1863,6 +1863,59 @@ try:
     from config import SLUG_NEGOZIO_PREZZO_SATS
 except ImportError:
     SLUG_NEGOZIO_PREZZO_SATS = 5_000
+
+# LE PROMOZIONI A PAGAMENTO (23 nov 2026, cantiere promozioni, decise
+# con Andrea dallo spunto delle schermate di Subito): TRE e non sette —
+# «🚀 Promuovi» sull'annuncio (In cima, In evidenza 7 o 15 giorni) e il
+# negozio in «Da scoprire» per 30 giorni, che poi resta per sempre fra i
+# Consigliati. Lo studio e le decisioni: CANTIERI, «Le promozioni a
+# pagamento». ACCESA DI SERIE, la regola delle leve nuove (14 nov 2026):
+# spenta, il bottone non nasce e le rotte rifiutano prima della fattura;
+# chi ha gia' pagato tiene quel che ha comprato fino alla sua scadenza.
+try:
+    from config import PROMOZIONI_ATTIVE
+except ImportError:
+    PROMOZIONI_ATTIVE = True
+# «⬆️ In cima»: l'annuncio torna primo fra i «Più recenti», come appena
+# pubblicato, e riesce nel nostro canale. Una volta, niente durata.
+# 0 = questa promozione e' spenta (le altre restano).
+try:
+    from config import PROMO_IN_CIMA_SATS
+except ImportError:
+    PROMO_IN_CIMA_SATS = 5_000
+# ...al massimo una volta ogni tante ore per annuncio: il conto parte da
+# quando l'annuncio e' salito in cima l'ultima volta (o e' nato).
+try:
+    from config import PROMO_IN_CIMA_ORE
+except ImportError:
+    PROMO_IN_CIMA_ORE = 24
+# «⭐ In evidenza»: la fila in home e l'etichetta sulla card, per GIORNI
+# -> SATS. Il primo giorno anche in cima. Un dizionario vuoto (o tutti
+# zero) = spenta.
+try:
+    from config import PROMO_EVIDENZA_SATS
+except ImportError:
+    PROMO_EVIDENZA_SATS = {7: 15_000, 15: 25_000}
+# I posti della fila: oltre, si aspetta che uno si liberi (e l'app dice
+# da che giorno). Un annuncio gia' in evidenza che allunga NON prende un
+# posto nuovo: il suo ce l'ha.
+try:
+    from config import PROMO_EVIDENZA_POSTI
+except ImportError:
+    PROMO_EVIDENZA_POSTI = 8
+# «🏪 Il negozio in Da scoprire»: quanto costa e per quanti giorni. Dopo
+# la scadenza la card esce da «Da scoprire» ma il negozio RESTA fra i
+# Consigliati, finche' un moderatore non lo toglie (decisione di Andrea:
+# «possono essere anche infiniti lì»). Nessun limite di posti: la fila
+# gira a ogni apertura e scorre da sola. 0 = spenta.
+try:
+    from config import PROMO_SCOPRIRE_SATS
+except ImportError:
+    PROMO_SCOPRIRE_SATS = 50_000
+try:
+    from config import PROMO_SCOPRIRE_GIORNI
+except ImportError:
+    PROMO_SCOPRIRE_GIORNI = 30
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -10037,6 +10090,16 @@ def init_db():
                     # contro `username` e `negozio`, due colonne che una
                     # UNIQUE su questa sola non potrebbe mai coprire.
                     "negozio_slug TEXT DEFAULT ''",
+                    # IL NEGOZIO PROMOSSO (23 nov 2026, cantiere promozioni):
+                    # fino a quando la sua card sta in «Da scoprire» (0 =
+                    # mai, o scaduta: gate in LETTURA, nessuna scopa), e se
+                    # sta fra i Consigliati — 1 dal primo pagamento, e ci
+                    # resta finche' un moderatore non lo toglie
+                    # (`/promossi togli`). Le scrive SOLO l'incasso
+                    # (`_incassa_promo`), le toglie il rimborso o il
+                    # moderatore: nessun'altra strada.
+                    "promo_scoprire_fino INTEGER DEFAULT 0",
+                    "promo_consigliato INTEGER DEFAULT 0",
                     # IL NOME VERIFICATO SU NOSTR (17 nov 2026): '' =
                     # nessuno. Solo il nome, mai la chiave: quella la
                     # dice ogni volta il giudice (`_nip05_chiave_hex`).
@@ -10535,6 +10598,11 @@ def init_db():
                     "lampo_scadenza INTEGER DEFAULT 0",
                     "lampo_creato INTEGER DEFAULT 0",
                     "lampo_colpo_avvisato INTEGER DEFAULT 0",
+                    # «⭐ In evidenza» (23 nov 2026, cantiere promozioni):
+                    # l'istante in cui finisce, 0 = mai. Gate in LETTURA
+                    # come la lampo: alla scadenza la card esce dalla fila
+                    # da sola. La scrive solo `_incassa_promo`.
+                    "evidenza_fino INTEGER DEFAULT 0",
                     # quantita (lug 2026): i pezzi disponibili ADESSO,
                     # non lo storico. Default 1 = ogni annuncio di ieri
                     # resta un pezzo solo. INVARIANTE: stato='venduto'
@@ -23952,6 +24020,90 @@ async def comando_sponsor(mittente: dict, testo: str):
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
+
+async def comando_promossi(mittente: dict, testo: str):
+    """`/promossi` — le promozioni a pagamento viste dal moderatore (23
+    nov 2026). Solo admin. Tre forme:
+      `/promossi`                    chi e' promosso adesso
+      `/promossi negozio <codice>`   toglie il negozio da Da scoprire
+                                     E dai Consigliati
+      `/promossi annuncio <id>`      toglie l'annuncio da In evidenza
+    LA PORTA DEL MODERATORE: un negozio pagato entra da solo, perche' la
+    sua card e' il banner GIA' approvato (il patto della fattura); se poi
+    va tolto si toglie da qui, e i sats, se e' il caso, si restituiscono
+    a mano dal pannello come per il banner. Togliere NON rimborsa: sono
+    due gesti, e il secondo muove soldi."""
+    chat = mittente["id"]
+    if not e_admin_bot(mittente):
+        return await _comando_sconosciuto(chat)
+    pezzi = testo.split()
+    cosa = pezzi[1].strip().lower() if len(pezzi) > 1 else ""
+    chi = pezzi[2].strip() if len(pezzi) > 2 else ""
+    adesso = int(time.time())
+    con = db()
+    try:
+        if cosa == "negozio" and chi:
+            cur = con.execute(
+                "UPDATE utenti SET promo_scoprire_fino=0, promo_consigliato=0 "
+                "WHERE negozio=? AND (promo_scoprire_fino>0 "
+                "OR promo_consigliato=1)", (chi,))
+            con.commit()
+            fatto = cur.rowcount
+            testo_out = (f"✅ Il negozio <b>{html.escape(chi)}</b> non e' piu' "
+                         "in «Da scoprire» ne' fra i Consigliati."
+                         if fatto else
+                         f"Il negozio <b>{html.escape(chi)}</b> non era "
+                         "promosso.")
+        elif cosa == "annuncio" and chi.isdigit():
+            cur = con.execute("UPDATE annunci SET evidenza_fino=0 "
+                              "WHERE id=? AND evidenza_fino>0", (int(chi),))
+            con.commit()
+            fatto = cur.rowcount
+            testo_out = (f"✅ L'annuncio #{chi} non e' piu' in evidenza."
+                         if fatto else
+                         f"L'annuncio #{chi} non era in evidenza.")
+        else:
+            fatto = 0
+            negozi = con.execute(
+                "SELECT negozio, nome, promo_scoprire_fino, promo_consigliato "
+                "FROM utenti WHERE negozio<>'' AND (promo_scoprire_fino>? "
+                "OR promo_consigliato=1) ORDER BY promo_scoprire_fino DESC",
+                (adesso,)).fetchall()
+            annunci = con.execute(
+                "SELECT id, titolo, evidenza_fino FROM annunci "
+                "WHERE stato='attivo' AND evidenza_fino>? "
+                "ORDER BY evidenza_fino", (adesso,)).fetchall()
+            righe = ["🚀 <b>Le promozioni a pagamento</b>", "",
+                     "🏪 <b>Negozi</b>"]
+            for n in negozi:
+                fino = int(n["promo_scoprire_fino"] or 0)
+                dove = (f"in Da scoprire fino al <b>{_data_sponsor(fino)}</b>"
+                        if fino > adesso else "fra i Consigliati")
+                righe.append(f"• <code>{html.escape(n['negozio'])}</code> "
+                             f"{html.escape(n['nome'] or '')} — {dove}")
+            if not negozi:
+                righe.append("nessuno")
+            righe += ["", f"⭐ <b>In evidenza</b> ({len(annunci)} su "
+                          f"{PROMO_EVIDENZA_POSTI} posti)"]
+            for a in annunci:
+                righe.append(f"• #{a['id']} {html.escape(a['titolo'] or '')}"
+                             f" — fino al {_data_sponsor(a['evidenza_fino'])}")
+            if not annunci:
+                righe.append("nessuno")
+            righe += ["", "<code>/promossi negozio CODICE</code> — toglie un "
+                      "negozio", "<code>/promossi annuncio ID</code> — toglie "
+                      "un annuncio da In evidenza", "",
+                      "Togliere non rimborsa: i sats si restituiscono a mano "
+                      "dal pannello, come per il banner."]
+            testo_out = "\n".join(righe)
+    finally:
+        con.close()
+    if fatto:
+        await notifica_admin(f"🚀 /promossi {cosa} {chi} (da tg {chat})",
+                             argomento="riepiloghi")
+    return await bot_api("sendMessage", {"chat_id": chat, "text": testo_out,
+        "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+
 def titolare_punto(codice: str) -> int:
     """Il tg_id del titolare di un punto, 0 se quel codice negozio non
     risolve. E' la domanda che il comando fa PRIMA di accendere."""
@@ -24699,6 +24851,7 @@ async def _comando_nel_gruppo(msg: dict, mittente: dict, testo: str):
         return
     fa = {"/anteprima": comando_anteprima, "/canale": comando_canale,
           "/sponsor": comando_sponsor, "/vetrina": comando_vetrina,
+          "/promossi": comando_promossi,
           "/punti": comando_punti, "/canali": comando_canali}.get(comando)
     if not fa:
         return
@@ -25245,6 +25398,8 @@ async def gestisci_update(update: dict):
         return await comando_canale(mittente, testo)
     if testo.startswith("/sponsor"):
         return await comando_sponsor(mittente, testo)
+    if testo.startswith("/promossi"):
+        return await comando_promossi(mittente, testo)
     if testo.startswith("/vetrina"):
         return await comando_vetrina(mittente, testo)
     if testo.startswith("/provawidget"):
@@ -29623,6 +29778,11 @@ CAMPI_VETRINA = (
     # l'offerta lampo e' pubblica per natura (il prezzo barrato deve
     # vedersi in vetrina): percento e scadenza, il resto lo fa il client
     "a.lampo_percento, a.lampo_scadenza, "
+    # «⭐ In evidenza» (23 nov 2026) e' pubblico per natura come la
+    # lampo: l'etichetta sulla card la deve vedere chiunque. La
+    # scadenza e basta: il client confronta con l'orologio, come fa
+    # con `lampo_scadenza`
+    "a.evidenza_fino, "
     # l'asta e' pubblica per natura (regola del cantiere: importo in
     # testa e numero di puntate si vedono, gli offerenti no): base e
     # scadenza qui, top e conteggio li aggiunge arricchisci_righe_vetrina
@@ -30941,6 +31101,15 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # sponsorizzato lo aggiunge il client dal suo catalogo. La chiave
         # assente (un server di ieri) = nessuno, come per lo sponsor.
         risposta["consigliati"] = consigliati_pubblici(con)
+        # LE PROMOZIONI A PAGAMENTO (23 nov 2026): la fila «In evidenza»
+        # e i negozi pagati per «Da scoprire» (poi Consigliati per
+        # sempre), nella busta per la stessa ragione dello sponsor. Anche
+        # a leva spenta: `PROMOZIONI_ATTIVE` chiude la CASSA, non toglie
+        # a chi ha gia' pagato quello che ha comprato.
+        risposta["in_evidenza"] = in_evidenza_pubblici(con, campi, _ora)
+        risposta["negozi_promossi"] = negozi_promossi_pubblici(con, _ora)
+        # ...e se la cassa e' aperta, per il bottone «🚀 Promuovi»
+        risposta["promozioni_attive"] = bool(PROMOZIONI_ATTIVE)
         # I pionieri viaggiano insieme (niente giro di rete in piu');
         # a interruttore spento la chiave non c'e' e il frontend non
         # disegna la riga.
@@ -37912,6 +38081,29 @@ def _leve_stato():
                   spento="la personalizzazione e' spenta del tutto: "
                          "nessuno puo' scegliersi un link, a nessun "
                          "livello"),
+            # LE PROMOZIONI A PAGAMENTO (23 nov 2026)
+            _leva("Promozioni a pagamento", "PROMOZIONI_ATTIVE",
+                  bool(PROMOZIONI_ATTIVE),
+                  spento="la cassa delle promozioni e' chiusa: nessuno "
+                         "ne compra di nuove, quelle gia' pagate restano",
+                  acceso="i venditori possono pagare In cima, In "
+                         "evidenza e il negozio in Da scoprire"),
+            _leva("Promozione In cima: prezzo (sats)",
+                  "PROMO_IN_CIMA_SATS", int(PROMO_IN_CIMA_SATS or 0),
+                  spento="In cima non si vende"),
+            _leva("Promozione In cima: ore fra due volte",
+                  "PROMO_IN_CIMA_ORE", int(PROMO_IN_CIMA_ORE or 0)),
+            _leva("Promozione In evidenza: prezzi (giorni: sats)",
+                  "PROMO_EVIDENZA_SATS",
+                  _elenco(f"{g} gg {s}" for g, s in listino_evidenza()),
+                  spento="In evidenza non si vende"),
+            _leva("Promozione In evidenza: posti", "PROMO_EVIDENZA_POSTI",
+                  int(PROMO_EVIDENZA_POSTI or 0)),
+            _leva("Negozio in Da scoprire: prezzo (sats)",
+                  "PROMO_SCOPRIRE_SATS", int(PROMO_SCOPRIRE_SATS or 0),
+                  spento="la card del negozio in Da scoprire non si vende"),
+            _leva("Negozio in Da scoprire: giorni", "PROMO_SCOPRIRE_GIORNI",
+                  int(PROMO_SCOPRIRE_GIORNI or 0)),
             _leva("Link toccabili in descrizione",
                   "LINK_DESCRIZIONE_AMMESSI",
                   _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
@@ -59070,7 +59262,10 @@ def _rimborso_del_motivo(motivo: str):
     quello sbagliato. Una sentinella di `prove.py` tiene questo elenco
     uguale a quello dello smistatore degli incassi."""
     return {"banner": ("dello sblocco banner", _disfa_banner),
-            "negozio_slug": ("del link negozio", _disfa_slug_negozio)
+            "negozio_slug": ("del link negozio", _disfa_slug_negozio),
+            "promo_cima": ("della promozione In cima", _disfa_promo),
+            "promo_evidenza": ("della promozione In evidenza", _disfa_promo),
+            "promo_scoprire": ("del negozio in Da scoprire", _disfa_promo)
             }.get(motivo)
 
 
@@ -59703,6 +59898,530 @@ async def _incassa_slug_negozio(pagamento_id: int) -> dict:
     except Exception as e:
         print(f"⚠️ Polso del link non partito: {e}")
     return {"stato": "pagato", "slug": slug}
+
+
+# ============ LE PROMOZIONI A PAGAMENTO (23 nov 2026) ================
+# Cantiere promozioni, deciso con Andrea dallo spunto delle schermate di
+# Subito («Promuovi annuncio»): li' le opzioni sono sette, qui TRE — la
+# semplicita' prima di tutto — e due di loro riusano macchine che
+# c'erano gia'.
+#   · «⬆️ In cima» (motivo `promo_cima`): l'annuncio torna primo fra i
+#     «Più recenti», come appena pubblicato, e riesce nel nostro canale.
+#     La macchina e' la DATA: `creato` diventa adesso, e la vetrina — il
+#     keyset, la finestra scorrevole, il negozio, la sitemap — lo mette
+#     in testa senza che nessun ordinamento sappia delle promozioni. Il
+#     segnalibro di chi sta scorrendo lo regge per costruzione (vedi
+#     `_pagina_finestra`: «un annuncio rilanciato esce allo stesso modo,
+#     e si ritrova in cima»). Il PREZZO DICHIARATO: la scheda dira'
+#     «pubblicato oggi», che e' quel che fa anche Subito.
+#   · «⭐ In evidenza» per 7 o 15 giorni (`promo_evidenza`): la fila in
+#     home sotto «Da scoprire» e l'etichetta sulla card, con
+#     PROMO_EVIDENZA_POSTI posti. Il primo giorno anche in cima.
+#   · «🏪 Il negozio in Da scoprire» (`promo_scoprire`): la card del
+#     negozio, fatta col SUO banner gia' approvato da un moderatore,
+#     per PROMO_SCOPRIRE_GIORNI; poi resta per sempre fra i Consigliati.
+#     Senza un banner attivo non si compra: la card e' il banner, e il
+#     banner e' gia' passato da un moderatore — quindi nessuna seconda
+#     coda di revisione.
+# LE TRE STRADE DI CASSA SONO QUELLE DEL BANNER: la tabella `pagamenti`
+# col suo motivo, la fattura dalla cassaforte nuova, il poll e
+# l'annullo GENERICI (`/api/pagamenti/{id}/verifica` e `/annulla`, che
+# smistano gia' per motivo), i due giri dell'orologio che riacciuffano
+# chi ha pagato a telefono chiuso (`_incasso_del_motivo`) e il rimborso
+# del moderatore (`_rimborso_del_motivo`), mai automatico.
+# NON E' UNA COMMISSIONE e quindi non tocca la regola 10: e' un servizio
+# che chi vende sceglie, e non si paga su nessuna vendita.
+MOTIVI_PROMO = ("promo_cima", "promo_evidenza", "promo_scoprire")
+MSG_PROMO_SPENTE = "Le promozioni non sono attive al momento"
+MSG_PROMO_SPENTA = "Questa promozione non è attiva al momento"
+
+
+def listino_evidenza() -> list:
+    """Le durate di «In evidenza», come [(giorni, sats)] dalla piu' corta.
+    Una voce storta o a zero si salta in silenzio: una leva scritta male
+    spegne quella durata, mai le altre — e mai un 500 sulla scheda."""
+    fuori = []
+    try:
+        voci = dict(PROMO_EVIDENZA_SATS or {}).items()
+    except (TypeError, ValueError):
+        return []
+    for g, s in voci:
+        try:
+            g, s = int(g), int(s)
+        except (TypeError, ValueError):
+            continue
+        if 0 < g <= 365 and s > 0:
+            fuori.append((g, s))
+    return sorted(fuori)
+
+
+def posti_evidenza(con, adesso: int, escluso: int = 0) -> tuple:
+    """I posti della fila «In evidenza»: (occupati, prossimo_libero).
+    `prossimo_libero` e' l'istante in cui uno si libera, e vale 0 se un
+    posto c'e' gia' adesso. `escluso` e' l'annuncio che allunga: il suo
+    posto ce l'ha, e contarlo lo farebbe aspettare se stesso.
+    Contano solo gli annunci ATTIVI: un venduto o un rimosso libera il
+    posto subito, anche se la sua data correrebbe ancora."""
+    righe = [r["evidenza_fino"] for r in con.execute(
+        "SELECT evidenza_fino FROM annunci WHERE stato='attivo' "
+        "AND evidenza_fino>? AND id<>? ORDER BY evidenza_fino",
+        (adesso, int(escluso)))]
+    posti = max(0, int(PROMO_EVIDENZA_POSTI or 0))
+    if len(righe) < posti:
+        return len(righe), 0
+    # i posti si liberano in ordine di scadenza: quello che fa scendere
+    # gli occupati sotto il tetto e' il (occupati - posti + 1)-esimo
+    return len(righe), (righe[len(righe) - posti] if righe else 0)
+
+
+def in_cima_da(creato: int) -> int:
+    """Da quando l'annuncio puo' tornare in cima: PROMO_IN_CIMA_ORE dopo
+    l'ultima volta che c'e' salito — o dopo che e' nato, che per la
+    vetrina e' la stessa cosa (un annuncio di stamattina e' gia' in
+    cima, e pagarlo per salirci sarebbe buttare i sats)."""
+    return int(creato or 0) + max(0, int(PROMO_IN_CIMA_ORE or 0)) * 3600
+
+
+def _voce_promo(tipo: str):
+    """Il tipo chiesto dal client -> (motivo, sats, giorni), o None se
+    non esiste o e' spento. E' l'UNICO posto che legge i prezzi: la
+    fattura, il listino della scheda e la verifica della ripresa
+    chiedono qui."""
+    tipo = (tipo or "").strip().lower()
+    if tipo == "cima":
+        s = int(PROMO_IN_CIMA_SATS or 0)
+        return ("promo_cima", s, 0) if s > 0 else None
+    if tipo.startswith("evidenza:"):
+        try:
+            g = int(tipo.split(":", 1)[1])
+        except ValueError:
+            return None
+        s = dict(listino_evidenza()).get(g, 0)
+        return ("promo_evidenza", s, g) if s > 0 else None
+    if tipo == "scoprire":
+        s = int(PROMO_SCOPRIRE_SATS or 0)
+        g = int(PROMO_SCOPRIRE_GIORNI or 0)
+        return ("promo_scoprire", s, g) if s > 0 and g > 0 else None
+    return None
+
+
+def _banner_vivo(u) -> bool:
+    """Il negozio ha un banner IN VETRINA, cioe' gia' approvato da un
+    moderatore: e' la card di «Da scoprire» e la sua pagina fra i
+    Consigliati. Senza, la promozione del negozio non si compra (e una
+    gia' comprata non si vede, finche' il banner non torna)."""
+    return bool(u and u["negozio"] and u["banner_stato"] == "attivo"
+                and u["banner_foto"])
+
+
+def negozi_promossi_pubblici(con, adesso: int | None = None) -> list:
+    """I NEGOZI CHE HANNO PAGATO, per la busta di prima pagina: quelli con
+    la card viva in «Da scoprire» (`scoprire` vero) e quelli che restano
+    fra i Consigliati. Escono il CODICE del negozio (mai il tg_id), il
+    nome, il file del banner e quello del logo — la foto del profilo,
+    solo se chi vende la mostra (la levetta di sempre).
+    FAIL-CLOSED: senza banner in vetrina il negozio non esce, ne' di qui
+    ne' di la' (un moderatore che spegne il banner spegne anche questo),
+    e un guasto da' una lista vuota invece di rompere la home."""
+    adesso = int(time.time()) if adesso is None else adesso
+    fuori = []
+    try:
+        for r in con.execute(
+                "SELECT negozio, nome, banner_stato, banner_foto, "
+                "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar END) "
+                "AS logo, promo_scoprire_fino, promo_consigliato "
+                "FROM utenti WHERE (promo_scoprire_fino>? "
+                "OR promo_consigliato=1) AND negozio<>'' "
+                "ORDER BY promo_scoprire_fino DESC, tg_id",
+                (adesso,)):
+            if not _banner_vivo(r):
+                continue
+            fuori.append({"negozio": r["negozio"],
+                          "nome": r["nome"] or "",
+                          "banner": r["banner_foto"],
+                          "logo": r["logo"] or "",
+                          "scoprire": int(r["promo_scoprire_fino"] or 0) > adesso,
+                          "consigliato": bool(r["promo_consigliato"])})
+    except Exception as e:
+        print(f"⚠️ [promozioni] i negozi promossi non si leggono: {e}")
+        return []
+    return fuori
+
+
+def in_evidenza_pubblici(con, campi: str, adesso: int | None = None) -> list:
+    """LA FILA «⭐ In evidenza» della home, per la busta di prima pagina:
+    gli annunci attivi con la promozione viva, di negozi aperti. Al piu'
+    il doppio dei posti — una cintura, che le guardie della fattura
+    tengono gia' la fila corta — e l'ordine lo decide il CLIENT, a turno
+    a ogni apertura (decisione di Andrea): qui escono dal piu' recente.
+    Fail-closed come le sorelle della busta."""
+    adesso = int(time.time()) if adesso is None else adesso
+    tetto = max(1, int(PROMO_EVIDENZA_POSTI or 0)) * 2
+    try:
+        return arricchisci_righe_vetrina([dict(r) for r in con.execute(
+            f"SELECT {campi} FROM annunci a "
+            "JOIN utenti u ON u.tg_id = a.venditore_id "
+            "WHERE a.stato='attivo' AND a.evidenza_fino>? "
+            "AND COALESCE(u.ferie_fino,0)<=? "
+            "ORDER BY a.evidenza_fino DESC, a.id DESC LIMIT ?",
+            (adesso, adesso, tetto))])
+    except Exception as e:
+        print(f"⚠️ [promozioni] la fila in evidenza non si legge: {e}")
+        return []
+
+
+def _annuncio_promuovibile(con, aid: int, tg_id: int):
+    """L'annuncio, se e' di chi chiede ed e' attivo; sennò il motivo."""
+    a = con.execute("SELECT id, venditore_id, stato, creato, evidenza_fino "
+                    "FROM annunci WHERE id=?", (int(aid),)).fetchone()
+    if not a or a["venditore_id"] != tg_id:
+        return None, "Annuncio non trovato"
+    if a["stato"] != "attivo":
+        return None, "Si promuove solo un annuncio in vendita"
+    return a, ""
+
+
+@app.get("/api/promo/listino")
+async def listino_promo(annuncio: int = 0,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Cosa si puo' comprare ADESSO, per il foglio «🚀 Promuovi» o per il
+    cassetto del negozio: i prezzi (il client non li scrive mai a mano,
+    il patto di `max_barattolo`) e, voce per voce, se si puo' e da
+    quando. Con `annuncio` le due voci dell'annuncio, che deve essere
+    suo; senza, la sola voce del negozio."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    adesso = int(time.time())
+    fuori = {"attive": bool(PROMOZIONI_ATTIVE)}
+    con = db()
+    try:
+        if annuncio:
+            a, motivo = _annuncio_promuovibile(con, annuncio, user["id"])
+            if not a:
+                raise HTTPException(400, motivo)
+            da = in_cima_da(a["creato"])
+            fuori["cima"] = {"sats": int(PROMO_IN_CIMA_SATS or 0),
+                             "da": da if da > adesso else 0}
+            occ, prossimo = posti_evidenza(con, adesso, a["id"])
+            fuori["evidenza"] = {
+                "durate": [{"giorni": g, "sats": s}
+                           for g, s in listino_evidenza()],
+                "posti": max(0, int(PROMO_EVIDENZA_POSTI or 0)),
+                "occupati": occ, "libero_da": prossimo,
+                "fino": (a["evidenza_fino"]
+                         if (a["evidenza_fino"] or 0) > adesso else 0)}
+        else:
+            u = con.execute("SELECT negozio, banner_stato, banner_foto, "
+                            "promo_scoprire_fino, promo_consigliato "
+                            "FROM utenti WHERE tg_id=?",
+                            (user["id"],)).fetchone()
+            fino = int((u["promo_scoprire_fino"] if u else 0) or 0)
+            fuori["scoprire"] = {
+                "sats": int(PROMO_SCOPRIRE_SATS or 0),
+                "giorni": int(PROMO_SCOPRIRE_GIORNI or 0),
+                "banner": _banner_vivo(u),
+                "fino": fino if fino > adesso else 0,
+                "consigliato": bool(u and u["promo_consigliato"])}
+    finally:
+        con.close()
+    return fuori
+
+
+@app.post("/api/promo/compra")
+async def compra_promo(req: Request,
+                       x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """La fattura di una promozione. Il calco di `sblocca_banner`, e i
+    suoi patti valgono tutti: LE GUARDIE STANNO TUTTE PRIMA DELLA
+    FATTURA (un 400 dopo `crea_invoice_escrow` lascerebbe sats senza una
+    riga su cui posarsi), l'unico await e' la fattura, e fra lei e
+    l'INSERT niente.
+    LA RIPRESA: chi chiede di nuovo LA STESSA cosa entro mezz'ora si
+    rivede la sua fattura; chi cambia idea (un'altra durata, un altro
+    annuncio) chiude quella vecchia — mai due inviti a pagare aperti per
+    la stessa persona. La lapide non perde niente: se la vecchia viene
+    pagata lo stesso, l'orologio la riacciuffa e la incassa.
+    I POSTI DELLA FILA SI GUARDANO QUI e non all'incasso: nella finestra
+    della fattura un altro puo' prendere l'ultimo, e allora la fila avra'
+    un posto in piu' per qualche giorno — meglio che negare a chi ha
+    pagato quel che ha pagato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not PROMOZIONI_ATTIVE:
+        raise HTTPException(400, MSG_PROMO_SPENTE)
+    d = await leggi_json(req)
+    voce = _voce_promo(d.get("tipo"))
+    if not voce:
+        raise HTTPException(400, MSG_PROMO_SPENTA)
+    motivo, prezzo, giorni = voce
+    adesso = int(time.time())
+    con = db()
+    if motivo in ("promo_cima", "promo_evidenza"):
+        try:
+            aid = int(d.get("annuncio_id") or 0)
+        except (TypeError, ValueError):
+            aid = 0
+        a, no = _annuncio_promuovibile(con, aid, user["id"])
+        if not a:
+            con.close()
+            raise HTTPException(400, no)
+        if motivo == "promo_cima" and in_cima_da(a["creato"]) > adesso:
+            con.close()
+            raise HTTPException(400, "È già fra i primi: potrai riportarlo "
+                                     "in cima più tardi")
+        if motivo == "promo_evidenza":
+            occ, prossimo = posti_evidenza(con, adesso, aid)
+            if prossimo:
+                con.close()
+                raise HTTPException(409, "I posti in evidenza sono tutti "
+                                         "presi: il prossimo si libera il "
+                                         + _data_sponsor(prossimo))
+        riferimento = str(aid) + (f":{giorni}" if giorni else "")
+        memo = (f"Barattolo promozione #{user['id']}: "
+                + ("in cima" if motivo == "promo_cima"
+                   else f"in evidenza {giorni} giorni")
+                + f", annuncio {aid}")
+    else:
+        u = con.execute("SELECT negozio, banner_stato, banner_foto "
+                        "FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        if not u or not u["negozio"]:
+            con.close()
+            raise HTTPException(400, "Il tuo negozio non è ancora pronto")
+        if not _banner_vivo(u):
+            con.close()
+            raise HTTPException(400, "Prima serve il banner del negozio "
+                                     "approvato: la card è fatta con quello")
+        riferimento = str(giorni)
+        memo = (f"Barattolo promozione #{user['id']}: negozio in "
+                f"Da scoprire {giorni} giorni")
+    # LA RIPRESA, nella finestra fisica del pagamento (30 minuti), come
+    # `sblocca_banner` e `_riservati`
+    segni = ",".join("?" * len(MOTIVI_PROMO))
+    vive = con.execute(
+        f"SELECT * FROM pagamenti WHERE tg_id=? AND motivo IN ({segni}) "
+        "AND stato='creato' AND creato>=?",
+        (user["id"], *MOTIVI_PROMO, adesso - 1800)).fetchall()
+    for v in vive:
+        if (v["motivo"] == motivo and v["riferimento"] == riferimento
+                and v["importo_sats"] == prezzo and v["invoice"]):
+            con.close()
+            return {"pagamento_id": v["id"], "invoice": v["invoice"],
+                    "payment_hash": v["payment_hash"],
+                    "importo_sats": v["importo_sats"],
+                    "scadenza_invoice": INVOICE_EXPIRY, "ripresa": True}
+    if vive:
+        con.executemany("UPDATE pagamenti SET stato='annullato', aggiornato=? "
+                        "WHERE id=? AND stato='creato'",
+                        [(adesso, v["id"]) for v in vive])
+        # si chiude SUBITO (14 nov 2026, audit): una scrittura aperta
+        # attraverso l'await di LNbits terrebbe il lucchetto del database
+        con.commit()
+    cf = cassaforte_nuova()
+    inv = await crea_invoice_escrow(prezzo, memo, cassaforte=cf)
+    # Da qui al commit NESSUN await: il patto mono-processo.
+    con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,"
+                "importo_sats,payment_hash,invoice,stato,creato,"
+                "aggiornato,cassaforte) "
+                "VALUES(?,?,?,?,?,?,'creato',?,?,?)",
+                (user["id"], motivo, riferimento, prezzo,
+                 inv["payment_hash"], inv["payment_request"],
+                 adesso, adesso, cf))
+    pid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
+    con.commit()
+    con.close()
+    return {"pagamento_id": pid, "invoice": inv["payment_request"],
+            "payment_hash": inv["payment_hash"], "importo_sats": prezzo,
+            "scadenza_invoice": INVOICE_EXPIRY}
+
+
+def _promo_dal_riferimento(p) -> tuple:
+    """(annuncio_id, giorni) dal `riferimento` di un pagamento promo:
+    «aid» per In cima, «aid:giorni» per In evidenza, «giorni» per il
+    negozio. Un riferimento storto torna zeri, e chi chiama non applica
+    niente (i sats restano incassati: il libro mastro lo dice)."""
+    rif = str(p["riferimento"] or "")
+    try:
+        if p["motivo"] == "promo_scoprire":
+            return 0, int(rif)
+        aid, _, g = rif.partition(":")
+        return int(aid), int(g or 0)
+    except ValueError:
+        return 0, 0
+
+
+async def _incassa_promo(pagamento_id: int) -> dict:
+    """I sats di una promozione sono arrivati: si registra il pagamento E
+    SI APPLICA quel che compra, nella STESSA transazione — il patto di
+    `_incassa_sblocco`, che rende impossibile «ha pagato e non ha avuto».
+    La chiamano in tre: il poll del telefono e i due giri dell'orologio.
+    Le durate SI SOMMANO: chi allunga mentre la sua e' ancora viva parte
+    dalla fine di quella, non da adesso — non perde i giorni gia' pagati.
+    L'annuncio si riguarda QUI (e' di chi ha pagato?): uno venduto nel
+    frattempo prende lo stesso la data — non fa male a nessuno, la fila
+    guarda solo gli attivi — e uno passato di mano non c'e' (il venditore
+    non cambia mai), quindi il ramo e' una cintura."""
+    adesso = int(time.time())
+    con = db()
+    p = con.execute("SELECT * FROM pagamenti WHERE id=?",
+                    (pagamento_id,)).fetchone()
+    if not p or p["stato"] != "creato":
+        stato = p["stato"] if p else "annullato"
+        con.close()
+        return {"stato": stato}
+    cur = con.execute("UPDATE pagamenti SET stato='pagato', pagato_il=?, "
+                      "aggiornato=? WHERE id=? AND stato='creato'",
+                      (adesso, adesso, pagamento_id))
+    if cur.rowcount == 0:
+        con.commit()
+        con.close()
+        return {"stato": "pagato"}
+    motivo = p["motivo"]
+    aid, giorni = _promo_dal_riferimento(p)
+    applicata, fino = False, 0
+    if motivo in ("promo_cima", "promo_evidenza") and aid:
+        a = con.execute("SELECT venditore_id, evidenza_fino FROM annunci "
+                        "WHERE id=?", (aid,)).fetchone()
+        if a and a["venditore_id"] == p["tg_id"]:
+            applicata = True
+            if motivo == "promo_evidenza" and giorni > 0:
+                fino = max(adesso, int(a["evidenza_fino"] or 0)) + giorni * 86400
+                con.execute("UPDATE annunci SET evidenza_fino=?, creato=? "
+                            "WHERE id=?", (fino, adesso, aid))
+            else:
+                con.execute("UPDATE annunci SET creato=? WHERE id=?",
+                            (adesso, aid))
+    elif motivo == "promo_scoprire" and giorni > 0:
+        u = con.execute("SELECT promo_scoprire_fino FROM utenti "
+                        "WHERE tg_id=?", (p["tg_id"],)).fetchone()
+        if u:
+            applicata = True
+            fino = max(adesso, int(u["promo_scoprire_fino"] or 0)) + giorni * 86400
+            con.execute("UPDATE utenti SET promo_scoprire_fino=?, "
+                        "promo_consigliato=1 WHERE tg_id=?",
+                        (fino, p["tg_id"]))
+    con.commit()
+    con.close()
+    # Dopo il commit, mai prima. LA RIGA NEL JOURNAL C'E' SEMPRE (la
+    # lezione del link del negozio: un incasso muto non lo vede nessuno).
+    nome = {"promo_cima": "in cima",
+            "promo_evidenza": f"in evidenza {giorni} giorni",
+            "promo_scoprire": f"negozio in Da scoprire {giorni} giorni"
+            }.get(motivo, motivo)
+    print(f"🚀 Promozione pagata: {nome}"
+          + (f", annuncio {aid}" if aid else "")
+          + f", {_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
+          f"(pagamento #{pagamento_id})"
+          + ("" if applicata else " — NON APPLICATA, da guardare a mano"),
+          flush=True)
+    if applicata and aid:
+        asyncio.create_task(promo_in_cima_canale(aid))
+    try:
+        if not applicata:
+            await notifica_admin(
+                f"⚠️ <b>Promozione pagata e non applicata.</b> #{p['tg_id']}, "
+                f"{nome}, pagamento #{pagamento_id}: da sistemare a mano "
+                "(rimborso o applicazione).", argomento="errori")
+        else:
+            await notifica_admin(
+                f"🚀 <b>Promozione pagata:</b> {nome}, "
+                f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
+                f"(pagamento #{pagamento_id}).", argomento="riepiloghi")
+    except Exception as e:
+        print(f"⚠️ Polso della promozione non partito: {e}")
+    try:
+        if applicata and motivo == "promo_scoprire":
+            await notifica(p["tg_id"],
+                           "🏪 <b>Fatto!</b> Il tuo negozio è in «Da scoprire» "
+                           f"fino al {_data_sponsor(fino)}, e poi resta fra "
+                           "i Consigliati.")
+        elif applicata and motivo == "promo_evidenza":
+            await notifica(p["tg_id"],
+                           "⭐ <b>Fatto!</b> Il tuo annuncio è in evidenza "
+                           f"fino al {_data_sponsor(fino)}, e oggi è anche "
+                           "in cima.")
+        elif applicata:
+            await notifica(p["tg_id"],
+                           "⬆️ <b>Fatto!</b> Il tuo annuncio è tornato in "
+                           "cima.")
+    except Exception as e:
+        print(f"⚠️ Avviso della promozione non partito: {e}")
+    return {"stato": "pagato", "applicata": applicata, "fino": fino}
+
+
+async def promo_in_cima_canale(annuncio_id: int):
+    """IL POST NUOVO DI «In cima» (23 nov 2026): l'annuncio riesce nel
+    NOSTRO canale, e solo li' — i canali della comunita' sono casa
+    d'altri, e un annuncio ripostato a pagamento li' sarebbe pubblicita'
+    in un posto che non l'ha chiesta. Niente Nostr: la nota e' gia' sui
+    relay, e ripubblicarla e' rumore.
+    IL POST VECCHIO SI TOGLIE PRIMA, cosi' nel canale l'annuncio c'e' una
+    volta sola, in alto; la colonna prende l'id del nuovo, e il ✅ Venduto
+    e la vetrina che si pulisce lavorano su quello. Dove Telegram non
+    lascia cancellare (oltre le 48 ore, la regola gia' scritta in
+    `promo_venduto`) il vecchio resta com'e': una imperfezione dichiarata,
+    che dice comunque il vero — l'annuncio c'e'.
+    NON CONSUMA E NON GUARDA il budget orario dei post, al contrario della
+    lampo: questo post e' stato pagato, e a tenerlo raro basta il prezzo.
+    Le guardie di sempre si: un negozio in ferie, un annuncio importato o
+    non piu' in vendita non si annunciano. Fail-open: un post fallito non
+    tocca il pagamento, che e' gia' chiuso."""
+    if not (POST_AUTOMATICI and canale_id()):
+        return
+    try:
+        con = db()
+        a = con.execute(
+            "SELECT a.*, u.ferie_fino, u.promo_canale_il, "
+            "u.nome AS venditore, u.username AS venditore_username, "
+            "u.npub AS venditore_npub, "
+            "u.npub_verificata AS venditore_npub_verificata, "
+            "u.npub_accesso AS venditore_npub_accesso, "
+            "u.negozio AS venditore_negozio "
+            "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+            "WHERE a.id=?", (annuncio_id,)).fetchone()
+        if not a or a["stato"] != "attivo" or origine_annuncio(a) \
+                or in_ferie(a["ferie_fino"], int(time.time())):
+            con.close()
+            return
+        a = dict(a)
+        altri = _altri_del_venditore(con, a)
+        con.close()
+        vecchio = a.get("post_canale_id") or 0
+        if vecchio:
+            await bot_api("deleteMessage", {"chat_id": canale_id(),
+                                            "message_id": vecchio})
+        nuovo = await _manda_post_canale(
+            canale_id(), _caption_canale(a, await cambio_btc_eur(),
+                                         altri=altri),
+            _foto_url_nostr(a.get("foto", "")))
+        if nuovo:
+            _post_promo_recenti.append(time.time())
+            con = db()
+            con.execute("UPDATE annunci SET post_canale_id=? WHERE id=?",
+                        (nuovo, annuncio_id))
+            con.commit()
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Post di «In cima» #{annuncio_id} saltato: {e}",
+              flush=True)
+
+
+def _disfa_promo(con, p) -> str:
+    """Il rimborso di una promozione: quel che ha comprato si toglie. Per
+    «In cima» non c'e' niente da togliere (la data non torna indietro:
+    l'annuncio e' salito, e scendera' da solo coi prossimi); «In
+    evidenza» esce dalla fila; il negozio esce da «Da scoprire» E dai
+    Consigliati — il rimborso disfa tutto in un gesto, la regola di
+    `_rimborsa_sblocco`."""
+    aid, _g = _promo_dal_riferimento(p)
+    if p["motivo"] == "promo_evidenza" and aid:
+        con.execute("UPDATE annunci SET evidenza_fino=0 WHERE id=? "
+                    "AND venditore_id=?", (aid, p["tg_id"]))
+        return "L'annuncio esce dalla fila «In evidenza»."
+    if p["motivo"] == "promo_scoprire":
+        con.execute("UPDATE utenti SET promo_scoprire_fino=0, "
+                    "promo_consigliato=0 WHERE tg_id=?", (p["tg_id"],))
+        return "Il negozio esce da «Da scoprire» e dai Consigliati."
+    return ""
 
 
 @app.post("/api/me/suggerimenti")
@@ -95395,7 +96114,12 @@ def _incasso_del_motivo(motivo: str):
     Il dizionario si costruisce ALLA CHIAMATA: i nomi si risolvono
     quando servono, e un banco puo' metterci le sue casse di cartone."""
     return {"banner": _incassa_sblocco,
-            "negozio_slug": _incassa_slug_negozio}.get(motivo)
+            "negozio_slug": _incassa_slug_negozio,
+            # Le promozioni a pagamento (23 nov 2026): una cassa sola per
+            # le tre, che legge il motivo dalla riga.
+            "promo_cima": _incassa_promo,
+            "promo_evidenza": _incassa_promo,
+            "promo_scoprire": _incassa_promo}.get(motivo)
 
 
 # ---------- LA GUARDIA DELLA LIQUIDITA' (11 ott 2026) ------------------
@@ -107381,7 +108105,12 @@ CONTROLLI_LIBRO_MASTRO = (
     ("sblocco pagato due volte",
      "due pagamenti riusciti per la stessa porta: qualcuno ha pagato "
      "due volte una cosa che si compra una volta sola",
+     # Solo le porte che si comprano UNA volta (23 nov 2026): una
+     # promozione si ricompra di diritto (lo stesso In cima ogni
+     # giorno, lo stesso In evidenza alla scadenza), e qui suonerebbe
+     # per ogni cliente affezionato.
      "SELECT MIN(id) FROM pagamenti WHERE stato='pagato' "
+     "AND motivo IN ('banner','negozio_slug') "
      "GROUP BY tg_id, motivo, riferimento HAVING COUNT(*) > 1"),
     ("sblocco rimborsato e porta ancora aperta",
      "i sats sono tornati indietro ma la porta e' rimasta aperta: il "
@@ -107445,7 +108174,8 @@ CONTROLLI_LIBRO_MASTRO = (
      "nessuno l'ha incassata — si guarda a mano su LNbits col suo "
      "payment_hash, e si da' al motivo la sua cassa",
      "SELECT id FROM pagamenti "
-     "WHERE motivo NOT IN ('banner','negozio_slug')"),
+     "WHERE motivo NOT IN ('banner','negozio_slug',"
+     "'promo_cima','promo_evidenza','promo_scoprire')"),
     # E QUALI NON NASCONO QUI, con la stessa domanda:
     # - «una lapide senza payment_hash»: NO, e' innocua e non dice
     #   niente a nessuno — una riga 'annullato' non tiene occupato
