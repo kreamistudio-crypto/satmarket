@@ -219425,12 +219425,31 @@ def prove_ritorno_nel_libro_onchain():
            R(dict(acq, stato="depositato"), "rimborsato", 0, 333, "onchain-rinuncia"),
            R(rim, "rimborsato", 0, 0, ""), R(rim, "rilasciato", 0, 222, "onchain-rinuncia"),
            R(rim, "rimborsato", 0, 222, "altro")])
-    prova("MAI COL PAYCODE (alla presa l'importo diventa quello del codice di chi prende) "
-          "ne' sulla fascia di Barattozon, e mai senza chi ha preso",
-          ["", "", ""],
-          [R(dict(vend, paycode='{"pc": "x"}'), "annullato", 222),
-           R(dict(acq, tab_min_cent=2500), "annullato"),
-           R(dict(vend, taker_id=0), "annullato", 222)])
+    # (23 nov 2026, barattozon-rinasce) il PayCode scritto da chi vende
+    bz = dict(vend, lato="sell", paycode='{"pc": "123456789", "scade": 200000}')
+    prova("COL PAYCODE DI CHI VENDE (Barattozon in «Vendi BTC») rinasce SOLO se annulla "
+          "chi ha preso prima del deposito (il PayCode non l'ha mai visto); non se annulla "
+          "chi ha pubblicato, non dalla ronda, non dopo il deposito (rinuncia, non pagato); "
+          "MAI sulla fascia di Barattozon («Compra BTC»: alla presa l'importo diventa quello "
+          "del codice di chi prende), mai un PayCode su un acquisto, e mai senza chi ha preso",
+          ["annullato", "", "", "", "", "", "", ""],
+          [R(bz, "annullato", 222), R(bz, "annullato", 111), R(bz, "annullato"),
+           R(dict(bz, stato="depositato"), "rimborsato", 0, 222, "onchain-rinuncia"),
+           R(dict(bz, stato="disputa"), "rimborsato", 0, 222, "onchain-non-pagato"),
+           R(dict(acq, lato="buy", tab_min_cent=2500), "annullato", 444),
+           R(dict(acq, lato="buy", paycode='{"pc": "123456789"}'), "annullato", 444),
+           R(dict(bz, taker_id=0), "annullato", 222)])
+    rottoR = pezzo("p2p_onchain_rinasce_perche").replace(
+        "        if paycode:\n            return \"\"\n", "", 1)
+    ambR = dict(amb)
+    exec(rottoR, ambR)
+    prova("controprova: senza il cancello del PayCode, un Barattozon rinascerebbe anche "
+          "quando l'annullo non e' di chi ha preso (qui: chi pubblica, a tempo finito)",
+          [True, "deposito"],
+          [rottoR != pezzo("p2p_onchain_rinasce_perche"),
+           ambR["p2p_onchain_rinasce_perche"](
+               dict(bz, depositante_id=222, deposito_entro=5000), "annullato", 111,
+               adesso=5000)])
 
     # --- 2) LA RINASCITA, sul database ---------------------------------------
     con = sqlite3.connect(":memory:")
@@ -219496,6 +219515,34 @@ def prove_ritorno_nel_libro_onchain():
     prova("chi non ha piu' la sua chiave on-chain, o ha cancellato l'account, non rinasce",
           [0, 0], [Rn(con, ordine(maker_id=555), 100000),
                    Rn(con, ordine(maker_id=2 ** 52 + 5), 100000)])
+    # (23 nov 2026, barattozon-rinasce) il PayCode di chi vende rinasce con
+    # lui, se vive ancora piu' delle 8 ore del margine
+    def bzo(scade, **k):
+        return ordine(**dict(dict(metodi='["Contanti al tabacchino"]', paracadute=0,
+                                  rip_minimo=0, rip_massimo=0, recapito="",
+                                  paycode=json.dumps({"pc": "123456789", "scade": scade,
+                                                      "barre": ""})), **k))
+    vb = bzo(100000 + 9 * 3600)
+    nb = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                     (Rn(con, vb, 100000),)).fetchone()
+    prova("BARATTOZON IN «VENDI BTC» rinasce con lo STESSO PayCode e la stessa scadenza, "
+          "nel libro fino a 8 ore prima di quella; con 8 ore esatte, o meno, o un PayCode "
+          "senza scadenza, non rinasce",
+          [vb["paycode"], 100000 + 3600, '["Contanti al tabacchino"]', vb["id"], 0, 0, 0],
+          [nb["paycode"], nb["scade"], nb["metodi"], nb["rinato_da"],
+           Rn(con, bzo(100000 + 8 * 3600), 100000), Rn(con, bzo(100000 + 3600), 100000),
+           Rn(con, ordine(paycode='{"pc": "123456789"}'), 100000)])
+    prova("...e un ordine senza PayCode rinasce senza (la colonna resta vuota)", "",
+          con.execute("SELECT paycode FROM p2p_onchain_ordini WHERE id=?",
+                      (Rn(con, ordine(), 100000),)).fetchone()[0])
+    rottoB = pezzo("_p2p_onchain_rinasci").replace(
+        "- P2P_ONCHAIN_TAB_MARGINE_S <= int(adesso):", "<= 0:", 1)
+    ambB = dict(amb)
+    exec(rottoB, ambB)
+    prova("controprova: senza il margine delle 8 ore un PayCode a 8 ore dalla scadenza "
+          "rinascerebbe (e uscirebbe dal libro appena nato)", [True, True],
+          [rottoB != pezzo("_p2p_onchain_rinasci"),
+           bool(ambB["_p2p_onchain_rinasci"](con, bzo(100000 + 8 * 3600), 100000))])
     rotto = pezzo("_p2p_onchain_rinasci").replace(
         'if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE rinato_da=?",', 'if False and (', 1)
     rotto = rotto.replace("(vecchio,)).fetchone():\n        return 0", "):\n        return 0", 1)

@@ -940,3 +940,9 @@ frase: Adesso puoi far vedere di più quello che vendi, pagando in sats. Dalla s
 dove: Scheda dell'annuncio → «Promuovi»; Profilo → cassetto del banner del negozio → «Promuovi»; home: la fila «In evidenza» sotto «Da scoprire».
 leva: PROMOZIONI_ATTIVE (accesa di serie)
 pubblico: sì
+
+## 2026-11-23 · barattozon-rinasce
+frase: Anche gli ordini Barattozon on-chain in «Vendi BTC» tornano nel libro da soli se chi li prende annulla prima del deposito, con lo stesso PayCode, finché al PayCode mancano più di 8 ore.
+dove: P2P → un tuo ordine Barattozon on-chain preso e annullato da chi l'ha preso → avviso «🔁 Il tuo ordine è tornato nel libro».
+leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
+pubblico: no

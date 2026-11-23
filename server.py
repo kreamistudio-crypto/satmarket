@@ -120744,9 +120744,18 @@ def _p2p_onchain_mancato(o, stato) -> tuple:
 # nome nuovo — come la ripubblica. Riaprire il vecchio era la strada
 # scartata: l'indirizzo 2-di-3 contiene la chiave di chi ha preso e non si
 # riusa con un'altra persona, e ogni tabella legata allo scambio avrebbe
-# dovuto imparare un «secondo giro». Col PayCode di un Barattozon non
-# rinasce niente: alla presa l'importo diventa quello del codice di chi
-# prende, e l'ordine di prima non c'e' piu' da copiare.
+# dovuto imparare un «secondo giro». Nella FASCIA di Barattozon («Compra
+# BTC») non rinasce niente: alla presa l'importo diventa quello del codice
+# di chi prende, e l'ordine di prima non c'e' piu' da copiare.
+# IL PAYCODE DI CHI VENDE (23 nov 2026, cantiere barattozon-rinasce; un
+# utente annullato due volte in un minuto ripubblicava a mano, e Andrea,
+# dalla card: «Sì», poi «Sì, 8 ore»). Barattozon in «Vendi BTC» rinasce
+# SOLO se chi l'ha preso annulla prima del deposito: il PayCode esce a chi
+# paga solo a deposito confermato, quindi non l'ha mai visto e si puo'
+# rimettere nel libro. Dopo il deposito no (l'ha visto). E solo se il
+# PayCode vive ancora piu' delle 8 ore del margine
+# (`P2P_ONCHAIN_TAB_MARGINE_S`, lo stesso limite con cui il libro lo
+# toglie): l'ordine nuovo ha lo stesso PayCode e la stessa scadenza.
 P2P_ONCHAIN_RINASCE_PERCHE = {
     "annullato": "Chi l'aveva preso ha annullato prima del deposito",
     "deposito": "Chi l'aveva preso non ha depositato in tempo",
@@ -120769,13 +120778,17 @@ def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
     taker = int(_p2p_onchain_campo(o, "taker_id", 0) or 0)
     if not taker or not int(_p2p_onchain_campo(o, "maker_id", 0) or 0):
         return ""
-    if (str(_p2p_onchain_campo(o, "paycode", "") or "")
-            or int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0)):
+    if int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0):
+        return ""
+    paycode = bool(str(_p2p_onchain_campo(o, "paycode", "") or ""))
+    if paycode and str(_p2p_onchain_campo(o, "lato", "") or "") != "sell":
         return ""
     prima = str(_p2p_onchain_campo(o, "stato", "") or "")
     if stato_nuovo == "annullato" and prima == "preso":
         if chi_chiude and int(chi_chiude) == taker:
             return "annullato"
+        if paycode:
+            return ""
         dep_taker = int(_p2p_onchain_campo(o, "depositante_id", 0) or 0) == taker
         entro = int(_p2p_onchain_campo(o, "deposito_entro", 0) or 0)
         if not chi_chiude and dep_taker:
@@ -120785,7 +120798,7 @@ def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
             return "deposito"
         return ""
     if (stato_nuovo == "rimborsato" and int(mancato_a or 0) == taker
-            and mancato_perche in P2P_ONCHAIN_RINASCE_PERCHE):
+            and mancato_perche in P2P_ONCHAIN_RINASCE_PERCHE and not paycode):
         return mancato_perche
     return ""
 
@@ -120796,9 +120809,11 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     (lato, prezzo o premio, cifra, metodi, filtro, paracadute ripartito
     dal cambio di adesso, ripubblica, zona, tempo per pagare, cauzione) e
     la vita nel libro di nuovo intera. Il recapito torna solo se l'aveva
-    scritto chi pubblica (ordine di vendita). Torna l'id nuovo, o 0 se
-    l'ordine era gia' rinato o chi l'aveva pubblicato non ha piu' la sua
-    chiave on-chain. Committa."""
+    scritto chi pubblica (ordine di vendita). Col PayCode di chi vende
+    (Barattozon in «Vendi BTC») lo stesso PayCode e la stessa scadenza, e
+    nel libro fino a 8 ore prima di quella. Torna l'id nuovo, o 0 se
+    l'ordine era gia' rinato, se chi l'aveva pubblicato non ha piu' la sua
+    chiave on-chain, o se al PayCode non restano piu' di 8 ore. Committa."""
     vecchio = int(o["id"])
     if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE rinato_da=?",
                    (vecchio,)).fetchone():
@@ -120809,6 +120824,17 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     if not con.execute("SELECT 1 FROM onchain_xpub WHERE tg_id=?",
                        (maker,)).fetchone():
         return 0
+    # il PayCode di chi vende rinasce con lui, se vive ancora oltre il
+    # margine: sennò l'ordine nuovo uscirebbe dal libro appena nato
+    paycode = str(_p2p_onchain_campo(o, "paycode", "") or "")
+    tab_scade = 0
+    if paycode:
+        try:
+            tab_scade = int((json.loads(paycode) or {}).get("scade") or 0)
+        except Exception:
+            tab_scade = 0
+        if not tab_scade or tab_scade - P2P_ONCHAIN_TAB_MARGINE_S <= int(adesso):
+            return 0
     mercato = _p2p_onchain_mercato(o)
     lato = str(o["lato"])
     recapito = str(o["recapito"] or "") if lato == "sell" else ""
@@ -120826,14 +120852,14 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (ordine, lato, maker, 0 if mercato else int(o["prezzo_sats"]),
          int(o["euro_cent"]), o["metodi"], recapito,
-         p2p_onchain_scade_libro(adesso, 0), adesso, adesso,
+         p2p_onchain_scade_libro(adesso, tab_scade), adesso, adesso,
          "mercato" if mercato else "fisso",
          int(_p2p_onchain_campo(o, "premio", 0) or 0) if mercato else 0,
          int(_p2p_onchain_campo(o, "filtro", 0) or 0),
          para if para_da else 0, para_da, para_letto,
          int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0),
          int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0),
-         str(_p2p_onchain_campo(o, "fiat", "") or ""), "",
+         str(_p2p_onchain_campo(o, "fiat", "") or ""), paycode,
          str(_p2p_onchain_campo(o, "zona", "") or ""),
          int(_p2p_onchain_campo(o, "para_su", -1)),
          int(_p2p_onchain_campo(o, "para_giu", -1)), 0,
