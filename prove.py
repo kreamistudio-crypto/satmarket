@@ -14248,7 +14248,7 @@ def prove_lista_ordini():
           "DELETE FROM ordini WHERE stato='annullato' " in pf
           and "aggiornato < ?" in pf)
     prova("il riacciuffo cerca ancora i pagamenti sulle lapidi", True,
-          "WHERE stato='annullato' " in pezzo("controlla_abbandonati"))
+          "WHERE stato='annullato' " in pezzo("controlla_annullati"))
     prova("il server non ha imparato a filtrare la lista", True,
           "WHERE o.compratore_id=? OR o.venditore_id=?"
           in pezzo("miei_ordini"))
