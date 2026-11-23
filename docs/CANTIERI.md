@@ -94999,3 +94999,20 @@ origin/develop f28d4c69, i cinque commit del cantiere ribasati):
 anche su develop («il riacciuffo cerca ancora i pagamenti sulle
 lapidi»), 3 saltate per l'ambiente; `collaudi_ci.py --elenco
 ci/collaudi.txt` 169 verdi, 0 rossi; `compileall` ok.
+
+## «Chiudi la storia» diventa «Chiudi» (23 nov 2026, cantiere chiudi-storia; Andrea, guardando l'anteprima del negozio Piano B Panama: «Il tasto chiudi la storia non va bene. Lascia solo chiudi.»)
+
+Il bottone della storia di un negozio consigliato, a storia aperta, dice
+«Chiudi» invece di «Chiudi la storia», in tutti e due i posti dove nasce
+(il disegno della testa e `toggleRacconto`). A storia chiusa resta «Leggi la
+storia ›». Vale per tutti i negozi con la storia, To The Mooon compreso.
+Tolta da `lingua/en.js` la riga di «Chiudi la storia», rimasta senza uso:
+«Chiudi» ha già la sua traduzione.
+
+PROVATO. Il banco del cassetto in `prove.py` («dal link la storia nasce
+APERTA… e il bottone che la chiude») ora cerca `>Chiudi</button>`; aggiornato LINGUA_VER
+(cambia lo sha di `lingua/en.js`). `PROVE_SEVERE=1 python prove.py` 31.173
+passate, 2 rosse e 2 saltate per l'ambiente (lo `config.py` d'esempio con la
+chiave segnaposto dell'assistente, rigirata verde senza; nostr-tools che in
+cloud non c'è); `collaudi_ci.py --elenco ci/collaudi.txt` 169 verdi, 0 rossi.
+Rebase sul giroconto interno: rigirate le sezioni toccate.

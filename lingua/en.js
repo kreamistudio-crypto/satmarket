@@ -2246,7 +2246,6 @@
   "garanzia di questo annuncio.": "escrow deposit.",
   "Apri": "Open",
   "foto in arrivo": "photo coming",
-  "Chiudi la storia": "Close the story",
   "Leggi la storia ›": "Read the story ›",
   "{} Consigliato": "{} Recommended",
   "Anteprima: questa pagina la vedi solo tu.": "Preview: only you see this page.",
