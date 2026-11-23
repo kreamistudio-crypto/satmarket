@@ -137,7 +137,9 @@ Le prestazioni si possono vendere, ma devono essere definite: quanto durano, che
 
 Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraffazioni, documenti, dati personali, farmaci, animali protetti.
 
-Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere.
+Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere. Le ferie si mettono da Profilo → «🌴 Negozio in ferie», scegliendo il giorno del rientro: gli annunci restano in vetrina col prezzo in grigio, nessuno li può comprare, e al rientro tornano comprabili da soli. Non si chiude con affari da spedire o aste in corso.
+
+Fermare per un po' un annuncio solo: nella sua scheda «🔄 Aggiorna i pezzi» e 0. Diventa «Esaurito»: resta visibile, in grigio, ma nessuno lo compra; con «🔄 Rifornisci» si rimettono i pezzi e torna in vendita. Non vale per i servizi e per gli annunci importati da Nostr. Bozze degli annunci non ce ne sono: appena pubblicato, l'annuncio passa dalla moderazione e poi va in vetrina.
 
 I numeri del negozio: nel Profilo, gruppo «Il tuo negozio», il cassetto «📊 I numeri del negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Contano gli ordini del mercatino conclusi, non gli scambi P2P. Quanto hai comprato NON si vede nel Profilo, per la privacy (scelta del 17 novembre 2026): né in questo cassetto né nella riga sotto il nome, che dice solo «N vendite concluse». I tuoi acquisti li trovi uno per uno in «Ordini». Chi ha solo comprato e non ha annunci non ha questo cassetto.
 

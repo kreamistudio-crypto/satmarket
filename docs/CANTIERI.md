@@ -95140,3 +95140,13 @@ DA GUARDARE. Non provato dal vivo: il primo Barattozon on-chain annullato
 dopo la promozione. Notato e non fatto: chi prende annulla in pochi secondi
 (78 aveva aperto il preventivo dello swap in Lightning prima di annullare).
 
+## Il sapere di Tappo sugli annunci: fermarne uno, le ferie, niente bozze (23 nov 2026, cantiere sapere-annunci-pausa; Zzap in Assistenza: «mi riferivo agli annunci del mercatino», Andrea: «Aggiungi al sapere di tappo tutte queste cose»)
+
+Le risposte date a Zzap sugli annunci, nel sapere: un annuncio solo si
+ferma con «🔄 Aggiorna i pezzi» a 0 (esaurito, visibile in grigio, torna
+con «🔄 Rifornisci»; non per servizi e importati da Nostr, come
+`bottoneRifornisci` e `ricarica_quantita`), il negozio intero con
+«🌴 Negozio in ferie» (le frasi di `renderFerie`), e che bozze degli
+annunci non ce ne sono. Solo testo del sapere e `conoscenza.md` rifatto.
+PROVATO: `prove_conoscenza_tappo`, `prove_assistente_bot` e le sezioni
+che leggono i documenti, verdi.
