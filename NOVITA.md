@@ -952,3 +952,9 @@ frase: Adesso puoi mettere su Barattolo un nome e una foto tuoi, gratis. Li guar
 dove: Profilo → «🆔 Nostr e identità» → «✏️ Nome e foto su Barattolo» → «✏️ Scegli nome e foto»; approvati, la scelta «✏️ Mia» in «📷 La tua foto».
 leva: PROFILO_MIO_ATTIVO (accesa di serie)
 pubblico: sì
+
+## 2026-11-23 · nascondi-annuncio
+frase: Adesso puoi nascondere un annuncio solo, senza mettere in ferie tutto il negozio e senza una data di rientro. Nella sua scheda tocca «🙈 Nascondi dalla vetrina»: nessuno lo vede più. Lo ritrovi in «I tuoi annunci», da dove con «👁 Rimetti in vetrina» torna quando vuoi.
+dove: Scheda del tuo annuncio → «🙈 Nascondi dalla vetrina»; Profilo → «I tuoi annunci» → «👁 Rimetti in vetrina».
+leva: NASCONDI_ANNUNCIO (accesa di serie)
+pubblico: sì

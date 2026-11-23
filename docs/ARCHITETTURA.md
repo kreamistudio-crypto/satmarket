@@ -15216,6 +15216,26 @@
   (`bloccoMioEsaurito`), e il foglio dell'esaurito ha la sua frase
   («Non lo rifornirai più?»). NON fatto, e proposto ad Andrea a parte:
   il «pezzo unico» scelto alla pubblicazione che si archivia da solo.
+  L'ANNUNCIO NASCOSTO (23 nov 2026, cantiere nascondi-annuncio): lo
+  stato 'nascosto', né scaffale vuoto né archivio. Esce da ogni filtro
+  stato='attivo' da solo, e il link condiviso resta 404 come per il
+  'rimosso' (`un_annuncio` serve solo attivi ed esauriti). Lo vede solo
+  il proprietario in «I tuoi annunci» (`miei_annunci`), da dove torna.
+  La rotta è `POST /api/listings/{id}/nascondi` col corpo
+  {"nascosto": 1|0}: parte solo da 'attivo' o 'nascosto' del
+  proprietario, e scrive con lo stato di partenza nel WHERE. Nascondere
+  ha le guardie: la LARGA degli ordini (la stessa ragione dell'esaurito
+  archiviato: `_rimborsa_compratore` e l'annullo del venditore scrivono
+  stato='attivo', quindi nessun ordine vivo deve mai toccare un
+  nascosto), `_riservati`, asta, importato (`origine_annuncio`,
+  `dal_negozio_collegato`), e la leva `NASCONDI_ANNUNCIO`. Rimettere non
+  ne ha. Le piazze fanno il gesto dell'esaurito (Nostr «sold»/«active»
+  con `solo_aggiornamento`, `promo_venduto`); la coda delle firme fa
+  nascere «sold» un nascosto non ancora pubblicato. Si elimina
+  (`rimuovi_annuncio`) e il moderatore lo rimuove. Nel client:
+  «🙈 Nascondi dalla vetrina» sulla scheda (dopo lo stock, prima
+  dell'uscita rossa, mai sull'importato, solo con `nascondi_annuncio`
+  true in /api/me) e la riga grigia con «👁 Rimetti in vetrina».
   DOVE SI VEDE (decisione di Andrea): SOLO nella pagina del negozio,
   in fondo, sezione «Esauriti di recente» — chiave `esauriti` nel dict
   di `/api/negozio` (tetto `TETTO_ESAURITI` 12, `creato DESC`, una

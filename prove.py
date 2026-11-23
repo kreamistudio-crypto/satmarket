@@ -175998,6 +175998,154 @@ console.log(JSON.stringify(fuori));
           [o.get("scad"), o.get("scadNuovo")])
 
 
+def prove_nascondi_annuncio():
+    """NASCONDERE UN ANNUNCIO SOLO (23 nov 2026, cantiere
+    nascondi-annuncio). Lo stato nuovo 'nascosto' esce da ogni filtro
+    stato='attivo' da solo; il comportamento del server lo prova il
+    collaudo (`collaudo_nascondi_annuncio`, server vero). Qui le righe
+    che un riordino toglierebbe senza rompere niente di visibile:
+
+    QUEL CHE SI ROMPE IN SILENZIO: la guardia degli ordini in corso che
+    scivola DOPO la scrittura (o sparisce: un rimborso riaccenderebbe il
+    nascosto in vetrina); la leva che ferma anche il RITORNO (un
+    annuncio chiuso fuori per sempre); il link condiviso che comincia a
+    servire i nascosti; «I tuoi annunci» che li perde (spariscono anche
+    per chi li possiede); la riga del nascosto che apre la scheda di chi
+    compra; il tasto sulla scheda che compare sull'importato o col
+    server di ieri."""
+    print("\n[nascondere un annuncio solo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+    src = _SORGENTE
+    fn = lambda firma: _fn_js(mini, firma)
+
+    # --- 1) IL SERVER: la forma delle righe che reggono il patto ---------
+    rotta = pezzo("nascondi_annuncio")
+    prova("la rotta e' registrata col suo percorso", True,
+          '@app.post("/api/listings/{annuncio_id}/nascondi")\n'
+          'async def nascondi_annuncio(' in src)
+    prova("parte solo da attivo o nascosto, e solo del proprietario", True,
+          '"AND stato IN (\'attivo\',\'nascosto\')",\n'
+          '                    (annuncio_id, user["id"])' in rotta)
+    i_scrive = rotta.index('cur = con.execute("UPDATE annunci SET stato=?')
+    prova("le guardie (leva, asta, importato, ordini, pagamento) stanno "
+          "PRIMA della scrittura, e solo sul nascondere",
+          [True] * 5,
+          [-1 < rotta.index(g) < i_scrive and
+           rotta.index("    if nascondi:\n        if not NASCONDI_ANNUNCIO:")
+           <= rotta.index(g)
+           for g in ("if not NASCONDI_ANNUNCIO:",
+                     'if a["asta_base_sats"] > 0:',
+                     "if origine_annuncio(a) or dal_negozio_collegato(a):",
+                     '("released", "refunded", "annullato", "creato"),\n'
+                     '                esclusi=True):',
+                     "if _riservati(con, annuncio_id):")])
+    prova("la scrittura guarda lo stato di partenza (due tocchi, un passaggio)",
+          True, 'WHERE id=? AND stato=?",' in rotta)
+    prova("le piazze: «sold»/«active» e la spunta del canale, dopo il commit",
+          [True, True, True],
+          ['"sold" if nascondi else "active",' in rotta,
+           "promo_venduto(annuncio_id, venduto=nascondi)" in rotta,
+           rotta.index("con.commit()") < rotta.index("annuncio_su_nostr(")])
+    prova("la leva nasce accesa e solo False la spegne, nel codice e "
+          "nell'esempio", [True] * 4,
+          ["except ImportError:\n    NASCONDI_ANNUNCIO = True" in src,
+           "NASCONDI_ANNUNCIO = NASCONDI_ANNUNCIO is not False" in src,
+           "\nNASCONDI_ANNUNCIO = True\n" in es,
+           bool(re.search(r'"NASCONDI_ANNUNCIO",\s+NASCONDI_ANNUNCIO,', src))])
+    prova("/api/me porta la leva viva", True,
+          'profilo["nascondi_annuncio"] = NASCONDI_ANNUNCIO' in
+          pezzo("mio_profilo"))
+    prova("«I tuoi annunci» porta i nascosti", True,
+          "('attivo','revisione','venduto','nascosto')" in pezzo("miei_annunci"))
+    prova("il link condiviso NO: solo attivi ed esauriti", [True, False],
+          ["WHERE a.id=? AND a.stato IN ('attivo','venduto')\"" in
+           pezzo("un_annuncio"), "nascosto" in pezzo("un_annuncio")])
+    prova("il nascosto si elimina, e il moderatore lo rimuove", [True, True],
+          ["'nascosto')\",\n                    (annuncio_id, user[\"id\"])"
+           in pezzo("rimuovi_annuncio"),
+           "('attivo','revisione','nascosto')" in pezzo("rimuovi_annuncio_admin")])
+    prova("il collaudo e' nella gabbia della CI", [True, True],
+          ["collaudo_nascondi_annuncio\n" in open("ci/collaudi.txt",
+                                                    encoding="utf-8").read(),
+           "collaudo_nascondi_annuncio.py\n" in open("ci/compila.txt",
+                                                       encoding="utf-8").read()])
+
+    # --- 2) IL CLIENT: la leva, la riga e il gesto, in node --------------
+    prova("il tasto nasce spento e lo accende solo un true del server",
+          [True, True], ["let nascondiAttivo = false;" in mini,
+                         "nascondiAttivo = me.nascondi_annuncio === true;" in mini])
+    i_tasto = mini.index("🙈 Nascondi dalla vetrina</button>")
+    prova("sulla scheda: dopo lo stock, prima del widget e dell'uscita rossa, "
+          "e non sull'importato", [True, True, True],
+          [mini.rindex("🔄 Aggiorna i pezzi</button>", 0, i_tasto)
+           > i_tasto - 1500,
+           i_tasto < mini.index("Widget per il web</button>", i_tasto)
+           < mini.index("deleteListing(${l.id}, true)", i_tasto),
+           "(!nascondiAttivo || l.nostr || daNegozioCollegato(l)) ? ''"
+           in mini[i_tasto - 400:i_tasto]])
+    riga = mini[mini.index("const rigaMioAnnuncio = l =>"):]
+    riga = riga[:riga.index("</div>`; };") + len("</div>`; };")]
+    prog = (r"""
+const esc = s => String(s), fmt = n => String(n), fmtEur = n => String(n);
+const riquadroMini = (s, e, n, stile) => `<i style="${stile}"></i>`;
+const badgeNostr = () => '', luogoPunto = () => '', saversPunto = () => '',
+      vistePunto = () => '', SERVIZIO_DEFINITO = '';
+let myListings = [], listings = [];
+""" + fn("function daNegozioCollegato(l){")
+      + fn("function etichettaElimina(l, lunga){") + riga + r"""
+let DEMO = false, chiamate = [], toasted = [], andato = [], ricaricati = 0;
+const haptic = () => {}, authHdr = () => 'x', API_BASE = '/api';
+const loadListings = async () => { ricaricati++; };
+const loadMyListings = async () => { ricaricati++; };
+const renderMyListings = () => {}, renderGrid = () => {};
+const toast = t => toasted.push(t), go = v => andato.push(v);
+let risposta = {ok: true, json: async () => ({ok: true})};
+const fetch = async (url, o) => { chiamate.push([url, o.method, JSON.parse(o.body)]); return risposta; };
+""" + fn("async function nascondiAnnuncio(id, nascondi){") + r"""
+(async () => {
+  const fuori = {};
+  const nasc = rigaMioAnnuncio({id: 7, stato: 'nascosto', title: 'Miele', price: 1});
+  const att = rigaMioAnnuncio({id: 8, stato: 'attivo', title: 'Tazza', price: 1});
+  fuori.riga = [nasc.includes('nascondiAnnuncio(7, false)'),
+    nasc.includes('👁 Rimetti in vetrina'), nasc.includes('openDetail(7)'),
+    nasc.includes('grayscale(1)'), nasc.includes('deleteListing(7)'),
+    nasc.includes('editListing(7)')];
+  fuori.att = [att.includes('nascondiAnnuncio('), att.includes('openDetail(8)'),
+    att.includes('editListing(8)')];
+  await nascondiAnnuncio(7, true);
+  await nascondiAnnuncio(7, false);
+  fuori.chiamate = chiamate; fuori.toast = toasted; fuori.go = andato;
+  fuori.ricaricati = ricaricati;
+  chiamate = []; toasted = []; andato = []; ricaricati = 0;
+  risposta = {ok: false, json: async () => ({detail: 'C\'è un ordine'})};
+  await nascondiAnnuncio(9, true);
+  fuori.no = [toasted, andato, ricaricati];
+  console.log(JSON.stringify(fuori));
+})();
+""")
+    out = _node_banco(prog)
+    if out is None:
+        salta("la riga del nascosto e il gesto", "node non installato")
+        return
+    prova("la riga del nascosto: «👁 Rimetti in vetrina», grigia, resta 🗑, "
+          "ma niente scheda e niente Modifica",
+          [True, True, False, True, True, False], out.get("riga"))
+    prova("la riga dell'attivo resta quella di sempre",
+          [False, True, True], out.get("att"))
+    prova("il gesto POSTa il corpo giusto, nei due versi",
+          [["/api/listings/7/nascondi", "POST", {"nascosto": 1}],
+           ["/api/listings/7/nascondi", "POST", {"nascosto": 0}]],
+          out.get("chiamate"))
+    prova("...ricarica le due liste, dice dove ritrovarlo, e dalla scheda "
+          "torna al Profilo solo nascondendo",
+          [4, ["🙈 Nascosto: lo ritrovi in «I tuoi annunci»",
+               "👁 Di nuovo in vetrina"], ["profilo"]],
+          [out.get("ricaricati"), out.get("toast"), out.get("go")])
+    prova("un rifiuto del server: il suo messaggio, e niente si muove",
+          [["C'è un ordine"], [], 0], out.get("no"))
+
+
 def prove_esauriti_eliminabili():
     """GLI ESAURITI CHE NON TORNANO SI ELIMINANO, E IL COMUNE SI RICORDA
     (16 nov 2026, richiesta di Andrea). Due cose del venditore: 1) il
@@ -221957,7 +222105,7 @@ CATEGORIE = {
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
-    venduto_canale esauriti_eliminabili chat_mercatino chat_dalla_notifica
+    venduto_canale esauriti_eliminabili nascondi_annuncio chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
     etichetta_alimenti fotografia_annuncio
@@ -223066,6 +223214,7 @@ def main():
               prove_prendi_metodo,
               prove_contanti_zona,
               prove_esauriti_eliminabili,
+              prove_nascondi_annuncio,
               prove_etichetta_alimenti,
               prove_fotografia_annuncio,
               prove_mappa_contanti,

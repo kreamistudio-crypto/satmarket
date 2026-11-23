@@ -95360,3 +95360,79 @@ megafono, il Podio, la fascia morta, `modaleNotizie` e la sua rotta. Guardato co
 Playwright a 390px, video e foto mandati ad Andrea (anche con i due
 negozi veri di oggi, AndreAI e To The Moon).
 RESTA: dopo il deploy, `BANNER_TEST = False` sul VPS (DA-FARE-ANDREA 32).
+
+## Nascondere un annuncio solo, senza scadenza (23 nov 2026, cantiere nascondi-annuncio; la richiesta di Zzap, venditore; Andrea: «lo facciamo ora», e che vada nella promozione della notte)
+
+COSA. Sulla scheda del proprio annuncio attivo «🙈 Nascondi dalla
+vetrina»: l'annuncio esce da vetrina, ricerca, negozio, link condiviso
+(404) e piazze, senza data. Resta in Profilo → «I tuoi annunci», foto
+grigia, con «👁 Rimetti in vetrina» al posto di «Modifica» e il 🗑 di
+sempre; la riga non apre la scheda (come la revisione: la scheda è quella
+di chi compra). Prima c'erano solo i pezzi a zero (resta in vetrina
+grigio, «Esaurito») e le ferie (tutto il negozio, con una data).
+Dettagli: ARCHITETTURA, «L'ANNUNCIO NASCOSTO».
+
+LO STATO È NUOVO, 'nascosto', e non una colonna: ogni filtro che guarda
+stato='attivo' (vetrina, ricerca, negozio, compra(), offerte, preferiti,
+giri di Nostr) lo lascia fuori da solo, mentre una colonna avrebbe voluto
+una riga in decine di query, e una dimenticata è un nascosto che si
+compra. Lo stato è dell'ANNUNCIO: la regola 4 di CLAUDE.md (stati
+dell'ordine) non cambia.
+
+LE GUARDIE, solo sul nascondere. Niente ordini non conclusi (la guardia
+LARGA della modifica, resi e rimborsi compresi): `_rimborsa_compratore` e
+l'annullo del venditore rimettono stato='attivo' e riaccenderebbero il
+nascosto in vetrina e in piazza. Fermare il gesto lascia intatti tutti i
+percorsi dei soldi. Niente pezzi in pagamento (`_riservati`, come la
+ricarica). Niente aste (vincolanti, a scadenza). Niente importati (Nostr,
+negozi collegati): il loro stato vive alla fonte e il sync lo riscriverebbe.
+Le fatture 'creato' scadute si annullano come nella rimozione. Rimettere
+non ha guardie: torna 'attivo' coi suoi pezzi.
+
+LE PIAZZE fanno il gesto dell'esaurito: Nostr «sold» (NIP-99 ha due stati,
+ed è la parola già decisa per la pausa dei pezzi a zero), il canale mette
+la spunta; al ritorno «active» e la spunta via. La prima pubblicazione
+ancora da firmare nasce «sold» se l'annuncio è nascosto. Le offerte vive
+le raccoglie `scadenze_offerte` col suo «non è più disponibile: la tua
+offerta decade», che qui è vero.
+
+LEVA `NASCONDI_ANNUNCIO`, accesa di serie (regola del 14 nov), nel
+pannello delle leve. Spenta, il tasto sparisce e la rotta non nasconde
+(404), ma «Rimetti in vetrina» funziona sempre. Il client lo accende solo
+con un true del server: un server di ieri non ha la rotta.
+
+STRADE SCARTATE. Togliere l'annuncio dai relay (NIP-09) e ripubblicarlo
+al ritorno: una cancellazione si porta dietro le versioni vecchie e la
+firma del venditore per chi pubblica col suo profilo; il «sold» è la
+strada già provata. Nascondere con ordini in corso tenendo il nascosto
+nei rimborsi: tre percorsi dei soldi da toccare, di notte. Una conferma
+prima di nascondere: il gesto si disfa con un tocco.
+
+TESTI NUOVI (da rivedere con Andrea): «🙈 Nascondi dalla vetrina»,
+«👁 Rimetti in vetrina», i toast «🙈 Nascosto: lo ritrovi in «I tuoi
+annunci»» e «👁 Di nuovo in vetrina»; i rifiuti «C'è un ordine in corso
+su questo annuncio: potrai nasconderlo quando è concluso», «Qualcuno lo
+sta pagando proprio ora: riprova tra qualche minuto», «Un'asta non si
+nasconde: si chiude da sola alla scadenza», «Questo annuncio arriva da
+fuori: si nasconde dove è nato», «Funzione non attiva»; la voce in
+NOVITA.md e il paragrafo in `assistente/sapere.md`.
+
+PROVATO. `collaudo_nascondi_annuncio` (server vero, 30 verdi, venv senza
+coincurve, in `ci/collaudi.txt`): fuori da vetrina, negozio e link, dentro
+«I tuoi annunci»; Nostr «sold»/«active» e canale; idempotenza; offerta
+decaduta con l'avviso; ordine spedito, pezzo in pagamento, asta, importato
+e annuncio altrui fermano il gesto senza ganci; leva spenta (404, ma il
+ritorno va); il nascosto si elimina. Controprove (codice rotto apposta,
+collaudo rosso): senza la guardia degli ordini, senza `_riservati`, senza
+'nascosto' in «I tuoi annunci», piazza sempre «sold», leva ignorata.
+`prove_nascondi_annuncio` (18): forma della rotta e delle guardie prima
+della scrittura, leva, link condiviso che resta chiuso, e in node la riga
+e il gesto del client; controprova: riga che apre la scheda e leva accesa
+di default, rosse. Sull'albero rebasato su develop (b4c3a2d3): suite
+severa 31.331 verdi e 0 rosse (nostr-tools fuori dal repo), collaudi della
+CI nel venv senza coincurve 171 verdi e 0 rossi.
+
+DA GUARDARE. Non provato dal vivo su Telegram né sui relay veri: il
+«sold» firmato dal venditore che pubblica col suo profilo (stessa coda
+dell'esaurito). Chi vuole nascondere con un ordine aperto deve aspettare
+che si chiuda.

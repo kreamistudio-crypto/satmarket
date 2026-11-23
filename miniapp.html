@@ -37971,6 +37971,14 @@ function openDetail(id){
                 (cantiere quantita-servizi): non ha scorte, e la
                 stessa rotta lo rifiuta per lo stesso motivo. -->
            ${(l.nostr || l.consegna === 'servizio') ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
+           ${/* NASCONDERE UN ANNUNCIO SOLO (23 nov 2026): esce dalla
+                vetrina senza scadenza, e torna da «I tuoi annunci». Sta
+                dopo lo stock perche' e' il suo parente (l'esaurito resta
+                in vetrina grigio, il nascosto no) e prima dell'uscita
+                rossa, che resta ultima. Non sull'importato: il suo
+                stato vive alla fonte (la stessa guardia del server). */
+              (!nascondiAttivo || l.nostr || daNegozioCollegato(l)) ? ''
+              : `<button class="btn ghost" onclick="nascondiAnnuncio(${l.id}, true)">🙈 Nascondi dalla vetrina</button>`}
            <button class="btn ghost" onclick="apriWidget('annuncio',${l.id})">&lt;/&gt; Widget per il web</button>
            <!-- L'uscita della colonna, e ora un bottone vero: il
                 testuale sottolineato spariva fra due ghost — proprio
@@ -59310,8 +59318,13 @@ async function caricaAltriMiei(){
    vive «🔄 Rifornisci», e senza questo click quel bottone non lo
    raggiungerebbe nessuno. Il ramo revisione resta parola per parola
    quello di ieri. */
+/* IL NASCOSTO (23 nov 2026) si comporta come la revisione: foto
+   grigia e il dettaglio non si apre (la scheda e' quella di chi compra,
+   e un nascosto non si compra). Al posto di «Modifica» c'e' la sua
+   strada di ritorno, «👁 Rimetti in vetrina», e resta 🗑. */
 const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
-  esa = l.stato==='venduto', spento = rev || esa, apre = !rev; return `
+  esa = l.stato==='venduto', nasc = l.stato==='nascosto',
+  spento = rev || esa || nasc, apre = !rev && !nasc; return `
     <div class="order">
       <div class="row mio-riga">
         <b class="mio-tit"${apre?` onclick="openDetail(${l.id})" style="cursor:pointer"`:''}>${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44, spento ? ';filter:grayscale(1);opacity:.6' : '')}<span${spento?' style="color:var(--muted)"':''}>${esc(l.title)}</span>${
@@ -59341,6 +59354,7 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
              libro mastro del venditore, e la vendita e' successa
              davvero. «Esaurito» e' la parola PUBBLICA, per chi
              guarda da fuori uno scaffale vuoto. */
+          :nasc?`<span class="badge az-btn" onclick="nascondiAnnuncio(${l.id}, false)" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Nascosto: non si vede in vetrina">👁 Rimetti in vetrina</span>`
           :esa?`<span class="badge" style="background:var(--off-bg);color:var(--muted)">Venduto</span><span class="badge az-btn" onclick="apriRifornisci(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)" title="Hai altri pezzi? L'annuncio torna in vetrina">🔄 Rifornisci</span>`
           :`<span class="badge az-btn" onclick="editListing(${l.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✏️ Modifica</span>`}
         ${/* 🗑 ANCHE SULL'ESAURITO (16 nov 2026, richiesta di Andrea):
@@ -63310,6 +63324,32 @@ async function deleteListing(id, dalDettaglio){
     }});
 }
 
+/* NASCONDI / RIMETTI IN VETRINA (23 nov 2026). Niente conferma: e' un
+   gesto che si disfa con un tocco, e la strada del ritorno la dice il
+   toast. Dopo, come per l'eliminazione: si ricaricano vetrina e «I tuoi
+   annunci», e dalla scheda si torna al Profilo, dove il nascosto vive. */
+async function nascondiAnnuncio(id, nascondi){
+  haptic();
+  if (DEMO) {
+    const l = (myListings || []).find(x => x.id === id)
+      || (listings || []).find(x => x.id === id);
+    if (l) l.stato = nascondi ? 'nascosto' : 'attivo';
+  } else {
+    const r = await fetch(`${API_BASE}/listings/${id}/nascondi`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),
+                               'Content-Type':'application/json'},
+       body: JSON.stringify({nascosto: nascondi ? 1 : 0})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail||'Operazione non riuscita'); return; }
+    await loadListings();
+    await loadMyListings();
+  }
+  renderMyListings(); renderGrid();
+  toast(nascondi ? '🙈 Nascosto: lo ritrovi in «I tuoi annunci»'
+                 : '👁 Di nuovo in vetrina');
+  if (nascondi) go('profilo');
+}
+
 /* Moderazione (solo admin): rimuove dal mercatino un annuncio altrui */
 async function rimuoviModerazione(id){
   haptic();
@@ -64045,6 +64085,9 @@ const ESENZIONI_ETICHETTA = [['fresco','Frutta, verdura o prodotto non lavorato'
   ['artigiano','Artigianale, in piccole quantità, venduto da chi lo fa']];
 /* la leva viva, da /api/me: nasce accesa come nel server */
 let etichettaAttiva = true;
+/* (23 nov 2026) il «🙈 Nascondi dalla vetrina»: nasce SPENTO qui e lo
+   accende solo un true del server — un server di ieri non ha la rotta */
+let nascondiAttivo = false;
 /* (18 nov 2026) la tabella obbligatoria, stessa fonte e stesso patto */
 let etichettaObbligatoria = true;
 /* lo stato del form: null = «non la so ancora» (la modifica aspetta la
@@ -123356,6 +123399,7 @@ async function avvia(){
        un false esplicito del server la spegne */
     etichettaAttiva = me.etichetta_alimenti !== false;
     etichettaObbligatoria = me.etichetta_obbligatoria !== false;
+    nascondiAttivo = me.nascondi_annuncio === true;
     renderEtichettaForm();
     aggiornaBottoneMM();
     astaLeve = me.asta_leve || null;
