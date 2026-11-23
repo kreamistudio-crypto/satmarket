@@ -4240,7 +4240,9 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
     stesso che serve il file: la card c'e' quando c'e' la sua immagine —
     e col negozio risolto. Escono quattro chiavi: lo slug, il titolo,
     l'emoji e il CODICE del negozio, mai il tg_id con cui il catalogo
-    puo' legare la pagina (il patto dei CAMPI_RACCONTO). In bozza non
+    puo' legare la pagina (il patto dei CAMPI_RACCONTO); dal 23 nov 2026
+    anche `quadro`, il numero della foto del quadrato, se la pagina lo
+    sceglie. In bozza non
     esce niente, per nessuno: questa busta la riceve chiunque.
 
     Fail-closed anche sul guasto: un ornamento della home non deve poter
@@ -4257,9 +4259,19 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
             v = _venditore_racconto(con, r)
             if not (v and v["negozio"]):
                 continue
-            fuori.append({"slug": s, "titolo": r.get("titolo") or "",
-                          "emoji": r.get("emoji") or "",
-                          "negozio": v["negozio"]})
+            voce = {"slug": s, "titolo": r.get("titolo") or "",
+                    "emoji": r.get("emoji") or "",
+                    "negozio": v["negozio"]}
+            # LA FOTO DEL QUADRATO (23 nov 2026, Piano B): il numero di
+            # una foto della storia, `{slug}-N.webp`, che il quadrato in
+            # home mostra al posto della prima foto dell'ultimo annuncio
+            # (una foto con le scritte, a 96px, non si legge). Solo un
+            # numero da 1 a 9, la forma di FORMA_RACCONTO: senza, il
+            # quadrato resta com'era.
+            q = r.get("quadro")
+            if type(q) is int and 1 <= q <= 9:
+                voce["quadro"] = q
+            fuori.append(voce)
     except Exception as e:
         print(f"⚠️ [sponsor] la fila non si legge: {e}")
         return []
@@ -4624,6 +4636,10 @@ def lista_racconti_admin(x_tg_init_data: str = Header(""),
             except ValueError:
                 d["pubblicato_il"] = 0
             d["venditore"] = None
+            # (23 nov 2026) il gesto «🔗 Collega il negozio»: solo le
+            # pagine nate per questo, e solo in bozza
+            d["collegabile"] = (_collegabile(r)
+                                and d["stato"] != "pubblicato")
             if r.get("negozio") or r.get("venditore_tg"):
                 v = _venditore_racconto(con, r)
                 if v and v["negozio"]:
@@ -4659,12 +4675,15 @@ async def decidi_racconto_admin(slug: str, req: Request,
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
     esito = (d.get("esito") or "").strip()
-    if esito not in ("pubblica", "bozza"):
+    if esito not in ("pubblica", "bozza", "collega"):
         raise HTTPException(400, "Esito sconosciuto")
     r = RACCONTI_NEGOZI.get(slug)
     if not r:
         raise HTTPException(404, "Pagina non trovata")
     titolo = html.escape(r.get("titolo") or slug)
+    if esito == "collega":
+        return await _collega_negozio_racconto(slug, r, d.get("negozio"),
+                                               user["id"], titolo)
     if esito == "pubblica":
         if not (r.get("negozio") or r.get("venditore_tg")):
             raise HTTPException(409, "Manca il venditore: senza il suo "
@@ -4689,6 +4708,75 @@ async def decidi_racconto_admin(slug: str, req: Request,
     return {"ok": True, "stato": "bozza",
             "detto": "📝 Rimessa in bozza: la vedono solo i moderatori "
                      "e il venditore"}
+
+
+# IL NEGOZIO COLLEGATO DAL PANNELLO (23 nov 2026, Piano B: la pagina e'
+# pronta e il negozio non esiste ancora). Una voce del catalogo con
+# `collega_dal_pannello` nasce col `negozio` vuoto; il moderatore, a
+# pagina in BOZZA, incolla il link (o il codice) del negozio e il codice
+# risolto finisce in `racconto_negozio:<slug>`. Da li' lo rimette nella
+# voce in memoria `applica_negozi_collegati`, all'avvio e dopo il gesto:
+# tutti i giudici di sempre (`_e_suo`, `_venditore_racconto`) leggono il
+# `negozio` della voce, e non c'e' un secondo posto da tenere in pari.
+# PERCHE' SOLO IN BOZZA: una pagina pubblicata che cambiasse negozio
+# finirebbe in un attimo sulla vetrina di un altro. Per cambiarlo la si
+# rimette in bozza, e il gesto si ripete.
+def _collegabile(r: dict) -> bool:
+    return r.get("collega_dal_pannello") is True and not r.get("venditore_tg")
+
+
+def applica_negozi_collegati():
+    for slug, r in RACCONTI_NEGOZI.items():
+        if not _collegabile(r):
+            continue
+        cod = impostazione(f"racconto_negozio:{slug}", "")
+        r["negozio"] = cod if cod and _CODICE_NEGOZIO.fullmatch(cod) else ""
+
+
+@app.on_event("startup")
+async def collega_negozi_racconti():
+    applica_negozi_collegati()
+
+
+def _codice_da_link_negozio(testo) -> str:
+    """Il codice (o il nome a scelta) da quel che incolla il moderatore:
+    il link intero del negozio — `.../negozio/<x>`, con o senza ? o # —
+    o il solo codice. Vuoto se non ha la forma."""
+    t = str(testo or "").strip()[:300]
+    t = t.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+    if "/" in t:
+        t = t.rsplit("/", 1)[1]
+    return t if _CODICE_NEGOZIO.fullmatch(t) else ""
+
+
+async def _collega_negozio_racconto(slug: str, r: dict, testo, admin_id,
+                                    titolo: str) -> dict:
+    if not _collegabile(r):
+        raise HTTPException(409, "Questa pagina ha il venditore scritto "
+                                 "nel catalogo")
+    if racconto_stato(slug) == "pubblicato":
+        raise HTTPException(409, "Rimetti la pagina in bozza prima di "
+                                 "cambiarle il negozio")
+    cod = _codice_da_link_negozio(testo)
+    if not cod:
+        raise HTTPException(400, "Incolla il link del negozio o il suo codice")
+    con = db()
+    try:
+        v = con.execute(
+            "SELECT negozio, nome FROM utenti WHERE negozio=? OR "
+            "(negozio_slug=? COLLATE NOCASE AND negozio_slug!='') LIMIT 1",
+            (cod, cod)).fetchone()
+    finally:
+        con.close()
+    if not (v and v["negozio"]):
+        raise HTTPException(404, "Nessun negozio con questo link")
+    scrivi_impostazione(f"racconto_negozio:{slug}", v["negozio"])
+    applica_negozi_collegati()
+    await notifica_admin(f"🔗 Pagina «{titolo}» collegata al negozio "
+                         f"{html.escape(v['negozio'])} (da tg {admin_id})",
+                         argomento="riepiloghi")
+    return {"ok": True, "stato": "bozza", "negozio": v["negozio"],
+            "detto": f"🔗 Collegata al negozio di {v['nome'] or v['negozio']}"}
 
 
 def nuovo_codice_negozio(con) -> str:

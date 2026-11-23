@@ -87,16 +87,94 @@ def main():
 
     SRV = banco.SRV
     c = TestClient(SRV.app)
+    # le pagine col negozio collegato dal pannello hanno il loro giro
+    collegabili = [s for s, r in SRV.RACCONTI_NEGOZI.items()
+                   if r.get("collega_dal_pannello") is True]
     prova("ogni pagina del catalogo ha il nome del suo venditore qui", [],
-          [s for s in SRV.RACCONTI_NEGOZI if s not in NOMI])
+          [s for s in SRV.RACCONTI_NEGOZI
+           if s not in NOMI and s not in collegabili])
     for slug in SRV.RACCONTI_NEGOZI:
         if slug in NOMI:
             giro(c, SRV, slug, NOMI[slug])
+    for slug in collegabili:
+        giro_collegato(c, SRV, slug)
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)
     return 1 if banco.FALLITE else 0
+
+
+def giro_collegato(c, SRV, SLUG):
+    """LA PAGINA PRONTA PRIMA DEL NEGOZIO (23 nov 2026, Piano B): nasce
+    col `negozio` vuoto, il moderatore la collega dal pannello in bozza,
+    il codice sopravvive al riavvio, e il quadrato in home prende la sua
+    foto (`quadro`)."""
+    print(f"\n######## {SLUG}: il negozio collegato dal pannello ########")
+    cat = SRV.RACCONTI_NEGOZI[SLUG]
+    PB = {"X-Tg-Init-Data": "collaudo:4242:PianoProva"}
+
+    def voce_admin():
+        r = c.get("/api/admin/racconti", headers=MODERATORE)
+        return {x["slug"]: x for x in r.json()["racconti"]}.get(SLUG) or {}
+
+    def collega(testo, h=MODERATORE):
+        return c.post(f"/api/admin/racconti/{SLUG}", headers=h,
+                      json={"esito": "collega", "negozio": testo})
+
+    SRV.scrivi_impostazione(f"racconto_negozio:{SLUG}", "")
+    SRV.scrivi_impostazione(f"racconto_pubblicato:{SLUG}", "")
+    SRV.applica_negozi_collegati()
+    d = voce_admin()
+    prova("nasce senza negozio, in bozza, collegabile",
+          ("", "bozza", True), (d.get("negozio"), d.get("stato"),
+                                d.get("collegabile")))
+    prova("pubblicare senza negozio si rifiuta (409)", 409,
+          c.post(f"/api/admin/racconti/{SLUG}", headers=MODERATORE,
+                 json={"esito": "pubblica"}).status_code)
+    prova("collegare e' dei soli moderatori (403)", 403,
+          collega("qualsiasi", COMPRATORE).status_code)
+    prova("un testo senza la forma di un codice e' un 400", 400,
+          collega("<script>").status_code)
+    prova("un codice di nessuno e' un 404", 404,
+          collega("https://barattolo.store/negozio/nessuno99").status_code)
+    c.get("/api/me", headers=PB)            # nasce il venditore di prova
+    con = SRV.db()
+    cod = con.execute("SELECT negozio FROM utenti WHERE tg_id=4242"
+                      ).fetchone()["negozio"]
+    con.close()
+    r = collega(f" https://barattolo.store/negozio/{cod}/?x=1#su ")
+    prova("il link intero del negozio la collega", (200, cod),
+          (r.status_code, r.json().get("negozio")))
+    d = voce_admin()
+    prova("...il pannello mostra il negozio trovato, sempre in bozza",
+          (cod, True, "bozza"), (d.get("negozio"),
+          (d.get("venditore") or {}).get("trovato"), d.get("stato")))
+    cat["negozio"] = ""                      # come dopo un riavvio
+    SRV.applica_negozi_collegati()
+    prova("...e il codice sopravvive al riavvio", cod, cat.get("negozio"))
+    prova("ora si pubblica", 200,
+          c.post(f"/api/admin/racconti/{SLUG}", headers=MODERATORE,
+                 json={"esito": "pubblica"}).status_code)
+    prova("...e pubblicata non cambia negozio (409)", 409,
+          collega(cod).status_code)
+    prova("...e chi apre il negozio vede la pagina", SLUG,
+          ((c.get(f"/api/negozio/{cod}?limit=12").json()["venditore"]
+            .get("racconto")) or {}).get("slug"))
+    # il quadrato: lo spazio acceso porta il numero della foto
+    import time as _t
+    SRV.imposta_sponsor(SLUG, int(_t.time()) + 3600)
+    lista = c.get("/api/listings?limit=12").json().get("sponsorizzati") or []
+    voce = next((x for x in lista if x.get("slug") == SLUG), {})
+    prova("lo spazio acceso porta la foto del quadrato",
+          cat.get("quadro"), voce.get("quadro"))
+    SRV.imposta_sponsor(SLUG, 0)
+    # di nuovo com'era
+    c.post(f"/api/admin/racconti/{SLUG}", headers=MODERATORE,
+           json={"esito": "bozza"})
+    SRV.scrivi_impostazione(f"racconto_negozio:{SLUG}", "")
+    SRV.applica_negozi_collegati()
+    prova("pulito: senza negozio come all'inizio", "", cat.get("negozio"))
 
 
 def giro(c, SRV, SLUG, NOME):

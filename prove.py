@@ -47815,7 +47815,7 @@ def prove_fogli_di_casa():
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
     # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
     # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
-    prova("i gesti che passano dalla domanda unica sono centoquarantaquattro (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoquarantacinque (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47842,8 +47842,8 @@ def prove_fogli_di_casa():
           "pannello, e delle gift card nel P2P l'annuncio di chi vende e il "
           "comprare da un annuncio; dal 23 nov «🚀 Promuovi» e il negozio "
           "in Da scoprire; e il moderatore che rifiuta o toglie nome e "
-          "foto scelti)",
-          144, solo_codice(mini).count("chiediConferma({"))
+          "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza)",
+          145, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -187310,7 +187310,7 @@ def prove_canale_admin():
           # applica negli errori; la promozione comprata e il /promossi
           # di un admin (tolta o rimborsata) nei riepiloghi
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 39,
-           "liquidita": 5, "moderazione": 28, "riepiloghi": 29}, per_stanza)
+           "liquidita": 5, "moderazione": 28, "riepiloghi": 30}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -187377,7 +187377,8 @@ def prove_canale_admin():
           "segreto di Bitpost cambiato dal pannello; dal 23 nov la "
           "promozione comprata, quella pagata che non si applica, il "
           "/promossi di un admin e la pagina dedicata da preparare; e il "
-          "nome e la foto scelti da approvare)", 124,
+          "nome e la foto scelti da approvare; e la pagina collegata a un "
+          "negozio dal pannello)", 125,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -221858,6 +221859,37 @@ console.log(JSON.stringify([righe, h.includes('src="/foto/x_0_min.jpg"'),
               "prodotto o il logo, e niente quadrato senza un codice buono",
               [["Gioco da tavolo", "Alimenti", "Fumetti usati"], True, True, 3,
                True, False], r)
+
+    # LA FOTO DEL QUADRATO SCELTA DALLA PAGINA (23 nov 2026, Piano B):
+    # `quadro` vince sulla miniatura dell'annuncio, e vociSponsor lo
+    # costruisce SOLO da un numero da 1 a 9 — mai da un testo del server
+    r = _node_banco("""
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const box = {style: {}, innerHTML: '', querySelectorAll: () => []};
+const el = id => id === 'scoprireQuadri' ? box : null;
+const fotoUrl = f => '/foto/' + f, fotoMini = f => f.replace('.jpg', '_min.jpg');
+let mqNetflix = {matches: false};
+const RACCONTI = {};
+let negoziVetrina = {bbb222: {foto: 'x_0.jpg', categoria: 'Alimenti', in_breve: ''}};
+let negoziVetrinaChiesti = '', quadriFirma = '';
+const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
+const apriNegozio = () => {};
+let sponsorizzati = [{slug: 'pagina-a', negozio: 'bbb222', quadro: 4},
+  {slug: 'pagina-b', negozio: 'bbb222', quadro: '4"><img'},
+  {slug: 'pagina-c', negozio: 'bbb222', quadro: 12},
+  {slug: 'pagina-d', negozio: 'bbb222'}];
+""" + _qr + "\n" + pezzo_js(mini, "function vociSponsor(){", "\n}") + "\n}\n" + """
+const v = vociSponsor();
+renderQuadriScoprire([v[0], v[3]]);
+console.log(JSON.stringify([v.map(x => x.quadro),
+  box.innerHTML.includes('src="/assets/racconti/pagina-a-4.webp"'),
+  box.innerHTML.includes('src="/foto/x_0_min.jpg"')]));""")
+    if r is None:
+        salta("la foto del quadrato, girata in node", "node non c'e'")
+    else:
+        prova("in node: la foto scelta dalla pagina vince sulla miniatura, "
+              "e nasce solo da un numero da 1 a 9",
+              [["/assets/racconti/pagina-a-4.webp", "", "", ""], True, True], r)
 
     # GRANDI E QUADRATI SI DIVIDONO I NEGOZI (23 nov 2026, Andrea): sul
     # telefono un negozio sta in una sola delle due file, uno si' e uno
