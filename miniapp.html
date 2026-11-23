@@ -45781,6 +45781,11 @@ let myScambiP2P = 0;   // gli scambi P2P completati (da /api/me, `scambi_complet
    la PROPRIA foto (vista privata), il selettore governa la sorgente
    e l'uscita pubblica decise dal server */
 let myAvatar = '', myAvatarScelta = '';
+/* NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere profilo-mio):
+   il cartellino — approvato, in attesa, lo stato — e la leva col giorno
+   del prossimo cambio. La foto scelta vive qui e mai nel DOM (un
+   data-URL, la regola di `bannerScelta`). */
+let myMio = {}, profiloMio = null, mioAperto = false, mioFotoScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
 let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non tornano
@@ -48509,8 +48514,11 @@ function renderIdentita(){
   /* Lo stato e le pillole portano un id perche' il velo di
      `attesaFoto` possa parlare DENTRO la riga che sta cambiando —
      e non su tutta l'app, per un gesto che non muove un sat. */
+  const mioOk = !!(profiloMio && profiloMio.attivo);
   const statoFoto = attivaFoto === 'nessuna'
     ? 'Nessuna: accanto al tuo nome compare la tua iniziale.'
+    : attivaFoto === 'mia'
+    ? 'Nome e foto <b style="color:var(--ink)">✏️ scelti da te</b>, controllati da un moderatore.'
     : `Viene dal tuo profilo <b style="color:var(--ink)">${attivaFoto==='telegram'?'✈️ Telegram':'🟣 Nostr'}</b>`
       + (myAvatarScelta ? '' : ' (automatico)')
       + ` e compare accanto al tuo nome in vetrina e nel negozio.`
@@ -48524,7 +48532,9 @@ function renderIdentita(){
     + `<div id="fotoPillole" style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px">
         ${tgFotoOk ? pillFoto('telegram','✈️ Telegram') : ''}
         ${nostrFotoOk ? pillFoto('nostr', etichettaNostr('Nostr')) : ''}
-        ${pillFoto('nessuna','Nessuna')}</div>`;
+        ${(mioOk || attivaFoto === 'mia') && myMio.nome ? pillFoto('mia','✏️ Mia') : ''}
+        ${pillFoto('nessuna','Nessuna')}</div>`
+    + (mioOk ? mioRigaHTML(riga, sub) : '');
   /* — riga «Pubblica i miei annunci anche sul mio profilo Nostr» (20 ott
      2026, cantiere nostr-da-telefono): solo con una chiave provata, che
      e' quando il bivio la usa. Due pillole e la frase che dice cosa
@@ -48594,6 +48604,99 @@ function attesaFoto(scelta){
      riuscita, rifiuto e rete caduta. Qui basta annullare il timer,
      o un velo comparirebbe DOPO la risposta. */
   return ()=>clearTimeout(t);
+}
+
+/* ---- NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere
+   profilo-mio). Gratis, decisione di Andrea: si propone un nome, una
+   foto o tutt'e due, un moderatore li guarda, e approvati valgono su
+   tutto Barattolo — il profilo Telegram o Nostr non cambia. Quel che
+   resta fuori dalla proposta resta com'e'. Un cambio approvato ogni
+   `profiloMio.giorni`: prima, al posto del modulo, la data. ---- */
+function mioRigaHTML(riga, sub){
+  const m = myMio || {};
+  const adesso = Date.now() / 1000;
+  const dal = (profiloMio && profiloMio.prossimo) || 0;
+  let stato;
+  if (m.stato === 'revisione')
+    stato = `⏳ In attesa del moderatore: «${esc(m.nomeAtt)}». Intanto si vede il nome di prima.`;
+  else if (m.stato === 'rifiutato')
+    stato = `⚠️ Non approvati.${m.motivo ? ' ' + esc(m.motivo) : ''} Puoi riprovare subito.`;
+  else if (m.stato === 'tolto')
+    stato = `⚠️ Un moderatore li ha tolti.${m.motivo ? ' ' + esc(m.motivo) : ''}`;
+  else if (m.nome)
+    stato = `Approvati: «${esc(m.nome)}».`;
+  else
+    stato = 'Scegli il nome e la foto con cui ti vedono gli altri su Barattolo. Il tuo profilo Telegram o Nostr non cambia. Li guarda un moderatore prima che si vedano.';
+  if (dal > adesso) {
+    return riga('✏️', 'Nome e foto su Barattolo', stato)
+      + sub(`Il prossimo cambio si può fare dal ${new Date(dal * 1000).toLocaleDateString('it-IT')}.`);
+  }
+  if (!mioAperto) {
+    return riga('✏️', 'Nome e foto su Barattolo', stato)
+      + `<button class="btn ghost" style="margin:0 0 8px" onclick="apriMio()">✏️ Scegli nome e foto</button>`;
+  }
+  return riga('✏️', 'Nome e foto su Barattolo', stato) + `
+    <div id="mioErrore"></div>
+    <div class="field">
+      <label for="mioNome">Il tuo nome</label>
+      <input type="text" id="mioNome" maxlength="30" autocomplete="off"
+             placeholder="${esc(m.nome || myNome || '')}">
+    </div>
+    <div class="field">
+      <label for="mioFile">La tua foto</label>
+      <input type="file" id="mioFile" accept="image/*"
+             onchange="scegliFotoMio(this.files)">
+      <div id="mioChip" style="font-size:12px;color:var(--muted);font-weight:700;margin-top:6px"></div>
+    </div>`
+    + sub('Puoi cambiare anche solo uno dei due: l\'altro resta com\'è.')
+    + `<button class="btn orange" style="margin:0 0 8px" onclick="mandaMio(this)">✏️ Manda al moderatore</button>`;
+}
+
+function apriMio(){
+  haptic();
+  mioAperto = true; mioFotoScelta = '';
+  renderIdentita();
+}
+
+async function scegliFotoMio(files){
+  const chip = el('mioChip');
+  const f = (files || [])[0];
+  if (!f){
+    if (chip) chip.textContent = 'Nessuna foto scelta.';
+    return;
+  }
+  if (chip) chip.textContent = 'Preparo la foto…';
+  const esito = await ridimensiona(f) || {};
+  mioFotoScelta = esito.foto || '';
+  if (chip) chip.textContent = mioFotoScelta
+    ? `✅ ${f.name.slice(0, 40)}`
+    : (esito.motivo || 'Questa foto non si riesce a leggere: provane un\'altra.');
+}
+
+async function mandaMio(btn){
+  haptic();
+  const nome = (el('mioNome')?.value || '').trim();
+  const box = el('mioErrore');
+  if (box) box.innerHTML = '';
+  const dillo = t => {
+    if (box) box.innerHTML =
+      `<div class="trust-note" style="margin:0 0 10px">⚠️ <span>${esc(t)}</span></div>`;
+    else toast(t, 6000);
+  };
+  if (!nome && !mioFotoScelta) return dillo('Scrivi il nome o scegli la foto');
+  const fine = bottoneInAttesa(btn, '⏳ Mando al moderatore…');
+  try {
+    const r = await fetch(`${API_BASE}/me/profilo-mio`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({nome, foto: mioFotoScelta})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { fine(); return dillo(d.detail || 'Non ci sono riuscito, riprova'); }
+    myMio = Object.assign({}, myMio, {stato: 'revisione', nomeAtt: d.nome || '', motivo: ''});
+  } catch(e) { fine(); return dillo('Rete assente: riprova'); }
+  fine();
+  mioAperto = false; mioFotoScelta = '';
+  renderIdentita();
+  toast('✏️ Mandati al moderatore: ti avvisiamo noi');
 }
 
 /* La bandierina del doppio tocco: da quando il si' si aspetta, la
@@ -48692,6 +48795,7 @@ async function setFotoScelta(scelta){
        cioe' il difetto che questo giro esiste per togliere. */
     renderProfilo(); renderAvatar();
     toast(scelta==='nessuna' ? '👤 Solo l\'iniziale, ovunque'
+        : scelta==='mia'     ? '✏️ Nome e foto scelti da te'
         : scelta==='nostr'   ? '📷 Foto dal profilo Nostr'
         : '📷 Foto dal profilo Telegram');
   } catch(e) { toast('Rete assente: riprova'); }
@@ -60541,6 +60645,14 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rb.ok) ban = await rb.json();
     } catch(e) {}
+    /* i nomi e le foto scelti su Barattolo (23 nov 2026): una fetch
+       sempre, come i banner */
+    let mio = [];
+    try {
+      const rm = await fetch(`${API_BASE}/admin/profilo-mio`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rm.ok) mio = await rm.json();
+    } catch(e) {}
     /* le pagine dei negozi consigliati (set 2026): una fetch SEMPRE,
        come i banner — il cassetto c'e' anche quando nessuna aspetta
        niente, perche' e' l'unico posto da cui una bozza si guarda */
@@ -60710,6 +60822,16 @@ async function loadAdminStats(){
             'Banner in vetrina', resto.length, `
         <div class="sub">Si può spegnere un banner in qualsiasi momento, e riaccenderlo se era un errore.</div>
         <div style="margin-top:10px">${resto.map(rigaBanner).join('')}</div>`) : '');
+      })()}
+      ${(() => {
+        const attesa = mio.filter(m => m.mio_stato === 'revisione');
+        const resto = mio.filter(m => m.mio_stato !== 'revisione' && m.mio_nome);
+        return (attesa.length ? `
+      <div class="section-label" style="padding:26px 0 0">✏️ Nomi e foto da approvare (${attesa.length})</div>
+      <div style="margin-top:10px">${attesa.map(rigaMio).join('')}</div>` : '')
+          + (resto.length ? cassettoAdm('accAdmMio', '✏️',
+            'Nomi e foto scelti', resto.length, `
+        <div style="margin-top:10px">${resto.map(rigaMio).join('')}</div>`) : '');
       })()}
       ${boxRacconti(admRacconti)}
       ${boxSponsor(admSponsor)}
@@ -61565,6 +61687,56 @@ async function decidiBannerAdmin(tgId, esito){
       + (motivo ? `\n\nGli scriverai: «${motivo}»`
                 : '\n\nNon hai scritto un motivo: riceverà un messaggio senza spiegazione.'),
     etichetta: esito === 'rifiuta' ? 'Rifiuta' : 'Spegni',
+    poi: manda});
+}
+
+/* Una riga dei nomi e foto scelti (23 nov 2026, profilo-mio): la
+   foto proposta, il nome proposto e quello di adesso — e' su quei tre
+   che si decide. Il motivo in riga, come per i banner. */
+const rigaMio = m => {
+  const attesa = m.mio_stato === 'revisione';
+  const foto = attesa ? (m.mio_foto_att || '') : (m.mio_foto || '');
+  const bottoni = attesa
+    ? `<span class="badge" onclick="decidiMioAdmin(${m.tg_id},'approva')" style="cursor:pointer;background:var(--trust-soft);color:var(--trust-text)">✅ Pubblica</span>
+       <span class="badge" onclick="decidiMioAdmin(${m.tg_id},'rifiuta')" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">❌ Rifiuta</span>`
+    : `<span class="badge" onclick="decidiMioAdmin(${m.tg_id},'togli')" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">🚫 Togli</span>`;
+  return `
+    <div class="order">
+      <div class="row" style="gap:10px">
+        ${foto ? `<img src="${esc(fotoUrl(foto))}" alt="" loading="lazy" decoding="async"
+             onerror="this.remove()" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none">` : ''}
+        <b style="flex:1;min-width:0;overflow-wrap:anywhere">${esc((attesa ? m.mio_nome_att : m.mio_nome) || '—')}</b>
+        <span style="white-space:nowrap">${bottoni}</span>
+      </div>
+      <div class="sub">Adesso: ${esc(m.nome || '—')}</div>
+      <input type="text" id="mioMot${m.tg_id}"
+           placeholder="Perché no? (lo legge l'utente)"
+           maxlength="200" style="margin-top:8px">
+    </div>`; };
+
+async function decidiMioAdmin(tgId, esito){
+  haptic();
+  const motivo = (el('mioMot' + tgId)?.value || '').trim();
+  const manda = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/admin/profilo-mio/${tgId}`,
+        {method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+         body: JSON.stringify({esito, motivo})});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) toast(d.detail || 'Operazione non riuscita', 4000);
+      else toast(d.detto || 'Fatto');
+    } catch(e) { toast('Rete assente: riprova'); return; }
+    loadAdminStats();
+  };
+  if (esito === 'approva') return manda();
+  chiediConferma({
+    titolo: esito === 'rifiuta' ? 'Rifiutare nome e foto?' : 'Togliere nome e foto?',
+    corpo: (esito === 'rifiuta'
+        ? 'Non andranno online. Se aveva già un nome approvato, quello resta.'
+        : 'Torna il nome del suo profilo Telegram o Nostr.')
+      + (motivo ? `\n\nGli scriverai: «${motivo}»`
+                : '\n\nNon hai scritto un motivo: riceverà un messaggio senza spiegazione.'),
+    etichetta: esito === 'rifiuta' ? 'Rifiuta' : 'Togli',
     poi: manda});
 }
 
@@ -122961,6 +123133,11 @@ async function avvia(){
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';
+    myMio = {nome: me.mio_nome || '', foto: me.mio_foto || '',
+             nomeAtt: me.mio_nome_att || '', stato: me.mio_stato || '',
+             motivo: me.mio_motivo || ''};
+    profiloMio = (me.profilo_mio && typeof me.profilo_mio === 'object')
+      ? me.profilo_mio : null;
     myDoppioni = me.doppioni_nostr || [];
     lampoLeve = me.lampo_leve || null;
     myAvvisatoTrasporto = me.avvisato_trasporto ? 1 : 0;

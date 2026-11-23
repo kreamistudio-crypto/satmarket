@@ -38506,3 +38506,34 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `/?assistenza=mia` e i moderatori ricevono «Da preparare la pagina di…»
   (argomento moderazione). Tutto solo con `ASSISTENZA_ATTIVA`. La pagina
   resta un racconto a mano (`racconti.py`).
+- NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere profilo-mio;
+  lo studio `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md`, GRATIS dal
+  23 nov). Il «cartellino» vive in nove colonne `mio_*` di `utenti`:
+  `mio_nome`/`mio_foto` gli APPROVATI, `mio_nome_att`/`mio_foto_att` la
+  proposta, `mio_stato` ('' | revisione | approvato | rifiutato | tolto),
+  `mio_motivo`, `mio_chiesto_il`, `mio_approvato_il` (il conto dei
+  `PROFILO_MIO_GIORNI` parte da qui) e `mio_nome_prima` (il nome che
+  torna quando lo si lascia). Approvato, si APPLICA scrivendo in `nome` e
+  `avatar` con `avatar_scelta='mia'` (`_applica_mio`): le letture del resto
+  non sanno niente del cartellino. Le porte che riscrivono lo rispettano:
+  `_upsert_da_telegram` (CASE su 'nostr','mia'), `aggiorna_profilo_social`
+  (esce subito con 'mia'), `_scrivi_avatar` e `_scrivi_nome_nostr`
+  (condizione nell'UPDATE, contro il giro partito prima
+  dell'approvazione); `_scrivi_avatar` non cancella mai `mio_foto` né
+  `mio_foto_att`. Rotte: `POST /api/me/profilo-mio` (nome e/o foto; quel
+  che manca resta com'è, la foto di adesso COPIATA da `_copia_foto_mia`),
+  `POST /api/me/avatar-scelta` con 'mia' (solo con `mio_nome`),
+  `GET/POST /api/admin/profilo-mio[/{tg_id}]` (approva | rifiuta | togli)
+  e la tastiera `pm:ok|no:{tg_id}` (`callback_profilo_mio`), cuore comune
+  `decidi_profilo_mio`. Il giudice del nome: `nome_mio_forma` (pura:
+  3-30, lettere latine, cifre, spazio e . - ' _, `NOME_MIO_VIETATE` dentro
+  il nome compattato e smascherato, `NOME_MIO_VIETATE_PAROLA` come parola
+  intera, `termine_vietato`) e `giudica_nome_mio` (i sosia di
+  `_nomi_protetti`: staff, Consigliati, chi ha venduto 10 volte; sempre
+  senza se stesso). All'approvazione con un nome diverso,
+  `_controparti_aperte` (ordini coi sats in cassaforte, scambi P2P toccati
+  nelle ultime 24 ore e non chiusi) riceve «X ora su Barattolo si chiama
+  Y». Fusione: il cartellino approvato della metà Nostr passa se di là
+  non ce n'è uno, senza imporre la scelta; la cancellazione porta via i
+  due file. Le foto hanno la forma `av_<negozio>_<millisecondi>.jpg`.
+  Leve: `PROFILO_MIO_ATTIVO` (accesa di serie), `PROFILO_MIO_GIORNI` (30).

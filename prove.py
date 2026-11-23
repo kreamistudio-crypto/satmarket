@@ -16573,8 +16573,9 @@ def prove_foto_scarti():
     # sarebbe entrata dappertutto
     # (ott 2026: il quarto e' il modulo del feedback con le foto)
     # (17 nov 2026: il quinto e' il ripiego degli screenshot dell'assistenza)
-    prova("sentinella: tutti e cinque i chiamanti leggono l'esito",
-          (5, 5), (mini.count("await ridimensiona("),
+    # (23 nov 2026: il sesto e' la foto scelta su Barattolo, profilo-mio)
+    prova("sentinella: tutti e sei i chiamanti leggono l'esito",
+          (6, 6), (mini.count("await ridimensiona("),
                    mini.count("esito = await ridimensiona(")))
 
     # ---- LA MINIATURA NON E' MAI NERA, E L'AVVISO DICE QUALE FOTO ----
@@ -18234,8 +18235,9 @@ def prove_foto_spenta():
           "await aggiorna_profilo_social(" in _end)
     prova("...e non e' piu' un create_task che nessuno attende", False,
           "create_task(aggiorna_profilo_social" in _end)
+    # (23 nov 2026) nemmeno con 'mia': nome e foto sono gia' qui
     prova("con 'nessuna' non si aspetta niente (spegnere e' istantaneo)",
-          True, 'if scelta != "nessuna":' in _end)
+          True, 'if scelta not in ("nessuna", "mia"):' in _end)
     prova("la risposta porta il nome del francobollo", True,
           '"avatar": avatar_da_mostrare(' in _end)
     # LA RIGA CHE VALE IL CANTIERE: rileggere PRIMA direbbe il nome di
@@ -18302,7 +18304,9 @@ def prove_foto_spenta():
         tg_id INT PRIMARY KEY, negozio TEXT DEFAULT '', nome TEXT DEFAULT '',
         avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
         npub TEXT DEFAULT '', npub_verificata INT DEFAULT 0,
-        npub_accesso TEXT DEFAULT '');
+        npub_accesso TEXT DEFAULT '', mio_nome TEXT DEFAULT '',
+        mio_foto TEXT DEFAULT '', mio_foto_att TEXT DEFAULT '',
+        mio_nome_prima TEXT DEFAULT '');
       INSERT INTO utenti(tg_id,negozio,nome,avatar,npub,npub_verificata)
         VALUES(111,'ab12cd34','Ada','av_ab12cd34_100.jpg','npub1zz',1);
       -- chi una npub non l'ha: la gamba Nostr non gli si offre
@@ -47755,7 +47759,7 @@ def prove_fogli_di_casa():
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
     # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
     # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
-    prova("i gesti che passano dalla domanda unica sono centoquarantatre (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoquarantaquattro (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47781,8 +47785,9 @@ def prove_fogli_di_casa():
           "firma l'incasso; dal 21 nov «🔑 … di Bitpost» dei segreti dal "
           "pannello, e delle gift card nel P2P l'annuncio di chi vende e il "
           "comprare da un annuncio; dal 23 nov «🚀 Promuovi» e il negozio "
-          "in Da scoprire)",
-          143, solo_codice(mini).count("chiediConferma({"))
+          "in Da scoprire; e il moderatore che rifiuta o toglie nome e "
+          "foto scelti)",
+          144, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -187090,10 +187095,12 @@ def prove_canale_admin():
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
     porta = sorted(d for d, _ in chiamate("_al_gruppo_admin"))
-    prova("la porta del gruppo ha sei ingressi e non uno di piu': "
-          "notifica_admin, le due tastiere, ponte, liquidita' e il P2P dei "
+    # (23 nov 2026, profilo-mio) la terza tastiera: nome e foto scelti
+    prova("la porta del gruppo ha sette ingressi e non uno di piu': "
+          "notifica_admin, le tre tastiere, ponte, liquidita' e il P2P dei "
           "moderatori",
           sorted(["notifica_admin", "avvisa_revisione", "avvisa_banner",
+                  "avvisa_profilo_mio",
                   "_avvisa_ponte", "_avvisa_liquidita", "_recapita_p2p"]),
           porta)
     cicli_p2p = sorted(f.name for f in funzioni for n in _ast.walk(f)
@@ -187118,6 +187125,7 @@ def prove_canale_admin():
           sorted(d for d, _ in chiamate("_recapita_p2p")))
     totale = (len(stanze_scritte) + len(cicli_p2p)
               + sum(1 for d in porta if d in ("avvisa_revisione", "avvisa_banner",
+                                              "avvisa_profilo_mio",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
           "118 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
@@ -187148,7 +187156,8 @@ def prove_canale_admin():
           "dell'abbonamento a un canale senza i permessi; dal 21 nov un "
           "segreto di Bitpost cambiato dal pannello; dal 23 nov la "
           "promozione comprata, quella pagata che non si applica, il "
-          "/promossi di un admin e la pagina dedicata da preparare)", 123,
+          "/promossi di un admin e la pagina dedicata da preparare; e il "
+          "nome e la foto scelti da approvare)", 124,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -187157,7 +187166,8 @@ def prove_canale_admin():
           "il gruppo: passi da notifica_admin, e poi si aggiorna l'elenco",
           ["_admin_in_privato", "_avvisa_liquidita", "_avvisa_ponte",
            "_chi_avvisa_ponte", "_ids_staff", "_leve_stato", "_moderatori_p2p",
-           "_ripiego_privato_admin", "assegna_admin_live", "avvisa_banner", "avvisa_revisione",
+           "_ripiego_privato_admin", "assegna_admin_live", "avvisa_banner",
+           "avvisa_profilo_mio", "avvisa_revisione",
            "e_admin", "notifica_admin"], con_admin_ids)
     disputa = codice(pezzo("apri_disputa"))
     prova("la disputa del mercatino passa da notifica_admin (stanza "

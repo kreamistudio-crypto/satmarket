@@ -95214,3 +95214,57 @@ di fiducia, e la tappa cerca il prezzo).
 DA FARE. NOVITA.md non toccato (testi nuovi solo col suo ok). Non chiesti
 e lasciati: il ⚡ e la tessera nella topbar da desktop, «il mercatino in
 sats» nel `<title>` e in `TITOLO_HOME`.
+
+## Nome e foto scelti su Barattolo, gratis col moderatore (23 nov 2026, cantiere profilo-mio; Andrea: «implementiamo ora la possibilità di customizzare la foto, e anche di mettere il nome umano sul mercatino, mantenendo nel contempo l'uso del profilo Nostr»)
+
+Nato dalla richiesta di Zzap (entra con Nostr). Il disegno è quello dello
+studio del 6 ott (`docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md`) con
+una decisione nuova di Andrea (23 nov, scheda): GRATIS, ma col moderatore.
+Cade quindi tutto il pagamento (20.000 sats, la porta comprata, i
+rimborsi: decisioni 1-3 del §7). Restano: revisione prima della
+pubblicazione, un cambio approvato ogni 30 giorni (`PROFILO_MIO_GIORNI`),
+niente emoji, parole dello staff vietate anche camuffate, sosia protetti
+(staff, Consigliati, chi ha venduto 10 volte), l'avviso a chi ha un ordine
+aperto (decisione 9). Tolto per semplicità, d'accordo con Andrea: il badge
+✏️ accanto al nome. Login Nostr, npub, kind-0 e Mostro non si toccano: il
+cartellino vale solo dentro Barattolo.
+
+COME. Nel cassetto «🆔 Nostr e identità», sotto «📷 La tua foto», la riga
+«✏️ Nome e foto su Barattolo»: si propone il nome, la foto o tutt'e due
+(quel che manca resta com'è: la foto di adesso si copia). La proposta va al
+moderatore (sendPhoto coi bottoni, gruppo admin se c'è; pannello admin
+«✏️ Nomi e foto da approvare», e gli approvati in un cassetto con
+«🚫 Togli»). Approvata, si applica subito: `nome` e `avatar` riscritti,
+`avatar_scelta='mia'`, e nel selettore compare «✏️ Mia». Si esce verso
+Telegram, Nostr o Nessuna quando si vuole (torna il nome fresco di
+Telegram dalla Mini App, sennò `mio_nome_prima`) e si rientra senza nuova
+revisione. Dettagli: ARCHITETTURA, «NOME E FOTO SCELTI SU BARATTOLO».
+
+DECISIONI MIE (dette nel report). La proposta rifatta in attesa sostituisce
+la precedente, come per il banner. «mod» e «team» solo come parola intera
+(«Modena», «Steam» passano). Gli scambi P2P «aperti» per l'avviso sono
+quelli toccati nelle ultime 24 ore e senza importi di chiusura: il server
+non ha uno stato P2P più preciso. Gli on-chain P2P non ricevono l'avviso.
+Dal sito (cookie) chi lascia «Mia» riprende il nome tenuto da parte, non
+quello di Telegram di oggi: lo riscrive la prossima apertura della Mini App.
+I testi nuovi li ho scritti io: Andrea li ha approvati in anticipo
+(«qualsiasi cosa metta», 23 nov sera).
+
+PROVATO. `collaudo_profilo_mio` (72 verdi, nel venv senza coincurve, in
+`ci/collaudi.txt`): migrazione e leva, forma del nome (18 casi), sosia,
+proposta che non cambia niente, approvazione applicata e non riscritta da
+Telegram né dal giro del social, avviso a chi ha l'ordine aperto e a
+nessun altro, 30 giorni, uscita e rientro coi file intatti, rifiuto col
+motivo, 403 e tocco altrui, «togli», fusione e cancellazione, leva spenta.
+Controprove (codice rotto apposta, collaudo rosso): senza 'mia' in
+`_upsert_da_telegram`, senza la condizione in `_scrivi_avatar`, senza i
+sosia, senza i 30 giorni, senza le controparti, senza la guardia dei file.
+Sentinelle aggiornate: sei chiamanti di `ridimensiona`, la porta del gruppo
+admin a sette ingressi (124 punti d'avviso), ADMIN_IDS in
+`avvisa_profilo_mio`, 144 `chiediConferma`. Schermate dal vivo sul server
+di collaudo locale (modulo, attesa, «✏️ Mia» approvato, testata del
+Profilo, riga del moderatore).
+
+DA GUARDARE. Non provato su Telegram vero: la foto al moderatore nel gruppo
+admin e il tocco ✅/❌. La moderazione AI resta spenta: oggi decide solo un
+moderatore.
