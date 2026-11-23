@@ -94513,3 +94513,46 @@ COSA. Un giro su tutti i bottoni della vetrina, del conto e delle vendite nella 
 DECISIONI E PERCHÉ. Una rete di sicurezza su go() (`negozio-sola-fuori`) invece di un foglio nuovo per il Lightning address: copre anche un'uscita che domani nascesse altrove. La 1.0 sul telefono di Andrea portava a Barattolo perché costruita prima della modalità sola: la 1.1 parte da `/?app=negozio&sola=1`.
 SCARTATI. Un foglio solo per il Lightning address dentro la cassa (doppione del Profilo).
 PROVATO. Sentinelle in `prove_app_negozio`; giro dal vivo (Venditore senza Lightning address): Profilo senza barra, il bottone e l'indietro tornano alla vetrina con la barra «Controlla e incassa», d=0, un indietro ancora chiude.
+
+## Il negozio delle gift card (23 nov 2026, cantiere gift-card-negozio; Andrea: «vorrei che chi compra la gift card possa selezionare quale carta, quindi voglio un menu con la grafica di un negozio barattolo dove però scelgo una carta con la variante in base al taglio di ogni carta redimibile da shoppy code. La controparte dovrà solamente comprare una carta shoppycode, sarà poi barattolo che dovrà fare il giro tramite browser»)
+
+COSA. Nel modulo della gift card («chiedi» e «compra da un annuncio») il
+vecchio select del taglio diventa un NEGOZIO: la griglia del mercatino
+(`.grid`, `.card`, `.ph`, il cartellino «da X €»), una card per carta, e
+sotto i tagli come bottoncini delle varianti (`.var-chip`, gli stessi
+della scheda di un annuncio) più «Quante» con − e +. Il catalogo viene dai
+negozi Shopify di Shoppy Code (`/products.json`, pubblico), riletto al più
+ogni ora dalla ronda e tenuto in `shoppy_carte` con la foto; la carta
+scelta va al server (`carta`), che la giudica e la salva sull'ordine; la
+lista, la card del libro e il dettaglio ne dicono il nome. Chi vende
+compra SEMPRE una carta Shoppy Code (lo dice anche il «prendi»): la carta
+del marchio è il lavoro del riscatto di Barattolo.
+
+PERCHÉ COSÌ. Oggi risponde solo thegiftcard.shoppycode.com (THE GIFT
+CARD, tagli 1–2000 €, di cui ordinabili quelli che Bitpost vende);
+shoppycode.com, dove stanno i marchi, è chiuso da password e torna 401: il
+codice lo rilegge comunque, e quando riapre i marchi entrano da soli in
+vetrina come «presto» (spenti, non ordinabili) finché il riscatto non c'è.
+Così il negozio non promette una carta che oggi nessuno saprebbe
+consegnare. La foto si serve da casa nostra: il telefono non chiede niente
+a Shopify (non gli dice chi guarda), e si scarica solo dalla CDN di
+Shopify e solo webp/png/jpeg (un SVG porterebbe script nella nostra
+origine). Senza catalogo (server vecchio, negozi muti) resta la sola
+carta di Bitpost coi tagli del suo catalogo, senza `carta` nella
+richiesta: le app vecchie continuano a funzionare.
+
+SCARTATO. Chiedere la foto direttamente a cdn.shopify.com dal telefono
+(traccia chi guarda, e dipende da un host esterno a ogni apertura);
+mostrare i marchi come ordinabili subito (ordine pagato senza nessuno che
+sappia consegnarlo).
+
+PROVATO. `prove_bitpost_gift_card` 6-ter (prezzi Shopify in centesimi,
+foto solo dalla CDN, presto, giudice della carta, forma dell'id, il
+vestito della vetrina); `collaudo_bitpost_gift_card` «il negozio delle
+carte» (stato con le carte in ordine, foto servita, SVG e id storti 404,
+marchio presto / taglio assente / carta sconosciuta 400, ordine con la
+carta e il nome in lista e dettaglio). Schermate dal vivo in collaudo
+locale col catalogo vero letto da thegiftcard.shoppycode.com (la foto
+dalla CDN qui è bloccata dalla rete della sessione: messa a mano dalla
+stessa immagine). DA GUARDARE: sul VPS la prima rilettura scarica la foto
+da cdn.shopify.com; la lista vera dei marchi quando shoppycode.com riapre.

@@ -220143,7 +220143,7 @@ console.log(JSON.stringify(fuori));
           [True, True, True, True],
           ["'<div class=\"p2p-premio\">'" in sl, "p2p-premio-capi" in sl,
            "r('Tu paghi', esc(n(totale)), 'tot sats') + r('Ricevi', esc(euro), 'tot euro')" in mini,
-           "{taglio, quanti, xpub, indice, quota, durata_ore}" in mini])
+           "{taglio, quanti, xpub, indice, quota, durata_ore, carta: gcCartaDaMandare()}" in mini])
     gb = mini[mini.index("let gcStato = null;"):]
     gb = gb[:gb.index("\n</script>")]
     testi = re.findall(r"`[^`]*`|'[^'\n]*'", re.sub(r"/\*.*?\*/", "", gb, flags=re.S))
@@ -220155,13 +220155,89 @@ console.log(JSON.stringify(fuori));
     prova("...«Vendi gift card»: l'annuncio di chi vende, e il comprare da un annuncio",
           [True, True, True, True],
           ["gcApi('/offerte', 'POST', {massimo, quota, durata_ore, xpub, indice})" in mini,
-           "gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice})" in mini,
+           "gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice, carta: gcCartaDaMandare()})" in mini,
            "gcModo = tipo === 'richiesta' ? 'prendi' : mio ? 'mia-offerta' : 'compra';" in mini,
            'return {"id": riga["id"], "massimo": riga["massimo"], "quota": riga["quota"],'
            in pezzo("bitpost_offerta_per_chi")])
     prova("...la quota: fra 0 e il totale di Bitpost, interi", ["", "", True, True, True],
           [_quota(0, 500), _quota(500, 500), bool(_quota(501, 500)), bool(_quota(-1, 500)),
            bool(_quota(2.5, 500))])
+    # --- 6-ter) IL NEGOZIO DELLE CARTE (23 nov 2026, Andrea: «un menu con
+    # la grafica di un negozio barattolo dove scelgo una carta con la
+    # variante in base al taglio di ogni carta redimibile da shoppy code»).
+    # QUEL CHE SI ROMPE IN SILENZIO: un prezzo Shopify letto male (50.00 →
+    # 50 centesimi), una foto presa da un host qualsiasi o in SVG, una carta
+    # di un marchio ordinabile prima del riscatto, il negozio che perde il
+    # vestito della vetrina. ---------------------------------------------
+    _amb_s = {"re": re, "json": _js, "HTTPException": Exception}
+    for n in ("shoppy_tagli", "shoppy_carte_da_prodotti", "shoppy_carte_per_chi"):
+        exec(pezzo(n), _amb_s)
+    for riga in re.findall(r"^SHOPPY_\w+ = .*$", src, re.M):
+        exec(riga, _amb_s)
+    prova("6-ter) i tagli dai prezzi Shopify: in centesimi, senza doppioni, "
+          "senza le varianti esaurite o storte", [100, 5000, 200000],
+          _amb_s["shoppy_tagli"]([{"price": "50.00"}, {"price": "1.00"},
+                                  {"price": "50.0"}, {"price": "2000.00"},
+                                  {"price": "25.00", "available": False},
+                                  {"price": "x"}, {"price": "0"}, "no"]))
+    _dati = {"products": [
+        {"id": 9011748897091, "title": "THE GIFT CARD", "product_type": "Gift Card",
+         "images": [{"src": "https://cdn.shopify.com/s/files/a.png"}],
+         "variants": [{"price": "10.00"}, {"price": "25.00"}]},
+        {"id": 1, "title": "Furba", "images": [{"src": "https://male.example/x.svg"}],
+         "variants": [{"price": "5.00"}]},
+        {"id": "../x", "title": "Storta", "variants": [{"price": "5.00"}]},
+        {"id": 2, "title": "Vuota", "variants": []}]}
+    _cc = _amb_s["shoppy_carte_da_prodotti"]("https://thegiftcard.shoppycode.com", _dati)
+    prova("...le carte di un products.json: id numerico, almeno un taglio, la "
+          "foto SOLO dalla CDN di Shopify",
+          [("9011748897091", [1000, 2500], "https://cdn.shopify.com/s/files/a.png"),
+           ("1", [500], "")],
+          [(k["id"], k["tagli"], k["immagine_url"]) for k in _cc])
+    _righe = [{"id": "9011748897091", "negozio": "https://thegiftcard.shoppycode.com",
+               "titolo": "THE GIFT CARD", "tipo": "Gift Card",
+               "tagli": "[100, 1000, 2500, 200000]", "immagine_tipo": "image/png"},
+              {"id": "7", "negozio": "https://shoppycode.com", "titolo": "Conad",
+               "tipo": "", "tagli": "[2500]", "immagine_tipo": ""}]
+    _pc = _amb_s["shoppy_carte_per_chi"](_righe, {"denominations": [100, 500, 1000, 2500]})
+    prova("...per l'app: la carta di Bitpost coi soli tagli che Bitpost vende, "
+          "i marchi «presto» finche' non c'e' il riscatto",
+          [("9011748897091", [100, 1000, 2500], False, "/api/bitpost/carta/9011748897091"),
+           ("7", [2500], True, "")],
+          [(k["id"], k["tagli"], k["presto"], k["immagine"]) for k in _pc])
+    cs = pezzo("bitpost_carta_scelta")
+    prova("...il giudice della carta ferma il marchio presto, il taglio che "
+          "non c'e' e la carta sconosciuta; senza carta lascia passare",
+          [True, True, True, True],
+          ['raise HTTPException(400, "Questa carta non si può ancora ordinare")' in cs,
+           'raise HTTPException(400, "Questa carta non ha quel taglio")' in cs,
+           'raise HTTPException(400, "Carta non trovata nel catalogo")' in cs,
+           'if cid in (None, ""):\n        return {}' in cs])
+    prova("...la carta si giudica e si salva in tutte e due le porte d'ordine",
+          [True, True, True, True],
+          ['carta = bitpost_carta_scelta(d.get("carta"), int(d["taglio"]), catalogo)' in pezzo("bitpost_crea"),
+           "scade, carta) " in pezzo("bitpost_crea"),
+           'carta = bitpost_carta_scelta(d.get("carta"), int(d["taglio"]), catalogo)' in pezzo("bitpost_offerta_compra"),
+           "scade, carta) " in pezzo("bitpost_offerta_compra")])
+    ft = pezzo("bitpost_carta_foto")
+    prova("...la foto: id dalla forma di sole cifre, dal database, solo nei "
+          "formati fermi (mai SVG)", [True, True, True, False],
+          ["if not SHOPPY_ID_CARTA.match(cid or \"\"):" in ft,
+           'r["immagine_tipo"] not in SHOPPY_FOTO_TIPI' in ft,
+           "ct in SHOPPY_FOTO_TIPI" in pezzo("_shoppy_rileggi"),
+           "image/svg" in _amb_s["SHOPPY_FOTO_TIPI"]])
+    prova("...la forma dell'id respinge i percorsi", [True, False, False, False],
+          [bool(_amb_s["SHOPPY_ID_CARTA"].match(x)) for x in ("9011748897091", "../a", "1a", "")])
+    gn = pezzo_js(mini, "function gcCarteHTML(massimo){", "\n}\n")
+    prova("...il negozio ha il vestito della vetrina: griglia, card, foto, "
+          "cartellino «da», e i tagli come varianti",
+          [True, True, True, True, True],
+          ['<div class="grid gc-negozio">' in gn, 'class="card gc-carta' in gn,
+           '<div class="tag-price">' in gn, '<span class="price-sub">da</span>' in gn,
+           'class="var-chip' in gn])
+    prova("...la ronda rilegge il catalogo, e lo stato lo porta all'app",
+          [True, True], ["await _shoppy_rileggi()" in pezzo("_orologio_bitpost"),
+                         '"carte": shoppy_carte_per_chi(shoppy_carte_lette(), catalogo)' in pezzo("bitpost_stato")])
     prova("i gruppi del pannello in ordine alfabetico, senza l'emoji davanti",
           True, 'key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())'
           in pezzo("_leve_stato"))

@@ -38391,6 +38391,17 @@ mai il kind 0 di nessuno: regola ferrea 2).
   ordine dal seme on-chain, `m/48'/0'/<100+n>'/2'`, e la firma
   dell'incasso sul telefono (`gcFirma`, `gcTrovaChiave`) solo su una PSBT
   che paga l'indirizzo scritto lì.
+  IL NEGOZIO DELLE CARTE (23 nov 2026; Cantieri, «Il negozio delle gift
+  card»): `shoppy_carte` tiene il catalogo dei negozi Shopify di Shoppy
+  Code (`SHOPPY_NEGOZI`, `/products.json` riletto al più ogni ora dalla
+  ronda, `_shoppy_rileggi`; un negozio chiuso o muto si salta). La foto si
+  scarica una volta, SOLO da `SHOPPY_CDN` e SOLO in `SHOPPY_FOTO_TIPI`
+  (mai SVG), e si serve da `GET /api/bitpost/carta/{cid}` (id a sole cifre,
+  dal database: rotta API pubblica senza percorsi). L'app la vede in
+  `/api/bitpost/stato` → `carte` (`shoppy_carte_per_chi`: la carta di
+  Bitpost coi tagli di Bitpost, i marchi `presto` finché non c'è il
+  riscatto); `bitpost_carta_scelta` giudica la carta in tutte e due le
+  porte d'ordine e la salva in `bitpost_ordini.carta` ({id, titolo}).
 
 - L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026, cantiere abbonamento-
   canale; Cantieri, «L'abbonamento a un canale Telegram»). Un annuncio
