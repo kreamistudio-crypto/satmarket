@@ -358,7 +358,12 @@ jobs:
       # arrivate su main con la promozione del 2 nov. Il banco ora usa
       # «collaudo-usa-e-getta-…», ma la storia non si riscrive. Scritte
       # INTERE, mai un prefisso: nessuna chiave vera ha quella forma.
-      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]"|SEGRETO *= *"\.\.\."|"collaudo-nodo-lettura"|"collaudo-nodo-paga"
+      # Il terzo con la cifra FACOLTATIVA (23 nov 2026, promozione
+      # rossa): a71a4ed4 (cantiere giroconto-interno) ha scritto nel
+      # banco `LNBITS_NODO_INVOICE_KEY="k"`, una lettera sola, entrata
+      # su main con la promozione. Una lettera, con o senza cifra, non
+      # e' la forma di nessuna chiave vera.
+      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]?"|SEGRETO *= *"\.\.\."|"collaudo-nodo-lettura"|"collaudo-nodo-paga"
       # LE CHIAVI DI CARTONE IN ESADECIMALE: 64 volte LO STESSO
       # carattere (i test Rust della patch 0005 ne avevano due, e sono
       # nella cronologia). Si TOGLIE IL VALORE dalla riga prima di
