@@ -60297,6 +60297,21 @@ async def compra_promo(req: Request,
             "scadenza_invoice": INVOICE_EXPIRY}
 
 
+# LA PAGINA DEDICATA DEL NEGOZIO IN «Da scoprire» (23 nov 2026, Andrea:
+# «la pagina fa parte di quello che vendiamo»; i tre testi sono suoi).
+# Alla prima entrata il negozio trova questo messaggio dello staff nella
+# sua chat di Assistenza, il bot glielo indica col tasto, e ai moderatori
+# arriva «Da preparare la pagina di…»: la pagina (un racconto, come quelle
+# dei Consigliati) si scrive a mano coi materiali che manda li'. Con
+# l'Assistenza spenta niente dei tre: non ci sarebbe dove rispondere.
+# `autore` 0: lo scrive Barattolo, non un admin col suo nome.
+PROMO_PAGINA_ASSISTENZA = (
+    "Ciao! Per preparare la pagina del tuo negozio mandaci qui da 3 a 6 "
+    "foto (prodotti, laboratorio, persone), il logo e un testo su chi siete "
+    "e cosa fate. La prepariamo noi e te la facciamo vedere prima di "
+    "pubblicarla.")
+
+
 def _promo_dal_riferimento(p) -> tuple:
     """(annuncio_id, giorni) dal `riferimento` di un pagamento promo:
     «aid» per In cima, «aid:giorni» per In evidenza, «giorni» per il
@@ -60341,6 +60356,7 @@ async def _incassa_promo(pagamento_id: int) -> dict:
     motivo = p["motivo"]
     aid, giorni = _promo_dal_riferimento(p)
     applicata, fino = False, 0
+    pagina_da_fare, negozio_nome = False, ""
     if motivo in ("promo_cima", "promo_evidenza") and aid:
         a = con.execute("SELECT venditore_id, evidenza_fino FROM annunci "
                         "WHERE id=?", (aid,)).fetchone()
@@ -60354,10 +60370,20 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                 con.execute("UPDATE annunci SET creato=? WHERE id=?",
                             (adesso, aid))
     elif motivo == "promo_scoprire" and giorni > 0:
-        u = con.execute("SELECT promo_scoprire_fino FROM utenti "
-                        "WHERE tg_id=?", (p["tg_id"],)).fetchone()
+        u = con.execute("SELECT promo_scoprire_fino, promo_consigliato, nome "
+                        "FROM utenti WHERE tg_id=?", (p["tg_id"],)).fetchone()
         if u:
             applicata = True
+            # LA PAGINA DEDICATA si chiede solo alla PRIMA entrata: chi
+            # rinnova, o e' gia' fra i Consigliati, la pagina ce l'ha (o
+            # l'ha gia' avviata). Il segno e' `promo_consigliato`, che dopo
+            # la prima volta resta acceso per sempre.
+            pagina_da_fare = ASSISTENZA_ATTIVA and not u["promo_consigliato"]
+            negozio_nome = u["nome"] or ""
+            if pagina_da_fare:
+                con.execute("INSERT INTO assistenza(utente, autore, admin, "
+                            "testo, quando, immagini) VALUES(?,0,1,?,?,'')",
+                            (p["tg_id"], PROMO_PAGINA_ASSISTENZA, adesso))
             fino = max(adesso, int(u["promo_scoprire_fino"] or 0)) + giorni * 86400
             con.execute("UPDATE utenti SET promo_scoprire_fino=?, "
                         "promo_consigliato=1 WHERE tg_id=?",
@@ -60389,6 +60415,12 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                 f"🚀 <b>Promozione pagata:</b> {nome}, "
                 f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
                 f"(pagamento #{pagamento_id}).", argomento="riepiloghi")
+        if pagina_da_fare:
+            await notifica_admin(
+                "🏪 Da preparare la pagina di "
+                f"<b>{html.escape(negozio_nome or '#' + str(p['tg_id']))}</b>: "
+                "gli abbiamo chiesto foto e testo in Assistenza.",
+                argomento="moderazione")
     except Exception as e:
         print(f"⚠️ Polso della promozione non partito: {e}")
     try:
@@ -60396,7 +60428,13 @@ async def _incassa_promo(pagamento_id: int) -> dict:
             await notifica(p["tg_id"],
                            "🏪 <b>Fatto!</b> Il tuo negozio è in «Da scoprire» "
                            f"fino al {_data_sponsor(fino)}, e poi resta fra "
-                           "i Consigliati.")
+                           "i Consigliati."
+                           + ("\n\nPer la pagina dedicata del tuo negozio "
+                              "mandaci le foto e un testo che lo racconti: "
+                              "tocca qui." if pagina_da_fare else ""),
+                           ("💬 Apri l'assistenza",
+                            f"{URL_PUBBLICO}/?assistenza=mia")
+                           if pagina_da_fare else None)
         elif applicata and motivo == "promo_evidenza":
             await notifica(p["tg_id"],
                            "⭐ <b>Fatto!</b> Il tuo annuncio è in evidenza "
