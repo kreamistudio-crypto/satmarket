@@ -142519,7 +142519,7 @@ const aspetta = () => new Promise(r => setTimeout(r, 0));
   const come = d => d && typeof d === 'object'
     ? {aperto: d.aperto, storia: d.html.length > 200,
        corpoAperto: d.html.includes('rac-corpo aperto'),
-       chiudi: d.html.includes('Chiudi la storia'),
+       chiudi: d.html.includes('>Chiudi</button>'),
        copertina: d.html.includes('/assets/racconti/to-the-moon-cop.webp')}
     : d;
   apriNegozioDaUrl(); await aspetta(); await aspetta();

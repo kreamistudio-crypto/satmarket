@@ -14608,7 +14608,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'c9f6817d2e';
+const LINGUA_VER = 'e8adf4f5d8';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -29577,7 +29577,7 @@ function raccontoNegozio(v){
         <div class="rac-azioni">
           <button class="scopri-link rac-apri" onclick="toggleRacconto(this)"
                   aria-expanded="${raccontoAperto ? 'true' : 'false'}">${
-            raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›'}</button>
+            raccontoAperto ? 'Chiudi' : 'Leggi la storia ›'}</button>
           <button class="btn orange rac-acquista"
                   onclick="acquistaDalRacconto()">Acquista</button>
         </div>
@@ -29664,7 +29664,7 @@ function toggleRacconto(btn){
   const c = document.querySelector('.rac-corpo');
   if (c) c.classList.toggle('aperto', raccontoAperto);
   btn.setAttribute('aria-expanded', raccontoAperto ? 'true' : 'false');
-  btn.textContent = raccontoAperto ? 'Chiudi la storia' : 'Leggi la storia ›';
+  btn.textContent = raccontoAperto ? 'Chiudi' : 'Leggi la storia ›';
 }
 
 /* «Acquista» dal racconto NON compra: porta alla merce, che in questa
