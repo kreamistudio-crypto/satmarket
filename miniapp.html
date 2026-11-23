@@ -740,18 +740,17 @@
   /* La ricetta del cerchietto di chrome: la dividono la levetta e il
      podio (sotto). Non si prende da .share-btn, che vive SULLA
      foto e ha colori fissi: qui sarebbe un buco chiaro nel tema scuro. */
-  .tema-btn,.podio-testa{flex:0 0 auto;width:34px;height:34px;
+  .tema-btn,.notizie-testa{flex:0 0 auto;width:34px;height:34px;
     border:1.5px solid var(--line);border-radius:50%;background:var(--card);
     cursor:pointer;align-items:center;justify-content:center;
     font-size:15px;line-height:1;padding:0;box-shadow:0 2px 0 rgba(35,40,44,.12)}
   /* l'auto-margine che spinge il gruppo a destra sta sulla LEVETTA
-     apposta: e' l'unica dei tre che c'e' sempre — il podio si
-     spegne a leva spenta, in demo e in vetrina, e dandolo a lui, a
-     icona spenta, il gruppo non verrebbe piu' spinto e levetta e tappo
-     scivolerebbero addosso al lockup. Regressione condizionale, cioe'
-     invisibile in sviluppo. */
+     apposta: e' quella che c'e' da sempre in ogni vetrina, e dandolo
+     al cerchietto di mezzo, il giorno che quello si spegnesse, il gruppo
+     non verrebbe piu' spinto e levetta e tappo scivolerebbero addosso al
+     lockup. Regressione condizionale, cioe' invisibile in sviluppo. */
   .tema-btn{display:inline-flex;margin-left:auto}
-  .tema-btn:active,.podio-testa:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
+  .tema-btn:active,.notizie-testa:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(35,40,44,.12)}
   /* IL TAPPO DIPENDE DALLA PRECEDENZA, NON DALL'ADIACENZA (~ e non +,
      ago 2026): fra la levetta e il tappo vive ora il podio, e col
      + questa regola smetterebbe di combaciare — il tappo ricadrebbe
@@ -761,18 +760,21 @@
      Lo zero spegne quell'auto: il ritmo dei tre cerchietti lo da' il
      solo gap della .brand, uguale fra tutti. */
   .tema-btn ~ .avatar-btn{margin-left:0}
-  /* ---- IL PODIO DELLA CLASSIFICA (ago 2026) ----
-     La porta della classifica, dove viveva il barattolino — che e'
-     diventato una CARD nella striscia delle categorie (decisione di
-     Andrea; vedi .cella-barattolo e renderStriscia). Il disegno e' il
-     podio a tre gradini, scelto fra otto candidate guardate a schermo:
-     SVG a tratto inline nel markup, statico — niente lampo, niente
-     innerHTML — che si distingue dalla levetta accanto perche' quella
-     e' un'emoji colorata e questo e' un tratto d'inchiostro.
-     `color` DICHIARATO e non ereditato: il tratto e' currentColor, e
-     nella topbar vincerebbe `nav button{color:var(--muted)}` — le due
-     istanze direbbero due colori diversi. */
-  .podio-testa{display:none;position:relative;color:var(--ink)}
+  /* ---- LE NOTIZIE DI BARATTOLO (23 nov 2026, Andrea: «levami il toggle
+     della classifica, quella classifica non la stiamo usando; fammi un
+     toggle con un'icona dedicata che porta al canale ufficiale per le
+     news») ----
+     Dove stava il podio della classifica (ago 2026), che e' sceso nel
+     Profilo sotto la Classifica Streak (`mercatoClassificaPortaHTML`).
+     Il disegno e' un megafono a tratto inline nel markup, statico —
+     niente lampo, niente innerHTML —, nella grammatica del podio che
+     sostituisce. C'e' SEMPRE: il canale e' pubblico, lo apre anche chi
+     guarda da anonimo. `color` DICHIARATO e non ereditato: il tratto e'
+     currentColor, e nella topbar vincerebbe `nav button{color:var(--muted)}`
+     — le due istanze direbbero due colori diversi. Nasce spento qui
+     perche' la stessa classe vive anche nella barra in basso del
+     telefono: lo accendono le due regole della testata e della topbar. */
+  .notizie-testa{display:none;position:relative;color:var(--ink)}
   /* LA MAPPA DEL RITIRO A MANO (14 nov 2026, cantiere mappa-mercatino):
      il posto del tondo comune (`.tema-btn.mappa-tondo`, lo stesso del
      P2P) in fondo alla barra di ricerca — `contents`, cosi' il tondo e'
@@ -783,15 +785,10 @@
   #mercMappaBox:not(:empty){padding:12px var(--pad) 0}
   .merc-mappa-titolo{margin:2px 0 8px;font-weight:800;font-size:15px}
   .merc-mappa-titolo em{font-style:normal;font-weight:700;color:var(--muted);font-size:13px}
-  header .brand .podio-testa.on{display:inline-flex}
+  header .brand .notizie-testa{display:inline-flex}
   /* il bersaglio largo quanto il pollice, senza occupare layout: la
      ricetta di .card-jar e dei pallini della galleria */
-  .podio-testa::after{content:'';position:absolute;inset:-6px;border-radius:50%}
-  /* SEI IN CLASSIFICA: lo stesso anello arancione del tappo sulla
-     vista Profilo — un segno che si e' gia' imparato, non uno nuovo.
-     Si vede da desktop (la topbar c'e' su ogni vista); su mobile la
-     testata vive in Esplora e la vista classifica la nasconde. */
-  .podio-testa.attivo{box-shadow:0 0 0 2.5px var(--sats),0 2px 0 rgba(35,40,44,.25)}
+  .notizie-testa::after{content:'';position:absolute;inset:-6px;border-radius:50%}
   /* ...e col barattolo acceso Ordina e Filtri non ci sono: quei
      controlli chiamano il SERVER, che del barattolo non sa niente. Le
      loro variabili restano VIVE e tornano uscendo (il patto dei filtri
@@ -1478,12 +1475,8 @@
      da Andrea: il bordo dell'anello non si vedeva). Alle categorie
      non succede perche' li' sotto il quadrato c'e' l'etichetta.
      C'e' la prova, e non ribatte il 4,5: lo DERIVA dall'outline.
-     L'ETICHETTA RESTA DELLA SUA FILA, che e' il vincolo dell'altro
-     verso: sopra di lei ci sono 10px (8 piu' i 2 di coda della
-     .cat-strip) e sotto 6, quindi si legge come il titolo di quel
-     che viene dopo. Chi stringesse ancora l'8 la lascerebbe a meta'
-     strada fra le due file, cioe' di nessuno. */
-  #scoprireSez .section-label{padding-top:8px}
+     L'ETICHETTA NON C'E' PIU' (23 nov 2026, Andrea: la scritta
+     «Consigliato» sulla card basta), e con lei la sua regola. */
   .scoprire-strip{display:flex;gap:8px;overflow-x:auto;
     overscroll-behavior-x:contain;scrollbar-width:none;
     padding:6px var(--pad) 6px}
@@ -1510,6 +1503,49 @@
     padding:6px var(--pad) 10px}
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
+  /* I QUADRATI DEI NEGOZI sotto la card grande (23 nov 2026, vedi
+     renderQuadriScoprire): fermi, in una fila che si scorre col dito,
+     solo sul telefono. Nessun bordo che segue la card grande (Andrea,
+     23 nov: «sotto non si deve evidenziare il quadrato»). */
+  .sc-quadri{display:none}
+  .sc-sfondo{display:none}
+  @media (max-width:767px){
+    .sc-quadri{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;
+      scrollbar-width:none;padding:0 var(--pad) 30px}
+    /* i 30 sotto (23 nov 2026, Andrea: «sì, va bene» allo spazio): senza
+       il titolo di «In evidenza» le due file si toccavano, e qui dentro
+       sfuma la fascia scura */
+    .sc-quadri::-webkit-scrollbar{display:none}
+    /* LO SFONDO COI COLORI DELLA CARD (23 nov 2026, Andrea, scelta la
+       «fascia 1» fra otto prove: «ottimo, cosi' e' perfetto»): dietro la
+       card grande e i quadrati la foto della card al CENTRO, sfocata e
+       spenta, che negli ultimi 50px sfuma nella pagina prima di «In
+       evidenza» (mai un taglio netto). Due strati che si danno il
+       cambio in un secondo quando la card al centro cambia (vedi
+       sfondoScoprire); con gli effetti ridotti il cambio e' secco (la
+       regola universale di fx-ridotti). Tenue apposta: piu' vivace
+       «crea troppo casino». Solo qui, solo sul telefono. */
+    #scoprireSez{position:relative;isolation:isolate}
+    .sc-sfondo{display:block;position:absolute;inset:0;z-index:-1;overflow:hidden;
+      pointer-events:none;opacity:.55;
+      -webkit-mask-image:linear-gradient(180deg,#000 0,#000 calc(100% - 50px),transparent 100%);
+      mask-image:linear-gradient(180deg,#000 0,#000 calc(100% - 50px),transparent 100%)}
+    .sc-sfondo i{position:absolute;inset:-60px;background-position:center;
+      background-size:cover;opacity:0;transition:opacity 1s ease;
+      filter:blur(44px) saturate(1) brightness(.6)}
+    .sc-sfondo i.su{opacity:1}
+    html:not([data-tema="scuro"]) .sc-sfondo i{filter:blur(44px) saturate(.9) brightness(1.15)}
+  }
+  .sc-quadro{flex:0 0 96px;width:96px;padding:0;margin:0;border:0;background:none;
+    font:inherit;color:inherit;text-align:left;cursor:pointer}
+  .sc-quadro-foto{position:relative;display:block;width:96px;height:96px;border-radius:12px;
+    overflow:hidden;box-sizing:border-box;border:2px solid var(--line);background:var(--card);
+    transition:border-color .3s ease}
+  .sc-quadro-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1}
+  .sc-quadro-emoji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px}
+  .sc-quadro b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+    margin-top:6px;font-size:12.5px;font-weight:700;line-height:1.25;color:var(--ink)}
+
   /* LE VOCI DI «Promuovi» (23 nov 2026; ritoccate la sera, Andrea: tre
      voci e non quattro, icone disegnate e non emoji; poi niente freccia:
      la voce scelta apre da sola sotto l'anteprima animata). Radio
@@ -1756,13 +1792,20 @@
      grande, il cambio e' secco (lo spegne la regola universale di
      `fx-ridotti`, in fondo al foglio). */
   @media (max-width:767px){
-    #scoprireStrip{gap:0;padding-top:12px;padding-bottom:14px;
+    #scoprireStrip{gap:0;padding-top:12px;padding-bottom:26px;
       scroll-snap-type:x mandatory}
     #scoprireStrip .scoprire-card{scroll-snap-align:center;margin:0 -10px;
       transform:scale(.82);opacity:.55;
       transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease}
     #scoprireStrip .scoprire-card.sc-centro{transform:scale(1.1);opacity:1;
-      z-index:3;box-shadow:0 10px 26px rgba(0,0,0,.55)}
+      z-index:3;box-shadow:0 6px 12px rgba(0,0,0,.45)}
+    /* L'OMBRA STA DENTRO LA FILA (23 nov 2026, Andrea: «c'e' una linea
+       scura fra la card grossa e le quadrate»): la fila scorre di lato,
+       quindi ritaglia anche in verticale al bordo del padding, e l'ombra
+       di prima (10+26px, piu' il 5% della card ingrandita) finiva tagliata
+       di netto in una riga scura. Ora ombra 6+12 e 26px sotto: ci sta
+       intera. I quadrati risalgono di 12 per non allargare il buco. */
+    #scoprireQuadri{margin-top:-12px}
     #scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}
     #scoprireStrip .scoprire-card{width:240px}
     #scoprireStrip .sc-titolo{left:12.4px;width:84.7px;font-size:15px}
@@ -2506,7 +2549,10 @@
     overscroll-behavior-x:contain;scrollbar-width:none;
     padding:8px var(--pad) 4px}
   .p2p-vt-fila::-webkit-scrollbar{display:none}
-  .p2p-vt-fila .card{flex:0 0 calc((100% - 12px) / 2)}
+  /* LARGHE COME QUELLE «In evidenza» (23 nov 2026, Andrea: «accorcia le
+     card degli scambi P2P, sono troppo lunghe rispetto alle altre»):
+     erano mezza fila (173 px a 390), adesso 150 come la fila di sopra */
+  .p2p-vt-fila .card{flex:0 0 150px;width:150px}
   .p2p-vt-testa{display:flex;align-items:baseline;justify-content:space-between;
     gap:8px;padding:16px var(--pad) 0}
   .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
@@ -7972,6 +8018,9 @@
   .serie-cl-porta .serie-f .f-fuori{fill:#fff}
   .serie-cl-porta .serie-f .f-cuore{fill:#FFE7C2}
   .serie-cl-porta:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+  /* la sorella del mercatino (23 nov 2026): stessa carta, in petrolio */
+  .merc-cl-porta{background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(160deg,#1F7A80 0%,#0D3F44 100%),#0D3F44}
   #serieClassificaFiamma .serie-f{width:22px;height:22px;margin:0 6px 0 0;
     vertical-align:-.16em}
   .serie-cl-lista{max-height:56vh;overflow-y:auto;margin-top:10px}
@@ -13118,7 +13167,6 @@
      NON un CTA pieno: l'arancione pieno e' del «+ Vendi» e dei bottoni
      d'acquisto — qui basta un cartellino col fondo tenue e il bordo ₿,
      che si vede da lontano senza rubare il gesto principale. */
-  #fasciaTest{padding:12px var(--pad) 0}
   .fascia-test{
     display:flex;align-items:center;justify-content:center;gap:6px 10px;
     flex-wrap:wrap;width:100%;text-align:center;
@@ -13647,10 +13695,10 @@
     /* la levetta del tema in topbar: niente auto-margine (ci pensa
        gia' il margin-right del logo), spaziata come il tappo */
     nav .tema-btn{display:inline-flex;margin-left:10px;width:32px;height:32px}
-    /* il podio della classifica, fra la levetta e il tappo come in
-       testata: qui la .brand non esiste (sparisce sopra i 768), quindi
-       senza questa riga da desktop non ci sarebbe */
-    nav .podio-testa.on{display:inline-flex;margin-left:10px;width:32px;height:32px}
+    /* le notizie, fra la levetta e il tappo come in testata: qui la
+       .brand non esiste (sparisce sopra i 768), quindi senza questa riga
+       da desktop non ci sarebbe */
+    nav .notizie-testa{display:inline-flex;margin-left:10px;width:32px;height:32px}
     /* ~ e non +, la stessa ragione della gemella in testata: col
        podio in mezzo l'adiacenza non combacia piu' */
     nav .tema-btn ~ .avatar-btn{margin-left:10px}
@@ -14729,7 +14777,7 @@ document.getElementById('cartello')?.remove();</script>
           <h1 class="lockup"><span class="bmark">B</span>arattolo</h1>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-        <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
+        <button class="notizie-testa" onclick="apriNotizie()" title="Le notizie di Barattolo" aria-label="Le notizie di Barattolo"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><path d="M4 10.2v3.6h3l7.5 4.2V6L7 10.2z" fill="currentColor" fill-opacity=".12" stroke="none"/><path d="M4 10.2v3.6h3l7.5 4.2V6L7 10.2z"/><path d="M7 13.8l1.2 4.2h2.1l-.9-3.1"/><path d="M17.5 9.5a3.4 3.4 0 0 1 0 5"/><path d="M19.6 7.6a6.2 6.2 0 0 1 0 8.8"/></svg></button>
         <button class="avatar-btn" onclick="toccaTappo()" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
       </div>
       <!-- MERCATO E LAVORO (22 ott 2026, richiesta di Alan, alla
@@ -14792,9 +14840,10 @@ document.getElementById('cartello')?.remove();</script>
          posto verranno una tessera in «Esplora per categorie» e una card
          quadrata in «Da scoprire», con le sue immagini. Intanto le aste,
          a cella vestita da Swap, si trovano dal filtro «solo all'asta». -->
-    <!-- La porta fissa al canale durante il rodaggio: la riempie
-         renderFasciaTest(), solo se BANNER_TEST è acceso e mai in DEMO -->
-    <div id="fasciaTest" style="display:none"></div>
+    <!-- LA FASCIA «FASE DI TEST» NON C'E' PIU' (23 nov 2026, Andrea:
+         «leva via quel banner, non ci deve essere»): in testata c'e' il
+         megafono delle notizie. Il cartello del giorno resta, sulla sua
+         leva BANNER_TEST del config. -->
     <!-- La riga di chi arriva dal servizio nascosto: la riempie
          renderFasciaOnion(), e fuori da Tor non nasce mai. -->
     <div id="fasciaOnion" style="display:none"></div>
@@ -14815,6 +14864,57 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
+    <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
+         filtri dell'occasione — oggi due fisse (offerte a tempo,
+         sconti dei negozi), domani la lista arrivera' dal server per
+         le sponsorizzazioni. Ogni card SPARISCE quando la sua
+         occasione non esiste (decisione di Andrea), e senza card
+         sparisce la sezione intera: per questo qui NON c'e' nessuna
+         min-height riservata — uno spazio riservato per una cosa che
+         puo' legittimamente non esserci sarebbe un buco. Niente salto
+         di layout sul percorso vivo: i flag arrivano CON la prima
+         pagina, cioe' prima del primo renderGrid (la lezione della
+         fascia test). -->
+    <div id="scoprireSez" style="display:none">
+      <!-- lo sfondo coi colori della card al centro: solo telefono, vedi
+           sfondoScoprire -->
+      <div class="sc-sfondo" id="scoprireSfondo" aria-hidden="true"><i></i><i></i></div>
+      <!-- SENZA TITOLO (23 nov 2026, Andrea: «non ha senso un titolo prima
+           di quelle card, c'e' gia' la scritta Consigliato»): il nome della
+           sezione resta per chi legge ad alta voce, sulla fila -->
+      <div class="strip-wrap">
+        <div class="scoprire-strip" id="scoprireStrip" role="region" aria-label="Da scoprire"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('scoprireStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+      <!-- I QUADRATI DEI NEGOZI (23 nov 2026): li disegna
+           renderQuadriScoprire, solo sul telefono (il CSS) -->
+      <div class="sc-quadri" id="scoprireQuadri"></div>
+    </div>
+    <!-- LA FILA «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento):
+         sotto «Da scoprire» e prima degli scambi P2P. Nasce spenta: la
+         accende renderEvidenza solo con annunci in evidenza e nella
+         vetrina nuda. Lo stesso guscio e le stesse frecce delle altre. -->
+    <div id="evidenzaSez" style="display:none">
+      <!-- SENZA TITOLO (23 nov 2026, Andrea: «bastano le card, che fanno
+           capire tutto»): ogni card porta gia' l'etichetta «In evidenza»;
+           il nome resta sulla fila per chi legge ad alta voce -->
+      <div class="strip-wrap">
+        <div class="ev-strip" id="evidenzaFila" role="region" aria-label="In evidenza"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('evidenzaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('evidenzaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+    <!-- LE CATEGORIE SOTTO «In evidenza» (23 nov 2026, Andrea: «le card
+         da scoprire proprio prima delle icone di esplora per categorie,
+         e le categorie prima degli scambi P2P e degli oggetti»): in cima
+         alla home la card grande e i quadrati dei negozi, poi la fila in
+         evidenza, poi qui la mappa dei reparti. Il blocco del lavoro le
+         sta accanto, che in Lavoro prende il loro posto. -->
     <!-- Le categorie come CARD ILLUSTRATE (ago 2026), in una fila che
          scorre di lato. Sta FUORI dall'header apposta — dentro,
          l'header a 320px si mangerebbe meta' schermo (176px oggi,
@@ -14860,41 +14960,6 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('lavStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
           onclick="scorriFila('lavStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-    <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
-         filtri dell'occasione — oggi due fisse (offerte a tempo,
-         sconti dei negozi), domani la lista arrivera' dal server per
-         le sponsorizzazioni. Ogni card SPARISCE quando la sua
-         occasione non esiste (decisione di Andrea), e senza card
-         sparisce la sezione intera: per questo qui NON c'e' nessuna
-         min-height riservata — uno spazio riservato per una cosa che
-         puo' legittimamente non esserci sarebbe un buco. Niente salto
-         di layout sul percorso vivo: i flag arrivano CON la prima
-         pagina, cioe' prima del primo renderGrid (la lezione della
-         fascia test). -->
-    <div id="scoprireSez" style="display:none">
-      <div class="section-label">Da scoprire</div>
-      <div class="strip-wrap">
-        <div class="scoprire-strip" id="scoprireStrip"></div>
-        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
-          onclick="scorriFila('scoprireStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
-          onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-    <!-- LA FILA «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento):
-         sotto «Da scoprire» e prima degli scambi P2P. Nasce spenta: la
-         accende renderEvidenza solo con annunci in evidenza e nella
-         vetrina nuda. Lo stesso guscio e le stesse frecce delle altre. -->
-    <div id="evidenzaSez" style="display:none">
-      <div class="section-label">In evidenza</div>
-      <div class="strip-wrap">
-        <div class="ev-strip" id="evidenzaFila"></div>
-        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
-          onclick="scorriFila('evidenzaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
-          onclick="scorriFila('evidenzaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
     <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
@@ -17892,7 +17957,7 @@ document.getElementById('cartello')?.remove();</script>
     <button id="nav-p2pinfo" class="strato-p2p" onclick="go('p2pinfo')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 3.6c4.7-.1 8.5 3.6 8.5 8.3 0 4.7-3.8 8.5-8.5 8.5-4.7 0-8.4-3.8-8.4-8.4 0-4.6 3.7-8.3 8.4-8.4z"/><path d="M12 7.9v.6"/><path d="M12 11.2v5.4"/></svg></span>Info P2P</button>
     </div>
     <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
-    <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
+    <button class="notizie-testa" onclick="apriNotizie()" title="Le notizie di Barattolo" aria-label="Le notizie di Barattolo"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><path d="M4 10.2v3.6h3l7.5 4.2V6L7 10.2z" fill="currentColor" fill-opacity=".12" stroke="none"/><path d="M4 10.2v3.6h3l7.5 4.2V6L7 10.2z"/><path d="M7 13.8l1.2 4.2h2.1l-.9-3.1"/><path d="M17.5 9.5a3.4 3.4 0 0 1 0 5"/><path d="M19.6 7.6a6.2 6.2 0 0 1 0 8.8"/></svg></button>
     <button class="avatar-btn" onclick="toccaTappo()" title="Il tuo profilo"><img class="av-tappo" src="/assets/tappo.jpeg" alt="" onerror="this.remove()"><span class="av-ini"></span><span class="off-dot"></span></button>
   </nav>
 
@@ -22582,6 +22647,18 @@ function serieClassificaPortaHTML(s){
   if (!serieBusta(s)) return '';
   return `<button type="button" class="serie-cl-porta" onclick="apriSerieClassifica()">${SERIE_FIAMMA}<span style="flex:1;min-width:0">Classifica Streak</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
 }
+/* LA CLASSIFICA DEL MERCATINO NEL PROFILO (23 nov 2026, Andrea: «quel
+   toggle della classifica lo metti nel profilo, sotto al tasto
+   classifica streak»): la porta che stava in testata come podio scende
+   qui, sotto la sorella, con la stessa forma e la stessa carta lucida
+   ma in petrolio (uno dei quattro colori provati per la Streak), e il
+   podio disegnato al posto della fiamma. Il gate e' la leva della
+   classifica, quello del podio: mai in DEMO e in VETRINA, dove la
+   pagina non esiste (la cintura sta in apriClassifica). */
+function mercatoClassificaPortaHTML(){
+  if (!myClassifica || DEMO || VETRINA) return '';
+  return `<button type="button" class="serie-cl-porta merc-cl-porta" onclick="apriClassifica()"><svg viewBox="2 2 20 20" width="18" height="18" aria-hidden="true" style="flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".18" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg><span style="flex:1;min-width:0">Il Podio di Barattolo</span><span class="cl-fr" aria-hidden="true">›</span></button>`;
+}
 /* LA POSIZIONE SI LEGGE SEMPRE (18 nov 2026, Andrea, sullo scatto della
    classifica al secondo giorno: «perché la classifica non ha le posizioni
    affianco agli utenti?»). Prima la medaglia PRENDEVA IL POSTO del numero
@@ -24123,8 +24200,6 @@ function go(view){
   el('nav-'+voceNav(view))?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
   document.querySelectorAll('.avatar-btn').forEach(a=>a.classList.toggle('attivo', view==='profilo'));
-  /* ...e la classifica accende il podio, per la stessa ragione */
-  document.querySelectorAll('.podio-testa').forEach(a=>a.classList.toggle('attivo', view==='classifica'));
   /* Nel dettaglio comprabile la tab bar lascia il posto alla barra
      d'acquisto (solo mobile, ci pensa il CSS); su ogni altra vista torna */
   aggiornaBarraCompra(view);
@@ -26654,6 +26729,8 @@ function renderStriscia(){
 const RACCONTI = {
   'to-the-moon': {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
+    /* la riga «cosa vende» sotto il suo quadrato in home (23 nov 2026) */
+    inBreve: 'Si gioca in sats',
     /* CONSIGLIATO (set 2026): true = fra i Consigliati (card e
        pagina) e con la storia sul suo negozio, a spazio in vetrina
        acceso o spento. false = TOLTO A MANO: esce dalla card e dalla
@@ -26884,7 +26961,7 @@ function vociSponsor(){
     if (fuori.some(v => v.slug === slug)) return;
     const casa = RACCONTI[slug];
     const negozio = casa ? casa.negozio : String(s.negozio || '');
-    fuori.push({id: 'sponsor-' + slug, slug,
+    fuori.push({id: 'sponsor-' + slug, slug, negozio,
       emoji: String((casa ? casa.emoji : s.emoji) || '📣'),
       titoloDentro: true, sponsor: true, file: slug + '.webp',
       testo: String((casa ? casa.titolo : s.titolo) || ''),
@@ -27009,9 +27086,11 @@ function renderScoprire(){
      si scrive PRIMA del controllo della firma (la lezione storica di
      renderStriscia: scritto dopo, tornando dal barattolo la firma
      uguale lascerebbe la sezione spenta per sempre). */
-  const vive = vociScoprire().filter(v =>
+  const tutte = vociScoprire().filter(v =>
     (!vistaBarattolo || v.tocca) && v.vivo());
-  el('scoprireSez').style.display = vive.length ? '' : 'none';
+  el('scoprireSez').style.display = tutte.length ? '' : 'none';
+  const {grandi: vive, quadri} = spartisciScoprire(tutte);
+  renderQuadriScoprire(quadri);
   if (!vive.length) return;
   /* La firma dice quali card ci sono E quale e' accesa: si ridisegna
      solo quando cambia qualcosa, mai mentre si guarda.
@@ -27094,6 +27173,92 @@ function renderScoprire(){
   armaScorriScoprire();
 }
 
+/* I QUADRATI DEI NEGOZI SOTTO LA CARD GRANDE (23 nov 2026, Andrea:
+   «sotto alla card principale i quadrati di tutti gli altri negozi, con
+   l'anteprima del prodotto che vende», poi «leggermente piu' piccoli»,
+   «fissi, tanto si anima gia' la card sopra»). SOLO SUL TELEFONO (il
+   CSS sotto i 768px): sul computer la fila mostra gia' piu' card
+   insieme. Solo i NEGOZI della fila (lo spazio in vetrina e chi ha
+   pagato), nello stesso ordine a turno; le card nostre no.
+   Ogni quadrato: la foto (la miniatura della prima foto dell'annuncio
+   piu' recente del negozio, che manda il server; senza, il logo) e
+   sotto SOLO la riga «cosa vende», SENZA il nome del negozio (Andrea:
+   «via il nome, rimane solo gioco da tavolo») — QUELLA CHE SCRIVIAMO NOI nel catalogo
+   della pagina (`inBreve` qui, `in_breve` nel server), e finche' non
+   c'e' la categoria dove il negozio ha piu' annunci (decisione di
+   Andrea); senza nemmeno quella, il nome, che un quadrato muto non si
+   capisce. Il nome resta comunque per chi legge ad alta voce
+   (aria-label). Il tocco e' quello della card grande (toccaScoperta), con
+   la stessa conta dello spazio. FERMI, e MUTI mentre la card grande
+   scorre: nessun quadrato si accende per seguirla (Andrea, 23 nov 2026:
+   «sotto non si deve evidenziare il quadrato»). */
+let negoziVetrina = {};          // codice -> {foto, categoria, in_breve}
+let negoziVetrinaChiesti = '', quadriFirma = '';
+const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
+/* GRANDI E QUADRATI SI DIVIDONO I NEGOZI (23 nov 2026, Andrea: «l'idea
+   e' mostrare chi paga, dappertutto, o nelle card quadrate o nelle card
+   grosse»): sul telefono un negozio sta O nella fila grande O nei
+   quadrati, mai in tutti e due. Nell'ordine del turno uno si' e uno no:
+   il primo grande, il secondo quadrato, il terzo grande... e siccome
+   `aTurno` avanza di uno a ogni apertura, la volta dopo chi era
+   quadrato e' grande. Le card nostre (P2P, aste...) restano sempre
+   nella fila grande. Sul computer i quadrati non ci sono: tutti grandi,
+   come prima. MAI UNA FILA MEZZA VUOTA (Andrea, 23 nov 2026: «almeno ce
+   ne devono essere 4, non mi piace che lasci vuoti»): sotto i
+   QUADRI_MIN quadrati la fila non c'e' e tornano tutti grandi. */
+const QUADRI_MIN = 4;
+function spartisciScoprire(tutte){
+  if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
+  const grandi = [], quadri = [];
+  let k = 0;
+  tutte.forEach(v => {
+    const negozio = v.negozio && CODICE_NEGOZIO.test(String(v.negozio));
+    (negozio && (k++ % 2) ? quadri : grandi).push(v);
+  });
+  if (quadri.length < QUADRI_MIN) return {grandi: tutte, quadri: []};
+  return {grandi, quadri};
+}
+function renderQuadriScoprire(vive){
+  const box = el('scoprireQuadri');
+  if (!box) return;
+  const negozi = (vive || []).filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));
+  if (negozi.length && mqNetflix.matches) chiediNegoziVetrina(negozi.map(v => String(v.negozio)));
+  const html = negozi.map(v => {
+    const d = negoziVetrina[v.negozio] || {};
+    /* il catalogo di casa per slug, o per codice (un negozio di casa che
+       ha anche pagato la card arriva senza slug) */
+    const casa = typeof RACCONTI === 'undefined' ? null : v.slug ? RACCONTI[v.slug]
+      : Object.values(RACCONTI).find(r => r && r.negozio === v.negozio) || null;
+    const breve = String((casa && casa.inBreve) || d.in_breve || d.categoria || '');
+    const foto = d.foto ? fotoUrl(fotoMini(String(d.foto))) : (v.logo || '');
+    const nome = esc(typeof v.testo === 'function' ? v.testo() : v.testo);
+    return `<button type="button" class="sc-quadro" data-id="${v.id}" aria-label="${nome}"
+      onclick="toccaScoperta(this.dataset.id)"><span class="sc-quadro-foto">${foto
+        ? `<img src="${esc(foto)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+        : ''}<span class="sc-quadro-emoji" aria-hidden="true">${esc(v.emoji || '🏪')}</span></span
+      ><b>${breve ? esc(breve) : nome}</b></button>`;
+  }).join('');
+  box.style.display = html ? '' : 'none';
+  if (html === quadriFirma) return;
+  quadriFirma = html;
+  box.innerHTML = html;
+}
+/* la foto e la categoria di ogni negozio: UNA domanda per insieme di
+   negozi (la chiave e' l'elenco ordinato), e un guasto lascia i quadrati
+   col logo e senza riga — un ornamento non rompe la home */
+async function chiediNegoziVetrina(codici){
+  const chiave = Array.from(new Set(codici)).sort().join(',');
+  if (!chiave || chiave === negoziVetrinaChiesti) return;
+  negoziVetrinaChiesti = chiave;
+  try {
+    const r = await fetch(`${API_BASE}/negozi/vetrina?codici=${encodeURIComponent(chiave)}`);
+    if (!r.ok) return;
+    const d = await r.json().catch(() => ({}));
+    negoziVetrina = (d && d.negozi && typeof d.negozi === 'object') ? d.negozi : {};
+    renderScoprire();
+  } catch(e) {}
+}
+
 /* LO SCORRIMENTO DA SOLO DI «Da scoprire» (23 nov 2026, idea di Andrea):
    mentre l'app resta aperta la fila passa alla card dopo ogni cinque
    secondi, e in fondo torna alla prima. SOLO QUESTA FILA: «In evidenza»
@@ -27127,6 +27292,25 @@ function centroScoprire(){
     if (d < dist) { dist = d; meglio = c; }
   });
   carte.forEach(c => c.classList.toggle('sc-centro', c === meglio));
+  sfondoScoprire(meglio);
+}
+
+/* lo sfondo prende la foto della card al centro (la prima <img>): due
+   strati, quello nuovo si accende e il vecchio si spegne, cosi' il
+   passaggio e' una dissolvenza. Una card senza foto lascia lo sfondo
+   che c'era. L'indirizzo passa da CSS.escape dentro url("...") */
+let sfondoOra = '';
+function sfondoScoprire(carta){
+  const box = el('scoprireSfondo');
+  const img = carta && carta.querySelector('img');
+  const src = (img && (img.currentSrc || img.src)) || '';
+  if (!box || !src || src === sfondoOra) return;
+  sfondoOra = src;
+  const [a, b] = box.children;
+  const nuovo = a.classList.contains('su') ? b : a, vecchio = nuovo === a ? b : a;
+  nuovo.style.backgroundImage = `url("${CSS.escape(src)}")`;
+  nuovo.classList.add('su');
+  vecchio.classList.remove('su');
 }
 const SCOPRIRE_PASSO_MS = 5000;
 const SCOPRIRE_RIPOSO_MS = 12000;
@@ -27178,7 +27362,10 @@ function armaScorriScoprire(){
       if (fotogramma) return;
       fotogramma = requestAnimationFrame(() => { fotogramma = 0; centroScoprire(); });
     }, {passive: true});
-    if (mqNetflix.addEventListener) mqNetflix.addEventListener('change', centroScoprire);
+    if (mqNetflix.addEventListener) mqNetflix.addEventListener('change', () => {
+      renderScoprire();
+      centroScoprire();
+    });
     if ('IntersectionObserver' in window)
       new IntersectionObserver(e => { scoprireVisto = e.some(x => x.isIntersecting); },
                                {threshold: .5}).observe(s);
@@ -27755,7 +27942,10 @@ function chipsSpente(){
 if (window.IntersectionObserver) {
   new IntersectionObserver(
     ([voce]) => (voce.boundingClientRect.width || voce.boundingClientRect.height)
-      ? chipsAppiccicate(!voce.isIntersecting) : chipsSpente(),
+      /* da quando le categorie stanno sotto «In evidenza» (23 nov 2026)
+         all'apertura sono SOTTO lo schermo: le pillole si appiccicano
+         solo quando la sezione e' passata in alto, non prima */
+      ? chipsAppiccicate(!voce.isIntersecting && voce.boundingClientRect.top < 0) : chipsSpente(),
     {threshold: 0}
   ).observe(el('catSez'));
 }
@@ -28908,9 +29098,9 @@ let classificaFiltro = 0;       /* stato di SESSIONE, mai localStorage */
 async function apriClassifica(){
   /* In DEMO e in VETRINA la pagina non esiste: la' non c'e' un server
      che la calcoli, e un numero inventato sarebbe peggio del niente —
-     il patto del cassetto wallet. Il podio in testata non compare
-     nemmeno (renderPodioTesta), e questa e' la cintura per ogni
-     altra strada. */
+     il patto del cassetto wallet. La porta del Profilo non compare
+     nemmeno (mercatoClassificaPortaHTML), e questa e' la cintura per
+     ogni altra strada. */
   if (DEMO || VETRINA) return;
   go('classifica');
   const box = el('classificaCorpo');
@@ -29084,6 +29274,19 @@ function renderClassifica(){
    ragione, si parla di UNA persona e della SUA pagina, e la risposta e'
    privata. */
 const CONTATTO_DATI = 'https://t.me/barattolostore?direct';
+/* IL MEGAFONO IN TESTATA (23 nov 2026, Andrea: «un toggle con un'icona
+   dedicata che porta al canale ufficiale di Barattolo per le news»): il
+   canale pubblico, quello che i sapere di Tappo danno come ufficiale.
+   Stessa scala di apriContattoDati: dentro Telegram apre il client,
+   fuori una scheda nuova. */
+const CANALE_NOTIZIE = 'https://t.me/barattolostore';
+function apriNotizie(){
+  haptic();
+  if (tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(CANALE_NOTIZIE); return; } catch(e){}
+  }
+  window.open(CANALE_NOTIZIE, '_blank', 'noopener');
+}
 function apriContattoDati(){
   if (tg?.initData && tg.openTelegramLink) {
     try { tg.openTelegramLink(CONTATTO_DATI); return; } catch(e){}
@@ -32574,25 +32777,17 @@ async function caricaBannerTest(){
   return bannerTestPromessa;
 }
 /* LA FASCIA PRIMA DELLE CARD (ago 2026, registrato coi fotogrammi):
-   `renderFasciaTest` viveva solo dentro `modaleTest`, in coda
+   la fascia del rodaggio viveva solo dentro `modaleTest`, in coda
    all'avvio — quindi si infilava SOPRA la griglia a card gia'
-   dipinte, e ogni card scendeva di ~56px (misurato su
-   barattolo.store: layout-shift v=0.035-0.044, 170ms dopo le card).
-   Era il pezzo grosso dello «scatto» all'apertura. Ora la fascia si
-   disegna QUI, prima di renderGrid, aspettando la risposta partita
-   in testa ad avvia(): a quel punto e' gia' arrivata da un pezzo,
-   quindi l'attesa non costa niente — e se il server tace, tace anche
-   la fascia, senza trattenere le card piu' del suo fetch.
-   `modaleTest` in coda la ridisegna identica (stesso innerHTML:
-   nessun movimento) e tiene il suo mestiere, il cartello del giorno. */
+   dipinte, e ogni card scendeva di ~56px. Dal 23 nov 2026 quella
+   fascia non c'e' piu' (Andrea), e qui resta la riga di Tor, con la
+   stessa regola: prima delle card. */
 async function fasciaPrima(){
   /* la riga di Tor non aspetta niente — l'hostname si sa dal primo
      fotogramma — quindi sta PRIMA del giro di rete del rodaggio: se
      nascesse dopo le card sarebbe un salto, la lezione della fascia
      sorella qui sotto */
   renderFasciaOnion();
-  await caricaBannerTest();
-  renderFasciaTest();
 }
 function finiscoModaleTest(){
   const poi = dopoModaleTest; dopoModaleTest = null;
@@ -32601,8 +32796,7 @@ function finiscoModaleTest(){
 async function modaleTest(dopo){
   dopoModaleTest = dopo || null;
   const d = await caricaBannerTest();
-  renderFasciaTest();          // la fascia vive anche quando il cartello tace
-  if (!d) return finiscoModaleTest();
+  if (!d) return modaleNotizie();
   let visto = '';
   try { visto = localStorage.getItem(TEST_CHIAVE) || ''; } catch(e){}
   if (visto === giornoOggi()) return finiscoModaleTest();
@@ -32631,20 +32825,6 @@ async function modaleTest(dopo){
   testModaleInCorso = true;
   el('testModale').classList.add('open');
   document.body.style.overflow = 'hidden';   // sotto non si scorre
-}
-/* La fascia sotto la barra Cerca di Esplora: la porta al canale che
-   resta anche quando il cartello ha gia' fatto il suo giro. Stesso
-   interruttore del cartello, mai in DEMO, anche per gli anonimi. */
-function renderFasciaTest(){
-  const f = el('fasciaTest'); if (!f) return;
-  if (!bannerTest || DEMO) { f.style.display = 'none'; f.innerHTML = ''; return; }
-  f.style.display = '';
-  /* senza link nel config resta l'avviso, senza fingersi toccabile */
-  f.innerHTML = bannerTest.link
-    ? `<button class="fascia-test" onclick="apriCanaleTest()">
-         <span>🚧 Barattolo è in fase di test</span>
-         <span class="ft-cta">💬 Dicci la tua ›</span></button>`
-    : `<div class="fascia-test"><span>🚧 Barattolo è in fase di test</span></div>`;
 }
 /* DOVE LA PROTEZIONE FINISCE, e si dice dove nasce il dubbio: nel
    cassetto in cui si sta per scrivere un recapito. UN TESTO E DUE
@@ -32880,6 +33060,48 @@ function apriCanaleTest(){
     try { tg.openTelegramLink(url); return; } catch(e){}
   }
   window.open(url, '_blank', 'noopener');
+}
+/* IL RIQUADRO DELLE NOTIZIE (23 nov 2026, Andrea: «al posto di quel
+   riquadro di fase di test, metti un riquadro che incentivi l'utente a
+   iscriversi nel canale Telegram delle notizie di Barattolo»): lo stesso
+   guscio del cartello, quando il rodaggio e' spento (`BANNER_TEST`).
+   OGNI 3 GIORNI FINCHE' NON ENTRA (scelta di Andrea sulla scheda), poi mai
+   piu': prima di riproporlo si chiede al server, che lo chiede a
+   Telegram (`/api/me/canale-notizie`). Se non si sa (account senza
+   Telegram, bot non amministratore del canale) lo si mostra UNA volta
+   sola. Il timbro `notizie` e' l'istante dell'ultima volta e segue il
+   conto su ogni dispositivo. ALLA PRIMA APERTURA VIENE PRIMA DEL TOUR
+   (Andrea: «La prima cosa che uno vede è il riquadro»): il tour aspetta
+   in `dopoModaleTest` e parte alla chiusura, come col cartello. Mai in DEMO
+   e in vetrina anonima (`hintAttivi`). Il tasto apre il canale come il
+   megafono in testata (`apriNotizie`). */
+const NOTIZIE_TITOLO = '📣 Le novità di Barattolo';
+const NOTIZIE_TESTO = 'Nel canale Telegram di Barattolo ti diciamo per primi cosa c\'è '
+  + 'di nuovo: funzioni nuove, negozi appena arrivati e consigli per usare '
+  + 'l\'app. Pochi messaggi, niente spam.';
+const NOTIZIE_OGNI_MS = 3 * 86400000;
+async function modaleNotizie(){
+  if (!hintAttivi()) return finiscoModaleTest();
+  const visto = Number(hintLetti().notizie) || 0;
+  if (visto && Date.now() - visto < NOTIZIE_OGNI_MS) return finiscoModaleTest();
+  let iscritto = null;
+  try {
+    const r = await fetch(`${API_BASE}/me/canale-notizie`,
+                          {headers: {'X-Tg-Init-Data': authHdr()}});
+    if (r.ok) iscritto = (await r.json()).iscritto;
+  } catch(e) {}
+  if (iscritto === true) return finiscoModaleTest();
+  if (iscritto !== false && visto) return finiscoModaleTest();
+  timbraVisto('notizie');
+  el('testTitolo').textContent = NOTIZIE_TITOLO;
+  el('testTesto').textContent = NOTIZIE_TESTO;
+  el('testAzioni').innerHTML =
+    `<button class="btn orange" onclick="chiudiModaleTest(); apriNotizie()">Entra nel canale</button>`
+    + `<button class="btn ghost" onclick="chiudiModaleTest()">Esplora l'app</button>`;
+  el('testModale').setAttribute('aria-label', 'Le novità di Barattolo');
+  testModaleInCorso = true;
+  el('testModale').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 function chiudiModaleTest(){
   if (!testModaleInCorso) return;
@@ -45928,6 +46150,7 @@ function renderProfilo(){
     </div>
     ${serieSettimanaHTML(mySerie)}
     ${serieClassificaPortaHTML(mySerie)}
+    ${mercatoClassificaPortaHTML()}
     ${guidaWalletBoxHTML()}`;
   /* LA FOTO DELLA TESTATA APRE «I TUOI ACCOUNT» (16 ott 2026, dal campo:
      «il doppio tocco sulla foto non fa niente»): sul telefono il tappo
@@ -60122,26 +60345,6 @@ function aggiornaBarattolo(n){
     myPreferiti.length ? `(${n}/${MAX_PREFERITI})` : '';
 }
 
-/* ---- IL PODIO IN TESTATA (ago 2026) ----
-   La porta della classifica, dove viveva il barattolino — che dall'ago
-   2026 e' una CARD nella striscia delle categorie (decisione di
-   Andrea; vedi renderStriscia). Due istanze gemelle come la levetta e
-   il tappo, una classe sola, un querySelectorAll solo. L'SVG e'
-   STATICO e inline nel markup — niente lampo, niente innerHTML: qui
-   non c'e' nessun livello da cuocere.
-   IL GATE E' LA LEVA, la stessa condizione che accendeva il bottone in
-   fondo al Profilo (morto con questo cantiere, decisione di Andrea:
-   una porta sola): un bottone che porta a una pagina spenta e' peggio
-   di un bottone che non c'e'. CONSEGUENZA DICHIARATA: su mobile la
-   testata vive solo in Esplora, quindi dal Profilo la classifica non
-   si raggiunge piu'; da desktop la topbar c'e' ovunque.
-   Niente aria-pressed: naviga, non toggla — l'anello .attivo (la
-   vista E' la classifica) lo scrive go(), accanto a quello del tappo. */
-function renderPodioTesta(){
-  const on = myClassifica && !DEMO && !VETRINA;
-  document.querySelectorAll('.podio-testa')
-    .forEach(b => b.classList.toggle('on', on));
-}
 
 /* IL GESTO: accende o spegne il filtro, e ridisegna. ZERO RETE, ed e'
    la ragione per cui questo cantiere e' tutto client: la lista sta
@@ -122690,7 +122893,6 @@ async function avviaVetrina(){
     await loadListings(true);  // anonimo: nessun header, prima pagina
     VETRINA = true; DEMO = false; orders = [];
     renderAvatar();            // in vetrina anonima il tappo non compare
-    renderPodioTesta();        // ...e il podio nemmeno: la cintura di apriClassifica
     mostraBanner(suOnion() ? BANNER_VETRINA_ONION : BANNER_VETRINA);
     /* SU ONION IL WIDGET TELEGRAM NON SI OFFRE, e non e' prudenza:
        il Login Widget funziona SOLO sul dominio registrato con
@@ -122752,7 +122954,6 @@ async function avviaVetrina(){
     myAvatar = '';             // dati finti, facce vere no: iniziale
     mostraBanner(BANNER_DEMO);
     renderAvatar();            // in demo il Profilo c'e': il tappo pure
-    renderPodioTesta();        // ...la classifica no: niente server che la calcoli
     /* le pillole e le due strisce si ridisegnano ADESSO che DEMO e'
        vera: il giro di renderChips in testa ad avvia() e' partito con
        DEMO ancora false, quindi la striscia delle categorie (e con
@@ -122844,7 +123045,7 @@ async function avvia(){
   preparaFiltriDaUrl();
   renderChips();
   if (!API_BASE) {                          // nessun backend configurato
-    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderPodioTesta(); renderGrid(); renderOrders();
+    DEMO = true; mostraBanner(BANNER_DEMO); renderAvatar(); renderGrid(); renderOrders();
     apriPaginaRicordata();   /* in DEMO: la home di sempre, e navRiflette riparte */
     return;
   }
@@ -123195,10 +123396,6 @@ async function avvia(){
     renderIdentita();
     DEMO = false;
     renderAvatar();
-    /* il podio si accende QUI, dove myClassifica e' appena arrivata;
-       la card del barattolo la disegna il renderChips di loadListings,
-       che da qui in poi gira con myTgId pieno */
-    renderPodioTesta();
     /* ...e il pallino degli scambi, qui dove conto e leva del P2P sono
        arrivati tutt'e due: l'archivio si legge con la chiave del conto */
     aggiornaPallinoScambiP2P();

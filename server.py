@@ -1260,6 +1260,13 @@ try:
     from config import BANNER_TEST_LINK
 except ImportError:
     BANNER_TEST_LINK = ""
+# IL CANALE DELLE NOTIZIE (23 nov 2026): quello che il megafono in
+# testata apre, e dove il riquadro invita a entrare. Il bot deve esserne
+# amministratore (anche senza permessi) perche' getChatMember risponda.
+try:
+    from config import CANALE_NOTIZIE_CHAT
+except ImportError:
+    CANALE_NOTIZIE_CHAT = "@barattolostore"
 
 # Il contatore degli «utenti» in vetrina: quante persone sono gia'
 # entrate nel mercatino (fino al 26 set 2026 la riga diceva
@@ -58400,7 +58407,9 @@ async def scegli_font_scala(req: Request,
 # le slide: parte da solo una volta, e la volta vale su ogni dispositivo.
 # `banner_p2p` (26 set 2026) e' la prima animazione del banner personale
 # delle commissioni: da li' il banner e' personale a ogni ingresso.
-VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
+# `notizie` (23 nov 2026) e' il riquadro che invita nel canale delle
+# notizie: una volta sola per persona, su ogni dispositivo.
+VISTI_NOTI = ("tour", "tour_p2p", "cartello", "notizie", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
               "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5", "giro_p2p",
               "banner_p2p",
@@ -61188,6 +61197,74 @@ def negozi_promossi_pubblici(con, adesso: int | None = None) -> list:
         print(f"⚠️ [promozioni] i negozi promossi non si leggono: {e}")
         return []
     return fuori
+
+
+# I QUADRATI DEI NEGOZI IN HOME (23 nov 2026, sotto la card grande di
+# «Da scoprire», sul telefono): per ogni negozio della fila la PRIMA foto
+# del suo annuncio attivo piu' recente, la categoria dove ne ha di piu', e
+# la riga «cosa vende» che scriviamo noi nel catalogo della pagina
+# (`in_breve`, solo a pagina PUBBLICATA: la bozza non esce mai, il patto
+# di `racconto_pubblico`). Il client manda i CODICI (pubblici), al piu'
+# NEGOZI_VETRINA_MAX e passati dalla forma; dei negozi che non ci sono non
+# si dice niente. Nessun tg_id esce. Fail-closed: un guasto da' un
+# dizionario vuoto, e i quadrati restano col logo.
+NEGOZI_VETRINA_MAX = 16
+_CODICE_NEGOZIO = re.compile(r"[A-Za-z0-9_-]{2,40}")
+
+
+def negozi_vetrina_pubblici(con, codici: list) -> dict:
+    fuori = {}
+    for cod in codici[:NEGOZI_VETRINA_MAX]:
+        u = con.execute("SELECT tg_id FROM utenti WHERE negozio=? LIMIT 1",
+                        (cod,)).fetchone()
+        if not u:
+            continue
+        foto = ""
+        for r in con.execute("SELECT foto FROM annunci WHERE venditore_id=? "
+                             "AND stato='attivo' AND foto<>'' "
+                             "ORDER BY creato DESC, id DESC LIMIT 5",
+                             (u["tg_id"],)):
+            try:
+                nomi = json.loads(r["foto"] or "[]")
+            except (ValueError, TypeError):
+                continue
+            if isinstance(nomi, list) and nomi and isinstance(nomi[0], str) and nomi[0]:
+                foto = nomi[0]
+                break
+        c = con.execute("SELECT categoria, COUNT(*) AS n FROM annunci "
+                        "WHERE venditore_id=? AND stato='attivo' "
+                        "AND COALESCE(categoria,'')<>'' GROUP BY categoria "
+                        "ORDER BY n DESC, categoria LIMIT 1",
+                        (u["tg_id"],)).fetchone()
+        breve = ""
+        for slug, rr in RACCONTI_NEGOZI.items():
+            if (rr.get("in_breve") and _e_suo(rr, cod, u["tg_id"])
+                    and racconto_stato(slug) == "pubblicato"):
+                breve = str(rr["in_breve"])
+                break
+        fuori[cod] = {"foto": foto, "categoria": (c["categoria"] if c else "") or "",
+                      "in_breve": breve}
+    return fuori
+
+
+@app.get("/api/negozi/vetrina")
+def negozi_vetrina(codici: str = ""):
+    """I quadrati dei negozi della home: vedi `negozi_vetrina_pubblici`."""
+    lista = []
+    for c in (codici or "").split(","):
+        c = c.strip()
+        if _CODICE_NEGOZIO.fullmatch(c) and c not in lista:
+            lista.append(c)
+    if not lista:
+        return {"negozi": {}}
+    con = db()
+    try:
+        return {"negozi": negozi_vetrina_pubblici(con, lista)}
+    except Exception as e:
+        print(f"⚠️ [promozioni] i quadrati dei negozi non si leggono: {e}")
+        return {"negozi": {}}
+    finally:
+        con.close()
 
 
 def in_evidenza_pubblici(con, campi: str, adesso: int | None = None) -> list:
@@ -124618,6 +124695,44 @@ async def prova_stradina(req: Request, x_tg_init_data: str = Header(""),
         return {"ok": True, "finte": sorted(stradina_finte(con, user["id"]))}
     finally:
         con.close()
+
+
+# IL RIQUADRO DELLE NOTIZIE SA CHI E' GIA' ENTRATO (23 nov 2026, Andrea:
+# «quando uno entra nel canale non viene piu' visualizzato», e la scelta
+# «ogni 3 giorni»): il client chiede qui prima di riproporlo, e qui si
+# chiede a Telegram se CHI BUSSA e' nel canale. Tre risposte: True (dentro:
+# il riquadro non torna piu'), False (fuori), None (non si sa: bot non
+# amministratore, account senza Telegram, Telegram muto — il client allora
+# lo mostra una volta sola). Una risposta per persona ogni 6 ore in
+# memoria: il riquadro si apre al piu' ogni 3 giorni, ma una domanda a
+# Telegram a ogni apertura non serve a nessuno.
+_NOTIZIE_ISCRITTI: dict = {}
+NOTIZIE_CACHE_S = 6 * 3600
+
+
+@app.get("/api/me/canale-notizie")
+async def mio_canale_notizie(x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    tg = int(user["id"])
+    adesso = time.time()
+    c = _NOTIZIE_ISCRITTI.get(tg)
+    if c and adesso - c[0] < NOTIZIE_CACHE_S:
+        return {"iscritto": c[1]}
+    esito = None
+    try:
+        r = await bot_api("getChatMember", {"chat_id": CANALE_NOTIZIE_CHAT,
+                                            "user_id": tg})
+        res = (r or {}).get("result")
+        if r and r.get("ok") and isinstance(res, dict) and res.get("status"):
+            esito = res["status"] in ("member", "administrator", "creator",
+                                      "restricted")
+    except Exception as e:
+        print(f"⚠️ [notizie] il canale non risponde: {e}")
+    if len(_NOTIZIE_ISCRITTI) > 20000:
+        _NOTIZIE_ISCRITTI.clear()
+    _NOTIZIE_ISCRITTI[tg] = (adesso, esito)
+    return {"iscritto": esito}
 
 
 @app.get("/api/me/stradina")

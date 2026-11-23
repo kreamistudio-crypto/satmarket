@@ -2246,6 +2246,10 @@ Per ora esplora liberamente e contribuisci allo sviluppo: un feedback, un'opinio
 👉 Entra nel canale: dentro trovi il post fissato 📋 dove lasciare i tuoi feedback."""
 # Dove porta il bottone "Entra nel canale". Vuoto = niente bottone.
 BANNER_TEST_LINK = ""
+# Il canale delle notizie: a rodaggio spento, il riquadro che invita a
+# entrarci (ogni 3 giorni) chiede al bot se la persona e' gia' iscritta.
+# Il bot deve essere amministratore del canale.
+CANALE_NOTIZIE_CHAT = "@barattolostore"
 
 # --- Contatore degli utenti (in vetrina, sotto gli oggetti) ----------
 # "54 utenti": quante persone sono già entrate nel mercatino (tutti gli
