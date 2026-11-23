@@ -224,3 +224,4 @@ collaudo_recensioni_nascoste
 collaudo_promozioni
 collaudo_profilo_mio
 collaudo_nascondi_annuncio
+collaudo_foto_varianti

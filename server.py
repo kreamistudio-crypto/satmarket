@@ -10804,6 +10804,11 @@ def init_db():
                     # compra ne sceglie una voce per tendina alla cassa
                     # e la scelta arriva al venditore nella nota.
                     "scelte TEXT DEFAULT ''",
+                    # LE DESCRIZIONI DELLE FOTO (23 nov 2026, chieste da
+                    # Zzap): JSON [testo, ...] allineato a `foto`, '' dove
+                    # la foto non ne ha. Le scrive chi vende dal foglio
+                    # Vendi e dalla modifica; si leggono a foto aperta.
+                    "didascalie TEXT DEFAULT ''",
                     # IL CONTEGGIO DELLE VISUALIZZAZIONI (set 2026):
                     # privato, lo vede solo il proprietario (e gli
                     # admin) — vedi la CREATE TABLE qui sopra per il
@@ -26667,7 +26672,8 @@ def _documento_busta(dataurl: str) -> tuple[bytes, str, str]:
 
 
 def salva_foto(annuncio_id: int, foto_lista: list,
-               versione: str = "") -> tuple[list, list]:
+               versione: str = "", indici: list | None = None
+               ) -> tuple[list, list]:
     """Salva le foto dell'annuncio. Dalla Mini App di solito arrivano
     gia' ridimensionate in JPEG (base64); quelle che il browser non ha
     saputo leggere (le HEIC degli iPhone) arrivano grezze e le converte
@@ -26684,7 +26690,12 @@ def salva_foto(annuncio_id: int, foto_lista: list,
     «la foto 2 non è stata accettata: troppo grande». La posizione e'
     quella della scelta, cioe' dell'anteprima che l'utente ha davanti,
     e la frase e' gia' intera qui: il client la mostra com'e', senza
-    una regola gemella da tenere in pari."""
+    una regola gemella da tenere in pari.
+
+    `indici` (23 nov 2026, cantiere foto-varianti), se c'e', riceve la
+    POSIZIONE nella lista di ogni foto entrata: serve a chi deve tenere
+    allineata alle foto un'altra lista (le descrizioni) o rimetterle in
+    mezzo a quelle che restano (la modifica)."""
     nomi, scarti = [], []
     for i, f in enumerate((foto_lista or [])[:5]):     # max 5 foto
         posto = f"la foto {i + 1} non è stata accettata: "
@@ -26753,6 +26764,8 @@ def salva_foto(annuncio_id: int, foto_lista: list,
         nome = _salva_una_foto(annuncio_id, i, raw, versione)
         if nome:
             nomi.append(nome)
+            if indici is not None:
+                indici.append(i)
         else:
             scarti.append(posto + "non riesco a leggere questa foto")
     return nomi, scarti
@@ -26880,6 +26893,262 @@ def guardia_almeno_una_foto(nuove, gia=None, messaggio: str = ""):
     if ha_foto(gia):
         return
     raise HTTPException(400, messaggio or MSG_SERVE_UNA_FOTO)
+
+
+# ---------------------------------------------------------------------
+# LE DESCRIZIONI DELLE FOTO E LE VARIANTI DI CHI VENDE (23 nov 2026,
+# cantiere foto-varianti: le ha chieste Zzap, le ha decise Andrea)
+# ---------------------------------------------------------------------
+# LA DESCRIZIONE DI UNA FOTO e' una riga corta che si legge a foto
+# aperta. Vive in `annunci.didascalie`, un JSON ALLINEATO a `foto` (la
+# posizione e' il legame): chi riordina, toglie o aggiunge foto rimanda
+# le due liste insieme, e il server le scrive insieme. '' = nessuna.
+# LE VARIANTI SEMPLICI («Colore: rosso, blu, verde») sono le scelte
+# «Qualsiasi» del 19 nov (`annunci.scelte`), che fin qui scriveva solo
+# il connettore dei negozi: stessa colonna, stessa cassa, stessa nota
+# all'ordine — qui le scrive chi vende dal foglio. Prezzo e pezzi sono
+# quelli dell'annuncio; le varianti col LORO prezzo sono un'altra
+# cosa, la famiglia (`varianti_da_payload`).
+# ENTRAMBE PASSANO DALLA MODERAZIONE: sono testo che entra in vetrina,
+# e `testo_da_moderare` le mette in coda alla descrizione.
+MAX_DIDASCALIA = 80
+MAX_SCELTE_VENDITORE = 3     # tendine per annuncio
+MAX_VOCI_SCELTA = 20         # voci per tendina
+MAX_NOME_SCELTA = 30
+MAX_VOCE_SCELTA = 40
+
+
+def didascalie_lette(grezzo) -> list:
+    """Le descrizioni dalla colonna: una lista di stringhe ('' = la foto
+    non ne ha), e la lista vuota per tutto il resto — mai un 500."""
+    try:
+        v = json.loads(grezzo or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(v, list):
+        return []
+    return [x if isinstance(x, str) else "" for x in v]
+
+
+def didascalie_da_payload(grezze, quante: int) -> list:
+    """Le descrizioni del payload, allineate alle `quante` foto
+    mandate: spazi ripuliti, '' dove non c'e' niente. Oltre il tetto e'
+    un 400 che dice quale foto — mai un taglio muto."""
+    if not isinstance(grezze, list):
+        grezze = []
+    fuori = []
+    for i in range(quante):
+        t = grezze[i] if i < len(grezze) else ""
+        t = " ".join(t.split()) if isinstance(t, str) else ""
+        if len(t) > MAX_DIDASCALIA:
+            raise HTTPException(400, f"La descrizione della foto {i + 1} "
+                                     f"è troppo lunga (massimo "
+                                     f"{MAX_DIDASCALIA} caratteri)")
+        fuori.append(t)
+    return fuori
+
+
+def didascalie_json(lista) -> str:
+    """Come si scrivono in colonna: '' se nessuna foto ne ha una."""
+    return json.dumps(list(lista), ensure_ascii=False) \
+        if any(lista) else ""
+
+
+def scelte_del_venditore(grezze):
+    """Le varianti semplici scritte da chi vende, nella forma della
+    colonna `scelte`. None = la chiave non c'era (la modifica non le
+    tocca), '' = nessuna. Voci ripulite e senza doppioni; una tendina
+    senza nome e senza voci e' una riga lasciata vuota, e si salta."""
+    if grezze is None:
+        return None
+    if not isinstance(grezze, list):
+        raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                 "riprova")
+    fuori = []
+    for o in grezze:
+        if not (isinstance(o, list) and len(o) == 2
+                and isinstance(o[1], list)):
+            raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                     "riprova")
+        nome = " ".join(str(o[0] or "").split())
+        voci = []
+        for v in o[1]:
+            v = " ".join(str(v or "").split())
+            if v and v not in voci:
+                voci.append(v)
+        if not nome and not voci:
+            continue
+        if not nome or not voci:
+            raise HTTPException(400, "Ogni variante vuole un nome e almeno "
+                                     "una voce (per esempio «Colore: "
+                                     "rosso, blu»)")
+        if (len(nome) > MAX_NOME_SCELTA
+                or any(len(v) > MAX_VOCE_SCELTA for v in voci)
+                or len(voci) > MAX_VOCI_SCELTA):
+            raise HTTPException(400, f"«{nome[:MAX_NOME_SCELTA]}»: nome fino "
+                                     f"a {MAX_NOME_SCELTA} caratteri, voci "
+                                     f"fino a {MAX_VOCE_SCELTA}, al massimo "
+                                     f"{MAX_VOCI_SCELTA} voci")
+        if any(nome.lower() == f[0].lower() for f in fuori):
+            raise HTTPException(400, f"«{nome}» c'è due volte: usa nomi "
+                                     f"diversi")
+        fuori.append([nome, voci])
+    if len(fuori) > MAX_SCELTE_VENDITORE:
+        raise HTTPException(400, f"Al massimo {MAX_SCELTE_VENDITORE} "
+                                 f"varianti per annuncio")
+    return json.dumps(fuori, ensure_ascii=False) if fuori else ""
+
+
+# LE VARIANTI COL LORO PREZZO E I LORO PEZZI (23 nov 2026, stesso
+# cantiere). Sono la FAMIGLIA dei negozi collegati (set 2026), fatta dal
+# foglio Vendi: ogni voce e' un annuncio vero, col suo prezzo e le sue
+# scorte, e la vetrina le mostra come UNA card coi bottoncini nella
+# scheda. Cosi' cassa, pagamento, scorte, esauriti e ordini restano
+# quelli di sempre, byte per byte: nessuna strada dei soldi nuova. La
+# chiave e' «u:<id del primo>» (u come utente: i negozi usano «c<n>:»,
+# non si mescolano mai). Nascono SOLO in pubblica; poi ogni variante si
+# ritocca dalla sua «Modifica», come un annuncio qualunque.
+MAX_VARIANTI_PREZZO = 10
+
+
+def titolo_variante(titolo: str, voce: str) -> str:
+    """Il titolo di una variante: quello dell'annuncio e la voce, cosi'
+    nell'ordine e nella notifica chi vende sa QUALE ha venduto."""
+    return f"{titolo} – {voce}"
+
+
+async def varianti_da_payload(d: dict, valuta: str, prezzo_sats: int,
+                              prezzo_eur: float, quantita: int,
+                              senza_scorte: bool) -> tuple[str, list]:
+    """(nome, voci) delle varianti col loro prezzo, o ("", []) se il
+    payload non ne porta. Ogni voce e' {voce, prezzo_sats, prezzo_eur,
+    quantita}: prezzo e pezzi lasciati vuoti valgono quelli
+    dell'annuncio. Il prezzo passa dal giudice di sempre
+    (`prezzo_da_payload`, nella valuta dell'annuncio), i pezzi da
+    `quantita_da_payload`; dove le scorte non esistono (servizi) i pezzi
+    restano quelli dell'annuncio."""
+    v = d.get("varianti")
+    if not v:
+        return "", []
+    if not isinstance(v, dict) or not isinstance(v.get("voci"), list):
+        raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                 "riprova")
+    nome = " ".join(str(v.get("nome") or "").split())
+    voci, viste = [], set()
+    for x in v["voci"]:
+        if not isinstance(x, dict):
+            raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                     "riprova")
+        voce = " ".join(str(x.get("voce") or "").split())
+        if not voce:
+            continue
+        if voce.lower() in viste:
+            raise HTTPException(400, f"«{voce}» c'è due volte: usa voci "
+                                     f"diverse")
+        viste.add(voce.lower())
+        if len(voce) > MAX_VOCE_SCELTA:
+            raise HTTPException(400, f"«{voce[:MAX_VOCE_SCELTA]}…»: una "
+                                     f"voce sta in {MAX_VOCE_SCELTA} "
+                                     f"caratteri")
+        ps, pe = prezzo_sats, prezzo_eur
+        if x.get("prezzo") not in (None, ""):
+            chiave = "prezzo_eur" if valuta == "eur" else "prezzo_sats"
+            _, ps, pe = await prezzo_da_payload(
+                {"titolo": d.get("titolo"), "valuta": valuta,
+                 chiave: x["prezzo"]})
+        q = quantita
+        if not senza_scorte and x.get("quantita") not in (None, ""):
+            q = quantita_da_payload({"quantita": x["quantita"]})
+        voci.append({"voce": voce, "prezzo_sats": ps, "prezzo_eur": pe,
+                     "quantita": q})
+    if not voci:
+        return "", []
+    if not nome:
+        raise HTTPException(400, "Scrivi il nome delle varianti (per "
+                                 "esempio «Colore»)")
+    if len(nome) > MAX_NOME_SCELTA:
+        raise HTTPException(400, f"Il nome delle varianti sta in "
+                                 f"{MAX_NOME_SCELTA} caratteri")
+    if len(voci) < 2:
+        raise HTTPException(400, "Per le varianti servono almeno due voci")
+    if len(voci) > MAX_VARIANTI_PREZZO:
+        raise HTTPException(400, f"Al massimo {MAX_VARIANTI_PREZZO} "
+                                 f"varianti per annuncio")
+    return nome, voci
+
+
+# Le colonne che una sorella NON eredita dalla prima: sono la sua storia
+# (eventi, post, visite, indice della ricerca), e lei non ne ha ancora.
+_SORELLA_DA_ZERO = {"nostr_event_id": "", "post_canale_id": 0,
+                    "nostr_impronta": "", "visualizzazioni": 0,
+                    "ricerca_v": 0}
+
+
+def crea_sorelle(capo_id: int, nome: str, voci: list,
+                 famiglia_titolo: str) -> list:
+    """La famiglia nasce dalla prima variante, gia' scritta e con le
+    sue foto: le altre sono sue COPIE (stessi campi, stessa consegna,
+    stesso stato — anche 'revisione') con voce, prezzo e pezzi propri,
+    e le foto copiate dai file (mai condivise: una modifica di una
+    sorella toglie le sue vecchie, e non deve togliere quelle delle
+    altre). Ritorna gli id delle sorelle nuove."""
+    chiave = f"u:{capo_id}"
+    con = db()
+    capo = dict(con.execute("SELECT * FROM annunci WHERE id=?",
+                            (capo_id,)).fetchone())
+    con.execute("UPDATE annunci SET famiglia=?, famiglia_titolo=?, "
+                "opzioni=? WHERE id=?",
+                (chiave, famiglia_titolo,
+                 json.dumps([[nome, voci[0]["voce"]]], ensure_ascii=False),
+                 capo_id))
+    ids = []
+    for v in voci[1:]:
+        riga = {k: x for k, x in capo.items() if k != "id"}
+        riga.update({k: x for k, x in _SORELLA_DA_ZERO.items()
+                     if k in riga})
+        riga.update(titolo=titolo_variante(famiglia_titolo, v["voce"]),
+                    prezzo_sats=v["prezzo_sats"],
+                    prezzo_eur=v["prezzo_eur"],
+                    quantita=v["quantita"], quantita_max=v["quantita"],
+                    famiglia=chiave, famiglia_titolo=famiglia_titolo,
+                    opzioni=json.dumps([[nome, v["voce"]]],
+                                       ensure_ascii=False),
+                    foto="", didascalie="")
+        colonne = list(riga)
+        con.execute(f"INSERT INTO annunci({','.join(colonne)}) "
+                    f"VALUES({','.join('?' * len(colonne))})",
+                    [riga[c] for c in colonne])
+        ids.append(con.execute("SELECT last_insert_rowid() AS i")
+                   .fetchone()["i"])
+    con.commit()
+    con.close()
+    try:
+        nomi_capo = json.loads(capo["foto"] or "[]")
+    except Exception:
+        nomi_capo = []
+    for sid in ids:
+        nomi, _ = copia_foto(sid, nomi_capo)
+        # le descrizioni viaggiano solo se le foto sono entrate tutte:
+        # con una in meno non si saprebbe piu' quale va con quale
+        did = (capo.get("didascalie") or "") \
+            if len(nomi) == len(nomi_capo) else ""
+        if nomi:
+            con = db()
+            con.execute("UPDATE annunci SET foto=?, didascalie=? "
+                        "WHERE id=?", (json.dumps(nomi), did, sid))
+            con.commit()
+            con.close()
+    return ids
+
+
+def testo_da_moderare(descrizione: str, didascalie=(), scelte="") -> str:
+    """La descrizione con in coda le descrizioni delle foto e le
+    varianti: tutto il testo che entra in vetrina passa dagli stessi
+    strati (filtro parole e AI), niente porta laterale."""
+    pezzi = [descrizione or ""] + [t for t in (didascalie or []) if t]
+    for nome, voci in scelte_lette(scelte or ""):
+        pezzi.append(f"{nome}: {', '.join(voci)}")
+    return "\n".join(p for p in pezzi if p)
 
 
 def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
@@ -30188,6 +30457,8 @@ CAMPI_VETRINA = (
     # LE SCELTE «QUALSIASI» (19 nov 2026): le tendine della scheda,
     # pubbliche come le opzioni (le dice il negozio a tutti)
     "a.scelte, "
+    # LE DESCRIZIONI DELLE FOTO (23 nov 2026): pubbliche come le foto
+    "a.didascalie, "
     # il massimo mai dichiarato NON esce da qui: lo legge
     # arricchisci_righe_vetrina per decidere il flag `ultimo`, e poi lo
     # butta via — grezzo racconterebbe «ne ha venduti N», che e' un dato
@@ -30427,6 +30698,8 @@ def arricchisci_righe_vetrina(righe):
             r["opzioni"] = _opzioni_lista(r["opzioni"])
         if "scelte" in r:
             r["scelte"] = scelte_lette(r["scelte"])
+        if "didascalie" in r:
+            r["didascalie"] = didascalie_lette(r["didascalie"])
     fam = sorted({r["famiglia"] for r in righe if r.get("famiglia")})
     if fam:
         con = db()
@@ -31782,11 +32055,38 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     guardia_almeno_una_foto(
         d.get("foto"),
         foto_da_copiare(user["id"], d.get("copia_foto_da")))
+    # LE DESCRIZIONI DELLE FOTO E LE VARIANTI (23 nov 2026, cantiere
+    # foto-varianti): lette e giudicate qui, PRIMA della moderazione che
+    # le legge insieme alla descrizione. Le varianti non valgono sulle
+    # aste: il vincitore non passa dalla cassa che le fa scegliere.
+    foto_chieste = d.get("foto") if isinstance(d.get("foto"), list) else []
+    didascalie_nuove = didascalie_da_payload(d.get("didascalie"),
+                                             len(foto_chieste))
+    scelte_nuove = "" if asta_secondi else (
+        scelte_del_venditore(d.get("scelte")) or "")
+    # le varianti col loro prezzo: la prima e' QUESTO annuncio (titolo,
+    # prezzo e pezzi suoi), le altre nascono dopo, sue copie. Non sulle
+    # aste ne' sugli abbonamenti: un pezzo unico e un mese non hanno
+    # varianti. Qui, coi loro await, prima dello scudo anti-doppione.
+    nome_var, varianti = ("", []) if (asta_secondi or abbonamento) else \
+        await varianti_da_payload(d, valuta, prezzo_sats, prezzo_eur,
+                                  quantita, consegna == "servizio")
+    famiglia_titolo = ""
+    if varianti:
+        famiglia_titolo = d["titolo"]
+        d["titolo"] = titolo_variante(famiglia_titolo, varianti[0]["voce"])
+        prezzo_sats = varianti[0]["prezzo_sats"]
+        prezzo_eur = varianti[0]["prezzo_eur"]
+        quantita = varianti[0]["quantita"]
+    testo_mod = testo_da_moderare(
+        d.get("descrizione", ""), didascalie_nuove, scelte_nuove
+        or (json.dumps([[nome_var, [v["voce"] for v in varianti]]])
+            if varianti else ""))
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
-    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    categoria = controlla_vietato(d["titolo"], testo_mod)
     if categoria:
-        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        parola = parola_vietata(d["titolo"], testo_mod)
         registra_moderazione("parole", "vietato",
                              motivo_parole(categoria, parola),
                              d["titolo"], venditore_id=user["id"])
@@ -31802,7 +32102,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # --- Strato 2: parere dell'AI. Il vietato netto blocca come
     # sempre; il DUBBIO non blocca piu' (lug 2026): l'annuncio nasce
     # in stato 'revisione' e decide un moderatore umano. ---
-    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    verdetto = await moderazione_ai(d["titolo"], testo_mod)
     if verdetto and verdetto[0] == "vietato":
         registra_moderazione("ai", "vietato", verdetto[1],
                              d["titolo"], venditore_id=user["id"])
@@ -31929,13 +32229,18 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     if abbonamento:
         con.execute("UPDATE annunci SET abbonamento=1 WHERE id=?",
                     (annuncio_id,))
+    # le varianti semplici (23 nov 2026): stesso UPDATE a parte
+    if scelte_nuove:
+        con.execute("UPDATE annunci SET scelte=? WHERE id=?",
+                    (scelte_nuove, annuncio_id))
     con.commit()
     con.close()
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
     # di CPU e non deve congelare il server (che e' mono-processo).
     # Il commit e' gia' fatto: niente lock del database nel frattempo.
+    entrate = []   # le posizioni delle foto entrate, per le descrizioni
     nomi, scarti_foto = await asyncio.to_thread(salva_foto, annuncio_id,
-                                                d.get("foto"))
+                                                d.get("foto"), "", entrate)
     # IL DUPLICATO EREDITA LE FOTO (ago 2026): chi ricalca un proprio
     # annuncio non le ricarica — si copiano i file di quello di
     # partenza. Solo se non ne ha scelte di NUOVE: sceglierne una
@@ -31981,15 +32286,26 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
               f"{len(nomi)} foto salvate, {len(scarti_foto)} scartate — "
               + "; ".join(scarti_foto), flush=True)
     if nomi:
+        # le descrizioni seguono le foto ENTRATE: una scartata si porta
+        # via la sua, e le altre restano accanto alla foto giusta (nel
+        # duplicato le foto copiate non ne hanno: `entrate` e' vuota)
+        didascalie = [didascalie_nuove[i] for i in entrate
+                      if i < len(didascalie_nuove)]
         con = db()
-        con.execute("UPDATE annunci SET foto=? WHERE id=?",
-                    (json.dumps(nomi), annuncio_id))
+        con.execute("UPDATE annunci SET foto=?, didascalie=? WHERE id=?",
+                    (json.dumps(nomi), didascalie_json(didascalie),
+                     annuncio_id))
         con.commit()
         con.close()
     # Quante ne sono entrate davvero: la risposta lo DICE, e il client
     # avvisa. Un annuncio che nasce con meno foto di quelle scelte non
     # e' una cosa da scoprire da soli aprendo la scheda.
     conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
+    # le sorelle (23 nov 2026): copie della prima, foto comprese; in
+    # piazza e nei canali parla la famiglia, cioe' la prima
+    if varianti:
+        await asyncio.to_thread(crea_sorelle, annuncio_id, nome_var,
+                                varianti, famiglia_titolo)
     if in_revisione:
         # La terza via: l'annuncio esiste ma non e' online — niente
         # Nostr, niente promo, niente avvisi di ricerca, niente
@@ -34579,11 +34895,40 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # a voler dire «restano quelle».
     guardia_almeno_una_foto(d.get("foto"), a["foto"],
                             MSG_SERVE_UNA_FOTO_MODIFICA)
+    # LE FOTO CHE RESTANO, LE NUOVE E LE DESCRIZIONI (23 nov 2026,
+    # cantiere foto-varianti). La lista `foto` adesso e' l'annuncio
+    # INTERO nell'ordine voluto: un nome che l'annuncio ha gia' vuol
+    # dire «questa resta, qui», un data: e' una foto nuova da salvare in
+    # quel posto. Quel che manca dalla lista se ne va. Un client di
+    # prima manda solo foto nuove, e per lui non cambia niente: e' la
+    # sostituzione in blocco di sempre.
+    try:
+        foto_prima = json.loads(a["foto"]) if a["foto"] else []
+    except Exception:
+        foto_prima = []
+    foto_chieste = d.get("foto") if isinstance(d.get("foto"), list) else []
+    restano = [f for f in foto_chieste
+               if isinstance(f, str) and f in foto_prima]
+    if len(set(restano)) != len(restano):
+        raise HTTPException(400, "La stessa foto c'è due volte: togline "
+                                 "una e riprova")
+    if len(foto_chieste) > 5:
+        raise HTTPException(400, "Al massimo 5 foto per annuncio")
+    didascalie_nuove = didascalie_da_payload(d.get("didascalie"),
+                                             len(foto_chieste))
+    # le varianti semplici: chiave assente = restano quelle che ci sono
+    # (None); sulle aste non valgono, come in pubblica
+    scelte_nuove = scelte_del_venditore(d.get("scelte"))
+    if scelte_nuove and a["asta_base_sats"]:
+        scelte_nuove = ""
+    testo_mod = testo_da_moderare(
+        d.get("descrizione", ""), didascalie_nuove,
+        a["scelte"] if scelte_nuove is None else scelte_nuove)
 
     # --- Stessa moderazione di una pubblicazione nuova ---
-    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    categoria = controlla_vietato(d["titolo"], testo_mod)
     if categoria:
-        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        parola = parola_vietata(d["titolo"], testo_mod)
         registra_moderazione("parole", "vietato",
                              motivo_parole(categoria, parola), d["titolo"],
                              annuncio_id, user["id"])
@@ -34595,7 +34940,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=categoria,
                                                    parola=parola))
-    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    verdetto = await moderazione_ai(d["titolo"], testo_mod)
     if verdetto and verdetto[0] == "vietato":
         registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
                              annuncio_id, user["id"])
@@ -34624,14 +34969,23 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # se ne ha scelte, e «toglile tutte» dal form non si puo' chiedere
     # (prima una lista vuota svuotava l'annuncio e ne cancellava i file).
     nomi_nuovi, scarti_foto = [], []
-    if isinstance(d.get("foto"), list) and d["foto"]:
+    foto_finali = None   # None = le foto e le loro descrizioni non si toccano
+    da_salvare = [(i, x) for i, x in enumerate(foto_chieste)
+                  if not (isinstance(x, str) and x in foto_prima)]
+    if da_salvare:
         # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
         # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
         # E in un thread, come in pubblica(): la conversione HEIC non
-        # deve congelare il server.
+        # deve congelare il server. Il timestamp salta avanti se una
+        # foto che RESTA lo porta gia' (due modifiche nello stesso
+        # secondo): un nome nuovo non deve mai coprire uno che resta.
+        ts = int(time.time())
+        while any(n.endswith(f"_{ts}.jpg") for n in restano):
+            ts += 1
+        entrate = []
         nomi_nuovi, scarti_foto = await asyncio.to_thread(
-            salva_foto, annuncio_id, d["foto"],
-            versione=f"_{int(time.time())}")
+            salva_foto, annuncio_id, [x for _, x in da_salvare],
+            f"_{ts}", entrate)
         if scarti_foto:
             print(f"📷 Modifica dell'annuncio #{annuncio_id}: "
                   f"{len(nomi_nuovi)} foto salvate, {len(scarti_foto)} "
@@ -34641,6 +34995,19 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                 400, "Modifica non salvata — " + "; ".join(scarti_foto)
                      + ". L'annuncio è com'era, foto comprese: cambia le "
                        "foto nuove e riprova.")
+        # ogni foto nuova entrata torna al posto in cui era nella lista
+        nuova_al_posto = {da_salvare[k][0]: n
+                          for k, n in zip(entrate, nomi_nuovi)}
+    else:
+        nuova_al_posto = {}
+    if foto_chieste:
+        foto_finali, didascalie_finali = [], []
+        for i, x in enumerate(foto_chieste):
+            nome = x if (isinstance(x, str) and x in foto_prima) \
+                else nuova_al_posto.get(i)
+            if nome:
+                foto_finali.append(nome)
+                didascalie_finali.append(didascalie_nuove[i])
 
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
@@ -34725,6 +35092,10 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # (20 nov 2026) l'abbonamento: deciso qui sopra, si scrive sempre
     con.execute("UPDATE annunci SET abbonamento=? WHERE id=?",
                 (abbonamento, annuncio_id))
+    # (23 nov 2026) le varianti semplici: None = chiave assente, restano
+    if scelte_nuove is not None:
+        con.execute("UPDATE annunci SET scelte=? WHERE id=?",
+                    (scelte_nuove, annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -34773,17 +35144,18 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"riproponi sul listino nuovo."
             f"\n{link_telegram('annuncio', annuncio_id)}")
     conto_foto = {}
-    if nomi_nuovi:
-        nomi = nomi_nuovi
+    if foto_finali:
+        nomi = foto_finali
         # come in pubblica(): quante ne sono entrate lo dice la risposta
-        conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
-        try:
-            vecchie = json.loads(a["foto"]) if a["foto"] else []
-        except Exception:
-            vecchie = []
+        # (le NUOVE: e' su quelle che il client fa il conto)
+        if da_salvare:
+            conto_foto = {"foto_salvate": len(nomi_nuovi),
+                          "foto_scarti": scarti_foto}
+        vecchie = foto_prima
         con = db()
-        con.execute("UPDATE annunci SET foto=? WHERE id=?",
-                    (json.dumps(nomi), annuncio_id))
+        con.execute("UPDATE annunci SET foto=?, didascalie=? WHERE id=?",
+                    (json.dumps(nomi), didascalie_json(didascalie_finali),
+                     annuncio_id))
         con.commit()
         # LE FOTO DELLA FOTOGRAFIA RESTANO (18 nov 2026): se una
         # fotografia in archivio (un anno) le nomina, sono lo storico.
@@ -35371,6 +35743,17 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
         "UPDATE annunci SET stato=? WHERE id=? AND stato='revisione'",
         (nuovo, annuncio_id))
     deciso = cur.rowcount == 1
+    # LE VARIANTI NATE INSIEME SI DECIDONO INSIEME (23 nov 2026, cantiere
+    # foto-varianti): la famiglia fatta dal foglio Vendi e' un annuncio
+    # solo per chi l'ha scritto, e il moderatore ne ha guardato uno. Solo
+    # le sorelle ancora com'erano alla nascita (stesso `creato` e stesso
+    # `modificato`): una ritoccata dopo ha la sua revisione, e si decide
+    # da sola.
+    if deciso and (a["famiglia"] or "").startswith("u:"):
+        con.execute("UPDATE annunci SET stato=? WHERE famiglia=? AND id<>? "
+                    "AND stato='revisione' AND creato=? AND modificato=?",
+                    (nuovo, a["famiglia"], annuncio_id, a["creato"],
+                     a["modificato"]))
     if (deciso and esito == "pubblica" and a["asta_base_sats"] > 0
             and a["asta_scadenza"] > 0):
         # L'asta nata (o tornata) in revisione non paga la coda: il

@@ -95436,3 +95436,71 @@ DA GUARDARE. Non provato dal vivo su Telegram né sui relay veri: il
 «sold» firmato dal venditore che pubblica col suo profilo (stessa coda
 dell'esaurito). Chi vuole nascondere con un ordine aperto deve aspettare
 che si chiuda.
+
+## Le foto in ordine con la loro descrizione, e le varianti dal foglio Vendi (23 nov 2026 notte, cantiere foto-varianti; Zzap in Assistenza: spostare le foto, aggiungerne dopo, una descrizione per foto, le varianti di colore; Andrea: «Rispondigli e sistemiamo anche questo», «Fai tutti i punti mandali sul develop e mandalo in produzione stanotte»)
+
+DECISO (piano approvato da Andrea, «Ok piano si manda», poi «Fai anche
+il punto 4» e «Fai tutti i punti»). Cinque cose.
+1. Le frecce ◀ ▶ sotto ogni foto e la riga «La prima foto è la
+copertina»: col dito sul telefono sono più semplici del trascinamento.
+2. In Modifica le foto attuali restano (etichetta «Le tue foto (fino a
+5)»): si aggiungono, si spostano, si tolgono con la ✕. Il patto col
+server: la lista `foto` della modifica è l'annuncio INTERO nell'ordine
+voluto; un nome che l'annuncio ha già vuol dire «resta, qui», un data: è
+una foto nuova in quel posto, quel che manca se ne va (anche dal disco,
+dopo il database, come prima; le foto della fotografia d'ordine restano
+protette). Il client di ieri manda solo data: e per lui è la
+sostituzione in blocco di sempre. Lista vuota o assente: le foto non si
+toccano (com'era). Il timestamp dei nomi nuovi salta avanti se una foto
+che resta lo porta già.
+3. «Descrizione della foto (facoltativa)», 80 caratteri, letta a foto
+aperta (`#lbDidascalia`). Colonna `annunci.didascalie`, JSON allineato a
+`foto`; `salva_foto` ha un argomento `indici` che dice quali posizioni
+sono entrate, così una foto scartata si porta via la sua descrizione. Nel
+client le descrizioni stanno in una mappa PER FOTO e non per posizione:
+spostare o togliere non le può disallineare.
+4. Le varianti semplici («Colore: rosso, blu, verde») sono le scelte
+«Qualsiasi» del 19 nov: stessa colonna `scelte`, stessa cassa, stessa
+nota all'ordine; fin qui le scriveva solo il connettore dei negozi, ora
+anche chi vende (`scelte_del_venditore`). In modifica: chiave assente =
+restano, lista vuota = tolte.
+5. Le varianti col loro prezzo e i loro pezzi (la spunta «Prezzo o pezzi
+diversi per ogni variante», solo pubblicando) sono la FAMIGLIA dei negozi
+(set 2026): un annuncio per voce, titolo «Titolo – voce», `famiglia`
+«u:<id della prima>» (i negozi usano «c<n>:», non si mescolano),
+`opzioni` [[nome, voce]]. La prima è l'annuncio che passa da pubblica
+come sempre; le altre sono sue copie (`crea_sorelle`) con prezzo e pezzi
+propri e le foto COPIATE dai file, mai condivise (una modifica di una
+sorella toglie le sue vecchie). Così cassa, pagamento, scorte ed esauriti
+restano quelli di sempre: nessuna strada dei soldi nuova. In piazza e nei
+canali parla la famiglia (`annuncio_per_nostr` lo faceva già). Nata in
+revisione, si decide tutta insieme: `decidi_revisione` porta con sé le
+sorelle «u:» ancora com'erano alla nascita (stesso creato e modificato).
+Niente varianti su aste e abbonamenti. Tutto il testo nuovo (descrizioni
+delle foto e varianti) passa dalla moderazione con la descrizione
+(`testo_da_moderare`).
+
+SCARTATE. Il trascinamento delle foto (più difficile col dito). Prezzo e
+pezzi DENTRO un annuncio solo, per voce: avrebbe toccato cassa, scorte e
+pagamenti, cioè le strade dei soldi, che si provano prima sul collaudo
+(decisione del 17 nov); la famiglia esiste già ed è provata. Le
+descrizioni nel duplicato: le foto ereditate restano il riquadro di
+sempre e partono senza descrizione (imperfezione dichiarata). Una
+famiglia che si rifà dalla modifica: ogni variante si ritocca da sola.
+
+PROVATO. `collaudo_foto_varianti.py` (49, gabbia verde): descrizioni
+allineate anche con una foto scartata, 80 caratteri, la spia vietata in
+pubblica e in modifica; modifica che riordina, aggiunge in mezzo, toglie
+(file compresi), doppioni e più di cinque in 400, il client di ieri; le
+scelte nella colonna, la cassa che le esige; la famiglia di tre (titoli,
+prezzi, pezzi, opzioni, foto non condivise, la card «da»), la variante
+ritoccata che non tocca le sorelle, i 400 delle voci; la famiglia in
+revisione decisa insieme. `prove_foto_varianti` (20): i giudici puri e i
+gesti del foglio girati in node. Controprove: tolti l'allineamento, il
+posto delle foto che restano, lo scambio della freccia e la decisione
+della famiglia, le prove vanno rosse. Ritoccate le sentinelle di
+`prove_foto_scarti` e del duplicato (la modifica conta le foto NUOVE).
+Guardato con Playwright a 390px: le schede delle foto, la tabella dei
+prezzi, la modifica, la descrizione a schermo intero.
+RESTA: guardarlo dal telefono dopo la promozione; dire a Zzap che è
+online (col sì di Andrea per il testo).

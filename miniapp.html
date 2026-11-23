@@ -2389,6 +2389,36 @@
   #photoPreview .x{position:absolute;top:-6px;right:-6px;background:var(--ink);
     color:var(--on-ink);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
     justify-content:center;font-size:11px;cursor:pointer}
+  /* LE FOTO DA METTERE IN ORDINE (23 nov 2026, cantiere foto-varianti):
+     due per riga sul telefono, ognuna con le frecce ◀ ▶ e la sua
+     descrizione sotto. Le frecce e non il trascinamento: col dito su
+     un telefono sono piu' semplici (decisione di Andrea). */
+  #photoPreview .foto-card{width:calc(50% - 4px);max-width:180px;display:flex;
+    flex-direction:column;gap:6px}
+  #photoPreview .foto-quadro{position:relative}
+  #photoPreview .foto-card img{width:100%;height:110px}
+  #photoPreview .foto-frecce{display:flex;gap:6px}
+  #photoPreview .foto-frecce button{flex:1;min-height:34px;border-radius:10px;
+    border:1.5px solid var(--field-line);background:var(--chip-bg);color:var(--ink);
+    font:800 13px/1 Nunito,sans-serif;cursor:pointer}
+  #photoPreview .foto-frecce button:disabled{opacity:.35;cursor:default}
+  #photoPreview .foto-didascalia{width:100%;box-sizing:border-box;font-size:12.5px;
+    padding:8px 10px;margin:0}
+  #photoPreview .foto-copertina{width:100%;font-size:12px;color:var(--muted);font-weight:600}
+  /* la tabella delle varianti col loro prezzo: voce, prezzo, pezzi */
+  #sellVarTabella .var-riga{display:flex;gap:8px;align-items:center;margin-top:8px}
+  #sellVarTabella .var-riga span{flex:1 1 30%;font-weight:700;font-size:13.5px;
+    overflow-wrap:anywhere}
+  #sellVarTabella .var-riga input{flex:1 1 35%;min-width:0;margin:0}
+  #sellVarTabella .var-testa{margin-top:10px}
+  #sellVarTabella .var-testa span{font-size:11.5px;color:var(--muted);font-weight:700}
+  #sellVarTabella .var-testa span+span{flex:1 1 35%}
+  /* la descrizione della foto a tutto schermo: sopra i pallini */
+  #lbDidascalia{position:absolute;left:16px;right:16px;
+    bottom:calc(36px + env(safe-area-inset-bottom));text-align:center;
+    color:#fff;font:700 14px/1.4 Nunito,sans-serif;
+    text-shadow:0 1px 3px rgba(0,0,0,.8);pointer-events:none}
+  #lbDidascalia:empty{display:none}
   .card .info{padding:32px 12px 12px}
   /* overflow-wrap qui non salva la PAGINA — ci pensa gia' l'overflow
      hidden del clamp, verificato: la griglia non sborda nemmeno con un
@@ -16753,6 +16783,18 @@ document.getElementById('cartello')?.remove();</script>
       <div class="field" id="sellQtaField"><label>Quantità disponibile</label>
         <input id="sellQta" type="number" inputmode="numeric" min="1" placeholder="1" oninput="aggiornaSupplHint()">
         <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanti pezzi uguali hai? Vuoto o 1&nbsp;= un pezzo solo. All'esaurimento l'annuncio si mette in pausa: lo ricarichi dai tuoi annunci.</div></div>
+      <!-- LE VARIANTI (23 nov 2026, cantiere foto-varianti, chieste da
+           Zzap): «Colore: rosso, blu, verde». Senza la spunta sono le
+           scelte «Qualsiasi» del 19 nov (stesso prezzo e stessi pezzi,
+           chi compra sceglie alla cassa); con la spunta ogni voce ha il
+           suo prezzo e i suoi pezzi, e nasce una famiglia di annunci
+           (vedi crea_sorelle nel server). La disegna renderVariantiForm. -->
+      <div class="field" id="sellVariantiField"><label>🎨 Varianti <span style="font-weight:600;color:var(--muted)">(facoltative)</span></label>
+        <input id="sellVarNome" maxlength="30" placeholder="Es. Colore" oninput="renderVariantiForm()">
+        <input id="sellVarVoci" maxlength="400" placeholder="Es. rosso, blu, verde" oninput="renderVariantiForm()" style="margin-top:8px">
+        <label class="cons-riga" id="sellVarPrezziRiga" style="display:none;margin-top:8px"><input type="checkbox" id="sellVarPrezzi" onchange="renderVariantiForm()"> <span>Prezzo o pezzi diversi per ogni variante</span></label>
+        <div id="sellVarTabella"></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Chi compra sceglie prima di pagare e tu trovi la scelta nell'ordine.</div></div>
       <div class="field" id="sellConsegnaField"><label>Consegna — spunta le opzioni che offri</label>
         <label class="cons-riga"><input type="checkbox" id="sellConsSped" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🚚</span>Spedizione</span></label>
         <label class="cons-riga"><input type="checkbox" id="sellConsRitiro" onchange="aggiornaConsegnaForm()"> <span><span class="cons-ico" aria-hidden="true">🤝</span>Ritiro in zona</span></label>
@@ -17711,6 +17753,7 @@ document.getElementById('cartello')?.remove();</script>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
     <button class="foto-nav lb-nav next" aria-label="Foto successiva" title="Foto successiva">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    <div id="lbDidascalia"></div>
     <div id="lbDots"></div>
   </div>
   <!-- LA SBIRCIATA DI «CONTROLLA E PAGA» (5 ott 2026): la foto in grande
@@ -21036,11 +21079,12 @@ function iconeCard(l){
   return i ? `<span class="ico">${i}</span>` : '';
 }
 function mapListing(a){
-  let photos = [], thumbs = [];
+  let photos = [], thumbs = [], fotoNomi = [];
   try {
     const nomi = a.foto ? JSON.parse(a.foto) : [];
     photos = nomi.map(fotoUrl);
     thumbs = nomi.map(n => fotoUrl(fotoMini(n)));
+    fotoNomi = nomi.slice();
   } catch(e) {}
   return {id:a.id, emoji:EMOJI_CAT[a.categoria]||'📦', title:a.titolo,
     /* il pezzo leggibile dell'indirizzo, calcolato dal SERVER: qui non
@@ -21220,7 +21264,14 @@ function mapListing(a){
     /* LE SCELTE «QUALSIASI» (19 nov 2026, il negozio Uhmami): le
        tendine che sul negozio non cambiano prezzo ne' giacenza, come
        [[nome, [voci]]]. Lista vuota = niente da scegliere. */
-    scelte:(Array.isArray(a.scelte) && a.scelte) || []};
+    scelte:(Array.isArray(a.scelte) && a.scelte) || [],
+    /* LE DESCRIZIONI DELLE FOTO (23 nov 2026, cantiere foto-varianti):
+       allineate a `photos`, '' dove la foto non ne ha; si leggono a
+       foto aperta (apriLightbox). `fotoNomi` sono i nomi come li
+       conosce il server: la modifica li rimanda per dire «questa resta,
+       qui» (vedi salvaModifica). */
+    didascalie:(Array.isArray(a.didascalie) && a.didascalie) || [],
+    fotoNomi};
 }
 function mapOrder(o){
   const role = o.compratore_id===myTgId ? 'buyer'
@@ -38306,6 +38357,7 @@ let lbPinch0 = null, lbMid = null, lbMoved = false, lbSwipeX = 0;
    schermo e quindi si fermava dopo 40px contro il suo stesso
    guinzaglio: era il muro. */
 let lbPosX = 0, lbVel = 0, lbUltimo = 0, lbSlide = [];
+let lbDidascalie = [];   // le descrizioni, allineate a lbFoto
 /* Le misure del palco e della foto si prendono una volta e si
    tengono: leggerle a ogni pointermove (com'era) costringeva il
    browser a rifare i conti del layout in mezzo al dito, che e' il
@@ -38322,11 +38374,15 @@ function lbMisura(){
 
 /* `foto` facoltativa (ott 2026): le foto di una recensione si aprono
    nello stesso visore, senza un annuncio aperto dietro */
-function apriLightbox(i, foto){
+function apriLightbox(i, foto, didascalie){
   const lista = foto || currentListing?.photos;
   if (!lista || !lista.length) return;
   haptic();
   lbFoto = lista;
+  /* le descrizioni delle foto (23 nov 2026): quelle passate, oppure
+     quelle dell'annuncio aperto — mai quelle di un annuncio quando si
+     sfogliano le foto di una recensione */
+  lbDidascalie = (foto ? didascalie : currentListing?.didascalie) || [];
   el('lightbox').classList.add('open');
   /* con una foto sola le frecce non hanno dove portare */
   el('lightbox').classList.toggle('sola', lbFoto.length < 2);
@@ -38372,6 +38428,7 @@ function lbAllestisci(){
     if (j === lbIdx) im.id = 'lbImg';
   });
   [...el('lbDots').children].forEach((p, j) => p.classList.toggle('on', j === lbIdx));
+  if (el('lbDidascalia')) el('lbDidascalia').textContent = lbDidascalie[lbIdx] || '';
   const n = lbFoto.length;
   document.querySelectorAll('#lightbox .lb-nav').forEach(b =>
     b.disabled = b.classList.contains('prev') ? lbIdx <= 0 : lbIdx >= n - 1);
@@ -63375,6 +63432,15 @@ let sellFoto = [];   // le foto scelte, gia' ridimensionate
    una miniatura nera direbbe «foto rotta» di una foto che non lo e'. */
 const anteprimeMute = new Set();
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
+/* LE FOTO IN ORDINE E LE LORO DESCRIZIONI (23 nov 2026, cantiere
+   foto-varianti). In modifica le foto che l'annuncio ha gia' stanno
+   DENTRO `sellFoto` (col loro URL), mescolate alle nuove: si spostano,
+   si tolgono e se ne aggiungono, e al salvataggio partono tutte
+   nell'ordine scelto — le vecchie col loro nome (`fotoNomeDi`), le
+   nuove come data:. Le descrizioni stanno in una mappa per FOTO e non
+   per posizione: spostare o togliere una foto non le puo' disallineare. */
+const didascaliaDi = new Map();   // foto (URL o data:) -> descrizione
+const fotoNomeDi = new Map();     // URL di una foto che resta -> nome sul server
 /* IL DUPLICATO (ago 2026): il form si riempie come in modifica, ma
    l'annuncio che nasce e' NUOVO — quindi `editandoId` resta null e
    publish() prende la strada di sempre. Le due modalita' non possono
@@ -64694,6 +64760,11 @@ function aggiornaConsegnaForm(){
     : 'Zona (facoltativa)';
   aggiornaSpedHint();
   aggiornaCondizioneForm();   /* il solo-codice-online non la chiede */
+  if (typeof renderVariantiForm === 'function') {
+    /* (23 nov 2026) asta, abbonamento e servizio cambiano le varianti */
+    if (el('sellVarTabella')) delete el('sellVarTabella').dataset.firma;
+    renderVariantiForm();
+  }
 }
 /* Il campo Condizioni si mostra solo dove la scala dice qualcosa: la
    regola e' il giudice senzaCondizione(), e i due ingressi che la
@@ -64980,6 +65051,19 @@ function riempiFormDa(l){
   }
   aggiornaSpedCampo();
   sellFoto = []; fotoAttuali = (l.photos||[]).slice();
+  didascaliaDi.clear(); fotoNomeDi.clear();
+  /* in modifica le foto attuali entrano nella lista che si riordina
+     (23 nov 2026); nel duplicato e negli importati da Nostr restano il
+     riquadro di sempre */
+  if (editandoId && !editandoNostr) {
+    sellFoto = fotoAttuali.slice();
+    sellFoto.forEach((u, i) => {
+      fotoNomeDi.set(u, (l.fotoNomi || [])[i] || u);
+      const t = (l.didascalie || [])[i];
+      if (t) didascaliaDi.set(u, t);
+    });
+  }
+  impostaVariantiForm(l);
   renderFotoPreview(); aggiornaFormVendi();
 }
 
@@ -65092,6 +65176,7 @@ function annullaModifica(){
   incassoSell = ''; renderIncassoForm();
   etichettaSell = etichettaVuota(); etichettaEnergiaAuto = ''; renderEtichettaForm();
   impostaSellValuta('sats');
+  didascaliaDi.clear(); fotoNomeDi.clear(); impostaVariantiForm(null);
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il form rinasce: col costo standard, se c'e'
   precompilaZonaVendi(true); // ...e con la zona dell'ultimo annuncio
@@ -65122,11 +65207,18 @@ function aggiornaFormVendi(){
        nato senza (11 ott 2026, cantiere foto-obbligatorie: per salvare
        ne serve una) direbbero di sostituire il niente, proprio accanto
        alla riga che chiede di aggiungerne una: li' si dice «Aggiungi». */
+    /* (23 nov 2026) in modifica le foto attuali restano e se ne
+       aggiungono altre: «Le tue foto». La nota «sostituiscono tutte»
+       vale ormai solo per gli importati da Nostr, che le foto da qui
+       non le cambiano comunque. */
     if (el('sellFotoEtichetta'))
       el('sellFotoEtichetta').textContent = fotoAttuali.length
-        ? 'Sostituisci le foto (fino a 5)' : 'Aggiungi foto (fino a 5)';
+        ? (editandoNostr ? 'Sostituisci le foto (fino a 5)'
+                         : 'Le tue foto (fino a 5)')
+        : 'Aggiungi foto (fino a 5)';
     if (el('sellFotoNota'))
-      el('sellFotoNota').style.display = fotoAttuali.length ? '' : 'none';
+      el('sellFotoNota').style.display =
+        (fotoAttuali.length && editandoNostr) ? '' : 'none';
     /* «la consegna compresa» solo dove la consegna si dichiara
        davvero: sui due importati digitali il blocco non c'e', e quella
        coda sarebbe una promessa che la pagina non mantiene (visto a
@@ -65914,7 +66006,9 @@ function anteprimaMuta(i){
 function fotoMancante(){
   if (editandoNostr) return false;
   if (sellFoto.length) return false;
-  return !((editandoId || duplicaDaId) && fotoAttuali.length);
+  /* in modifica le foto attuali sono dentro sellFoto (23 nov 2026):
+     tolte tutte con la ✕, ne serve una per salvare */
+  return !(duplicaDaId && fotoAttuali.length);
 }
 /* IL RIQUADRO ACCESO HA UN PADRONE SOLO: questa variabile, che ricorda
    su QUALE faccia del form il tocco l'ha acceso (pubblica, la modifica
@@ -65961,7 +66055,7 @@ function mostraObbligoFoto(){
 
 function renderFotoPreview(){
   aggiornaObbligoFoto();
-  if ((editandoId || duplicaDaId) && !sellFoto.length && fotoAttuali.length){
+  if ((duplicaDaId || editandoNostr) && !sellFoto.length && fotoAttuali.length){
     /* In modifica: si vedono le foto attuali; appena se ne scelgono
        di nuove, il set si sostituisce per intero. Per gli importati
        da Nostr invece le foto non si toccano proprio (v1).
@@ -65985,19 +66079,135 @@ function renderFotoPreview(){
      pubblicazione» non c'e' piu': prometteva una cosa che nessuno
      aveva verificato. */
   const chip = (testo, extra) => `
-    <div style="width:110px;height:64px;border-radius:10px;background:var(--chip-bg);border:1.5px dashed var(--field-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box;${extra||''}">
+    <div style="width:100%;height:110px;border-radius:10px;background:var(--chip-bg);border:1.5px dashed var(--field-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px;box-sizing:border-box;${extra||''}">
       <span style="font-size:17px">📷</span>
       <span style="font-size:9px;color:var(--muted);font-weight:700;text-align:center;line-height:1.2">${testo}</span>
     </div>`;
   for (const f of anteprimeMute) if (!sellFoto.includes(f)) anteprimeMute.delete(f);
-  el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
-    <div class="th">${f.startsWith('caricando:')
-      ? chip('Carico la foto…', 'opacity:.55')
-      : anteprimeMute.has(f) ? chip('Foto pronta, la sistemiamo noi')
-      : `<img src="${f}" alt="" onerror="anteprimaMuta(${i})">`}
-      ${f.startsWith('caricando:') ? ''
-        : `<span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>`}
-    </div>`).join('');
+  for (const f of [...didascaliaDi.keys()]) if (!sellFoto.includes(f)) didascaliaDi.delete(f);
+  /* (23 nov 2026) ogni foto e' una scheda: la miniatura con la ✕, le
+     frecce ◀ ▶ per spostarla e la sua descrizione. La prima e' la
+     copertina, e con piu' di una foto lo si dice. */
+  const n = sellFoto.length;
+  el('photoPreview').innerHTML = sellFoto.map((f,i)=>{
+    const carica = f.startsWith('caricando:');
+    return `<div class="th foto-card">
+      <div class="foto-quadro">${carica
+        ? chip('Carico la foto…', 'opacity:.55')
+        : anteprimeMute.has(f) ? chip('Foto pronta, la sistemiamo noi')
+        : `<img src="${esc(f)}" alt="" onerror="anteprimaMuta(${i})">`}
+        ${carica ? '' : `<span class="x" onclick="togliFoto(${i})">✕</span>`}</div>
+      ${carica ? '' : `<div class="foto-frecce">
+        <button type="button" onclick="spostaFoto(${i},-1)"${i === 0 ? ' disabled' : ''} aria-label="Sposta prima">◀</button>
+        <button type="button" onclick="spostaFoto(${i},1)"${i === n - 1 ? ' disabled' : ''} aria-label="Sposta dopo">▶</button></div>
+      <input class="foto-didascalia" maxlength="80" placeholder="Descrizione della foto (facoltativa)" value="${esc(didascaliaDi.get(f) || '')}" oninput="scriviDidascalia(${i}, this.value)">`}
+    </div>`;
+  }).join('') + (n > 1
+    ? '<div class="foto-copertina">La prima foto è la copertina</div>' : '');
+}
+/* I tre gesti sulle foto scelte (23 nov 2026). Gli indici valgono per
+   il disegno corrente: ogni gesto ridisegna, quindi non invecchiano. */
+function togliFoto(i){
+  sellFoto.splice(i, 1);
+  renderFotoPreview();
+}
+function spostaFoto(i, verso){
+  const j = i + verso;
+  if (j < 0 || j >= sellFoto.length) return;
+  haptic();
+  [sellFoto[i], sellFoto[j]] = [sellFoto[j], sellFoto[i]];
+  renderFotoPreview();
+}
+function scriviDidascalia(i, testo){
+  const f = sellFoto[i];
+  if (!f) return;
+  const t = String(testo || '').slice(0, 80);
+  if (t.trim()) didascaliaDi.set(f, t); else didascaliaDi.delete(f);
+}
+/* Le descrizioni nell'ordine delle foto, come le vuole il server. */
+function didascaliePayload(){
+  return sellFoto.map(f => (didascaliaDi.get(f) || '').trim());
+}
+
+/* ============ LE VARIANTI DEL FOGLIO VENDI (23 nov 2026) ============
+   Un nome («Colore») e le voci separate da virgole. Senza la spunta
+   partono come `scelte` (stesso prezzo e pezzi, chi compra sceglie
+   alla cassa); con la spunta ogni voce ha il suo prezzo e i suoi pezzi
+   e partono come `varianti`: il server fa una famiglia di annunci. La
+   spunta c'e' solo pubblicando: in modifica una famiglia si ritocca
+   variante per variante, e la sezione sparisce. Sulle aste e sugli
+   abbonamenti niente varianti (il server le ignora comunque). */
+const varRighe = {};   // voce -> {prezzo, pezzi}: sopravvive ai ridisegni
+let varFamiglia = false;   // si sta modificando una variante di famiglia
+function vociVarianti(){
+  const viste = new Set(), voci = [];
+  for (const v of (el('sellVarVoci')?.value || '').split(',')) {
+    const t = v.replace(/\s+/g, ' ').trim();
+    if (t && !viste.has(t.toLowerCase())) { viste.add(t.toLowerCase()); voci.push(t); }
+  }
+  return voci;
+}
+function variantiVisibili(){
+  if (varFamiglia || editandoNostr) return false;
+  if (typeof astaAccesa === 'function' && astaAccesa()) return false;
+  if (el('sellAbbo')?.checked && el('sellAbboRiga')?.style.display !== 'none') return false;
+  return true;
+}
+function renderVariantiForm(){
+  const campo = el('sellVariantiField');
+  if (!campo) return;
+  const vis = variantiVisibili();
+  campo.style.display = vis ? '' : 'none';
+  const voci = vociVarianti();
+  const riga = el('sellVarPrezziRiga');
+  /* la spunta solo pubblicando e con almeno due voci */
+  const spuntabile = vis && !editandoId && voci.length >= 2;
+  if (riga) riga.style.display = spuntabile ? '' : 'none';
+  const tab = el('sellVarTabella');
+  if (!tab) return;
+  if (!spuntabile || !el('sellVarPrezzi')?.checked) { tab.innerHTML = ''; return; }
+  const serv = !!el('sellConsServ')?.checked;
+  const prezzo = el('sellPrice')?.value || '';
+  const pezzi = el('sellQta')?.value || '1';
+  /* si ridisegna solo se le voci sono cambiate: scrivere un prezzo non
+     deve far perdere il dito dal campo */
+  const firma = voci.join('\u0001') + (serv ? '|s' : '');
+  if (tab.dataset.firma === firma) return;
+  tab.dataset.firma = firma;
+  tab.innerHTML = `<div class="var-riga var-testa"><span></span><span>Prezzo</span>${serv ? '' : '<span>Pezzi</span>'}</div>`
+    + voci.map((v, i) => {
+    const r = varRighe[v] || {};
+    return `<div class="var-riga"><span>${esc(v)}</span>
+      <input type="number" inputmode="decimal" min="0" placeholder="${esc(prezzo || 'Prezzo')}" value="${esc(r.prezzo || '')}" aria-label="Prezzo" oninput="scriviVarRiga(${i}, 'prezzo', this.value)">
+      ${serv ? '' : `<input type="number" inputmode="numeric" min="1" placeholder="${esc(pezzi)}" value="${esc(r.pezzi || '')}" aria-label="Pezzi" oninput="scriviVarRiga(${i}, 'pezzi', this.value)">`}</div>`;
+  }).join('');
+}
+function scriviVarRiga(i, campo, valore){
+  const v = vociVarianti()[i];
+  if (!v) return;
+  varRighe[v] = {...(varRighe[v] || {}), [campo]: valore};
+}
+function impostaVariantiForm(l){
+  for (const k of Object.keys(varRighe)) delete varRighe[k];
+  varFamiglia = !!(l && l.famiglia && editandoId);
+  const sc = (l && Array.isArray(l.scelte) && l.scelte[0]) || null;
+  if (el('sellVarNome')) el('sellVarNome').value = sc ? sc[0] : '';
+  if (el('sellVarVoci')) el('sellVarVoci').value = sc ? sc[1].join(', ') : '';
+  if (el('sellVarPrezzi')) el('sellVarPrezzi').checked = false;
+  if (el('sellVarTabella')) { el('sellVarTabella').innerHTML = ''; delete el('sellVarTabella').dataset.firma; }
+  renderVariantiForm();
+}
+function variantiPayload(){
+  if (!variantiVisibili()) return {};
+  const nome = (el('sellVarNome')?.value || '').trim();
+  const voci = vociVarianti();
+  /* in modifica i campi vuoti vogliono dire «togli le varianti» */
+  if (!nome && !voci.length) return editandoId ? {scelte: []} : {};
+  if (!editandoId && voci.length >= 2 && el('sellVarPrezzi')?.checked)
+    return {varianti: {nome, voci: voci.map(v => ({voce: v,
+      prezzo: (varRighe[v] || {}).prezzo || '',
+      quantita: (varRighe[v] || {}).pezzi || ''}))}};
+  return {scelte: [[nome, voci]]};
 }
 
 /* Quante foto sono entrate DAVVERO. Il server lo dice (`foto_salvate`
@@ -66139,7 +66349,8 @@ async function publish(){
          DEMO non c'e' nessun server che le copi, e mostrarne zero
          direbbe il falso su quel che si sta per pubblicare */
       desc:el('sellDesc').value||'—',
-      photos:(sellFoto.length ? sellFoto : fotoAttuali).slice()});
+      photos:(sellFoto.length ? sellFoto : fotoAttuali).slice(),
+      didascalie:didascaliePayload()});
   } else {
     const r = await fetch(`${API_BASE}/listings`, {
       method:'POST',
@@ -66157,7 +66368,8 @@ async function publish(){
            una sostituisce il set per intero, come in modifica. */
         ...(duplicaDaId && !sellFoto.length
             ? {copia_foto_da: duplicaDaId} : {}),
-        foto:sellFoto})});
+        ...variantiPayload(),
+        foto:sellFoto, didascalie:didascaliePayload()})});
     const d = await r.json().catch(()=>({}));
     /* 413: il corpo intero e' stato rifiutato prima di arrivare al
        server (un proxy davanti a noi). Non e' un errore generico ed e'
@@ -66221,6 +66433,7 @@ async function publish(){
      e la prossima pubblicazione erediterebbe delle foto che nessuno
      ha piu' chiesto */
   duplicaDaId = null; duplicaTitolo = ''; fotoAttuali = [];
+  didascaliaDi.clear(); fotoNomeDi.clear(); impostaVariantiForm(null);
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
   precompilaSpedStd(true);   // il prossimo articolo nasce col costo standard
   precompilaZonaVendi(true); // ...e con la zona di quello appena pubblicato
@@ -66281,7 +66494,9 @@ async function salvaModifica(t, p){
         condizione:el('sellCond').value, quantita:qtaForm(),
         zone:el('sellZone').value||'', comune:comuneDemo(el('sellZone').value),
         desc:el('sellDesc').value||'—'});
-      if (sellFoto.length) l.photos = sellFoto.slice();
+      if (sellFoto.length) {
+        l.photos = sellFoto.slice(); l.didascalie = didascaliePayload();
+      }
     }
   } else {
     const prezzo = sellValuta==='eur' ? {valuta:'eur', prezzo_eur:p} : {prezzo_sats:p};
@@ -66289,7 +66504,14 @@ async function salvaModifica(t, p){
       ...sottoPayload(),
       condizione:el('sellCond').value, quantita:qtaForm(),
       zona:el('sellZone').value||'', descrizione:el('sellDesc').value||''};
-    if (sellFoto.length) body.foto = sellFoto;
+    /* (23 nov 2026) l'annuncio INTERO nell'ordine scelto: le foto che
+       restano col loro nome, le nuove come data:, e le descrizioni
+       accanto. Il server toglie quelle che non ci sono piu'. */
+    if (sellFoto.length) {
+      body.foto = sellFoto.map(f => fotoNomeDi.get(f) || f);
+      body.didascalie = didascaliePayload();
+    }
+    Object.assign(body, variantiPayload());
     const r = await fetch(`${API_BASE}/listings/${id}/modifica`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
@@ -66297,7 +66519,9 @@ async function salvaModifica(t, p){
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { const e = d.detail||'Errore nella modifica';
                  toast(e, tempoLettura(e)); return; }
-    avvisoFotoTesto = avvisoFoto(d, (body.foto || []).length);
+    /* il conto e' sulle foto NUOVE: quelle che restano non si scartano */
+    avvisoFotoTesto = avvisoFoto(d,
+      sellFoto.filter(f => !fotoNomeDi.has(f)).length);
     if (d.revisione) {
       /* la modifica ha insospettito l'AI: l'annuncio esce dalla
          vetrina finché un moderatore non decide — la verità subito */
