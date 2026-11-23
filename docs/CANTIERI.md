@@ -94625,3 +94625,35 @@ aggiornati, coi negozi pagati dentro. Netflix guardato con Playwright a
 DA GUARDARE. I banner 3:1 nella card 272:130 si tagliano ai lati (la
 scritta dentro un banner può perdere i bordi). Il riposto nel canale di
 «In cima» mostra «pubblicato oggi» (è la data che il server rimette).
+
+## Il foglio «Promuovi» ritoccato: tre voci, icone disegnate, l'anteprima animata (23 nov 2026 sera, cantiere promuovi-anteprime; Andrea, provandolo sul collaudo: «ho 2 tasti in evidenza uguali», «non puoi usare delle emoji», «voglio che ci sia un tasto a fianco ad ogni opzione che faccia vedere realmente che cosa succede»)
+
+COSA. Il foglio di `apriPromuovi` ha TRE voci: «In cima», «In evidenza»
+con la durata dentro (due bottoni, 7 o 15 giorni, `scegliGiorniPromo`,
+`promoGiorni`) e «Il negozio in Da scoprire», che ora si compra anche da
+qui (secondo `GET /api/promo/listino` senza annuncio, in parallelo; senza
+banner la voce è spenta e dice perché). Le emoji del foglio sono diventate
+icone disegnate (`ICONA_PROMO`, tratto arancio nel riquadro tenue). Accanto
+a ogni voce un tasto rotondo (`guardaPromo`) apre sotto un riquadro con un
+disegnino animato (`ANTEPRIMA_PROMO`): l'annuncio che risale la lista e
+l'aeroplanino del canale; la card che entra per prima nella fila e prende
+l'etichetta; la card del negozio che arriva al centro e diventa la grande.
+Il tasto «Promuovi» (scheda e cassetto del banner) ha la carta lucida della
+porta della Classifica Streak, in brace, col razzo disegnato.
+
+DECISIONI. Brace e non oro: i due tasti fratelli ma riconoscibili (si
+cambia in una riga). L'anteprima è un disegno e non una schermata: nessuna
+parola tranne l'etichetta «In evidenza». Lo stato fermo di ogni pezzo è
+quello d'arrivo: con gli effetti ridotti la regola universale spegne
+l'animazione e resta il risultato. Il tasto dell'anteprima funziona anche
+sulla voce spenta. Nella frase NOVITA approvata tolte le emoji dei nomi
+(il tasto non le ha più).
+
+PROVATO. `prove_promozioni`: tre voci e nessuna «evidenza:» nella lista,
+«Paga» compra la durata scelta o il negozio, nessuna emoji nel codice del
+foglio, i due tasti con la carta lucida, la voce girata in node (durata
+accesa, tasto e riquadro, voce spenta guardabile), il riavvio
+dell'animazione; controprove rosse. Guardato con Playwright a 390 px.
+
+DA GUARDARE. Il modo di aprire il negozio da «Da scoprire» (pagina che sale
+dal basso, appendice, com'è): esempi in video mandati, aspetta la scelta.
