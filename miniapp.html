@@ -27015,6 +27015,10 @@ function vociSponsor(){
     fuori.push({id: 'sponsor-' + slug, slug, negozio,
       emoji: String((casa ? casa.emoji : s.emoji) || '📣'),
       titoloDentro: true, sponsor: true, file: slug + '.webp',
+      /* la foto del quadrato in home, se la pagina ne sceglie una
+         (`quadro` del server: il numero di una foto della storia) */
+      quadro: Number.isInteger(s.quadro) && s.quadro >= 1 && s.quadro <= 9
+        ? `/assets/racconti/${slug}-${s.quadro}.webp` : '',
       testo: String((casa ? casa.titolo : s.titolo) || ''),
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
@@ -27281,7 +27285,7 @@ function renderQuadriScoprire(vive){
     const casa = typeof RACCONTI === 'undefined' ? null : v.slug ? RACCONTI[v.slug]
       : Object.values(RACCONTI).find(r => r && r.negozio === v.negozio) || null;
     const breve = String((casa && casa.inBreve) || d.in_breve || d.categoria || '');
-    const foto = d.foto ? fotoUrl(fotoMini(String(d.foto))) : (v.logo || '');
+    const foto = v.quadro || (d.foto ? fotoUrl(fotoMini(String(d.foto))) : (v.logo || ''));
     const nome = esc(typeof v.testo === 'function' ? v.testo() : v.testo);
     return `<button type="button" class="sc-quadro" data-id="${v.id}" aria-label="${nome}"
       onclick="toccaScoperta(this.dataset.id)"><span class="sc-quadro-foto">${foto
@@ -30103,6 +30107,38 @@ function decidiRacconto(slug, esito){
       if (el('view-negozio').classList.contains('active')
           && el('negozioHeader').querySelector('.rac-bozza'))
         apriAnteprimaRacconto(slug);
+      loadAdminStats();
+    }});
+}
+
+/* 🔗 COLLEGA IL NEGOZIO (23 nov 2026): il moderatore incolla il link
+   del negozio (o il codice) nel campo del foglio di conferma; il valore
+   si tiene da parte a ogni battuta, perche' il foglio si svuota alla
+   chiusura. Il giudice e' il server: forma, bozza, negozio esistente. */
+let racCollegaVal = '';
+function collegaNegozioRacconto(slug){
+  const r = admRacconti.find(x => x.slug === slug) || {};
+  racCollegaVal = '';
+  chiediConferma({
+    titolo: `Colleghi «${r.titolo || slug}» a un negozio?`,
+    corpo: 'Incolla il link del negozio del venditore, o il suo codice. '
+      + 'La pagina resta in bozza: la pubblichi dopo.',
+    fissa: `<input id="racCollegaCampo" type="text" autocomplete="off"
+      placeholder="https://barattolo.store/negozio/…"
+      style="width:100%;box-sizing:border-box"
+      oninput="racCollegaVal=this.value">`,
+    etichetta: '🔗 Collega',
+    poi: async () => {
+      try {
+        const q = await fetch(
+          `${API_BASE}/admin/racconti/${encodeURIComponent(slug)}`,
+          {method:'POST', headers:{'Content-Type':'application/json',
+                                   'X-Tg-Init-Data':authHdr()},
+           body: JSON.stringify({esito: 'collega', negozio: racCollegaVal})});
+        const d = await q.json().catch(()=>({}));
+        if (!q.ok) { toast(d.detail || 'Operazione non riuscita', 4000); return; }
+        toast(d.detto || 'Fatto');
+      } catch(e) { toast('Rete assente: riprova'); return; }
       loadAdminStats();
     }});
 }
@@ -62055,6 +62091,12 @@ function boxRacconti(lista){
       ? `<button class="btn orange" style="margin-top:8px"
            onclick="decidiRacconto('${slug}','pubblica')">✅ Pubblica la pagina</button>`
       : '';
+    /* (23 nov 2026) la pagina pronta prima del negozio: si lega dal
+       pannello, solo in bozza (il server lo dice con `collegabile`) */
+    const collega = r.collegabile === true
+      ? `<button class="btn ghost" style="margin-top:8px"
+           onclick="collegaNegozioRacconto('${slug}')">🔗 Collega il negozio</button>`
+      : '';
     return `
       <div class="order">
         <div class="row">
@@ -62067,6 +62109,7 @@ function boxRacconti(lista){
           <button class="btn ghost" onclick="copiaLinkAnteprima('${slug}')">🔗 Copia il link</button>
         </div>
         ${perLui}
+        ${collega}
         ${gesto}
       </div>`;
   }).join('');

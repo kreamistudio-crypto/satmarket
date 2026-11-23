@@ -38558,6 +38558,19 @@ mai il kind 0 di nessuno: regola ferrea 2).
   grandi. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,
   due `<i>` col `.su` che si scambiano): la foto della card al centro,
   sfocata, messa da `sfondoScoprire` alla fine di `centroScoprire`.
+  LA FOTO DEL QUADRATO SCELTA DALLA PAGINA (23 nov 2026 notte, Piano
+  B): una voce di `racconti.py` con `quadro: N` (1-9) fa uscire `quadro`
+  da `sponsorizzati_pubblici`; `vociSponsor` ne fa
+  `/assets/racconti/<slug>-N.webp` (solo da un intero 1-9) e
+  `renderQuadriScoprire` lo mette prima della miniatura dell'annuncio.
+  IL NEGOZIO COLLEGATO DAL PANNELLO (stessa notte): una voce con
+  `collega_dal_pannello` nasce col `negozio` vuoto; il gesto
+  `{"esito": "collega", "negozio": <link o codice>}` su
+  `POST /api/admin/racconti/<slug>` (solo in bozza) scrive
+  `racconto_negozio:<slug>`, e `applica_negozi_collegati` (avvio e
+  gesto) lo rimette nella voce in memoria: i giudici leggono sempre e
+  solo `r["negozio"]`. Nel pannello «🔗 Collega il negozio», con
+  `collegabile` dall'elenco admin.
   LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
   `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
   Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);

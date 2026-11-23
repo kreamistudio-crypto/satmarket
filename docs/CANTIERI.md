@@ -95504,3 +95504,52 @@ Guardato con Playwright a 390px: le schede delle foto, la tabella dei
 prezzi, la modifica, la descrizione a schermo intero.
 RESTA: guardarlo dal telefono dopo la promozione; dire a Zzap che è
 online (col sì di Andrea per il testo).
+
+## La pagina di Piano B Panama, pronta prima del negozio (23 nov 2026, notte)
+
+COSA. Entra in `racconti.py` la pagina «Piano B Panama» (la residenza a
+Panama di Piano B Group, pacchetti pagati in sats col deposito di
+garanzia), IN BOZZA e SENZA negozio: Piano B il suo account non l'ha
+ancora aperto, e Andrea la voleva in produzione spenta, da accendere il
+giorno dopo all'ok di Angelo senza un altro deploy. Due pezzi nuovi,
+tutti e due adattabili a qualsiasi pagina:
+1. `collega_dal_pannello`: la voce nasce col `negozio` vuoto, e nel
+   cassetto «Negozi consigliati» del pannello compare «🔗 Collega il
+   negozio» (solo in bozza). Il moderatore incolla il link del negozio
+   (o il codice, o il nome a scelta); il server lo risolve, scrive il
+   codice in `racconto_negozio:<slug>` e lo rimette nella voce in
+   memoria (`applica_negozi_collegati`, anche all'avvio). Così i giudici
+   di sempre (`_e_suo`, `_venditore_racconto`) leggono un posto solo.
+   Pubblicata non si ricollega: prima si rimette in bozza (una pagina
+   pubblicata non deve poter saltare sulla vetrina di un altro).
+2. `quadro`: il numero di una foto della storia che fa da foto al
+   QUADRATO del negozio in home, al posto della prima foto dell'ultimo
+   annuncio (le foto dei pacchetti hanno le scritte, a 96px illeggibili).
+   Esce da `sponsorizzati_pubblici`, il client lo costruisce solo da un
+   numero 1-9 (`/assets/racconti/<slug>-N.webp`, rotta e forma di sempre).
+
+LE DECISIONI DI ANDREA. Testi approvati (bozza in
+/mnt/project-files/piano-b/); niente frasi su tasse o patrimonio. Foto
+da Flow: copertina Casco Viejo (lo skyline ripeteva il banner: «la
+seconda foto assomiglia troppo alla prima»), «Cos'è» in elenco e non più
+riquadri («strutturato troppo uguale»), titoletto «COSA FANNO PER TE» e
+riga del quadrato «La residenza a Panama» approvati. Il quadrato: il
+balcone scartato («più di impatto»), poi lo skyline e una bandiera;
+scelta la baia dall'alto al tramonto, coi nuvoloni («La 1»).
+
+SCARTATE. Copiare pianobmaps.com dentro Barattolo (è loro, lo aggiornano
+loro, e parla di contante e tasse): basta un collegamento. Mettere il
+codice del negozio nel catalogo domani: un deploy in più per un dato
+che il moderatore ha già in mano.
+
+PROVATO. `collaudo_racconti_bozza`: il giro della pagina collegabile
+(senza negozio, 409 a pubblicare, 403/400/404 al collega, il link intero
+con ? e # la lega, sopravvive al riavvio, si pubblica, pubblicata non si
+ricollega, il negozio la mostra, lo spazio acceso porta `quadro`).
+`prove_promozioni`: il quadrato girato in node (la foto della pagina
+vince, solo da un numero 1-9). Guardato con Playwright a 390px.
+
+RESTA. Domani, a negozio aperto da Piano B: «🔗 Collega il negozio»,
+«✅ Pubblica la pagina», `/sponsor piano-b-panama 60`. Il link verso
+pianobmaps.com (oggi le foto aprono solo YouTube). La consegna
+«servizio» adattata alla pratica (appuntamento, offerta, quantità).

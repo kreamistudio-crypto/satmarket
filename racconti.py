@@ -66,6 +66,17 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
     acceso, e la scadenza corre, ma non si vede. Uno slug non puo' stare
     in tutt'e due i cataloghi: ogni spazio ha una leva sola.
 
+  - `quadro` (23 nov 2026, Piano B): il numero di una foto della storia
+    (`{slug}-N.webp`, da 1 a 9) che fa da foto al QUADRATO del negozio
+    in home, al posto della prima foto dell'ultimo annuncio. Esce nella
+    busta dello spazio sponsorizzato.
+  - `collega_dal_pannello` (23 nov 2026, Piano B): la pagina nasce col
+    `negozio` vuoto e il moderatore la lega a un negozio dal pannello,
+    finche' e' in bozza; il codice vive in `impostazioni`
+    (`racconto_negozio:<slug>`) e il server lo rimette nella voce
+    all'avvio. Serve a una pagina pronta prima che il venditore apra il
+    negozio. Vuole il vero booleano, e niente `venditore_tg`.
+
 LO STATO (bozza o pubblicata) NON STA QUI: vive in `impostazioni`, e
 lo cambia il gesto del moderatore dal pannello. Questo file dice COSA
 c'e' scritto, mai SE si vede. Quindi anche TOGLIERE UNA PAGINA DAI
@@ -547,6 +558,69 @@ RACCONTI_NEGOZI = {
                    "finanziario: sono le mie analisi, a scopo didattico.")},
             {"t": "firma", "h": "Smetti di indovinare, inizia a capire.",
              "p": "Andrea, AndreAI · Intelligence Finanziaria"},
+        ],
+    },
+    # PIANO B PANAMA (23 nov 2026): la residenza a Panama di Piano B
+    # Group, coi pacchetti pagati in sats col deposito di garanzia. Il
+    # negozio NON esiste ancora: lo aprira' Piano B col suo account, e il
+    # moderatore lo collega dal pannello («🔗 Collega il negozio»), senza
+    # un deploy — vedi `collega_dal_pannello` e `racconto_negozio:<slug>`.
+    #   piano-b-panama-cop.webp  Casco Viejo al tramonto (Flow), 1360x583
+    #   piano-b-panama-1.webp    la firma dei documenti
+    #   piano-b-panama-3.webp    l'ingresso di una banca
+    #   piano-b-panama-4.webp    il Canale, il quadrato in home (`quadro`)
+    "piano-b-panama": {
+        "negozio": "",
+        "collega_dal_pannello": True,
+        "emoji": "🇵🇦",
+        "titolo": "Piano B Panama",
+        "in_breve": "La residenza a Panama",
+        "sottotitolo": "La residenza permanente a Panama, pagata in sats.",
+        "intro": ("Grazie al Trattato di Amicizia tra Italia e Panama del 1965, "
+                  "i cittadini italiani possono ottenere la residenza permanente "
+                  "a Panama. Piano B Group ti segue passo per passo, dai "
+                  "documenti agli appuntamenti con gli avvocati."),
+        "foto": True, "logo": False, "banner": True,
+        # la foto del quadrato in home (assets/racconti/<slug>-4.webp)
+        "quadro": 4,
+        "blocchi": [
+            {"t": "punti", "h": "PERCHÉ COMPRARLO SU BARATTOLO", "voci": [
+                {"e": "🔒", "h": "I tuoi soldi restano al sicuro",
+                 "p": "Paghi nel deposito di garanzia. I sats arrivano a Piano B solo quando confermi ogni tappa: prima l'area riservata aperta, poi la residenza temporanea."},
+                {"e": "💶", "h": "Lo stesso prezzo",
+                 "p": "Paghi quanto pagheresti comprando direttamente da Piano B."},
+                {"e": "⚡", "h": "Paghi in bitcoin",
+                 "p": "Dal tuo wallet, in sats, senza bonifici."},
+                {"e": "⚖️", "h": "Se qualcosa va storto, non sei solo",
+                 "p": "Apri una disputa e un moderatore guarda le prove."},
+                {"e": "💬", "h": "Prima ne parli, gratis",
+                 "p": "Prenoti la call con un consulente di Piano B prima di pagare."},
+            ]},
+            {"t": "testo", "h": "COS'È",
+             "p": ("Piano B Group accompagna gli italiani che vogliono la "
+                   "residenza permanente a Panama, nel pieno rispetto della "
+                   "legge. Non serve vivere a Panama, fare investimenti, "
+                   "comprare casa o aprire una società.")},
+            {"t": "elenco", "h": "COSA FANNO PER TE", "voci": [
+                "I documenti li preparano loro: traduzioni giurate, affidavit, autenticazione del passaporto, ci pensa il partner legale.",
+                "Il conto in banca: ti presentano alla banca partner, e il conto apre in 24 ore.",
+                "Gli avvocati con te: all'Ufficio Immigrazione ti accompagnano gli avvocati del team.",
+                "Un referente sempre: ti segue su WhatsApp, Telegram o Signal, 7 giorni su 7.",
+            ]},
+            {"t": "foto", "n": 1, "etichetta": "documenti", "alt": "La firma dei documenti"},
+            {"t": "tappe", "h": "COME FUNZIONA", "voci": [
+                {"h": "La call gratuita", "p": "Parli con un consulente di Piano B e capisci se fa per te."},
+                {"h": "Scegli il pacchetto", "p": "Basic, Business o VIP. Paghi in sats col deposito di garanzia: metà all'apertura della tua area riservata."},
+                {"h": "I documenti", "p": "In 1-2 mesi li procuri, col tuo referente che ti dice cosa serve. Due settimane prima di partire paghi l'altra metà."},
+                {"h": "Il viaggio a Panama", "p": "Sette giorni lavorativi, con gli avvocati agli appuntamenti."},
+                {"h": "La residenza", "p": "Quella temporanea arriva di solito nei primi 3-4 giorni: lo confermi, e il saldo arriva a Piano B. La permanente è pronta dopo circa tre mesi."},
+            ]},
+            {"t": "foto", "n": 3, "etichetta": "banca", "alt": "L'ingresso di una banca"},
+            {"t": "elenco", "h": "I PACCHETTI", "voci": [
+                "Basic, 4.000 €: tutto quello che serve per la residenza",
+                "Business, 5.500 €: in più il conto in una banca boutique, anche crypto-friendly, e la Cédula E",
+                "VIP, 9.000 €: in più autista, traduttore a ogni appuntamento, voli e hotel",
+            ]},
         ],
     },
 }
