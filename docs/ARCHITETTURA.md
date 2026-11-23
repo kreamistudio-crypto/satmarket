@@ -30860,14 +30860,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del mercatino e quelle degli scambi P2P (`utenti.recensioni_mercatino_
   nascoste`, `utenti.recensioni_p2p_nascoste`, rotta POST
   `/api/me/recensioni-nascoste`). Il giudice è `_recensioni_nascoste_di`
-  (al proprietario e ai moderatori niente è nascosto), il filtro
+  (al solo proprietario niente è nascosto: ai moderatori sì dal 23 nov
+  2026, con la frase «Quelle nascoste le vedi sempre solo tu.»), il filtro
   `_sql_recensioni_visibili` sta nella SELECT della rotta del negozio,
-  prima del tetto. STELLE E NUMERO RESTANO, su tutte: nascondere toglie
+  prima del tetto, e dal 23 nov 2026 lascia sempre passare le negative
+  (`VOTO_SEMPRE_VISIBILE` = 2: una e due stelle). STELLE E NUMERO RESTANO, su tutte: nascondere toglie
   il racconto, mai il voto. Con le P2P nascoste escono anche
   `scambi_completati` (0) e `risponde_in_fretta` (falso); i marchi dei
   non completati e delle dispute perse restano. Le due scelte non escono
   mai dalla risposta del negozio. Leva `RECENSIONI_NASCONDIBILI`, accesa.
   Il verbale in CANTIERI, «Le recensioni nascondibili».
+  LE CARD DEL P2P (23 nov 2026): `_p2p_nascosti_fra` dice chi ha spento
+  le P2P, e i tre costruttori dei volti — `_facce_ordini_p2p` (libro
+  Lightning e «Chi ha pubblicato»), la fotografia on-chain (`_rep`),
+  `_volti_persone` (l'altra parte) — gli tolgono `completati` e `veloce`
+  per TUTTI, moderatori compresi. CANTIERI, «"Scambi P2P" nascosto
+  anche sulle card del P2P».
 
 - LE RECENSIONI DEGLI SCAMBI (set 2026, richiesta di Andrea): a
   scambio P2P concluso le due parti si recensiscono come nel
