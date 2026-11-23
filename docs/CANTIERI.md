@@ -94657,3 +94657,88 @@ dell'animazione; controprove rosse. Guardato con Playwright a 390 px.
 
 DA GUARDARE. Il modo di aprire il negozio da «Da scoprire» (pagina che sale
 dal basso, appendice, com'è): esempi in video mandati, aspetta la scelta.
+
+## Il giroconto interno: i sats del P2P nel deposito dell'ordine senza uscire dal nodo (23 nov 2026, cantiere giroconto-interno; Andrea, dall'idea di un utente: «partiamo bene con la B e fammi un bello studio accurato», poi «Giroconto interno» sulla scelta)
+
+IL PERCHÉ. L'idea (girata da Andrea): chi non ha sats compra la felpa di
+Anna pagando EURO a Luca nel P2P, e Luca rilascia i sats dritti nel
+deposito di garanzia dell'ordine. Studio intero nel Claude Doc «Studio:
+comprare merce pagando solo euro» (prezzo letto dal libro, offerta più
+economica tra i metodi veloci, tetto 100 €, nessun ricarico di Barattolo,
+arrotondamento ad Anna: le sette proposte approvate da Andrea alle 17:06,
+«basta che sia il più semplicissimo possibile, anche mia madre»). Il nodo
+vero: il deposito sta sulla cassaforte «nodo», cioè sullo STESSO LND di
+Mostro, e Mostro paga la fattura di chi compra con `SendPaymentV2` coi
+valori di serie (`allow_self_payment` spento; nessuna delle 14 patch della
+`-bar12` tocca quel punto, letto nel sorgente).
+
+LA PROVA SUL NODO (23 nov, 17:07-17:11, comandi di Andrea). Fattura da
+1.000 sats sul nodo; `payinvoice` senza permesso: «self-payments not
+allowed». Con `--allow_self_payment`: quattro tentativi (commissione 10,
+20, 50; due forzando il ritorno da LNBiG), tutti FAILED NO_ROUTE, zero
+sats usciti: ACINQ non inoltra verso LNBiG, e l'altro verso non può
+andare perché ACINQ dal suo lato ha quasi zero. I canali quel giorno:
+LNBiG 5M (nostro 763k), ACINQ 400k (nostro 395k, loro 4k), ACINQ 1M
+(nostro 989k, loro 10k). Il giro su noi stessi dipende da due hub: scartato.
+
+LA STRADA SCELTA. Quando Luca rilascia, Mostro ha GIÀ incassato la sua
+garanzia (`release_action`: `settle_seller_hold_invoice` prima di
+`do_payment`, letto nella v0.20.2). Patch 0016 del fork: per una fattura
+il cui destinatario è il nostro nodo, nel task del payout (dopo il claim,
+prima di `send_payment`) Mostro chiede a `/api/p2p/giroconto` «la saldi
+tu?» con id, hash della fattura, hash della garanzia, sats. Il server non
+crede alla domanda: ordine 'creato' sulla cassaforte nodo con quella
+fattura, stesso importo, sotto `GIROCONTO_TETTO_SATS`; garanzia SETTLED su
+LND per almeno quei sats (LookupInvoice dal ponte, col macaroon delle
+cauzioni); una garanzia salda un ordine solo (tabella `giroconti`, tre
+UNIQUE; la riga nasce PRIMA del pagamento). Poi paga il deposito da un
+portafoglio LNbits a parte, la RISERVA (`LNBITS_RISERVA_ADMIN_KEY`, stesso
+LNbits: passaggio interno, niente rete né commissioni) passando
+dall'UNICA uscita, `paga_venditore`: è la QUINTA funzione d'uscita, con la
+sua riga (`("giroconti", id, "riserva")`), la mano presa prima di LNbits, il
+diario, l'INCERTO e il NON_CHIESTO guardati (le sentinelle che contavano
+quattro uscite ora contano cinque; la cassaforte «riserva» in
+`_chiavi_cassaforte` legge e paga con la SUA chiave, perché con quella
+del nodo la domanda «quell'hash esiste già?» troverebbe il deposito in
+entrata e direbbe «in volo»). Poi ricontrolla che il
+deposito risulti pagato, `_incassa_ordine`, e risponde `{"saldata":
+true}`. Solo quella risposta fa chiudere a Mostro lo scambio come pagato;
+ogni altra = strada di upstream (LND rifiuta, retry, poi fattura nuova a
+chi compra). Idempotente: la domanda ripetuta per un deposito già pagato
+con la stessa garanzia risponde sì senza ripagare.
+
+STRADE SCARTATE. La patch di una riga `allow_self_payment` (la prova l'ha
+bocciata). L'accredito dal super utente di LNbits: crea sats dal nulla, e
+un errore o una chiave rubata li inventerebbe; con la riserva il danno
+massimo è la riserva. Il ribilanciamento dei canali per tenere il giro:
+fragile e a pagamento. Il flag «via euro» come condizione di sicurezza:
+non serve, chiunque dia a Mostro la fattura di un nostro ordine sta
+pagando quell'ordine coi sats di un P2P vero, e la garanzia lo prova.
+
+ANCHE LA PULIZIA. `controlla_abbandonati` metteva la lapide a ogni ordine
+'creato' dopo `creato + INVOICE_EXPIRY`: con un deposito lungo (Mostro
+vuole fatture di almeno un'ora) l'avrebbe annullato a scambio in corso.
+Ora salta gli ordini la cui bolt11 è ancora viva (`vita_fattura`); per le
+fatture di serie da 15 minuti non cambia niente (a quel punto sono morte).
+
+PROVATO. Fork: `git am` delle sedici `.patch` su un clone pulito della
+`v0.20.2` = albero `654388cb`; `cargo test --release` 2015 verdi, 0 rosse
+(2011 + 4 del modulo: inerte senza variabili, solo la nostra chiave ben
+fatta è «nostra», la domanda vuole ogni pezzo, solo un JSON `true` vale).
+Server: `prove_giroconto_interno`, 17 spunte (domanda storta, cinque no
+dell'ordine, porta 404/403, garanzia non incassata o corta, saldo una
+volta sola, seconda domanda senza ripagare, garanzia riusata, registro,
+l'uscita unica con la sua riga, la chiave della riserva, pulizia).
+
+DA FARE PRIMA DI ACCENDERE. 1) La parte «via euro» dell'ordine: deposito
+con fattura lunga (consiglio 4 h) e le schermate guidate (fasi F1-F2 dello
+studio, testi con Andrea). 2) La prova: il P2P del collaudo usa il nodo di
+produzione, quindi la `-bar13` va sul nodo (a variabili spente è identica
+alla `-bar12`) e il giroconto si prova con un ordine piccolo, deciso con
+Andrea. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta
+proposta 300.000 sats), `LNBITS_RISERVA_ADMIN_KEY`, `P2P_GIROCONTO_SEGRETO`;
+sul nodo `BARATTOLO_GIROCONTO_URL` e `BARATTOLO_GIROCONTO_SEGRETO`. 4) Il
+rabbocco della riserva e il controllo di quadratura (riserva scesa = sats
+in più sul nodo dal lato di Mostro). 5) La ronda dei pagamenti del nodo
+non vede uscire niente per i giroconti (nessun pagamento LND): da
+verificare che non lo legga come anomalia.

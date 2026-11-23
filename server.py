@@ -341,6 +341,7 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     "MOSTRO_NPUB", "P2P_PROVA_IDS", "P2P_STATISTICHE_IDS", "MOSTRO_RELAY",
     "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
     "P2P_EVENTI_SEGRETO", "P2P_FINESTRA_SEGRETO", "SEGRETI_PROFILO_P2P",
+    "P2P_GIROCONTO_SEGRETO", "LNBITS_RISERVA_ADMIN_KEY",
     "SEGRETO_PROFILO_P2P_VIVA",
     "MOSTRO_RELAY_SPECCHIO", "MOSTRO_RELAY_CONFERMA",
     # ⛓️ 🪙 🔔 chiavi e liste di persone. ONCHAIN_RETE ne e' uscita il
@@ -14596,6 +14597,8 @@ INVOICE_EXPIRY = 900
 # pagamento — e un nome nuovo le avrebbe rese cieche senza farle
 # rosse.
 CASSAFORTE_SAAS, CASSAFORTE_NODO = "saas", "nodo"
+# Il portafoglio dei giroconti (23 nov 2026): vedi «IL GIROCONTO INTERNO».
+CASSAFORTE_RISERVA = "riserva"
 CASSAFORTI = (CASSAFORTE_SAAS, CASSAFORTE_NODO)
 
 
@@ -14649,6 +14652,16 @@ def _chiavi_cassaforte(nome: str = "") -> _Cassaforte:
     if nome == CASSAFORTE_SAAS:
         return _Cassaforte(nome, LNBITS_URL, LNBITS_INVOICE_KEY,
                            LNBITS_ADMIN_KEY)
+    if nome == "riserva":   # CASSAFORTE_RISERVA, scritto per esteso: i
+        # banchi delle prove montano questa funzione con le sole due
+        # costanti delle cassaforti vere.
+        # (23 nov 2026, giroconto interno) un portafoglio della cassaforte
+        # nodo, non una cassaforte: stesso LNbits, chiave sua. Anche per
+        # leggere si usa la SUA chiave: con quella del nodo la domanda
+        # «quell'hash esiste gia'?» troverebbe il deposito IN ENTRATA e
+        # direbbe «in volo» a un pagamento mai partito.
+        return _Cassaforte(nome, LNBITS_NODO_URL, LNBITS_RISERVA_ADMIN_KEY,
+                           LNBITS_RISERVA_ADMIN_KEY)
     raise ValueError(f"cassaforte sconosciuta: {nome!r}")
 
 
@@ -17235,6 +17248,290 @@ def pulisci_fattura(testo) -> str:
     if t[:10].lower() == "lightning:":
         t = t[10:].strip()
     return t
+
+
+# ══ IL GIROCONTO INTERNO (23 nov 2026, cantiere giroconto-interno) ══
+# Chi non ha sats compra la felpa di Anna pagando EURO a Luca nel P2P, e
+# i sats di Luca devono finire nel deposito dell'ordine. La fattura del
+# deposito e' della cassaforte «nodo», che sta sullo STESSO LND di Mostro:
+# per LND sarebbe un pagamento a se stesso, e lo rifiuta («self-payments
+# not allowed»). Col permesso tenta un giro circolare, ma dipende da altri
+# nodi: il 23 nov 2026 quattro tentativi dal nostro nodo sono falliti
+# tutti (ACINQ non inoltra verso LNBiG). Studio: Claude Doc «Studio:
+# comprare merce pagando solo euro», scelta di Andrea delle 17:12.
+# LA STRADA: quando Luca rilascia, Mostro ha GIA' incassato la sua
+# garanzia (prima incassa, poi paga: `release_action`). La patch 0016 del
+# fork, invece di mandare in rete una fattura del nostro nodo, chiede qui
+# «la saldi tu?». E qui si salda da un portafoglio LNbits a parte, la
+# RISERVA: tra due portafogli dello stesso LNbits il pagamento e' interno
+# (niente rete, niente commissioni, istantaneo).
+# PERCHE' UNA RISERVA E NON UN ACCREDITO: LNbits saprebbe anche aggiungere
+# sats dal nulla (il super utente), ma con quel potere un errore o una
+# chiave rubata CREA SATS CHE NON ESISTONO. Con la riserva il server ha
+# solo la chiave di quel portafoglio: al peggio la svuota, mai inventa.
+# LA DOMANDA NON SI CREDE MAI: chi chiede col segreto giusto potrebbe
+# essere chiunque l'abbia rubato. Qui si controlla DA SOLI che la fattura
+# sia il deposito di un ordine ancora da pagare, sulla cassaforte nodo,
+# per lo stesso importo; che la garanzia nominata risulti INCASSATA su
+# LND per almeno quei sats; che quella garanzia non abbia gia' saldato un
+# altro ordine (UNIQUE nella tabella). Qualunque dubbio = «no», e Mostro
+# fa come upstream (riprova piu' tardi, poi chiede una fattura nuova).
+# IDEMPOTENTE: un deposito gia' pagato risponde «si'» senza ripagare, e la
+# riga nasce PRIMA del pagamento, cosi' due domande insieme non pagano due
+# volte (vince l'INSERT, l'altra trova la riga).
+try:
+    from config import P2P_GIROCONTO_SEGRETO
+except ImportError:
+    P2P_GIROCONTO_SEGRETO = ""
+# La chiave ADMIN del portafoglio «riserva» sulla cassaforte nodo (stesso
+# LNbits di LNBITS_NODO_URL, portafoglio diverso). SEGRETA: paga.
+try:
+    from config import LNBITS_RISERVA_ADMIN_KEY
+except ImportError:
+    LNBITS_RISERVA_ADMIN_KEY = ""
+# Il tetto di un giroconto, in sats: una rete di sicurezza sotto il tetto
+# in euro che vede chi compra (100 € decisi da Andrea il 23 nov 2026). Un
+# deposito piu' grande non si salda da qui: Mostro fa come upstream.
+try:
+    from config import GIROCONTO_TETTO_SATS
+except ImportError:
+    GIROCONTO_TETTO_SATS = 150_000
+
+
+def giroconto_attivo() -> bool:
+    """La porta del giroconto ESISTE? Segreto vero, chiave della riserva
+    vera, cassaforte nodo configurata. A porta chiusa la rotta tace (404)
+    e Mostro paga come upstream (cioe' non paga le fatture di casa)."""
+    def vero(v):
+        v = str(v or "").strip()
+        return bool(v) and not v.startswith("INCOLLA") and "INCOLLA_QUI" not in v
+    # senza il macaroon che legge una fattura per hash la garanzia di Luca
+    # non si puo' controllare: la porta resta chiusa
+    return (vero(P2P_GIROCONTO_SEGRETO) and vero(LNBITS_RISERVA_ADMIN_KEY)
+            and vero(LNBITS_NODO_URL) and vero(LNBITS_NODO_INVOICE_KEY)
+            and bool(_p2p_onchain_cauzione_macaroon()))
+
+
+def _porta_giroconto(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato: il calco di
+    `_porta_finestra_p2p`, a byte e a tempo costante."""
+    if not giroconto_attivo():
+        raise HTTPException(404, "Non trovato")
+    atteso = ("Bearer " + str(P2P_GIROCONTO_SEGRETO)).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+def _tabella_giroconti(con) -> None:
+    """Il registro dei giroconti. Tre UNIQUE e ognuna e' una regola: un
+    ordine si salda una volta, una fattura una volta, una garanzia di
+    Luca salda UN SOLO ordine."""
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS giroconti("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " ordine_id INTEGER UNIQUE NOT NULL,"
+        " fattura TEXT UNIQUE NOT NULL,"
+        " garanzia TEXT UNIQUE NOT NULL,"
+        " ordine_mostro TEXT DEFAULT '',"
+        " sats INTEGER NOT NULL,"
+        " stato TEXT DEFAULT 'in_corso',"     # in_corso | saldato
+        " creato INTEGER, saldato INTEGER DEFAULT 0,"
+        # le colonne di ogni riga che paga (l'uscita unica, `paga_venditore`
+        # con la sua `riga`): la mano, l'ultimo hash, il diario
+        " payout_stato TEXT DEFAULT '', payout_hash TEXT DEFAULT '',"
+        " payout_verso TEXT DEFAULT '', payout_tentativi INTEGER DEFAULT 0,"
+        " payout_ultimo INTEGER DEFAULT 0, payout_verificato INTEGER DEFAULT 0,"
+        " payout_errore TEXT DEFAULT '')")
+
+
+def _domanda_giroconto(d) -> dict:
+    """PURA: la domanda di Mostro, ripulita. Alza ValueError su ogni pezzo
+    storto: una domanda da indovinare non si paga."""
+    if not isinstance(d, dict):
+        raise ValueError("domanda illeggibile")
+    fattura = str(d.get("fattura") or "").strip().lower()
+    garanzia = str(d.get("garanzia") or "").strip().lower()
+    ordine_mostro = str(d.get("ordine") or "").strip()[:64]
+    sats = d.get("sats")
+    if not re.fullmatch(r"[0-9a-f]{64}", fattura):
+        raise ValueError("fattura storta")
+    if not re.fullmatch(r"[0-9a-f]{64}", garanzia):
+        raise ValueError("garanzia storta")
+    if fattura == garanzia:
+        raise ValueError("fattura e garanzia uguali")
+    if isinstance(sats, bool) or not isinstance(sats, int) or sats <= 0:
+        raise ValueError("sats storti")
+    return {"fattura": fattura, "garanzia": garanzia,
+            "ordine_mostro": ordine_mostro, "sats": sats}
+
+
+def _verdetto_giroconto(o, domanda: dict, tetto: int) -> str:
+    """PURA: l'ordine trovato per quella fattura si puo' saldare da qui?
+    '' = si'; altrimenti il perche' (per il log, mai per Mostro)."""
+    if not o:
+        return "nessun ordine con quella fattura"
+    if o["cassaforte"] != CASSAFORTE_NODO:
+        return "il deposito non sta sulla cassaforte nodo"
+    if o["stato"] != "creato":
+        return f"ordine in stato {o['stato']}"
+    if int(o["prezzo_sats"] or 0) != domanda["sats"]:
+        return "importo diverso dal deposito"
+    if importo_bolt11(o["invoice"] or "") != domanda["sats"]:
+        return "la fattura del deposito dice un altro importo"
+    if domanda["sats"] > int(tetto or 0):
+        return "sopra il tetto del giroconto"
+    return ""
+
+
+async def _garanzia_incassata(hash_hex: str) -> int:
+    """Quanti sats della garanzia di Luca risultano INCASSATI su LND (0 se
+    non e' SETTLED o LND non l'ha detto). LookupInvoice dal ponte, col
+    macaroon che sa leggere una fattura per hash."""
+    d, _perche = await _lnd_cauzione("GET", f"/v1/invoice/{hash_hex}")
+    if not isinstance(d, dict) or str(d.get("state") or "").upper() != "SETTLED":
+        return 0
+    try:
+        return int(d.get("amt_paid_sat") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+async def _paga_dalla_riserva(o, riga_id: int) -> bool:
+    """Paga la fattura del deposito dal portafoglio riserva: stesso
+    LNbits, quindi un passaggio interno. Passa dall'UNICA uscita
+    (`paga_venditore`) come ogni altra: la cintura sull'importo, la
+    domanda sugli hash gia' tentati, LA MANO presa sulla riga del
+    registro `giroconti` prima di toccare LNbits. E' la QUINTA funzione
+    d'uscita. Vero solo per PAGATO. NON_PAGATO e NON_CHIESTO liberano la
+    mano ('da_riprovare': la prossima domanda di Mostro riprova); INCERTO
+    la lascia 'in_volo', e la prossima domanda guarda PRIMA se il
+    deposito risulta pagato — un passaggio interno non resta in volo."""
+    taccuino = {"etichetta": f"Giroconto dalla riserva per l'ordine #{o['id']}"}
+    try:
+        esito = await paga_venditore(
+            o["invoice"], int(o["prezzo_sats"] or 0), taccuino,
+            cassaforte=CASSAFORTE_RISERVA, riga=("giroconti", riga_id, "riserva"))
+    except LnbitsMuto as e:
+        print(f"🔁 giroconto dell'ordine #{o['id']}: {e}", flush=True)
+        esito = NON_CHIESTO
+    con = db()
+    try:
+        _timbra_pagamento(con, "giroconti", riga_id, taccuino)
+        if esito == PAGATO:
+            con.execute("UPDATE giroconti SET payout_stato='uscito', "
+                        "stato='saldato', saldato=? WHERE id=?",
+                        (int(time.time()), riga_id))
+        elif esito == NON_CHIESTO or esito == NON_PAGATO:
+            con.execute("UPDATE giroconti SET payout_stato='da_riprovare' "
+                        "WHERE id=? AND payout_stato='in_volo'", (riga_id,))
+        elif esito == INCERTO:
+            print(f"🧊 giroconto dell'ordine #{o['id']}: esito incerto, la "
+                  f"riga resta in volo", flush=True)
+        con.commit()
+    finally:
+        con.close()
+    return esito == PAGATO
+
+
+@app.post("/api/p2p/giroconto")
+async def giroconto_p2p(req: Request):
+    """Mostro (patch 0016) chiede se saldiamo noi il deposito che chi
+    compra gli ha dato come fattura. Risponde `{"saldata": true}` SOLO a
+    deposito pagato davvero; ogni altra risposta per Mostro e' «no».
+    POST perche' gli hash non finiscano nei log."""
+    _porta_giroconto(req.headers.get("authorization", ""))
+    try:
+        domanda = _domanda_giroconto(await req.json())
+    except Exception:
+        return JSONResponse({"saldata": False}, headers={"Cache-Control": "no-store"})
+    no = JSONResponse({"saldata": False}, headers={"Cache-Control": "no-store"})
+    si = JSONResponse({"saldata": True}, headers={"Cache-Control": "no-store"})
+    con = db()
+    try:
+        _tabella_giroconti(con)
+        o = con.execute("SELECT * FROM ordini WHERE payment_hash=?",
+                        (domanda["fattura"],)).fetchone()
+        riga = con.execute("SELECT * FROM giroconti WHERE fattura=?",
+                           (domanda["fattura"],)).fetchone()
+    finally:
+        con.close()
+    if not o:
+        print("🔁 giroconto: nessun ordine con quella fattura", flush=True)
+        return no
+    # GIA' FATTO (una risposta persa, un secondo giro di Mostro): si'
+    # solo se e' la STESSA garanzia e il deposito risulta pagato davvero.
+    if riga and riga["garanzia"] == domanda["garanzia"]:
+        if await invoice_pagata(domanda["fattura"], CASSAFORTE_NODO):
+            if riga["stato"] != "saldato":
+                con = db()
+                con.execute("UPDATE giroconti SET stato='saldato', saldato=? "
+                            "WHERE id=?", (int(time.time()), riga["id"]))
+                con.commit()
+                con.close()
+            await _incassa_ordine(o["id"])
+            return si
+        # la riga c'e' ma il deposito non risulta pagato (un tentativo
+        # andato male): si ripassa dagli stessi controlli di una domanda
+        # nuova, perche' nel frattempo l'ordine puo' essere cambiato
+        perche = _verdetto_giroconto(o, domanda, GIROCONTO_TETTO_SATS)
+        if perche:
+            print(f"🔁 giroconto: ordine #{o['id']} non si salda da qui: {perche}",
+                  flush=True)
+            return no
+    elif riga:
+        print(f"⛔ giroconto: ordine #{o['id']} gia' legato a un'altra garanzia",
+              flush=True)
+        return no
+    else:
+        perche = _verdetto_giroconto(o, domanda, GIROCONTO_TETTO_SATS)
+        if perche:
+            print(f"🔁 giroconto: ordine #{o['id']} non si salda da qui: {perche}",
+                  flush=True)
+            return no
+    incassati = await _garanzia_incassata(domanda["garanzia"])
+    if incassati < domanda["sats"]:
+        print(f"⛔ giroconto: ordine #{o['id']}, la garanzia non risulta "
+              f"incassata per l'importo del deposito", flush=True)
+        return no
+    if not riga:
+        con = db()
+        try:
+            con.execute(
+                "INSERT INTO giroconti(ordine_id,fattura,garanzia,ordine_mostro,"
+                "sats,stato,creato) VALUES(?,?,?,?,?,'in_corso',?)",
+                (o["id"], domanda["fattura"], domanda["garanzia"],
+                 domanda["ordine_mostro"], domanda["sats"], int(time.time())))
+            con.commit()
+        except sqlite3.IntegrityError:
+            # un'altra domanda e' arrivata prima, o la garanzia ha gia'
+            # saldato un altro ordine: in tutti e due i casi non si paga
+            print(f"⛔ giroconto: ordine #{o['id']}, riga gia' presente "
+                  f"(garanzia o ordine gia' usati)", flush=True)
+            return no
+        finally:
+            con.close()
+    # prima di pagare si guarda se il deposito e' gia' pagato (un giro
+    # precedente che ha pagato e non ha fatto in tempo a scriverlo)
+    pagato = await invoice_pagata(domanda["fattura"], CASSAFORTE_NODO)
+    if not pagato:
+        con = db()
+        r = con.execute("SELECT id FROM giroconti WHERE fattura=?",
+                        (domanda["fattura"],)).fetchone()
+        con.close()
+        if r and await _paga_dalla_riserva(o, r["id"]):
+            pagato = await invoice_pagata(domanda["fattura"], CASSAFORTE_NODO)
+    if not pagato:
+        return no
+    con = db()
+    con.execute("UPDATE giroconti SET stato='saldato', saldato=? WHERE fattura=?",
+                (int(time.time()), domanda["fattura"]))
+    con.commit()
+    con.close()
+    print(f"✅ giroconto: ordine #{o['id']} saldato dalla riserva",
+          flush=True)
+    await _incassa_ordine(o["id"])
+    return si
 
 
 def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
@@ -97493,9 +97790,20 @@ async def controlla_abbandonati():
     adesso = int(time.time())
     con = db()
     ordini = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash, cassaforte FROM ordini WHERE stato='creato' "
+        "SELECT * FROM ordini WHERE stato='creato' "
         "AND payment_hash != '' AND creato < ?",
         (adesso - INVOICE_EXPIRY,))]
+    # LA FATTURA LUNGA (23 nov 2026, cantiere giroconto-interno): chi paga
+    # in euro nel P2P ha un deposito che vive ore, non 15 minuti (Mostro
+    # vuole fatture di almeno un'ora). Contare dall'ora di nascita gli
+    # metterebbe la lapide a scambio in corso: si guarda la scadenza VERA,
+    # scritta nella fattura, e finche' e' viva l'ordine resta com'e'. Le
+    # fatture di serie (15 minuti) a questo punto sono gia' morte, quindi
+    # per loro non cambia niente; una bolt11 illeggibile segue la strada
+    # di sempre.
+    ordini = [o for o in ordini
+              if not (o.get("invoice")
+                      and (vita_fattura(o["invoice"]) or 0) > 0)]
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='creato' AND payment_hash != '' "
         "AND creato < ?", (adesso - RILANCIO_EXPIRY,))]

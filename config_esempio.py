@@ -1442,6 +1442,23 @@ P2P_EVENTI_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # segnaposto = la rotta NON ESISTE (404) e nessuno scambio si annulla da
 # solo allo scadere del tempo per pagare.
 P2P_FINESTRA_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# IL GIROCONTO INTERNO (23 nov 2026, patch 0016 del fork): quando chi
+# compra nel mercatino paga in euro nel P2P, i sats di chi vende vanno nel
+# deposito dell'ordine senza uscire dal nodo. Il coordinatore chiede a
+# /api/p2p/giroconto «la saldi tu?» con questo segreto; lo stesso valore
+# va nel compose del nodo (`BARATTOLO_GIROCONTO_SEGRETO`, accanto a
+# `BARATTOLO_GIROCONTO_URL`). UN SEGRETO SUO: si ruota da solo. Vuoto o
+# segnaposto = la rotta NON ESISTE (404) e il coordinatore paga come
+# upstream (cioe' una fattura del nostro nodo non si paga).
+P2P_GIROCONTO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# La chiave ADMIN del portafoglio «riserva», sulla stessa cassaforte nodo
+# (LNBITS_NODO_URL) ma portafoglio DIVERSO: da qui escono i giroconti.
+# Il server puo' spendere solo quel che c'e' dentro, mai creare sats.
+# SEGRETA. Vuota o segnaposto = niente giroconti.
+LNBITS_RISERVA_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY_DELLA_RISERVA"
+# Il deposito piu' grande che si salda col giroconto, in sats: la rete di
+# sicurezza sotto il tetto in euro di chi compra (100 €, Andrea 23 nov).
+GIROCONTO_TETTO_SATS = 150_000
 # Il segreto con cui la RONDA DEL NODO chiede a /api/nodo/pagamenti-noti
 # se un pagamento uscito dal nodo e' un payout di Barattolo (28 set
 # 2026): risponde solo si'/no per ogni hash. Lo stesso valore va sul nodo
