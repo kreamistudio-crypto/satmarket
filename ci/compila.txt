@@ -238,3 +238,4 @@ collaudo_abbonamento_canale.py
 collaudo_recensioni_nascoste.py
 collaudo_promozioni.py
 collaudo_profilo_mio.py
+collaudo_nascondi_annuncio.py

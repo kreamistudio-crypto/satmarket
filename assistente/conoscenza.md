@@ -184,7 +184,7 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere. Le ferie si mettono da Profilo → «🌴 Negozio in ferie», scegliendo il giorno del rientro: gli annunci restano in vetrina col prezzo in grigio, nessuno li può comprare, e al rientro tornano comprabili da soli. Non si chiude con affari da spedire o aste in corso.
 
-Fermare per un po' un annuncio solo: nella sua scheda «🔄 Aggiorna i pezzi» e 0. Diventa «Esaurito»: resta visibile, in grigio, ma nessuno lo compra; con «🔄 Rifornisci» si rimettono i pezzi e torna in vendita. Non vale per i servizi e per gli annunci importati da Nostr. Bozze degli annunci non ce ne sono: appena pubblicato, l'annuncio passa dalla moderazione e poi va in vetrina.
+Fermare per un po' un annuncio solo: nella sua scheda «🔄 Aggiorna i pezzi» e 0. Diventa «Esaurito»: resta visibile, in grigio, ma nessuno lo compra; con «🔄 Rifornisci» si rimettono i pezzi e torna in vendita. Non vale per i servizi e per gli annunci importati da Nostr. Per toglierlo proprio dalla vetrina, senza scadenza: nella sua scheda «🙈 Nascondi dalla vetrina». Nessuno lo vede più (nemmeno col link), e lo ritrovi in Profilo → «I tuoi annunci», in grigio, con «👁 Rimetti in vetrina» per farlo tornare quando vuoi (dal 24 novembre 2026). Non si nasconde con un ordine ancora aperto su quell'annuncio, né un'asta o un annuncio importato da Nostr o da un negozio collegato. Bozze degli annunci non ce ne sono: appena pubblicato, l'annuncio passa dalla moderazione e poi va in vetrina.
 
 <!-- pezzo libro-019 | libro -->
 ## Libro · Vendere nel mercatino (5/10)
@@ -2794,4 +2794,12 @@ pubblico: no
 frase: Adesso puoi mettere su Barattolo un nome e una foto tuoi, gratis. Li guarda un moderatore, poi si vedono ovunque nel mercatino e nel P2P. Il tuo profilo Telegram o Nostr non cambia.
 dove: Profilo → «🆔 Nostr e identità» → «✏️ Nome e foto su Barattolo» → «✏️ Scegli nome e foto»; approvati, la scelta «✏️ Mia» in «📷 La tua foto».
 leva: PROFILO_MIO_ATTIVO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-153 | novita -->
+## Novità · 2026-11-23 · nascondi-annuncio
+
+frase: Adesso puoi nascondere un annuncio solo, senza mettere in ferie tutto il negozio e senza una data di rientro. Nella sua scheda tocca «🙈 Nascondi dalla vetrina»: nessuno lo vede più. Lo ritrovi in «I tuoi annunci», da dove con «👁 Rimetti in vetrina» torna quando vuoi.
+dove: Scheda del tuo annuncio → «🙈 Nascondi dalla vetrina»; Profilo → «I tuoi annunci» → «👁 Rimetti in vetrina».
+leva: NASCONDI_ANNUNCIO (accesa di serie)
 pubblico: sì

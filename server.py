@@ -7294,7 +7294,7 @@ def init_db():
         foto TEXT DEFAULT '',              -- lista JSON: nomi file o URL
         contatto_nostr TEXT DEFAULT '',    -- npub del venditore (annunci importati)
         nostr_event_id TEXT DEFAULT '',    -- evento NIP-99 firmato dalla piattaforma
-        stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso
+        stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso | nascosto
         -- quante volte l'annuncio e' stato visto (set 2026): PRIVATO,
         -- lo vede solo il proprietario (e gli admin) — mai un dato
         -- pubblico come i savers. Cresce da registra_vista, una volta
@@ -32140,8 +32140,10 @@ def miei_annunci(limit: int = 0, cursore: str = "",
     # E dal cantiere stock anche i venduti/esauriti: la ricarica parte
     # da qui, e la riga «Venduto» col bottone «Rimetti in vendita» e'
     # il relist onesto anche per chi vendeva un pezzo solo.
+    # ...e i NASCOSTI (23 nov 2026): qui e' l'unico posto dove chi
+    # vende li ritrova, ed e' da qui che li rimette in vetrina.
     dove = ("a.venditore_id=? AND a.stato IN "
-            "('attivo','revisione','venduto')")
+            "('attivo','revisione','venduto','nascosto')")
     con = db()
     if limit:
         righe, prossimo = pagina_annunci(
@@ -34037,8 +34039,12 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     # 'rimosso' di sempre, cioe' un ARCHIVIO e non una cancellazione:
     # la riga resta, e ordini, recensioni e dispute ci si appoggiano
     # come prima.
+    # ...e il NASCOSTO (23 nov 2026): chi lo ha tolto dalla vetrina puo'
+    # anche decidere che non torna. Gli ordini vivi su un nascosto non
+    # ci sono (li ferma il gesto stesso), quindi basta la guardia stretta.
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
-                    "AND stato IN ('attivo','revisione','venduto')",
+                    "AND stato IN ('attivo','revisione','venduto',"
+                    "'nascosto')",
                     (annuncio_id, user["id"])).fetchone()
     if not a:
         con.close()
@@ -34296,6 +34302,128 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
     # si annuncia niente.
     return {"ok": True, "quantita": quantita, "riattivato": riattivato,
             "esaurito": esaurito_ora}
+
+
+# NASCONDERE UN ANNUNCIO SOLO (23 nov 2026, cantiere nascondi-annuncio;
+# lo ha chiesto un venditore). Prima c'erano due strade e nessuna era
+# questa: i pezzi a zero (l'annuncio resta in vetrina, grigio,
+# «Esaurito») e le ferie (fermano TUTTO il negozio, e con una data).
+# Il nascosto esce dalla vetrina senza scadenza e ci torna quando chi
+# vende vuole. LO STATO E' NUOVO, 'nascosto', e non una colonna: ogni
+# filtro di sempre — vetrina, ricerca, negozio, compra(), offerte,
+# preferiti, piazza Nostr — guarda stato='attivo', e cosi' lo lascia
+# fuori da solo, senza una riga in ognuno di quei posti. Il link
+# condiviso risponde 404 come per il 'rimosso': per chi guarda da fuori
+# non c'e'. Lo vede solo il proprietario, in «I tuoi annunci».
+# LA LEVA NASCE ACCESA (regola di Andrea del 14 nov): spenta, il tasto
+# «Nascondi» sparisce e la rotta rifiuta di nascondere — ma RIMETTERE
+# IN VETRINA funziona sempre, o un annuncio resterebbe chiuso fuori.
+try:
+    from config import NASCONDI_ANNUNCIO
+    if not isinstance(NASCONDI_ANNUNCIO, bool):
+        print("[nascondi] NASCONDI_ANNUNCIO non e' True/False: "
+              "il tasto «Nascondi» resta acceso")
+    NASCONDI_ANNUNCIO = NASCONDI_ANNUNCIO is not False
+except ImportError:
+    NASCONDI_ANNUNCIO = True
+
+
+@app.post("/api/listings/{annuncio_id}/nascondi")
+async def nascondi_annuncio(annuncio_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Nasconde (body {"nascosto": 1}, il default) o rimette in vetrina
+    ({"nascosto": 0}) un annuncio del proprietario.
+
+    SI NASCONDE SOLO L'ATTIVO NATO QUI, e ogni esclusione ha il suo
+    perche':
+    - l'esaurito ('venduto') e' gia' fuori dagli acquisti, e ha il suo
+      «Elimina»;
+    - l'asta e' vincolante e a scadenza: nasconderla a gara aperta
+      toglierebbe la gara a chi ha versato;
+    - l'importato (Nostr, negozio collegato) ha lo stato che vive alla
+      fonte: il giro di sync lo riscriverebbe, o non lo troverebbe piu'
+      fra gli attivi e lo rifarebbe accanto.
+    GLI ORDINI IN CORSO FERMANO IL GESTO, con la guardia LARGA della
+    modifica (ogni ordine non concluso, resi e rimborsi compresi): il
+    rimborso (`_rimborsa_compratore`) e l'annullo del venditore rimettono
+    i pezzi con stato='attivo', e su un nascosto lo riaccenderebbero in
+    vetrina — e in piazza — rovesciando la scelta di chi vende. Cosi'
+    nessun ordine vivo tocca mai un nascosto, e nessun percorso dei
+    soldi va cambiato. Niente pezzi in pagamento, per la stessa ragione
+    della ricarica: una fattura gia' in volo atterrerebbe su un annuncio
+    che non c'e'.
+    LE PIAZZE fanno il gesto dell'esaurito, parola per parola: su Nostr
+    NIP-99 ha due stati, active e sold, e «non si compra» e' sold (la
+    decisione di Andrea per la pausa dei pezzi a zero); il post del
+    canale prende la spunta. Al ritorno, il viaggio inverso. Le offerte
+    vive le raccoglie `scadenze_offerte` entro dieci minuti col suo
+    «non è più disponibile: la tua offerta decade», che qui e' vero.
+    E' IDEMPOTENTE: nascondere un nascosto (o rimettere un attivo) non
+    rifa' partire niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    nascondi = bool(d.get("nascosto", 1))
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('attivo','nascosto')",
+                    (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    gia = (a["stato"] == "nascosto") == nascondi
+    if gia:
+        con.close()
+        return {"ok": True, "nascosto": nascondi, "cambiato": False}
+    if nascondi:
+        if not NASCONDI_ANNUNCIO:
+            con.close()
+            raise HTTPException(404, "Funzione non attiva")
+        if a["asta_base_sats"] > 0:
+            con.close()
+            raise HTTPException(400, "Un'asta non si nasconde: si chiude "
+                                     "da sola alla scadenza")
+        if origine_annuncio(a) or dal_negozio_collegato(a):
+            con.close()
+            raise HTTPException(400, "Questo annuncio arriva da fuori: "
+                                     "si nasconde dove è nato")
+        if _ordini_vivi_annuncio(
+                con, annuncio_id,
+                ("released", "refunded", "annullato", "creato"),
+                esclusi=True):
+            con.close()
+            raise HTTPException(400, "C'è un ordine in corso su questo "
+                                     "annuncio: potrai nasconderlo quando "
+                                     "è concluso")
+        if _riservati(con, annuncio_id):
+            con.close()
+            raise HTTPException(400, "Qualcuno lo sta pagando proprio ora: "
+                                     "riprova tra qualche minuto")
+    # La scrittura guarda lo stato di PARTENZA anche nel WHERE: due tocchi
+    # incrociati non fanno due passaggi (il secondo trova 0 righe).
+    cur = con.execute("UPDATE annunci SET stato=? WHERE id=? AND stato=?",
+                      ("nascosto" if nascondi else "attivo", annuncio_id,
+                       a["stato"]))
+    if cur.rowcount == 0:
+        con.close()
+        raise HTTPException(409, "L'annuncio è cambiato proprio adesso: "
+                                 "ricarica la pagina e riprova")
+    if nascondi:
+        # Le fatture mai pagate (e scadute: _riservati qui sopra dice che
+        # di fresche non ce n'e') si chiudono come nella rimozione: una
+        # fattura viva non deve poter pagare un annuncio nascosto.
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                    "(SELECT ordine_id FROM ordine_righe WHERE "
+                    "annuncio_id=?))",
+                    (int(time.time()), annuncio_id, annuncio_id))
+    con.commit()
+    con.close()
+    asyncio.create_task(annuncio_su_nostr(
+        annuncio_id, "sold" if nascondi else "active",
+        solo_aggiornamento=True))
+    asyncio.create_task(promo_venduto(annuncio_id, venduto=nascondi))
+    return {"ok": True, "nascosto": nascondi, "cambiato": True}
 
 
 
@@ -35070,8 +35198,10 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     con = db()
     # anche 'revisione': il moderatore puo' rimuovere pure cio' che
     # e' ancora in attesa (equivale a un rifiuto)
+    # (e il nascosto, 23 nov 2026: fuori dalla vetrina non vuol dire
+    # fuori dalla moderazione)
     a = con.execute("SELECT * FROM annunci WHERE id=? AND "
-                    "stato IN ('attivo','revisione')",
+                    "stato IN ('attivo','revisione','nascosto')",
                     (annuncio_id,)).fetchone()
     if not a:
         con.close()
@@ -38820,6 +38950,16 @@ def _leve_stato():
                          "il motivo per cui la legge non la chiede",
                   spento="la tabella torna facoltativa: si può pubblicare "
                          "un alimento senza"),
+            # NASCONDERE UN ANNUNCIO SOLO (23 nov 2026): acceso di serie,
+            # la leva e' l'interruttore d'emergenza
+            _leva("Nascondi un annuncio dalla vetrina",
+                  "NASCONDI_ANNUNCIO", NASCONDI_ANNUNCIO,
+                  acceso="sulla scheda del proprio annuncio c'è «🙈 "
+                         "Nascondi dalla vetrina»: l'annuncio esce dalla "
+                         "vetrina senza scadenza e torna con «👁 Rimetti "
+                         "in vetrina» da «I tuoi annunci»",
+                  spento="il tasto «Nascondi» non c'è; i nascosti restano "
+                         "tali e si possono sempre rimettere in vetrina"),
             # LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026): accesa di
             # serie, la leva e' l'interruttore d'emergenza
             _leva("Fotografia dell'annuncio all'acquisto",
@@ -55612,6 +55752,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
+    # Il «🙈 Nascondi» sulla scheda del proprio annuncio (23 nov 2026):
+    # la leva VIVA, perche' il tasto nasca solo quando la rotta nasconde.
+    profilo["nascondi_annuncio"] = NASCONDI_ANNUNCIO
     # ...e la tabella obbligatoria (18 nov 2026), perche' il form dica
     # «obbligatoria» solo quando il server la esige davvero
     profilo["etichetta_obbligatoria"] = ETICHETTA_OBBLIGATORIA
@@ -62086,8 +62229,10 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         # 'pubblica' rilegge lo stato di ADESSO: fra l'accodamento
         # e la firma l'annuncio puo' essere stato venduto, e
         # nascere «attivo» sarebbe una bugia in piazza.
+        # (il nascosto, 23 nov 2026, nasce «sold» come l'esaurito: in
+        # piazza non si compra, e NIP-99 un terzo stato non ce l'ha)
         stato = a["azione"] if a["azione"] in ("sold", "active") else (
-            "sold" if a["stato"] == "venduto" else "active")
+            "sold" if a["stato"] in ("venduto", "nascosto") else "active")
         # Si riusa evento_annuncio per non avere DUE posti che
         # costruiscono i tag NIP-99 di un annuncio (divergerebbero
         # al primo campo nuovo, ed e' anche cio' che la sentinella

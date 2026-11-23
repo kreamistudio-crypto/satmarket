@@ -468,6 +468,11 @@ ETICHETTA_ALIMENTI = True
 # pubblica solo con la tabella intera o col motivo per cui la legge non
 # la chiede. Nasce ACCESA; False la rende di nuovo facoltativa.
 ETICHETTA_OBBLIGATORIA = True
+# Nascondere un annuncio solo (23 nov 2026): sulla scheda del proprio
+# annuncio «🙈 Nascondi dalla vetrina», senza scadenza; si rimette da «I
+# tuoi annunci». Nasce ACCESA: la riga serve per SPEGNERLA, e solo False
+# spegne (i nascosti si possono rimettere in vetrina anche a leva spenta).
+NASCONDI_ANNUNCIO = True
 
 # --- La fotografia dell'annuncio all'acquisto (18 nov 2026) -----------
 # Al pagamento l'ordine salva l'annuncio com'era (testo, condizione,
