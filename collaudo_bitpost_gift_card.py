@@ -499,6 +499,52 @@ def main():
           (any("Bitpost" in r[0] for r in righe), any(NUOVA in r[0] or NUOVO in r[0] for r in righe)))
     c.post("/api/admin/bitpost/segreti", json={"nome": "api_key", "torna_al_config": True})
 
+    print("\n[il negozio delle carte (23 nov 2026)]")
+    banco.come(111, admin=True)
+    PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+    con = SRV._bitpost_db()
+    con.execute("INSERT OR REPLACE INTO shoppy_carte(id, negozio, titolo, tipo, tagli, "
+                "immagine, immagine_tipo) VALUES (?,?,?,?,?,?,?)",
+                ("9011748897091", SRV.SHOPPY_NEGOZI[0], "THE GIFT CARD", "Gift Card",
+                 "[100, 2500, 5000, 200000]", PNG, "image/png"))
+    con.execute("INSERT OR REPLACE INTO shoppy_carte(id, negozio, titolo, tipo, tagli) "
+                "VALUES (?,?,?,?,?)", ("77", SRV.SHOPPY_NEGOZI[1], "Conad", "", "[5000]"))
+    con.execute("INSERT OR REPLACE INTO shoppy_carte(id, negozio, titolo, tipo, tagli, "
+                "immagine, immagine_tipo) VALUES (?,?,?,?,?,?,?)",
+                ("78", SRV.SHOPPY_NEGOZI[1], "Furba", "", "[5000]", b"<svg/>", "image/svg+xml"))
+    con.commit()
+    con.close()
+    st = c.get("/api/bitpost/stato").json()
+    prova("lo stato porta le carte: Bitpost coi tagli di Bitpost, i marchi «presto»",
+          [("9011748897091", [100, 2500, 5000], False, "/api/bitpost/carta/9011748897091"),
+           ("77", [5000], True, ""), ("78", [5000], True, "")],
+          [(k["id"], k["tagli"], k["presto"], k["immagine"]) for k in st["carte"]])
+    r = c.get("/api/bitpost/carta/9011748897091")
+    prova("la foto si serve da qui, col suo tipo", (200, "image/png", PNG),
+          (r.status_code, r.headers["content-type"], r.content))
+    prova("...un SVG non esce mai, un id storto nemmeno", (404, 404, 404),
+          (c.get("/api/bitpost/carta/78").status_code,
+           c.get("/api/bitpost/carta/..%2Fconfig.py").status_code,
+           c.get("/api/bitpost/carta/999").status_code))
+    ind = st["prossimo_indice"]
+    base = {"taglio": 5000, "quanti": 1, "xpub": XPUB_A, "indice": ind}
+    prova("un marchio non ancora ordinabile: no", (400, True),
+          (lambda r: (r.status_code, "ancora" in r.json()["detail"]))(
+              c.post("/api/bitpost/ordini", json=dict(base, carta="77"))))
+    prova("...un taglio che la carta non ha: no", 400,
+          c.post("/api/bitpost/ordini", json=dict(base, carta="9011748897091",
+                                                  taglio=500, quanti=10)).status_code)
+    prova("...una carta che non c'e': no", 400,
+          c.post("/api/bitpost/ordini", json=dict(base, carta="123")).status_code)
+    r = c.post("/api/bitpost/ordini", json=dict(base, carta="9011748897091"))
+    prova("la carta del negozio: l'ordine nasce", 200, r.status_code)
+    oc = r.json()["ordine"]["id"]
+    mio = [o for o in c.get("/api/bitpost/stato").json()["miei"] if o["id"] == oc]
+    prova("...e la lista dice quale carta", [{"id": "9011748897091", "titolo": "THE GIFT CARD"}],
+          [o["carta"] for o in mio])
+    prova("...anche il dettaglio", "THE GIFT CARD",
+          c.get(f"/api/bitpost/ordini/{oc}").json()["carta"].get("titolo"))
+
     print("\n[il ponte vero: l'indirizzo e gli errori di Bitpost]")
     prova("in collaudo una base fuori casa non e' ammessa", False,
           SRV._bitpost_base_ammessa("https://beta.bitpost.shop/api/v1/barattolo", True))

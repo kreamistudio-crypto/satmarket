@@ -131378,6 +131378,17 @@ def _bitpost_prepara(con):
         con.execute("ALTER TABLE bitpost_ordini ADD COLUMN scade INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # la carta scelta nel negozio (23 nov 2026): {"id", "titolo"} o vuoto
+    try:
+        con.execute("ALTER TABLE bitpost_ordini ADD COLUMN carta TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    # IL CATALOGO DI SHOPPY CODE (23 nov 2026): le carte coi tagli e la foto,
+    # riletto ogni ora dai negozi Shopify; resta qui fra un riavvio e l'altro
+    con.execute("""CREATE TABLE IF NOT EXISTS shoppy_carte(
+        id TEXT PRIMARY KEY, negozio TEXT, titolo TEXT, tipo TEXT,
+        tagli TEXT DEFAULT '[]', immagine BLOB, immagine_tipo TEXT DEFAULT '',
+        aggiornato INTEGER DEFAULT 0)""")
 
 
 def bitpost_quota_motivo(quota, totale: int) -> str:
@@ -131571,6 +131582,11 @@ def _bitpost_in_lista(riga, tg_id) -> dict:
     # la data di nascita, per la barra del tempo e il «Piu' recenti» della
     # card nel libro P2P (22 nov 2026)
     o["creato"] = int(riga["creato"] or 0)
+    # la carta scelta nel negozio (23 nov 2026)
+    try:
+        o["carta"] = json.loads(riga["carta"] or "{}") if "carta" in riga.keys() else {}
+    except (TypeError, ValueError):
+        o["carta"] = {}
     return o
 
 
@@ -131613,6 +131629,8 @@ async def bitpost_stato(x_tg_init_data: str = Header(""),
             "strada_base": BITPOST_STRADA_BASE, "prossimo_indice": prossimo,
             "quota_totale": BITPOST_QUOTA_TOTALE,
             "durate_ore": list(BITPOST_DURATE_ORE),
+            # il negozio delle carte (23 nov 2026)
+            "carte": shoppy_carte_per_chi(shoppy_carte_lette(), catalogo),
             "miei": [_bitpost_in_lista(r, user["id"]) for r in miei],
             "bacheca": [_bitpost_in_lista(r, user["id"]) for r in bacheca]}
 
@@ -131642,6 +131660,7 @@ async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
     ore = d.get("durata_ore", 24)
     if ore not in BITPOST_DURATE_ORE:
         raise HTTPException(400, "Durata non valida")
+    carta = bitpost_carta_scelta(d.get("carta"), int(d["taglio"]), catalogo)
     con = _bitpost_db()
     try:
         if not _bitpost_indice_libero(con, user["id"], d.get("indice")):
@@ -131660,12 +131679,12 @@ async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
     try:
         con.execute(
             "INSERT INTO bitpost_ordini(id, reference, compratore_id, "
-            "compratore_indice, stato, ordine, creato, aggiornato, scade) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "compratore_indice, stato, ordine, creato, aggiornato, scade, carta) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (int(o["id"]), rif, user["id"], int(d["indice"]),
              int((o.get("status") or {}).get("id") or 1),
              json.dumps(o, ensure_ascii=False), adesso, adesso,
-             adesso + int(ore) * 3600))
+             adesso + int(ore) * 3600, json.dumps(carta, ensure_ascii=False) if carta else ""))
         con.commit()
     finally:
         con.close()
@@ -131750,6 +131769,11 @@ async def bitpost_ordine(oid: int, x_tg_init_data: str = Header(""),
     fuori = {"ordine": bitpost_per_chi(o, ruolo), "ruolo": ruolo,
              "indice": indice, "strada_base": BITPOST_STRADA_BASE,
              "firme": [dict(f) for f in firme]}
+    # la carta scelta nel negozio (23 nov 2026)
+    try:
+        fuori["carta"] = json.loads(riga["carta"] or "{}") if "carta" in riga.keys() else {}
+    except (TypeError, ValueError):
+        fuori["carta"] = {}
     if ruolo == "compratore" and st == 2:
         fuori["pagamento"] = await _bitpost_chiama("GET", f"/orders/{oid}/payment")
     if st in BITPOST_INCASSABILI or st == 10:
@@ -132231,6 +132255,7 @@ async def bitpost_offerta_compra(fid: int, req: Request,
                                     BITPOST_MAX_EURO)
     if motivo:
         raise HTTPException(400, motivo)
+    carta = bitpost_carta_scelta(d.get("carta"), int(d["taglio"]), catalogo)
     valore = int(d["taglio"]) * int(d["quanti"])
     adesso = int(time.time())
     con = _bitpost_db()
@@ -132275,11 +132300,12 @@ async def bitpost_offerta_compra(fid: int, req: Request,
     try:
         con.execute(
             "INSERT INTO bitpost_ordini(id, reference, compratore_id, "
-            "compratore_indice, stato, ordine, creato, aggiornato, scade) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "compratore_indice, stato, ordine, creato, aggiornato, scade, carta) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (int(o["id"]), rif, user["id"], int(d["indice"]),
              int((o.get("status") or {}).get("id") or 1),
-             json.dumps(o, ensure_ascii=False), adesso, adesso, adesso + 3600))
+             json.dumps(o, ensure_ascii=False), adesso, adesso, adesso + 3600,
+             json.dumps(carta, ensure_ascii=False) if carta else ""))
         con.execute("UPDATE bitpost_offerte SET ordine_id=? WHERE id=?",
                     (int(o["id"]), fid))
         con.commit()
@@ -132351,8 +132377,188 @@ async def _bitpost_ronda_scadute(adesso: int = 0) -> int:
 _TASK_BITPOST_RONDA = None
 
 
+# ── IL NEGOZIO DELLE CARTE (23 nov 2026, Andrea: «chi compra la gift card
+# possa selezionare quale carta … un menu con la grafica di un negozio
+# barattolo dove scelgo una carta con la variante in base al taglio di ogni
+# carta redimibile da shoppy code»). I negozi di Shoppy Code sono Shopify:
+# `/products.json` e' pubblico e dice titolo, foto e varianti (i tagli).
+# Oggi risponde solo il negozio della carta di Bitpost («THE GIFT CARD»);
+# shoppycode.com, dove stanno i marchi, e' chiuso con una password e torna
+# 401: lo si salta finche' non riapre, e da li' entra da solo.
+# Il catalogo si rilegge al piu' ogni ora, dalla ronda; la FOTO si scarica
+# una volta e si serve da qui (`/api/bitpost/carta/<id>`): il telefono non
+# chiede niente a Shopify, quindi non gli dice chi guarda.
+SHOPPY_NEGOZI = ("https://thegiftcard.shoppycode.com", "https://shoppycode.com")
+SHOPPY_OGNI_S = 3600
+_SHOPPY_LETTO = {"t": 0}
+SHOPPY_ID_CARTA = re.compile(r"^[0-9]{1,20}$")
+# la foto si scarica SOLO dalla CDN di Shopify e SOLO in questi formati
+# (un SVG porterebbe script dentro la nostra origine)
+SHOPPY_CDN = "https://cdn.shopify.com/"
+SHOPPY_FOTO_TIPI = ("image/webp", "image/png", "image/jpeg")
+
+
+def shoppy_tagli(varianti) -> list:
+    """I tagli di un prodotto Shopify, in centesimi: le varianti disponibili
+    col loro prezzo (stringhe come «50.00»), senza doppioni, in ordine.
+    PURA."""
+    tagli = set()
+    for v in varianti or []:
+        if not isinstance(v, dict) or v.get("available") is False:
+            continue
+        try:
+            c = int(round(float(str(v.get("price") or "0")) * 100))
+        except (TypeError, ValueError):
+            continue
+        if 0 < c <= 1000000:
+            tagli.add(c)
+    return sorted(tagli)
+
+
+def shoppy_carte_da_prodotti(negozio: str, dati) -> list:
+    """Le carte di un `/products.json`: solo i prodotti con almeno un taglio
+    e un id numerico. PURA."""
+    carte = []
+    for p in (dati or {}).get("products") or []:
+        if not isinstance(p, dict):
+            continue
+        cid = str(p.get("id") or "")
+        tagli = shoppy_tagli(p.get("variants"))
+        if not SHOPPY_ID_CARTA.match(cid) or not tagli:
+            continue
+        imm = ""
+        for i in p.get("images") or []:
+            if isinstance(i, dict) and str(i.get("src") or "").startswith(SHOPPY_CDN):
+                imm = i["src"]
+                break
+        carte.append({"id": cid, "negozio": negozio,
+                      "titolo": str(p.get("title") or "")[:120],
+                      "tipo": str(p.get("product_type") or "")[:60],
+                      "tagli": tagli, "immagine_url": imm})
+    return carte
+
+
+async def _shoppy_rileggi(adesso: float = 0):
+    """Rilegge i negozi (al piu' ogni ora). Un negozio che non risponde, o
+    risponde 401 perche' chiuso, si salta e tiene le carte di prima."""
+    adesso = adesso or time.time()
+    if adesso - _SHOPPY_LETTO["t"] < SHOPPY_OGNI_S:
+        return
+    _SHOPPY_LETTO["t"] = adesso
+    async with httpx.AsyncClient(timeout=20, follow_redirects=False) as c:
+        for negozio in SHOPPY_NEGOZI:
+            try:
+                r = await c.get(negozio + "/products.json?limit=250")
+                if r.status_code != 200:
+                    continue
+                carte = shoppy_carte_da_prodotti(negozio, r.json())
+            except Exception as e:
+                print(f"[shoppy] {negozio}: {type(e).__name__}", flush=True)
+                continue
+            con = _bitpost_db()
+            try:
+                for k in carte:
+                    vecchia = con.execute("SELECT immagine FROM shoppy_carte WHERE id=?",
+                                          (k["id"],)).fetchone()
+                    imm, tipo_imm = (vecchia["immagine"] if vecchia else None), None
+                    if not imm and k["immagine_url"]:
+                        try:
+                            ri = await c.get(k["immagine_url"] + ("&" if "?" in k["immagine_url"] else "?") + "width=400")
+                            ct = ri.headers.get("content-type", "").split(";")[0].strip()
+                            if ri.status_code == 200 and ct in SHOPPY_FOTO_TIPI and len(ri.content) < 2_000_000:
+                                imm, tipo_imm = ri.content, ct.split(";")[0]
+                        except Exception:
+                            pass
+                    con.execute(
+                        "INSERT INTO shoppy_carte(id, negozio, titolo, tipo, tagli, aggiornato) "
+                        "VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET negozio=excluded.negozio, "
+                        "titolo=excluded.titolo, tipo=excluded.tipo, tagli=excluded.tagli, "
+                        "aggiornato=excluded.aggiornato",
+                        (k["id"], negozio, k["titolo"], k["tipo"], json.dumps(k["tagli"]), int(adesso)))
+                    if tipo_imm:
+                        con.execute("UPDATE shoppy_carte SET immagine=?, immagine_tipo=? WHERE id=?",
+                                    (imm, tipo_imm, k["id"]))
+                con.commit()
+            finally:
+                con.close()
+
+
+def shoppy_carte_per_chi(righe, catalogo) -> list:
+    """Le carte come le vede l'app. I tagli ordinabili sono quelli che
+    Bitpost vende (`denominations`): oggi la carta di Bitpost ha gli stessi
+    tagli, e una carta di un marchio diventera' ordinabile col riscatto
+    (fino ad allora `presto`). PURA."""
+    ammessi = set((catalogo or {}).get("denominations") or [])
+    fuori = []
+    for r in righe:
+        try:
+            tagli = [int(x) for x in json.loads(r["tagli"] or "[]")]
+        except (TypeError, ValueError):
+            tagli = []
+        bitpost = r["negozio"] == SHOPPY_NEGOZI[0]
+        fuori.append({"id": r["id"], "titolo": r["titolo"], "tipo": r["tipo"],
+                      "immagine": f"/api/bitpost/carta/{r['id']}"
+                      if r["immagine_tipo"] in SHOPPY_FOTO_TIPI else "",
+                      "tagli": [t for t in tagli if t in ammessi] if bitpost else tagli,
+                      "presto": not bitpost})
+    # prima quelle ordinabili, poi i marchi «presto»; dentro, per nome
+    return sorted((k for k in fuori if k["tagli"]),
+                  key=lambda k: (k["presto"], k["titolo"].casefold()))
+
+
+def bitpost_carta_scelta(cid, taglio: int, catalogo) -> dict:
+    """La carta scelta nel negozio, se c'e': {"id", "titolo"}. Una carta
+    che non sta nel catalogo, o non ha quel taglio, o non e' ancora
+    ordinabile (`presto`) ferma la richiesta. Senza carta, {} (le richieste
+    di prima e le app vecchie)."""
+    if cid in (None, ""):
+        return {}
+    cid = str(cid)
+    for k in shoppy_carte_per_chi(shoppy_carte_lette(), catalogo):
+        if k["id"] == cid:
+            if k["presto"]:
+                raise HTTPException(400, "Questa carta non si può ancora ordinare")
+            if taglio not in k["tagli"]:
+                raise HTTPException(400, "Questa carta non ha quel taglio")
+            return {"id": k["id"], "titolo": k["titolo"]}
+    raise HTTPException(400, "Carta non trovata nel catalogo")
+
+
+def shoppy_carte_lette() -> list:
+    con = _bitpost_db()
+    try:
+        return con.execute("SELECT id, negozio, titolo, tipo, tagli, immagine_tipo "
+                           "FROM shoppy_carte ORDER BY negozio, titolo").fetchall()
+    finally:
+        con.close()
+
+
+@app.get("/api/bitpost/carta/{cid}")
+def bitpost_carta_foto(cid: str):
+    """La foto di una carta del catalogo, servita da qui: l'id passa da una
+    forma (solo cifre) e la foto viene dal database, mai da un percorso."""
+    if not SHOPPY_ID_CARTA.match(cid or ""):
+        raise HTTPException(404)
+    con = _bitpost_db()
+    try:
+        r = con.execute("SELECT immagine, immagine_tipo FROM shoppy_carte WHERE id=?",
+                        (cid,)).fetchone()
+    finally:
+        con.close()
+    if not r or not r["immagine"] or r["immagine_tipo"] not in SHOPPY_FOTO_TIPI:
+        raise HTTPException(404)
+    return Response(content=r["immagine"], media_type=r["immagine_tipo"],
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 async def _orologio_bitpost():
     while True:
+        try:
+            if BITPOST_ATTIVO:
+                await _shoppy_rileggi()
+        except Exception as e:
+            print(f"⚠️ Gift card: il catalogo di Shoppy Code non si e' riletto ({e})",
+                  flush=True)
         await asyncio.sleep(300)
         try:
             if BITPOST_ATTIVO and bitpost_configurato():

@@ -3724,6 +3724,19 @@
     .p2p-ord.p2p-gift .p2p-testa{padding-right:108px}
   }
   .p2p-voce-gift small{color:var(--muted);font-weight:600}
+  /* il negozio delle carte (23 nov 2026): la griglia del mercatino, la
+     carta scelta col bordo arancio, i marchi non ancora ordinabili spenti */
+  .gc-negozio{padding:4px 0 8px}
+  .gc-negozio .card{display:block;width:100%;padding:0;border:2px solid transparent;
+    font:inherit;color:inherit;text-align:left}
+  .gc-negozio .card.on{border-color:var(--sats);box-shadow:0 0 0 3px color-mix(in srgb,var(--sats) 25%,transparent)}
+  .gc-negozio .card.presto{opacity:.55;cursor:default}
+  .gc-negozio .card .ph{aspect-ratio:1.55/1;background:var(--card)}
+  .gc-negozio .card .ph img{object-fit:contain;padding:8px}
+  .gc-negozio .card .title{font-size:14px}
+  .gc-carta-tipo{font-size:12px;color:var(--muted);margin-top:2px}
+  .gc-quanti{display:flex;gap:7px;align-items:center}
+  .gc-quanti input{flex:0 0 72px;width:72px;max-width:72px;text-align:center;min-height:40px}
   .gc-carte{display:flex;align-items:center;gap:10px}
   .gc-carte select{flex:1 1 auto;min-width:0}
   .gc-carte input{flex:0 0 76px;width:76px;text-align:center}
@@ -122621,7 +122634,7 @@ function rigaGiftP2P(r){
   const fee = r.mio ? mia : perChiPrende;
   const badge = '<span class="p2p-badge">' + (r.mio ? 'la tua commissione ' : 'commissione per te ')
     + '<b class="' + (fee * 2 <= tot ? 'p2p-affare' : 'p2p-avviso') + '">' + esc(gcPct(fee)) + '</b></span>';
-  const paga = '<div class="p2p-box p2p-paga p2p-paga-gift">🎁 Gift card Shoppy Code'
+  const paga = '<div class="p2p-box p2p-paga p2p-paga-gift">🎁 ' + (richiesta && x.carta && x.carta.titolo ? esc(x.carta.titolo) : 'Gift card Shoppy Code')
     + (richiesta ? ' · ' + Number(x.quantity) + ' × ' + esc(gcEuro(x.denomination)) : '') + '</div>';
   const barra = Number(x.scade) && Number(x.creato) && typeof barraScadenzaP2P === 'function'
     ? barraScadenzaP2P({scade: Number(x.scade), creato: Number(x.creato)}) : '';
@@ -122833,14 +122846,101 @@ function gcDurateHTML(){
       onclick="gcScegliDurata(${Number(h)}, this)">${esc(gcDurataTesto(h))}</button>`).join('') + '</div>';
 }
 
+/* IL NEGOZIO DELLE CARTE (23 nov 2026, Andrea: «voglio un menu con la
+   grafica di un negozio barattolo dove scelgo una carta con la variante in
+   base al taglio di ogni carta redimibile da shoppy code»). Le carte
+   arrivano dal catalogo dei negozi Shoppy Code (`gcStato.carte`, riletto
+   ogni ora dal server): la vetrina e' la griglia del mercatino (.grid,
+   .card, .ph, il cartellino «da X €»), i tagli i bottoncini delle varianti
+   (.var-chip) come nella scheda di un annuncio. Chi vende compra sempre
+   una carta Shoppy Code: la carta del marchio la ottiene Barattolo col
+   riscatto, e finche' quello non c'e' i marchi stanno in vetrina «presto».
+   Senza catalogo (server vecchio o negozi muti) resta la sola carta di
+   Bitpost coi tagli del suo catalogo. */
+let gcCartaId = '';           // la carta scelta nel negozio
+let gcTaglioScelto = 0;       // il taglio scelto, in centesimi
+
+function gcCarteNegozio(){
+  const c = gcStato.carte;
+  if (Array.isArray(c) && c.length) return c;
+  return [{id: '', titolo: 'THE GIFT CARD', tipo: 'Shoppy Code', immagine: '/assets/gift-card-shoppy.webp',
+           tagli: (gcStato.catalogo || {}).denominations || [], presto: false}];
+}
+
+function gcCartaAttuale(){
+  const carte = gcCarteNegozio().filter(k => !k.presto);
+  return carte.find(k => k.id === gcCartaId) || carte[0] || null;
+}
+
 function gcCarteHTML(massimo){
   const tetto = Math.min(gcTetto(), massimo || Infinity), minimo = gcMinimo();
-  const tagli = ((gcStato.catalogo || {}).denominations || []).filter(d => d <= tetto);
-  return '<div class="gc-carte"><select id="gcTaglio" onchange="gcContoDetta()" aria-label="Taglio">'
-    + tagli.map(d => `<option value="${d}"${d === gcTaglioDiSerie(tagli, minimo) ? ' selected' : ''}>${esc(gcEuro(d))}</option>`).join('')
-    + '</select><span>×</span><input id="gcQuanti" type="number" min="1" max="50" value="1" inputmode="numeric" '
-    + 'oninput="gcContoDetta()" aria-label="Quante carte"></div>'
-    + `<div class="hint">Minimo per ordine ${esc(gcEuro(minimo))}, massimo ${esc(gcEuro(tetto))}.</div>`;
+  const carta = gcCartaAttuale();
+  const vetrina = gcCarteNegozio().map(k => {
+    const tagli = (k.tagli || []).filter(d => d <= tetto);
+    const scelta = !k.presto && carta && k.id === carta.id;
+    const foto = k.immagine ? `<img src="${esc(k.immagine)}" alt="" loading="lazy">` : '🎁';
+    const prezzo = tagli.length ? `<span class="price-sub">da</span> ${esc(gcEuro(tagli[0]))}` : '—';
+    return `<button type="button" class="card gc-carta${scelta ? ' on' : ''}${k.presto ? ' presto' : ''}" aria-pressed="${scelta}"
+        ${k.presto ? 'disabled' : `data-id="${esc(k.id)}" onclick="gcScegliCarta(this.dataset.id)"`}>
+      <div class="ph-wrap"><div class="ph">${foto}</div>
+        <div class="tag-price"><div class="price">${k.presto ? 'presto' : prezzo}</div></div></div>
+      <div class="info"><div class="title">${esc(k.titolo)}</div>
+        <div class="gc-carta-tipo">${esc(k.presto ? 'Arriva col riscatto automatico' : (k.tipo || 'Gift card'))}</div></div>
+    </button>`;
+  }).join('');
+  const tagli = carta ? (carta.tagli || []).filter(d => d <= tetto) : [];
+  if (!tagli.includes(gcTaglioScelto)) gcTaglioScelto = tagli.length ? gcTaglioDiSerie(tagli, minimo) : 0;
+  const chips = tagli.map(d => `<button type="button" class="var-chip${d === gcTaglioScelto ? ' on' : ''}" aria-pressed="${d === gcTaglioScelto}"
+      onclick="gcScegliTaglio(${Number(d)})">${esc(gcEuro(d))}</button>`).join('');
+  return `<div class="grid gc-negozio">${vetrina}</div>
+    <div class="varianti gc-varianti">
+      <div><div class="var-nome">Taglio${carta ? ' · ' + esc(carta.titolo) : ''}</div>
+        <div class="var-chips" role="group" aria-label="Taglio">${chips || '<span class="hint">Nessun taglio sotto il tetto.</span>'}</div></div>
+      <div><div class="var-nome">Quante</div>
+        <div class="gc-quanti"><button type="button" class="var-chip" onclick="gcPiuMeno(-1)" aria-label="Una in meno">−</button>
+          <input id="gcQuanti" type="number" min="1" max="50" value="${Math.max(1, Number(el('gcQuanti')?.value || 1))}" inputmode="numeric"
+            oninput="gcContoDetta()" aria-label="Quante carte">
+          <button type="button" class="var-chip" onclick="gcPiuMeno(1)" aria-label="Una in più">+</button></div></div>
+    </div>
+    <input type="hidden" id="gcTaglio" value="${Number(gcTaglioScelto)}">
+    <div class="hint">Minimo per ordine ${esc(gcEuro(minimo))}, massimo ${esc(gcEuro(tetto))}.</div>`;
+}
+
+function gcRidisegnaCarte(){
+  const box = el('gcNegozio');
+  if (!box) return;
+  const f = gcModo === 'compra' ? (gcStato.offerte || []).find(x => x.id === gcModoId) : null;
+  box.innerHTML = gcCarteHTML(f ? f.massimo : 0);
+  gcContoDetta();
+}
+
+function gcScegliCarta(id){
+  haptic();
+  gcCartaId = String(id || '');
+  gcRidisegnaCarte();
+}
+
+function gcScegliTaglio(d){
+  haptic();
+  gcTaglioScelto = Number(d);
+  gcRidisegnaCarte();
+}
+
+function gcPiuMeno(n){
+  const i = el('gcQuanti');
+  if (!i) return;
+  i.value = Math.min(50, Math.max(1, Number(i.value || 1) + n));
+  gcContoDetta();
+}
+
+/* la carta da mandare al server: l'id del catalogo (vuoto senza catalogo) */
+function gcCartaDaMandare(){
+  const k = gcCartaAttuale();
+  return k && k.id ? k.id : undefined;
+}
+
+function gcNomeCarta(x){
+  return x && x.carta && x.carta.titolo ? x.carta.titolo : 'Shoppy Code';
 }
 
 /* IL MODULO, nel verso del P2P: sezioni come il foglio «Pubblica», lo
@@ -122855,7 +122955,7 @@ function gcModuloHTML(){
   if (gcModo === 'chiedi') {
     h = '<h4 class="gc-modo-tit">Vendi BTC, ricevi una gift card</h4>'
       + '<p class="hint">Chiedi carte <b>Shoppy Code</b> pagando in sats on-chain: chi prende la tua richiesta le compra per te coi suoi euro.</p>'
-      + sez('Che carte vuoi', gcCarteHTML())
+      + sez('Scegli la carta', '<div id="gcNegozio">' + gcCarteHTML() + '</div>')
       + sez('La tua parte della commissione (%)', gcSliderHTML('chi vende'))
       + sez('Resta aperta', gcDurateHTML() + '<div class="hint">Se nessuno la prende entro questo tempo si annulla da sola.</div>')
       + '<div id="gcConto"></div>'
@@ -122875,14 +122975,14 @@ function gcModuloHTML(){
     if (!f) return sparito;
     h = '<h4 class="gc-modo-tit">Vendi BTC, ricevi una gift card</h4>'
       + `<p class="hint">Chi vende ti compra carte <b>Shoppy Code</b> fino a ${esc(gcEuro(f.massimo))}${gcScadeTesto({scade: f.scade, status: {id: 1}})}.</p>`
-      + sez('Che carte vuoi', gcCarteHTML(f.massimo))
+      + sez('Scegli la carta', '<div id="gcNegozio">' + gcCarteHTML(f.massimo) + '</div>')
       + '<div id="gcConto"></div>'
       + `<button type="button" class="btn orange" onclick="gcCompraOfferta(${Number(f.id)}, this)">🎁 Compra</button>`;
   } else if (gcModo === 'prendi') {
     const o = (gcStato.bacheca || []).find(x => x.id === gcModoId);
     if (!o) return sparito;
     h = '<h4 class="gc-modo-tit">Compra BTC, paghi con una gift card</h4>'
-      + `<p class="hint">Qualcuno chiede ${Number(o.quantity)} ${Number(o.quantity) === 1 ? 'carta' : 'carte'} <b>Shoppy Code</b> da ${esc(gcEuro(o.denomination))}${gcScadeTesto(o)}. Dopo il suo deposito le compri tu e le regali all'email che ti diamo: hai 5 giorni.</p>`
+      + `<p class="hint">Qualcuno chiede ${Number(o.quantity)} ${Number(o.quantity) === 1 ? 'carta' : 'carte'} <b>${esc(gcNomeCarta(o))}</b> da ${esc(gcEuro(o.denomination))}${gcScadeTesto(o)}. Tu compri carte <b>Shoppy Code</b>: alla carta scelta pensa Barattolo. Dopo il suo deposito le compri tu e le regali all'email che ti diamo: hai 5 giorni.</p>`
       + '<div id="gcConto"></div>'
       + `<button type="button" class="btn orange" onclick="gcPrendi(${Number(o.id)}, this)">🎁 Vendi le carte</button>`;
   } else if (gcModo === 'mia-offerta') {
@@ -122936,13 +123036,13 @@ async function gcCompraOfferta(id, btn){
   const tot = Number(gcStato.quota_totale || 0), mia = tot - Number(f.quota);
   const invii = gcSatsDa(taglio * quanti, mia);
   chiediConferma({titolo: 'Compri queste gift card?', soldi: true,
-    corpo: `Tu paghi: ${invii ? '≈ ' + fmt(invii) + ' sats' : 'i sats'} nel deposito on-chain, in sats veri.\nRicevi: ${quanti} ${quanti === 1 ? 'carta' : 'carte'} Shoppy Code da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nLa tua commissione: ${gcPct(mia)}.`,
+    corpo: `Tu paghi: ${invii ? '≈ ' + fmt(invii) + ' sats' : 'i sats'} nel deposito on-chain, in sats veri.\nRicevi: ${quanti} ${quanti === 1 ? 'carta' : 'carte'} ${gcCartaAttuale()?.titolo || 'Shoppy Code'} da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nLa tua commissione: ${gcPct(mia)}.`,
     etichetta: 'Compra', poi: async () => {
       gcOccupato = true;
       try {
         const indice = gcStato.prossimo_indice;
         const xpub = await gcXpub(indice);
-        const d = await gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice});
+        const d = await gcApi(`/offerte/${id}/compra`, 'POST', {taglio, quanti, xpub, indice, carta: gcCartaDaMandare()});
         toast(d.agganciato ? '🎁 Fatto: ora paga il deposito' : '🎁 Richiesta creata: chi vende non ha risposto, resta nel P2P un\'ora');
         gcApriDettaglio(d.ordine.id);
       } catch(e){ toast('⚠️ ' + e.message, 5000); }
@@ -122954,7 +123054,7 @@ function gcListaHTML(lista, bacheca){
   if (!lista.length) return `<p class="hint">${bacheca
     ? 'Nessun ordine da prendere adesso.' : 'Ancora nessun ordine di gift card.'}</p>`;
   return lista.map(o => `<div class="gc-riga" onclick="gcApriDettaglio(${Number(o.id)})">
-      <div><b>${Number(o.quantity)} × ${esc(gcEuro(o.denomination))}</b>
+      <div><b>${Number(o.quantity)} × ${esc(gcEuro(o.denomination))}</b> ${esc(gcNomeCarta(o))}
         <small>#${Number(o.id)} · ${o.ruolo === 'compratore' ? 'compri tu'
           : o.ruolo === 'bitworker' ? 'vendi tu' : `commissione per te ${esc(gcPct(o.bitworker_fee))}`}${gcScadeTesto(o)}</small></div>
       <div class="gc-stato">${esc(o.stato_testo)}</div>
@@ -122969,13 +123069,13 @@ async function gcCrea(btn){
   const durata_ore = gcDurata;
   const invii = gcSatsDa(taglio * quanti, quota);
   chiediConferma({titolo: 'Pubblichi la richiesta?', soldi: true,
-    corpo: `Tu paghi: ${invii ? '≈ ' + fmt(invii) + ' sats' : 'i sats'} nel deposito on-chain, in sats veri, quando qualcuno la prende.\nRicevi: ${quanti} ${quanti === 1 ? 'carta' : 'carte'} Shoppy Code da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nCommissione: paghi tu ${gcPct(quota)}, chi vende ${gcPct((gcStato.quota_totale || 0) - quota)}.\nResta aperta ${gcDurataTesto(durata_ore)}.`,
+    corpo: `Tu paghi: ${invii ? '≈ ' + fmt(invii) + ' sats' : 'i sats'} nel deposito on-chain, in sats veri, quando qualcuno la prende.\nRicevi: ${quanti} ${quanti === 1 ? 'carta' : 'carte'} ${gcCartaAttuale()?.titolo || 'Shoppy Code'} da ${gcEuro(taglio)} (${gcEuro(taglio * quanti)}).\nCommissione: paghi tu ${gcPct(quota)}, chi vende ${gcPct((gcStato.quota_totale || 0) - quota)}.\nResta aperta ${gcDurataTesto(durata_ore)}.`,
     etichetta: 'Pubblica', poi: async () => {
       gcOccupato = true;
       try {
         const indice = gcStato.prossimo_indice;
         const xpub = await gcXpub(indice);
-        const d = await gcApi('/ordini', 'POST', {taglio, quanti, xpub, indice, quota, durata_ore});
+        const d = await gcApi('/ordini', 'POST', {taglio, quanti, xpub, indice, quota, durata_ore, carta: gcCartaDaMandare()});
         toast('🎁 Richiesta pubblicata: aspettiamo chi vende');
         gcApriDettaglio(d.ordine.id);
       } catch(e){ toast('⚠️ ' + e.message, 5000); }
@@ -123020,7 +123120,7 @@ function gcDettaglioHTML(){
   const id = Number(o.id);
   let h = `<div class="gc-box">
     <button type="button" class="btn ghost" onclick="gcAperto=null;gcDisegna()">← Indietro</button>
-    <h4>#${id} · ${Number(o.quantity)} × ${esc(gcEuro(o.denomination))}</h4>
+    <h4>#${id} · ${Number(o.quantity)} × ${esc(gcEuro(o.denomination))} ${esc(gcNomeCarta(a))}</h4>
     <p><b>${esc(o.stato_testo)}</b></p>
     <p class="hint">Sei ${io === 'compratore' ? 'chi compra' : 'chi vende'} ·
       commissioni: chi compra ${esc(gcPct(o.buyer_fee))}, chi vende ${esc(gcPct(o.bitworker_fee))}${o.total_sats ? ` · deposito ${Number(o.total_sats).toLocaleString('it-IT')} sats` : ''}</p>`;
