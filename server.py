@@ -17319,20 +17319,51 @@ GIROCONTO_FATTURA_SECONDI = 4 * 3600
 GIROCONTO_RIPRESA_MIN_S = 3600 + 600
 # LA CIFRA LA DECIDE MOSTRO: la fattura che chiede a chi compra e' per i
 # sats esatti dello scambio meno la commissione, calcolati da lui alla
-# presa. Il deposito nasce per QUELLA cifra, purche' copra l'ordine e lo
-# superi al massimo dell'1% (l'arrotondamento, che va a chi vende: deciso
-# il 23 nov 2026); di meno = non basta, e il telefono riprova con qualche
-# centesimo in piu' prima che chi compra abbia pagato niente.
-GIROCONTO_AVANZO_PERCENTO = 1
+# presa. Il deposito nasce per QUELLA cifra, purche' copra l'ordine e non
+# lo superi troppo; l'avanzo e' l'arrotondamento, e va a chi vende (deciso
+# il 23 nov 2026). QUANTO AVANZO: Mostro prende solo EURO INTERI
+# (`fiat_amount` e' un i64), quindi chi deve 41,62 € ne manda 42, e il suo
+# prezzo puo' scostarsi un poco dal nostro cambio: si ammette il piu'
+# largo fra il 3% e un euro e mezzo (al cambio di adesso). Di meno = non
+# basta, e il telefono rinuncia prima che chi compra abbia pagato niente.
+GIROCONTO_AVANZO_PERCENTO = 3
+GIROCONTO_AVANZO_EURO = 1.5
+# «NON HAI SATS?» (23 nov 2026, decisione di Andrea): i due tasti della
+# cassa che aprono la strada del giroconto. Leva nuova, accesa di serie
+# ma all'inizio SOLO per i moderatori (Andrea e Alan, la regola delle
+# leve nuove); False = per tutti quelli che il P2P lo vedono.
+try:
+    from config import VIA_EURO_SOLO_ADMIN
+except ImportError:
+    VIA_EURO_SOLO_ADMIN = True
+# Il tetto in euro dell'ordine pagato cosi' (100 €, deciso il 23 nov
+# 2026): lo guarda il telefono per mostrare i tasti; sotto c'e' sempre
+# il tetto in sats del giroconto, che e' quello che fa fede.
+try:
+    from config import VIA_EURO_MAX_EURO
+except ImportError:
+    VIA_EURO_MAX_EURO = 100
 
 
-def giroconto_cifra_giusta(totale: int, sats: int) -> bool:
+def giroconto_cifra_giusta(totale: int, sats: int, eur_btc: float = 0.0) -> bool:
     """I sats che Mostro chiede vanno bene per un ordine da `totale`?
-    Mai meno, e al massimo l'1% in piu' (almeno 10 sats di tolleranza,
-    che sui piccoli importi l'1% e' meno di un arrotondamento)."""
+    Mai meno; in piu' al massimo il 3%, o un euro e mezzo se e' di piu'
+    (col cambio `eur_btc` in euro per bitcoin; 0 = non lo so, vale il 3%),
+    e comunque almeno 10 sats."""
     if isinstance(sats, bool) or not isinstance(sats, int) or totale <= 0:
         return False
-    return totale <= sats <= totale + max(10, totale * GIROCONTO_AVANZO_PERCENTO // 100)
+    avanzo = max(10, totale * GIROCONTO_AVANZO_PERCENTO // 100)
+    if eur_btc and eur_btc > 0:
+        avanzo = max(avanzo, int(GIROCONTO_AVANZO_EURO * 100_000_000 / eur_btc) + 1)
+    return totale <= sats <= totale + avanzo
+
+
+def via_euro_ammesso(tg_id) -> bool:
+    """Chi vede «Non hai sats?»: porta del giroconto aperta, il P2P per
+    lui, e la leva (moderatori soli, all'inizio)."""
+    if not giroconto_attivo() or not bool(_p2p_per(tg_id)["attivo"]):
+        return False
+    return (not VIA_EURO_SOLO_ADMIN) or e_admin(tg_id)
 
 
 def giroconto_attivo() -> bool:
@@ -49633,7 +49664,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # l'avanzo entra nel totale e va a chi vende (prezzo_sats meno
     # spedizione e protezione e' la sua parte)
     if giroconto:
-        if not giroconto_cifra_giusta(totale, sats_giroconto):
+        if not giroconto_cifra_giusta(totale, sats_giroconto, cambio_noto_ora()):
             con.close()
             raise HTTPException(409, "Giroconto: cifra fuori misura")
         totale = sats_giroconto
@@ -55328,6 +55359,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # ...e l'interruttore «₿ Bitcoin only» del Filtro (18 nov 2026,
     # cantiere bitcoin-only): la leva lo OFFRE, la scelta sta nel telefono
     profilo["p2p_bitcoin_only"] = bool(P2P_BITCOIN_ONLY_ATTIVO)
+    # ...e «Non hai sats?» (23 nov 2026, giroconto interno): il cancello e
+    # il tetto in euro; i tasti li accende il telefono solo a chi non ha
+    # un wallet nel profilo e con un venditore di sats pronto nel libro
+    profilo["via_euro"] = via_euro_ammesso(user["id"])
+    profilo["via_euro_max_euro"] = int(VIA_EURO_MAX_EURO or 0)
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
