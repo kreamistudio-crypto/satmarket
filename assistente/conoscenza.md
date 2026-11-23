@@ -184,17 +184,21 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere. Le ferie si mettono da Profilo → «🌴 Negozio in ferie», scegliendo il giorno del rientro: gli annunci restano in vetrina col prezzo in grigio, nessuno li può comprare, e al rientro tornano comprabili da soli. Non si chiude con affari da spedire o aste in corso.
 
-Fermare per un po' un annuncio solo: nella sua scheda «🔄 Aggiorna i pezzi» e 0. Diventa «Esaurito»: resta visibile, in grigio, ma nessuno lo compra; con «🔄 Rifornisci» si rimettono i pezzi e torna in vendita. Non vale per i servizi e per gli annunci importati da Nostr. Per toglierlo proprio dalla vetrina, senza scadenza: nella sua scheda «🙈 Nascondi dalla vetrina». Nessuno lo vede più (nemmeno col link), e lo ritrovi in Profilo → «I tuoi annunci», in grigio, con «👁 Rimetti in vetrina» per farlo tornare quando vuoi (dal 24 novembre 2026). Non si nasconde con un ordine ancora aperto su quell'annuncio, né un'asta o un annuncio importato da Nostr o da un negozio collegato. Bozze degli annunci non ce ne sono: appena pubblicato, l'annuncio passa dalla moderazione e poi va in vetrina.
+Le foto dell'annuncio (dal 24 novembre 2026): sotto ogni foto ci sono le frecce ◀ ▶ per spostarla, e la prima foto è la copertina. Sotto ogni foto c'è anche «Descrizione della foto (facoltativa)», fino a 80 caratteri: chi compra la legge aprendo la foto a schermo intero. In «Modifica» le foto attuali restano: se ne aggiungono altre fino a 5, si spostano con le frecce e si toglie quella che non si vuole con la ✕. Le descrizioni passano dalla moderazione come il resto.
 
 <!-- pezzo libro-019 | libro -->
 ## Libro · Vendere nel mercatino (5/10)
 
-I numeri del negozio: nel Profilo, gruppo «Il tuo negozio», il cassetto «📊 I numeri del negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Contano gli ordini del mercatino conclusi, non gli scambi P2P. Quanto hai comprato NON si vede nel Profilo, per la privacy (scelta del 17 novembre 2026): né in questo cassetto né nella riga sotto il nome, che dice solo «N vendite concluse». I tuoi acquisti li trovi uno per uno in «Ordini». Chi ha solo comprato e non ha annunci non ha questo cassetto.
+Le varianti (dal 24 novembre 2026): nel modulo «Vendi», sotto la quantità, c'è «🎨 Varianti (facoltative)». Si scrive il nome (per esempio «Colore») e le voci separate da virgole («rosso, blu, verde»). Così chi compra sceglie la voce prima di pagare, e chi vende la trova nella nota dell'ordine; prezzo e pezzi sono quelli dell'annuncio. Se ogni voce ha un prezzo o dei pezzi diversi, si spunta «Prezzo o pezzi diversi per ogni variante» e si scrivono accanto a ogni voce (vuoto = quelli dell'annuncio): nascono tanti annunci quante le voci, che in vetrina sono una card sola, e nella scheda chi compra sceglie la variante coi bottoncini. Ogni variante poi si modifica dalla sua «Modifica», come un annuncio qualunque, e si esaurisce da sola. Le varianti non valgono per le aste e gli abbonamenti.
 
-I codici sconto: nel Profilo, gruppo «Spedizioni e sconti», alla voce «🎟 Codici sconto», chi vende crea i suoi codici (in percentuale o a cifra fissa, con una durata e un tetto di usi) e li dà a chi vuole; chi compra lo scrive alla cassa. Col tasto «📣» sulla riga di un codice ancora valido può anche mandarlo ai clienti che hanno già comprato da lui: sceglie chi (sono già tutti spuntati) e preme «Invia invito sconto». Il messaggio lo manda Barattolo, sul bot, come DM Nostr o dentro l'app, e chi vende non vede mai i contatti dei clienti. Ogni cliente riceve lo stesso codice una volta sola, e al massimo un invito a settimana dallo stesso negozio. Un codice scaduto, finito o in pausa non si può mandare: si riattiva con ✏️ (scegliendo di nuovo i giorni, che ripartono da oggi). La data «scade il» è scritta all'italiana, giorno/mese/anno. Chi riceve le offerte e non le vuole più le spegne in Profilo → «🔔 Avvisi» → «🎟️ Offerte dei negozi», per tutti i negozi o per uno solo.
+Fermare per un po' un annuncio solo: nella sua scheda «🔄 Aggiorna i pezzi» e 0. Diventa «Esaurito»: resta visibile, in grigio, ma nessuno lo compra; con «🔄 Rifornisci» si rimettono i pezzi e torna in vendita. Non vale per i servizi e per gli annunci importati da Nostr. Per toglierlo proprio dalla vetrina, senza scadenza: nella sua scheda «🙈 Nascondi dalla vetrina». Nessuno lo vede più (nemmeno col link), e lo ritrovi in Profilo → «I tuoi annunci», in grigio, con «👁 Rimetti in vetrina» per farlo tornare quando vuoi (dal 24 novembre 2026). Non si nasconde con un ordine ancora aperto su quell'annuncio, né un'asta o un annuncio importato da Nostr o da un negozio collegato. Bozze degli annunci non ce ne sono: appena pubblicato, l'annuncio passa dalla moderazione e poi va in vetrina.
+
+I numeri del negozio: nel Profilo, gruppo «Il tuo negozio», il cassetto «📊 I numeri del negozio» mostra le visite alla pagina del negozio, le vendite concluse (ultimi 30 giorni e da sempre, coi sats che ha incassato: spedizione compresa, commissione tolta) e le recensioni. Contano gli ordini del mercatino conclusi, non gli scambi P2P. Quanto hai comprato NON si vede nel Profilo, per la privacy (scelta del 17 novembre 2026): né in questo cassetto né nella riga sotto il nome, che dice solo «N vendite concluse». I tuoi acquisti li trovi uno per uno in «Ordini». Chi ha solo comprato e non ha annunci non ha questo cassetto.
 
 <!-- pezzo libro-020 | libro -->
 ## Libro · Vendere nel mercatino (6/10)
+
+I codici sconto: nel Profilo, gruppo «Spedizioni e sconti», alla voce «🎟 Codici sconto», chi vende crea i suoi codici (in percentuale o a cifra fissa, con una durata e un tetto di usi) e li dà a chi vuole; chi compra lo scrive alla cassa. Col tasto «📣» sulla riga di un codice ancora valido può anche mandarlo ai clienti che hanno già comprato da lui: sceglie chi (sono già tutti spuntati) e preme «Invia invito sconto». Il messaggio lo manda Barattolo, sul bot, come DM Nostr o dentro l'app, e chi vende non vede mai i contatti dei clienti. Ogni cliente riceve lo stesso codice una volta sola, e al massimo un invito a settimana dallo stesso negozio. Un codice scaduto, finito o in pausa non si può mandare: si riattiva con ✏️ (scegliendo di nuovo i giorni, che ripartono da oggi). La data «scade il» è scritta all'italiana, giorno/mese/anno. Chi riceve le offerte e non le vuole più le spegne in Profilo → «🔔 Avvisi» → «🎟️ Offerte dei negozi», per tutti i negozi o per uno solo.
 
 I premi fedeltà del negozio: nel Profilo, gruppo «Spedizioni e sconti», alla voce «🎀 Premi fedeltà», chi vende scrive fino a quattro gradini in euro, ognuno col suo regalo («da 100 € la borsa, da 200 € la tazza»). Barattolo conta quanto ogni cliente ha speso in quel negozio (solo gli ordini conclusi, in euro al cambio di quel giorno, mai gli altri negozi) e, quando passa una soglia, avvisa tutti e due e mostra il premio sul suo ordine successivo pagato e non ancora spedito: «Nel pacco trovi…» a chi compra, «Nel pacco metti…» a chi vende. Il regalo lo mette nel pacco il venditore: Barattolo non lo compra e non lo spedisce, e non è uno sconto (il prezzo non cambia). Ogni soglia vale una volta per cliente; se l'ordine col premio viene annullato, il premio passa al prossimo. Sulla pagina del negozio chi compra vede i gradini e quanto ha già speso lì. Non sono punti XP né livelli: quelli si fanno con tutti gli affari su Barattolo. Dal 18 novembre: il negozio sceglie se scrivere le soglie in euro o in sats (interruttore «€ euro / ₿ sats» nel cassetto; in sats conta i sats pagati, in euro ogni ordine al cambio del suo giorno); il regalo si può scegliere dalla tendina fra gli articoli in vetrina del proprio negozio, oppure «✏️ Lo scrivo io». Lo sceglie sempre chi vende, mai chi compra. Chi ha un premio da riscuotere lo sa: gli arriva il messaggio del bot «hai un premio da riscuotere» (anche quando il negozio scrive una soglia che aveva già passato), lo legge sulla pagina del negozio («🎁 Hai un premio da riscuotere») e sulla scheda di ogni articolo di quel negozio; quando paga l'ordine, il messaggio «Ordine pagato» gli dice cosa troverà nel pacco e «Hai venduto» dice al negozio cosa metterci. Nello stesso cassetto, «🏆 I tuoi clienti» mostra al negozio la classifica di chi ha comprato da lui, dal più alto per totale speso (solo ordini conclusi), in sats o in euro con un tocco: ognuno vede solo i suoi clienti.
 
@@ -1040,9 +1044,13 @@ Per qualsiasi cosa riguardi i tuoi dati — sapere cosa abbiamo, farlo corregger
  scambi P2P: se torni, ritrovi quelle e nient'altro.
 
 <!-- pezzo schermata-035 | schermata -->
-## Schermata «Vendi (pubblicare un annuncio)» (1/2)
+## Schermata «Vendi (pubblicare un annuncio)» (1/3)
 
 &#8592;
+
+<!-- pezzo schermata-036 | schermata -->
+## Schermata «Vendi (pubblicare un annuncio)» · Metti in vendita (2/3)
+
 ## Metti in vendita
 ✕
 3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.
@@ -1074,6 +1082,9 @@ Vendita
 Il prezzo qui sopra diventa la base d'asta (solo sats). Un pezzo solo; la consegna è senza costi extra — la spedizione, se la offri, è inclusa nel prezzo. Chi punta versa subito nel deposito di garanzia; chi non vince viene rimborsato.
 Quantità disponibile
 Quanti pezzi uguali hai? Vuoto o 1 = un pezzo solo. All'esaurimento l'annuncio si mette in pausa: lo ricarichi dai tuoi annunci.
+🎨 Varianti (facoltative)
+ Prezzo o pezzi diversi per ogni variante
+Chi compra sceglie prima di pagare e tu trovi la scelta nell'ordine.
 Consegna — spunta le opzioni che offri
  🚚Spedizione
  🤝Ritiro in zona
@@ -1095,13 +1106,13 @@ sats ⇄
 Locker / punto
 sats
 Facoltativo, spesso costa meno. Vuoto = come a casa; 0 = gratis al punto.
- 🌍 Spedizione internazionale 
+ 🌍 Spedizione internazionale
+
+<!-- pezzo schermata-037 | schermata -->
+## Schermata «Vendi (pubblicare un annuncio)» · Metti in vendita (3/3)
+
 Dogana ed eventuale IVA sono a carico di chi riceve: non le incassi tu e non le anticipa Barattolo.
  Non spedisco in Italia
-
-<!-- pezzo schermata-036 | schermata -->
-## Schermata «Vendi (pubblicare un annuncio)» (2/2)
-
 Lo paga chi compra, tu lo incassi per intero. Nel tuo paese vuoto o 0 = gratis. Nelle zone estere 0 = gratis e casella vuota = lì non spedisci. San Marino e Città del Vaticano contano come Italia.
 💡 Indica nel Profilo (📦 Come spedisci) con quali corrieri spedisci: con Poste Italiane, SDA o InPost chi compra potrà scegliere anche un punto di ritiro.
 Ogni pezzo in più: +
@@ -1122,7 +1133,7 @@ Annulla la modifica
 Cosa non si può vendere
 ⚡ Pubblica annuncio
 
-<!-- pezzo schermata-037 | schermata -->
+<!-- pezzo schermata-038 | schermata -->
 ## Schermata «Profilo» · Il tuo profilo
 
 ## Il tuo profilo
@@ -1213,7 +1224,7 @@ On-chain
 Tutorial
 Esci
 
-<!-- pezzo schermata-038 | schermata -->
+<!-- pezzo schermata-039 | schermata -->
 ## Schermata «On-chain e finestre della Mini App» · On-chain (1/5)
 
 ## On-chain
@@ -1328,7 +1339,7 @@ Annulla
 Ho capito
 Come funziona il deposito
 
-<!-- pezzo schermata-039 | schermata -->
+<!-- pezzo schermata-040 | schermata -->
 ## Schermata «On-chain e finestre della Mini App» · 📖 Come si spedisce? (2/5)
 
 ## 📖 Come si spedisce?
@@ -1417,7 +1428,7 @@ Annulla il conto
 ✕
  sats
 
-<!-- pezzo schermata-040 | schermata -->
+<!-- pezzo schermata-041 | schermata -->
 ## Schermata «On-chain e finestre della Mini App» · 💰 Offri per tutto il carrello (3/5)
 
 ## 💰 Offri per tutto il carrello
@@ -1487,7 +1498,7 @@ Chiudi
 ## 🧪 Collaudo privato
 Un attimo…
 
-<!-- pezzo schermata-041 | schermata -->
+<!-- pezzo schermata-042 | schermata -->
 ## Schermata «On-chain e finestre della Mini App» · Entra con Nostr (4/5)
 
 ## Entra con Nostr
@@ -1548,7 +1559,7 @@ Annulla
  qualsiasi app, non solo qui.
 Ho capito, torno all'accesso
 
-<!-- pezzo schermata-042 | schermata -->
+<!-- pezzo schermata-043 | schermata -->
 ## Schermata «On-chain e finestre della Mini App» · 👛 Il tuo primo wallet (5/5)
 
 ## 👛 Il tuo primo wallet
@@ -2802,4 +2813,12 @@ pubblico: sì
 frase: Adesso puoi nascondere un annuncio solo, senza mettere in ferie tutto il negozio e senza una data di rientro. Nella sua scheda tocca «🙈 Nascondi dalla vetrina»: nessuno lo vede più. Lo ritrovi in «I tuoi annunci», da dove con «👁 Rimetti in vetrina» torna quando vuoi.
 dove: Scheda del tuo annuncio → «🙈 Nascondi dalla vetrina»; Profilo → «I tuoi annunci» → «👁 Rimetti in vetrina».
 leva: NASCONDI_ANNUNCIO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-154 | novita -->
+## Novità · 2026-11-24 · foto-varianti
+
+frase: Le foto del tuo annuncio adesso si mettono in ordine con le frecce ◀ ▶ (la prima è la copertina), e ognuna può avere una breve descrizione che si legge a schermo intero. In «Modifica» le foto restano: ne aggiungi altre e togli quella che non vuoi. E ci sono le varianti: «Colore: rosso, blu, verde», anche con un prezzo e dei pezzi diversi per ognuna.
+dove: Vendi → le foto (frecce ◀ ▶ e «Descrizione della foto (facoltativa)»), «🎨 Varianti (facoltative)» sotto la quantità, «Prezzo o pezzi diversi per ogni variante»; I tuoi annunci → Modifica → «Le tue foto (fino a 5)».
+leva: nessuna
 pubblico: sì

@@ -16136,8 +16136,11 @@ def prove_foto_scarti():
     prova("sentinella: il FileReader che fallisce lo dice", True,
           "Non riesco a leggere «" in mini)
     # 4) quante ne sono entrate: il server lo dice e il client lo mostra
-    prova("sentinella: la pubblicazione conta le foto", 2,
-          _SORGENTE.count('"foto_salvate": len(nomi)'))
+    # (23 nov 2026, foto-varianti: la modifica conta le NUOVE, perche'
+    # quelle che restano non si possono scartare)
+    prova("sentinella: la pubblicazione conta le foto", (1, 1),
+          (_SORGENTE.count('"foto_salvate": len(nomi)'),
+           _SORGENTE.count('"foto_salvate": len(nomi_nuovi)')))
     # due chiamate (pubblicazione e modifica) piu' la definizione
     prova("sentinella: e il client lo racconta in due posti", 2,
           mini.count("= avvisoFoto("))
@@ -16601,6 +16604,7 @@ def prove_foto_scarti():
             "function avvisoFoto(d, chieste){"))
         _b = """
           const anteprimeMute = new Set();
+          const didascaliaDi = new Map();   // (23 nov 2026) le descrizioni
           let sellFoto = [], editandoId = null, duplicaDaId = null,
               fotoAttuali = [], editandoNostr = false;
           const nodo = {innerHTML: '', style: {}, setAttribute(){},
@@ -16680,7 +16684,7 @@ def prove_foto_scarti():
     # senza che nessuna prova funzionale se ne accorga.
     _mod = pezzo("modifica_annuncio")
     prova("sentinella: in modifica le foto si salvano PRIMA dei campi",
-          True, _mod.index('salva_foto, annuncio_id, d["foto"]')
+          True, _mod.index('salva_foto, annuncio_id, [x for _, x in da_salvare]')
           < _mod.index('"UPDATE annunci SET titolo=?, descrizione=?'))
     prova("sentinella: ...e se nessuna entra, 400 prima di scrivere", True,
           _mod.index("if not nomi_nuovi:")
@@ -16690,8 +16694,11 @@ def prove_foto_scarti():
           < _mod.index("os.remove("))
     prova("sentinella: la riga che svuotava l'annuncio non c'e' piu'",
           False, 'json.dumps(nomi) if nomi else ""' in _mod)
+    # (23 nov 2026, foto-varianti) la lista e' l'annuncio intero, e
+    # vuota (o assente) lascia `foto_finali` a None: niente si scrive
     prova("sentinella: una lista vuota non tocca le foto", True,
-          'isinstance(d.get("foto"), list) and d["foto"]' in _mod)
+          'foto_finali = None' in _mod and "if foto_chieste:" in _mod
+          and "if foto_finali:" in _mod)
     _pub = pezzo("pubblica")
     prova("sentinella: tutte scartate = annuncio ritirato, prima di "
           "annunciarlo al mondo", True,
@@ -17041,7 +17048,9 @@ def prove_foto_obbligatorie():
         await publish();
         out.oltre = {detti: detti.slice(), ...stato()};
         // la modifica
-        out.modCon = metti([], 5, null, ['a5_0.jpg'], false);
+        // (23 nov 2026, foto-varianti) in modifica le foto attuali
+        // stanno DENTRO sellFoto, come quelle scelte adesso
+        out.modCon = metti(['a5_0.jpg'], 5, null, ['a5_0.jpg'], false);
         detti.length = 0;
         await publish();
         out.modConTocco = {detti: detti.slice(), ...stato()};
@@ -19065,7 +19074,7 @@ def prove_duplica_annuncio():
           pezzo_js(mini, "function annullaModificaChiedendo()"))
     # LE FOTO EREDITATE SI VEDONO, o si pubblicherebbe alla cieca
     prova("client: le foto di partenza si vedono nel duplicato", True,
-          "if ((editandoId || duplicaDaId) && !sellFoto.length" in
+          "if ((duplicaDaId || editandoNostr) && !sellFoto.length" in
           pezzo_js(mini, "function renderFotoPreview(){", "\n}"))
     # E SOLO SU CIO' CHE E' NATO QUI: duplicare un importato darebbe
     # un nativo gemello del suo evento, cioe' il doppione che la
@@ -210202,6 +210211,142 @@ console.log(JSON.stringify(fuori));
           "myOnchainIncassoVista = me.onchain_incasso_vista || '';" in mini)
 
 
+def prove_foto_varianti():
+    """LE FOTO IN ORDINE, LE LORO DESCRIZIONI E LE VARIANTI (23 nov 2026,
+    cantiere foto-varianti, chieste da Zzap). Le rotte le gira
+    collaudo_foto_varianti.py; qui i giudici puri del server e i gesti
+    del foglio Vendi in un banco node: le frecce, la ✕, le descrizioni
+    che seguono la foto e non il posto, e i due modi delle varianti."""
+    print("\n[le foto in ordine, le loro descrizioni e le varianti]")
+    class _H(Exception):
+        def __init__(self, c, d=""):
+            self.status_code, self.detail = c, d
+    amb = {"json": json, "HTTPException": _H, "MAX_DIDASCALIA": 80,
+           "MAX_SCELTE_VENDITORE": 3, "MAX_VOCI_SCELTA": 20,
+           "MAX_NOME_SCELTA": 30, "MAX_VOCE_SCELTA": 40}
+    for nome in ("scelte_lette", "didascalie_lette", "didascalie_da_payload",
+                 "didascalie_json", "scelte_del_venditore",
+                 "testo_da_moderare"):
+        exec(pezzo(nome), amb)
+
+    def no(f, *a):
+        try:
+            f(*a)
+        except _H as e:
+            return e.status_code
+        return None
+    prova("le descrizioni si allineano alle foto, ripulite",
+          ["Davanti", "", ""],
+          amb["didascalie_da_payload"]([" Davanti ", 5], 3))
+    prova("...oltre 80 caratteri e' un 400, mai un taglio", 400,
+          no(amb["didascalie_da_payload"], ["x" * 81], 1))
+    prova("in colonna: '' se nessuna foto ne ha una", ("", '["a", ""]'),
+          (amb["didascalie_json"](["", ""]),
+           amb["didascalie_json"](["a", ""])))
+    prova("una colonna rovinata si legge vuota, mai un 500", [],
+          amb["didascalie_lette"]("{rotto"))
+    prova("le varianti semplici: ripulite, senza doppioni",
+          '[["Colore", ["rosso", "blu"]]]',
+          amb["scelte_del_venditore"]([[" Colore", ["rosso", "blu ", "blu"]]]))
+    prova("...chiave assente = None (la modifica non le tocca), vuota = ''",
+          (None, ""), (amb["scelte_del_venditore"](None),
+                       amb["scelte_del_venditore"]([])))
+    prova("...un nome senza voci e due nomi uguali: 400", (400, 400),
+          (no(amb["scelte_del_venditore"], [["Colore", []]]),
+           no(amb["scelte_del_venditore"], [["A", ["x"]], ["a", ["y"]]])))
+    prova("la moderazione legge descrizione, descrizioni delle foto e "
+          "varianti", "Cotone\nDavanti\nColore: rosso, blu",
+          amb["testo_da_moderare"]("Cotone", ["Davanti", ""],
+                                   '[["Colore", ["rosso", "blu"]]]'))
+
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    try:
+        prog = ("""
+let sellFoto = [], editandoId = null, editandoNostr = false;
+const didascaliaDi = new Map(), fotoNomeDi = new Map();
+const campi = {sellVarNome: {value: ''}, sellVarVoci: {value: ''},
+               sellVarPrezzi: {checked: false}};
+function el(id){ return campi[id] || null; }
+function haptic(){}
+let ridisegni = 0;
+function renderFotoPreview(){ ridisegni++; }
+function astaAccesa(){ return false; }
+let varFamiglia = false;
+const varRighe = {};
+"""
+                + _fn_js(mini, "function togliFoto(i){")
+                + _fn_js(mini, "function spostaFoto(i, verso){")
+                + _fn_js(mini, "function scriviDidascalia(i, testo){")
+                + _fn_js(mini, "function didascaliePayload(){")
+                + _fn_js(mini, "function vociVarianti(){")
+                + _fn_js(mini, "function variantiVisibili(){")
+                + _fn_js(mini, "function variantiPayload(){")
+                + """
+const fuori = {};
+sellFoto = ['A', 'B', 'C'];
+scriviDidascalia(1, 'di B');
+spostaFoto(1, -1);
+fuori.dopoFreccia = [sellFoto.slice(), didascaliePayload()];
+spostaFoto(0, -1);
+fuori.oltreIlBordo = sellFoto.slice();
+togliFoto(0);
+fuori.dopoX = [sellFoto.slice(), didascaliePayload()];
+campi.sellVarNome.value = 'Colore';
+campi.sellVarVoci.value = ' rosso, blu,, Blu , verde';
+fuori.voci = vociVarianti();
+fuori.semplici = variantiPayload();
+campi.sellVarPrezzi.checked = true;
+varRighe['blu'] = {prezzo: '45000', pezzi: '7'};
+fuori.prezzi = variantiPayload();
+editandoId = 5;
+fuori.inModifica = variantiPayload();
+campi.sellVarNome.value = ''; campi.sellVarVoci.value = '';
+fuori.tolteInModifica = variantiPayload();
+varFamiglia = true;
+fuori.famiglia = variantiPayload();
+console.log(JSON.stringify(fuori));
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("le foto in ordine e le varianti", "node non installato")
+        return
+    prova("la freccia ◀ sposta la foto, e la descrizione va con lei",
+          [["B", "A", "C"], ["di B", "", ""]], out.get("dopoFreccia"))
+    prova("...oltre il bordo non succede niente", ["B", "A", "C"],
+          out.get("oltreIlBordo"))
+    prova("la ✕ toglie la foto e la sua descrizione", [["A", "C"], ["", ""]],
+          out.get("dopoX"))
+    prova("le voci: separate da virgole, ripulite, senza doppioni",
+          ["rosso", "blu", "verde"], out.get("voci"))
+    prova("senza la spunta partono come scelte",
+          {"scelte": [["Colore", ["rosso", "blu", "verde"]]]},
+          out.get("semplici"))
+    prova("con la spunta partono come varianti, coi prezzi scritti",
+          {"nome": "Colore", "voci": [
+              {"voce": "rosso", "prezzo": "", "quantita": ""},
+              {"voce": "blu", "prezzo": "45000", "quantita": "7"},
+              {"voce": "verde", "prezzo": "", "quantita": ""}]},
+          (out.get("prezzi") or {}).get("varianti"))
+    prova("in modifica la spunta non vale: restano scelte", True,
+          "scelte" in (out.get("inModifica") or {}))
+    prova("...e i campi vuoti le tolgono", {"scelte": []},
+          out.get("tolteInModifica"))
+    prova("su una variante di famiglia la sezione tace", {},
+          out.get("famiglia"))
+    salva = _fn_js(mini, "async function salvaModifica(t, p){")
+    prova("la modifica manda tutte le foto: le vecchie per nome", True,
+          "body.foto = sellFoto.map(f => fotoNomeDi.get(f) || f);" in salva
+          and "body.didascalie = didascaliePayload();" in salva)
+    prova("la pubblicazione manda descrizioni e varianti", True,
+          "...variantiPayload()," in mini
+          and "foto:sellFoto, didascalie:didascaliePayload()" in mini)
+    prova("la foto a tutto schermo dice la sua descrizione", True,
+          "el('lbDidascalia').textContent = lbDidascalie[lbIdx] || '';"
+          in mini and '<div id="lbDidascalia"></div>' in mini)
+
+
 def prove_assistente_bot():
     """L'ASSISTENTE DEL BOT (28 ott 2026, cantiere bot-assistente,
     richiesta di Andrea). A leva accesa chi scrive una domanda al bot
@@ -222101,7 +222246,7 @@ CATEGORIE = {
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
     carrello_salvato bollino_staff anello_ovunque avvisi_mercatino
-    x_risonanza indirizzo_lightning foto_obbligatorie vibrazione
+    x_risonanza indirizzo_lightning foto_obbligatorie foto_varianti vibrazione
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
@@ -223280,6 +223425,7 @@ def main():
               prove_assistente_bot,
               prove_assistenza_id_nostr,
               prove_incasso_onchain_visto,
+              prove_foto_varianti,
               prove_relay_risolti,
               prove_certificati_relay,
               prove_config_esempio,

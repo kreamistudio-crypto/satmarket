@@ -958,3 +958,9 @@ frase: Adesso puoi nascondere un annuncio solo, senza mettere in ferie tutto il 
 dove: Scheda del tuo annuncio → «🙈 Nascondi dalla vetrina»; Profilo → «I tuoi annunci» → «👁 Rimetti in vetrina».
 leva: NASCONDI_ANNUNCIO (accesa di serie)
 pubblico: sì
+
+## 2026-11-24 · foto-varianti
+frase: Le foto del tuo annuncio adesso si mettono in ordine con le frecce ◀ ▶ (la prima è la copertina), e ognuna può avere una breve descrizione che si legge a schermo intero. In «Modifica» le foto restano: ne aggiungi altre e togli quella che non vuoi. E ci sono le varianti: «Colore: rosso, blu, verde», anche con un prezzo e dei pezzi diversi per ognuna.
+dove: Vendi → le foto (frecce ◀ ▶ e «Descrizione della foto (facoltativa)»), «🎨 Varianti (facoltative)» sotto la quantità, «Prezzo o pezzi diversi per ogni variante»; I tuoi annunci → Modifica → «Le tue foto (fino a 5)».
+leva: nessuna
+pubblico: sì

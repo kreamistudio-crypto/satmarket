@@ -27382,6 +27382,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `scelte` sul singolo, `scelte_righe` per id nel carrello, dalla
   fabbrica `corpoConsegna`. Il perché in CANTIERI, «Le tendine
   "Qualsiasi" dei negozi collegati».
+- LE FOTO IN ORDINE, LE LORO DESCRIZIONI E LE VARIANTI DAL FOGLIO
+  VENDI (23 nov 2026, cantiere foto-varianti). La lista `foto` della
+  modifica e' l'annuncio intero in ordine: nome gia' suo = resta, data: =
+  nuova in quel posto, assente = via. Colonna additiva
+  `annunci.didascalie` (JSON allineato a `foto`, '' = nessuna; pubblica
+  in `CAMPI_VETRINA`, letta da `didascalie_lette`), scritta insieme alle
+  foto in pubblica e in modifica; `salva_foto(..., indici)` dice quali
+  posizioni sono entrate. Le varianti semplici scrivono `scelte` da
+  `scelte_del_venditore`; quelle col loro prezzo (`varianti` nel
+  payload, `varianti_da_payload`) fanno una famiglia «u:<id>» con
+  `crea_sorelle` (copie della prima, foto copiate dai file), decisa
+  insieme da `decidi_revisione`. Tutto il testo passa da
+  `testo_da_moderare`. Il perché in CANTIERI, «Le foto in ordine con la
+  loro descrizione, e le varianti dal foglio Vendi».
 - LE FAMIGLIE DI VARIANTI (30 set 2026, il negozio AGORA): l'esplosione
   resta — un annuncio per variante, col suo prezzo, la sua giacenza, i
   suoi ordini e il suo deposito di garanzia — e SOPRA ci si scrive la

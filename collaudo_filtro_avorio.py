@@ -84,8 +84,11 @@ def avvio():
     SRV = server
     # la foto di cartone: senza almeno una foto non si pubblica, e
     # questo collaudo non parla di foto
-    server.salva_foto = lambda aid, foto, versione="": (
-        [f"a{aid}_0.jpg"], [])
+    # (23 nov 2026, foto-varianti) `indici` dice quale posizione e'
+    # entrata: qui entra sempre la prima, l'unica che si salva
+    server.salva_foto = lambda aid, foto, versione="", indici=None: (
+        indici.append(0) if indici is not None else None,
+        ([f"a{aid}_0.jpg"], []))[1]
 
     async def zitto(*a, **k):
         return None
