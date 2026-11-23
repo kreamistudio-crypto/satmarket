@@ -30,7 +30,6 @@
   "Sezione": "Section",
   "Cerca su Barattolo…": "Search Barattolo…",
   "Mostra i prezzi in euro o in sats": "Show prices in euros or in sats",
-  "🔒 Ogni acquisto è protetto dal deposito di garanzia": "🔒 Every purchase is protected by the escrow deposit",
   "Compra e vendi": "Buy and sell",
   "Pagamenti in Lightning, col deposito di garanzia che protegge tutti. Pubblicare non costa nulla.": "Lightning payments, with an escrow deposit that protects everyone. Listing is free.",
   "Esplora": "Explore",
