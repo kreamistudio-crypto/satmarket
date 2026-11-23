@@ -1115,8 +1115,8 @@ riavviare: niente link né espulsioni, e gli abbonati già dentro restano.
 
 ## 31. «Non hai sats?»: la prova vera del giroconto in produzione, coi moderatori (23 nov 2026, cantiere giroconto-interno)
 
-**Stato.** IN ATTESA DEL SÌ DI ANDREA sulla scelta (thread «Non hai sats?»):
-il collaudo ha i pagamenti FINTI (LNbits FakeWallet), il deposito non sta
+**Stato.** SCELTA DI ANDREA (23 nov, 21:01): «Produzione, solo tu e Alan».
+Va fatta DOPO la promozione che porta il cantiere su main. Il collaudo ha i pagamenti FINTI (LNbits FakeWallet), il deposito non sta
 sul nodo e Mostro non lo può saldare, quindi la prova vera si fa in
 produzione col tasto visibile ai soli moderatori (`VIA_EURO_SOLO_ADMIN`,
 di serie True: arriva con la promozione, nessuna riga da scrivere).
