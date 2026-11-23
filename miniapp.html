@@ -60682,6 +60682,9 @@ async function loadAdminStats(){
             </div>
           </div>`).join('')}
       </div>
+      <!-- Gli id Telegram degli utenti in un file (23 nov 2026): solo i
+           numeri, mandati dal bot nella chat di chi li chiede. -->
+      <button class="btn ghost" style="margin-top:10px" onclick="admIdUtenti(this)">📇 Mandami gli id Telegram degli utenti</button>
       <!-- Come si arriva a un ordine SPEDITO fra estranei (ago 2026):
            non compare in nessuna coda — e giustamente, non e' un caso
            da moderare — quindi per correggerne il tracciamento serve
@@ -62342,6 +62345,20 @@ function vistaBackupLeve(){
     </div>
     ${anteprima}
     <div class="leve-spiega">Le leve stanno anche nel backup cifrato del database, ogni notte e prima di ogni aggiornamento.</div>`;
+}
+
+async function admIdUtenti(btn){
+  haptic();
+  btn.disabled = true;
+  try {
+    const r = await fetch(`${API_BASE}/admin/id-utenti/telegram`,
+      {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+    const x = await r.json().catch(() => ({}));
+    toast(!r.ok ? '⚠️ ' + (x.detail || 'non riuscito')
+      : x.collaudo ? `🧪 In modalità collaudo il bot non manda file (${x.utenti} utenti)`
+      : `📇 Mandato: guarda la chat col bot (${x.utenti} utenti)`, 6000);
+  } catch(e) { toast('Rete assente: riprova'); }
+  btn.disabled = false;
 }
 
 async function backupTelegram(btn){

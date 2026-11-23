@@ -3283,6 +3283,7 @@ FRENI = {
     # Lightning address, la nascita legge un PSBT
     "onchain_cambio": (40, 3600),     # preventivo, fattura e cambio di un ordine, per persona
     "leva_pannello": (20, 3600),      # una leva cambiata dal pannello, per admin
+    "id_utenti": (5, 3600),           # il file degli id Telegram degli utenti, per admin
     # (2 nov 2026) il «Conferma» del cambio automatico: ogni tocco puo'
     # far nascere uno swap dal fornitore
     "swap_auto": (10, 3600),          # il cambio automatico di un ordine, per persona
@@ -40368,6 +40369,53 @@ async def leve_backup_telegram(x_tg_init_data: str = Header(""),
     if not ok:
         raise HTTPException(502, "Telegram non ha preso il file: usa «Copia il testo»")
     return {"ok": True, "leve": len(b["leve"])}
+
+
+# GLI ID TELEGRAM DEGLI UTENTI, IN UN FILE (23 nov 2026, chiesto da
+# Andrea). Serve a incrociarli, SUL SUO PC, coi membri dei gruppi
+# Telegram in cui sta lui (lo userbot «gruppi in comune», fuori dal
+# repo): quanti di un gruppo sono gia' su Barattolo. Escono SOLO i
+# numeri, uno per riga: niente nomi, username, npub — per il conto
+# bastano gli id, e un file che gira con meno dentro fa meno danno se
+# finisce dove non deve. Gli utenti solo-Nostr (tg_id negativo) non ci
+# sono: su Telegram non esistono. Il file va nella chat di CHI LO
+# CHIEDE, come il backup delle leve, e mai in una risposta della rotta:
+# la Mini App non scarica file, e una lista intera nel JSON finirebbe
+# in qualche cache. Ogni richiesta lascia una riga nel journal.
+@app.post("/api/admin/id-utenti/telegram")
+async def id_utenti_telegram(x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: gli id Telegram degli utenti, un .txt dal bot."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _frena("id_utenti", user["id"])
+    con = db()
+    try:
+        ids = [r["tg_id"] for r in con.execute(
+            "SELECT tg_id FROM utenti WHERE tg_id>0 ORDER BY tg_id")]
+    finally:
+        con.close()
+    print(f"📇 Id Telegram degli utenti chiesti dall'admin {user['id']}: "
+          f"{len(ids)} righe", flush=True)
+    if MODALITA_COLLAUDO:
+        return {"ok": False, "collaudo": True, "utenti": len(ids)}
+    nome = time.strftime("barattolo-id-utenti-%Y-%m-%d.txt")
+    testo = "\n".join(str(i) for i in ids) + "\n"
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
+                             data={"chat_id": str(user["id"]),
+                                   "caption": f"📇 {len(ids)} id Telegram degli utenti "
+                                              "di Barattolo, uno per riga. Sono dati "
+                                              "degli iscritti: tienili sul tuo PC."},
+                             files={"document": (nome, testo.encode("utf-8"), "text/plain")})
+        ok = r.status_code == 200 and r.json().get("ok")
+    except Exception:
+        ok = False
+    if not ok:
+        raise HTTPException(502, "Telegram non ha preso il file: riprova tra poco")
+    return {"ok": True, "utenti": len(ids)}
 
 
 @app.post("/api/admin/leve-ripristina")
