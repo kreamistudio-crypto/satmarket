@@ -4522,7 +4522,9 @@ def prove_doppio_wallet():
     # scaduta senza pagamento («Paga ora»). SETTE dal 10 ott 2026: la
     # fattura da 1 sat di `/prova-wallet` (`_fattura_prova_wallet`), che
     # non e' di nessun ordine e passa la cassaforte del denaro nuovo.
-    prova("...e le strade che coniano sono sette", 7, len(chiamate))
+    # OTTO dal 23 nov 2026: la fattura delle promozioni a pagamento
+    # (`compra_promo`), che passa la cassaforte del denaro nuovo.
+    prova("...e le strade che coniano sono otto", 8, len(chiamate))
 
     # 3) chi legge passa la colonna della riga, mai un letterale
     prova("nessun invoice_pagata a un argomento solo", [],
@@ -29289,6 +29291,8 @@ let uscitaDopoAnnullo = false, uscitaDopoSalva = false;
 let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let p2pDettOrdine = '', currentOrder = null, orders = [];
 let pollTimer = null, currentOrderId = null, rilancioCorrente = null, pagamentoCorrente = null;
+/* (23 nov 2026) la promozione a pagamento: qui nessuna in corso */
+let promoInCorso = null;
 let confermaAzione = null, confermaAltra = null, confermaNo = null;
 let nwcRipristina = null, acqDati = null, paccoDati = null, listings = [];
 /* ---- quel che si conta ---- */
@@ -30863,7 +30867,10 @@ def prove_pagina_acquisto():
     # da scrivere, e la sentinella qui sotto non lo cerca), e l'ottavo
     # di domani lo sente da qui invece di scoprirlo il giorno che un
     # incasso resta senza riga.
-    prova("chi conia una fattura in entrata e' sette", 7,
+    # OTTO dal 23 nov 2026 (cantiere promozioni): `compra_promo`, la
+    # fattura di «In cima», «In evidenza» e del negozio in Da scoprire.
+    # Scrive la sua riga in `pagamenti`, come lo sblocco del banner.
+    prova("chi conia una fattura in entrata e' otto", 8,
           codice(src).count("await crea_invoice_escrow("))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
@@ -37291,6 +37298,9 @@ def _censimento(acceso, dopo=None):
               "_raccolta_intero", "raccolta_max_euro", "raccolta_giorni_max",
               "raccolta_min_garantita_euro", "raccolta_vendite_min",
               "raccolta_zap_max_sats", "_raccolte_leve",
+              # le promozioni a pagamento (23 nov 2026): la riga dei
+              # prezzi di In evidenza CHIAMA `listino_evidenza()`
+              "listino_evidenza",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -37728,7 +37738,8 @@ console.log(JSON.stringify([
            # dentro da solo, ma passando dal SUO giudice)
            "_posta_negozio",          # la raffica di un negozio solo
            "comando_canale",          # che il canale lo DICE, non ci posta
-           "annuncia_ordine_p2p_canale"},  # l'ordine P2P appena pubblicato
+           "annuncia_ordine_p2p_canale",  # l'ordine P2P appena pubblicato
+           "promo_in_cima_canale"},   # «⬆️ In cima», la promozione pagata
           # `_manda_post_canale` non c'e': il canale non lo sceglie,
           # lo RICEVE — ed e' precisamente quel che la prova qui
           # sopra le chiede
@@ -47732,7 +47743,9 @@ def prove_fogli_di_casa():
     # annullare?» di chi ha depositato, a chi compra.
     # CENTOTRENTADUE (19 nov 2026, cantiere regole-sulla-card): «↩️ Ti
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
-    prova("i gesti che passano dalla domanda unica sono centotrentadue (dal 30 ott "
+    # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
+    # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
+    prova("i gesti che passano dalla domanda unica sono centoquarantatre (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47757,8 +47770,9 @@ def prove_fogli_di_casa():
           "card di Bitpost: chiedi, prendi, funzionano, disputa, annulla, "
           "firma l'incasso; dal 21 nov «🔑 … di Bitpost» dei segreti dal "
           "pannello, e delle gift card nel P2P l'annuncio di chi vende e il "
-          "comprare da un annuncio)",
-          141, solo_codice(mini).count("chiediConferma({"))
+          "comprare da un annuncio; dal 23 nov «🚀 Promuovi» e il negozio "
+          "in Da scoprire)",
+          143, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -52084,7 +52098,9 @@ def prove_scoprire():
     # img e ripiego FRATELLI ADIACENTI (la lezione dell'emoji delle
     # categorie, chiusa dentro un altro span la regola non matcha mai):
     # fra l'apertura dell'img e la riserva ci sono solo due «<»
-    _i = _rs.index('<img src="/assets/scoprire/')
+    # (23 nov 2026, promozioni) il negozio pagato porta la sua foto
+    # (`v.img`, il banner approvato): l'apertura dell'img e' una sola
+    _i = _rs.index('<img src="${v.img ? esc(v.img) : \'/assets/scoprire/\'')
     _t = _rs[_i:_rs.index('sc-riserva', _i)]
     prova("il ripiego e' il fratello adiacente dell'immagine", (2, 1),
           (_t.count("<"), _t.count("<span")))
@@ -52901,6 +52917,11 @@ def prove_scoprire_p2p(mini=None, node=None):
              + _fetta("const RACCONTI = {", "\n};")
              + _fetta("const SCOPRIRE = [", "\n];")
              + "\n" + _fetta("function vociSponsor(){", "\n}") + "\n"
+             # (23 nov 2026, promozioni) i negozi pagati e il turno
+             # VERI: la fila passa da loro prima di arrivare qui
+             + _fetta("const nomeFotoPromo = ", ";\n")
+             + _fetta("function vociNegoziPromossi(){", "\n}") + "\n"
+             + _fetta("function aTurno(lista){", "\n}") + "\n"
              + _fetta("function lancioP2P(){", "\n}") + "\n"
              + _fetta("function toccaLancioP2P(){", "\n}") + "\n"
              + _fetta("const vociScoprire = ", ";\n")
@@ -52964,6 +52985,15 @@ let p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
    sequenza delle scritte e' quel che confronta — le frecce
    hanno la loro prova, qui sarebbero rumore in mezzo ai gesti. */
 function aggiornaFrecce(){}
+/* ...e muto per la stessa ragione lo scorrimento da solo (23 nov 2026),
+   che ha la sua prova in prove_promozioni */
+function armaScorriScoprire(){}
+/* le promozioni (23 nov 2026): nessun negozio pagato, e il turno fermo
+   allo zero — un banco che cambiasse ordine a ogni giro non direbbe
+   niente */
+let negoziPromossi = [];
+const turnoPromo = 0;
+function fotoUrl(f){ return '/foto/' + f; }
 function lampoAttiva(){ return false; }
 function scontoQui(){ return false; }
 let DEMO = false, vistaBarattolo = false, listings = [];
@@ -53078,8 +53108,11 @@ RACCONTI['to-the-moon'].negozio = codiceCard;
 rifai();
 // ⚠️ DAL 30 SET 2026 E' LA SECONDA: davanti c'e' la card «P2P in
 // arrivo», che non entra nell'ordine degli spazi
-dice('col codice e la prima degli spazi, dietro la card P2P',
-     ['p2p','sponsor-to-the-moon','aste','lampo','sconto'], idCard());
+// ⚠️ DAL 23 NOV 2026 TORNA LA PRIMA (promozioni, decisione di Andrea):
+// i negozi — spazi e negozi pagati, a turno — stanno davanti, e le
+// nostre card (P2P, aste) dopo di loro
+dice('col codice e la prima, davanti alla card P2P',
+     ['sponsor-to-the-moon','p2p','aste','lampo','sconto'], idCard());
 
 const cardDi = id => nodi['scoprireStrip'].innerHTML
   .split('data-id="' + id + '"')[1].split('</div>')[0];
@@ -53123,8 +53156,8 @@ const utpt = {slug: 'un-tempo-per-te', titolo: 'Un tempo per te',
               emoji: '🌱', negozio: 'cd34ef56'};
 sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 rifai();
-dice('due spazi: due card dietro la P2P, nell ordine della busta',
-     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon','aste','lampo','sconto'],
+dice('due spazi: due card davanti alla P2P, nell ordine della busta',
+     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','aste','lampo','sconto'],
      idCard());
 const cardU = cardDi('sponsor-un-tempo-per-te');
 dice('...e la pagina del server ha lo stesso aspetto: banner, pastiglia, niente titolo dell app',
@@ -53146,7 +53179,7 @@ dice('...e quello dell altra al suo, col suo slug',
 sponsorizzati = [{slug: 'to-the-moon'}, utpt];
 rifai();
 dice('l ordine rovesciato nella busta rovescia le card',
-     ['p2p','sponsor-to-the-moon','sponsor-un-tempo-per-te','aste','lampo','sconto'],
+     ['sponsor-to-the-moon','sponsor-un-tempo-per-te','p2p','aste','lampo','sconto'],
      idCard());
 
 // LA SCADENZA DI UNO NON TOCCA L'ALTRO: il server smette di mandare
@@ -53154,7 +53187,7 @@ dice('l ordine rovesciato nella busta rovescia le card',
 sponsorizzati = [utpt];
 rifai();
 dice('scaduto To The Mooon resta Un tempo per te',
-     ['p2p','sponsor-un-tempo-per-te','aste','lampo','sconto'], idCard());
+     ['sponsor-un-tempo-per-te','p2p','aste','lampo','sconto'], idCard());
 
 // FAIL-CLOSED PER VOCE: una pagina senza codice non nasce, e le altre
 // restano; uno slug fuori forma nemmeno; un doppione conta una volta.
@@ -53163,7 +53196,7 @@ sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'X', negozio: ''},
                  {slug: 'to-the-moon'}];
 rifai();
 dice('una voce senza codice o fuori forma non nasce, e le altre restano',
-     ['p2p','sponsor-to-the-moon','aste','lampo','sconto'], idCard());
+     ['sponsor-to-the-moon','p2p','aste','lampo','sconto'], idCard());
 
 // IL TITOLO DAL SERVER PASSA DA esc(): niente di un catalogo entra nudo
 sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'A <b>"B"</b>',
@@ -53181,7 +53214,7 @@ sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 vistaBarattolo = true;
 rifai();
 dice('col barattolo restano le card che navigano',
-     ['p2p','sponsor-un-tempo-per-te','sponsor-to-the-moon','aste'], idCard());
+     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','aste'], idCard());
 
 // E ALLA SCADENZA SE NE VANNO DA SOLE, senza che nessuna scopa passi:
 // il server smette di mandarle, e la fila guarda quella.
@@ -58283,7 +58316,9 @@ def prove_strisce_web():
     # Il guscio si cerca risalendo dalla striscia, non piu' come «il
     # primo» e «l'ultimo»: col terzo l'ultimo era diventato il suo.
     # (23 ott 2026) la quarta fila e' quella delle card del Lavoro
-    for _id in ("catStrip", "scoprireStrip", "p2pVetrinaFila", "lavStrip"):
+    # (23 nov 2026) e la sesta e' «In evidenza», le promozioni
+    for _id in ("catStrip", "scoprireStrip", "p2pVetrinaFila", "lavStrip",
+                "evidenzaFila"):
         # la striscia sta DENTRO il wrapper, o le frecce non avrebbero
         # niente rispetto a cui posizionarsi (`position:relative` e'
         # suo) e finirebbero ancorate alla pagina
@@ -58302,7 +58337,8 @@ def prove_strisce_web():
     # da scorrere. Nate accese, la prima cosa che si vedrebbe
     # all'apertura sono due frecce inerti.
     # (18 nov 2026) la quinta fila e' la seconda riga delle sottocategorie
-    prova("le dieci frecce nascono spente", 10,
+    # (23 nov 2026) la sesta e' «In evidenza» (cantiere promozioni)
+    prova("le dodici frecce nascono spente", 12,
           mini.count('class="strip-frec sx off"')
           + mini.count('class="strip-frec dx off"'))
     # ...e sul telefono non esistono affatto: `display:none` nella base
@@ -58326,7 +58362,7 @@ def prove_strisce_web():
     # «semplifica» rimetterebbe un trattino al posto di una freccia.
     _bott = [_r for _r in mini.split(chr(10))
              if "onclick" in _r and "scorriFila(" in _r]
-    prova("...e la freccia e' un disegno, mai un carattere", (10, 10),
+    prova("...e la freccia e' un disegno, mai un carattere", (12, 12),
           (len(_bott), sum(1 for _r in _bott if "<svg" in _r)))
     # LA ROTELLINA SI ARMA SOLO FUORI DA TELEGRAM, e col giudice GIA'
     # deciso: `FUORI_TG` LEGGE la classe che l'anti-flash ha messo, mai
@@ -118649,7 +118685,8 @@ def prove_piu_account_ovunque():
           "window.fetch = fetchColConto(fetchCheRiprova(" in mini)
     # (20 nov 2026) +3: le gift card di Bitpost (chiedi, prendi, firma l'incasso)
     # (21 nov 2026) +2: l'annuncio «Vendi gift card» e il comprare da un annuncio
-    prova("i gesti coi soldi chiedono il volto (soldi: true)", 11,
+    # (23 nov 2026) +2: le promozioni a pagamento («🚀 Promuovi» e il negozio)
+    prova("i gesti coi soldi chiedono il volto (soldi: true)", 13,
           mini.count("soldi: true,"))
     prova("...e i due fogli di pagamento hanno il loro posto", 2,
           mini.count('<div class="conto-in-vista" data-conto-in-vista'))
@@ -119267,8 +119304,10 @@ def prove_paracadute_motivo():
               in c)
 
     # ---- 2. LO SMISTATORE, girato ------------------------------------
+    # (23 nov 2026) e la cassa delle tre promozioni a pagamento
     casse = {"_incassa_sblocco": object(),
-             "_incassa_slug_negozio": object()}
+             "_incassa_slug_negozio": object(),
+             "_incassa_promo": object()}
     amb0 = dict(casse)
     exec(pezzo("_incasso_del_motivo"), amb0)
     smista = amb0["_incasso_del_motivo"]
@@ -119288,6 +119327,11 @@ def prove_paracadute_motivo():
     for m in _re.finditer(r"INSERT INTO pagamenti\(", _SORGENTE):
         fetta = _SORGENTE[m.start():m.start() + 400]
         scritti |= set(_re.findall(r"VALUES\(\?,'([a-z_]+)'", fetta))
+    # (23 nov 2026, promozioni) la INSERT delle promozioni ha il motivo
+    # in un segnaposto, scelto da MOTIVI_PROMO: quei tre sono scritti
+    # anche loro, e si leggono dalla tupla vera
+    _mp = _re.search(r"^MOTIVI_PROMO = \(([^)]*)\)", _SORGENTE, _re.M)
+    scritti |= set(_re.findall(r'"([a-z_]+)"', _mp.group(1) if _mp else ""))
     # la cintura del censimento stesso: una regex che non trova piu'
     # niente renderebbe verde il confronto qui sotto (vuoto == vuoto)
     prova("il censimento delle INSERT vede almeno i due motivi del "
@@ -119383,8 +119427,11 @@ def prove_paracadute_motivo():
         async def _mai(*a):
             raise AssertionError("qui non ci sono ne' ordini ne' rilanci")
 
+        # (23 nov 2026) lo smistatore nomina anche la cassa delle
+        # promozioni: qui non ce n'e' nessuna, e toccarla e' un errore
         amb = {"db": Con, "time": _t, "invoice_pagata": _pagata,
                "_incassa_ordine": _mai, "_paga_rimborso": _mai,
+               "_incassa_promo": _mai,
                "notifica": _notifica, "notifica_admin": _notifica_admin,
                "_fmt_sats": lambda n: str(n),
                "URL_PUBBLICO": "https://barattolo.store",
@@ -119612,7 +119659,7 @@ def prove_rimborso_motivo():
                "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
                "OCCUPATO": "occupato", "MAX_TENTATIVI_PAYOUT": 5}
         amb["_lucchetti_sblocco"] = amb["defaultdict"](asyncio.Lock)
-        for nome in ("_disfa_banner", "_disfa_slug_negozio",
+        for nome in ("_disfa_banner", "_disfa_slug_negozio", "_disfa_promo",
                      "_rimborso_del_motivo"):
             exec(pezzo(nome), amb)
         if prima:
@@ -139911,6 +139958,10 @@ def prove_effetti_ridotti():
     #     aperto (si ferma con `latoFerma`, chiamato da `arenaFerma` in
     #     ogni uscita); passo fisso a 120 al secondo. Polvere, lampeggio e
     #     respiro con gli effetti ridotti stanno fermi
+    #   armaScorriScoprire (23 nov 2026, «Da scoprire» come Netflix): un
+    #     ricalcolo per fotogramma di QUALE card sta al centro mentre la
+    #     fila scorre (anche col dito) — sposta una classe, non anima
+    #     niente; la corsa e' del CSS, e la regola universale la spegne
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -139920,7 +139971,7 @@ def prove_effetti_ridotti():
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
            "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
            "arenaAccendi": 1, "arenaGiro": 1, "latoApri": 1, "latoGiro": 2,
-           "zoomQuiMappaP2P": 1},
+           "zoomQuiMappaP2P": 1, "armaScorriScoprire": 1},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
@@ -143259,7 +143310,10 @@ def _consigliati_porte(src, mini, _pz):
     _ol = _pz(mini, "function ordinaLoghiConsigliati(loghi){", "\n}\n")
     prova("la card si disegna nell'ordine di questa apertura, e la lista e "
           "la pagina no", (True, False, False),
-          ("const loghi = ordinaLoghiConsigliati(voci);"
+          # (23 nov 2026, promozioni) il negozio pagato senza logo
+          # resta fuori dal giro: sta nella pagina, col suo banner
+          ("const loghi = ordinaLoghiConsigliati(voci.filter(v => !v.promo "
+           "|| v.logoUrl));"
            in _pz(mini, "function cardConsigliati(voci){", "\n}\n"),
            "ordinaLoghiConsigliati"
            in _pz(mini, "function renderConsigliati(){", "\n}\n"),
@@ -143649,6 +143703,11 @@ let activeSotto = '';
 const etichettaSotto = () => '';
 function renderSottoRiga(){}   /* la seconda riga (18 nov 2026) non e' di questo banco */
 let sponsorizzati = [], consigliatiServer = [];
+/* i negozi che hanno pagato la card in Da scoprire (23 nov 2026): la
+   forma del nome e la cartella delle foto sono quelle vere */
+let negoziPromossi = [];
+const nomeFotoPromo = f => String(f || '').replace(/[^A-Za-z0-9_.-]/g, '');
+const fotoUrl = f => '/foto/' + f;
 let ridotti = false, premutaFatta = false;
 const effettiRidotti = () => ridotti;
 const ordineSfoglia = () => ['Bitcoin', 'Libri e media'];
@@ -143681,6 +143740,7 @@ function dice(che, atteso, avuto){
 const TTM0 = JSON.stringify(RACCONTI['to-the-moon']);
 function caso(nome, f){
   sponsorizzati = []; consigliatiServer = []; ridotti = false;
+  negoziPromossi = [];
   RACCONTI['to-the-moon'] = JSON.parse(TTM0);
   homeAttiva = true; document.hidden = false; DEMO = false; myTgId = 111;
   premutaFatta = false; richieste = []; scritte = []; carrelloFinto = null;
@@ -144394,6 +144454,39 @@ caso('il tocco della card', () => {
   scritte = []; fermato = 0;
   apriConsigliatiDaTocco(ev({ctrlKey: true}));
   dice('...e il ctrl+click resta al browser', [[], 0], [scritte, fermato]);
+});
+
+/* I NEGOZI CHE HANNO PAGATO (23 nov 2026, promozioni): finiti i 30
+   giorni in Da scoprire restano in Consigliati per sempre (`consigliato`
+   vero), col banner approvato nella pagina e il logo nel giro della
+   card; il tocco apre il negozio SENZA storia (non ne hanno una). Le
+   foto passano dalla forma del nome: niente entra nudo in un src. */
+caso('i negozi pagati', () => {
+  RACCONTI['to-the-moon'].consigliato = false;
+  negoziPromossi = [
+    {negozio: 'gh78ij90', nome: 'Bottega <pagata>', banner: 'ban"1.webp',
+     logo: 'log1.webp', scoprire: false, consigliato: true},
+    {negozio: 'ij90kl12', nome: 'Ancora in corsa', banner: 'b2.webp',
+     logo: 'l2.webp', scoprire: true, consigliato: false},
+    {negozio: '../x', nome: 'Fuori forma', banner: 'b3.webp',
+     logo: 'l3.webp', scoprire: false, consigliato: true}];
+  rifai();
+  dice('il negozio pagato finito accende la card col SUO logo, gli altri no',
+       [true, true, false, false],
+       [ordine().includes('/consigliati'),
+        primaImg().attr.includes('src="/foto/log1.webp"'),
+        nodi['catStrip'].innerHTML.includes('l2.webp'),
+        nodi['catStrip'].innerHTML.includes('l3.webp')]);
+  renderConsigliati();
+  const h = nodi['consigliatiLista'].innerHTML;
+  dice('...la pagina mostra il suo banner, col nome passato dalla forma e '
+       + 'il titolo scappato', [true, false, true, 1],
+       [h.includes('src="/foto/ban1.webp"'), h.includes('<pagata>'),
+        h.includes('Bottega &lt;pagata&gt;'),
+        h.split('class="scoprire-card"').length - 1]);
+  apriConsigliato('promo-gh78ij90');
+  dice('...e il tocco apre il negozio senza la storia', ['negozio:gh78ij90:chiuso'],
+       scritte);
 });
 
 caso('il tocco lungo', () => {
@@ -186913,8 +187006,11 @@ def prove_canale_admin():
           # i permessi nel canale: negli errori
           # (21 nov 2026, leve-ordine-segreti) un segreto di Bitpost
           # cambiato dal pannello: nella moderazione
-          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 38,
-           "liquidita": 5, "moderazione": 27, "riepiloghi": 27}, per_stanza)
+          # (23 nov 2026, promozioni) la promozione pagata che non si
+          # applica negli errori; la promozione comprata e il /promossi
+          # di un admin (tolta o rimborsata) nei riepiloghi
+          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 39,
+           "liquidita": 5, "moderazione": 27, "riepiloghi": 29}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -186975,7 +187071,9 @@ def prove_canale_admin():
           "dal 19 nov «Riprendi i sats» on-chain a tempo finito, e la meta' "
           "di una cauzione P2P ferma nel registro; dal 20 nov il bot "
           "dell'abbonamento a un canale senza i permessi; dal 21 nov un "
-          "segreto di Bitpost cambiato dal pannello)", 119,
+          "segreto di Bitpost cambiato dal pannello; dal 23 nov la "
+          "promozione comprata, quella pagata che non si applica e il "
+          "/promossi di un admin)", 122,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -187091,7 +187189,8 @@ def prove_canale_admin():
         chiamati.append(("sconosciuto", chat))
 
     for nome in ("comando_anteprima", "comando_canale", "comando_sponsor",
-                 "comando_vetrina", "comando_punti", "comando_canali"):
+                 "comando_vetrina", "comando_punti", "comando_canali",
+                 "comando_promossi"):
         C[nome] = finto(nome)
     C["_comando_sconosciuto"] = sconosciuto
     for nome in ("e_admin", "e_admin_bot", "gruppo_admin_id"):
@@ -220243,6 +220342,237 @@ console.log(JSON.stringify(fuori));
           in pezzo("_leve_stato"))
 
 
+def prove_promozioni():
+    """LE PROMOZIONI A PAGAMENTO (23 nov 2026, dallo spunto delle
+    schermate di Subito, deciso con Andrea): «⬆️ In cima», «⭐ In
+    evidenza» (7 o 15 giorni, otto posti) e «🏪 il negozio in Da
+    scoprire» (30 giorni, poi per sempre fra i Consigliati). Il giro vero
+    sul server, coi sats di cartone, e' `collaudo_promozioni.py`; qui i
+    pezzi che devono restare dove sono: le leve, le colonne, le casse che
+    smistano per motivo, il libro mastro che non suona per chi ricompra,
+    la busta, e nell'app l'etichetta, la fila e il turno."""
+    print("\n[le promozioni a pagamento]")
+    import sqlite3 as _sq
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # ---- 1. LE LEVE, coi prezzi decisi da Andrea il 23 nov ----------
+    for riga in ("PROMOZIONI_ATTIVE = True", "PROMO_IN_CIMA_SATS = 5_000",
+                 "PROMO_IN_CIMA_ORE = 24",
+                 "PROMO_EVIDENZA_SATS = {7: 15_000, 15: 25_000}",
+                 "PROMO_EVIDENZA_POSTI = 8", "PROMO_SCOPRIRE_SATS = 50_000",
+                 "PROMO_SCOPRIRE_GIORNI = 30"):
+        prova(f"la leva c'e' col suo valore: {riga}", True, riga in src)
+        prova(f"...e nel config d'esempio", True, riga in esempio)
+    for col in ('"promo_scoprire_fino INTEGER DEFAULT 0"',
+                '"promo_consigliato INTEGER DEFAULT 0"',
+                '"evidenza_fino INTEGER DEFAULT 0"'):
+        prova(f"la colonna e' fra le migrazioni additive: {col}", True,
+              col in src)
+    prova("la scadenza di In evidenza viaggia con ogni card", True,
+          "a.evidenza_fino, " in src[src.index("CAMPI_VETRINA = ("):
+                                     src.index("\n)\n", src.index("CAMPI_VETRINA = ("))])
+
+    # ---- 2. LE CASSE SMISTANO PER MOTIVO ------------------------------
+    casse = {"_incassa_sblocco": object(), "_incassa_slug_negozio": object(),
+             "_incassa_promo": object()}
+    amb = dict(casse)
+    exec(pezzo("_incasso_del_motivo"), amb)
+    prova("i tre motivi delle promozioni vanno alla loro cassa",
+          [True, True, True],
+          [amb["_incasso_del_motivo"](m) is casse["_incassa_promo"]
+           for m in ("promo_cima", "promo_evidenza", "promo_scoprire")])
+    disfa = {"_disfa_banner": object(), "_disfa_slug_negozio": object(),
+             "_disfa_promo": object()}
+    amb = dict(disfa)
+    exec(pezzo("_rimborso_del_motivo"), amb)
+    prova("...e il rimborso sa disfarli tutti e tre",
+          [True, True, True],
+          [(amb["_rimborso_del_motivo"](m) or (0, 0))[1] is disfa["_disfa_promo"]
+           for m in ("promo_cima", "promo_evidenza", "promo_scoprire")])
+
+    # ---- 3. I PEZZI PURI, girati --------------------------------------
+    amb = {"PROMO_EVIDENZA_SATS": {7: 15_000, 15: 25_000, "x": 3, 0: 9,
+                                   400: 1, 30: 0},
+           "PROMO_IN_CIMA_SATS": 5_000, "PROMO_SCOPRIRE_SATS": 50_000,
+           "PROMO_SCOPRIRE_GIORNI": 30, "PROMO_IN_CIMA_ORE": 24}
+    for nome in ("listino_evidenza", "_voce_promo", "_promo_dal_riferimento",
+                 "in_cima_da"):
+        exec(pezzo(nome), amb)
+    prova("il listino salta le voci storte e resta ordinato",
+          [(7, 15_000), (15, 25_000)], amb["listino_evidenza"]())
+    prova("le voci che si comprano, e quelle che no",
+          [("promo_cima", 5_000, 0), ("promo_evidenza", 25_000, 15),
+           ("promo_scoprire", 50_000, 30), None, None, None],
+          [amb["_voce_promo"](t) for t in
+           ("cima", "evidenza:15", "scoprire", "evidenza:3", "boh", None)])
+    rif = amb["_promo_dal_riferimento"]
+    prova("il riferimento si rilegge: annuncio, annuncio:giorni, giorni",
+          [(12, 0), (12, 7), (0, 30), (0, 0)],
+          [rif({"motivo": "promo_cima", "riferimento": "12"}),
+           rif({"motivo": "promo_evidenza", "riferimento": "12:7"}),
+           rif({"motivo": "promo_scoprire", "riferimento": "30"}),
+           rif({"motivo": "promo_evidenza", "riferimento": "x:y"})])
+    prova("In cima si ricompra dopo PROMO_IN_CIMA_ORE", 1000 + 24 * 3600,
+          amb["in_cima_da"](1000))
+
+    # ---- 4. I POSTI DELLA FILA ----------------------------------------
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript("""
+      CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
+        evidenza_fino INT DEFAULT 0);
+      INSERT INTO annunci VALUES(1,'attivo',5000),(2,'attivo',3000),
+        (3,'venduto',9000),(4,'attivo',500);
+    """)
+    amb = {"PROMO_EVIDENZA_POSTI": 2}
+    exec(pezzo("posti_evidenza"), amb)
+    prova("due posti, due presi: la fila e' piena e dice quando si libera",
+          (2, 3000), amb["posti_evidenza"](con, 1000))
+    prova("...un venduto non occupa un posto, uno scaduto nemmeno",
+          (1, 0), amb["posti_evidenza"](con, 4000))
+    prova("...e chi allunga la sua non conta se stesso", (1, 0),
+          amb["posti_evidenza"](con, 1000, 1))
+
+    # ---- 5. IL LIBRO MASTRO: chi ricompra non e' un doppio pagamento --
+    con.executescript("""
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT,
+        motivo TEXT, riferimento TEXT, stato TEXT);
+      INSERT INTO pagamenti(tg_id,motivo,riferimento,stato) VALUES
+        (1,'promo_cima','5','pagato'),(1,'promo_cima','5','pagato'),
+        (1,'promo_evidenza','5:7','pagato'),(1,'promo_evidenza','5:7','pagato'),
+        (2,'promo_scoprire','30','pagato'),(2,'promo_scoprire','30','pagato');
+    """)
+    _i = src.index("CONTROLLI_LIBRO_MASTRO = (") + len("CONTROLLI_LIBRO_MASTRO = ")
+    controlli = {c[0]: c[2] for c in eval(
+        src[_i:src.index("\n)\n", _i) + 2])}
+    prova("tre promozioni ricomprate non suonano «pagato due volte»", [],
+          con.execute(controlli["sblocco pagato due volte"]).fetchall())
+    prova("...e i loro motivi hanno una cassa", [],
+          con.execute(controlli["pagamento con un motivo che nessuno sa "
+                                "incassare"]).fetchall())
+    con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,stato) "
+                "VALUES(3,'banner','','pagato'),(3,'banner','','pagato')")
+    prova("...mentre un banner pagato due volte suona ancora", 1,
+          len(con.execute(controlli["sblocco pagato due volte"]).fetchall()))
+    sql = open("query_libro_mastro.sql", encoding="utf-8").read()
+    prova("il gemello SQL del libro mastro esclude le promozioni anche lui",
+          True, "AND motivo IN ('banner','negozio_slug')" in sql)
+    con.close()
+
+    # ---- 6. LA BUSTA E LE ROTTE ---------------------------------------
+    corpo = pezzo("lista_annunci")
+    for k in ('risposta["in_evidenza"]', 'risposta["negozi_promossi"]',
+              'risposta["promozioni_attive"]'):
+        prova(f"la busta di prima pagina porta {k}", True, k in corpo)
+    prova("le chiavi escono anche a cassa chiusa (chi ha pagato tiene)",
+          False, "if PROMOZIONI_ATTIVE:\n            risposta[\"in_evidenza\"]"
+          in corpo)
+    prova("le due rotte ci sono", True,
+          '@app.get("/api/promo/listino")' in src
+          and '@app.post("/api/promo/compra")' in src)
+    c = codice(pezzo("compra_promo"))
+    fattura = c.index("await crea_invoice_escrow(")
+    prova("compra: le guardie stanno PRIMA della fattura", True,
+          c.index("raise HTTPException(400, MSG_PROMO_SPENTE)") < fattura
+          and c.index("posti_evidenza(con") < fattura
+          and c.index("_banner_vivo(u)") < fattura)
+    prova("compra: fra la fattura e l'INSERT nessun altro await", 1,
+          c[fattura:c.index("con.commit()",
+            c.index("INSERT INTO pagamenti"))].count("await "))
+    prova("il moderatore ha /promossi nei due smistatori del bot", True,
+          '"/promossi": comando_promossi' in src
+          and 'if testo.startswith("/promossi"):' in src)
+
+    # ---- 7. L'APP -----------------------------------------------------
+    prova("la card in evidenza porta l'etichetta, e mai da esaurita", True,
+          "const ev = !esa && inEvidenza(l);" in mini
+          and '<div class="card-evidenza">In evidenza</div>' in mini)
+    prova("la fila «In evidenza» sta fra «Da scoprire» e gli scambi P2P",
+          True, mini.index('id="scoprireSez"') < mini.index('id="evidenzaSez"')
+          < mini.index('id="p2pVetrinaSez"'))
+    prova("...e chiede la stessa vetrina nuda della fila P2P", True,
+          "vetrinaNuda() ? inEvidenzaServer" in mini
+          and "return !!p2pInVetrina && vetrinaNuda();" in mini)
+    prova("in «Da scoprire» i negozi vanno a turno e PRIMA delle card nostre",
+          True, "aTurno(vociSponsor().concat(vociNegoziPromossi()))\n"
+          "  .concat(SCOPRIRE.filter(v => v.inTesta)" in mini)
+    prova("lo scorrimento da solo si ferma con gli effetti ridotti e al tocco",
+          True, "if (effettiRidotti() || Date.now() < scoprireFermoFino) return;"
+          in mini and "'pointerdown', 'touchstart', 'wheel', 'keydown'" in mini)
+    turno = pezzo_js(mini, "function aTurno(lista){")
+    r = _node_banco("let turnoPromo = 7;\n" + turno + """
+console.log(JSON.stringify([aTurno([1,2,3]), aTurno([1]), aTurno([]),
+  (turnoPromo = 8, aTurno([1,2,3]))]));""")
+    if r is None:
+        salta("il turno, girato in node", "node non c'e'")
+    else:
+        prova("il turno: ogni apertura parte dalla card dopo",
+              [[2, 3, 1], [1], [], [3, 1, 2]], r)
+    # «DA SCOPRIRE» COME NETFLIX (23 nov 2026, scelto da Andrea in
+    # video): sotto i 768px la card al centro e' grande e accesa, le
+    # vicine piu' piccole e scure; sopra, la fila del computer non cambia
+    _i_n = mini.index("«DA SCOPRIRE» COME NETFLIX")
+    _net = mini[mini.index("@media (max-width:767px){", _i_n):
+                mini.index(".sc-q-pre{", _i_n)]
+    prova("Netflix: la card al centro grande, le vicine piccole e scure, "
+          "e con gli effetti ridotti niente corsa", (True, True, True),
+          ("#scoprireStrip .scoprire-card.sc-centro{transform:scale(1.1);"
+           "opacity:1;" in _net,
+           "transform:scale(.82);opacity:.55;" in _net,
+           # la corsa la spegne la regola universale, che sta in fondo
+          "fx-ridotti" not in _net))
+    prova("...solo sotto i 768px: ogni regola Netflix sta in un blocco "
+          "che finisce a 767px, e altrove sc-centro non esiste",
+          (True, 1),
+          (all("max-width:767px" in b.split("{", 1)[0]
+               for b in _net.split("@media")[1:]),
+           mini.count(".scoprire-card.sc-centro{")))
+    prova("...e il giudice del centro e' lo stesso media del CSS", True,
+          "window.matchMedia('(max-width:767px)')" in mini)
+    r = _node_banco("""
+const figli = [10, 150, 290].map(x => ({x, cls: new Set(),
+  getBoundingClientRect(){ return {left: this.x, width: 120}; },
+  classList: null}));
+figli.forEach(f => f.classList = {
+  toggle: (c, si) => si ? f.cls.add(c) : f.cls.delete(c),
+  remove: c => f.cls.delete(c), contains: c => f.cls.has(c)});
+const fila = {children: figli,
+  getBoundingClientRect: () => ({left: 0, width: 390})};
+const el = () => fila;
+let mqNetflix = {matches: true};
+""" + pezzo_js(mini, "function centroScoprire(){") + """
+const chi = () => figli.map(f => f.cls.has('sc-centro'));
+centroScoprire(); const a = chi();
+figli.forEach(f => f.x -= 140); centroScoprire(); const b = chi();
+mqNetflix = {matches: false}; centroScoprire(); const c = chi();
+console.log(JSON.stringify([a, b, c]));""")
+    if r is None:
+        salta("il centro di Netflix, girato in node", "node non c'e'")
+    else:
+        prova("Netflix: si accende la card piu' vicina al centro, segue lo "
+              "scorrimento, e sopra i 768px nessuna",
+              [[False, True, False], [False, False, True],
+               [False, False, False]], r)
+    prova("...e il passo porta al centro la card DOPO quella accesa, "
+          "dall'ultima la prima", True,
+          "carte[(ora + 1) % carte.length]" in pezzo_js(
+              mini, "function passoScoprire(){"))
+    prova("il bottone «🚀 Promuovi» nasce solo a cassa aperta e fuori ferie",
+          True, "promoAttive && !inFerie(l) && !DEMO && !VETRINA" in mini)
+    prova("il paySheet sa che sta pagando una promozione", True,
+          "promoInCorso.pid === pagamentoCorrente)\n    verificaPromo(" in mini)
+
+    # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
+    prova("collaudo_promozioni e' fra i collaudi della CI", True,
+          "\ncollaudo_promozioni\n" in
+          open("ci/collaudi.txt", encoding="utf-8").read() + "\n")
+    prova("...e fra i file che si compilano", True,
+          "\ncollaudo_promozioni.py\n" in
+          open("ci/compila.txt", encoding="utf-8").read() + "\n")
+
+
 def prove_categorie_delle_prove():
     """LE CATEGORIE DELLE PROVE (5 nov 2026, cantiere «prove per
     categoria»). La mappa `CATEGORIE` regge solo se ogni sezione di
@@ -220529,7 +220859,7 @@ CATEGORIE = {
     anteprima_prezzo_condiviso pagina_dati note_piccole
     feedback_tre_e_tondi loghi_tondi card_parte_ordine font porta_timer
     feedback_confermato dati_spedizione_copia indirizzo_resta_dove_sta servizi quantita_servizi
-    banner_negozio paracadute_motivo rimborso_motivo slug_negozio
+    banner_negozio paracadute_motivo rimborso_motivo slug_negozio promozioni
     link_descrizione foto_vuota foto_metadati connettori connettori_sync
     connettori_woo connettori_registro connettori_ingresso
     titoli_importati connettori_varianti connettore_interrompibile
@@ -221757,6 +222087,7 @@ def main():
               prove_dettaglio_schede,
               prove_pubblica_passi,
               prove_bitpost_gift_card,
+              prove_promozioni,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

@@ -284,8 +284,10 @@ def monta(base, canale_id, argomenti, detto, timbri, fatti, coda=""):
 
     S.update(notifica=notifica, _manda_telegram=manda_telegram,
              decidi_revisione=decidi_revisione, _comando_sconosciuto=sconosciuto)
+    # (23 nov 2026) e /promossi, le promozioni a pagamento
     for nome in ("comando_anteprima", "comando_canale", "comando_sponsor",
-                 "comando_vetrina", "comando_punti", "comando_canali"):
+                 "comando_vetrina", "comando_punti", "comando_canali",
+                 "comando_promossi"):
         S[nome] = comando(nome)
     return S
 

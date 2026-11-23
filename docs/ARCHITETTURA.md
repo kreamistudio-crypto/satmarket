@@ -38457,3 +38457,31 @@ mai il kind 0 di nessuno: regola ferrea 2).
   registro, backup o ripristino delle leve. Ogni cambio: riga nel registro
   senza valore e `notifica_admin(..., argomento="moderazione")`. I gruppi
   di `_leve_stato` escono in ordine alfabetico sul nome senza emoji.
+
+- LE PROMOZIONI A PAGAMENTO (23 nov 2026): tre motivi del giro generico
+  dei `pagamenti` — `promo_cima`, `promo_evidenza`, `promo_scoprire` —
+  con `riferimento` = `annuncio`, `annuncio:giorni` o `giorni`
+  (`_promo_dal_riferimento`). Porta `POST /api/promo/compra` (guardie
+  prima della fattura: leva, annuncio promuovibile `_annuncio_promuovibile`,
+  24 ore `in_cima_da`, posti `posti_evidenza`, banner vivo `_banner_vivo`)
+  e `GET /api/promo/listino` (prezzi da `listino_evidenza` e dalle leve:
+  il client non ne scrive). Incasso `_incassa_promo` (In cima:
+  `creato` = adesso e `promo_in_cima_canale`; In evidenza:
+  `annunci.evidenza_fino`, che si somma, e il primo giorno in cima;
+  negozio: `utenti.promo_scoprire_fino` e `promo_consigliato` = 1),
+  rimborso `_disfa_promo`. Escono nella busta di prima pagina:
+  `in_evidenza` (`in_evidenza_pubblici`), `negozi_promossi`
+  (`negozi_promossi_pubblici`: `scoprire` finché corrono i giorni,
+  `consigliato` dopo) e `promozioni_attive`; `evidenza_fino` viaggia con
+  ogni card (`CAMPI_VETRINA`). Il moderatore: `/promossi` (elenco,
+  `negozio CODICE`, `annuncio ID`), nel gruppo e in privato. Nella pagina:
+  `inEvidenza(l)` e la cornice `.card.ev`, la fila `#evidenzaFila`
+  (`renderEvidenza`, solo vetrina nuda), le voci `vociNegoziPromossi` in
+  «Da scoprire» e in `consigliatiPubblicati` (`promo: true`, banner e
+  logo da `/foto/`), `aTurno` (il turno per apertura, `turnoPromo`), il
+  bottone `apriPromuovi` e `chiediPromoScoprire`, il paySheet con
+  `promoInCorso`. «Da scoprire» sul telefono (sotto i 768px) è la fila
+  Netflix: `centroScoprire` accende `sc-centro` sulla card più vicina al
+  centro, `passoScoprire` ogni `SCOPRIRE_PASSO_MS` porta al centro quella
+  dopo, `armaScorriScoprire` arma pausa al tocco, osservatore e ricalcolo
+  allo scroll (un fotogramma).

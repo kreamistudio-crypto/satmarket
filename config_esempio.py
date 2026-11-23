@@ -626,6 +626,21 @@ SLUG_NEGOZIO_LIVELLO = "avviato"
 # 0 = la personalizzazione e' spenta del tutto.
 SLUG_NEGOZIO_PREZZO_SATS = 5_000
 
+# --- LE PROMOZIONI A PAGAMENTO (23 nov 2026) --------------------------
+# «🚀 Promuovi» sull'annuncio e il negozio in «Da scoprire». Accese di
+# serie; False le spegne tutte (chi ha gia' pagato tiene il suo).
+PROMOZIONI_ATTIVE = True
+# «⬆️ In cima»: torna primo fra i più recenti e riesce nel canale.
+# 0 = spenta. Al massimo una volta ogni PROMO_IN_CIMA_ORE per annuncio.
+PROMO_IN_CIMA_SATS = 5_000
+PROMO_IN_CIMA_ORE = 24
+# «⭐ In evidenza»: giorni -> sats. La fila in home ha PROMO_EVIDENZA_POSTI.
+PROMO_EVIDENZA_SATS = {7: 15_000, 15: 25_000}
+PROMO_EVIDENZA_POSTI = 8
+# «🏪 Il negozio in Da scoprire»: poi resta per sempre fra i Consigliati.
+PROMO_SCOPRIRE_SATS = 50_000
+PROMO_SCOPRIRE_GIORNI = 30
+
 # LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026): gli unici
 # domini che una descrizione di annuncio rende TOCCABILI. Tutto il
 # resto resta testo copiabile, cioe' la vita di sempre.

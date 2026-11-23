@@ -438,9 +438,11 @@ SELECT u.tg_id, u.negozio,
   FROM utenti u WHERE COALESCE(u.banner_sbloccato_il, 0) >= 1789603200
    AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id = u.tg_id
      AND p.motivo = 'banner' AND p.stato IN ('pagato','rimborsato'));
--- 3) pagato due volte la stessa porta
+-- 3) pagato due volte la stessa porta (le promozioni no: si
+--    ricomprano di diritto, 23 nov 2026)
 SELECT tg_id, motivo, COUNT(*) AS quanti, SUM(importo_sats) AS sats
   FROM pagamenti WHERE stato = 'pagato'
+   AND motivo IN ('banner','negozio_slug')
  GROUP BY tg_id, motivo, riferimento HAVING COUNT(*) > 1;
 -- 4) rimborsato ma la porta e' rimasta aperta
 SELECT p.id, p.tg_id FROM pagamenti p JOIN utenti u ON u.tg_id = p.tg_id
