@@ -64053,6 +64053,7 @@ def prove_card_parte_ordine():
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
+    amb["_p2p_nascosti_fra"] = lambda con, ids: set()   # (23 nov 2026, le P2P spente)
     # la chat dell'ordine (16 ott 2026, chat-mercatino): la sua prova e' `prove_chat_mercatino`
     amb["_chat_mercatino_vista"] = lambda *a: ""
     amb["_chat_mercatino_ferma"] = lambda *a: False
@@ -66618,6 +66619,7 @@ def prove_ritocchi_prova_alan():
         amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
         amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
         amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
+        amb["_p2p_nascosti_fra"] = lambda con, ids: set()   # (23 nov 2026, le P2P spente)
         for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "MAX_ORDINI_MAI_VISTI_P2P = ", "P2P_ORDINI_MAI_VISTI_S = ", "P2P_CAMBIO_PUB_SCARTO = "):
             i = _SORGENTE.index("\n" + riga) + 1
             exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
@@ -74185,6 +74187,7 @@ def prove_parti_si_vedono():
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
+    amb["_p2p_nascosti_fra"] = lambda con, ids: set()   # (23 nov 2026, le P2P spente)
     for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
               "_controparti_p2p"):
         exec(pezzo(f), amb)
@@ -77469,6 +77472,7 @@ def prove_volti_libro():
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
+    amb["_p2p_nascosti_fra"] = lambda con, ids: set()   # (23 nov 2026, le P2P spente)
     for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
@@ -108811,7 +108815,9 @@ def _ambiente_libro_p2p(detto):
            # (10 ott 2026, feedback-p2p) gli scambi completati accanto al nome
            "_completati_p2p": lambda con, ids: {},
            # (12 ott 2026) e il badge «⚡ risponde in fretta»
-           "_veloci_p2p": lambda con, ids, adesso: set()}
+           "_veloci_p2p": lambda con, ids, adesso: set(),
+           # (23 nov 2026) e chi ha spento le recensioni P2P: nessuno
+           "_p2p_nascosti_fra": lambda con, ids: set()}
     _m = _SORGENTE.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(_SORGENTE[_m:_SORGENTE.index("}\n", _m) + 2], amb)
     return {**amb, "html": _html,
@@ -109138,6 +109144,7 @@ def prove_p2p_recapito_passo():
     amb["_marchi_dispute_p2p"] = lambda con, ids, adesso: {}   # (10 ott 2026, malus-p2p)
     amb["_completati_p2p"] = lambda con, ids: {}   # (10 ott 2026, feedback-p2p)
     amb["_veloci_p2p"] = lambda con, ids, adesso: set()   # (12 ott 2026, il badge)
+    amb["_p2p_nascosti_fra"] = lambda con, ids: set()   # (23 nov 2026, le P2P spente)
     for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     # col contanti l'avviso dice l'appuntamento (1 ott 2026)
                                     "_tabacchino_libro", "_recapito_contanti_p2p", "_dati_frase_p2p",
@@ -180837,8 +180844,8 @@ def prove_recensioni_nascondibili():
     quelle degli scambi P2P o tutte e due. Stelle e numero restano.
     Il giro su un database vero e' `collaudo_recensioni_nascoste.py`.
 
-    QUEL CHE SI ROMPE IN SILENZIO: il proprietario o il moderatore che non
-    vedono piu' le loro; le due scelte che escono dalla risposta del
+    QUEL CHE SI ROMPE IN SILENZIO: il proprietario che non vede piu' le
+    sue (il moderatore, dal 23 nov 2026, non le vede: «solo tu»); le due scelte che escono dalla risposta del
     negozio (dire «nasconde le P2P» direbbe quel che nasconde); le stelle
     ricalcolate sulle sole visibili (chi riceve un voto brutto lo
     nasconde); «✅ scambi P2P» che resta e tradisce; la leva che non si
@@ -180850,7 +180857,8 @@ def prove_recensioni_nascondibili():
     es = open("config_esempio.py", encoding="utf-8").read()
 
     # --- 1) I DUE GIUDICI PURI, sui casi che decidono -------------------
-    amb = {"RECENSIONI_NASCONDIBILI": True, "e_admin": lambda t: t == 999}
+    amb = {"RECENSIONI_NASCONDIBILI": True, "e_admin": lambda t: t == 999,
+           "VOTO_SEMPRE_VISIBILE": 2}
     for f in ("_recensioni_nascoste_di", "_sql_recensioni_visibili"):
         exec(pezzo(f), amb)
     nasc, sql = amb["_recensioni_nascoste_di"], amb["_sql_recensioni_visibili"]
@@ -180858,8 +180866,8 @@ def prove_recensioni_nascondibili():
             "recensioni_p2p_nascoste": 1}
     prova("l'estraneo e l'anonimo non vedono quel che e' nascosto",
           [(True, True), (True, True)], [nasc(riga, 333), nasc(riga, 0)])
-    prova("...il proprietario e il moderatore vedono tutto",
-          [(False, False), (False, False)], [nasc(riga, 222), nasc(riga, 999)])
+    prova("...il proprietario vede tutto, il moderatore no (23 nov 2026)",
+          [(False, False), (True, True)], [nasc(riga, 222), nasc(riga, 999)])
     prova("una riga senza le colonne (un database di ieri) vale «mostra»",
           (False, False), nasc({"tg_id": 222}, 333))
     prova("...e una scelta sola resta sola", (False, True),
@@ -180867,9 +180875,13 @@ def prove_recensioni_nascondibili():
                 "recensioni_p2p_nascoste": 1}, 333))
     amb["RECENSIONI_NASCONDIBILI"] = False
     prova("a leva spenta niente e' nascosto", (False, False), nasc(riga, 333))
-    prova("il filtro: niente, solo le P2P, solo il mercatino, tutte",
-          ["", " AND COALESCE(f.scambio,'')=''", " AND f.scambio<>''", " AND 0"],
+    prova("il filtro: niente, solo le P2P, solo il mercatino, tutte — e le "
+          "negative (1 e 2 stelle) passano sempre (23 nov 2026)",
+          ["", " AND (COALESCE(f.scambio,'')='' OR f.voto<=2)",
+           " AND (f.scambio<>'' OR f.voto<=2)", " AND f.voto<=2"],
           [sql(False, False), sql(False, True), sql(True, False), sql(True, True)])
+    prova("...e il numero delle negative e' 2, una e due stelle", True,
+          "\nVOTO_SEMPRE_VISIBILE = 2\n" in src)
 
     # --- 2) LA ROTTA DEL NEGOZIO ---------------------------------------
     neg = codice(pezzo("negozio"))
@@ -180888,6 +180900,39 @@ def prove_recensioni_nascondibili():
           and 'del venditore["recensioni_p2p_nascoste"]' in neg)
     prova("le stelle non guardano le scelte: si ricalcolano su tutte", False,
           "nascoste" in codice(pezzo("_ricalcola_rating")))
+
+    # --- 2b) LE CARD DEL P2P (23 nov 2026, scambi-p2p-nascosti-scheda) --
+    # Andrea: «deve sparire anche da lì [...] gli scambi non completati
+    # non devono sparire, ma quelli conclusi sì». Tre card: il volto del
+    # libro Lightning, quello del libro on-chain, l'altra parte.
+    import sqlite3
+    amb2 = {"RECENSIONI_NASCONDIBILI": True, "sqlite3": sqlite3}
+    exec(pezzo("_p2p_nascosti_fra"), amb2)
+    _c = sqlite3.connect(":memory:")
+    _c.execute("CREATE TABLE utenti(tg_id INTEGER, recensioni_p2p_nascoste INTEGER)")
+    _c.executemany("INSERT INTO utenti VALUES(?,?)", [(222, 1), (333, 0)])
+    zitti = amb2["_p2p_nascosti_fra"]
+    prova("chi ha spento le P2P sta fra gli zitti, gli altri no",
+          {222}, zitti(_c, [222, 333, 0]))
+    amb2["RECENSIONI_NASCONDIBILI"] = False
+    prova("...a leva spenta nessuno", set(), zitti(_c, [222, 333]))
+    amb2["RECENSIONI_NASCONDIBILI"] = True
+    prova("...e un database senza la colonna vale «nessuno»", set(),
+          zitti(sqlite3.connect(":memory:"), [222]))
+    for nome, corpo in (("il volto del libro Lightning",
+                         codice(pezzo("_facce_ordini_p2p"))),
+                        ("la card dell'altra parte",
+                         codice(pezzo("_volti_persone")))):
+        prova(f"{nome} toglie i conclusi e «risponde in fretta» agli zitti",
+              True, "zitti = _p2p_nascosti_fra(con, " in corpo
+              and "fatti = {t: n for t, n in fatti.items() if t not in zitti}" in corpo
+              and "veloci = veloci - zitti" in corpo)
+        prova(f"...e i non completati no", (True, False),
+              ("marchi = _marchi_mancati_p2p(con, " in corpo,
+               "marchi = {" in corpo))
+    prova("il volto del libro on-chain fa lo stesso", True,
+          "zitti = _p2p_nascosti_fra(con, makers)" in src
+          and src.count("fatti = {t: n for t, n in fatti.items() if t not in zitti}") == 3)
 
     # --- 3) LA ROTTA DELLA SCELTA, LA LEVA, /api/me ---------------------
     sc = codice(pezzo("scegli_recensioni_nascoste"))
@@ -180922,7 +180967,8 @@ const c = {};
 const h = recensioniVisibiliHTML();
 c.scritte = [h.includes('Mostra sul profilo pubblico le recensioni del mercatino'),
              h.includes('Mostra sul profilo pubblico le recensioni degli scambi P2P'),
-             h.includes('Le stelle e il numero di recensioni restano sempre visibili.')];
+             h.includes('Le stelle e il numero di recensioni restano sempre visibili.'),
+             h.includes('Quelle nascoste le vedi sempre solo tu.')];
 c.stati = (h.match(/>\s*(Attivo|Spento)<\/button>/g) || []).map(x => /(Attivo|Spento)/.exec(x)[1]);
 c.gesti = [h.includes("setRecensioniVisibili('mercatino', false, this)"),
            h.includes("setRecensioniVisibili('p2p', true, this)")];
@@ -180934,7 +180980,8 @@ console.log(JSON.stringify(c));
     if c is None:
         salta("gli interruttori delle recensioni in node", "node non c'e'")
         return
-    prova("le tre scritte approvate da Andrea", [True, True, True], c.get("scritte"))
+    prova("le scritte approvate da Andrea (la quarta dal 23 nov 2026)",
+          [True, True, True, True], c.get("scritte"))
     prova("...mercatino «Attivo» (si mostra), P2P «Spento» (nascosta)",
           ["Attivo", "Spento"], c.get("stati"))
     prova("...e il tocco chiede il contrario di com'e'", [True, True], c.get("gesti"))

@@ -94726,3 +94726,73 @@ chi non è admin, il conto senza i solo-Nostr, il freno alla sesta. Il
 censimento degli indirizzi Telegram di `prove.py` ne conta nove.
 
 DA GUARDARE. Il primo invio vero dal bot in produzione.
+
+## «Scambi P2P» nascosto anche sulle card del P2P, moderatori senza le nascoste, negative sempre visibili (23 nov 2026, cantiere scambi-p2p-nascosti-scheda; Andrea, dopo aver spento le recensioni P2P di AccaSats e averle viste ancora: «Se uno decide di nascondere dal profilo pubblico le recensioni degli scambi peer-to-peer, deve sparire anche da lì», poi «Ovviamente gli scambi non completati non devono sparire, ma quelli conclusi sì»)
+
+LA SEGNALAZIONE, IN DUE PEZZI. Primo: sul profilo di AccaSats Andrea
+vedeva ancora «da uno scambio P2P». Non era un bug: è moderatore, e i
+moderatori le vedono per avere «rimuovi»; guardato da anonimo in
+produzione, il negozio dava 11 recensioni su 14, nessuna dello scambio, e
+`scambi_completati` a 0. Secondo, da un account non moderatore: sulla
+scheda dell'ordine P2P, nel riquadro «Chi ha pubblicato quest'ordine»,
+restava «✅ 3 scambi P2P». Il cantiere del 22 l'aveva tolto dal PROFILO
+(la rotta del negozio), ma le card del P2P prendono il numero da altri
+costruttori, che la scelta non la guardavano.
+
+COSA. Il giudice nuovo `_p2p_nascosti_fra(con, ids)` dice chi, fra quelle
+persone, ha spento le recensioni P2P (insieme vuoto a leva spenta o senza
+la colonna). Lo usano i tre costruttori dei volti del P2P:
+`_facce_ordini_p2p` (la card del libro Lightning e il riquadro «Chi ha
+pubblicato»), la fotografia del libro on-chain (`_rep`) e `_volti_persone`
+(la card dell'altra parte, nello scambio P2P e nel dettaglio di un ordine
+del mercatino). Per chi è fra gli «zitti» escono senza «✅ N scambi P2P»
+e senza «⚡ Risponde in fretta», come il profilo. «Non completati»,
+«dispute perse», stelle e numero restano.
+
+PERCHÉ PER TUTTI SULLE CARD. L'eccezione del proprietario e del
+moderatore sta nella lista delle recensioni, dove il moderatore ha
+«rimuovi»: sul numero di una card non c'è niente da moderare, e vederlo
+da moderatore ha appena fatto credere a un bug. Anche la card dell'altra
+parte: nel dettaglio di un ordine del mercatino quel numero direbbe a chi
+compra un oggetto che il venditore usa il P2P, cioè proprio la cosa da
+nascondere.
+
+E I MODERATORI NON LE VEDONO PIÙ (stesso giorno). Andrea: «aggiungi anche
+nel menu [...] scrivi che [...] il proprietario di quell'account li vede
+comunque, solo lui però». Due frasi proposte; scelta «Quelle nascoste le
+vedi sempre solo tu.», con la conseguenza detta: anche i moderatori
+smettono di vederle sul profilo, e da lì non le possono più rimuovere.
+`_recensioni_nascoste_di` perde `e_admin`; la frase sta sotto «Le stelle
+e il numero di recensioni restano sempre visibili.» nel cassetto.
+
+LE NEGATIVE NON SI NASCONDONO MAI (stesso giorno). Andrea: «le recensioni
+negative, quelle da 1 o 2 stelle, devono restare sempre visibili».
+`_sql_recensioni_visibili` lascia passare `f.voto<=VOTO_SEMPRE_VISIBILE`
+(2) anche quando il loro tipo è spento; con tutte e due spente restano
+solo le negative. Detto ad Andrea il prezzo: una negativa di uno scambio
+dice «da uno scambio P2P», cioè proprio quel che le P2P spente
+nascondono. Le stelle e il numero c'erano già (contano anche le
+nascoste); i marchi «non completati» e «dispute perse» pure. La frase
+del cassetto non lo dice: un testo nuovo aspetta l'ok di Andrea.
+
+SCARTATO. Lasciare il numero sulla card del libro, perché lì chi pubblica
+sta già vendendo sats (era la mia raccomandazione): Andrea ha scelto di
+nasconderlo anche lì. «...solo tu e i moderatori» (la mia
+raccomandazione, perché un moderatore possa togliere una recensione
+offensiva nascosta): scelta l'altra.
+
+PROVATO. `collaudo_recensioni_nascoste.py`, sezione 3b nuova, sul database
+vero: con le P2P nascoste la card del libro e quella dell'altra parte
+senza `completati` né `veloce`, col marchio dei non completati e le
+stelle intatti; con le P2P di nuovo visibili e a leva spenta i numeri
+tornano; il moderatore, sul profilo, non vede più quella dello scambio
+né i numeri del P2P. Controprova: col giudice che risponde
+sempre vuoto, 2 rosse. Sezione 3c: una da 1 stella di uno scambio resta
+all'estraneo con le P2P spente; la sezione 4 tiene la negativa del
+mercatino, la 5 solo quella. 39 su 39. `prove_recensioni_nascondibili`, sezione 2b: il giudice su un
+database in memoria (leva spenta, colonna assente) e le sentinelle nei
+tre costruttori; nella sezione 1 il moderatore ora vede nascosto, e in
+node la quarta scritta.
+
+DA GUARDARE. Dopo la promozione, da un account non moderatore: la scheda
+di un ordine P2P di chi ha spento le P2P, senza «✅ scambi P2P».

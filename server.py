@@ -32961,15 +32961,18 @@ def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
 # COSA RESTA: le stelle e il numero di recensioni, che contano anche
 # quelle nascoste — altrimenti chi riceve un voto brutto lo nasconde e
 # la media sale. Nascondere toglie il RACCONTO, mai il voto.
-# CHI LE VEDE LO STESSO: il proprietario (il suo cassetto «Recensioni
-# ricevute» legge questa stessa rotta) e i moderatori, che da qui
-# hanno il bottone «rimuovi».
+# CHI LE VEDE LO STESSO: SOLO il proprietario (il suo cassetto
+# «Recensioni ricevute» legge questa stessa rotta). Fino al 23 nov 2026
+# anche i moderatori, per il bottone «rimuovi»; poi Andrea, scegliendo
+# la frase «Quelle nascoste le vedi sempre solo tu.»: via anche ai
+# moderatori (cantiere scambi-p2p-nascosti-scheda). Da qui una nascosta
+# non si rimuove piu': si torna a vederla se il proprietario la riaccende.
 # Scartata «togliere la provenienza a tutti» (la prima proposta):
 # Andrea vuole lasciare la scelta a chi e' recensito.
 def _recensioni_nascoste_di(riga, chi_guarda: int = 0) -> tuple:
     """PURA: `(mercatino, p2p)` — quali recensioni di questo profilo
-    NON si mostrano a `chi_guarda`. A leva spenta, al proprietario e ai
-    moderatori niente e' nascosto. `riga` e' la riga di `utenti` (con
+    NON si mostrano a `chi_guarda`. A leva spenta e al proprietario
+    niente e' nascosto (ai moderatori si', dal 23 nov 2026). `riga` e' la riga di `utenti` (con
     `tg_id` e le due colonne; una colonna assente vale 0)."""
     if not RECENSIONI_NASCONDIBILI:
         return (False, False)
@@ -32978,7 +32981,7 @@ def _recensioni_nascoste_di(riga, chi_guarda: int = 0) -> tuple:
         suo = int(riga["tg_id"] or 0)
     except (TypeError, ValueError, KeyError, IndexError):
         io, suo = 0, 0
-    if io and (io == suo or e_admin(io)):
+    if io and io == suo:
         return (False, False)
 
     def _col(nome):
@@ -32995,14 +32998,26 @@ def _sql_recensioni_visibili(mercatino: bool, p2p: bool) -> str:
     che toglie le recensioni nascoste. Le P2P sono quelle con `scambio`
     pieno — lo stesso ramo che le chiama «scambio» nel CASE del ruolo —,
     tutte le altre sono del mercatino. Niente da nascondere, stringa
-    vuota; tutte e due, nessuna riga."""
+    vuota; tutte e due, solo le negative.
+    LE NEGATIVE NON SI NASCONDONO MAI (23 nov 2026, Andrea: «le
+    recensioni negative, quelle da 1 o 2 stelle, devono restare sempre
+    visibili»): nascondere serve a non dire «uso il P2P», non a togliere
+    di mezzo chi si e' trovato male. Una da 1 o 2 stelle esce anche se
+    il suo tipo e' spento — e se e' di uno scambio, dice lo scambio:
+    e' il prezzo scelto da Andrea. Il numero sta in `VOTO_SEMPRE_VISIBILE`."""
+    neg = f"f.voto<={int(VOTO_SEMPRE_VISIBILE)}"
     if mercatino and p2p:
-        return " AND 0"
+        return f" AND {neg}"
     if p2p:
-        return " AND COALESCE(f.scambio,'')=''"
+        return f" AND (COALESCE(f.scambio,'')='' OR {neg})"
     if mercatino:
-        return " AND f.scambio<>''"
+        return f" AND (f.scambio<>'' OR {neg})"
     return ""
+
+
+# Fin dove una recensione e' «negativa» e quindi non si nasconde mai (23
+# nov 2026, vedi `_sql_recensioni_visibili`): 2 = una e due stelle.
+VOTO_SEMPRE_VISIBILE = 2
 
 
 @app.get("/api/negozio/{chi}")
@@ -67398,6 +67413,34 @@ def _completati_p2p(con, ids) -> dict:
     return {int(r[0]): int(r[1]) for r in righe if int(r[1] or 0) > 0}
 
 
+def _p2p_nascosti_fra(con, ids) -> set:
+    """CHI HA SPENTO LE RECENSIONI P2P fra queste persone: l'insieme dei
+    tg_id (23 nov 2026, cantiere scambi-p2p-nascosti-scheda; Andrea: «se
+    uno decide di nascondere dal profilo pubblico le recensioni degli
+    scambi peer-to-peer, deve sparire anche da lì [...] gli scambi non
+    completati non devono sparire, ma quelli conclusi sì»). A chi sta
+    qui dentro le CARD del P2P — il volto sulla card del libro,
+    Lightning e on-chain, e la card dell'altra parte (`_volti_persone`)
+    — non mostrano «✅ N scambi P2P» né «⚡ Risponde in fretta», come
+    gia' il profilo pubblico. «Non completati» e «dispute perse»
+    restano: proteggono chi ci scambia (10 ott 2026).
+    SULLE CARD VALE PER TUTTI, anche per il proprietario e i moderatori:
+    la loro eccezione sta nella lista delle recensioni, dove il
+    moderatore ha il bottone «rimuovi»; sul numero di una card non c'e'
+    niente da moderare, e vederlo da moderatore ha gia' fatto credere a
+    un bug (23 nov). A leva spenta, o senza la colonna, insieme vuoto."""
+    ids = sorted({int(i) for i in ids or [] if i})
+    if not ids or not RECENSIONI_NASCONDIBILI:
+        return set()
+    segni = ",".join("?" * len(ids))
+    try:
+        return {int(r[0]) for r in con.execute(
+            f"SELECT tg_id FROM utenti WHERE recensioni_p2p_nascoste=1 "
+            f"AND tg_id IN ({segni})", ids)}
+    except sqlite3.OperationalError:
+        return set()
+
+
 def _euro_sospesi_p2p(con, tg_id, adesso: int) -> int:
     """IN QUANTI SCAMBI chi vende aspetta gli euro di questa persona da
     piu' di P2P_EURO_SOSPESI_DOPO_S (10 ott 2026, «I MALUS DOPO LA
@@ -68479,6 +68522,10 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     # ...e il badge «⚡ risponde in fretta» (12 ott 2026): la chiave c'e'
     # SOLO per chi ce l'ha, come lo staff
     veloci = _veloci_p2p(con, [r["autore"] for r in righe], adesso)
+    # ...tranne chi ha spento le recensioni P2P (23 nov 2026)
+    zitti = _p2p_nascosti_fra(con, [r["autore"] for r in righe])
+    fatti = {t: n for t, n in fatti.items() if t not in zitti}
+    veloci = veloci - zitti
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
@@ -68631,6 +68678,10 @@ def _volti_persone(con, ids, adesso) -> dict:
     fatti = _completati_p2p(con, ids)
     # ...e il badge «⚡ risponde in fretta» (12 ott 2026)
     veloci = _veloci_p2p(con, ids, adesso)
+    # ...tranne chi ha spento le recensioni P2P (23 nov 2026)
+    zitti = _p2p_nascosti_fra(con, ids)
+    fatti = {t: n for t, n in fatti.items() if t not in zitti}
+    veloci = veloci - zitti
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -116331,6 +116382,10 @@ def _p2p_onchain_rifai_foto() -> None:
                 perse = _marchi_dispute_p2p(con, makers, adesso)
                 fatti = _completati_p2p(con, makers)
                 veloci = _veloci_p2p(con, makers, adesso)
+                # ...tranne chi ha spento le recensioni P2P (23 nov 2026)
+                zitti = _p2p_nascosti_fra(con, makers)
+                fatti = {t: n for t, n in fatti.items() if t not in zitti}
+                veloci = veloci - zitti
                 for m in makers:
                     u = con.execute(
                         "SELECT rating, n_feedback, (CASE WHEN avatar_scelta='nessuna' "

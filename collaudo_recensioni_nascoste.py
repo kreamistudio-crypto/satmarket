@@ -18,9 +18,15 @@ Qui si cammina su un database vero, con la rotta del negozio vera:
   2. nascoste le P2P: l'estraneo e l'anonimo non vedono la recensione
      dello scambio, ne' «✅ scambi P2P» ne' «⚡ risponde in fretta»;
      stelle e numero restano; i marchi dei non completati restano;
-  3. il proprietario e il moderatore vedono tutto lo stesso;
-  4. nascoste quelle del mercatino: resta solo quella dello scambio;
-  5. tutte e due: nessuna recensione, le stelle restano;
+  3. il proprietario vede tutto lo stesso, il moderatore no (dal 23
+     nov 2026: «Quelle nascoste le vedi sempre solo tu.»);
+     3b. (23 nov) le CARD del P2P — il volto sul libro e quella
+     dell'altra parte — tacciono «scambi P2P» e «risponde in fretta»
+     per tutti; il marchio dei non completati resta;
+     3c. (23 nov) le negative, 1 e 2 stelle, non si nascondono mai;
+  4. nascoste quelle del mercatino: resta quella dello scambio (e la
+     negativa del mercatino);
+  5. tutte e due: resta solo la negativa, le stelle restano;
   6. la rotta: una chiave assente vale «mostra»;
   7. a leva spenta si vede tutto e la rotta risponde 404.
 
@@ -194,30 +200,96 @@ def main():
     prova("...e le scelte non escono nemmeno adesso", False,
           "recensioni_p2p_nascoste" in v)
 
-    print("\n[3. il proprietario e il moderatore vedono tutto]")
-    for tg, chi in ((222, "il proprietario"), (999, "il moderatore")):
-        chi_guarda(tg)
-        neg = profilo()
-        prova(f"{chi} vede anche quella dello scambio",
-              ["scambio", "utente", "utente"], provenienze(neg))
-        prova(f"...e i numeri del P2P", 5, neg["venditore"]["scambi_completati"])
+    print("\n[3. solo il proprietario vede tutto]")
+    chi_guarda(222)
+    neg = profilo()
+    prova("il proprietario vede anche quella dello scambio",
+          ["scambio", "utente", "utente"], provenienze(neg))
+    prova("...e i numeri del P2P", 5, neg["venditore"]["scambi_completati"])
+    # (23 nov 2026) il moderatore NO: Andrea ha scelto «Quelle nascoste le
+    # vedi sempre solo tu.», via anche ai moderatori
+    chi_guarda(999)
+    neg = profilo()
+    prova("il moderatore non vede quella dello scambio",
+          ["utente", "utente"], provenienze(neg))
+    prova("...ne' i numeri del P2P", (0, False),
+          (neg["venditore"]["scambi_completati"],
+           neg["venditore"]["risponde_in_fretta"]))
+
+    print("\n[3b. le card del P2P tacciono i conclusi, per tutti]")
+    # (23 nov 2026, cantiere scambi-p2p-nascosti-scheda; Andrea: «deve
+    # sparire anche da lì [...] gli scambi non completati non devono
+    # sparire, ma quelli conclusi sì»). Il volto sulla card del libro e
+    # la card dell'altra parte: niente «✅ scambi P2P» né «⚡ risponde in
+    # fretta», il marchio dei non completati resta. Qui non c'e' chi
+    # guarda: sulle card vale per tutti, moderatore compreso.
+    con = SRV.db()
+    con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato) VALUES(?,?,?)",
+                (SCAMBIO, 222, int(time.time())))
+    con.commit()
+    adesso = int(time.time())
+    faccia = SRV._facce_ordini_p2p(con, [SCAMBIO], adesso)[SCAMBIO]
+    volto = SRV._volti_persone(con, [222], adesso)[222]
+    prova("la card del libro: niente «scambi P2P» né «risponde in fretta»",
+          (False, False), ("completati" in faccia, "veloce" in faccia))
+    prova("...il marchio dei non completati resta", 2, faccia.get("mancati"))
+    prova("...stelle e numero restano", (stelle, quante),
+          (faccia["media"], faccia["voti"]))
+    prova("la card dell'altra parte: niente «scambi P2P» né «risponde in "
+          "fretta»", (False, False), ("completati" in volto, "veloce" in volto))
+    prova("...il marchio dei non completati resta", 2, volto.get("mancati"))
+    con.close()
+
+    print("\n[3c. una negativa dello scambio resta, con le P2P spente]")
+    # (23 nov 2026) una da 1 stella da uno scambio: le P2P sono spente,
+    # ma le negative non si nascondono mai
+    con = SRV.db()
+    con.execute("INSERT INTO feedback(ordine_id, da_tg_id, per_tg_id, voto, "
+                "commento, creato, scambio) VALUES(-8, 333, 222, 1, "
+                "'Mai arrivati', ?, ?)", (int(time.time()) - 50,
+                                         "992e288e-bbbb-4a2b-9c3d-00000000bbbb"))
+    con.commit()
+    con.close()
+    chi_guarda(333)
+    neg = profilo()
+    prova("l'estraneo vede la negativa dello scambio, non la positiva",
+          [("scambio", 1), ("utente", 2), ("utente", 5)],
+          sorted((f["ruolo"], f["voto"]) for f in neg["feedback"]))
+    con = SRV.db()
+    con.execute("DELETE FROM feedback WHERE ordine_id=-8")
+    con.commit()
+    con.close()
 
     print("\n[4. nascoste quelle del mercatino]")
     chi_guarda(222)
     scegli({"mercatino": False, "p2p": True})
     chi_guarda(333)
     neg = profilo()
-    prova("resta solo quella dello scambio", ["scambio"], provenienze(neg))
+    # la negativa del mercatino («Lento», 2 stelle) NON si nasconde mai
+    # (23 nov 2026, Andrea: «quelle da 1 o 2 stelle, devono restare
+    # sempre visibili»)
+    prova("resta quella dello scambio, e la negativa del mercatino",
+          ["scambio", "utente"], provenienze(neg))
+    prova("...che e' proprio «Lento», da 2 stelle", [2],
+          [f["voto"] for f in neg["feedback"] if f["ruolo"] == "utente"])
     prova("...e i numeri del P2P tornano", (5, True),
           (neg["venditore"]["scambi_completati"],
            neg["venditore"]["risponde_in_fretta"]))
+    con = SRV.db()
+    faccia = SRV._facce_ordini_p2p(con, [SCAMBIO], int(time.time()))[SCAMBIO]
+    volto = SRV._volti_persone(con, [222], int(time.time()))[222]
+    con.close()
+    prova("...anche sulle due card del P2P", (5, True, 5, True),
+          (faccia.get("completati"), faccia.get("veloce"),
+           volto.get("completati"), volto.get("veloce")))
 
     print("\n[5. tutte e due nascoste]")
     chi_guarda(222)
     scegli({"mercatino": False, "p2p": False})
     chi_guarda(333)
     neg = profilo()
-    prova("nessuna recensione", [], neg["feedback"])
+    prova("resta solo la negativa, da 2 stelle", [("utente", 2)],
+          [(f["ruolo"], f["voto"]) for f in neg["feedback"]])
     prova("...le stelle restano", (stelle, quante),
           (neg["venditore"]["rating"], neg["venditore"]["n_feedback"]))
 
@@ -240,6 +312,13 @@ def main():
           provenienze(neg))
     prova("...e i numeri del P2P si vedono", 5,
           neg["venditore"]["scambi_completati"])
+    con = SRV.db()
+    prova("...anche sulle card del P2P", (5, 5),
+          (SRV._facce_ordini_p2p(con, [SCAMBIO], int(time.time()))[SCAMBIO]
+           .get("completati"),
+           SRV._volti_persone(con, [222], int(time.time()))[222]
+           .get("completati")))
+    con.close()
     chi_guarda(222)
     prova("la rotta della scelta risponde 404", 404,
           errore_scelta({"p2p": False}))
