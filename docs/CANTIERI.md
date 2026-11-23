@@ -94435,3 +94435,47 @@ DA GUARDARE. Dal telefono, in collaudo: spegnere «P2P» nel cassetto e
 aprire il proprio negozio da un secondo account (la recensione dello
 scambio e «✅ scambi P2P» spariti, le stelle uguali). NOVITA.md e la riga
 per Tappo NON scritte: testi nuovi solo con l'ok di Andrea.
+
+## Il promemoria del PayCode a chi paga: resta solo quello dell'ora (23 nov 2026, cantiere promemoria-paycode; un utente, inoltrato da Andrea: dopo sei ore, di notte, «Se non puoi più, tocca ✕ Annulla» con un PayCode che valeva ancora due giorni, «devo richiedere annullamento del match?»; Andrea sul riquadro: «Togli quelli di 6 ore e 1 giorno»)
+
+COSA. Negli scambi Barattozon su Lightning, a chi paga il PayCode al
+tabacchino, dei tre promemoria contati dalla garanzia (un'ora, sei ore,
+un giorno) resta solo quello dell'ora. Server: `SOLLECITO_EURO_PAYCODE_TESTI`
+ha la sola voce 1 (testo invariato), e `_solleciti_evento_p2p` col
+tabacchino mette in attesa `SOLLECITI_EURO_PAYCODE_S` (l'ora) al posto di
+`SOLLECITI_EURO_S`. Gli altri metodi tengono i loro tre. Nessuna scritta
+nuova, nessuna leva: si torna indietro rimettendo due voci.
+
+PERCHÉ. Il server la scadenza del PayCode non la sa: su Lightning viaggia
+cifrata fra i due telefoni. Le sei ore e il giorno erano contati alla
+cieca, e tutt'e due dicevano di annullare («Se non puoi più, tocca ✕
+Annulla»; «se no, tocca ✕ Annulla»), anche a chi aveva ancora due giorni
+per pagare. La scadenza VERA ha già i suoi avvisi giusti, sei ore e
+un'ora prima: in app (`statoTabacchinoP2P`, il toast del battito) e su
+Telegram (`SVEGLIA_P2P_TESTI`, messa dal telefono con
+`sincronizzaSvegliaP2P`). Sono loro a dire «adesso o mai».
+
+LA SECONDA METÀ DELLA SEGNALAZIONE, NON UN BUG. L'utente diceva che la sua
+card di ACQUISTO stava in «Vendi BTC». È voluto: il libro è visto dal lato
+di chi guarda (`P2P_LATO_K`: «Vendi BTC» mostra k=buy), e un ordine di
+acquisto sta dove lo trova chi vuole vendere. Anche il proprio. Niente
+codice: lo spiega Tappo.
+
+SCARTATO. Riscrivere i due testi senza la spinta ad annullare (servivano
+due scritte nuove da approvare, e avrebbero ripetuto gli avvisi della
+scadenza vera). Lasciare così e affidarsi a Tappo.
+
+PROVATO. `collaudo_solleciti_p2p` (in CI), nel venv senza coincurve: col
+PayCode a chi compra nasce una sola attesa, `euro_sollecito1`; controprova
+con gli intervalli di prima, rosso su quella riga. In prove.py
+(`prove_solleciti_p2p` e vicine): il dizionario del PayCode ha la sola
+voce 1 e finisce col buono regalo, intervalli `(H,)`, nessun «Annulla»
+nei suoi testi, e a sei ore e a un giorno a chi compra non parte niente.
+
+DA GUARDARE. Gli scambi già in garanzia al momento del deploy hanno le
+attese delle sei ore e del giorno già scritte in tabella col testo
+vecchio: partono ancora, una volta. Resta uguale Barattozon ON-CHAIN, che
+ha il suo promemoria delle sei ore (`_p2p_onchain_promemoria_tab`: «Se non
+puoi più, tocca ↩️ Rinuncio»), anche se lì il server la scadenza la sa e
+manda già quello delle quattro ore prima: non era nella scelta di Andrea,
+è in fondo al rapporto.

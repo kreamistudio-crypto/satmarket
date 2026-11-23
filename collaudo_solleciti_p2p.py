@@ -351,6 +351,10 @@ async def giro():
     g = ordine(7)
     await scambio_attivo(g, '["Contanti al tabacchino 111.80"]')
     G = quando(g, "garanzia_pagata")
+    # (23 nov 2026, promemoria-paycode) a chi compra un promemoria solo, l'ora:
+    # le sei ore e il giorno, senza la scadenza del PayCode, spingevano ad annullare
+    prova("a chi compra un'attesa sola, quella dell'ora", [("euro_sollecito1", C)],
+          in_attesa(g, "sollecito_euro"))
     await recapito(g)
     detti, _ = await battito(G + H + 5)
     prova("a chi compra si dice di pagarlo al tabacchino",
