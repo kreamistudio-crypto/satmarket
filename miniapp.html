@@ -11093,6 +11093,13 @@
      per caso. */
   .fine-frase{white-space:nowrap}
   .guida-wallet-btn{margin:8px 0 12px}
+  /* «Non hai sats?» accanto a «Paga» (23 nov 2026): due tasti pari */
+  .via-euro-fila{display:flex;gap:10px}
+  .via-euro-fila > .btn{flex:1;min-width:0}
+  .via-euro-cifra{font-size:40px;font-weight:900;text-align:center;margin:8px 0 2px;color:var(--ink)}
+  .via-euro-sotto{font-size:13px;font-weight:600;color:var(--muted);text-align:center;margin:0 0 14px}
+  .via-euro-metodi{display:flex;gap:10px;margin:0 0 14px}
+  .via-euro-metodi > .btn{flex:1;min-width:0}
   /* la casella del Profilo, sotto i sette giorni: verde fiducia, non
      l'arancio della serie (quinto giro, 17 nov 2026) */
   .guida-wallet-box{margin-top:10px;background:var(--trust-soft);
@@ -17894,6 +17901,9 @@ document.getElementById('cartello')?.remove();</script>
       Paga con qualsiasi wallet Lightning. I sats restano <b style="color:var(--trust)">bloccati e al sicuro</b> finché non confermi di aver ricevuto l'oggetto.
     </div>
     <div class="qr" id="payQr"></div>
+    <!-- «Non hai sats?» (23 nov 2026, giroconto interno): subito sotto il
+         codice, senza scorrere; lo accende payViaEuroVista -->
+    <button type="button" id="payViaEuro" class="btn orange via-euro-btn" style="display:none;margin:0 0 12px" onclick="apriViaEuro('qr')">Non hai sats? Compra da qui</button>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
     <div id="payQrNota" style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
     <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
@@ -17916,6 +17926,14 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn primary" id="payHoPagato" onclick="sheetPaid()">✓ Ho pagato</button>
     <button class="btn ghost" onclick="annullaPagamento()">Annulla</button>
     <div id="payHint"></div>
+  </div>
+
+  <!-- ============ «NON HAI SATS?» (23 nov 2026, giroconto interno) ============
+       Il prezzo in euro, tutto compreso, e «Continua». Lo apre apriViaEuro. -->
+  <div class="sheet" id="viaEuroSheet" role="dialog" aria-modal="true" aria-labelledby="viaEuroTit">
+    <div class="grab"></div>
+    <h3 id="viaEuroTit">Non hai sats?</h3>
+    <div id="viaEuroCorpo"></div>
   </div>
 
   <!-- ============ LA SCELTA DELLA RETE AL «PAGA» (2 nov 2026) ============
@@ -35362,7 +35380,8 @@ function renderAcquisto(){
     <div class="ctrl-fondo">${nwc}
       ${/* A CONTO CHIUSO «PAGA» E' SPENTO, e come nello scheletro
             NON porta l'id acqCompra: quello e' il bottone che paga. */
-        viaOk ? `<button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>`
+        viaOk ? viaEuroAccanto(`<button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>`,
+                               d.tipo==='mono' ? tot : 0)
               : `<button class="btn orange" disabled>Paga</button>`}
       ${secondari}
     </div>`;
@@ -38817,6 +38836,8 @@ async function payCreaFattura(l, offAcc){
   mostraQr(d.invoice);
   payAvvisoGrosso(d);
   avvisaEmailNonSalvata(d);
+  /* «Non hai sats?» sotto il codice: solo l'oggetto singolo */
+  payViaEuroVista(d.prezzo_sats || 0);
   /* La RIPRESA (ago 2026): avevi gia' un ordine 'creato' su questo
      annuncio e il server ti ha ridato la TUA fattura ancora viva —
      va detto, o i conti («convertito ora») sembrerebbero bugiardi */
@@ -39921,6 +39942,7 @@ function closeSheet(){
   salaNip46Chiudi();                          // e la sala d'attesa non resta appesa al foglio
   el('nostrGuidaSheet').classList.remove('open');
   el('walletGuidaSheet').classList.remove('open');
+  el('viaEuroSheet').classList.remove('open');
   el('collegaSheet').classList.remove('open');
   el('nwcConfermaSheet').classList.remove('open');
   el('installSheet').classList.remove('open');
@@ -74301,6 +74323,9 @@ let payOffAcc = null;            // l'accordo del foglio (qui sempre nessuno), p
 function payGuidaWalletVista(si){
   const r = el('payGuidaWallet');
   if (r) r.style.display = si ? '' : 'none';
+  /* «Non hai sats?» e' di Lightning come la guida: l'on-chain lo spegne,
+     e il ritorno alla fattura lo riaccende solo se l'offerta c'e' ancora */
+  if (!si && typeof payViaEuroVista === 'function') payViaEuroVista(0);
 }
 /* L'ON-CHAIN CONSIGLIATO PER GLI ACQUISTI GROSSI (17 nov 2026, Andrea:
    «per importi grossi deve venire proposto l'on-chain da solo»): la
@@ -74340,6 +74365,7 @@ function payMetodoSpegni(){
   if (payOc && el('payQrNota'))
     el('payQrNota').textContent = 'inquadra il QR col wallet, o tocca la invoice per copiarla';
   payGuidaWalletVista(true);
+  if (typeof payViaEuroVista === 'function') payViaEuroVista(0);   /* «Non hai sats?» lo riaccende solo la fattura nuova */
   payOc = null; payOcPronto = null; payMetodoAcceso = false;
   acqMetodo = 'ln';
   const box = el('payMetodo'), nota = el('payMetodoNota');
@@ -83489,6 +83515,224 @@ function apriGuidaWallet(scopo){
   renderGuidaWallet();
   el('sheetBg').classList.add('open');
   el('walletGuidaSheet').classList.add('open');
+}
+/* ---------------- «NON HAI SATS?» (23 nov 2026) ----------------
+   (cantiere giroconto-interno, decisioni di Andrea dello stesso giorno.)
+   Chi non ha sats compra lo stesso: manda euro a un venditore di sats del
+   P2P, e i suoi sats vanno DRITTI nel deposito di garanzia dell'ordine
+   (il giroconto interno: Cantieri, «Il giroconto interno»). Due porte,
+   lo stesso tasto arancione: accanto a «Paga» nella cassa, e nel foglio
+   del QR subito sotto il codice («magari uno clicca paga senza sapere
+   che si paga in Satoshi, poi vede un codice QR e si spaventa»).
+   LE VEDE SOLO chi non ha un wallet nel profilo (ne' Lightning address
+   ne' on-chain: quasi certamente un neofita, scelta delegata da Andrea),
+   con la leva del server (`via_euro`), con un venditore di sats pronto
+   nel libro ADESSO e un ordine sotto il tetto in euro: senza, il tasto
+   aprirebbe una strada che non porta da nessuna parte.
+   ⚠️ MAI «PAGA IN EURO» SUL TASTO (regola di Andrea): la community
+   leggerebbe che il mercatino incassa euro, e non e' vero — chi vende
+   riceve sempre sats, gli euro vanno a chi vende sats nel P2P. */
+let myViaEuro = false;      // il cancello, da /api/me
+let myViaEuroMax = 0;       // il tetto in euro, da /api/me (100)
+let viaEuroSats = 0;        // il totale dell'ordine dell'ultima porta accesa
+let viaEuroLibroTentato = 0;
+const VIA_EURO_METODI = ['SEPA Instant', 'Satispay'];
+/* il margine sul cambio: il prezzo di Mostro puo' scostarsi un poco dal
+   nostro, e con un sat in meno il deposito non si salda (il server ne
+   ammette in piu' fino al 3% o a un euro e mezzo, l'euro intero compreso) */
+const VIA_EURO_MARGINE = 0.005;
+function viaEuroPerMe(){
+  return !!myViaEuro && !myLnAddress && !myOnchainIncasso && !DEMO && !VETRINA;
+}
+/* PURA. L'offerta piu' conveniente del libro per avere `sats` nel
+   deposito: chi VENDE sats in euro, a prezzo di mercato (di un prezzo
+   fisso la cifra si sa solo prendendolo), con almeno uno dei metodi
+   veloci decisi, e non un mio scambio. La cifra in euro e' un INTERO
+   (Mostro vuole euro interi: `fiat_amount` e' un i64) e deve stare
+   nell'intervallo dell'ordine, o essere il suo importo unico entro un
+   euro. La ricetta e' quella del coordinatore (`satsMercatoP2P`: sats =
+   euro / perSat × (1 − premio)), all'indietro, con meta' commissione a
+   chi compra (`nettoLatoP2P`). A parita' di cifra, il piu' recente: e'
+   piu' probabile che sia al telefono. null = niente da proporre. */
+function viaEuroScelta(ordini, sats, perSat, fee, miei){
+  if (!(sats > 0) || !(perSat > 0) || !(fee >= 0) || fee >= 2 || !Array.isArray(ordini)) return null;
+  const lordo = Math.ceil(sats / (1 - fee / 2)) + 1;
+  let meglio = null;
+  for (const o of ordini) {
+    if (!o || o.lato !== 'sell' || o.fiat !== 'EUR') continue;
+    if (o.stato && o.stato !== 'pending') continue;
+    if (o.sats > 0 || o.coin) continue;
+    if (miei && miei[o.id]) continue;
+    const metodi = (o.metodi || []).filter(m => VIA_EURO_METODI.indexOf(m) >= 0);
+    if (!metodi.length) continue;
+    const quota = 1 - (Number(o.premium) || 0) / 100;
+    if (!(quota > 0)) continue;
+    const euro = Math.ceil(lordo * perSat * (1 + VIA_EURO_MARGINE) / quota);
+    const dentro = o.euroMax > 0 ? (euro >= o.euro && euro <= o.euroMax)
+                                 : (o.euro >= euro && o.euro <= euro + 1);
+    if (!dentro) continue;
+    const cifra = o.euroMax > 0 ? euro : o.euro;
+    if (!meglio || cifra < meglio.euro
+        || (cifra === meglio.euro && (o.creato || 0) > meglio.creato))
+      meglio = {id: o.id, euro: cifra, metodi: metodi,
+                premium: Number(o.premium) || 0, creato: o.creato || 0,
+                intervallo: o.euroMax > 0};
+  }
+  return meglio;
+}
+/* l'offerta di adesso per un ordine da `sats`, col libro che c'e' */
+function viaEuroOfferta(sats){
+  if (!viaEuroPerMe() || !p2pLibro || !(sats > 0)) return null;
+  const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
+  const fee = commissioneVivaP2P();
+  if (fee === null) return null;
+  const o = viaEuroScelta(p2pLibro.ordini, sats, perSat, fee, ordiniP2P());
+  if (!o || !(myViaEuroMax > 0) || o.euro > myViaEuroMax) return null;
+  return o;
+}
+/* il libro, se manca o e' vecchio, si legge in sottofondo e poi si
+   ridisegna chi l'ha chiesto. Al piu' un tentativo al minuto: se i relay
+   tacciono, la cassa non si ridisegna in tondo. */
+function viaEuroLibro(poi){
+  if (!viaEuroPerMe()) return;
+  const fresco = p2pLibro && (Date.now() - p2pLibro.quando) < P2P_LIBRO_FRESCO_MS;
+  if (fresco || Date.now() - viaEuroLibroTentato < 60000) return;
+  viaEuroLibroTentato = Date.now();
+  caricaLibroP2P().then(() => { if (typeof poi === 'function') poi(); }).catch(() => {});
+}
+function viaEuroTasto(sats, dove){
+  if (!viaEuroOfferta(sats)) return '';
+  viaEuroSats = sats;
+  const qr = dove === 'qr';
+  return '<button type="button" class="btn orange via-euro-btn" onclick="apriViaEuro(\''
+    + (qr ? 'qr' : 'cassa') + '\')">' + (qr ? 'Non hai sats? Compra da qui' : 'Non hai sats?') + '</button>';
+}
+/* accanto a «Paga», nella stessa fila: il bottone di sempre resta
+   identico, e senza offerta la cassa e' quella di ieri */
+function viaEuroAccanto(paga, sats){
+  const t = sats > 0 ? viaEuroTasto(sats, 'cassa') : '';
+  if (!t) { viaEuroLibro(() => { if (acqDati && el('acqCompra')) renderAcquisto(); }); return paga; }
+  return '<div class="via-euro-fila">' + paga + t + '</div>';
+}
+/* nel foglio del QR: si accende con la fattura di un ordine del mercatino,
+   si spegne a foglio chiuso e sull'on-chain (`payGuidaWalletVista`) */
+function payViaEuroVista(sats){
+  const b = el('payViaEuro');
+  if (!b) return;
+  const si = sats > 0 && !!viaEuroOfferta(sats);
+  if (si) viaEuroSats = sats;
+  b.style.display = si ? '' : 'none';
+}
+/* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
+   euro interi), e sotto in piccolo da cosa e' fatto. Il metodo si
+   sceglie solo se l'offerta ne ha piu' d'uno fra quelli decisi. */
+const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay'};
+let viaEuroScelto = null;   // {id, euro, metodo} dell'offerta mostrata
+let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in memoria
+function apriViaEuro(dove){
+  haptic();
+  const o = viaEuroOfferta(viaEuroSats);
+  if (!o) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
+  /* dal foglio del QR: il foglio della fattura si chiude (il suo ordine
+     da 15 minuti lo sostituisce il server col deposito lungo) */
+  if (dove === 'qr') closeSheet();
+  viaEuroScelto = {id: o.id, euro: o.euro, metodo: o.metodi[0]};
+  renderViaEuro();
+  el('sheetBg').classList.add('open');
+  el('viaEuroSheet').classList.add('open');
+}
+function renderViaEuro(){
+  const box = el('viaEuroCorpo');
+  const o = viaEuroOfferta(viaEuroSats);
+  if (!box) return;
+  if (!o || !viaEuroScelto) { chiudiFoglioP2P('viaEuroSheet'); return; }
+  if (o.id !== viaEuroScelto.id || o.euro !== viaEuroScelto.euro)
+    viaEuroScelto = {id: o.id, euro: o.euro, metodo: o.metodi[0]};
+  if (o.metodi.indexOf(viaEuroScelto.metodo) < 0) viaEuroScelto.metodo = o.metodi[0];
+  const prezzo = viaEuroSats * eurPerSat;
+  const cambio = Math.max(0, o.euro - prezzo);
+  const metodi = o.metodi.length > 1
+    ? '<div class="via-euro-metodi">' + o.metodi.map(m =>
+        '<button type="button" class="btn ' + (m === viaEuroScelto.metodo ? 'orange' : 'ghost')
+        + '" onclick="viaEuroMetodo(\'' + esc(m) + '\')">' + esc(VIA_EURO_NOMI[m] || m) + '</button>').join('')
+      + '</div>'
+    : '<div class="via-euro-sotto">' + esc(VIA_EURO_NOMI[o.metodi[0]] || o.metodi[0]) + '</div>';
+  box.innerHTML = '<div class="via-euro-cifra">' + o.euro + ' €</div>'
+    + '<div class="via-euro-sotto">prezzo ' + centesimiTestoP2P(prezzo) + ' € + '
+    + centesimiTestoP2P(cambio) + ' € di cambio</div>'
+    + metodi
+    + '<button type="button" class="btn primary" onclick="viaEuroContinua()">Continua</button>';
+}
+function viaEuroMetodo(m){
+  if (!viaEuroScelto) return;
+  haptic();
+  viaEuroScelto.metodo = m;
+  renderViaEuro();
+}
+/* «CONTINUA»: si prende l'ordine di chi vende sats con la cifra e il
+   metodo mostrati. Il corpo dell'acquisto (consegna, indirizzo, codice)
+   resta SOLO in memoria — l'indirizzo non si scrive nel telefono — e
+   serve un attimo dopo, quando il coordinatore chiede la fattura: la
+   fa il server, il deposito lungo dell'ordine (`viaEuroDeposito`). Da
+   li' lo scambio e' quello di sempre, nella sua pagina: i sats in
+   garanzia, il recapito di chi vende, «Ho inviato». */
+async function viaEuroContinua(){
+  const s = viaEuroScelto;
+  const l = currentListing;
+  if (!s || !l) return;
+  haptic();
+  const offAcc = offertaAccettataPer(l.id, true);
+  viaEuroInCorso[s.id] = {
+    totale: viaEuroSats,
+    corpo: Object.assign({annuncio_id: l.id,
+                          quantita: (acqDati && acqDati.qta) || qtaScelta,
+                          offerta_id: offAcc ? offAcc.id : 0},
+                         corpoConsegna(), corpoCodiceSconto())
+  };
+  chiudiFoglioP2P('viaEuroSheet');
+  await eseguiPresaP2P(s.id, s.euro, s.metodo);
+  const o = ordiniP2P()[s.id];
+  if (o && !o.viaEuro) {
+    o.viaEuro = {annuncio: l.id, totale: viaEuroSats};
+    scriviOrdineP2P(o);
+  }
+  if (o && o.stato === 'attesa_mia_fattura') viaEuroDeposito(s.id);
+}
+/* LA FATTURA AL COORDINATORE E' IL DEPOSITO DELL'ORDINE: la cassa del
+   server la conia per i sats esatti che il coordinatore ha chiesto
+   (`satsMiei`, gia' tolta la meta' della commissione), con la vita
+   lunga del giroconto. Se non copre l'ordine (il prezzo e' saltato) il
+   server dice no, e lo scambio resta senza fattura: lo si annulla dalla
+   sua pagina, e nessuno ha pagato niente. */
+async function viaEuroDeposito(id){
+  const o = ordiniP2P()[id];
+  const ve = viaEuroInCorso[id];
+  if (!o || !ve || ve.inviando) return false;
+  const sats = Number(o.satsMiei) || 0;
+  if (!(sats > 0)) return false;
+  ve.inviando = true;
+  const rip = attesaP2P('Sto preparando il pagamento…');
+  try {
+    const r = await fetch(`${API_BASE}/orders`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify(Object.assign({}, ve.corpo, {metodo: 'giroconto', sats_giroconto: sats}))});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.invoice) throw new Error(d.detail || 'errore');
+    await chiamataOrdineP2P(ordiniP2P()[id] || o, 'add-invoice', {payment_request: [null, d.invoice, null]});
+    const b = leggiBolt11(d.invoice);
+    if (b && b.scade) ricordaFatturaP2P(id, b.scade);
+    const agg = ordiniP2P()[id] || o;
+    agg.viaEuro = Object.assign({}, agg.viaEuro || {}, {ordine: d.ordine_id || 0, deposito: true});
+    scriviOrdineP2P(agg);
+    delete viaEuroInCorso[id];
+    if (p2pOrdineAperto === id) renderOrdineP2P();
+    return true;
+  } catch(e) {
+    ve.inviando = false;
+    toast('Il prezzo è cambiato: annulla lo scambio e riprova', 8000);
+    return false;
+  } finally { if (rip) rip(); }
 }
 /* Il terzo passo, l'unica parte viva della guida.
    'paga': i primi sats (un amico, o il P2P se e' acceso e c'e' un
@@ -93472,7 +93716,13 @@ function applicaMessaggioP2P(ord, dentro){
   /* ...e lo stesso per «dove vuoi i sats»: la garanzia e' bloccata (o
      l'ordine e' appena stato preso) e tocca a chi compra. Col wallet
      collegato la fattura la chiede il foglio da solo. */
+  /* «NON HAI SATS?» (23 nov 2026): lo scambio nato dalla cassa non chiede
+     dove ricevere i sats — la fattura e' il deposito dell'ordine */
   if (nuovo.stato === 'attesa_mia_fattura' && prima !== 'attesa_mia_fattura'
+      && nuovo.lato === 'compro' && typeof viaEuroInCorso !== 'undefined'
+      && viaEuroInCorso[nuovo.id]) {
+    setTimeout(() => viaEuroDeposito(nuovo.id), 0);
+  } else if (nuovo.stato === 'attesa_mia_fattura' && prima !== 'attesa_mia_fattura'
       && nuovo.lato === 'compro') {
     haptic();
     toast(P2P_TOAST_FATTURA, 6000);
@@ -122344,6 +122594,9 @@ async function avvia(){
     /* ...e le pillole «No altcoin» e «No stablecoin» (18 nov 2026): la leva
        le offre, e quelle ricordate su questo telefono rientrano nel filtro */
     myP2PBitcoinOnly = !!me.p2p_bitcoin_only;
+    /* ...e «Non hai sats?» alla cassa (23 nov 2026, giroconto interno) */
+    myViaEuro = !!me.via_euro;
+    myViaEuroMax = Math.max(0, Math.floor(Number(me.via_euro_max_euro) || 0));
     if (!p2pFiltro && typeof noMoneteRicordateP2P === 'function' && bitcoinOnlyOffertoP2P()) {
       const ric = noMoneteRicordateP2P();
       if (ric.soloBtc || ric.noStable) p2pFiltro = Object.assign(filtroVuotoP2P(), ric);

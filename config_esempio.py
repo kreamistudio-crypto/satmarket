@@ -1459,6 +1459,10 @@ LNBITS_RISERVA_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY_DELLA_RISERVA"
 # Il deposito piu' grande che si salda col giroconto, in sats: la rete di
 # sicurezza sotto il tetto in euro di chi compra (100 €, Andrea 23 nov).
 GIROCONTO_TETTO_SATS = 150_000
+# «Non hai sats?» alla cassa: solo i moderatori finche' e' True; il tetto
+# in euro dell'ordine pagato cosi'.
+VIA_EURO_SOLO_ADMIN = True
+VIA_EURO_MAX_EURO = 100
 # Il segreto con cui la RONDA DEL NODO chiede a /api/nodo/pagamenti-noti
 # se un pagamento uscito dal nodo e' un payout di Barattolo (28 set
 # 2026): risponde solo si'/no per ogni hash. Lo stesso valore va sul nodo

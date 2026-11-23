@@ -94931,9 +94931,11 @@ restano nella sua garanzia e Mostro chiede una fattura nuova). LA CIFRA LA
 DECIDE MOSTRO: chiede a chi compra una fattura per i sats esatti dello
 scambio meno la commissione, calcolati da lui alla presa. Quindi la cassa
 riceve anche `sats_giroconto` e il deposito nasce per QUELLA cifra, purché
-copra il totale e lo superi al massimo dell'1% (almeno 10 sats:
-`giroconto_cifra_giusta`); l'avanzo entra in `prezzo_sats` e va a chi vende
-(l'arrotondamento ad Anna, deciso). Di meno = 409, e il telefono riprova
+copra il totale e non lo superi di più del 3% o di un euro e mezzo al
+cambio di adesso, se è di più (`giroconto_cifra_giusta`): Mostro prende
+solo EURO INTERI (`fiat_amount` è un i64), quindi chi deve 41,62 € ne
+manda 42, e il suo prezzo può scostarsi un poco dal nostro. L'avanzo entra
+in `prezzo_sats` e va a chi vende (l'arrotondamento ad Anna, deciso). Di meno = 409, e il telefono riprova
 con qualche centesimo in più prima che chi compra abbia pagato niente. La
 ripresa confronta anche la cifra. I no della cassa («Giroconto non
 disponibile», «cifra fuori misura») sono la cintura del body scritto a
@@ -94942,8 +94944,34 @@ sale a 32 spunte (un mondo vero: prenota e conta l'uso solo a fattura
 lunga viva, la lapide a fattura viva resta; la cifra giusta; i pezzi della
 cassa).
 
-DA FARE PRIMA DI ACCENDERE. 1) Le schermate guidate (fase F2 dello
-studio, testi con Andrea). 2) La prova: il P2P del collaudo usa il nodo di
+«NON HAI SATS?» (F2, primo giro, stessa sera). Andrea ha deciso le porte
+e le scritte: un tasto ARANCIONE «Non hai sats?» accanto a «Paga», e nel
+foglio del QR, subito sotto il codice, «Non hai sats? Compra da qui» («uno
+clicca paga senza sapere che si paga in Satoshi, vede un QR e si
+spaventa»). MAI «paga in euro» (la community leggerebbe che il mercatino
+incassa euro). Li vede solo chi non ha né Lightning address né wallet
+on-chain nel profilo (scelta delegata: è quasi certamente un neofita),
+con la leva del server `via_euro` (di serie solo i moderatori,
+`VIA_EURO_SOLO_ADMIN`) e solo se ADESSO nel libro c'è un venditore di sats
+adatto e l'ordine sta sotto `VIA_EURO_MAX_EURO` (100). La scelta è la pura
+`viaEuroScelta`: chi vende sats in euro a prezzo di mercato (di un prezzo
+fisso la cifra si sa solo prendendolo), con SEPA Instant o Satispay, la
+cifra in euro interi più bassa (la ricetta del coordinatore all'indietro,
+mezza commissione a chi compra, mezzo punto di margine sul cambio). Il
+foglio mostra un numero solo e da cosa è fatto, il metodo e «Continua»;
+«Continua» prende l'ordine (`eseguiPresaP2P`), e quando il coordinatore
+chiede la fattura la conia la cassa come deposito lungo
+(`viaEuroDeposito`, metodo giroconto con i suoi `satsMiei`). Il corpo
+dell'acquisto (indirizzo compreso) resta SOLO in memoria. Da lì, in questo
+primo giro, lo scambio prosegue nella sua pagina di sempre (garanzia,
+recapito di chi vende, «Ho inviato»): le schermate semplificate di quei
+passi sono il giro dopo. Provato: `prove_non_hai_sats`, 17 spunte (porte,
+condizioni, niente «paga in euro», il gancio, la scelta in node).
+
+DA FARE PRIMA DI ACCENDERE. 1) Le schermate semplificate dei passi dopo
+«Continua» (attesa, dati per pagare, «Ho pagato», «Riprendi il pagamento»
+sulla card); il caso del prezzo saltato (oggi un avviso: si annulla lo
+scambio dalla sua pagina). 2) La prova: il P2P del collaudo usa il nodo di
 produzione, quindi la `-bar13` va sul nodo (a variabili spente è identica
 alla `-bar12`) e il giroconto si prova con un ordine piccolo, deciso con
 Andrea. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta

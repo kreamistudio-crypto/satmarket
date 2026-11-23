@@ -1223,6 +1223,7 @@ Info P2P
 🌙
 ## Blocca sats a garanzia
  Paga con qualsiasi wallet Lightning. I sats restano bloccati e al sicuro finché non confermi di aver ricevuto l'oggetto.
+Non hai sats? Compra da qui
 lnbc…
 inquadra il QR col wallet, o tocca la invoice per copiarla
 👛 Non hai un wallet? Ti spieghiamo come fare
@@ -1230,6 +1231,7 @@ inquadra il QR col wallet, o tocca la invoice per copiarla
 ⚡ Generane una nuova
 ✓ Ho pagato
 Annulla
+## Non hai sats?
 ## Come vuoi pagare?
 ## ⚡ Compra subito
  Stai per pagare sats
