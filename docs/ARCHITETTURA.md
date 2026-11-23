@@ -38506,6 +38506,33 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `/?assistenza=mia` e i moderatori ricevono «Da preparare la pagina di…»
   (argomento moderazione). Tutto solo con `ASSISTENZA_ATTIVA`. La pagina
   resta un racconto a mano (`racconti.py`).
+  I QUADRATI DEI NEGOZI (23 nov 2026 sera): sul telefono `#scoprireQuadri`
+  sotto la fila grande, disegnati da `renderQuadriScoprire`; la divisione
+  la fa `spartisciScoprire` (dei negozi della fila, nell'ordine del
+  turno, uno si' e uno no va nei quadrati; card nostre e computer: tutte
+  grandi). Foto, categoria e riga «cosa vende» da `GET
+  /api/negozi/vetrina?codici=` (`negozi_vetrina_pubblici`: al piu'
+  `NEGOZI_VETRINA_MAX` codici passati da `_CODICE_NEGOZIO`, la prima foto
+  dell'annuncio attivo piu' recente, la categoria piu' frequente,
+  `in_breve` del racconto solo se pubblicato; mai un tg_id). La riga di
+  casa sta in `RACCONTI[slug].inBreve` (client) e
+  `RACCONTI_NEGOZI[slug]["in_breve"]` (server). L'ordine della home sul
+  ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (senza titolo),
+  `#catSez`, `#lavSez`, `#p2pVetrinaSez`; le pillole si appiccicano solo a
+  `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
+  I quadrati escono solo se sono almeno `QUADRI_MIN` (4), sennò tutti
+  grandi. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,
+  due `<i>` col `.su` che si scambiano): la foto della card al centro,
+  sfocata, messa da `sfondoScoprire` alla fine di `centroScoprire`.
+  LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
+  `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
+  Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);
+  niente piu' `#fasciaTest`. A rodaggio spento `modaleTest` chiama
+  `modaleNotizie`: timbro `notizie` (in `VISTI_NOTI`), ogni
+  `NOTIZIE_OGNI_MS`, chiede `GET /api/me/canale-notizie`
+  (`getChatMember` su `CANALE_NOTIZIE_CHAT`, cache `NOTIZIE_CACHE_S`;
+  `iscritto` vero, falso o null) e non si ripresenta a chi e' iscritto,
+  ne' a chi non si sa se e' gia' stato visto una volta.
 - NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere profilo-mio;
   lo studio `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md`, GRATIS dal
   23 nov). Il «cartellino» vive in nove colonne `mio_*` di `utenti`:

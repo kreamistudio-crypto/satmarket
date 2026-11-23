@@ -95268,3 +95268,95 @@ Profilo, riga del moderatore).
 DA GUARDARE. Non provato su Telegram vero: la foto al moderatore nel gruppo
 admin e il tocco ✅/❌. La moderazione AI resta spenta: oggi decide solo un
 moderatore.
+
+## La home coi quadrati dei negozi sotto «Da scoprire» (23 nov 2026 sera, cantiere scoprire-quadrati; Andrea: «sotto alle card da scoprire, sotto a quella principale, dei quadratini con tutte le altre», «si vede l'anteprima del prodotto, quando ci clicchi sopra si apre il negozio», «l'idea è mostrare chi paga, dappertutto, o nelle card quadrate o nelle card grosse»)
+
+COSA. Sul telefono (sotto i 768px), sotto la card grande di «Da scoprire»,
+una fila di quadrati da 96px, fermi (si scorrono col dito, non da soli):
+uno per negozio, con la foto di un prodotto (la prima dell'annuncio attivo
+più recente, la miniatura `_min`; senza annunci il logo) e sotto SOLO la
+riga «cosa vende», su al più due righe. Il tocco è quello della card
+grande (`toccaScoperta`): apre il negozio. La riga la scriviamo noi
+(decisione di Andrea, «La scriviamo noi»): `inBreve` nel catalogo di casa
+del client, `in_breve` in `racconti.py`; finché non c'è, la categoria dove
+il negozio ha più annunci, e senza nemmeno quella il nome.
+
+GRANDI E QUADRATI SI DIVIDONO I NEGOZI (`spartisciScoprire`). Un negozio
+sta o nella fila grande o nei quadrati, mai in tutte e due: nell'ordine
+del turno (`aTurno`, che avanza di uno a ogni apertura) uno sì e uno no, il
+primo grande. Così chi oggi è quadrato alla prossima apertura è grande.
+Con un negozio solo resta grande; le card nostre (P2P, aste) restano
+grandi; sul computer i quadrati non ci sono e la fila è quella di prima.
+
+L'ORDINE DELLA HOME. «Da scoprire» in cima, senza titolo (basta la
+scritta «Consigliato»), poi «In evidenza», anche lei senza titolo (le card
+hanno l'etichetta), poi «Esplora per categorie» (scesa da sopra), poi gli
+scambi P2P e gli annunci. Le card P2P in home sono larghe 150px come
+quelle in evidenza (erano più larghe). Con le categorie più in basso le
+pillole si appiccicavano subito all'apertura (la sezione sotto lo schermo
+non interseca): ora solo a sezione passata in alto. Fra i quadrati e «In evidenza»
+30px sotto i quadrati, il respiro che prima faceva il titolo (sì di Andrea).
+LO SFONDO DIETRO: card grande e quadrati stanno sulla foto della card al
+centro, sfocata e smorzata (`.sc-sfondo`, due strati `<i>` che si passano
+la mano in 1s quando la card al centro cambia, `sfondoScoprire` chiamata
+da `centroScoprire`; blur 44px, saturazione 1, luminosità .6 col tema
+scuro, 1.15 col chiaro, lo strato al 55%), che negli ultimi 50px sfuma
+nella pagina. La strada è stata lunga: un velo scuro (no), una fascia
+arancio (no), quattro tinte neutre («sono morti 'sti colori»), poi la foto
+sfocata ma troppo viva («creano troppo casino»), infine questa: «Ottimo,
+così è perfetto». La riga scura fra card grande e quadrati era l'ombra
+della card al centro tagliata dal bordo della fila: ombra più corta e
+fila con più spazio sotto.
+
+ALMENO QUATTRO QUADRATI (`QUADRI_MIN`): sotto i quattro la fila resta
+mezza vuota (Andrea: «non mi piace che lasci vuoti»), e allora tutti i
+negozi tornano grandi. Con la divisione uno sì e uno no servono otto
+negozi di chi paga.
+
+NELLO STESSO CANTIERE, LA TESTA DELLA HOME (Andrea: «leva via quel
+banner», «un toggle con un'icona dedicata che porta al canale ufficiale
+di barattolo per le notizie», «quel toggle lì della classifica lo metti
+nel profilo»). (1) La fascia «Barattolo è in fase di test» è tolta dal
+codice (`#fasciaTest`, `renderFasciaTest`); `fasciaPrima` disegna solo
+la riga di Tor. (2) Al posto del podio in testa, un megafono
+(`.notizie-testa`, `apriNotizie`) che apre https://t.me/barattolostore.
+(3) La classifica del mercatino va nel Profilo sotto «Classifica Streak»:
+«Il Podio di Barattolo» (`mercatoClassificaPortaHTML`, stesso disegno del
+podio, solo con la leva della classifica accesa, mai in demo o vetrina;
+Andrea: «Il podio di barattolo mi piace»). (4) Il cartello giornaliero
+del rodaggio si spegne dal config del VPS (`BANNER_TEST = False`,
+DA-FARE-ANDREA 32: «spegnilo dalla lista»); a rodaggio spento
+`modaleTest` passa a `modaleNotizie`, il riquadro che invita nel canale
+delle notizie: alla prima apertura prima del tour, che parte alla sua
+chiusura (Andrea: «La prima cosa che uno vede è il riquadro»), poi al
+più ogni 3 giorni (decisione di Andrea,
+«Ogni 3 giorni»; timbro `notizie` in `VISTI_NOTI`), e mai più a chi è
+già nel canale. Lo dice `GET /api/me/canale-notizie` col `getChatMember`
+del bot (che Andrea ha fatto admin di @barattolostore), con cache di 6
+ore; se il bot non risponde, o per chi entra solo con Nostr, il riquadro
+esce una volta sola.
+
+IL SERVER. `GET /api/negozi/vetrina?codici=` (`negozi_vetrina_pubblici`):
+codici pubblici passati dalla forma, al più 16, per ognuno foto,
+categoria e `in_breve` (solo a pagina pubblicata: la bozza non esce). Mai
+un tg_id. Un guasto dà un dizionario vuoto e i quadrati restano col logo.
+
+SCARTATE. Il bordino arancio sul quadrato del negozio che è nella card
+grande: fatto e tolto (Andrea, «sotto non si deve evidenziare il
+quadrato»), e con la divisione non avrebbe più senso. Quadrati che
+scorrono da soli: Andrea li ha voluti fermi («si anima già la card
+sopra»). Il nome del negozio sotto il quadrato: tolto, resta solo «cosa
+vende» (il nome va a chi legge ad alta voce, `aria-label`).
+
+PROVATO. `prove_promozioni` 7c: il contenitore, il CSS solo telefono, i
+96px e le due righe, i quadrati girati in node (la riga da catalogo,
+server o categoria; miniatura o logo; niente quadrato senza codice
+buono), la divisione girata in node (uno sì e uno no, un negozio solo,
+il turno dopo, il computer), la funzione del server in un db finto, la
+rotta, i 150px, i due titoli tolti, lo sfondo girato in node, l'ombra
+che sta nella fila, i quattro quadrati minimi; l'ordine nuovo e le
+pillole nelle prove di sempre. `prove_barattolo_in_striscia` 7: il
+megafono, il Podio, la fascia morta, `modaleNotizie` e la sua rotta. Guardato con
+Playwright a 390px, video e foto mandati ad Andrea (anche con i due
+negozi veri di oggi, AndreAI e To The Moon).
+RESTA: dopo il deploy, `BANNER_TEST = False` sul VPS (DA-FARE-ANDREA 32).
