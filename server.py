@@ -12209,6 +12209,13 @@ def init_db():
         con.execute("ALTER TABLE ordini ADD COLUMN prova INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # LA FATTURA LUNGA (23 nov 2026, giroconto interno): quando scade il
+    # deposito pagato in euro nel P2P. 0 = la fattura di sempre.
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN fattura_scade "
+                    "INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # Riallineamento quantita (lug 2026, idempotente a ogni avvio):
     # l'invariante venduto <=> quantita=0 vale anche sul pregresso
     # (i venduti di ieri sono nati col DEFAULT 1) e ripara gli
@@ -17297,6 +17304,36 @@ try:
     from config import GIROCONTO_TETTO_SATS
 except ImportError:
     GIROCONTO_TETTO_SATS = 150_000
+# LA FATTURA LUNGA del deposito che si salda col giroconto: Mostro vuole
+# da chi compra sats una fattura con almeno un'ora di vita davanti (il
+# suo `invoice_expiration_window`, 3600 sul nodo), e fra la presa e il
+# rilascio di Luca ci stanno il bonifico e il suo «ricevuto». Quattro
+# ore, scritte nella colonna `fattura_scade` dell'ordine (0 = la fattura
+# di sempre, 15 minuti). Dove il codice contava «un 'creato' e' vivo
+# per mezz'ora dalla nascita» ora conta ANCHE «...o finche' la sua
+# fattura lunga non e' scaduta da un quarto d'ora»: prenotazione dello
+# stock, ferie, chiusura dell'account, usi del codice sconto, lapidi.
+GIROCONTO_FATTURA_SECONDI = 4 * 3600
+# La ripresa al secondo tocco: si ripresenta la fattura di prima solo se
+# ha ancora piu' dell'ora che Mostro pretende, piu' dieci minuti di
+# margine per i passi in mezzo; sennò se ne fa una nuova.
+GIROCONTO_RIPRESA_MIN_S = 3600 + 600
+# LA CIFRA LA DECIDE MOSTRO: la fattura che chiede a chi compra e' per i
+# sats esatti dello scambio meno la commissione, calcolati da lui alla
+# presa. Il deposito nasce per QUELLA cifra, purche' copra l'ordine e lo
+# superi al massimo dell'1% (l'arrotondamento, che va a chi vende: deciso
+# il 23 nov 2026); di meno = non basta, e il telefono riprova con qualche
+# centesimo in piu' prima che chi compra abbia pagato niente.
+GIROCONTO_AVANZO_PERCENTO = 1
+
+
+def giroconto_cifra_giusta(totale: int, sats: int) -> bool:
+    """I sats che Mostro chiede vanno bene per un ordine da `totale`?
+    Mai meno, e al massimo l'1% in piu' (almeno 10 sats di tolleranza,
+    che sui piccoli importi l'1% e' meno di un arrotondamento)."""
+    if isinstance(sats, bool) or not isinstance(sats, int) or totale <= 0:
+        return False
+    return totale <= sats <= totale + max(10, totale * GIROCONTO_AVANZO_PERCENTO // 100)
 
 
 def giroconto_attivo() -> bool:
@@ -46476,8 +46513,8 @@ def _impegni_aperti(con, tg_id: int) -> list:
     #    (la soglia di _riservati: vita della invoice + reaper).
     n = con.execute(
         "SELECT COUNT(*) AS n FROM ordini WHERE venditore_id=? AND "
-        "stato='creato' AND creato>=?",
-        (tg_id, adesso - 1800)).fetchone()["n"]
+        "stato='creato' AND (creato>=? OR COALESCE(fattura_scade,0)>=?)",
+        (tg_id, adesso - 1800, adesso - 900)).fetchone()["n"]
     if n:
         voci.append(f"{n} pagament{'o' if n == 1 else 'i'} in corso: "
                     f"aspetta qualche minuto e riprova")
@@ -46505,10 +46542,13 @@ def _riservati(con, annuncio_id: int) -> int:
     le righe dei set 'creato' freschi — due query e non una UNION,
     cosi' la prima resta sull'indice caldo idx_ordini_annuncio."""
     soglia = int(time.time()) - 1800
+    # ...o la fattura lunga del giroconto ancora viva (vedi
+    # GIROCONTO_FATTURA_SECONDI): solo i mono, il giroconto non fa set
     mono = con.execute(
         "SELECT COALESCE(SUM(quantita),0) AS n FROM ordini "
-        "WHERE annuncio_id=? AND stato='creato' AND creato>=?",
-        (annuncio_id, soglia)).fetchone()["n"]
+        "WHERE annuncio_id=? AND stato='creato' AND "
+        "(creato>=? OR COALESCE(fattura_scade,0)>=?)",
+        (annuncio_id, soglia, soglia + 900)).fetchone()["n"]
     nei_set = con.execute(
         "SELECT COALESCE(SUM(r.quantita),0) AS n FROM ordine_righe r "
         "JOIN ordini o ON o.id=r.ordine_id "
@@ -46535,7 +46575,10 @@ def _riservati(con, annuncio_id: int) -> int:
 # Il frammento e' una COSTANTE perche' lo condividono la cassa e la
 # lista del venditore: scritto due volte e' il posto esatto in cui i
 # due direbbero due numeri diversi sullo stesso codice.
-USI_CODICE_DOVE = ("stato<>'annullato' AND (stato<>'creato' OR creato>=?)")
+# Due segnaposto dal 23 nov 2026: la mezz'ora dalla nascita, e la fattura
+# lunga del giroconto ancora viva (vedi GIROCONTO_FATTURA_SECONDI).
+USI_CODICE_DOVE = ("stato<>'annullato' AND (stato<>'creato' OR "
+                   "creato>=? OR COALESCE(fattura_scade,0)>=?)")
 
 
 def _usi_codice(con, codice_id: int) -> int:
@@ -46567,7 +46610,7 @@ def _usi_codice(con, codice_id: int) -> int:
     return con.execute(
         f"SELECT COUNT(*) AS n FROM ordini "
         f"WHERE codice_sconto_id=? AND {USI_CODICE_DOVE}",
-        (codice_id, soglia)).fetchone()["n"]
+        (codice_id, soglia, soglia + 900)).fetchone()["n"]
 
 
 def _codice_sconto(con, venditore_id: int, codice: str,
@@ -48761,6 +48804,22 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         if not d.get("annuncio_id"):
             raise HTTPException(400, "On-chain per ora si compra un "
                                      "oggetto alla volta")
+    # IL GIROCONTO (23 nov 2026): il deposito che pagheranno i sats di un
+    # venditore P2P, dentro il nodo (vedi «IL GIROCONTO INTERNO»). Stessa
+    # cassa e stessi controlli; cambia solo la VITA della fattura, lunga
+    # quanto serve a Mostro (GIROCONTO_FATTURA_SECONDI). Un oggetto alla
+    # volta, come l'on-chain. Il no qui sotto non lo vede nessuno dalla
+    # app (il metodo lo chiede solo la sua schermata, a porta aperta): e'
+    # la cintura per il body scritto a mano.
+    giroconto = d.get("metodo") == "giroconto"
+    if giroconto and (not giroconto_attivo() or not d.get("annuncio_id")):
+        raise HTTPException(400, "Giroconto non disponibile")
+    # ...e la cifra che Mostro ha chiesto (vedi giroconto_cifra_giusta)
+    sats_giroconto = d.get("sats_giroconto") if giroconto else 0
+    if giroconto and (isinstance(sats_giroconto, bool)
+                      or not isinstance(sats_giroconto, int)
+                      or sats_giroconto <= 0):
+        raise HTTPException(400, "Giroconto non disponibile")
     # Il SET (lug 2026): col body a righe si passa dal ramo dedicato;
     # con annuncio_id tutto e' l'acquisto di sempre, byte per byte.
     if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
@@ -49118,7 +49177,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   and (mio["codice_sconto"] or "") == cod_nome
                   and (legame["id"] if legame else 0)
                   == int(d.get("offerta_id") or 0))
-        viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
+        # IL GIROCONTO NON SI MESCOLA (23 nov 2026): la fattura lunga si
+        # ripresenta solo a chi chiede di nuovo il giroconto, e solo se
+        # le resta piu' dell'ora che Mostro pretende; la fattura di
+        # sempre solo a chi paga come sempre.
+        scade = (mio["fattura_scade"] or 0) if "fattura_scade" in mio.keys() else 0
+        stessa = (stessa and bool(scade) == giroconto
+                  and (not giroconto or mio["prezzo_sats"] == sats_giroconto))
+        if giroconto:
+            viva = scade - int(time.time()) >= GIROCONTO_RIPRESA_MIN_S
+        else:
+            viva = mio["creato"] >= int(time.time()) - RIPRESA_INVOICE_S
         if stessa and viva and mio["invoice"]:
             # L'INDIRIZZO NON ENTRA NEL CONFRONTO QUI SOPRA, e non e'
             # una svista: Fernet non e' deterministico (IV casuale a
@@ -49617,8 +49686,23 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             raise HTTPException(409, f"Sopra {onchain_solo_soglia()} € si "
                                      "paga solo on-chain.")
     cf = cassaforte_nuova()
+    # IL GIROCONTO vive solo sulla cassaforte nodo (la riserva sta li') e
+    # sotto il suo tetto in sats: fuori, la cintura del body a mano
+    if giroconto and (cf != CASSAFORTE_NODO
+                      or sats_giroconto > GIROCONTO_TETTO_SATS):
+        con.close()
+        raise HTTPException(400, "Giroconto non disponibile")
+    # ...e il deposito nasce per la cifra di Mostro, se copra l'ordine:
+    # l'avanzo entra nel totale e va a chi vende (prezzo_sats meno
+    # spedizione e protezione e' la sua parte)
+    if giroconto:
+        if not giroconto_cifra_giusta(totale, sats_giroconto):
+            con.close()
+            raise HTTPException(409, "Giroconto: cifra fuori misura")
+        totale = sats_giroconto
     inv = await crea_invoice_escrow(
         totale, f"Barattolo escrow #{a['id']}: {a['titolo'][:40]}",
+        expiry=GIROCONTO_FATTURA_SECONDI if giroconto else INVOICE_EXPIRY,
         cassaforte=cf)
     # Il ricontrollo che fa fede (patto mono-processo: da qui all'INSERT
     # nessun await, il blocco e' atomico). Durante l'attesa della
@@ -49739,6 +49823,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     if _indirizzo_confermato(d, ind):
         con.execute("UPDATE ordini SET indirizzo_confermato_il=? "
                     "WHERE id=?", (int(time.time()), ordine_id))
+    # LA FATTURA LUNGA del giroconto: stessa transazione, stesso patto
+    if giroconto:
+        con.execute("UPDATE ordini SET fattura_scade=? WHERE id=?",
+                    (int(time.time()) + GIROCONTO_FATTURA_SECONDI,
+                     ordine_id))
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
         # finestra in cui l'uno esiste senza l'altro.
@@ -62063,7 +62152,8 @@ async def lista_codici_sconto(x_tg_init_data: str = Header(""),
                 f"SELECT codice_sconto_id AS cid, COUNT(*) AS n FROM ordini "
                 f"WHERE codice_sconto_id IN ({segni}) AND {USI_CODICE_DOVE} "
                 f"GROUP BY codice_sconto_id",
-                [r["id"] for r in righe] + [int(time.time()) - 1800]):
+                [r["id"] for r in righe] + [int(time.time()) - 1800,
+                                            int(time.time()) - 900]):
             usi[u["cid"]] = u["n"]
     con.close()
     adesso = int(time.time())
@@ -96505,11 +96595,15 @@ def pulisci_ordini_fantasma(con):
     # Copre anche gli 'annullato' storici di aste e rimozioni: mai
     # pagati per costruzione, stessa pulizia del reaper.
     soglia_lapidi = int(time.time()) - 3600
+    # ...e la lapide di una fattura LUNGA (il giroconto, 4 ore) resta
+    # finche' quella fattura e' viva, piu' la stessa ora di margine
     con.execute("DELETE FROM ordine_righe WHERE ordine_id IN "
                 "(SELECT id FROM ordini WHERE stato='annullato' "
-                "AND aggiornato < ?)", (soglia_lapidi,))
+                "AND aggiornato < ? AND COALESCE(fattura_scade,0) < ?)",
+                (soglia_lapidi, soglia_lapidi))
     con.execute("DELETE FROM ordini WHERE stato='annullato' "
-                "AND aggiornato < ?", (soglia_lapidi,))
+                "AND aggiornato < ? AND COALESCE(fattura_scade,0) < ?",
+                (soglia_lapidi, soglia_lapidi))
     # E le lapidi delle fatture di puntata (vita 10 min, soglia 2x come
     # per gli ordini): utili finche' la fattura puo' ancora essere
     # pagata — vedi controlla_annullati. Via con loro la puntata mai
@@ -97772,7 +97866,8 @@ async def controlla_annullati():
     con = db()
     ordini = [dict(r) for r in con.execute(
         "SELECT id, payment_hash, cassaforte FROM ordini WHERE stato='annullato' "
-        "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
+        "AND payment_hash != '' AND (creato >= ? OR "
+        "COALESCE(fattura_scade,0) >= ?)", (adesso - 1800, adesso - 900))]
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='annullato' AND creato >= ?",
         (adesso - RILANCIO_STANTIO,))]
@@ -130187,9 +130282,10 @@ def _impegni_cancellazione(con, tg_id: int) -> list:
         voci.append(f"{n} pagament{'o' if n == 1 else 'i'} di un ordine "
                     f"ancora in viaggio: aspetta che arrivi")
     n = con.execute(
-        "SELECT COUNT(*) FROM ordini WHERE stato='creato' AND creato>=? "
+        "SELECT COUNT(*) FROM ordini WHERE stato='creato' AND "
+        "(creato>=? OR COALESCE(fattura_scade,0)>=?) "
         "AND (compratore_id=? OR venditore_id=?)",
-        (adesso - 1800, tg, tg)).fetchone()[0]
+        (adesso - 1800, adesso - 900, tg, tg)).fetchone()[0]
     if n:
         voci.append(f"{n} pagament{'o' if n == 1 else 'i'} in corso: "
                     f"aspetta qualche minuto e riprova")
