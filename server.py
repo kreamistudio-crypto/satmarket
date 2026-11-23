@@ -10107,6 +10107,29 @@ def init_db():
                     # dice ogni volta il giudice (`_nip05_chiave_hex`).
                     # Unicita' dell'applicazione, come `negozio_slug`.
                     "nip05_nome TEXT DEFAULT ''",
+                    # NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere
+                    # profilo-mio; lo studio del 6 ott, GRATIS per decisione
+                    # di Andrea del 23 nov): il «cartellino» che l'utente
+                    # appende alla bancarella, timbrato da un moderatore.
+                    # `mio_nome`/`mio_foto` sono quelli APPROVATI, le due
+                    # `_att` la proposta in attesa (il vivo resta esposto
+                    # finche' il nuovo non e' approvato, il patto del
+                    # banner). Stato: '' mai chiesto | revisione |
+                    # approvato | rifiutato | tolto. `mio_nome_prima` e' il
+                    # nome che c'era prima del cartellino: torna quando lo
+                    # si lascia e non c'e' un Telegram fresco a ridirlo.
+                    # Le letture del resto del server non si toccano:
+                    # applicato, il cartellino si scrive in `nome` e
+                    # `avatar`, e `avatar_scelta='mia'` lo tiene li'.
+                    "mio_nome TEXT DEFAULT ''",
+                    "mio_foto TEXT DEFAULT ''",
+                    "mio_nome_att TEXT DEFAULT ''",
+                    "mio_foto_att TEXT DEFAULT ''",
+                    "mio_stato TEXT DEFAULT ''",
+                    "mio_motivo TEXT DEFAULT ''",
+                    "mio_chiesto_il INTEGER DEFAULT 0",
+                    "mio_approvato_il INTEGER DEFAULT 0",
+                    "mio_nome_prima TEXT DEFAULT ''",
                     # L'INTERRUTTORE DEGLI AVVISI P2P (16 set 2026): 1 =
                     # accesi, di serie. Chi lo spegne non riceve NIENTE
                     # dello scambio, ne' la frase precisa ne' la generica
@@ -12406,7 +12429,10 @@ def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
     decine per sessione. In automatico ('') e per chi ha scelto
     'telegram'/'nessuna' vince sempre Telegram, com'e' sempre stato:
     e' la stessa precedenza gia' scritta per la foto in
-    aggiorna_profilo_social. `username` non ha questa preferenza —
+    aggiorna_profilo_social. Lo stesso vale per 'mia' (23 nov 2026, il
+    nome scelto su Barattolo e approvato da un moderatore): senza, la
+    richiesta dopo l'approvazione lo ricancellerebbe. `username` non ha
+    questa preferenza —
     Nostr non ne ha uno equivalente — e si aggiorna sempre.
 
     CHI RIENTRA DOPO ESSERSI CANCELLATO (1 nov 2026, cantiere
@@ -12419,7 +12445,8 @@ def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
         "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
         "VALUES(?,?,?,?,?) "
         "ON CONFLICT(tg_id) DO UPDATE SET "
-        "nome=CASE WHEN avatar_scelta='nostr' THEN nome ELSE excluded.nome END, "
+        "nome=CASE WHEN avatar_scelta IN ('nostr','mia') THEN nome "
+        "ELSE excluded.nome END, "
         "username=excluded.username",
         (tg_id, nome, username, int(time.time()), nuovo_codice_negozio(con)))
     if nuovo:
@@ -23096,6 +23123,19 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         if _sbl_n and (not _sbl_p or _sbl_n < _sbl_p):
             con.execute("UPDATE utenti SET banner_sbloccato_il=? "
                         "WHERE tg_id=?", (_sbl_n, id_telegram))
+        # IL NOME E LA FOTO SCELTI SU BARATTOLO (23 nov 2026) passano
+        # solo se di la' non ce n'e' gia' un cartellino approvato: come
+        # il nome NIP-05, quello di Telegram resta. Si porta il
+        # cartellino, non la scelta: si rientra su «mia» dal selettore,
+        # senza nuova revisione. Una proposta in attesa della meta'
+        # Nostr muore con la sua riga (si ripropone).
+        if n and "mio_nome" in n.keys() and n["mio_nome"]:
+            con.execute(
+                "UPDATE utenti SET mio_nome=?, mio_foto=?, "
+                "mio_approvato_il=?, mio_stato='approvato', "
+                "mio_nome_prima=nome WHERE tg_id=? AND mio_nome=''",
+                (n["mio_nome"], n["mio_foto"] or "",
+                 n["mio_approvato_il"] or 0, id_telegram))
         # IL NOME VERIFICATO SU NOSTR (17 nov 2026) passa solo se di la'
         # non ce n'e' gia' uno: quello di Telegram resta.
         if n and "nip05_nome" in n.keys() and n["nip05_nome"]:
@@ -24654,6 +24694,9 @@ async def gestisci_callback(cb: dict):
     if azione == "ban":
         # la tastiera ✅/❌ del banner del negozio (solo moderatori)
         return await callback_banner(cb, token)
+    if azione == "pm":
+        # la tastiera ✅/❌ del nome e della foto scelti (solo moderatori)
+        return await callback_profilo_mio(cb, token)
     if azione == "entra":
         # le figure dell'ingresso dal bot (ENTRA DAL BOT)
         return await callback_ingresso_bot(cb, token)
@@ -39647,6 +39690,19 @@ def _leve_stato():
                          "restano salvati"),
             _leva("...gratis dal livello", "NIP05_UTENTI_LIVELLO",
                   NIP05_UTENTI_LIVELLO or "(storto: porta chiusa)"),
+        ]},
+        {"gruppo": "✏️ Nome e foto scelti su Barattolo", "voci": [
+            # NOME E FOTO SCELTI (23 nov 2026, cantiere profilo-mio):
+            # gratis, accesa di serie, nessun segreto
+            _leva("Nome e foto scelti dall'utente", "PROFILO_MIO_ATTIVO",
+                  bool(PROFILO_MIO_ATTIVO),
+                  acceso="nel Profilo si propongono nome e foto; li "
+                         "approva un moderatore, poi valgono su tutto "
+                         "Barattolo",
+                  spento="niente proposte e niente quarta scelta; chi ha "
+                         "gia' un nome approvato lo tiene"),
+            _leva("...un cambio ogni (giorni)", "PROFILO_MIO_GIORNI",
+                  PROFILO_MIO_GIORNI),
         ]},
         {"gruppo": "🔥 Serie dei giorni", "voci": [
             # LA SERIE DEI GIORNI (17 nov 2026, cantiere serie-giorni):
@@ -54855,13 +54911,29 @@ def _scrivi_avatar(tg_id: int, nome_nuovo: str):
     avatar_aggiornato si segna comunque: niente ritentativi a raffica
     per chi una foto non ce l'ha proprio."""
     con = db()
-    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
-                    (tg_id,)).fetchone()
+    r = con.execute("SELECT avatar, mio_foto, mio_foto_att FROM utenti "
+                    "WHERE tg_id=?", (tg_id,)).fetchone()
     vecchio = r["avatar"] if r else ""
-    con.execute("UPDATE utenti SET avatar=?, avatar_aggiornato=? "
-                "WHERE tg_id=?", (nome_nuovo, int(time.time()), tg_id))
+    # IL CARTELLINO NON SI SCAVALCA (23 nov 2026, profilo-mio): un giro
+    # del social partito PRIMA dell'approvazione puo' finire DOPO, e
+    # scriverebbe la foto di Telegram sopra quella appena approvata. La
+    # condizione sta nell'UPDATE, cioe' nel momento in cui si scrive, e
+    # non in una lettura di prima che puo' essere gia' vecchia.
+    scritte = con.execute(
+        "UPDATE utenti SET avatar=?, avatar_aggiornato=? "
+        "WHERE tg_id=? AND avatar_scelta!='mia'",
+        (nome_nuovo, int(time.time()), tg_id)).rowcount
     con.commit()
     con.close()
+    if not scritte:
+        # la foto appena scaricata non e' di nessuno: via subito
+        if nome_nuovo and nome_nuovo != vecchio:
+            _togli_banner_file(nome_nuovo)
+        return
+    # ...e i file del cartellino restano: la foto approvata (e quella in
+    # attesa) torna quando si rientra su «mia», senza nuova revisione
+    if r and vecchio in (r["mio_foto"], r["mio_foto_att"]):
+        vecchio = ""
     if vecchio and vecchio != nome_nuovo:
         # Col francobollo vecchio se ne va anche la _min che gli avatar
         # non avrebbero mai dovuto avere (ago 2026): finche' la passata
@@ -55070,8 +55142,10 @@ def _scrivi_nome_nostr(tg_id: int, nome: str):
     if not nome:
         return
     con = db()
-    con.execute("UPDATE utenti SET nome=? WHERE tg_id=? AND nome!=?",
-                (nome, tg_id, nome))
+    # (23 nov 2026) mai sopra il nome scelto su Barattolo: vedi
+    # `_scrivi_avatar`, stessa corsa e stessa cura
+    con.execute("UPDATE utenti SET nome=? WHERE tg_id=? AND nome!=? "
+                "AND avatar_scelta!='mia'", (nome, tg_id, nome))
     con.commit()
     con.close()
 
@@ -55112,6 +55186,17 @@ async def aggiorna_profilo_social(tg_id: int):
         if not u or not u["negozio"]:
             return
         scelta = u["avatar_scelta"]
+        if scelta == "mia":
+            # NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026): qui non c'e'
+            # niente da prendere dal social — ne' il nome, nemmeno per un
+            # nativo Nostr, ne' la faccia. Si timbra il giro, o si
+            # rifarebbe a ogni apertura.
+            con = db()
+            con.execute("UPDATE utenti SET avatar_aggiornato=? "
+                        "WHERE tg_id=?", (int(time.time()), tg_id))
+            con.commit()
+            con.close()
+            return
         npub = u["npub_accesso"] or \
             (u["npub"] if u["npub_verificata"] else "")
         # Un solo giro sui relay per il nome e per la faccia. None = i
@@ -55918,6 +56003,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # a leva accesa; null = il client non disegna niente
     profilo["nip05"] = nip05_stato(u) if (NIP05_UTENTI_ATTIVO and u) \
         else None
+    # NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026): le colonne `mio_*`
+    # escono gia' con la riga; qui la leva e da quando si puo' cambiare
+    profilo["profilo_mio"] = {
+        "attivo": PROFILO_MIO_ATTIVO, "giorni": PROFILO_MIO_GIORNI,
+        "prossimo": mio_prossimo_cambio(u["mio_approvato_il"] or 0)
+        if u else 0}
     # LE RACCOLTE IN SATS (17 nov 2026): la voce nel Profilo e la tessera
     # in vetrina solo a leva accesa; la tessera solo se ce n'e' almeno una
     # viva (una porta su un elenco vuoto e' un bottone che porta a un muro)
@@ -60168,6 +60259,559 @@ async def decidi_banner_admin(tg_id: int, req: Request,
     return {"ok": True, "detto": testo}
 
 
+# --- NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere profilo-mio) ---
+# La richiesta di un utente entrato con Nostr, e la decisione di Andrea
+# («implementiamo ora la possibilita' di customizzare la foto, e di
+# mettere il nome umano sul mercatino, mantenendo l'uso del profilo
+# Nostr»). Il disegno e' quello dello studio del 6 ott
+# (docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md) con UNA differenza
+# decisa il 23 nov: e' GRATIS — niente fattura, niente porta da
+# comprare, niente rimborsi. Restano il moderatore PRIMA della
+# pubblicazione (la moderazione AI e' ferma, e una foto la guarda
+# solo un occhio), un cambio approvato ogni PROFILO_MIO_GIORNI, le
+# regole del nome (niente emoji, niente parole dello staff, niente
+# sosia) e l'avviso a chi ha un ordine aperto con lui.
+# LA METAFORA: Barattolo fotocopia il documento che sta altrove
+# (Telegram, il kind-0); con questo l'utente appende alla bancarella
+# un CARTELLINO scritto da lui e timbrato da un moderatore. Il kind-0,
+# la npub, il login Nostr e Mostro non si toccano: il cartellino vale
+# solo dentro Barattolo.
+# COME SI APPLICA: approvato, si scrive in `utenti.nome` e
+# `utenti.avatar` con `avatar_scelta='mia'` — le ~70 letture del
+# server e la decina del client non sanno niente del cartellino, e le
+# due porte che riscrivono (`_upsert_da_telegram`, il giro del social)
+# rispettano 'mia' come gia' rispettavano 'nostr'.
+# LA LEVA: PROFILO_MIO_ATTIVO, accesa di serie (la regola delle leve
+# nuove). Spenta: niente proposte e niente quarta scelta; chi ha gia'
+# il cartellino lo tiene, e puo' sempre tornare a Telegram o Nostr.
+try:
+    from config import PROFILO_MIO_ATTIVO
+except ImportError:
+    PROFILO_MIO_ATTIVO = True
+PROFILO_MIO_ATTIVO = bool(PROFILO_MIO_ATTIVO)
+try:
+    from config import PROFILO_MIO_GIORNI
+except ImportError:
+    PROFILO_MIO_GIORNI = 30
+try:
+    PROFILO_MIO_GIORNI = max(0, int(PROFILO_MIO_GIORNI))
+except (TypeError, ValueError):
+    PROFILO_MIO_GIORNI = 30
+# i SOSIA PROTETTI (decisione 7 del 6 ott): lo staff, i Consigliati e
+# chi ha venduto almeno questo numero di volte
+PROFILO_MIO_SOSIA_VENDITE = 10
+NOME_MIO_MIN, NOME_MIO_MAX = 3, 30
+MSG_MIO_SPENTO = "Il nome e la foto a scelta non sono attivi al momento"
+MSG_MIO_NON_APPROVATO = ("Prima scegli il tuo nome e la tua foto: li "
+                         "guarda un moderatore")
+# LA FORMA DEL NOME: lettere latine (con le accentate), cifre, spazio
+# e . - ' _ — NIENTE EMOJI (decisione 6) ne' altri alfabeti, che e'
+# anche quel che chiude i sosia di un carattere (la «а» cirillica,
+# identica alla «a» latina). L'intervallo À-ÿ salta × e ÷.
+_NOME_MIO_FORMA = re.compile(r"[A-Za-z0-9À-ÖØ-ö"
+                             r"ø-ÿ .'_-]+")
+# il camuffamento piu' comune: «4dm1n», «$taff», «m0deratore»
+_NOME_MIO_LEET = str.maketrans("01345789@$", "oieastgbas")
+# PAROLE DELLO STAFF, cercate DENTRO il nome compattato (senza spazi
+# ne' segni): un nome non descrive un oggetto, dichiara chi sei — e
+# «Barattolo» qui vale anche se e' un vaso di vetro.
+NOME_MIO_VIETATE = ("barattolo", "barattozon", "admin", "amministrator",
+                    "moderator", "moderatric", "staff", "supporto",
+                    "support", "assistenza", "helpdesk", "ufficiale",
+                    "official", "mostro", "tappo")
+# ...e le CORTE, solo come parola intera: «mod» dentro «Modena» no
+NOME_MIO_VIETATE_PAROLA = ("mod", "team")
+
+
+def _nome_mio_parole(nome: str) -> list:
+    """Il nome in parole normalizzate e smascherate: minuscole, senza
+    accenti, i numeri-lettera rimessi a lettera, i segni a spazio."""
+    t = unicodedata.normalize("NFKD", (nome or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = t.translate(_NOME_MIO_LEET)
+    return re.findall(r"[a-z0-9]+", t)
+
+
+def nome_mio_compatto(nome: str) -> str:
+    """La forma su cui si confrontano i sosia e si cercano le parole:
+    «Bottega  del-Riuso» e «bottegadelriuso» sono lo stesso nome."""
+    return "".join(_nome_mio_parole(nome))
+
+
+def nome_mio_forma(nome) -> tuple[str, str]:
+    """(nome pulito, '') o ('', motivo). Solo la FORMA e le parole
+    vietate: pura, si tortura in CI. I sosia li guarda
+    `giudica_nome_mio`, che ha bisogno del database."""
+    nome = " ".join(str(nome or "").split())
+    if len(nome) < NOME_MIO_MIN or len(nome) > NOME_MIO_MAX:
+        return "", (f"Il nome deve avere da {NOME_MIO_MIN} a "
+                    f"{NOME_MIO_MAX} caratteri")
+    if not _NOME_MIO_FORMA.fullmatch(nome):
+        return "", ("Nel nome solo lettere, numeri, spazi e . - ' _ "
+                    "(niente emoji)")
+    compatto = nome_mio_compatto(nome)
+    # la lettera si cerca PRIMA di smascherare i numeri: «123 456»
+    # smascherato diventerebbe «iea asg»
+    if not re.search(r"[a-z]", normalizza(nome)):
+        return "", "Il nome deve contenere almeno una lettera"
+    parole = _nome_mio_parole(nome)
+    if any(v in compatto for v in NOME_MIO_VIETATE) or \
+            any(v in parole for v in NOME_MIO_VIETATE_PAROLA):
+        return "", ("Questo nome non si può usare: ricorda lo staff di "
+                    "Barattolo")
+    if termine_vietato(nome, ""):
+        return "", "Questo nome non si può usare"
+    return nome, ""
+
+
+def _nomi_protetti(con, tg_id: int) -> set:
+    """I nomi (compattati) che nessun altro puo' prendere: lo staff, i
+    negozi Consigliati (quelli del catalogo e quelli promossi) e chi ha
+    venduto almeno PROFILO_MIO_SOSIA_VENDITE volte. Sempre senza se
+    stesso: chi ha gia' quel nome resta libero di tenerlo."""
+    ids = set(_ids_staff())
+    try:
+        codici = [c["negozio"] for c in consigliati_pubblici(con)]
+    except Exception:
+        codici = []
+    for cod in codici:
+        r = con.execute("SELECT tg_id FROM utenti WHERE negozio=?",
+                        (cod,)).fetchone()
+        if r:
+            ids.add(r["tg_id"])
+    ids.update(r[0] for r in con.execute(
+        "SELECT tg_id FROM utenti WHERE promo_consigliato=1"))
+    ids.update(r[0] for r in con.execute(
+        "SELECT venditore_id FROM ordini WHERE stato='released' AND prova=0 "
+        "GROUP BY venditore_id HAVING COUNT(*)>=?",
+        (PROFILO_MIO_SOSIA_VENDITE,)))
+    ids.discard(tg_id)
+    if not ids:
+        return set()
+    fuori = set()
+    lista = list(ids)
+    for i in range(0, len(lista), 500):
+        pezzo = lista[i:i + 500]
+        for r in con.execute(
+                "SELECT nome, mio_nome FROM utenti WHERE tg_id IN "
+                f"({','.join('?' * len(pezzo))})", pezzo):
+            for n in (r["nome"], r["mio_nome"]):
+                c = nome_mio_compatto(n or "")
+                if c:
+                    fuori.add(c)
+    return fuori
+
+
+def giudica_nome_mio(con, tg_id: int, nome) -> tuple[str, str]:
+    """La forma, le parole e i sosia: (nome, '') o ('', motivo). La
+    macchina ferma i casi netti PRIMA del moderatore; il resto lo
+    giudica lui."""
+    nome, motivo = nome_mio_forma(nome)
+    if not nome:
+        return "", motivo
+    if nome_mio_compatto(nome) in _nomi_protetti(con, tg_id):
+        return "", ("Questo nome è troppo simile a quello di un altro "
+                    "venditore")
+    return nome, ""
+
+
+def mio_prossimo_cambio(approvato_il: int) -> int:
+    """Da quando si puo' proporre il prossimo cambio (0 = adesso). Il
+    conto parte dall'APPROVAZIONE: un rifiuto o una proposta sostituita
+    non consumano il mese."""
+    if not approvato_il or not PROFILO_MIO_GIORNI:
+        return 0
+    return int(approvato_il) + PROFILO_MIO_GIORNI * 86400
+
+
+def _salva_foto_mia(negozio: str, raw: bytes) -> str:
+    """Il francobollo del cartellino: come `_salva_avatar` (quadrato da
+    AVATAR_LATO, la ricompressione toglie EXIF e GPS), col nome in
+    MILLISECONDI — un giro del social nello stesso secondo non deve
+    poter scrivere sopra la foto in attesa. La forma resta `av_..._N.jpg`,
+    quella che la rotta `/foto/` gia' conosce."""
+    if not ImmaginePillow or not raw or not negozio:
+        return ""
+    try:
+        img = _decodifica_frenata(raw, (AVATAR_LATO, AVATAR_LATO))
+        if img is None:
+            return ""
+        img = ImageOps.fit(img, (AVATAR_LATO, AVATAR_LATO),
+                           ImmaginePillow.Resampling.LANCZOS)
+        nome = f"av_{negozio}_{time.time_ns() // 1_000_000}.jpg"
+        img.save(os.path.join(FOTO_DIR, nome), "JPEG",
+                 quality=AVATAR_QUALITA)
+        return nome
+    except Exception:
+        return ""
+
+
+def _copia_foto_mia(negozio: str, attuale: str) -> str:
+    """La foto di adesso, COPIATA come foto del cartellino, per chi
+    propone solo il nome: «l'altro resta com'e'». Una copia e non lo
+    stesso file, perche' quello del social se ne va al prossimo giro."""
+    if not attuale or not negozio or not NOME_FOTO.match(attuale):
+        return ""
+    sorgente = os.path.join(FOTO_DIR, attuale)
+    if not os.path.exists(sorgente):
+        return ""
+    nome = f"av_{negozio}_{time.time_ns() // 1_000_000}.jpg"
+    try:
+        with open(sorgente, "rb") as f:
+            dati = f.read()
+        with open(os.path.join(FOTO_DIR, nome), "wb") as f:
+            f.write(dati)
+    except OSError:
+        return ""
+    return nome
+
+
+def _applica_mio(con, tg_id: int, u) -> str:
+    """Mette il cartellino approvato al posto del nome e della foto
+    del social, DENTRO la transazione di chi chiama. Ritorna il file
+    da togliere DOPO il commit (la foto del social, che non serve
+    piu'), o ''. Il nome di prima si tiene da parte, solo se arriva
+    davvero da fuori: rientrare su 'mia' da 'mia' non lo sovrascrive."""
+    prima = u["mio_nome_prima"] or ""
+    if u["avatar_scelta"] != "mia":
+        prima = u["nome"] or prima
+    con.execute("UPDATE utenti SET nome=?, avatar=?, avatar_scelta='mia', "
+                "mio_nome_prima=? WHERE tg_id=?",
+                (u["mio_nome"], u["mio_foto"] or "", prima, tg_id))
+    vecchio = u["avatar"] or ""
+    if vecchio in ("", u["mio_foto"] or "", u["mio_foto_att"] or ""):
+        return ""
+    return vecchio
+
+
+def _lascia_mio(con, tg_id: int, u, scelta: str, fresco: str = ""):
+    """Si lascia il cartellino: torna il nome di prima (quello fresco
+    di Telegram se c'e', sennò quello tenuto da parte) e — tranne che
+    per 'nessuna', dove la foto non si vede comunque — la colonna della
+    foto si svuota, e la riempie il giro del social. I file del
+    cartellino restano: rientrare non chiede una nuova revisione."""
+    nome = fresco or u["mio_nome_prima"] or u["nome"] or ""
+    if scelta == "nessuna":
+        con.execute("UPDATE utenti SET nome=? WHERE tg_id=?", (nome, tg_id))
+    else:
+        con.execute("UPDATE utenti SET nome=?, avatar='', "
+                    "avatar_aggiornato=0 WHERE tg_id=?", (nome, tg_id))
+
+
+@app.post("/api/me/profilo-mio")
+async def proponi_profilo_mio(req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """La proposta: un nome, una foto, o tutt'e due. Nasce SEMPRE in
+    revisione, e fino all'approvazione resta esposto quel che c'era
+    (il patto del banner: niente «faccio approvare il pulito e lo
+    cambio il giorno dopo»). Proporre di nuovo mentre una revisione e'
+    in corso SOSTITUISCE quella in attesa: e' una correzione.
+    Quel che non si cambia resta com'e': senza nome vale quello di
+    adesso, senza foto quella di adesso (copiata)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not PROFILO_MIO_ATTIVO:
+        raise HTTPException(400, MSG_MIO_SPENTO)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        u = con.execute(
+            "SELECT nome, negozio, avatar, avatar_scelta, mio_nome, "
+            "mio_foto, mio_foto_att, mio_approvato_il FROM utenti "
+            "WHERE tg_id=?", (user["id"],)).fetchone()
+        if not u or not u["negozio"]:
+            raise HTTPException(400, "Il tuo profilo non è ancora pronto")
+        dal = mio_prossimo_cambio(u["mio_approvato_il"] or 0)
+        if dal > time.time():
+            raise HTTPException(400, "Il prossimo cambio si può fare dal "
+                                + time.strftime("%d/%m/%Y",
+                                                time.localtime(dal)))
+        scritto = " ".join(str(d.get("nome") or "").split())
+        foto_dato = d.get("foto") or ""
+        if not scritto and not foto_dato:
+            raise HTTPException(400, "Scrivi il nome o scegli la foto")
+        if scritto:
+            nome, motivo = giudica_nome_mio(con, user["id"], scritto)
+            if not nome:
+                raise HTTPException(400, motivo)
+        else:
+            nome = u["mio_nome"] or u["nome"] or ""
+        raw = None
+        if foto_dato:
+            raw, motivo = _byte_banner(foto_dato)
+            if raw is None:
+                raise HTTPException(400, motivo)
+    finally:
+        con.close()
+    if raw is not None:
+        foto = await asyncio.to_thread(_salva_foto_mia, u["negozio"], raw)
+        if not foto:
+            raise HTTPException(400, "Non riesco a leggere questa foto")
+    elif u["mio_foto"]:
+        foto = u["mio_foto"]
+    else:
+        foto = await asyncio.to_thread(_copia_foto_mia, u["negozio"],
+                                       u["avatar"] or "")
+    con = db()
+    vecchia = con.execute("SELECT mio_foto_att, mio_foto, avatar FROM utenti "
+                          "WHERE tg_id=?", (user["id"],)).fetchone()
+    con.execute("UPDATE utenti SET mio_nome_att=?, mio_foto_att=?, "
+                "mio_stato='revisione', mio_motivo='', mio_chiesto_il=? "
+                "WHERE tg_id=?", (nome, foto, int(time.time()), user["id"]))
+    con.commit()
+    con.close()
+    # la foto della proposta PRECEDENTE se ne va dopo il commit, mai
+    # prima — salvo che sia ancora in uso (il vivo, o la faccia di adesso)
+    va = (vecchia["mio_foto_att"] or "") if vecchia else ""
+    if va and va != foto and va not in (vecchia["mio_foto"],
+                                        vecchia["avatar"]):
+        _togli_banner_file(va)
+    asyncio.create_task(avvisa_profilo_mio(user["id"]))
+    return {"ok": True, "stato": "revisione", "nome": nome, "foto": foto,
+            "attesa_ore": REVISIONE_ATTESA_ORE}
+
+
+async def avvisa_profilo_mio(tg_id: int):
+    """La notifica coi bottoni ✅/❌ ai moderatori, gemella di
+    `avvisa_banner`: il moderatore deve VEDERE la foto, e accanto il
+    nome proposto e quello di adesso. callback_data `pm:ok:{tg_id}` /
+    `pm:no:{tg_id}`: autorizza `e_admin` sul mittente del tocco."""
+    con = db()
+    u = con.execute("SELECT tg_id, nome, negozio, mio_nome_att, "
+                    "mio_foto_att, mio_stato FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    if not u or u["mio_stato"] != "revisione":
+        return
+    testo = (f"✏️ <b>Nome e foto da approvare</b>\n"
+             f"Nome proposto: <b>{html.escape(u['mio_nome_att'] or '')}</b>\n"
+             f"Adesso si chiama: {html.escape(u['nome'] or '')} "
+             f"({URL_PUBBLICO}/negozio/{u['negozio']})")
+    tastiera = {"inline_keyboard": [[
+        {"text": "✅ Pubblica", "callback_data": f"pm:ok:{tg_id}"},
+        {"text": "❌ Rifiuta", "callback_data": f"pm:no:{tg_id}"},
+    ]]}
+    foto = (f"{URL_PUBBLICO}/foto/{u['mio_foto_att']}"
+            if u["mio_foto_att"] else "")
+    if await _al_gruppo_admin(testo, "moderazione", tastiera=tastiera,
+                              foto=foto):
+        return
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for admin in destinatari:
+        if foto:
+            await bot_api("sendPhoto", {
+                "chat_id": admin, "parse_mode": "HTML", "caption": testo,
+                "photo": foto, "reply_markup": tastiera})
+        else:
+            await bot_api("sendMessage", {
+                "chat_id": admin, "parse_mode": "HTML", "text": testo,
+                "reply_markup": tastiera})
+
+
+def _controparti_aperte(con, tg_id: int) -> set:
+    """Chi ha con lui un ordine del mercatino coi sats in cassaforte, o
+    uno scambio P2P toccato nell'ultimo giorno e non ancora chiuso (gli
+    importi arrivano solo alla chiusura: `p2p_scambi`). Sono quelli a
+    cui un nome nuovo, a ordine aperto, va detto (decisione 9)."""
+    fuori = set()
+    segni = ",".join("?" * len(STATI_SATS_IN_CASSAFORTE))
+    for r in con.execute(
+            "SELECT venditore_id, compratore_id FROM ordini WHERE "
+            f"(venditore_id=? OR compratore_id=?) AND stato IN ({segni})",
+            (tg_id, tg_id, *STATI_SATS_IN_CASSAFORTE)):
+        fuori.update((r[0], r[1]))
+    for r in con.execute(
+            "SELECT compratore, venditore FROM p2p_scambi WHERE "
+            "(compratore=? OR venditore=?) AND aggiornato>? "
+            "AND COALESCE(sats_compratore,0)=0",
+            (tg_id, tg_id, int(time.time()) - 86400)):
+        fuori.update((r[0], r[1]))
+    fuori.discard(tg_id)
+    fuori.discard(0)
+    fuori.discard(None)
+    return fuori
+
+
+async def decidi_profilo_mio(tg_id: int, esito: str, admin_id: int,
+                             motivo: str = "") -> tuple[bool, str]:
+    """Il cuore condiviso della decisione (tastiera E pannello admin).
+    · `approva` — il cartellino diventa quello vivo e si APPLICA
+      subito (avatar_scelta='mia'): chi aspetta la risposta vuole
+      vedersi col nome nuovo, non andarlo a scegliere;
+    · `rifiuta` — la proposta se ne va, il vivo (se c'e') resta: si
+      boccia la MODIFICA, non quel che era gia' approvato. Non consuma
+      il mese;
+    · `togli` — un cartellino gia' approvato che non va piu' bene: via
+      nome e foto scelti, si torna all'automatico.
+    L'UPDATE e' sempre CONDIZIONATO sullo stato letto: il secondo
+    moderatore che tocca trova il fatto compiuto."""
+    con = db()
+    u = con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    if not u:
+        con.close()
+        return False, "Utente non trovato"
+    stato, adesso = u["mio_stato"] or "", int(time.time())
+    via = set()
+    nome_prima, nome_dopo = u["nome"] or "", ""
+    if esito == "approva":
+        if stato != "revisione" or not u["mio_nome_att"]:
+            con.close()
+            return False, "Questa proposta non è in attesa di una decisione"
+        n = con.execute(
+            "UPDATE utenti SET mio_nome=mio_nome_att, mio_foto=mio_foto_att, "
+            "mio_nome_att='', mio_foto_att='', mio_stato='approvato', "
+            "mio_motivo='', mio_approvato_il=? "
+            "WHERE tg_id=? AND mio_stato='revisione'",
+            (adesso, tg_id)).rowcount
+        if n:
+            nuovo = con.execute(
+                "SELECT nome, avatar, avatar_scelta, mio_nome, mio_foto, "
+                "mio_foto_att, mio_nome_prima FROM utenti WHERE tg_id=?",
+                (tg_id,)).fetchone()
+            f_via = _applica_mio(con, tg_id, nuovo)
+            via.update(x for x in (f_via, u["mio_foto"] or "")
+                       if x and x != (nuovo["mio_foto"] or ""))
+            nome_dopo = nuovo["mio_nome"]
+        avviso = ("✏️ <b>Il tuo nome e la tua foto sono online su "
+                  "Barattolo.</b> Li vedi nel tuo Profilo.")
+        detto = "✅ Nome e foto pubblicati"
+    elif esito == "rifiuta":
+        if stato != "revisione":
+            con.close()
+            return False, "Questa proposta non è in attesa di una decisione"
+        n = con.execute(
+            "UPDATE utenti SET mio_nome_att='', mio_foto_att='', "
+            "mio_stato='rifiutato', mio_motivo=? "
+            "WHERE tg_id=? AND mio_stato='revisione'",
+            (motivo, tg_id)).rowcount
+        att = u["mio_foto_att"] or ""
+        if att and att not in (u["mio_foto"], u["avatar"]):
+            via.add(att)
+        avviso = ("✏️ <b>Il nome e la foto che hai proposto non sono stati "
+                  "approvati.</b>"
+                  + (f" Motivo: {html.escape(motivo)}." if motivo else "")
+                  + " Puoi riprovare subito dal Profilo, su Barattolo.")
+        detto = "❌ Proposta rifiutata"
+    elif esito == "togli":
+        if not u["mio_nome"]:
+            con.close()
+            return False, "Questo utente non ha un nome scelto"
+        n = con.execute(
+            "UPDATE utenti SET mio_nome='', mio_foto='', mio_stato='tolto', "
+            "mio_motivo=?, mio_approvato_il=0 "
+            "WHERE tg_id=? AND mio_nome!=''", (motivo, tg_id)).rowcount
+        if n and u["avatar_scelta"] == "mia":
+            _lascia_mio(con, tg_id, u, "")
+            con.execute("UPDATE utenti SET avatar_scelta='' WHERE tg_id=?",
+                        (tg_id,))
+        if u["mio_foto"] and u["mio_foto"] != (u["mio_foto_att"] or ""):
+            via.add(u["mio_foto"])
+        avviso = ("✏️ <b>Il nome e la foto che avevi scelto su Barattolo "
+                  "sono stati tolti</b> da un moderatore."
+                  + (f" Motivo: {html.escape(motivo)}." if motivo else "")
+                  + " Adesso vale di nuovo il tuo profilo.")
+        detto = "🚫 Nome e foto tolti"
+    else:
+        con.close()
+        return False, "Esito sconosciuto"
+    if not n:
+        con.close()
+        return False, "Ci ha già pensato un altro moderatore"
+    controparti = set()
+    if nome_dopo and nome_mio_compatto(nome_dopo) != \
+            nome_mio_compatto(nome_prima):
+        controparti = _controparti_aperte(con, tg_id)
+    con.commit()
+    con.close()
+    for f in via:
+        _togli_banner_file(f)
+    registra_moderazione("profilo", esito, motivo,
+                         nome_dopo or u["mio_nome_att"] or u["mio_nome"] or "",
+                         0, tg_id, admin_id)
+    try:
+        await notifica(tg_id, avviso)
+    except Exception as e:
+        print(f"⚠️ Avviso nome e foto saltato (tg {tg_id}): {e}")
+    if esito == "togli":
+        asyncio.create_task(aggiorna_profilo_social(tg_id))
+    for altro in controparti:
+        try:
+            await notifica(altro, (
+                f"✏️ <b>{html.escape(nome_prima)}</b> ora su Barattolo si "
+                f"chiama <b>{html.escape(nome_dopo)}</b>. È la stessa "
+                "persona del tuo ordine in corso."))
+        except Exception as e:
+            print(f"⚠️ Avviso del nome nuovo saltato (tg {altro}): {e}")
+    return True, detto
+
+
+async def callback_profilo_mio(cb: dict, dati: str):
+    """Il tocco su ✅/❌ della tastiera del cartellino. Solo i
+    moderatori; il tg_id puo' essere NEGATIVO (i nativi Nostr)."""
+    if not e_admin((cb.get("from") or {}).get("id") or 0):
+        return
+    esito, _, sid = dati.partition(":")
+    if esito not in ("ok", "no") or not sid.lstrip("-").isdigit():
+        return
+    ok, testo = await decidi_profilo_mio(
+        int(sid), "approva" if esito == "ok" else "rifiuta",
+        cb["from"]["id"])
+    msg = cb.get("message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    if chat:
+        if msg.get("photo"):
+            await bot_api("editMessageCaption", {
+                "chat_id": chat, "message_id": msg.get("message_id"),
+                "caption": testo, "parse_mode": "HTML"})
+        else:
+            await bot_api("editMessageText", {
+                "chat_id": chat, "message_id": msg.get("message_id"),
+                "text": testo, "parse_mode": "HTML"})
+
+
+@app.get("/api/admin/profilo-mio")
+def lista_profilo_mio(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le proposte in ATTESA (dalla piu' vecchia) e sotto i
+    cartellini gia' approvati, perche' quello da togliere abbia un
+    bottone da qualche parte."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id, nome, negozio, mio_stato, mio_motivo, mio_nome, "
+        "mio_foto, mio_nome_att, mio_foto_att, mio_chiesto_il, "
+        "mio_approvato_il FROM utenti "
+        "WHERE mio_stato='revisione' OR mio_nome!='' "
+        "ORDER BY CASE mio_stato WHEN 'revisione' THEN 0 ELSE 1 END, "
+        "         mio_chiesto_il ASC LIMIT 50").fetchall()
+    con.close()
+    return [dict(r) for r in righe]
+
+
+@app.post("/api/admin/profilo-mio/{tg_id}")
+async def decidi_profilo_mio_admin(tg_id: int, req: Request,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la seconda porta della decisione, gemella di quella
+    del banner. Il 403 sta PRIMA di leggere il body."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    esito = (d.get("esito") or "").strip()
+    if esito not in ("approva", "rifiuta", "togli"):
+        raise HTTPException(400, "Esito sconosciuto")
+    ok, testo = await decidi_profilo_mio(tg_id, esito, user["id"],
+                                         (d.get("motivo") or "").strip()[:200])
+    if not ok:
+        raise HTTPException(409, testo)
+    return {"ok": True, "detto": testo}
+
+
 # --- IL LINK DEL NEGOZIO A SCELTA, la fattura (set 2026) -------------
 # SUBITO DOPO IL BANNER nella scala delle personalizzazioni (decisione
 # di Andrea): stesso livello che apriva la porta del banner prima che
@@ -61783,17 +62427,22 @@ async def scegli_avatar(req: Request,
     chi ha entrambe le sorgenti, 'nessuna' = iniziale ovunque per il
     pubblico (reversibile: il file resta in dispensa e il CASE nelle
     SELECT lo tiene in casa). Si accetta solo una sorgente che esiste
-    davvero — il pattern di canale-notifiche."""
+    davvero — il pattern di canale-notifiche.
+    LA QUARTA SCELTA, 'mia' (23 nov 2026, cantiere profilo-mio): nome e
+    foto scelti su Barattolo, gia' approvati da un moderatore. Si entra
+    solo con un cartellino approvato in mano, e rientrarci non chiede
+    una nuova revisione; uscirne e' sempre libero e immediato."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     scelta = (d.get("scelta") or "").strip().lower()
-    if scelta not in ("", "telegram", "nostr", "nessuna"):
+    if scelta not in ("", "telegram", "nostr", "nessuna", "mia"):
         raise HTTPException(400, "Scelta sconosciuta: telegram, nostr, "
-                                 "nessuna o vuoto (automatico)")
+                                 "nessuna, mia o vuoto (automatico)")
     con = db()
     u = con.execute(
-        "SELECT npub, npub_verificata, npub_accesso FROM utenti "
-        "WHERE tg_id=?", (user["id"],)).fetchone()
+        "SELECT npub, npub_verificata, npub_accesso, avatar_scelta, nome, "
+        "avatar, mio_nome, mio_foto, mio_foto_att, mio_nome_prima "
+        "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
     if not u:
         con.close()
         raise HTTPException(404, "Profilo non trovato")
@@ -61809,10 +62458,26 @@ async def scegli_avatar(req: Request,
         raise HTTPException(400,
             "Prima verifica la tua npub (o entra con Nostr): la foto si "
             "prende solo da una chiave di cui hai dimostrato il possesso")
-    con.execute("UPDATE utenti SET avatar_scelta=? WHERE tg_id=?",
-                (scelta, user["id"]))
+    if scelta == "mia" and not (PROFILO_MIO_ATTIVO and u["mio_nome"]):
+        con.close()
+        raise HTTPException(400, MSG_MIO_NON_APPROVATO)
+    file_via = ""
+    if scelta == "mia":
+        file_via = _applica_mio(con, user["id"], u)
+    else:
+        if u["avatar_scelta"] == "mia":
+            # il nome FRESCO di Telegram c'e' solo dalla Mini App (la
+            # firma di initData lo porta); dal sito vale quello di prima
+            fresco = ""
+            if x_tg_init_data and user["id"] > 0:
+                fresco = (user.get("first_name") or "").strip()
+            _lascia_mio(con, user["id"], u, scelta, fresco)
+        con.execute("UPDATE utenti SET avatar_scelta=? WHERE tg_id=?",
+                    (scelta, user["id"]))
     con.commit()
     con.close()
+    if file_via:
+        _togli_banner_file(file_via)
     # LA SORGENTE E' CAMBIATA, E QUI SI ASPETTA (ago 2026, decisione
     # di Andrea): era un `create_task` — la risposta non aspettava — e
     # andava bene finche' la propria faccia si vedeva comunque. Da
@@ -61826,8 +62491,9 @@ async def scegli_avatar(req: Request,
     # social (due chiamate a Telegram, quattro relay per Nostr). Vale
     # per un gesto raro, e a dirlo c'e' il velo del cassetto.
     # Con 'nessuna' non si aspetta NIENTE: li' non c'e' niente da
-    # scaricare, e spegnere resta istantaneo.
-    if scelta != "nessuna":
+    # scaricare, e spegnere resta istantaneo. Con 'mia' nemmeno: nome e
+    # foto sono gia' qui, approvati.
+    if scelta not in ("nessuna", "mia"):
         await aggiorna_profilo_social(user["id"])
     # Il nome del francobollo torna col si': e' quello che permette al
     # client di rimettere la faccia SUBITO, senza ricaricare. Si
@@ -130793,7 +131459,8 @@ def esegui_cancellazione(tg_id: int) -> dict:
     except Exception as e:
         print(f"⚠️ Cancellazione account: chat non pulita ({e})", flush=True)
     file_foto += [x for x in (u["avatar"], u["banner_foto"],
-                              u["banner_foto_att"])
+                              u["banner_foto_att"], u["mio_foto"],
+                              u["mio_foto_att"])
                   if x and "/" not in str(x) and NOME_FOTO.match(str(x))]
     print(f"🗑 Account cancellato: {len(ids_annunci)} annunci ritirati, "
           f"il resto ora porta il fantasma {fantasma}", flush=True)

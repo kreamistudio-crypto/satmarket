@@ -946,3 +946,9 @@ frase: Anche gli ordini Barattozon on-chain in «Vendi BTC» tornano nel libro d
 dove: P2P → un tuo ordine Barattozon on-chain preso e annullato da chi l'ha preso → avviso «🔁 Il tuo ordine è tornato nel libro».
 leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
 pubblico: no
+
+## 2026-11-23 · profilo-mio
+frase: Adesso puoi mettere su Barattolo un nome e una foto tuoi, gratis. Li guarda un moderatore, poi si vedono ovunque nel mercatino e nel P2P. Il tuo profilo Telegram o Nostr non cambia.
+dove: Profilo → «🆔 Nostr e identità» → «✏️ Nome e foto su Barattolo» → «✏️ Scegli nome e foto»; approvati, la scelta «✏️ Mia» in «📷 La tua foto».
+leva: PROFILO_MIO_ATTIVO (accesa di serie)
+pubblico: sì

@@ -1738,6 +1738,14 @@ NIP05_UTENTI_ATTIVO = True
 # ...gratis da questo livello (l'id del gradino: nuovo, avviato, pratico,
 # esperto, maestro). Storto o sconosciuto: porta chiusa per tutti.
 NIP05_UTENTI_LIVELLO = "avviato"
+# NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026): nel Profilo l'utente propone
+# un nome e una foto suoi, GRATIS; un moderatore li approva prima che si
+# vedano, e poi valgono ovunque dentro Barattolo (il profilo Telegram o Nostr
+# non cambia). Accesa di serie; a False niente proposte nuove, chi ha gia'
+# un nome approvato lo tiene.
+PROFILO_MIO_ATTIVO = True
+# ...un cambio approvato ogni tanti giorni (0 = nessun limite)
+PROFILO_MIO_GIORNI = 30
 
 # --- I relay Nostr ----------------------------------------------------
 # Dove Barattolo scrive e legge su Nostr. Erano cinque elenchi scritti
