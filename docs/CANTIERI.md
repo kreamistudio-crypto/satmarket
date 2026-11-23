@@ -95100,3 +95100,43 @@ pubblicare come strada; l'indirizzo on-chain salvato e il suo pezzo
 visibile. `conoscenza.md` rifatto.
 DA FARE. NOVITA.md non toccato: il ritocco è piccolo, e un post vorrebbe
 una frase nuova approvata da Andrea.
+
+## Barattozon on-chain «Vendi BTC» torna nel libro se chi prende annulla (23 nov 2026, cantiere barattozon-rinasce; un utente, persona-apmbpt, nel canale: «è da 2gg che inserisco ordine, utenti accettano e dopo 1 minuto annullano ordine e devo reinserire manualmente»; Andrea dalla card «Sì, se il PayCode ha 12 ore», poi «Sì, 8 ore», poi «ok» al piano)
+
+IL CASO. In produzione (sola lettura, comandi lanciati da Andrea) i suoi
+ordini erano on-chain 76 e 78: Barattozon in «Vendi BTC», 803,88 €, presi e
+annullati da chi li aveva presi dopo 12 e 50 secondi, mai rinati; lui li
+ripubblicava a mano (84). Non un guasto: il ritorno nel libro on-chain del
+19 nov (cantiere ritorno-nel-libro) usciva subito su qualunque riga con
+`paycode` o `tab_min_cent`. Tappo gli aveva detto il contrario. Lezione per
+chi cerca: gli account Nostr hanno id NEGATIVI (`taker_id>0` inganna), e
+l'account Telegram del commento non era quello che pubblicava.
+
+COSA. `p2p_onchain_rinasce_perche`: la fascia («Compra BTC», `tab_min_cent`)
+resta esclusa, un PayCode su un acquisto anche; col PayCode di chi vende
+rinasce SOLO l'annullo di chi ha preso a scambio `preso` («annullato»). La
+ronda di chi pubblica, la rinuncia e il non pagato dopo il deposito no: dal
+deposito confermato chi paga il PayCode l'ha visto. `_p2p_onchain_rinasci`:
+lo stesso PayCode (la colonna copiata com'era) e `scade` del libro da
+`p2p_onchain_scade_libro(adesso, scadenza del PayCode)`, cioè 8 ore prima
+della scadenza; con 8 ore o meno, o un PayCode senza scadenza, torna 0 e chi
+annulla manda l'avviso di sempre («L'altra parte ha annullato»). Nessuna
+scritta nuova nell'app: l'avviso è quello della rinascita.
+
+DECISIONI. 8 ore e non le 12 della pubblicazione (Andrea): torna finché
+potrebbe stare nel libro, lo stesso margine con cui il libro lo toglie
+(`P2P_ONCHAIN_TAB_MARGINE_S`). Prima del deposito il PayCode non è uscito
+(esce solo con `depositato_il`), quindi ripubblicarlo non lo espone a
+nessuno. Gli ordini già annullati non rinascono a mano.
+
+PROVATO. `prove_ritorno_nel_libro_onchain`: chi fa rinascere col PayCode
+(otto casi), la rinascita col PayCode e la scadenza del libro, 8 ore esatte e
+meno, PayCode senza scadenza, colonna vuota senza PayCode; due controprove
+(senza il cancello del PayCode rinasce dalla ronda di chi pubblica; senza il
+margine rinasce a 8 ore) e la mutazione manuale del codice vecchio rossa.
+Tappo: la riga di sapere.md (testo approvato nel piano).
+
+DA GUARDARE. Non provato dal vivo: il primo Barattozon on-chain annullato
+dopo la promozione. Notato e non fatto: chi prende annulla in pochi secondi
+(78 aveva aperto il preventivo dello swap in Lightning prima di annullare).
+
