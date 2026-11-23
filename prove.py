@@ -5023,10 +5023,11 @@ def prove_esito_pagamento():
           True, pv.index("_stato_pagamento") < pv.index("LNBITS_ADMIN_KEY"))
     # i quattro rami riusciti timbrano, e il conto cresce A MANO come
     # quello dell'INCERTO: se CALA, qualcuno ha tolto una traccia
-    prova("sentinella: tutt'e quattro i rami riusciti timbrano 'uscito'",
-          4, _SORGENTE.count("payout_stato='uscito', "))
-    prova("sentinella: tutt'e quattro le uscite scrivono il diario",
-          4, _SORGENTE.count('_timbra_pagamento(con, "'))
+    # (23 nov 2026) cinque dal giroconto interno (`_paga_dalla_riserva`)
+    prova("sentinella: tutt'e cinque i rami riusciti timbrano 'uscito'",
+          5, _SORGENTE.count("payout_stato='uscito', "))
+    prova("sentinella: tutt'e cinque le uscite scrivono il diario",
+          5, _SORGENTE.count('_timbra_pagamento(con, "'))
     # il diario dice cos'e' successo, lo stato dice cosa fare: se
     # questo timbro scrivesse anche lo stato, i suoi tre scrittori si
     # metterebbero a litigare. ⚠️ SENZA LA PROSA: la docstring nomina
@@ -6295,7 +6296,9 @@ def prove_pagamenti_in_volo(attrezzi=False):
     sorg = codice(_SORGENTE)
     chiamate = re.findall(
         r"await paga_venditore\((?:[^()]|\([^()]*\))*\)", sorg)
-    prova("le funzioni d'uscita sono quattro", 4, len(chiamate))
+    # (23 nov 2026) la QUINTA e' il giroconto interno, dalla riserva
+    # (`_paga_dalla_riserva`): passa la sua riga come le altre
+    prova("le funzioni d'uscita sono cinque", 5, len(chiamate))
     prova("...e tutte passano la RIGA a paga_venditore", [],
           [c for c in chiamate if "riga=(" not in c])
     pv = codice(pezzo("paga_venditore"))
@@ -9276,8 +9279,9 @@ def prove_pagamento_incerto():
     # leggerebbe «non lo sappiamo» come «e' andata bene», e i sats
     # uscirebbero due volte. Se questo numero CALA, qualcuno ha
     # tolto una guardia.
-    prova("sentinella: tutt'e quattro le uscite guardano l'INCERTO",
-          4, _SORGENTE.count("esito == INCERTO"))
+    # (23 nov 2026) cinque dal giroconto interno
+    prova("sentinella: tutt'e cinque le uscite guardano l'INCERTO",
+          5, _SORGENTE.count("esito == INCERTO"))
     # dal set 2026 la guardia ferma DUE timbri: 'incerto' (decide una
     # persona) e 'in_volo' (decide il giro, chiedendo per hash). Da
     # nessuno dei due parte un pagamento, ed e' la proprieta' che il
@@ -9306,10 +9310,10 @@ def prove_pagamento_incerto():
                  and pv4.index("except LnbitsMuto")
                  < pv4.index("LNBITS_ADMIN_KEY")))
     # gemelle del conto a mano dell'INCERTO, stessa ragione
-    prova("sentinella: tutt'e quattro le uscite guardano il NON_CHIESTO",
-          4, _SORGENTE.count("esito == NON_CHIESTO"))
-    prova("sentinella: tutt'e quattro sanno prenderlo dall'eccezione",
-          4, _SORGENTE.count("esito = NON_CHIESTO"))
+    prova("sentinella: tutt'e cinque le uscite guardano il NON_CHIESTO",
+          5, _SORGENTE.count("esito == NON_CHIESTO"))
+    prova("sentinella: tutt'e cinque sanno prenderlo dall'eccezione",
+          5, _SORGENTE.count("esito = NON_CHIESTO"))
     # IL TIMBRO E' MITE: se un giorno tocca `aggiornato` fa ripartire da
     # capo l'attesa dei promemoria e della coda dei fermi, e se avvisa
     # qualcuno diventa il rumore che il quarto esito esiste per togliere
@@ -14244,7 +14248,7 @@ def prove_lista_ordini():
           "DELETE FROM ordini WHERE stato='annullato' " in pf
           and "aggiornato < ?" in pf)
     prova("il riacciuffo cerca ancora i pagamenti sulle lapidi", True,
-          "WHERE stato='annullato' " in pezzo("controlla_annullati"))
+          "WHERE stato='annullato' " in pezzo("controlla_abbandonati"))
     prova("il server non ha imparato a filtrare la lista", True,
           "WHERE o.compratore_id=? OR o.venditore_id=?"
           in pezzo("miei_ordini"))
@@ -212982,6 +212986,197 @@ console.log(JSON.stringify(out));
           ["p2pNuovoCauzione = typeof cauzioneRicordataP2P === 'function' && cauzioneRicordataP2P();" in ap, "p2pNuovoCauzione = false;" in ap,
            "ricordaCauzioneNuovoP2P(p2pNuovoCauzione);" in sc])
 
+def prove_giroconto_interno():
+    """IL GIROCONTO INTERNO (23 nov 2026, cantiere giroconto-interno). Chi
+    compra pagando euro nel P2P manda i sats di chi vende nel deposito
+    dell'ordine, e il deposito sta sullo stesso LND di Mostro: la patch
+    0016 chiede a /api/p2p/giroconto «la saldi tu?», e qui si salda da un
+    portafoglio «riserva». Le regole provate: la domanda storta non si
+    paga; si paga SOLO un ordine 'creato' sulla cassaforte nodo, con
+    l'importo giusto, sotto il tetto, con la garanzia di Luca INCASSATA per
+    almeno quei sats; una garanzia salda un ordine solo; la seconda domanda
+    per lo stesso deposito risponde si' senza ripagare; la porta chiusa
+    e' un 404. E la pulizia degli ordini non mette la lapide a un deposito
+    la cui fattura e' ancora viva."""
+    print("\n[il giroconto interno]")
+    import asyncio
+    import sqlite3 as _sq
+    amb = {"re": re, "time": time, "sqlite3": _sq, "hmac": __import__("hmac"),
+           "CASSAFORTE_NODO": "nodo", "Request": object}
+    for nome in ("_domanda_giroconto", "_verdetto_giroconto",
+                 "_tabella_giroconti", "giroconto_attivo", "_porta_giroconto"):
+        exec(pezzo(nome), amb)
+
+    # --- LA DOMANDA ---------------------------------------------------
+    H1, H2, H3 = "a" * 64, "b" * 64, "c" * 64
+    dg = amb["_domanda_giroconto"]
+
+    def storta(d):
+        try:
+            dg(d)
+            return False
+        except ValueError:
+            return True
+    prova("la domanda giusta si legge, hash in minuscolo",
+          {"fattura": H1, "garanzia": H2, "ordine_mostro": "m1", "sats": 1000},
+          dg({"fattura": H1.upper(), "garanzia": H2, "ordine": "m1", "sats": 1000}))
+    prova("...ogni pezzo storto e' un no (hash corti, uguali, sats non interi)",
+          [True] * 7,
+          [storta(None), storta({"fattura": "ab", "garanzia": H2, "sats": 1}),
+           storta({"fattura": H1, "garanzia": "zz" * 32, "sats": 1}),
+           storta({"fattura": H1, "garanzia": H1, "sats": 1}),
+           storta({"fattura": H1, "garanzia": H2, "sats": 0}),
+           storta({"fattura": H1, "garanzia": H2, "sats": "1000"}),
+           storta({"fattura": H1, "garanzia": H2, "sats": True})])
+
+    # --- IL VERDETTO SULL'ORDINE ----------------------------------------
+    amb["importo_bolt11"] = lambda b: {"inv1000": 1000, "inv999": 999}.get(b)
+    vg = amb["_verdetto_giroconto"]
+    dom = {"fattura": H1, "garanzia": H2, "ordine_mostro": "", "sats": 1000}
+    buono = {"cassaforte": "nodo", "stato": "creato", "prezzo_sats": 1000,
+             "invoice": "inv1000"}
+    prova("un ordine 'creato' sul nodo, importo giusto, sotto il tetto: si'",
+          "", vg(buono, dom, 150000))
+    prova("...e ognuno dei cinque no ha il suo perche'",
+          [True] * 6,
+          [bool(vg(None, dom, 150000)),
+           bool(vg({**buono, "cassaforte": "saas"}, dom, 150000)),
+           bool(vg({**buono, "stato": "locked"}, dom, 150000)),
+           bool(vg({**buono, "prezzo_sats": 999}, dom, 150000)),
+           bool(vg({**buono, "invoice": "inv999"}, dom, 150000)),
+           bool(vg(buono, dom, 999))])
+
+    # --- LA PORTA -------------------------------------------------------
+    class _HTTPExc(Exception):
+        def __init__(self, codice, testo=""):
+            self.status_code = codice
+    amb["HTTPException"] = _HTTPExc
+    amb["_p2p_onchain_cauzione_macaroon"] = lambda: "abc"
+
+    def porta(segreto, chiave, auth):
+        amb.update(P2P_GIROCONTO_SEGRETO=segreto, LNBITS_RISERVA_ADMIN_KEY=chiave,
+                   LNBITS_NODO_URL="http://127.0.0.1:5001",
+                   LNBITS_NODO_INVOICE_KEY="k")
+        try:
+            amb["_porta_giroconto"](auth)
+            return 200
+        except _HTTPExc as e:
+            return e.status_code
+    prova("porta: chiusa senza segreto o senza riserva (404), segreto "
+          "sbagliato 403, giusto passa",
+          [404, 404, 404, 403, 200],
+          [porta("", "r", "Bearer x"),
+           porta("INCOLLA_QUI_UN_SEGRETO_CASUALE", "r", "Bearer x"),
+           porta("s3", "INCOLLA_QUI_LA_ADMIN_KEY_DELLA_RISERVA", "Bearer s3"),
+           porta("s3", "r", "Bearer s4"), porta("s3", "r", "Bearer s3")])
+    amb["_p2p_onchain_cauzione_macaroon"] = lambda: ""
+    prova("...e senza il macaroon che legge la garanzia resta chiusa", 404,
+          porta("s3", "r", "Bearer s3"))
+    amb["_p2p_onchain_cauzione_macaroon"] = lambda: "abc"
+
+    # --- LA ROTTA, CON LNBITS E LND FINTI ---------------------------------
+    con = _sq.connect(":memory:", check_same_thread=False)
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, cassaforte TEXT, "
+                "stato TEXT, prezzo_sats INTEGER, payment_hash TEXT, invoice TEXT)")
+
+    class _Con:
+        """La connessione condivisa, che `close` non chiude."""
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+    pagati, pagamenti, incassati, garanzie = set(), [], [], {}
+
+    async def invoice_pagata(h, cf):
+        return h in pagati
+
+    async def garanzia(h):
+        return garanzie.get(h, 0)
+
+    async def riserva(o, riga_id):
+        pagamenti.append(o["invoice"])
+        pagati.add({"inv1000": H1, "inv2000": H3}[o["invoice"]])
+        return True
+
+    async def incassa(oid):
+        incassati.append(oid)
+        con.execute("UPDATE ordini SET stato='locked' WHERE id=?", (oid,))
+        return {}
+
+    class _Risp:
+        def __init__(self, d, headers=None):
+            self.d = d
+    amb.update(db=lambda: _Con(), invoice_pagata=invoice_pagata,
+               _garanzia_incassata=garanzia, _paga_dalla_riserva=riserva,
+               _incassa_ordine=incassa, JSONResponse=_Risp,
+               GIROCONTO_TETTO_SATS=150000,
+               app=type("A", (), {"post": staticmethod(lambda *_a: (lambda f: f))})(),
+               print=lambda *a, **k: None)
+    exec("async " + pezzo("giroconto_p2p"), amb)
+
+    class _Req:
+        def __init__(self, d, auth="Bearer s3"):
+            self.d, self.headers = d, {"authorization": auth}
+
+        async def json(self):
+            return self.d
+
+    def chiedi(d):
+        return asyncio.run(amb["giroconto_p2p"](_Req(d))).d["saldata"]
+    porta("s3", "r", "Bearer s3")
+    amb["_porta_giroconto"]("Bearer s3")
+    con.execute("INSERT INTO ordini VALUES(1,'nodo','creato',1000,?,'inv1000')", (H1,))
+    con.execute("INSERT INTO ordini VALUES(2,'nodo','creato',2000,?,'inv2000')", (H3,))
+    amb["importo_bolt11"] = lambda b: {"inv1000": 1000, "inv2000": 2000}.get(b)
+    d1 = {"fattura": H1, "garanzia": H2, "ordine": "m1", "sats": 1000}
+    prova("garanzia NON incassata: no, e la riserva non paga niente",
+          (False, []), (chiedi(d1), list(pagamenti)))
+    garanzie[H2] = 999
+    prova("...incassata per meno dei sats: no", (False, []),
+          (chiedi(d1), list(pagamenti)))
+    garanzie[H2] = 1000
+    prova("incassata per intero: si', la riserva paga il deposito UNA volta "
+          "e l'ordine passa a locked",
+          (True, ["inv1000"], [1]), (chiedi(d1), list(pagamenti), list(incassati)))
+    prova("...la seconda domanda per lo stesso deposito: si', senza ripagare",
+          (True, ["inv1000"]), (chiedi(d1), list(pagamenti)))
+    garanzie[H2] = 5000
+    prova("la stessa garanzia per un ALTRO ordine: no (salda un ordine solo)",
+          (False, ["inv1000"]),
+          (chiedi({"fattura": H3, "garanzia": H2, "sats": 2000}), list(pagamenti)))
+    prova("lo stesso deposito con un'altra garanzia: no", False,
+          chiedi({"fattura": H1, "garanzia": "d" * 64, "sats": 1000}))
+    prova("una domanda storta: no, senza alzare", False,
+          chiedi({"fattura": "x", "garanzia": H2, "sats": 1}))
+    prova("il registro: una riga, saldata, per l'ordine 1",
+          [(1, "saldato")],
+          [tuple(r) for r in con.execute("SELECT ordine_id, stato FROM giroconti")])
+
+    # --- LA RISERVA PAGA DALL'UNICA USCITA ---------------------------------
+    pr = pezzo("_paga_dalla_riserva")
+    prova("la riserva paga da paga_venditore (l'uscita unica, con la sua "
+          "cintura e la RIGA del registro giroconti), con la cassaforte "
+          "riserva, e vale solo PAGATO",
+          (True, True, True, True),
+          ("await paga_venditore(" in pr, "cassaforte=CASSAFORTE_RISERVA" in pr,
+           'riga=("giroconti", riga_id, "riserva")' in pr,
+           "return esito == PAGATO" in pr))
+    cc = pezzo("_chiavi_cassaforte")
+    prova("...e la cassaforte riserva legge e paga con la SUA chiave, sul "
+          "LNbits del nodo", True,
+          "return _Cassaforte(nome, LNBITS_NODO_URL, LNBITS_RISERVA_ADMIN_KEY,\n"
+          "                           LNBITS_RISERVA_ADMIN_KEY)" in cc
+          and 'CASSAFORTE_RISERVA = "riserva"' in _SORGENTE)
+
+    # --- LA PULIZIA NON UCCIDE UNA FATTURA VIVA -----------------------------
+    prova("la pulizia degli ordini 'creato' salta quelli con la fattura "
+          "ancora viva (vita_fattura)", True,
+          "and (vita_fattura(o[\"invoice\"]) or 0) > 0)]" in _SORGENTE
+          and "\"SELECT * FROM ordini WHERE stato='creato' \"" in pezzo("controlla_abbandonati"))
+
+
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
     primo-wallet). Andrea voleva un wallet custodial per i neofiti; dallo
@@ -220984,7 +221179,7 @@ CATEGORIE = {
     meta_cauzione_auto
     """.split(),
     "mercatino": """
-    guida_wallet mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
@@ -222012,6 +222207,7 @@ def main():
     prove_onchain_contanti_scambio,
     prove_onchain_cauzione,
     prove_guida_wallet,
+    prove_giroconto_interno,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,

@@ -1,5 +1,29 @@
 # IL FORK DI MOSTRO — le dodici patch, dal 29 ott 2026 sopra il tag v0.20.2
 
+**Dal 23 novembre 2026 c'è la 0016, NON ancora sul nodo** (cantiere
+`giroconto-interno`; studio: Claude Doc «Studio: comprare merce pagando
+solo euro», scelta di Andrea delle 17:12): IL GIROCONTO INTERNO. Chi
+compra nel mercatino pagando euro nel P2P dà a Mostro, come fattura di chi
+compra, il DEPOSITO dell'ordine, che sta sulla cassaforte «nodo», cioè sul
+nostro stesso LND. Upstream lo paga con `SendPaymentV2` e LND rifiuta
+(«self-payments not allowed», provato sul nodo il 23 nov); col permesso
+tenta un giro circolare che dipende da ACINQ e LNBiG, e quattro tentativi
+su quattro sono falliti. La 0016: se la fattura è del nostro nodo, nel
+task del payout, dopo la presa del claim e prima di `send_payment`,
+Mostro chiede al server `BARATTOLO_GIROCONTO_URL` (segreto suo,
+`BARATTOLO_GIROCONTO_SEGRETO`) «la saldi tu?» con id, hash della fattura,
+hash della garanzia e sats; il server verifica DA SOLO (garanzia SETTLED
+su LND, ordine giusto, una garanzia per un ordine), paga il deposito da
+un portafoglio LNbits «riserva» e risponde `{"saldata": true}`; solo
+allora `payment_success`, come se LND avesse detto `Succeeded`. Ogni altra
+risposta: la strada di upstream (LND rifiuta, retry, poi fattura nuova).
+Senza le due variabili è inerte. Ha il suo modulo (`barattolo_giroconto.rs`)
+e NON ha un patcher: la `.patch` è la sorgente. `git am` delle sedici
+`.patch` su un clone pulito della `v0.20.2` dà l'albero `654388cb`, e
+`cargo test --release` dice 2015 verdi (le 2011 di prima più le 4 del
+modulo), 0 rosse. L'immagine sarà la `-bar13`, solo dopo la prova sul
+collaudo e col sì di Andrea.
+
 **Dal 19 novembre 2026 la 0015 È SUL NODO** (immagine
 `mostro:v0.20.2-bar12`, 22:16 UTC; PRODUZIONE, «LA `-bar12`»; cantiere `pubblica-col-tempo`):
 su una vendita col tempo per pagare scelto, chi pubblica ha al massimo
