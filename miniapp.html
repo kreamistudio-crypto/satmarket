@@ -19544,7 +19544,7 @@ function percorsoDaStartapp(p){
      «📦 Come spedisci». Si rilegge in `/?corrieri=1`, che
      `apriCorrieriDaUrl` sa aprire */
   if (p === 'corrieri') return '/?corrieri=1';
-  const as = /^assistenza_(-?[1-9][0-9]{0,15})$/.exec(p);
+  const as = /^assistenza_(-?[1-9][0-9]{0,18})$/.exec(p);
   if (as) return '/?assistenza=' + as[1];
   const sc = /^scambio_([0-9a-zA-Z-]{8,64})_chat$/.exec(p);
   if (sc && p.length <= 64) return '/p2p?scambio=' + sc[1] + '&chat=1';
@@ -19919,7 +19919,7 @@ function startappDaLink(link, base){
   const om = /^\/\?ordine=([1-9][0-9]{0,11})(&chat=1|&incasso=1)?$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
   if (om) return 'mercatino_' + om[1] + (om[2] ? '_' + om[2].slice(1, -2) : '');
   /* l'assistenza (5 nov 2026): il gemello di `_startapp_da_link` */
-  const as = /^\/\?assistenza=(mia|-?[1-9][0-9]{0,15})$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
+  const as = /^\/\?assistenza=(mia|-?[1-9][0-9]{0,18})$/.exec(u.indexOf(base) === 0 ? u.slice(base.length) : '');
   if (as) return as[1] === 'mia' ? 'assistenza' : 'assistenza_' + as[1];
   /* i corrieri nel Profilo (17 nov 2026): il gemello di `_startapp_da_link` */
   if (u === base + '/?corrieri=1') return 'corrieri';
@@ -20265,6 +20265,7 @@ let myAbboCanale = false;
 let myOnchainRete = '';     // «signet» o «mainnet», detta da /api/me (30 ott 2026)
 let mySceltaRete = false;   // al «Paga» di un oggetto si sceglie prima la rete (2 nov 2026)
 let myOnchainIncasso = '';   // dove ricevo on-chain: '' | 'indirizzo' | 'xpub' (27 ott 2026)
+let myOnchainIncassoVista = '';  // ...e il suo inizio e la sua fine (23 nov 2026)
 /* come ricevo quando vendo on-chain (28 ott 2026): {attivo, modo, minimo} */
 let myOnchainLn = {attivo: false};
 /* Ha premuto Avvia per entrare dal bot (19 ott 2026, ENTRA DAL BOT):
@@ -70531,7 +70532,7 @@ const assistenzaImgUrl = {};        // nome -> objectURL
    la propria chat, `/?assistenza=<utente>` la conversazione per un
    admin. Una volta sola, dopo /api/me (serve sapere leva e admin). */
 const ASSISTENZA_URL = /^\/(miniapp\.html)?$/.test(location.pathname)
-  ? (location.search.match(/[?&]assistenza=(mia|-?[1-9][0-9]{0,15})(?:&|$)/) || [])[1] || '' : '';
+  ? (location.search.match(/[?&]assistenza=(mia|-?[1-9][0-9]{0,18})(?:&|$)/) || [])[1] || '' : '';
 let assistenzaUrlAperta = false;
 function apriAssistenzaDaUrl(){
   if (!ASSISTENZA_URL || assistenzaUrlAperta) return;
@@ -70539,7 +70540,7 @@ function apriAssistenzaDaUrl(){
   if (DEMO || VETRINA || !assistenzaAttiva) return;
   if (ASSISTENZA_URL === 'mia') { go('assistenza'); return; }
   if (!isAdmin) return;
-  assistenzaAdmAperta = {utente: Number(ASSISTENZA_URL), dati: null};
+  assistenzaAdmAperta = {utente: idAssistenza(ASSISTENZA_URL), dati: null};
   go('assistenzaadm');
 }
 /* I CORRIERI DAL BOTTONE DELL'AVVISO (17 nov 2026, cantiere
@@ -70797,7 +70798,7 @@ async function renderAssistenzaAdmin(){
     + (da ? '<b>' + da + ' da rispondere.</b>' : 'Nessuna in attesa di risposta.') + '</div>'
     + (l.length ? l.map(c =>
         '<button type="button" class="assist-conv' + (c.da_rispondere ? ' da-rispondere' : '') + '" '
-        + 'onclick="apriConversazioneAdmin(' + Number(c.utente) + ')">'
+        + 'onclick="apriConversazioneAdmin(\'' + idAssistenza(c.utente) + '\')">'
         + '<b>' + esc(c.nome || 'Senza nome') + '</b>'
         + (c.staff_utente ? ' ' + bollinoStaff() : '')
         + (c.da_rispondere ? '<span class="assist-pallino" aria-label="Da rispondere"></span>' : '')
@@ -70808,10 +70809,19 @@ async function renderAssistenzaAdmin(){
         + '</button>').join('')
       : '<div class="hint">Ancora nessuna conversazione.</div>');
 }
+/* L'UTENTE SEMPRE COME TESTO (23 nov 2026, cantiere assistenza-id-nostr):
+   l'id di un nativo Nostr arriva a 19 cifre, oltre il 2^53 dei numeri di
+   JavaScript, e un Number() lo arrotondava — si chiedeva al server un
+   utente che non esiste («Utente non trovato», il caso di Zzap). Il
+   server lo manda come testo e qui resta testo; solo cifre, o vuoto. */
+function idAssistenza(x){
+  const t = String(x ?? '');
+  return /^-?[1-9][0-9]{0,18}$/.test(t) ? t : '';
+}
 function apriConversazioneAdmin(utente){
   haptic();
   assistenzaAllegati.adm = [];
-  assistenzaAdmAperta = {utente: Number(utente), dati: null};
+  assistenzaAdmAperta = {utente: idAssistenza(utente), dati: null};
   renderConversazioneAdmin();
   window.scrollTo(0, 0);
 }
@@ -70838,7 +70848,7 @@ async function renderConversazioneAdmin(){
   };
   disegna();
   try {
-    const r = await fetch(`${API_BASE}/admin/assistenza/${Number(a.utente)}`,
+    const r = await fetch(`${API_BASE}/admin/assistenza/${idAssistenza(a.utente)}`,
       {headers:{'X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Conversazione non trovata', 6000); return; }
@@ -70860,7 +70870,7 @@ async function rispondiAssistenzaAdmin(){
   haptic();
   assistenzaInvio = true;
   try {
-    const r = await fetch(`${API_BASE}/admin/assistenza/${Number(a.utente)}`,
+    const r = await fetch(`${API_BASE}/admin/assistenza/${idAssistenza(a.utente)}`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
        body: JSON.stringify(immagini.length ? {testo, immagini} : {testo})});
     const d = await r.json().catch(()=>({}));
@@ -73645,6 +73655,15 @@ async function onchainModoScegli(btn, modo){
   renderIncassoOnchainProfilo();
 }
 
+/* L'INIZIO E LA FINE di dove ricevi (23 nov 2026, Andrea: «magari
+   mostralo, solo l'inizio e la fine»): il Profilo diceva solo «un tuo
+   indirizzo», e chi l'aveva salvato non lo ritrovava. Otto caratteri,
+   «…», sei: la stessa regola di `onchain_accorcia` nel server, che lo
+   manda in /api/me; qui serve subito dopo il salvataggio. */
+function accorciaIncassoOnchain(v){
+  const t = String(v || '');
+  return t.length <= 16 ? t : t.slice(0, 8) + '…' + t.slice(-6);
+}
 function renderIncassoOnchainProfilo(){
   const box = el('onchainIncassoProfilo');
   if (!box || !myOnchain || DEMO) return;
@@ -73652,7 +73671,8 @@ function renderIncassoOnchainProfilo(){
      l'unica cosa da compilare; la scelta di come ricevi viene dopo */
   box.innerHTML = `<div class="payout"><h4>Dove ricevi i bitcoin</h4>` + (myOnchainIncasso
     ? `<div class="hint" style="color:var(--ok);margin-top:10px"><b>✅ Ricevi nel tuo wallet</b>
-         (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}).
+         (${myOnchainIncasso === 'xpub' ? 'la chiave del conto: un indirizzo nuovo a ogni vendita' : 'un tuo indirizzo'}${myOnchainIncassoVista
+           ? `, <span class="mono">${esc(myOnchainIncassoVista)}</span>` : ''}).
          Per cambiarlo, incolla qui sotto.
          <button type="button" class="btn link" onclick="onchainIncassoTogli(this)">Togli</button></div>`
     : `<div class="hint" style="margin-top:10px"><b>Non hai ancora scelto dove ricevere on-chain.</b>
@@ -74116,6 +74136,7 @@ function onchainIncassoTogli(btn){
           body: JSON.stringify({tipo: 'barattolo'})});
         if (!r.ok) throw new Error(((await r.json().catch(() => ({}))).detail) || 'non tolto');
         myOnchainIncasso = '';
+        myOnchainIncassoVista = '';
         onchainSrv = null;
         toast('Tolto: per i prossimi scambi l\'app ti chiederà dove ricevere', 5000);
       } catch(e) { toast('⚠️ ' + (e.message || 'non tolto'), 6000); }
@@ -74151,6 +74172,7 @@ async function onchainIncassoSalva(btn, pref){
       ? `✅ Salvato: ricevi nel tuo wallet, anche per ${x.ordini_aggiornati === 1 ? 'la vendita che aspettava' : x.ordini_aggiornati + ' vendite che aspettavano'}`
       : '✅ Salvato: dalle prossime vendite ricevi nel tuo wallet', 5000);
     myOnchainIncasso = tipo;
+    myOnchainIncassoVista = accorciaIncassoOnchain(valore);
     onchainSrv = null;
     renderIncassoOnchainProfilo();
     renderChecklist();
@@ -122701,6 +122723,7 @@ async function avvia(){
        nelle card nella home»): la fotografia poteva arrivare prima di /api/me */
     if (typeof renderVetrinaP2P === 'function') setTimeout(renderVetrinaP2P, 0);
     myOnchainIncasso = me.onchain_incasso || '';
+    myOnchainIncassoVista = me.onchain_incasso_vista || '';
     myOnchainLn = me.onchain_ln || {attivo: false};
     /* le co-firme on-chain che aspettano me partono da sole (tappa 3) */
     if (myOnchain) setTimeout(onchainCofirmeInSottofondo, 3000);

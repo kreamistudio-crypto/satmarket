@@ -95016,3 +95016,88 @@ passate, 2 rosse e 2 saltate per l'ambiente (lo `config.py` d'esempio con la
 chiave segnaposto dell'assistente, rigirata verde senza; nostr-tools che in
 cloud non c'è); `collaudi_ci.py --elenco ci/collaudi.txt` 169 verdi, 0 rossi.
 Rebase sul giroconto interno: rigirate le sezioni toccate.
+
+## L'Assistenza apre anche i nativi Nostr: l'id come testo, fino a 19 cifre (23 nov 2026, cantiere assistenza-id-nostr; Andrea, col bot che gli diceva «Assistenza: scrive Zzap (n. -5945373116987485543)»: «Clicco, ma non mi trova l'utente. Non so come rispondergli», e «quando clicco sul link di Telegram mi porta alla home del mercatino… Dovrebbe portarmi direttamente lì»)
+
+IL GUASTO. Zzap è un nativo Nostr: il suo tg_id nasce da
+`tg_id_da_pubkey`, in [-2^63, -1], cioè fino a 19 cifre. Due difetti, una
+causa sola. (1) `/api/admin/assistenza` mandava `utente` come NUMERO JSON,
+e oltre il 2^53 di JavaScript il numero arriva arrotondato
+(-5945373116987485543 diventa -5945373116987485696): `Number(c.utente)`
+nell'elenco e nella fetch chiedeva al server un utente che non esiste,
+quindi «Utente non trovato» e la pagina ferma su «Carico la
+conversazione…», anche da «Tutte le conversazioni». (2) Le quattro forme
+del tasto dell'avviso (`_link_dentro_telegram` nel server,
+`percorsoDaStartapp`, `startappDaLink` e `ASSISTENZA_URL` nella Mini App)
+accettavano al massimo 16 cifre: con 19 il link restava quello del sito e
+la Mini App si apriva in home. Era già segnato come «visto strada
+facendo» nella voce di «Da scoprire» (myTgId arrotondato).
+
+COM'È ADESSO. Il server manda `utente` come TESTO nell'elenco e nella
+conversazione (`str(...)`); la Mini App lo tiene testo con
+`idAssistenza(x)` (solo `-?[1-9][0-9]{0,18}`, altrimenti vuoto), che sta
+nel tocco dell'elenco (tra apici), in `apriConversazioneAdmin`, in
+`apriAssistenzaDaUrl` e nelle due fetch. Le quattro forme del tasto
+salgono a 19 cifre. Le rotte del server non cambiano (`utente: int` di
+FastAPI legge le 19 cifre esatte). Nessun testo nuovo.
+
+RISPOSTO A ZZAP NEL FRATTEMPO. Col sì di Andrea («fallo tu»), dal suo
+Chrome entrato su barattolo.store come admin: una fetch POST alla rotta
+con l'id esatto (23 nov, 20:19), `ok: true`, l'avviso è partito.
+
+STRADE SCARTATE. Un BigInt in pagina (l'id non fa conti, è un nome: il
+testo basta ed è quel che fa già `idConto` del portachiavi); due campi,
+numero e testo (un doppione che qualcuno rileggerebbe dal lato
+sbagliato).
+
+PROVATO. `prove_assistenza_id_nostr` (8): in node la catena VERA della
+Mini App — l'elenco come lo manda il server, il tocco, la fetch che ne
+nasce (proprio `/api/admin/assistenza/-5945373116987485543`), nessun
+toast, il tasto dal sito e da Telegram, e forme storte (20 cifre,
+esponente, apici) che restano vuote. `collaudo_assistenza.py` (89, il
+nuovo `il_nativo_nostr`): elenco e conversazione con l'id esatto come
+testo, l'arrotondato che è un 404, la risposta dello staff con l'avviso
+al nativo, il tasto Telegram a 19 cifre e a -2^63, le 20 cifre che
+restano link del sito; le tre righe che confrontavano l'id come numero
+ora lo confrontano come testo. Controprove: Number() nella fetch, tetto 16
+in `percorsoDaStartapp` e in `ASSISTENZA_URL`, il tocco senza apici,
+`str` tolto nel server, tetto 16 nel server → tutte rosse, rimesse a
+posto → verdi.
+
+DA GUARDARE. Altri posti dove un id di nativo Nostr passa per un numero
+in JavaScript (`myTgId`, già noto): non toccati, fuori da questo cantiere.
+
+## L'indirizzo on-chain salvato si vede: l'inizio e la fine (23 nov 2026, cantiere indirizzo-visibile; Zzap in Assistenza: «ho impostato un indirizzo onchain, ma non lo vedo piu visibile», Andrea: «anche io quando ho impostato un indirizzo on-chain non lo vedo effettivamente nelle impostazioni», poi «magari mostralo, solo l'inizio e la fine»)
+
+PERCHÉ. In Profilo → «₿ On-chain» → «Dove ricevi i bitcoin», salvato
+l'indirizzo, la voce diceva solo «✅ Ricevi nel tuo wallet (un tuo
+indirizzo)»: /api/me portava il TIPO (`onchain_incasso`), mai il valore,
+e chi l'aveva salvato pensava di averlo perso.
+COM'È ADESSO. /api/me porta anche `onchain_incasso_vista`: otto
+caratteri, «…», sei (`onchain_accorcia`), solo per chi l'ha salvato e
+solo se la firma vale ancora (`_onchain_destinazione_mia`, la lettura
+che prima stava dentro `_onchain_incasso_mio`, ora condivisa). La pagina
+ha il gemello `accorciaIncassoOnchain` per il momento subito dopo il
+salvataggio, e la riga diventa «(un tuo indirizzo, bc1qw508…v8f3t4)»;
+per la chiave del conto lo stesso, dopo la sua frase. Nessuna parola
+nuova: solo il valore accorciato, in `mono`.
+STRADE SCARTATE. L'indirizzo intero (Andrea ha detto inizio e fine);
+accorciare solo in pagina mandando il valore intero (in /api/me basta
+il pezzo che si mostra).
+PROVATO. `prove_incasso_onchain_visto` (6): in node la pagina accorcia
+come il server valore per valore (corti, 16 e 17 caratteri, xpub), la
+riga del Profilo col pezzo e senza, salvataggio e «Togli» che la
+aggiornano, /api/me che la porta. `collaudo_onchain_incasso.py` (70):
+dopo il salvataggio vero /api/me dà inizio e fine e non l'intero, e
+tolta la scelta niente. Controprove: sei caratteri diventati cinque in
+pagina (2 rosse), la riga senza il pezzo (1 rossa), `onchain_accorcia`
+che restituisce tutto (1 rossa nel collaudo) → rimesse a posto, verdi.
+SAPERE DI TAPPO (Andrea: «Aggiungi al sapere di tappo tutte queste
+cose», dopo le risposte a Zzap): nome e foto vengono da Telegram o
+Nostr e la foto si sceglie o si spegne («📷 La tua foto» → «Nessuna»);
+la pausa degli ordini P2P (dove, i due modi, cosa vede chi guarda il
+libro, che vale solo dentro Barattolo), niente bozze e la pausa prima di
+pubblicare come strada; l'indirizzo on-chain salvato e il suo pezzo
+visibile. `conoscenza.md` rifatto.
+DA FARE. NOVITA.md non toccato: il ritocco è piccolo, e un post vorrebbe
+una frase nuova approvata da Andrea.
