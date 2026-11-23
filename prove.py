@@ -108091,10 +108091,12 @@ def prove_telegram_simulato_collaudo():
     # leve come file dal bot (sendDocument). Anche lui si ferma in collaudo.
     # ...E OTTO dal 17 nov 2026: `_foto_al_bot`, lo screenshot
     # dell'assistenza agli admin (sendPhoto coi byte). Guardia in cima.
-    prova("il censimento trova gli otto indirizzi di oggi",
+    # ...E NOVE dal 23 nov 2026: `id_utenti_telegram`, il file degli id
+    # Telegram degli utenti dal bot a chi lo chiede. Guardia prima.
+    prova("il censimento trova i nove indirizzi di oggi",
           ["_foto_al_bot", "_foto_profilo_telegram", "_getme_telegram",
            "_manda_telegram", "_posta_gruppo_admin", "_registra", "bot_api",
-           "leve_backup_telegram"], sorted(trovati))
+           "id_utenti_telegram", "leve_backup_telegram"], sorted(trovati))
     for nome, ok in sorted(trovati.items()):
         prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
 
@@ -156820,6 +156822,9 @@ def prove_freni():
            # 27 ott 2026: «Dove ricevi i sats» 10 all'ora, una leva
            # cambiata dal pannello 20 all'ora per admin
            "onchain_incasso": (10, 3600), "onchain_incasso_guarda": (40, 3600), "leva_pannello": (20, 3600),
+           # 23 nov 2026: il file degli id Telegram degli utenti, 5 all'ora
+           # per admin
+           "id_utenti": (5, 3600),
            # 28 ott 2026: il cambio in Lightning di chi vende (preventivo,
            # fattura, nascita) 40 all'ora
            "onchain_cambio": (40, 3600),

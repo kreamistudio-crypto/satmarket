@@ -94702,3 +94702,27 @@ fiamma; la voce senza banner girata in node (non spenta, il segno, la riga),
 l'etichetta e il ramo verso il cassetto, la frase dei Consigliati due volte;
 controprove rosse. Guardato con Playwright a 390 px, fino al cassetto
 aperto nel Profilo.
+## Gli id Telegram degli utenti in un file, dal pannello admin (23 nov 2026, cantiere scarica-id-utenti; Andrea: «mi servono gli id telegram degli utenti su barattolo», per un grafico di quanti membri di ogni gruppo Telegram sono già su Barattolo)
+
+COSA. Sotto l'elenco utenti delle statistiche admin c'è «📇 Mandami gli id
+Telegram degli utenti» (`admIdUtenti`): `POST /api/admin/id-utenti/telegram`
+manda dal bot, nella chat di chi lo chiede, un `.txt` con un `tg_id` per
+riga (solo `tg_id>0`). Il file si incrocia SUL PC di chi lo ha chiesto coi
+membri dei gruppi letti da uno userbot (fuori dal repo: lo script
+«gruppi in comune» nei file del progetto).
+
+DECISIONI. Solo i numeri: niente nomi, username, npub, perché per il conto
+bastano gli id, e un file che gira con meno dentro fa meno danno. Il file va
+in chat come il backup delle leve, mai nella risposta della rotta (la Mini
+App non scarica file, e una lista intera in un JSON finisce nelle cache).
+Solo admin (`e_admin`, la stessa lista che già vede l'elenco utenti coi
+nomi), freno `id_utenti` 5 l'ora, una riga «📇» nel journal a ogni
+richiesta. In collaudo si ferma prima di Telegram e dice solo quanti.
+SCARTATI: la query sul VPS lanciata a mano (chi la chiedeva non ha accesso
+al VPS); un export CSV con nomi (più dati del necessario).
+
+PROVATO. `collaudo_id_utenti` (nella gabbia e in `ci/collaudi.txt`): 403 a
+chi non è admin, il conto senza i solo-Nostr, il freno alla sesta. Il
+censimento degli indirizzi Telegram di `prove.py` ne conta nove.
+
+DA GUARDARE. Il primo invio vero dal bot in produzione.
