@@ -94657,3 +94657,48 @@ dell'animazione; controprove rosse. Guardato con Playwright a 390 px.
 
 DA GUARDARE. Il modo di aprire il negozio da «Da scoprire» (pagina che sale
 dal basso, appendice, com'è): esempi in video mandati, aspetta la scelta.
+
+## Promuovi senza freccia e in cima alla scheda, nei colori del razzo (23 nov 2026, cantiere promuovi-apre-da-sola; Andrea: «nel foglio promuovi non ci deve essere la freccia, l'appendice si apre nel momento in cui selezioni quella promozione», poi «il tasto promuovi deve essere in cima a tutto, tra la foto e il nome dell'oggetto, col colore del razzo, giallo, rosso, bello evidente»)
+
+COSA. Nel foglio di `apriPromuovi` non c'è più il tasto rotondo con la
+freccia (`guardaPromo`, `FRECCIA_GUARDA` e `.promo-guarda` tolti): scegliere
+una voce (`scegliVocePromo`, dal radio o da una durata di In evidenza) apre
+la SUA anteprima e chiude le altre, e la fa ripartire da capo. La prima voce
+libera è scelta di serie, quindi la sua anteprima è già aperta quando il
+foglio si apre (`vocePromoHTML` la disegna senza `hidden`). Nella scheda del
+proprio annuncio il tasto «Promuovi» è salito in cima a `.detail-body`, fra
+la foto e la data/il titolo (classe `in-cima`), con le guardie del blocco del
+proprietario (mio, non asta, non esaurito) più le sue. La tinta è il razzo:
+fiamma dal giallo al rosso (`#FFC23D → #FF7417 → #E1251B`), scritta bianca
+con ombra calda, alone rosso sotto; resta il riflesso lucido della porta
+Streak. Vale anche per il tasto del cassetto del banner.
+
+IL NEGOZIO SENZA BANNER (stesso giorno, Andrea: «se non ha il banner
+glielo farei fare in questo momento», e la scritta «Prima fai il banner»
+approvata). La voce «Il negozio in Da scoprire» non è più spenta senza
+banner: si sceglie, apre l'anteprima, porta sotto la frase di prima in
+arancio (`serve`, `.promo-serve`), e il tasto in fondo diventa «Prima fai
+il banner» (`etichettaPromo`, rifatto da `scegliVocePromo` a ogni scelta):
+toccato, `apriCassettoProfilo('accBanner')`. Il server rifiutava già la
+compra senza banner, e continua. Col cassetto spento (`bannerLeve.attivo`
+falso) la voce resta spenta come prima: non c'è dove portarlo. In più la
+voce, e il foglio del cassetto (`chiediPromoScoprire`), dicono «Finiti i 30
+giorni, il negozio resta per sempre nei Consigliati.» (`scoprireSempre`,
+frase dettata da Andrea).
+
+DECISIONI. Una sola anteprima aperta alla volta: è l'appendice della scelta.
+Una voce spenta non si sceglie, quindi la sua anteprima non si apre: prima
+la freccia la mostrava. Il banner NON entra nei 50.000 (proposto e
+lasciato, Andrea d'accordo): resta per sempre sul negozio, chi l'ha già
+pagato ci perderebbe, e con la card pagata prima di un banner rifiutato il
+rimborso sarebbe a mano. Tutto in una pagina sola scartato: il moderatore
+fa comunque tornare dopo, e sarebbero due copie del caricamento banner.
+
+PROVATO. `prove_promozioni` 7b: la voce girata in node (nessuna freccia,
+prima voce aperta, le altre chiuse, `onchange` su `scegliVocePromo`), il
+codice di `scegliVocePromo` e il passaggio da `scegliGiorniPromo`, zero
+resti della freccia, il tasto prima di data e titolo e dopo la foto, la
+fiamma; la voce senza banner girata in node (non spenta, il segno, la riga),
+l'etichetta e il ramo verso il cassetto, la frase dei Consigliati due volte;
+controprove rosse. Guardato con Playwright a 390 px, fino al cassetto
+aperto nel Profilo.

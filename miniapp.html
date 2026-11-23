@@ -1492,12 +1492,12 @@
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
   /* LE VOCI DI «Promuovi» (23 nov 2026; ritoccate la sera, Andrea: tre
-     voci e non quattro, icone disegnate e non emoji, e un tasto accanto a
-     ogni voce che apre sotto l'anteprima animata di cosa succede). Radio
+     voci e non quattro, icone disegnate e non emoji; poi niente freccia:
+     la voce scelta apre da sola sotto l'anteprima animata). Radio
      dentro la testata del foglio di casa, la scelta accesa in arancio ₿. */
   .promo-scelte{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left}
-  .promo-voce{display:grid;grid-template-columns:1fr auto;align-items:center;
-    column-gap:8px;padding:10px 10px 10px 12px;border:1.5px solid var(--line);
+  .promo-voce{display:grid;grid-template-columns:1fr;align-items:center;
+    padding:10px 10px 10px 12px;border:1.5px solid var(--line);
     border-radius:12px}
   .promo-riga{display:flex;gap:10px;align-items:center;cursor:pointer;min-width:0}
   .promo-riga input{margin:0;accent-color:var(--sats-deep);flex:none}
@@ -1512,15 +1512,10 @@
   .promo-voce small{display:block;font-size:12.5px;color:var(--ink-soft);
     font-weight:600;line-height:1.4;margin-top:2px}
   .promo-voce.spenta .promo-riga{opacity:.55;cursor:default}
+  .promo-voce small.promo-serve{color:var(--sats-deep);margin-top:4px}
   /* la scelta accesa la dice il titolo in arancio, dal fratello del
      radio: `:has()` in questo file non entra (prove_tastiera_iphone) */
   .promo-riga input:checked ~ .promo-testo b{color:var(--sats-deep)}
-  .promo-guarda{width:38px;height:38px;border-radius:50%;flex:none;cursor:pointer;
-    border:1.5px solid var(--line);background:var(--card);color:var(--sats-deep);
-    display:flex;align-items:center;justify-content:center;padding:0}
-  .promo-guarda svg{width:16px;height:16px;transition:transform .25s}
-  .promo-guarda[aria-expanded="true"]{background:var(--sats-soft);border-color:var(--sats-deep)}
-  .promo-guarda[aria-expanded="true"] svg{transform:rotate(90deg)}
   .promo-durate{grid-column:1 / -1;display:flex;gap:6px;margin-top:8px;padding-left:24px}
   .promo-durata{flex:1;min-width:0;font:inherit;font-size:12.5px;font-weight:800;
     padding:8px 6px;border-radius:10px;cursor:pointer;color:var(--ink);
@@ -1582,14 +1577,18 @@
   /* IL TASTO «Promuovi» (23 nov 2026 sera, Andrea: «colorato in un certo
      modo, simile al tasto della classifica degli streak»): la stessa carta
      lucida della porta della Classifica Streak (il riflesso chiaro
-     nell'angolo, la discesa verso lo scuro, il filo bianco), ma BRACE,
-     una delle quattro tinte che Andrea aveva visto per quella porta: cosi'
-     i due tasti si riconoscono come fratelli e non si confondono. */
+     nell'angolo, il filo bianco). La tinta e' quella del RAZZO (ritocco
+     dello stesso giorno, Andrea: «giallo, rosso, bello evidente»; prima
+     era brace scura): la fiamma dal giallo al rosso, la scritta bianca
+     con l'ombra calda che la tiene leggibile anche sul giallo, e un
+     alone rosso sotto che lo stacca dalla pagina. */
   .btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
-      linear-gradient(160deg,#C2410C 0%,#6B1D04 100%),#6B1D04;
-    border:1px solid rgba(255,255,255,.14);color:#FFF7EC;
+      linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%),#E1251B;
+    border:1px solid rgba(255,255,255,.28);color:#FFFFFF;
+    text-shadow:0 1px 2px rgba(110,18,0,.6);box-shadow:0 6px 18px -6px rgba(225,37,27,.65);
     display:flex;align-items:center;justify-content:center;gap:8px}
-  .btn.promo-porta svg{width:18px;height:18px;flex:none}
+  .btn.promo-porta svg{width:18px;height:18px;flex:none;filter:drop-shadow(0 1px 1.5px rgba(110,18,0,.6))}
+  .btn.promo-porta.in-cima{margin:0 0 14px}
   /* IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea, che
      ROVESCIA il dondolio alla mascotte vissuto un'ora: il bottone
      resta FERMO — e con lui bersaglio, anello e :active — quindi il
@@ -37549,6 +37548,14 @@ function openDetail(id){
   el('detailContent').innerHTML = `
     ${foto}
     <div class="detail-body">
+      ${/* «Promuovi» IN CIMA A TUTTO (23 nov 2026, Andrea: «appena apro un
+           mio annuncio, fra la foto e il nome dell'oggetto»): prima stava
+           nella colonna del proprietario accanto alla lampo, in fondo.
+           Le guardie sono quelle di quel blocco (mio, non asta, non
+           esaurito) piu' le sue: non in ferie (l'annuncio si vede ma non
+           si compra) e solo a cassa aperta, che un bottone verso un muro
+           e' peggio di nessun bottone. */''}${mio && !asta && !esa && promoAttive && !inFerie(l) && !DEMO && !VETRINA
+        ? `<button class="btn promo-porta in-cima" onclick="apriPromuovi(${l.id})">${ICONA_PROMO.porta}Promuovi</button>` : ''}
       ${dataRiga(l)}
       <h2>${titoloConCondizione(l)}</h2>
       ${luogoRiga(l)}
@@ -37653,12 +37660,6 @@ function openDetail(id){
            ${!(lampoLeve && lampoLeve.attive) || inFerie(l) ? '' : (lampoAttiva(l)
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
-           ${/* «🚀 Promuovi» (23 nov 2026, le promozioni a pagamento): un
-                'occasione' come la lampo, quindi le sta accanto. Non in
-                ferie (l'annuncio si vede ma non si compra) e solo a
-                cassa aperta, che un bottone verso un muro e' peggio di
-                nessun bottone. */''}${promoAttive && !inFerie(l) && !DEMO && !VETRINA
-             ? `<button class="btn promo-porta" onclick="apriPromuovi(${l.id})">${ICONA_PROMO.porta}Promuovi</button>` : ''}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <!-- LA PORTA DEL DUPLICATO (ago 2026), e sta SUBITO DOPO
                 la modifica perche' sono i due gesti che partono da
@@ -53089,6 +53090,9 @@ async function verificaSlugNegozio(pid){
 let promoScelta = '';
 let promoGiorni = 0;         // la durata scelta dentro «In evidenza»
 let promoInCorso = null;     // {pid, tipo} della fattura aperta
+let promoServeBanner = false; // il negozio non ha ancora il banner approvato
+const scoprireSempre = giorni =>
+  `Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`;
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
   {day: 'numeric', month: 'long'});
 const oraPromo = ts => new Date(ts * 1000).toLocaleString('it-IT',
@@ -53102,7 +53106,6 @@ const ICONA_PROMO = {
   scoprire: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M4 9.5 5.4 4.5h13.2L20 9.5"/><path class="ip-l" d="M4 9.5c0 1.4 1 2.4 2.2 2.4s2.3-1 2.3-2.4c0 1.4 1 2.4 2.3 2.4h.4c1.3 0 2.3-1 2.3-2.4 0 1.4 1.1 2.4 2.3 2.4S20 10.9 20 9.5"/><path class="ip-l" d="M5.5 12.3V20h13v-7.7M10 20v-4.3h4V20"/></svg>',
   porta: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M13.5 15.5 8.5 10.5C10 6 13.5 3.5 20.5 3.5c0 7-2.5 10.5-7 12z"/><circle class="ip-l" cx="15" cy="9" r="1.6"/><path class="ip-l" d="M8.5 10.5H5l2.5-3.2h3.4M13.5 15.5V19l3.2-2.5v-3.4M6.6 15.4c-1.5.6-2.3 2.3-2.4 4.4 2.1-.1 3.8-.9 4.4-2.4"/></svg>'
 };
-const FRECCIA_GUARDA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-p" d="M8 5.5v13l10-6.5z"/></svg>';
 /* L'ANTEPRIMA DI OGNI VOCE: un disegnino, mai una schermata vera, e
    nessuna parola tranne l'etichetta che l'annuncio prende davvero.
    «In cima»: il tuo annuncio (bordo arancio) risale la lista e parte
@@ -53123,27 +53126,35 @@ function vocePromoHTML(v, prima){
       onclick="scegliGiorniPromo(this, ${x.giorni})">${x.giorni} giorni, ${fmt(x.sats)} sats</button>`).join('');
   return `<div class="promo-voce${v.no ? ' spenta' : ''}">
     <label class="promo-riga">
-      <input type="radio" name="promoTipo" value="${esc(v.tipo)}"${v.no ? ' disabled' : ''}${prima ? ' checked' : ''}
-             onchange="promoScelta=this.value">
+      <input type="radio" name="promoTipo" value="${esc(v.tipo)}"${v.no ? ' disabled' : ''}${prima ? ' checked' : ''}${v.serve ? ' data-serve="banner"' : ''}
+             onchange="scegliVocePromo(this)">
       <span class="promo-ico">${ICONA_PROMO[v.tipo] || ''}</span>
-      <span class="promo-testo"><b>${esc(v.titolo)}</b><small>${esc(v.no || v.testo)}</small></span>
+      <span class="promo-testo"><b>${esc(v.titolo)}</b><small>${esc(v.no || v.testo)}</small>${
+        v.serve ? `<small class="promo-serve">${esc(v.serve)}</small>` : ''}</span>
     </label>
-    <button type="button" class="promo-guarda" aria-expanded="false"
-            aria-label="Guarda cosa succede" onclick="guardaPromo(this)">${FRECCIA_GUARDA}</button>
     ${durate ? `<div class="promo-durate">${durate}</div>` : ''}
-    <div class="promo-ante" hidden>${ANTEPRIMA_PROMO[v.tipo] || ''}</div>
+    <div class="promo-ante"${prima ? '' : ' hidden'}>${ANTEPRIMA_PROMO[v.tipo] || ''}</div>
   </div>`;
 }
-/* il tasto accanto alla voce apre e chiude la sua anteprima; l'animazione
-   riparte da capo a ogni apertura (il riquadro nasce di nuovo) */
-function guardaPromo(b){
-  const v = b.closest('.promo-voce');
-  const a = v && v.querySelector('.promo-ante');
-  if (!a) return;
-  const apri = a.hidden;
-  if (apri) a.innerHTML = a.innerHTML;
-  a.hidden = !apri;
-  b.setAttribute('aria-expanded', apri ? 'true' : 'false');
+/* SCEGLIERE UNA VOCE APRE LA SUA ANTEPRIMA (23 nov 2026, Andrea:
+   «niente freccia, l'appendice si apre quando selezioni la promozione»):
+   un'anteprima sola aperta, quella della voce scelta, e la prima e' gia'
+   aperta quando il foglio si apre. L'animazione riparte da capo a ogni
+   scelta (il riquadro nasce di nuovo). */
+function scegliVocePromo(r){
+  promoScelta = r.value;
+  /* la voce del negozio senza banner si sceglie lo stesso, e allora il
+     tasto in fondo non paga: porta al cassetto del banner */
+  const ok = el('confOk');
+  if (ok) ok.textContent = etichettaPromo(!!r.dataset.serve);
+  const v = r.closest('.promo-voce');
+  const tutte = v && v.closest('.promo-scelte');
+  if (!tutte) return;
+  tutte.querySelectorAll('.promo-ante').forEach(a => {
+    const sua = a.closest('.promo-voce') === v;
+    if (sua && a.hidden) a.innerHTML = a.innerHTML;
+    a.hidden = !sua;
+  });
 }
 /* la durata dentro «In evidenza»: sceglierla sceglie anche la voce */
 function scegliGiorniPromo(b, giorni){
@@ -53152,8 +53163,9 @@ function scegliGiorniPromo(b, giorni){
   v.querySelectorAll('.promo-durata').forEach(x =>
     x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
   const r = v.querySelector('input[name="promoTipo"]');
-  if (r && !r.disabled) { r.checked = true; promoScelta = r.value; }
+  if (r && !r.disabled) { r.checked = true; scegliVocePromo(r); }
 }
+const etichettaPromo = serve => serve ? 'Prima fai il banner' : 'Paga';
 async function apriPromuovi(aid){
   haptic();
   if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
@@ -53186,13 +53198,25 @@ async function apriPromuovi(aid){
       no: (!!e.libero_da && !e.fino)
         ? `I posti sono tutti presi: il prossimo si libera il ${dataPromo(e.libero_da)}` : ''});
   }
+  /* SENZA BANNER LA VOCE SI SCEGLIE LO STESSO (23 nov 2026, Andrea:
+     «se non ha il banner glielo farei fare in questo momento»): prima
+     era spenta. Scelta, il tasto in fondo diventa «Prima fai il banner»
+     e porta al cassetto del banner nel Profilo, gia' aperto: il banner
+     passa da un moderatore, quindi la card si compra dopo, da qui. E la
+     voce dice che finiti i giorni il negozio resta nei Consigliati.
+     Col cassetto del banner spento (la sua leva) non c'e' dove portarlo:
+     allora la voce resta spenta come prima, con la stessa frase. */
   const sc = n.scoprire || {};
+  const cassettoBanner = !!(bannerLeve && bannerLeve.attivo);
+  promoServeBanner = sc.sats > 0 && !sc.banner && cassettoBanner;
   if (sc.sats > 0)
     voci.push({tipo: 'scoprire',
       titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
-      testo: sc.fino ? `È già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
-                     : 'La card del tuo negozio in home, dopo l\'ok del moderatore.',
-      no: sc.banner ? '' : 'Prima serve il banner del negozio approvato: la card è fatta con quello'});
+      testo: (sc.fino ? `È già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
+                      : 'La card del tuo negozio in home, dopo l\'ok del moderatore.')
+           + ` ${scoprireSempre(sc.giorni)}`,
+      serve: promoServeBanner ? 'Prima serve il banner del negozio approvato: la card è fatta con quello' : '',
+      no: (sc.banner || cassettoBanner) ? '' : 'Prima serve il banner del negozio approvato: la card è fatta con quello'});
   if (!voci.length) { toast('Le promozioni non sono attive al momento', 5000); return; }
   const libera = voci.find(v => !v.no);
   promoScelta = libera ? libera.tipo : '';
@@ -53201,9 +53225,10 @@ async function apriPromuovi(aid){
     testata: `<div class="promo-scelte">${voci.map(v =>
       vocePromoHTML(v, libera && v.tipo === libera.tipo)).join('')}</div>`,
     corpo: 'Si paga una volta, in sats. Non è un abbonamento.',
-    etichetta: 'Paga', soldi: true,
+    etichetta: etichettaPromo(!!(libera && libera.serve)), soldi: true,
     poi: () => {
       if (!promoScelta) { toast('Per ora non c\'è una promozione libera', 5000); return; }
+      if (promoScelta === 'scoprire' && promoServeBanner) return apriCassettoProfilo('accBanner');
       if (promoScelta === 'scoprire') return pagaPromo('scoprire', 0);
       if (promoScelta === 'evidenza') return pagaPromo('evidenza:' + promoGiorni, aid);
       return pagaPromo(promoScelta, aid);
@@ -53289,7 +53314,8 @@ async function chiediPromoScoprire(){
   if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
   chiediConferma({
     titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
-    corpo: 'La card del tuo negozio in home, dopo l\'ok del moderatore.'
+    corpo: 'La card del tuo negozio in home, dopo l\'ok del moderatore. '
+         + scoprireSempre(sc.giorni)
          + (sc.fino ? `\n\nÈ già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
          + '\n\nSi paga una volta, in sats. Non è un abbonamento.',
     etichetta: 'Paga', soldi: true,

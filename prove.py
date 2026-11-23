@@ -220567,9 +220567,10 @@ console.log(JSON.stringify([a, b, c]));""")
     # ---- 7b. IL FOGLIO «Promuovi» RITOCCATO (23 nov 2026 sera, Andrea
     # dal collaudo): TRE voci (i 7 e i 15 giorni sono una voce sola con
     # la durata dentro, e la terza e' il negozio in Da scoprire), icone
-    # disegnate e non emoji, e accanto a ogni voce il tasto che apre
-    # l'anteprima animata. Il tasto «Promuovi» ha la carta lucida della
-    # porta della Classifica Streak, in brace.
+    # disegnate e non emoji, e l'anteprima animata della voce scelta
+    # (poi senza freccia: si apre scegliendo, e la prima e' gia' aperta).
+    # Il tasto «Promuovi» ha la carta lucida della porta della Classifica
+    # Streak, nei colori del razzo, e sta in cima alla scheda.
     ap = pezzo_js(mini, "async function apriPromuovi(aid){", "\n}\n")
     prova("il foglio ha tre voci: In cima, In evidenza, il negozio",
           (1, 1, 1, 0),
@@ -220584,12 +220585,11 @@ console.log(JSON.stringify([a, b, c]));""")
               ap + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n"))))
     prova("...e il tasto Promuovi, nella scheda e nel cassetto, porta il "
           "razzo disegnato e la carta lucida", (2, 0),
-          (mini.count('class="btn promo-porta"'), mini.count("🚀 Promuovi</button>")))
+          (mini.count('class="btn promo-porta'), mini.count("🚀 Promuovi</button>")))
     prova("...la carta lucida e' la ricetta della porta Streak", True,
           ".btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,"
           "rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%)," in mini)
     _v = (pezzo_js(mini, "const ICONA_PROMO = {", "\n};") + "\n};\n"
-          + "const FRECCIA_GUARDA = '';\n"
           + pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};") + "\n};\n"
           + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n") + "\n}\n")
     r = _node_banco("""
@@ -220603,22 +220603,69 @@ const sp = vocePromoHTML({tipo: 'scoprire', titolo: 'N', testo: 't', no: 'serve 
 const conta = (h, x) => h.split(x).length - 1;
 console.log(JSON.stringify([conta(ev, 'class="promo-durata"'),
   conta(ev, 'aria-pressed="true"'), ev.includes('onclick="scegliGiorniPromo(this, 15)"'),
-  conta(ev, 'class="promo-guarda"'), ev.includes('class="promo-ante" hidden>'),
-  ev.includes('pa-eti'), ev.includes('<svg'),
-  sp.includes(' disabled'), conta(sp, 'class="promo-guarda"'), sp.includes('pa-s2'),
+  conta(ev, 'promo-guarda'), ev.includes('class="promo-ante">'),
+  ev.includes('pa-eti'), ev.includes('<svg'), ev.includes('onchange="scegliVocePromo(this)"'),
+  sp.includes(' disabled'), sp.includes('class="promo-ante" hidden>'), sp.includes('pa-s2'),
   sp.includes('serve il banner')]));""")
     if r is None:
         salta("la voce del foglio, girata in node", "node non c'e'")
     else:
-        prova("la voce: la durata accesa dentro In evidenza, il tasto "
-              "dell'anteprima e il riquadro chiuso; anche la voce spenta "
-              "si puo' guardare", [2, 1, True, 1, True, True, True,
-                                   True, 1, True, True], r)
-    prova("il tasto apre e chiude la SUA anteprima, e la fa ripartire",
+        prova("la voce: la durata accesa dentro In evidenza, nessuna "
+              "freccia, la prima voce con l'anteprima gia' aperta e le "
+              "altre chiuse", [2, 1, True, 0, True, True, True, True,
+                               True, True, True, True], r)
+    _sv = pezzo_js(mini, "function scegliVocePromo(r){", "\n}\n")
+    prova("scegliere una voce apre la SUA anteprima, chiude le altre e la "
+          "fa ripartire; la durata sceglie passando di li'",
+          (True, True, True, True, 0),
+          ("promoScelta = r.value;" in _sv,
+           "a.hidden = !sua;" in _sv,
+           "if (sua && a.hidden) a.innerHTML = a.innerHTML;" in _sv,
+           "r.checked = true; scegliVocePromo(r);" in pezzo_js(
+               mini, "function scegliGiorniPromo(b, giorni){", "\n}\n"),
+           mini.count("promo-guarda") + mini.count("guardaPromo")
+           + mini.count("FRECCIA_GUARDA")))
+    _dc = mini[mini.index("el('detailContent').innerHTML = `"):]
+    prova("il tasto Promuovi sta in cima alla scheda, fra la foto e il "
+          "titolo, solo sul mio annuncio vendibile",
           (True, True, True),
-          ("b.closest('.promo-voce')" in pezzo_js(mini, "function guardaPromo(b){"),
-           "a.innerHTML = a.innerHTML;" in pezzo_js(mini, "function guardaPromo(b){"),
-           "b.setAttribute('aria-expanded'" in pezzo_js(mini, "function guardaPromo(b){")))
+          (_dc.index('class="btn promo-porta in-cima"') < _dc.index("${dataRiga(l)}")
+           < _dc.index("<h2>${titoloConCondizione(l)}</h2>"),
+           _dc.index("${foto}") < _dc.index('class="btn promo-porta in-cima"'),
+           "mio && !asta && !esa && promoAttive && !inFerie(l) && !DEMO && !VETRINA" in mini))
+    prova("il negozio senza banner si sceglie lo stesso: niente piu' voce "
+          "spenta (se il cassetto del banner c'e'), la riga che lo dice e il "
+          "tasto che porta al banner", (True, True, True, True, True, True),
+          ("serve: promoServeBanner ? 'Prima serve il banner" in ap,
+           "no: (sc.banner || cassettoBanner) ? ''" in ap
+           and "&& !sc.banner && cassettoBanner;" in ap,
+           "if (promoScelta === 'scoprire' && promoServeBanner) return "
+           "apriCassettoProfilo('accBanner');" in ap,
+           "etichetta: etichettaPromo(!!(libera && libera.serve))" in ap,
+           "const etichettaPromo = serve => serve ? 'Prima fai il banner' : 'Paga';" in mini,
+           "if (ok) ok.textContent = etichettaPromo(!!r.dataset.serve);" in _sv))
+    _vs = _node_banco("""
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => String(n);
+let promoGiorni = 15;
+""" + _v + """
+const a = vocePromoHTML({tipo: 'scoprire', titolo: 'N', testo: 't', serve: 'serve il banner'}, false);
+const b = vocePromoHTML({tipo: 'scoprire', titolo: 'N', testo: 't'}, true);
+console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="banner"'),
+  a.includes('<small class="promo-serve">serve il banner</small>'),
+  b.includes('data-serve'), b.includes('promo-serve')]));""")
+    if _vs is None:
+        salta("la voce del negozio senza banner, girata in node", "node non c'e'")
+    else:
+        prova("...in node: la voce senza banner non e' spenta, porta il segno "
+              "e la riga arancio; col banner niente dei due",
+              [False, True, True, False, False], _vs)
+    prova("...e la voce dice che finiti i giorni il negozio resta nei "
+          "Consigliati, anche dal cassetto del banner", (True, 2),
+          ("`Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`" in mini,
+           mini.count("scoprireSempre(sc.giorni)")))
+    prova("...nei colori del razzo, dal giallo al rosso", True,
+          "linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%)" in mini)
     prova("...e con gli effetti ridotti resta il disegno d'arrivo: lo stato "
           "fermo e' quello finale, i fotogrammi partono da prima", True,
           "@keyframes pa-r1{0%,25%{top:84px}55%,100%{top:8px}}" in mini
