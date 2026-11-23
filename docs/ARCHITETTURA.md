@@ -38486,6 +38486,6 @@ mai il kind 0 di nessuno: regola ferrea 2).
   dopo, `armaScorriScoprire` arma pausa al tocco, osservatore e ricalcolo
   allo scroll (un fotogramma).
   Il foglio di `apriPromuovi` (23 nov sera): tre voci (`vocePromoHTML`,
-  icone `ICONA_PROMO`, anteprime `ANTEPRIMA_PROMO` aperte da `guardaPromo`,
+  icone `ICONA_PROMO`, anteprime `ANTEPRIMA_PROMO` aperte da `scegliVocePromo` (la voce scelta, una sola aperta),
   durata di In evidenza in `promoGiorni`), due letture del listino in
-  parallelo; il tasto `.btn.promo-porta`.
+  parallelo; il tasto `.btn.promo-porta` (in cima a `.detail-body`, classe `in-cima`).
