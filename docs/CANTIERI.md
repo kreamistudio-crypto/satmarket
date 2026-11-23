@@ -94979,13 +94979,23 @@ niente «paga in euro», il gancio, la scelta e il passo in node).
 
 DA FARE PRIMA DI ACCENDERE. 1) La scritta del prezzo saltato, da far
 approvare; le difese della F3 (la spunta dei venditori di sats e la lista
-di fiducia, il limite per i nuovi). 2) La prova: il P2P del collaudo usa il nodo di
-produzione, quindi la `-bar13` va sul nodo (a variabili spente è identica
-alla `-bar12`) e il giroconto si prova con un ordine piccolo, deciso con
-Andrea. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta
+di fiducia, il limite per i nuovi). 2) La prova: il collaudo ha i pagamenti FINTI
+(LNbits FakeWallet), il deposito non sta sul nodo e Mostro non può
+saldarlo; Andrea alle 21:01 ha scelto la prova in PRODUZIONE coi soli
+moderatori (il tasto è chiuso a loro di serie, `VIA_EURO_SOLO_ADMIN`):
+dopo la promozione, riserva e segreto sul VPS, `-bar13` sul nodo (a
+variabili spente è identica alla `-bar12`), un ordine piccolo. I comandi:
+DA-FARE-ANDREA, voce 31. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta
 proposta 300.000 sats), `LNBITS_RISERVA_ADMIN_KEY`, `P2P_GIROCONTO_SEGRETO`;
 sul nodo `BARATTOLO_GIROCONTO_URL` e `BARATTOLO_GIROCONTO_SEGRETO`. 4) Il
 rabbocco della riserva e il controllo di quadratura (riserva scesa = sats
 in più sul nodo dal lato di Mostro). 5) La ronda dei pagamenti del nodo
 non vede uscire niente per i giroconti (nessun pagamento LND): da
 verificare che non lo legga come anomalia.
+
+PROVATO PRIMA DEL PUSH SU DEVELOP (23 nov sera, albero sopra
+origin/develop f28d4c69, i cinque commit del cantiere ribasati):
+`PROVE_SEVERE=1 python3 prove.py` 31.219 verdi, 1 rossa preesistente
+anche su develop («il riacciuffo cerca ancora i pagamenti sulle
+lapidi»), 3 saltate per l'ambiente; `collaudi_ci.py --elenco
+ci/collaudi.txt` 169 verdi, 0 rossi; `compileall` ok.
