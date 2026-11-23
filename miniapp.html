@@ -11100,6 +11100,8 @@
   .via-euro-sotto{font-size:13px;font-weight:600;color:var(--muted);text-align:center;margin:0 0 14px}
   .via-euro-metodi{display:flex;gap:10px;margin:0 0 14px}
   .via-euro-metodi > .btn{flex:1;min-width:0}
+  .via-euro-attesa{display:flex;align-items:center;justify-content:center;gap:10px;
+    font-size:15px;font-weight:700;color:var(--ink);padding:24px 0}
   /* la casella del Profilo, sotto i sette giorni: verde fiducia, non
      l'arancio della serie (quinto giro, 17 nov 2026) */
   .guida-wallet-box{margin-top:10px;background:var(--trust-soft);
@@ -83643,6 +83645,9 @@ function apriViaEuro(dove){
 }
 function renderViaEuro(){
   const box = el('viaEuroCorpo');
+  const tit = el('viaEuroTit');
+  if (tit) tit.textContent = 'Non hai sats?';
+  viaEuroSeguo = '';
   const o = viaEuroOfferta(viaEuroSats);
   if (!box) return;
   if (!o || !viaEuroScelto) { chiudiFoglioP2P('viaEuroSheet'); return; }
@@ -83697,6 +83702,8 @@ async function viaEuroContinua(){
     scriviOrdineP2P(o);
   }
   if (o && o.stato === 'attesa_mia_fattura') viaEuroDeposito(s.id);
+  /* ...e il foglio segue lo scambio, un passo alla volta */
+  if (o && o.viaEuro) viaEuroSegui(s.id);
 }
 /* LA FATTURA AL COORDINATORE E' IL DEPOSITO DELL'ORDINE: la cassa del
    server la conia per i sats esatti che il coordinatore ha chiesto
@@ -83730,9 +83737,93 @@ async function viaEuroDeposito(id){
     return true;
   } catch(e) {
     ve.inviando = false;
+    ve.fallito = true;
     toast('Il prezzo è cambiato: annulla lo scambio e riprova', 8000);
+    if (viaEuroSeguo === id) { viaEuroOrma = ''; renderViaEuroPasso(); }
     return false;
   } finally { if (rip) rip(); }
+}
+/* I PASSI DOPO «CONTINUA» (secondo giro, scritte approvate da Andrea il
+   23 nov 2026): lo stesso foglio segue lo scambio e dice UNA cosa per
+   volta. «Sto preparando il pagamento…» finche' chi vende non ha bloccato
+   i sats e lasciato il recapito; poi «Manda N € a Luca» col recapito (il
+   riquadro di sempre, coi suoi «Copia»), il tempo e «Ho pagato»; poi
+   «Luca sta controllando il pagamento». Il resto — una disputa, un
+   annullo, un pagamento da rifare — lo dice la pagina dello scambio, che
+   sta sotto il foglio: li' il foglio si fa da parte. Il gesto «Ho pagato»
+   e' quello della pagina (`euroInviatiP2P`, con la sua conferma). */
+let viaEuroSeguo = '';      // lo scambio che il foglio sta seguendo
+let viaEuroOrma = '';       // l'ultimo passo disegnato: si ridisegna solo se cambia
+let viaEuroBattito = null;
+/* PURA: a che punto e' lo scambio, per il foglio */
+function viaEuroPasso(o){
+  if (!o || P2P_FINALI.indexOf(o.stato) >= 0 || o.stato === 'rilasciato') return 'fine';
+  if (o.stato === 'euro_inviati') return 'controllo';
+  if (o.stato === 'attivo') return recapitoEuroArrivatoP2P(o) ? 'paga' : 'attesa';
+  if (['prendo', 'attesa_mia_fattura', 'attesa_hold_venditore'].indexOf(o.stato) >= 0) return 'attesa';
+  return 'pagina';
+}
+function viaEuroSegui(id){
+  viaEuroSeguo = id;
+  viaEuroOrma = '';
+  renderViaEuroPasso();
+  el('sheetBg').classList.add('open');
+  el('viaEuroSheet').classList.add('open');
+  if (!viaEuroBattito) viaEuroBattito = setInterval(() => {
+    const f = el('viaEuroSheet');
+    if (!viaEuroSeguo || !f || !f.classList.contains('open')) {
+      clearInterval(viaEuroBattito); viaEuroBattito = null; return;
+    }
+    renderViaEuroPasso();
+  }, 2000);
+}
+function renderViaEuroPasso(){
+  const box = el('viaEuroCorpo'), tit = el('viaEuroTit');
+  const o = ordiniP2P()[viaEuroSeguo];
+  let passo = viaEuroPasso(o);
+  /* il deposito rifiutato (prezzo saltato): lo scambio si annulla dalla
+     sua pagina, e il foglio non gira a vuoto */
+  if (passo === 'attesa' && o && o.stato === 'attesa_mia_fattura'
+      && (viaEuroInCorso[o.id] || {}).fallito) passo = 'pagina';
+  const orma = passo + ':' + (o ? o.stato : '') + ':' + (o && recapitoEuroArrivatoP2P(o) ? 1 : 0);
+  if (!box || orma === viaEuroOrma) return;
+  viaEuroOrma = orma;
+  if (passo === 'fine' || passo === 'pagina') {
+    viaEuroSeguo = '';
+    chiudiFoglioP2P('viaEuroSheet');
+    if (o) apriOrdineP2P(o.id);
+    return;
+  }
+  const nome = nomeControparteP2P(o, 'chi vende i sats');
+  if (passo === 'attesa') {
+    if (tit) tit.textContent = '';
+    box.innerHTML = '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>';
+    return;
+  }
+  if (passo === 'paga') {
+    if (tit) tit.textContent = 'Manda ' + String(o.euro) + ' € a ' + nome;
+    box.innerHTML = recapitoCompratoreP2P(o)
+      + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')
+      + '<button type="button" class="btn primary" onclick="viaEuroHoPagato()">Ho pagato</button>';
+    return;
+  }
+  if (tit) tit.textContent = nome + ' sta controllando il pagamento';
+  box.innerHTML = '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>';
+}
+function viaEuroHoPagato(){
+  const id = viaEuroSeguo;
+  if (!id) return;
+  haptic();
+  if (p2pOrdineAperto !== id) apriOrdineP2P(id);
+  euroInviatiP2P();
+}
+/* «RIPRENDI IL PAGAMENTO»: nella pagina dello scambio nato dalla cassa,
+   finche' c'e' un passo del foglio da fare */
+function viaEuroRiprendiP2P(o){
+  if (!o || !o.viaEuro || o.lato !== 'compro') return '';
+  const passo = viaEuroPasso(o);
+  if (passo !== 'attesa' && passo !== 'paga') return '';
+  return '<button type="button" class="btn orange" onclick="viaEuroSegui(\'' + esc(o.id) + '\')">Riprendi il pagamento</button>';
 }
 /* Il terzo passo, l'unica parte viva della guida.
    'paga': i primi sats (un amico, o il P2P se e' acceso e c'e' un
@@ -97511,6 +97602,9 @@ function renderOrdineP2P(){
        fine. Vive nel suo blocco, che si ridisegna da solo */
     (typeof bloccoChatScambioP2P === 'function' ? bloccoChatScambioP2P(o) : '') +
     '<!--scheda:passi-->' +
+    /* «Riprendi il pagamento» (23 nov 2026): lo scambio nato da «Non hai
+       sats?» riapre il suo foglio */
+    (typeof viaEuroRiprendiP2P === 'function' ? viaEuroRiprendiP2P(o) : '') +
     /* i recapiti stanno FRA il passo da fare e le uscite (fase 6, al
        posto della chat): quel che e' arrivato si mostra, quel che
        manca si chiede. Compaiono solo quando si sa con chi si sta

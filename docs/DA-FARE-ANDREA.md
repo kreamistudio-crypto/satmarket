@@ -1112,3 +1112,90 @@ rifiutato. L'espulsione si vede solo dopo 33 giorni: la ronda gira da sola.
 **ROLLBACK.** Togliere la riga (`cp -p
 /srv/barattolo/config.py.prima-abbonamento /srv/barattolo/config.py`) e
 riavviare: niente link né espulsioni, e gli abbonati già dentro restano.
+
+## 31. «Non hai sats?»: la prova vera del giroconto in produzione, coi moderatori (23 nov 2026, cantiere giroconto-interno)
+
+**Stato.** IN ATTESA DEL SÌ DI ANDREA sulla scelta (thread «Non hai sats?»):
+il collaudo ha i pagamenti FINTI (LNbits FakeWallet), il deposito non sta
+sul nodo e Mostro non lo può saldare, quindi la prova vera si fa in
+produzione col tasto visibile ai soli moderatori (`VIA_EURO_SOLO_ADMIN`,
+di serie True: arriva con la promozione, nessuna riga da scrivere).
+
+**Perché.** Chi non ha sats compra un oggetto pagando euro nel P2P: Mostro
+chiede al server «la saldi tu?», il server controlla la garanzia di chi
+vende i sats e paga il deposito dal portafoglio «riserva». Il giro intero:
+Cantieri, «Il giroconto interno». Senza i tre pezzi sotto la porta resta
+CHIUSA (404) e il tasto non compare a nessuno.
+
+**Ordine dei passi: PRIMA il server (promozione), POI la riserva e il
+segreto sul VPS, POI la `-bar13` sul nodo.** Il nodo nuovo davanti a un
+server senza porta prende 404 e paga come la `-bar12`.
+
+**1) La riserva, dal pannello di LNbits nodo** (il tunnel di sempre
+dal PC verso il VPS sulla porta 5001, poi `http://127.0.0.1:5001`, super
+utente). Nuovo portafoglio «Riserva giroconti». Dentro: «Ricevi» →
+20.000 sats per la prova (la scorta vera, 300.000, solo dopo) → paga la
+fattura dal telefono. La chiave ADMIN di quel portafoglio si copia SOLO
+nel `read -s` del passo 3, mai in chat.
+
+**2) Sola lettura, sul VPS (root).** Che le righe non ci siano già:
+```
+grep -n "^P2P_GIROCONTO_SEGRETO\|^LNBITS_RISERVA_ADMIN_KEY\|^VIA_EURO" /srv/barattolo/config.py
+```
+
+**3) Le due righe, sul VPS (root).** Copia, poi la chiave (incollata al
+buio), poi il segreto che nasce lì e non si stampa:
+```
+cp -p /srv/barattolo/config.py /srv/barattolo/config.py.prima-giroconto
+```
+```
+read -s -p "Admin key della riserva: " K && printf '\nLNBITS_RISERVA_ADMIN_KEY = "%s"\n' "$K" | sudo tee -a /srv/barattolo/config.py >/dev/null && unset K && echo ok
+```
+```
+S=$(python3 -c "import secrets;print(secrets.token_hex(32))") && printf 'P2P_GIROCONTO_SEGRETO = "%s"\n' "$S" | sudo tee -a /srv/barattolo/config.py >/dev/null && echo "impronta: $(printf %s "$S" | sha256sum | cut -c1-8)" && unset S
+```
+```
+systemctl restart barattolo && sleep 5 && curl -s -o /dev/null -w "%{http_code}\n" -X POST https://barattolo.store/api/p2p/giroconto
+```
+Deve dire `403` (la porta c'è, il segreto no). `404` = manca un pezzo
+(la chiave, il segreto o il macaroon delle cauzioni).
+
+**4) La `-bar13` sul nodo.** La procedura è quella della `-bar12`
+(PRODUZIONE, «LA `-bar12`»), con la sola `0016-*.patch`:
+sorgente pulito sul branch `barattolo/v0.20.2`, albero `deb731c3`;
+`git am` della `0016-*.patch` → l'albero deve cominciare con `654388cb`
+(lo stesso del cloud); i test nello stadio `builder` col filtro di sempre
+più `barattolo_giroconto` (4 test nuovi, 0 rossi); nel binario la parola
+`BARATTOLO_GIROCONTO_URL`. Il compose `.bar13`: l'immagine
+`mostro:v0.20.2-bar13` e due righe accanto a quelle della FINESTRA,
+`BARATTOLO_GIROCONTO_URL=https://barattolo.store/api/p2p/giroconto` e
+`BARATTOLO_GIROCONTO_SEGRETO` (lo stesso valore del passo 3, copiato dal
+terminale del VPS al `read -s` del nodo; impronta uguale). Copia
+`docker-compose.yml.prima-bar13`, libro fermo come sempre, poi il cambio.
+Nel log del nodo NON deve esserci «giroconto … not set».
+
+**5) La prova, piccola.** Tre account:
+- Andrea (principale) pubblica un oggetto da 3-5 €, spedizione a mano.
+- Alan pubblica «Vendi BTC» a prezzo di mercato, SEPA Instant o Satispay.
+- Il secondo account di Andrea (8711624959, moderatore) SENZA indirizzo
+  Lightning né wallet on-chain nel profilo: apre l'oggetto, accanto a
+  «Paga» deve esserci «Non hai sats?»; lo tocca, sceglie il metodo,
+  «Continua», poi segue il foglio fino a «Ho pagato» (manda davvero gli
+  euro ad Alan).
+- Alan riceve gli euro e rilascia.
+
+Deve succedere: l'ordine passa a pagato (locked) da solo; la riserva scende
+di quanto il deposito; nel log del nodo
+`Order …: giroconto done, the marketplace settled hash …`; nel journal del
+VPS niente righe rosse col 🔁. Poi la ronda del nodo:
+```
+sudo /usr/local/bin/ronda-nodo.sh
+```
+Se segnala un «PAGAMENTO SCONOSCIUTO» legato alla prova:
+`sudo /usr/local/bin/ronda-nodo.sh --impara <prime 8 lettere dell'hash>`.
+Quel che si vede va nel verbale (CANTIERI, «Il giroconto interno»).
+
+**ROLLBACK.** Server: `cp -p /srv/barattolo/config.py.prima-giroconto
+/srv/barattolo/config.py` e riavvio (porta 404, il tasto sparisce). Nodo:
+`cp -p docker-compose.yml.prima-bar13 docker-compose.yml && docker compose
+up -d mostro`. I sats rimasti nella riserva restano lì.
