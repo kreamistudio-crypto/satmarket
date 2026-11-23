@@ -96895,8 +96895,10 @@ DOM = null;
            _euPc.count("AVVISO_BUONO_PAYCODE")])
     _dizPc = re.search(r"SOLLECITO_EURO_PAYCODE_TESTI = (\{.*?\n\})\n", src, re.S)
     _solPc = ast.literal_eval(_dizPc.group(1)) if _dizPc else {}
-    prova("...e i tre promemoria Telegram di chi paga il PayCode finiscono con la STESSA frase, una volta l'uno",
-          [[1, 2, 3], [True] * 3, [1] * 3],
+    # (23 nov 2026, promemoria-paycode) i promemoria sono diventati UNO,
+    # quello dell'ora: le sei ore e il giorno spingevano ad annullare
+    prova("...e il promemoria Telegram di chi paga il PayCode (uno solo, a un'ora) finisce con la STESSA frase, una volta",
+          [[1], [True], [1]],
           [sorted(_solPc), [t.endswith(" " + _FRASE_BUONO) for _, t in sorted(_solPc.items())],
            [t.count("buono regalo") for _, t in sorted(_solPc.items())]])
     _dizEu = re.search(r"SOLLECITO_EURO_TESTI = (\{.*?\n\})\n", src, re.S)
@@ -179706,6 +179708,8 @@ def prove_solleciti_p2p():
 
     con, amb = _banco_eventi_p2p()
     for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = ",
+                 # (23 nov 2026, promemoria-paycode) col PayCode solo l'ora
+                 "SOLLECITI_EURO_PAYCODE_S = ",
                  # (10 ott 2026, feedback-p2p) il promemoria della recensione
                  # nasce dalla stessa funzione, a concluso e a disputa chiusa
                  "P2P_RECENSIONE_PROMEMORIA_S = ",
@@ -179730,8 +179734,16 @@ def prove_solleciti_p2p():
            amb["SOLLECITI_RILASCIO_S"] is amb["SOLLECITI_PAYCODE_S"], amb["SOLLECITI_EURO_S"]])
     famiglie = {n: amb[n] for n in ("SOLLECITO_RILASCIO_TESTI", "SOLLECITO_RILASCIO_CONTANTI_TESTI",
                                     "SOLLECITO_EURO_TESTI", "SOLLECITO_EURO_PAYCODE_TESTI")}
-    prova("ogni famiglia ha i suoi tre testi", [[1, 2, 3]] * 4,
-          [sorted(t) for t in famiglie.values()])
+    # (23 nov 2026, promemoria-paycode) ...tranne il PayCode, che ne ha uno:
+    # l'ora. Le sei ore e il giorno, contati alla cieca senza la scadenza
+    # del PayCode, dicevano «tocca ✕ Annulla» a chi aveva ancora due giorni
+    prova("ogni famiglia ha i suoi tre testi, il PayCode uno solo (l'ora), coi suoi "
+          "intervalli", [[[1, 2, 3]] * 3 + [[1]], (H,), True],
+          [[sorted(t) for t in famiglie.values()], amb["SOLLECITI_EURO_PAYCODE_S"],
+           len(amb["SOLLECITI_EURO_PAYCODE_S"]) == len(famiglie["SOLLECITO_EURO_PAYCODE_TESTI"])])
+    prova("...e chi paga il PayCode non legge piu' «✕ Annulla» in un promemoria contato "
+          "alla cieca", [], [t for t in famiglie["SOLLECITO_EURO_PAYCODE_TESTI"].values()
+                             if "Annulla" in t])
     tutti = [t for f in famiglie.values() for t in f.values()]
     prova("i testi non portano importi, cifre ne' id, e nessun tag da chiudere", [],
           [t for t in tutti if _re.search(r"[\d€<>]", t)])
@@ -179754,9 +179766,7 @@ def prove_solleciti_p2p():
            and all("«Ho pagato al tabacchino»" in t
                    for t in famiglie["SOLLECITO_EURO_PAYCODE_TESTI"].values()),
            ">✕ Annulla</button>" in mini
-           and all("«✕ Annulla»" in f[n] for f in (famiglie["SOLLECITO_EURO_TESTI"],
-                                                  famiglie["SOLLECITO_EURO_PAYCODE_TESTI"])
-                   for n in (2, 3)),
+           and all("«✕ Annulla»" in famiglie["SOLLECITO_EURO_TESTI"][n] for n in (2, 3)),
            ">🔓 Libera i sats</button>" in mini])
 
     # --- 2) LO SCAMBIO ------------------------------------------------------
@@ -180019,8 +180029,19 @@ def prove_solleciti_p2p():
     o = nuovo('["Contanti al tabacchino 23.47"]')
     G = fino_alla_garanzia(o)
     recapito(con, o, B, G + 10)
+    # (23 nov 2026, promemoria-paycode) a chi compra UNA attesa sola, l'ora
+    prova("col PayCode a chi compra nasce una sola attesa degli euro, quella dell'ora",
+          ["euro_sollecito1"],
+          [r[0] for r in con.execute("SELECT momento FROM p2p_attese WHERE ordine=? AND "
+                                     "fonte='sollecito_euro' ORDER BY momento", (o,))])
     prova("col PayCode a chi compra si dice di pagarlo al tabacchino",
           ([(A, PAY[1])], [URL + o]), batte(G + H))
+    # (le attese degli altri casi di questo banco scadono alle stesse ore e
+    # vanno alla stessa persona: si guarda la tabella di QUESTO ordine)
+    prova("...e dopo l'ora, per chi compra, in attesa non resta niente: niente sei ore "
+          "ne' giorno, la scadenza vera ha i suoi avvisi", [],
+          [r[0] for r in con.execute("SELECT momento FROM p2p_attese WHERE ordine=? AND "
+                                     "fonte='sollecito_euro'", (o,))])
     arriva(o, "fiat-sent", "buyer", "", G + 2 * H)
     prova("...e dopo il «pagato» a chi vende restano i TRE solleciti del PayCode, coi "
           "loro testi", [3, sorted(amb["SOLLECITO_PAYCODE_TESTI"].values())],
@@ -180257,7 +180278,9 @@ def prove_feedback_p2p():
     con, amb = _banco_eventi_p2p()
     amb["sqlite3"] = sqlite3
     for riga in ("SOLLECITI_RILASCIO_S = ", "SOLLECITI_EURO_S = ", "STATI_RECENSIONE_P2P = ",
-                 "P2P_RECENSIONE_PROMEMORIA_S = ", "SOLLECITI_RECAPITO_S = "):
+                 "P2P_RECENSIONE_PROMEMORIA_S = ", "SOLLECITI_RECAPITO_S = ",
+                 # (23 nov 2026, promemoria-paycode)
+                 "SOLLECITI_EURO_PAYCODE_S = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for blocco in ("SOLLECITO_RILASCIO_TESTI = {", "SOLLECITO_RILASCIO_CONTANTI_TESTI = {",

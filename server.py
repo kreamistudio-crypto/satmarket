@@ -73757,31 +73757,30 @@ def _minuti_pagare_ordine_p2p(con, ordine: str) -> int:
         return 0
 
 
-# IL BUONO REGALO, IN CODA A TUTT'E TRE (10 ott 2026, cantiere
-# guida-paycode, col si' di Andrea): una cassiera ha emesso un Buono
-# Regalo Amazon al posto del pagamento del PayCode, e ognuno di questi
-# tre invita a toccare «Ho pagato al tabacchino». La frase e' LA STESSA
-# della conferma nell'app (`AVVISO_BUONO_PAYCODE` in miniapp.html), parola
-# per parola: una prova le confronta. Sta scritta per esteso in ogni
-# testo, e non in una costante a parte, perche' le prove e i collaudi
-# ritagliano questo dizionario da solo.
+# IL BUONO REGALO, IN CODA (10 ott 2026, cantiere guida-paycode, col si'
+# di Andrea): una cassiera ha emesso un Buono Regalo Amazon al posto del
+# pagamento del PayCode, e questo promemoria invita a toccare «Ho pagato
+# al tabacchino». La frase e' LA STESSA della conferma nell'app
+# (`AVVISO_BUONO_PAYCODE` in miniapp.html), parola per parola: una prova
+# le confronta. Sta scritta per esteso nel testo, e non in una costante a
+# parte, perche' le prove e i collaudi ritagliano questo dizionario da solo.
+# UNO SOLO, A UN'ORA (23 nov 2026, cantiere promemoria-paycode, scelta di
+# Andrea sul riquadro: «Togli quelli di 6 ore e 1 giorno»). Un utente,
+# dopo sei ore e di notte, ha letto «Se non puoi più, tocca ✕ Annulla»
+# con un PayCode che valeva ancora due giorni, e si e' chiesto se doveva
+# annullare. Il server la scadenza del PayCode non la sa (viaggia cifrata
+# fra i due telefoni), quindi le sei ore e il giorno erano contati alla
+# cieca, e spingevano ad annullare. La scadenza VERA ha gia' i suoi
+# avvisi, sei ore e un'ora prima, in app (`statoTabacchinoP2P`) e su
+# Telegram (`SVEGLIA_P2P_TESTI`, messa da `sincronizzaSvegliaP2P`): sono
+# loro a dire «adesso o mai». Gli altri metodi tengono i loro tre.
+SOLLECITI_EURO_PAYCODE_S = SOLLECITI_EURO_S[:1]   # solo l'ora
 SOLLECITO_EURO_PAYCODE_TESTI = {
     1: "🧾 Promemoria: i sats sono in garanzia da un'ora e aspettano il "
        "pagamento del PayCode. Pagalo in contanti al tabacchino, poi tocca "
        "«Ho pagato al tabacchino» nella pagina dello scambio. Se l'hai già "
        "pagato, segnalo lì: chi vende aspetta quel gesto. Se ti hanno dato "
        "un buono regalo, non confermare.",
-    2: "🧾 Sono passate sei ore: i sats di chi vende sono fermi in garanzia "
-       "e il PayCode non risulta pagato. Pagalo al tabacchino e tocca «Ho "
-       "pagato al tabacchino». Se non puoi più, tocca «✕ Annulla» nella "
-       "pagina dello scambio: chi vende deve accettare, e i sats gli "
-       "tornano. Se ti hanno dato un buono regalo, non confermare.",
-    3: "⏰ È passato un giorno: i sats di chi vende sono ancora fermi in "
-       "garanzia per te, e un PayCode non vale per sempre. Se l'hai pagato "
-       "tocca «Ho pagato al tabacchino»; se no, tocca «✕ Annulla» nella "
-       "pagina dello scambio. Chi vende può aprire una disputa: a decidere "
-       "sarà un moderatore. Se ti hanno dato un buono regalo, non "
-       "confermare.",
 }
 
 
@@ -74298,10 +74297,13 @@ def _solleciti_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             righe.append(f"· Solleciti P2P: {corto} si paga in contanti di "
                          "persona: a chi compra nessun sollecito degli euro")
         else:
+            # (23 nov 2026, promemoria-paycode) col PayCode solo l'ora:
+            # la scadenza vera ha i suoi avvisi
             in_attesa("euro_sollecito", compra,
                       SOLLECITO_EURO_PAYCODE_TESTI if dati["tabacchino"]
                       else SOLLECITO_EURO_TESTI,
-                      SOLLECITI_EURO_S, "sollecito_euro")
+                      SOLLECITI_EURO_PAYCODE_S if dati["tabacchino"]
+                      else SOLLECITI_EURO_S, "sollecito_euro")
     if momento == "fiat" and vende:
         dati = _dati_frase_p2p(con, ordine)
         if not dati["tabacchino"]:
