@@ -20629,13 +20629,16 @@ def _startapp_da_link(url) -> str:
     # L'ASSISTENZA IN APP (5 nov 2026, passo 2): `/?assistenza=mia` →
     # `assistenza` (la propria chat), `/?assistenza=<utente>` →
     # `assistenza_<utente>` (la conversazione, per gli admin; un account
-    # solo-Nostr ha il numero negativo, e il trattino e' nella forma)
+    # solo-Nostr ha il numero negativo, e il trattino e' nella forma).
+    # FINO A 19 CIFRE (23 nov 2026, cantiere assistenza-id-nostr): l'id
+    # di un nativo Nostr arriva a -2^63, cioe' 19 cifre, e col tetto di
+    # 16 il tasto «Apri la conversazione» di Zzap portava in home.
     testa = URL_PUBBLICO + "/?assistenza="
     if u.startswith(testa):
         chi = u[len(testa):]
         if chi == "mia":
             return "assistenza"
-        if re.fullmatch(r"-?[1-9][0-9]{0,15}", chi):
+        if re.fullmatch(r"-?[1-9][0-9]{0,18}", chi):
             return "assistenza_" + chi
         return ""
     # I CORRIERI NEL PROFILO (17 nov 2026, cantiere chiedi-locker):
@@ -55432,6 +55435,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
     profilo["onchain_incasso"] = (_onchain_incasso_mio(user["id"])
                                   if profilo["onchain"] else "")
+    # ...e il suo inizio e la sua fine (23 nov 2026, cantiere
+    # indirizzo-visibile): prima il Profilo diceva solo «un tuo
+    # indirizzo», e chi l'aveva salvato non lo ritrovava
+    profilo["onchain_incasso_vista"] = (_onchain_incasso_mio_vista(user["id"])
+                                        if profilo["onchain_incasso"] else "")
     # (28 ott 2026) come ricevo quando vendo on-chain: la busta del cambio
     # in Lightning (il cancello per me, il modo scelto, il minimo)
     profilo["onchain_ln"] = (onchain_ln_busta(user["id"])
@@ -56757,8 +56765,13 @@ def assistenza_elenco_admin(x_tg_init_data: str = Header(""),
             (ASSISTENZA_ELENCO_MAX,)).fetchall()
     finally:
         con.close()
+    # L'UTENTE COME TESTO (23 nov 2026, cantiere assistenza-id-nostr):
+    # l'id di un nativo Nostr va oltre il 2^53 di JavaScript, e come
+    # numero JSON arrivava arrotondato — l'app chiedeva un utente che non
+    # esiste («Utente non trovato», il caso di Zzap). Come testo resta
+    # esatto, come gia' fa `idConto` per il portachiavi.
     return {"conversazioni": [{
-        "utente": r["utente"], "nome": r["nome"] or "",
+        "utente": str(r["utente"]), "nome": r["nome"] or "",
         "username": r["username"] or "", "negozio": r["negozio"] or "",
         "staff_utente": e_staff(r["utente"]), "messaggi": r["n"],
         "ultimo": r["testo"][:140] or "📎 Screenshot", "quando": r["quando"],
@@ -56785,7 +56798,7 @@ def assistenza_conversazione_admin(utente: int,
         righe = _righe_assistenza(con, utente, True)
     finally:
         con.close()
-    return {"utente": u["tg_id"], "nome": u["nome"] or "",
+    return {"utente": str(u["tg_id"]), "nome": u["nome"] or "",
             "username": u["username"] or "", "negozio": u["negozio"] or "",
             "messaggi": righe, "max": ASSISTENZA_TESTO_MAX}
 
@@ -112636,24 +112649,44 @@ async def _onchain_xpub_rileggi_tutte():
                   f"({type(e).__name__})", flush=True)
 
 
-def _onchain_incasso_mio(tg_id: int) -> str:
-    """'indirizzo' | 'xpub' se chi vende ha una destinazione viva (firmata
-    dal seme di adesso), sennò ''. Muto sui guasti: e' una voce del
-    profilo, non un giudizio — quello lo da' la cassa."""
+def _onchain_destinazione_mia(tg_id: int):
+    """La riga viva di «Dove ricevi» (firmata dal seme di adesso), o None.
+    Muta sui guasti: serve alle voci del profilo, non alla cassa."""
     if not EMBIT:
-        return ""
+        return None
     try:
         con = _onchain_db()
         try:
             r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
                             (int(tg_id),)).fetchone()
-            dest = (_onchain_destinazione_viva(con, tg_id, r["xpub"])
+            return (_onchain_destinazione_viva(con, tg_id, r["xpub"])
                     if r else None)
         finally:
             con.close()
     except Exception:
-        return ""
+        return None
+
+
+def _onchain_incasso_mio(tg_id: int) -> str:
+    """'indirizzo' | 'xpub' se chi vende ha una destinazione viva (firmata
+    dal seme di adesso), sennò ''. Muto sui guasti: e' una voce del
+    profilo, non un giudizio — quello lo da' la cassa."""
+    dest = _onchain_destinazione_mia(tg_id)
     return dest["tipo"] if dest else ""
+
+
+def onchain_accorcia(valore: str) -> str:
+    """L'INIZIO E LA FINE di dove ricevi (23 nov 2026, Andrea: «magari
+    mostralo, solo l'inizio e la fine»): otto caratteri, «…», sei. Il
+    gemello in pagina e' `accorciaIncassoOnchain`, con la stessa regola."""
+    v = str(valore or "")
+    return v if len(v) <= 16 else v[:8] + "…" + v[-6:]
+
+
+def _onchain_incasso_mio_vista(tg_id: int) -> str:
+    """Dove ricevo, accorciato per il Profilo: solo per me, in /api/me."""
+    dest = _onchain_destinazione_mia(tg_id)
+    return onchain_accorcia(dest["valore"]) if dest else ""
 
 
 ONCHAIN_MSG_SENZA_DESTINAZIONE = (

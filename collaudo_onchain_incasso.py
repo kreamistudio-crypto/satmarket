@@ -304,13 +304,22 @@ def main():
                firma=firma_dest(888, "indirizzo", fisso.lower()))
     prova("un indirizzo fisso (anche scritto in maiuscolo): 200", 200,
           r.status_code)
+    # L'INIZIO E LA FINE NEL PROFILO (23 nov 2026, Andrea: «magari
+    # mostralo, solo l'inizio e la fine»): prima /api/me diceva solo il tipo
+    vista = c.get("/api/me").json().get("onchain_incasso_vista")
+    prova("...e il profilo ne mostra l'inizio e la fine, non tutto",
+          (dal_wallet(7)[:8] + "…" + dal_wallet(7)[-6:], False),
+          (vista, vista == dal_wallet(7)))
+    prova("...con la stessa regola del gemello in pagina", vista,
+          SRV.onchain_accorcia(dal_wallet(7)))
     o3 = compra(999, annunci[2]).json().get("onchain") or {}
     prova("...e la vendita arriva li'", dal_wallet(7), o3.get("incasso"))
     prova("togliere la scelta: 200, senza firme", 200,
           scegli(888, tipo="barattolo").status_code)
     come(888)
-    prova("...e il profilo lo dice: dove ricevo = ''", "",
-          c.get("/api/me").json().get("onchain_incasso"))
+    prova("...e il profilo lo dice: dove ricevo = '', senza inizio ne' fine",
+          ("", ""), tuple(c.get("/api/me").json().get(k) for k in
+                          ("onchain_incasso", "onchain_incasso_vista")))
     # MAI NEL CONTO DI BARATTOLO, MA SI PAGA LO STESSO (27 ott 2026,
     # Andrea: «un utente paga [...] quello è solo l'output finale ma può
     # definirlo in un secondo momento, l'importante è che il multisig si

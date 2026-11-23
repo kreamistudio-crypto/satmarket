@@ -209820,6 +209820,154 @@ def _banco_assistente(**leve):
     return amb, T, DETTI, AVVISI, CHIAMATE, CLAUDE, CHI_GUARDA
 
 
+def prove_assistenza_id_nostr():
+    """L'ASSISTENZA AI NATIVI NOSTR (23 nov 2026, cantiere assistenza-id-
+    nostr, il caso di Zzap). Un nativo Nostr ha l'id fino a -2^63, 19
+    cifre, oltre il 2^53 dei numeri di JavaScript: con Number() la pagina
+    dello staff chiedeva al server un utente arrotondato («Utente non
+    trovato»), e col tetto di 16 cifre il tasto «Apri la conversazione»
+    portava in home. Qui gira in node la catena VERA della Mini App:
+    l'elenco come lo manda il server, il tocco sulla conversazione, la
+    fetch che ne nasce; il tasto dell'avviso, da Telegram e dal sito."""
+    print("\n[l'assistenza ai nativi Nostr: 19 cifre]")
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    ZZAP = "-5945373116987485543"
+    try:
+        prog = ("""
+const API_BASE = '/api';
+let assistenzaAdmAperta = null, assistenzaAdmLista = [], assistenzaMax = 0;
+const assistenzaAllegati = {mio: [], adm: []};
+const box = {innerHTML: ''}, chiamate = [], toasts = [];
+function el(id){ return id === 'assistenzaAdmCorpo' ? box : null; }
+function haptic(){} function esc(s){ return String(s); }
+function bollinoStaff(){ return ''; } function quandoAssistenza(){ return ''; }
+function authHdr(){ return ''; } function toast(t){ toasts.push(t); }
+function messaggiAssistenzaHTML(){ return ''; } function casellaAssistenzaHTML(){ return ''; }
+function scorriInFondoAssistenza(){} function caricaScreenshotAssistenza(){}
+const window = {scrollTo(){}};
+let DEMO = false, VETRINA = false, assistenzaAttiva = true, isAdmin = true, aperta = '';
+function go(v){ aperta = v; }
+const location = {pathname: '/', search: '?assistenza=""" + ZZAP + """'};
+const ELENCO = '{"conversazioni":[{"utente":\"""" + ZZAP + """\","nome":"Zzap","username":"","negozio":"","staff_utente":false,"messaggi":1,"ultimo":"ciao","quando":1,"da_rispondere":true}]}';
+async function fetch(url){
+  chiamate.push(url);
+  const corpo = url === API_BASE + '/admin/assistenza' ? ELENCO : '{"utente":\"""" + ZZAP + """\","nome":"Zzap","messaggi":[]}';
+  return {ok: true, json: async () => JSON.parse(corpo)};
+}
+"""
+                + _fn_js(mini, "function idAssistenza(x){")
+                + _fn_js(mini, "async function renderAssistenzaAdmin(){")
+                + _fn_js(mini, "function apriConversazioneAdmin(utente){")
+                + _fn_js(mini, "async function renderConversazioneAdmin(){")
+                + pezzo_js(mini, "const ASSISTENZA_URL = ", "\nlet ")
+                + "\nlet assistenzaUrlAperta = false;\n"
+                + _fn_js(mini, "function apriAssistenzaDaUrl(){")
+                + _fn_js(mini, "function percorsoDaStartapp(p){")
+                + _fn_js(mini, "function startappDaLink(link, base){")
+                + """
+(async () => {
+  const fuori = {};
+  await renderAssistenzaAdmin();
+  const m = /onclick="(apriConversazioneAdmin\\([^"]*\\))"/.exec(box.innerHTML);
+  fuori.tocco = m ? m[1] : '';
+  chiamate.length = 0;
+  if (m) eval(m[1]);
+  await new Promise(r => setTimeout(r, 0));
+  fuori.aperta = assistenzaAdmAperta && assistenzaAdmAperta.utente;
+  fuori.fetch = chiamate.slice();
+  fuori.toasts = toasts.slice();
+  assistenzaAdmAperta = null;
+  apriAssistenzaDaUrl();
+  fuori.da_url = [aperta, assistenzaAdmAperta && assistenzaAdmAperta.utente];
+  fuori.da_startapp = percorsoDaStartapp('assistenza_""" + ZZAP + """');
+  fuori.a_startapp = startappDaLink('https://b.x/?assistenza=""" + ZZAP + """', 'https://b.x');
+  fuori.storto = [idAssistenza('-12345678901234567890'), idAssistenza('1e3'),
+                  idAssistenza("1');alert(1);('")];
+  console.log(JSON.stringify(fuori));
+})();
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("l'assistenza ai nativi Nostr", "node non installato")
+        return
+    prova("il tocco nell'elenco porta l'id ESATTO, tra apici (testo, non numero)",
+          f"apriConversazioneAdmin('{ZZAP}')", out.get("tocco"))
+    prova("...la conversazione aperta e' la sua", ZZAP, out.get("aperta"))
+    prova("...e la fetch chiede al server proprio lui (non l'arrotondato)",
+          [f"/api/admin/assistenza/{ZZAP}"], out.get("fetch"))
+    prova("...senza nessun «Utente non trovato»", [], out.get("toasts"))
+    prova("il tasto dell'avviso dal sito apre la sua conversazione",
+          ["assistenzaadm", ZZAP], out.get("da_url"))
+    prova("...e da Telegram (startapp) torna lo stesso indirizzo",
+          f"/?assistenza={ZZAP}", out.get("da_startapp"))
+    prova("...e l'indirizzo diventa il suo startapp", f"assistenza_{ZZAP}",
+          out.get("a_startapp"))
+    prova("venti cifre, esponenti e apici non passano (resta vuoto)",
+          ["", "", ""], out.get("storto"))
+
+
+def prove_incasso_onchain_visto():
+    """L'INIZIO E LA FINE DI DOVE RICEVI (23 nov 2026, cantiere indirizzo-
+    visibile; Andrea: «magari mostralo, solo l'inizio e la fine»). Prima
+    il Profilo diceva solo «un tuo indirizzo» e chi l'aveva salvato non
+    lo ritrovava. Il server accorcia per /api/me, la pagina accorcia
+    dopo il salvataggio: stessa regola, e la riga lo scrive."""
+    print("\n[l'indirizzo on-chain salvato: l'inizio e la fine]")
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    amb = {}
+    exec(pezzo("onchain_accorcia"), amb)
+    VALORI = ["bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", "corto", "",
+              "1234567890123456", "12345678901234567",
+              "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs"]
+    try:
+        prog = ("""
+let myOnchain = true, DEMO = false, myOnchainIncasso = 'indirizzo',
+    myOnchainIncassoVista = 'bc1qw508…v8f3t4';
+const box = {innerHTML: ''};
+function el(id){ return id === 'onchainIncassoProfilo' ? box : null; }
+function esc(s){ return String(s).replace(/</g, '&lt;'); }
+function onchainModuloIncasso(){ return ''; } function renderComeRicevi(){}
+"""
+                + _fn_js(mini, "function accorciaIncassoOnchain(v){")
+                + _fn_js(mini, "function renderIncassoOnchainProfilo(){")
+                + """
+const fuori = {};
+fuori.accorcia = """ + json.dumps(VALORI) + """.map(accorciaIncassoOnchain);
+renderIncassoOnchainProfilo();
+fuori.riga = box.innerHTML;
+myOnchainIncassoVista = '';
+renderIncassoOnchainProfilo();
+fuori.senza = box.innerHTML;
+console.log(JSON.stringify(fuori));
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("l'indirizzo on-chain salvato", "node non installato")
+        return
+    prova("la pagina accorcia come il server, valore per valore",
+          [amb["onchain_accorcia"](v) for v in VALORI], out.get("accorcia"))
+    prova("...otto caratteri, «…», sei; i corti restano interi",
+          ["bc1qw508…v8f3t4", "corto", "", "1234567890123456", "12345678…234567"],
+          out.get("accorcia", [])[:5])
+    prova("il Profilo scrive l'inizio e la fine accanto a «un tuo indirizzo»",
+          True, "un tuo indirizzo, <span class=\"mono\">bc1qw508…v8f3t4</span>)."
+          in (out.get("riga") or ""))
+    prova("...e senza la vista resta la frase di prima", True,
+          "(un tuo indirizzo)." in " ".join((out.get("senza") or "").split()))
+    salva = _fn_js(mini, "async function onchainIncassoSalva(btn, pref){")
+    togli = _fn_js(mini, "function onchainIncassoTogli(btn){")
+    prova("salvando la vista nasce dal valore incollato, togliendo si svuota",
+          (True, True),
+          ("myOnchainIncassoVista = accorciaIncassoOnchain(valore);" in salva,
+           "myOnchainIncassoVista = '';" in togli))
+    prova("...e all'apertura arriva da /api/me", True,
+          "myOnchainIncassoVista = me.onchain_incasso_vista || '';" in mini)
+
+
 def prove_assistente_bot():
     """L'ASSISTENTE DEL BOT (28 ott 2026, cantiere bot-assistente,
     richiesta di Andrea). A leva accesa chi scrive una domanda al bot
@@ -221520,7 +221668,7 @@ CATEGORIE = {
     bundle_bitcoin journal_senza_buffer istanza_prova
     collaudo_segue_develop avvisi_nostr_arrivano notifiche_telefono filtro_10050
     semina_collaudo relay_risolti certificati_relay config_esempio
-    assistente_bot sentinella_server_fermo lingua_inglese
+    assistente_bot assistenza_id_nostr sentinella_server_fermo lingua_inglese
     """.split(),
     "swap": """
     swap_cella swap_preventivo swap_telefono swap_fornitori
@@ -221530,7 +221678,7 @@ CATEGORIE = {
     onchain_verso_lightning parole_uniche backup_obbligato
     """.split(),
     "onchain": """
-    cancello_onchain banco_chiavi_onchain indirizzo_ordine_onchain
+    cancello_onchain banco_chiavi_onchain indirizzo_ordine_onchain incasso_onchain_visto
     ordine_onchain ripristino_visibile chiave_che_nasce_da_sola cassetta_telegram
     checksum_descrittore leva_rgb annuncio_identita mutinynet_prep
     deposito_p2p_onchain grafica_p2p_onchain incasso_esterno_onchain
@@ -222661,6 +222809,8 @@ def main():
               prove_filtro_10050,
               prove_semina_collaudo, prove_leva_mercato_lavoro,
               prove_assistente_bot,
+              prove_assistenza_id_nostr,
+              prove_incasso_onchain_visto,
               prove_relay_risolti,
               prove_certificati_relay,
               prove_config_esempio,
