@@ -31935,8 +31935,9 @@ def prove_pagina_acquisto():
           "consegnaEsplicita =" in mini)
     # l'ordine nasce solo dai varchi noti: startBuy, startBuySet e
     # confermaCompraSubito — piu' l'UNICO lettore del preventivo; dal
-    # 23 ott 2026 anche startBuyOnchain, la stessa cassa con `metodo`
-    prova("quattro POST /orders (i varchi di sempre, piu' l'on-chain)", 4,
+    # 23 ott 2026 anche startBuyOnchain, la stessa cassa con `metodo`; dal
+    # 23 nov 2026 viaEuroDeposito, la stessa cassa col metodo «giroconto»
+    prova("cinque POST /orders (i varchi di sempre, l'on-chain e il giroconto)", 5,
           mini.count("fetch(`${API_BASE}/orders`"))
     # UN CONTO SOLO (ago 2026, il cantiere della cassa): i lettori del
     # preventivo erano DUE — caricaPreventivo e caricaPreventivoPacco,
@@ -51136,8 +51137,9 @@ def prove_prezzo_accordo():
     # IL CENSIMENTO, non un elenco: chi manda `offerta_id` al SERVER lo
     # scavalca, perche' l'orologio del telefono e' il giudice di cosa
     # si DISEGNA, mai dei soldi. Sono i due preventivi, i due startBuy
-    # e il pagamento col wallet: un sesto deve farsi vedere qui.
-    prova("...e lo scavalcano i cinque che parlano col server", 5,
+    # e il pagamento col wallet: un sesto deve farsi vedere qui. Il sesto
+    # (23 nov 2026) e' «Non hai sats?», che compra col giroconto.
+    prova("...e lo scavalcano i sei che parlano col server", 6,
           len([1 for r in mini.split("\n")
                if "offertaAccettataPer(" in r and ", true)" in r]))
 
@@ -160242,8 +160244,10 @@ def prove_indirizzo_non_verificato():
     # EMENDATA (1 nov 2026, cantiere presa-altra-rete): TRE strade, la
     # terza e' la fattura del cambio (`inviaCambioP2P`, ricevi on-chain),
     # che passa dallo stesso `add-invoice` e va ricordata come le altre.
-    prova("...e chi la ricorda e' la strada del foglio, quella del wallet collegato "
-          "e quella del cambio", 3,
+    # ...e QUATTRO dal 23 nov 2026: la fattura che e' il deposito
+    # dell'ordine pagato in euro (`viaEuroDeposito`, giroconto interno)
+    prova("...e chi la ricorda e' la strada del foglio, quella del wallet collegato, "
+          "quella del cambio e il deposito di «Non hai sats?»", 4,
           m.count("ricordaFatturaP2P(") - 1)
 
     # --- IL SERVER SA QUALI WALLET NON PASSANO, E LO DICE PRIMA --------
@@ -213243,18 +213247,24 @@ def prove_giroconto_interno():
     prova("...solo sulla cassaforte nodo e sotto il tetto, PRIMA della fattura",
           True, cmp.index("cf != CASSAFORTE_NODO\n                      or sats_giroconto > GIROCONTO_TETTO_SATS")
           < cmp.index("inv = await crea_invoice_escrow("))
-    amb3 = {"GIROCONTO_AVANZO_PERCENTO": 1}
+    amb3 = {"GIROCONTO_AVANZO_PERCENTO": 3, "GIROCONTO_AVANZO_EURO": 1.5}
     exec(pezzo("giroconto_cifra_giusta"), amb3)
     cg = amb3["giroconto_cifra_giusta"]
-    prova("la cifra di Mostro: mai meno dell'ordine, al massimo l'1% in piu' "
+    prova("la cifra di Mostro: mai meno dell'ordine, al massimo il 3% in piu' "
           "(almeno 10 sats), e solo un intero vero",
           [True, True, False, False, True, False, False, False],
-          [cg(100_000, 100_000), cg(100_000, 101_000), cg(100_000, 101_001),
-           cg(100_000, 99_999), cg(500, 510), cg(500, 511),
+          [cg(100_000, 100_000), cg(100_000, 103_000), cg(100_000, 103_001),
+           cg(100_000, 99_999), cg(300, 310), cg(300, 311),
            cg(1000, True), cg(1000, "1000")])
+    # a 100.000 €/BTC un euro e mezzo e' 1.500 sats: su un ordine da 20.000
+    # (20 €) il 3% sarebbe 600, e l'euro intero di Mostro non ci starebbe
+    prova("...o un euro e mezzo al cambio di adesso, se e' di piu' (Mostro "
+          "vuole euro interi)", [True, False, True],
+          [cg(20_000, 21_500, 100_000.0), cg(20_000, 21_502, 100_000.0),
+           cg(20_000, 20_600, 0.0)])
     prova("...il deposito nasce per QUELLA cifra (l'avanzo a chi vende), "
           "controllata prima della fattura", True,
-          cmp.index("if not giroconto_cifra_giusta(totale, sats_giroconto):")
+          cmp.index("if not giroconto_cifra_giusta(totale, sats_giroconto, cambio_noto_ora()):")
           < cmp.index("totale = sats_giroconto")
           < cmp.index("inv = await crea_invoice_escrow("))
     prova("...e la ripresa la confronta: un'altra cifra e' un'altra fattura",
@@ -213271,6 +213281,104 @@ def prove_giroconto_interno():
           and "GIROCONTO_RIPRESA_MIN_S = 3600 + 600" in _SORGENTE)
     prova("la colonna nasce con la migrazione", True,
           '"ALTER TABLE ordini ADD COLUMN fattura_scade "' in _SORGENTE)
+
+def prove_non_hai_sats():
+    """«NON HAI SATS?» (23 nov 2026, cantiere giroconto-interno; decisioni di
+    Andrea dello stesso giorno). Il tasto arancione accanto a «Paga» e nel
+    foglio del QR: solo a chi non ha un wallet nel profilo, con la leva,
+    con un venditore di sats pronto e sotto il tetto in euro. Mai «paga in
+    euro» sul tasto. La scelta dell'offerta e' una pura: la piu' economica
+    fra chi vende sats in euro a mercato, coi metodi decisi, in euro
+    interi. E la fattura del coordinatore e' il deposito dell'ordine."""
+    print("\n[non hai sats?]")
+    import json as _js, subprocess as _sp, tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = _SORGENTE
+
+    prova("il server: la leva sola per i moderatori di serie, e il tetto in "
+          "euro, in /api/me", True,
+          "VIA_EURO_SOLO_ADMIN = True" in srv and "VIA_EURO_MAX_EURO = 100" in srv
+          and 'profilo["via_euro"] = via_euro_ammesso(user["id"])' in srv
+          and "if not giroconto_attivo() or not bool(_p2p_per(tg_id)[\"attivo\"]):" in pezzo("via_euro_ammesso"))
+    per_me = _fn_js(mini, "function viaEuroPerMe(){")
+    prova("il telefono: solo senza Lightning address ne' wallet on-chain, con la "
+          "leva", True,
+          "!!myViaEuro && !myLnAddress && !myOnchainIncasso" in per_me)
+    prova("i due tasti: arancioni, «Non hai sats?» e «Non hai sats? Compra da "
+          "qui», mai «paga in euro»", True,
+          "'Non hai sats? Compra da qui' : 'Non hai sats?'" in mini
+          and 'id="payViaEuro" class="btn orange via-euro-btn"' in mini
+          and "paga in euro" not in _fn_js(mini, "function viaEuroTasto(sats, dove){").lower())
+    i_qr = mini.index('<div class="qr" id="payQr"></div>')
+    prova("...quello del QR sta subito sotto il codice, prima della fattura "
+          "scritta", True,
+          i_qr < mini.index('id="payViaEuro"') < mini.index('id="payInvoice"'))
+    prova("...quello della cassa accanto a «Paga», col bottone di sempre "
+          "identico, solo sull'oggetto singolo", True,
+          "viaEuroAccanto(`<button class=\"btn orange\" id=\"acqCompra\" onclick=\"ctaAcquisto()\">Paga</button>`,\n"
+          "                               d.tipo==='mono' ? tot : 0)" in mini)
+    prova("il foglio si chiude con gli altri, e il tasto del QR si spegne a "
+          "foglio chiuso e sull'on-chain", True,
+          "el('viaEuroSheet').classList.remove('open');" in _fn_js(mini, "function closeSheet(){")
+          and "payViaEuroVista(0);" in _fn_js(mini, "function payMetodoSpegni(){")
+          and "if (!si && typeof payViaEuroVista === 'function') payViaEuroVista(0);" in _fn_js(mini, "function payGuidaWalletVista(si){"))
+    dep = _fn_js(mini, "async function viaEuroDeposito(id){")
+    prova("la fattura al coordinatore e' il deposito: metodo giroconto con i "
+          "sats che ha chiesto lui", True,
+          "{metodo: 'giroconto', sats_giroconto: sats}" in dep
+          and "'add-invoice', {payment_request: [null, d.invoice, null]}" in dep
+          and "Number(o.satsMiei)" in dep)
+    prova("...e lo scambio nato dalla cassa non apre il foglio «dove ricevere»",
+          True, "viaEuroInCorso[nuovo.id]) {\n    setTimeout(() => viaEuroDeposito(nuovo.id), 0);" in mini)
+    prova("...l'indirizzo resta in memoria, mai nel telefono", True,
+          "viaEuroInCorso[s.id] = {" in mini
+          and "o.viaEuro = {annuncio: l.id, totale: viaEuroSats};" in mini)
+
+    # --- la scelta, in node ------------------------------------------------
+    prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
+            + _riga_js(mini, "const VIA_EURO_MARGINE = ")
+            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei){")
+            + r"""
+const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
+  euro: 10, euroMax: 100, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
+const per = 0.001;   // 1.000 €/BTC per comodita': un sat = 0,001 €
+const r = {};
+// 40.000 sats, fee 2% (1% a chi compra): lordo 40.405, x0,001 x1,005 = 40,61 -> 41 €
+r.base = viaEuroScelta([O('a')], 40000, per, 0.02, {});
+r.premio = viaEuroScelta([O('a', {premium: 5}), O('b', {premium: 1})], 40000, per, 0.02, {});
+r.metodi = viaEuroScelta([O('a', {metodi: ['PayPal', 'Contanti']}), O('b', {metodi: ['Satispay', 'Revolut'], premium: 5})], 40000, per, 0.02, {});
+r.fuori = viaEuroScelta([O('a', {euro: 50, euroMax: 100}), O('b', {euroMax: 30})], 40000, per, 0.02, {});
+r.unico = viaEuroScelta([O('a', {euro: 41, euroMax: 0}), O('b', {euro: 45, euroMax: 0})], 40000, per, 0.02, {});
+r.scartati = viaEuroScelta([O('a', {lato: 'buy'}), O('b', {fiat: 'USD'}), O('c', {sats: 40000}),
+  O('d', {stato: 'in-progress'}), O('e')], 40000, per, 0.02, {e: {}});
+r.pari = viaEuroScelta([O('a', {creato: 5}), O('b', {creato: 9})], 40000, per, 0.02, {});
+r.storti = [viaEuroScelta([O('a')], 0, per, 0.02, {}), viaEuroScelta([O('a')], 100, 0, 0.02, {}),
+            viaEuroScelta(null, 100, per, 0.02, {})];
+console.log(JSON.stringify(r));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog)
+        nome = f.name
+    try:
+        out = _sp.run(["node", nome], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome)
+    if out.returncode != 0:
+        prova("la scelta gira in node", "", out.stderr[-300:])
+        return
+    r = _js.loads(out.stdout)
+    prova("un ordine a intervallo: la cifra in euro INTERI, col margine",
+          ["a", 41, ["SEPA Instant"]], [r["base"]["id"], r["base"]["euro"], r["base"]["metodi"]])
+    prova("...fra due, il premio piu' basso (la cifra piu' bassa)", "b", r["premio"]["id"])
+    prova("...solo i metodi decisi (SEPA Instant, Satispay), e si mostrano solo quelli",
+          ["b", ["Satispay"]], [r["metodi"]["id"], r["metodi"]["metodi"]])
+    prova("...la cifra deve stare nell'intervallo", None, r["fuori"])
+    prova("...un importo unico va bene solo se copre ed e' entro un euro", ["a", 41],
+          [r["unico"]["id"], r["unico"]["euro"]])
+    prova("...scartati: chi compra, altre valute, prezzo fisso, gia' preso, i miei",
+          None, r["scartati"])
+    prova("...a parita' di cifra il piu' recente", "b", r["pari"]["id"])
+    prova("...e senza sats, cambio o libro: niente", [None, None, None], r["storti"])
 
 
 def prove_guida_wallet():
@@ -221275,7 +221383,7 @@ CATEGORIE = {
     meta_cauzione_auto
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
@@ -222304,6 +222412,7 @@ def main():
     prove_onchain_cauzione,
     prove_guida_wallet,
     prove_giroconto_interno,
+    prove_non_hai_sats,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,
