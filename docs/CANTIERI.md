@@ -94973,12 +94973,11 @@ il pagamento. Puoi chiudere l'app, ti avvisiamo noi.» Disputa, annullo,
 pagamento da rifare: il foglio si fa da parte e resta la pagina dello
 scambio, dove c'è «Riprendi il pagamento» finché un passo del foglio è da
 fare. Il deposito rifiutato (prezzo saltato) dice «Il prezzo è cambiato:
-annulla lo scambio e riprova» e porta alla pagina (scritta mia, da far
-approvare). Provato: `prove_non_hai_sats`, 22 spunte (porte, condizioni,
+annulla lo scambio e riprova» e porta alla pagina (scritta mia, approvata da
+Andrea il 23 nov alle 21:43: «Okay, allora va bene»). Provato: `prove_non_hai_sats`, 22 spunte (porte, condizioni,
 niente «paga in euro», il gancio, la scelta e il passo in node).
 
-DA FARE PRIMA DI ACCENDERE. 1) La scritta del prezzo saltato, da far
-approvare; le difese della F3 (la spunta dei venditori di sats e la lista
+DA FARE PRIMA DI ACCENDERE. 1) Le difese della F3 (la spunta dei venditori di sats e la lista
 di fiducia, il limite per i nuovi). 2) La prova: il collaudo ha i pagamenti FINTI
 (LNbits FakeWallet), il deposito non sta sul nodo e Mostro non può
 saldarlo; Andrea alle 21:01 ha scelto la prova in PRODUZIONE coi soli
