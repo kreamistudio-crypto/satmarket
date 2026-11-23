@@ -34439,6 +34439,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   porte Telegram e Nostr di sempre; `body.negozio-accesso` nasconde il
   resto), senza l'invito a installare Barattolo. Le icone stanno in
   `assets/negozio-icona-*.png`, ognuna con la sua rotta.
+  FUORI DALLA CASSA (23 nov 2026, Andrea: «non deve rimandare alla
+  schermata di Barattolo»): l'unico gesto che porta via è «aggiungi il
+  tuo Lightning address» (il Profilo). Là go() accende
+  `body.negozio-sola-fuori`: niente barra di Barattolo, il bottone fisso
+  «🏪 Torna alla cassa» (`negozioRientra`: `history.go(-d)` fino alla
+  entry della vetrina, o `apriCassaNelNegozio`). `cassaNelNegozio` nella
+  modalità sola non si spegne uscendo, così la entry «negozio» riapplicata
+  dall'indietro torna cassa da sé.
   LA CASSA È LA VISTA DEL NEGOZIO (20 nov 2026, cantiere cassa-vetrina):
   con `myNegozio` l'ingresso (`apriCassaNelNegozio`) apre la vista
   `negozio` del proprio negozio con la bandierina `cassaNelNegozio`;

@@ -203420,6 +203420,18 @@ def prove_app_negozio():
     avs = pezzo_js(mini, "async function avviaVetrina(){", "\n}\n")
     prova("da non entrati: la schermata d'accesso del Negozio, e niente invito a installare Barattolo", True,
           "if (negozioSola()) accessoNegozio();" in avs and "if (!negozioSola()) modaleTest(bannerInstallaPwa);" in avs)
+    # (23 nov 2026, Andrea: «non deve rimandare alla schermata di Barattolo»)
+    prova("fuori dalla cassa (il Lightning address nel Profilo) niente barra di Barattolo: "
+          "solo «🏪 Torna alla cassa»", True,
+          "document.body.classList.toggle('negozio-sola-fuori', negozioSola() && !appNegozio && !DEMO && !VETRINA);"
+          in pezzo_js(mini, "function go(view){", "\n}\n")
+          and "body.negozio-sola-fuori nav" in mini
+          and 'onclick="negozioRientra()">🏪 Torna alla cassa</button>' in mini)
+    prova("...nell'app da sola la vetrina resta la cassa anche da fuori (l'indietro ci rientra)", True,
+          "if (!negozioSola()) cassaNelNegozio = false;" in pezzo_js(mini, "function modoNegozio(acceso){", "\n}\n"))
+    rie = pezzo_js(mini, "function negozioRientra(){", "\n}\n")
+    prova("...e il bottone scende fino alla prima entry, o riapre la cassa", True,
+          "history.go(-giu)" in rie and "apriCassaNelNegozio();" in rie)
     srv = open("server.py", encoding="utf-8").read()
     prova("le icone dell'app Negozio hanno la loro rotta esplicita (niente mount)", True,
           '@app.get("/assets/negozio-icona-512.png")' in srv and '@app.get("/assets/negozio-icona-192.png")' in srv)
