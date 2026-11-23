@@ -74,6 +74,8 @@ USCITE = []         # le bolt11 che avremmo pagato
 POST = []           # i post che sarebbero usciti nel canale
 TOLTI = []          # i post vecchi cancellati
 AVVISI = []         # (tg, testo) agli utenti
+BOTTONI = []        # (tg, bottone) degli stessi avvisi
+ADMIN = []          # (testo, argomento) ai moderatori
 ESITO = ["pagato"]
 
 
@@ -93,6 +95,11 @@ async def _muta(*a, **k):
 
 async def _avviso(tg, testo, *a, **k):
     AVVISI.append((tg, testo))
+    BOTTONI.append((tg, a[0] if a else k.get("bottone")))
+
+
+async def _admin(testo, *a, **k):
+    ADMIN.append((testo, k.get("argomento", "")))
 
 
 async def _finta_uscita(bolt11, atteso_sats, diario=None, *, cassaforte,
@@ -130,7 +137,7 @@ server.invoice_da_ln_address = _finto_address
 server.crea_invoice_escrow = _finta_invoice
 server.invoice_pagata = _finta_pagata
 server.notifica = _avviso
-server.notifica_admin = _muta
+server.notifica_admin = _admin
 server.bot_api = _finto_bot
 server._manda_post_canale = _finto_post
 server.cambio_btc_eur = _cambio
@@ -375,6 +382,9 @@ def main():
     scrivi("UPDATE utenti SET banner_stato='attivo', banner_foto="
            "'ban_cc33.jpg', avatar='av_cc33.jpg' WHERE tg_id=3")
     come(3)
+    # LA PAGINA DEDICATA (23 nov 2026) si chiede in Assistenza: accesa qui
+    server.ASSISTENZA_ATTIVA = True
+    AVVISI.clear(); BOTTONI.clear(); ADMIN.clear()
     r, no = compra({"tipo": "scoprire"})
     prova("col banner approvato la fattura chiede 50.000", 50000,
           FATTURE[r["payment_hash"]]["sats"])
@@ -391,6 +401,42 @@ def main():
     prova("...e il negozio e' in Da scoprire per 30 giorni, poi Consigliato",
           (True, 1), (abs(u["promo_scoprire_fino"] - (adesso + 30 * 86400))
                       < 120, u["promo_consigliato"]))
+    a = uno("SELECT autore, admin, testo FROM assistenza WHERE utente=3")
+    prova("alla prima entrata il negozio trova in Assistenza la richiesta "
+          "di foto e testo, scritta da Barattolo (autore 0)",
+          (0, 1, server.PROMO_PAGINA_ASSISTENZA),
+          tuple(a) if a else None)
+    prova("...il «Fatto!» del bot gliela indica, col tasto dell'assistenza",
+          (True, ("💬 Apri l'assistenza", f"{server.URL_PUBBLICO}/?assistenza=mia")),
+          (any(tg == 3 and "Per la pagina dedicata del tuo negozio" in t
+               for tg, t in AVVISI),
+           next((b for tg, b in BOTTONI if tg == 3 and b), None)))
+    prova("...e ai moderatori arriva «Da preparare la pagina di…»",
+          [("🏪 Da preparare la pagina di <b>Bottega 3</b>: gli abbiamo "
+            "chiesto foto e testo in Assistenza.", "moderazione")],
+          [x for x in ADMIN if "Da preparare" in x[0]])
+    # CHI E' GIA' CONSIGLIATO (rinnovo, o pagina gia' fatta) non riceve
+    # di nuovo la richiesta: il negozio 4, gia' fra i Consigliati
+    scrivi("UPDATE utenti SET banner_stato='attivo', banner_foto="
+           "'ban_dd44.jpg', promo_consigliato=1 WHERE tg_id=4")
+    come(4)
+    AVVISI.clear(); BOTTONI.clear(); ADMIN.clear()
+    r4, _ = compra({"tipo": "scoprire"})
+    paga(r4["payment_hash"])
+    verifica(r4["pagamento_id"])
+    prova("chi e' gia' fra i Consigliati non riceve di nuovo la richiesta",
+          (0, False, [None], []),
+          (uno("SELECT COUNT(*) FROM assistenza WHERE utente=4")[0],
+           any("pagina dedicata" in t for _, t in AVVISI),
+           [b for tg, b in BOTTONI if tg == 4],
+           [x for x in ADMIN if "Da preparare" in x[0]]))
+    # via le tracce del negozio 4: il resto del giro guarda il 3
+    scrivi("UPDATE utenti SET banner_stato='', promo_consigliato=0, "
+           "promo_scoprire_fino=0 WHERE tg_id=4")
+    scrivi("UPDATE pagamenti SET stato='annullato' WHERE id=?",
+           (r4["pagamento_id"],))
+    server.ASSISTENZA_ATTIVA = False
+    come(3)
     b = busta()
     prova("la busta porta il negozio: codice, banner, logo, mai il tg_id",
           [{"negozio": "cc33", "nome": "Bottega 3", "banner": "ban_cc33.jpg",

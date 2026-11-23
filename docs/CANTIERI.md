@@ -94796,3 +94796,42 @@ node la quarta scritta.
 
 DA GUARDARE. Dopo la promozione, da un account non moderatore: la scheda
 di un ordine P2P di chi ha spento le P2P, senza «✅ scambi P2P».
+
+
+## La pagina dedicata del negozio in «Da scoprire»: si vende e si chiede in Assistenza (23 nov 2026, cantiere pagina-da-scoprire; Andrea: «la pagina fa parte di quello che vendiamo, quindi bisogna scriverlo», e «dovrebbe arrivarci una notifica… o un messaggio automatico dove gli si dice: incolla qui le foto e il testo»)
+
+COSA. «Il negozio in Da scoprire» vende la card E una pagina dedicata come
+quelle dei Consigliati (To The Mooon, AndreAI, Una Garlanda), scritta a mano
+da noi. Il foglio, il cassetto del banner e la conferma dicono «La card del
+tuo negozio in home e una pagina dedicata, preparata da noi con le tue foto
+e il tuo testo.» (`SCOPRIRE_COSA`, frase approvata; prima «dopo l'ok del
+moderatore», che era l'ok del banner). Dopo il pagamento, alla PRIMA entrata:
+nella chat di Assistenza del negozio compare il messaggio dello staff
+(`PROMO_PAGINA_ASSISTENZA`: da 3 a 6 foto, il logo, un testo; «te la facciamo
+vedere prima di pubblicarla»), il «Fatto!» del bot aggiunge «Per la pagina
+dedicata del tuo negozio mandaci le foto e un testo che lo racconti: tocca
+qui.» col tasto «💬 Apri l'assistenza» (etichetta già esistente), e ai
+moderatori arriva «🏪 Da preparare la pagina di [nome]: gli abbiamo chiesto
+foto e testo in Assistenza.» (argomento moderazione). Le risposte del negozio
+arrivano col solito avviso dell'Assistenza, foto comprese. I tre testi sono
+di Andrea.
+
+DECISIONI. L'Assistenza in app e non un canale nuovo: accetta foto, avvisa
+i moderatori, è accesa in produzione. Solo alla prima entrata
+(`promo_consigliato` era 0): chi rinnova o è già Consigliato la pagina ce
+l'ha. La riga dello staff nasce nella stessa transazione dell'incasso, con
+`autore` 0 (la scrive Barattolo, non un admin col suo nome). Con l'Assistenza
+spenta niente dei tre: non ci sarebbe dove rispondere, e l'avviso ai
+moderatori direbbe il falso. Finché la pagina non c'è, la card apre il
+negozio normale col banner in cima. La pagina resta un racconto a mano
+(`racconti.py`, bozza, pubblicazione dal pannello).
+
+PROVATO. `collaudo_promozioni`: la riga in Assistenza (autore 0, admin 1, il
+testo), il «Fatto!» con la frase e il tasto, l'avviso ai moderatori con il
+nome e l'argomento; il negozio già Consigliato non riceve niente di nuovo;
+mutazione (tolta la guardia del primo ingresso) rossa. `prove_promozioni`: la
+frase in quattro posti, nessun «dopo l'ok del moderatore», la guardia e la
+riga prima del commit.
+
+DA FARE. NOVITA.md non toccato (la frase approvata non nomina la pagina).
+

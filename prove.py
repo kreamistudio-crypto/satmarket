@@ -187062,7 +187062,7 @@ def prove_canale_admin():
           # applica negli errori; la promozione comprata e il /promossi
           # di un admin (tolta o rimborsata) nei riepiloghi
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 39,
-           "liquidita": 5, "moderazione": 27, "riepiloghi": 29}, per_stanza)
+           "liquidita": 5, "moderazione": 28, "riepiloghi": 29}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -187124,8 +187124,8 @@ def prove_canale_admin():
           "di una cauzione P2P ferma nel registro; dal 20 nov il bot "
           "dell'abbonamento a un canale senza i permessi; dal 21 nov un "
           "segreto di Bitpost cambiato dal pannello; dal 23 nov la "
-          "promozione comprata, quella pagata che non si applica e il "
-          "/promossi di un admin)", 122,
+          "promozione comprata, quella pagata che non si applica, il "
+          "/promossi di un admin e la pagina dedicata da preparare)", 123,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -220716,6 +220716,22 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
           "Consigliati, anche dal cassetto del banner", (True, 2),
           ("`Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`" in mini,
            mini.count("scoprireSempre(sc.giorni)")))
+    prova("«Da scoprire» vende la card E la pagina dedicata, con la frase di "
+          "Andrea, nel foglio, nel suo cassetto e nella conferma; «dopo l'ok "
+          "del moderatore» non c'e' piu'", (True, 4, 0),
+          ("const SCOPRIRE_COSA = 'La card del tuo negozio in home e una pagina "
+           "dedicata, '\n  + 'preparata da noi con le tue foto e il tuo testo.';" in mini,
+           mini.count("SCOPRIRE_COSA"),
+           mini.count("dopo l\\'ok del moderatore")))
+    _srv_promo = pezzo("_incassa_promo")
+    prova("la pagina dedicata si chiede in Assistenza solo alla PRIMA entrata, "
+          "nella stessa transazione, e solo con l'Assistenza accesa",
+          (True, True, True),
+          ('pagina_da_fare = ASSISTENZA_ATTIVA and not u["promo_consigliato"]'
+           in _srv_promo,
+           _srv_promo.index("(p[\"tg_id\"], PROMO_PAGINA_ASSISTENZA, adesso))")
+           < _srv_promo.index("    con.commit()\n    con.close()\n    # Dopo il commit"),
+           'argomento="moderazione"' in _srv_promo))
     prova("...nei colori del razzo, dal giallo al rosso", True,
           "linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%)" in mini)
     prova("...e con gli effetti ridotti resta il disegno d'arrivo: lo stato "

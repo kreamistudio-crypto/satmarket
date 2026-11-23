@@ -38497,3 +38497,10 @@ mai il kind 0 di nessuno: regola ferrea 2).
   icone `ICONA_PROMO`, anteprime `ANTEPRIMA_PROMO` aperte da `scegliVocePromo` (la voce scelta, una sola aperta),
   durata di In evidenza in `promoGiorni`), due letture del listino in
   parallelo; il tasto `.btn.promo-porta` (in cima a `.detail-body`, classe `in-cima`).
+  La pagina dedicata di «Da scoprire» (23 nov): alla PRIMA entrata
+  (`promo_consigliato` ancora 0) `_incassa_promo` scrive nella stessa
+  transazione la riga dello staff `PROMO_PAGINA_ASSISTENZA` nella chat di
+  Assistenza del negozio (`autore` 0, `admin` 1), il «Fatto!» porta il tasto
+  `/?assistenza=mia` e i moderatori ricevono «Da preparare la pagina di…»
+  (argomento moderazione). Tutto solo con `ASSISTENZA_ATTIVA`. La pagina
+  resta un racconto a mano (`racconti.py`).

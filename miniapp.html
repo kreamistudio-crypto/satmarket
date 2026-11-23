@@ -52658,7 +52658,7 @@ function renderBanner(){
       <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:12px">${
         myPromoScoprireFino * 1000 > Date.now()
           ? `Il tuo negozio è in «Da scoprire» fino al <b style="color:var(--ink)">${dataPromo(myPromoScoprireFino)}</b>.`
-          : 'La card del tuo negozio in home, dopo l\'ok del moderatore.'}</div>
+          : SCOPRIRE_COSA}</div>
       <button class="btn promo-porta" style="margin-top:8px" onclick="chiediPromoScoprire()">${ICONA_PROMO.porta}Promuovi</button>` : ''}` : ''}
     ${attesa ? `
       <div class="trust-note" style="margin-top:12px">⏳ <span>Il banner
@@ -53093,6 +53093,13 @@ let promoScelta = '';
 let promoGiorni = 0;         // la durata scelta dentro «In evidenza»
 let promoInCorso = null;     // {pid, tipo} della fattura aperta
 let promoServeBanner = false; // il negozio non ha ancora il banner approvato
+/* COSA SI COMPRA CON «Da scoprire» (23 nov 2026, Andrea: «la pagina fa
+   parte di quello che vendiamo, quindi bisogna scriverlo»): la card E la
+   pagina dedicata, quella dei Consigliati, scritta da noi coi materiali
+   del negozio. La frase e' sua; prima diceva «dopo l'ok del moderatore»,
+   ma l'ok e' quello del banner, che viene prima. */
+const SCOPRIRE_COSA = 'La card del tuo negozio in home e una pagina dedicata, '
+  + 'preparata da noi con le tue foto e il tuo testo.';
 const scoprireSempre = giorni =>
   `Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`;
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
@@ -53215,7 +53222,7 @@ async function apriPromuovi(aid){
     voci.push({tipo: 'scoprire',
       titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
       testo: (sc.fino ? `È già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
-                      : 'La card del tuo negozio in home, dopo l\'ok del moderatore.')
+                      : SCOPRIRE_COSA)
            + ` ${scoprireSempre(sc.giorni)}`,
       serve: promoServeBanner ? 'Prima serve il banner del negozio approvato: la card è fatta con quello' : '',
       no: (sc.banner || cassettoBanner) ? '' : 'Prima serve il banner del negozio approvato: la card è fatta con quello'});
@@ -53316,7 +53323,7 @@ async function chiediPromoScoprire(){
   if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
   chiediConferma({
     titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
-    corpo: 'La card del tuo negozio in home, dopo l\'ok del moderatore. '
+    corpo: SCOPRIRE_COSA + ' '
          + scoprireSempre(sc.giorni)
          + (sc.fino ? `\n\nÈ già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
          + '\n\nSi paga una volta, in sats. Non è un abbonamento.',
