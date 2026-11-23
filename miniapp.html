@@ -10029,6 +10029,14 @@
   /* l'app Barattolo Negozio da sola: nessuna uscita verso Barattolo */
   body.negozio-sola #negozioTorna,body.negozio-sola .eser-esci{display:none!important}
   body.negozio-sola .negozio-su{justify-content:flex-end}
+  /* (23 nov 2026, Andrea: «non deve rimandare alla schermata di Barattolo»)
+     ...e se un gesto porta FUORI dalla cassa (il Lightning address nel
+     Profilo), niente barra di Barattolo: solo il ritorno alla cassa */
+  body.negozio-sola-fuori nav,body.negozio-sola-fuori #distintiviSheet{display:none!important}
+  #negozioRientra{display:none}
+  body.negozio-sola-fuori #negozioRientra{display:flex;position:fixed;z-index:39;left:16px;right:16px;
+    bottom:calc(14px + env(safe-area-inset-bottom));justify-content:center}
+  body.negozio-sola #view-negozio .negozio-distintivi,body.negozio-sola [onclick^="apriDistintiviSheet"]{pointer-events:none}
   /* ...e senza account la pagina e' solo l'accesso */
   body.negozio-accesso #app > *:not(#demoBanner),body.negozio-accesso nav{display:none!important}
   body.negozio-accesso #demoBanner{display:flex!important;flex-direction:column;align-items:stretch;
@@ -18550,6 +18558,7 @@ document.getElementById('cartello')?.remove();</script>
        QR grande su bianco — e poi il «Pagato» quando arriva. Niente
        bottoni del negozio sotto il pollice del cliente: si torna alla
        cassa con la ✕ in alto, che e' di chi vende. -->
+  <button id="negozioRientra" class="btn" type="button" onclick="negozioRientra()">🏪 Torna alla cassa</button>
   <div id="cassaCliente" role="dialog" aria-modal="true" aria-label="Schermo per il cliente" style="display:none">
     <button type="button" class="cliente-x" onclick="chiudiSchermoCliente()" aria-label="Torna alla cassa">✕</button>
     <div class="cliente-negozio" id="clienteNegozio"></div>
@@ -23817,6 +23826,7 @@ function go(view){
      ogni altra vista, senza una seconda strada da tenere in pari */
   modoNegozio(view === 'esercente' || (view === 'negozio' && cassaNelNegozio));
   if (appNegozio) barraCassa(cassaVetrinaQui());
+  document.body.classList.toggle('negozio-sola-fuori', negozioSola() && !appNegozio && !DEMO && !VETRINA);
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
   el('nav-'+voceNav(view))?.classList.add('active');
   /* Il Profilo non ha voce in nav: si accende il tappo in testata */
@@ -43984,7 +43994,9 @@ function modoNegozio(acceso){
     eserControllaBanco();
   } else {
     appNegozio = false;
-    cassaNelNegozio = false;
+    /* nell'app da sola la vetrina resta la cassa: l'indietro da fuori ci
+       rientra (la entry dice «negozio», e go() la riaccende da qui) */
+    if (!negozioSola()) cassaNelNegozio = false;
     document.body.classList.remove('app-negozio', 'cassa-vetrina');
     el('negozioTorna').textContent = '← Torna';
     segnaCardCassa();
@@ -44036,6 +44048,15 @@ function apriCassaNelNegozio(){
   if (negozioSola()) navPrimaPagina = true;
   /* `ridisegno`: il proprio negozio non si conta come una visita */
   apriNegozio(myNegozio, false, false, '', true);
+}
+/* il bottone «🏪 Torna alla cassa» di quando si e' fuori (vedi
+   `negozio-sola-fuori`): giu' fino alla prima entry, che e' la vetrina
+   della cassa; senza gradini sotto, la si riapre */
+function negozioRientra(){
+  haptic();
+  const giu = (history.state && history.state.d) || 0;
+  if (giu > 0) { closeSheet(); history.go(-giu); return; }
+  apriCassaNelNegozio();
 }
 function cassaTocca(id){
   const d = cassaDati;

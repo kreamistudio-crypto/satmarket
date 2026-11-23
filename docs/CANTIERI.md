@@ -94499,3 +94499,17 @@ compra, e ci guadagna. Nessun codice cambiato.
 PROVATO. Suite severa sull'albero del commit (le sezioni che leggono il
 sapere comprese, `prove_conoscenza_tappo` dice conoscenza.md aggiornato).
 Tappo lo sa dopo la promozione: legge da main.
+
+
+## L'icona di Barattolo Negozio ricorda Barattolo (23 nov 2026, cantiere icona-negozio; Andrea: «il logo deve ricordare Barattolo, questo quasi non c'entra nulla, metterei un Barattolo o due in un bancone, tipo da mercato proprio per intenderci»)
+COSA. La bottega verde del 20 nov lascia il posto al barattolo di Barattolo e a uno più piccolo sul bancone di un banco da mercato, con la tenda a righe, sull'arancio di Barattolo. Stessi file (`assets/negozio-icona-sorgente.png`, 512, 192), stesse rotte; le immagini sono entrate da sole in fa40e305, qui i testi che le descrivono.
+DECISIONI E PERCHÉ. Fra cinque proposte (una disegnata col barattolo vero ritagliato da `scontorna`, quattro fatte con Flow sul PC di Andrea) è passata la quarta, il barattolo grande in primo piano, che da piccola si legge meglio; rifatta col banco INTERO, gambe comprese, dentro il quadrato: nella prima il bordo tagliava il bancone, e l'icona adattiva, lo splash e Zapstore mostravano il taglio.
+SCARTATI. La bottega verde (non ricordava Barattolo); il disegno col barattolo ritagliato (meno leggibile in piccolo); un QR o un POS sul bancone per dire «cassa» (proposto, non chiesto: resta un'idea).
+PROVATO. Le sentinelle delle misure in `prove_app_negozio`; le anteprime icona, icona tonda e splash sul PC.
+DA GUARDARE. La build 1.1 sul PC con l'icona nuova.
+
+## Barattolo Negozio non porta più dentro Barattolo (23 nov 2026, cantiere icona-negozio-banco; Andrea: «non deve rimandare alla schermata di Barattolo, questa è solo quella del negozio quindi serve solamente per avere già il proprio catalogo e vendere al volo nel mercatino»)
+COSA. Un giro su tutti i bottoni della vetrina, del conto e delle vendite nella modalità sola: l'unica uscita era «aggiungi il tuo Lightning address», che apre il Profilo con la barra di Barattolo. Ora là la barra non c'è e c'è «🏪 Torna alla cassa»; l'indietro di Android dal Profilo torna alla vetrina della cassa, e da lì chiude l'app.
+DECISIONI E PERCHÉ. Una rete di sicurezza su go() (`negozio-sola-fuori`) invece di un foglio nuovo per il Lightning address: copre anche un'uscita che domani nascesse altrove. La 1.0 sul telefono di Andrea portava a Barattolo perché costruita prima della modalità sola: la 1.1 parte da `/?app=negozio&sola=1`.
+SCARTATI. Un foglio solo per il Lightning address dentro la cassa (doppione del Profilo).
+PROVATO. Sentinelle in `prove_app_negozio`; giro dal vivo (Venditore senza Lightning address): Profilo senza barra, il bottone e l'indietro tornano alla vetrina con la barra «Controlla e incassa», d=0, un indietro ancora chiude.
