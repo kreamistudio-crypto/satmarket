@@ -94899,7 +94899,7 @@ Ora salta gli ordini la cui bolt11 è ancora viva (`vita_fattura`); per le
 fatture di serie da 15 minuti non cambia niente (a quel punto sono morte).
 
 PROVATO. Fork: `git am` delle sedici `.patch` su un clone pulito della
-`v0.20.2` = albero `654388cb`; `cargo test --release` 2015 verdi, 0 rosse
+`v0.20.2` = albero `7408b7fa`; `cargo test --release` 2015 verdi, 0 rosse
 (2011 + 4 del modulo: inerte senza variabili, solo la nostra chiave ben
 fatta è «nostra», la domanda vuole ogni pezzo, solo un JSON `true` vale).
 Server: `prove_giroconto_interno`, 17 spunte (domanda storta, cinque no

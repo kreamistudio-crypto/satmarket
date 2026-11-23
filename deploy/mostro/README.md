@@ -19,7 +19,7 @@ allora `payment_success`, come se LND avesse detto `Succeeded`. Ogni altra
 risposta: la strada di upstream (LND rifiuta, retry, poi fattura nuova).
 Senza le due variabili è inerte. Ha il suo modulo (`barattolo_giroconto.rs`)
 e NON ha un patcher: la `.patch` è la sorgente. `git am` delle sedici
-`.patch` su un clone pulito della `v0.20.2` dà l'albero `654388cb`, e
+`.patch` su un clone pulito della `v0.20.2` dà l'albero `7408b7fa`, e
 `cargo test --release` dice 2015 verdi (le 2011 di prima più le 4 del
 modulo), 0 rosse. L'immagine sarà la `-bar13`, solo dopo la prova sul
 collaudo e col sì di Andrea.
