@@ -1459,12 +1459,8 @@
      da Andrea: il bordo dell'anello non si vedeva). Alle categorie
      non succede perche' li' sotto il quadrato c'e' l'etichetta.
      C'e' la prova, e non ribatte il 4,5: lo DERIVA dall'outline.
-     L'ETICHETTA RESTA DELLA SUA FILA, che e' il vincolo dell'altro
-     verso: sopra di lei ci sono 10px (8 piu' i 2 di coda della
-     .cat-strip) e sotto 6, quindi si legge come il titolo di quel
-     che viene dopo. Chi stringesse ancora l'8 la lascerebbe a meta'
-     strada fra le due file, cioe' di nessuno. */
-  #scoprireSez .section-label{padding-top:8px}
+     L'ETICHETTA NON C'E' PIU' (23 nov 2026, Andrea: la scritta
+     «Consigliato» sulla card basta), e con lei la sua regola. */
   .scoprire-strip{display:flex;gap:8px;overflow-x:auto;
     overscroll-behavior-x:contain;scrollbar-width:none;
     padding:6px var(--pad) 6px}
@@ -1491,6 +1487,28 @@
     padding:6px var(--pad) 10px}
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
+  /* I QUADRATI DEI NEGOZI sotto la card grande (23 nov 2026, vedi
+     renderQuadriScoprire): fermi, in una fila che si scorre col dito,
+     solo sul telefono. Nessun bordo che segue la card grande (Andrea,
+     23 nov: «sotto non si deve evidenziare il quadrato»). */
+  .sc-quadri{display:none}
+  @media (max-width:767px){
+    .sc-quadri{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;
+      scrollbar-width:none;padding:0 var(--pad) 16px}
+    /* i 16 sotto (23 nov 2026, Andrea: «sì, va bene»): senza il titolo
+       di «In evidenza» le due file si toccavano */
+    .sc-quadri::-webkit-scrollbar{display:none}
+  }
+  .sc-quadro{flex:0 0 96px;width:96px;padding:0;margin:0;border:0;background:none;
+    font:inherit;color:inherit;text-align:left;cursor:pointer}
+  .sc-quadro-foto{position:relative;display:block;width:96px;height:96px;border-radius:12px;
+    overflow:hidden;box-sizing:border-box;border:2px solid var(--line);background:var(--card);
+    transition:border-color .3s ease}
+  .sc-quadro-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1}
+  .sc-quadro-emoji{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px}
+  .sc-quadro b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+    margin-top:6px;font-size:12.5px;font-weight:700;line-height:1.25;color:var(--ink)}
+
   /* LE VOCI DI «Promuovi» (23 nov 2026; ritoccate la sera, Andrea: tre
      voci e non quattro, icone disegnate e non emoji; poi niente freccia:
      la voce scelta apre da sola sotto l'anteprima animata). Radio
@@ -2487,7 +2505,10 @@
     overscroll-behavior-x:contain;scrollbar-width:none;
     padding:8px var(--pad) 4px}
   .p2p-vt-fila::-webkit-scrollbar{display:none}
-  .p2p-vt-fila .card{flex:0 0 calc((100% - 12px) / 2)}
+  /* LARGHE COME QUELLE «In evidenza» (23 nov 2026, Andrea: «accorcia le
+     card degli scambi P2P, sono troppo lunghe rispetto alle altre»):
+     erano mezza fila (173 px a 390), adesso 150 come la fila di sopra */
+  .p2p-vt-fila .card{flex:0 0 150px;width:150px}
   .p2p-vt-testa{display:flex;align-items:baseline;justify-content:space-between;
     gap:8px;padding:16px var(--pad) 0}
   .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
@@ -14781,6 +14802,54 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()">
     </div>
+    <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
+         filtri dell'occasione — oggi due fisse (offerte a tempo,
+         sconti dei negozi), domani la lista arrivera' dal server per
+         le sponsorizzazioni. Ogni card SPARISCE quando la sua
+         occasione non esiste (decisione di Andrea), e senza card
+         sparisce la sezione intera: per questo qui NON c'e' nessuna
+         min-height riservata — uno spazio riservato per una cosa che
+         puo' legittimamente non esserci sarebbe un buco. Niente salto
+         di layout sul percorso vivo: i flag arrivano CON la prima
+         pagina, cioe' prima del primo renderGrid (la lezione della
+         fascia test). -->
+    <div id="scoprireSez" style="display:none">
+      <!-- SENZA TITOLO (23 nov 2026, Andrea: «non ha senso un titolo prima
+           di quelle card, c'e' gia' la scritta Consigliato»): il nome della
+           sezione resta per chi legge ad alta voce, sulla fila -->
+      <div class="strip-wrap">
+        <div class="scoprire-strip" id="scoprireStrip" role="region" aria-label="Da scoprire"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('scoprireStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+      <!-- I QUADRATI DEI NEGOZI (23 nov 2026): li disegna
+           renderQuadriScoprire, solo sul telefono (il CSS) -->
+      <div class="sc-quadri" id="scoprireQuadri"></div>
+    </div>
+    <!-- LA FILA «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento):
+         sotto «Da scoprire» e prima degli scambi P2P. Nasce spenta: la
+         accende renderEvidenza solo con annunci in evidenza e nella
+         vetrina nuda. Lo stesso guscio e le stesse frecce delle altre. -->
+    <div id="evidenzaSez" style="display:none">
+      <!-- SENZA TITOLO (23 nov 2026, Andrea: «bastano le card, che fanno
+           capire tutto»): ogni card porta gia' l'etichetta «In evidenza»;
+           il nome resta sulla fila per chi legge ad alta voce -->
+      <div class="strip-wrap">
+        <div class="ev-strip" id="evidenzaFila" role="region" aria-label="In evidenza"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('evidenzaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('evidenzaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+    <!-- LE CATEGORIE SOTTO «In evidenza» (23 nov 2026, Andrea: «le card
+         da scoprire proprio prima delle icone di esplora per categorie,
+         e le categorie prima degli scambi P2P e degli oggetti»): in cima
+         alla home la card grande e i quadrati dei negozi, poi la fila in
+         evidenza, poi qui la mappa dei reparti. Il blocco del lavoro le
+         sta accanto, che in Lavoro prende il loro posto. -->
     <!-- Le categorie come CARD ILLUSTRATE (ago 2026), in una fila che
          scorre di lato. Sta FUORI dall'header apposta — dentro,
          l'header a 320px si mangerebbe meta' schermo (176px oggi,
@@ -14826,41 +14895,6 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('lavStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
           onclick="scorriFila('lavStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-    <!-- «DA SCOPRIRE» (ago 2026): card rettangolari che accendono i
-         filtri dell'occasione — oggi due fisse (offerte a tempo,
-         sconti dei negozi), domani la lista arrivera' dal server per
-         le sponsorizzazioni. Ogni card SPARISCE quando la sua
-         occasione non esiste (decisione di Andrea), e senza card
-         sparisce la sezione intera: per questo qui NON c'e' nessuna
-         min-height riservata — uno spazio riservato per una cosa che
-         puo' legittimamente non esserci sarebbe un buco. Niente salto
-         di layout sul percorso vivo: i flag arrivano CON la prima
-         pagina, cioe' prima del primo renderGrid (la lezione della
-         fascia test). -->
-    <div id="scoprireSez" style="display:none">
-      <div class="section-label">Da scoprire</div>
-      <div class="strip-wrap">
-        <div class="scoprire-strip" id="scoprireStrip"></div>
-        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
-          onclick="scorriFila('scoprireStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
-          onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-    <!-- LA FILA «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento):
-         sotto «Da scoprire» e prima degli scambi P2P. Nasce spenta: la
-         accende renderEvidenza solo con annunci in evidenza e nella
-         vetrina nuda. Lo stesso guscio e le stesse frecce delle altre. -->
-    <div id="evidenzaSez" style="display:none">
-      <div class="section-label">In evidenza</div>
-      <div class="strip-wrap">
-        <div class="ev-strip" id="evidenzaFila"></div>
-        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
-          onclick="scorriFila('evidenzaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
-          onclick="scorriFila('evidenzaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
     <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
@@ -26608,6 +26642,8 @@ function renderStriscia(){
 const RACCONTI = {
   'to-the-moon': {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
+    /* la riga «cosa vende» sotto il suo quadrato in home (23 nov 2026) */
+    inBreve: 'Gioco da tavolo',
     /* CONSIGLIATO (set 2026): true = fra i Consigliati (card e
        pagina) e con la storia sul suo negozio, a spazio in vetrina
        acceso o spento. false = TOLTO A MANO: esce dalla card e dalla
@@ -26838,7 +26874,7 @@ function vociSponsor(){
     if (fuori.some(v => v.slug === slug)) return;
     const casa = RACCONTI[slug];
     const negozio = casa ? casa.negozio : String(s.negozio || '');
-    fuori.push({id: 'sponsor-' + slug, slug,
+    fuori.push({id: 'sponsor-' + slug, slug, negozio,
       emoji: String((casa ? casa.emoji : s.emoji) || '📣'),
       titoloDentro: true, sponsor: true, file: slug + '.webp',
       testo: String((casa ? casa.titolo : s.titolo) || ''),
@@ -26963,9 +26999,11 @@ function renderScoprire(){
      si scrive PRIMA del controllo della firma (la lezione storica di
      renderStriscia: scritto dopo, tornando dal barattolo la firma
      uguale lascerebbe la sezione spenta per sempre). */
-  const vive = vociScoprire().filter(v =>
+  const tutte = vociScoprire().filter(v =>
     (!vistaBarattolo || v.tocca) && v.vivo());
-  el('scoprireSez').style.display = vive.length ? '' : 'none';
+  el('scoprireSez').style.display = tutte.length ? '' : 'none';
+  const {grandi: vive, quadri} = spartisciScoprire(tutte);
+  renderQuadriScoprire(quadri);
   if (!vive.length) return;
   /* La firma dice quali card ci sono E quale e' accesa: si ridisegna
      solo quando cambia qualcosa, mai mentre si guarda.
@@ -27046,6 +27084,88 @@ function renderScoprire(){
   }).join('');
   aggiornaFrecce('scoprireStrip');
   armaScorriScoprire();
+}
+
+/* I QUADRATI DEI NEGOZI SOTTO LA CARD GRANDE (23 nov 2026, Andrea:
+   «sotto alla card principale i quadrati di tutti gli altri negozi, con
+   l'anteprima del prodotto che vende», poi «leggermente piu' piccoli»,
+   «fissi, tanto si anima gia' la card sopra»). SOLO SUL TELEFONO (il
+   CSS sotto i 768px): sul computer la fila mostra gia' piu' card
+   insieme. Solo i NEGOZI della fila (lo spazio in vetrina e chi ha
+   pagato), nello stesso ordine a turno; le card nostre no.
+   Ogni quadrato: la foto (la miniatura della prima foto dell'annuncio
+   piu' recente del negozio, che manda il server; senza, il logo) e
+   sotto SOLO la riga «cosa vende», SENZA il nome del negozio (Andrea:
+   «via il nome, rimane solo gioco da tavolo») — QUELLA CHE SCRIVIAMO NOI nel catalogo
+   della pagina (`inBreve` qui, `in_breve` nel server), e finche' non
+   c'e' la categoria dove il negozio ha piu' annunci (decisione di
+   Andrea); senza nemmeno quella, il nome, che un quadrato muto non si
+   capisce. Il nome resta comunque per chi legge ad alta voce
+   (aria-label). Il tocco e' quello della card grande (toccaScoperta), con
+   la stessa conta dello spazio. FERMI, e MUTI mentre la card grande
+   scorre: nessun quadrato si accende per seguirla (Andrea, 23 nov 2026:
+   «sotto non si deve evidenziare il quadrato»). */
+let negoziVetrina = {};          // codice -> {foto, categoria, in_breve}
+let negoziVetrinaChiesti = '', quadriFirma = '';
+const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
+/* GRANDI E QUADRATI SI DIVIDONO I NEGOZI (23 nov 2026, Andrea: «l'idea
+   e' mostrare chi paga, dappertutto, o nelle card quadrate o nelle card
+   grosse»): sul telefono un negozio sta O nella fila grande O nei
+   quadrati, mai in tutti e due. Nell'ordine del turno uno si' e uno no:
+   il primo grande, il secondo quadrato, il terzo grande... e siccome
+   `aTurno` avanza di uno a ogni apertura, la volta dopo chi era
+   quadrato e' grande. Con un negozio solo resta grande. Le card nostre
+   (P2P, aste...) restano sempre nella fila grande. Sul computer i
+   quadrati non ci sono: tutti grandi, come prima. */
+function spartisciScoprire(tutte){
+  if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
+  const grandi = [], quadri = [];
+  let k = 0;
+  tutte.forEach(v => {
+    const negozio = v.negozio && CODICE_NEGOZIO.test(String(v.negozio));
+    (negozio && (k++ % 2) ? quadri : grandi).push(v);
+  });
+  return {grandi, quadri};
+}
+function renderQuadriScoprire(vive){
+  const box = el('scoprireQuadri');
+  if (!box) return;
+  const negozi = (vive || []).filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));
+  if (negozi.length && mqNetflix.matches) chiediNegoziVetrina(negozi.map(v => String(v.negozio)));
+  const html = negozi.map(v => {
+    const d = negoziVetrina[v.negozio] || {};
+    /* il catalogo di casa per slug, o per codice (un negozio di casa che
+       ha anche pagato la card arriva senza slug) */
+    const casa = typeof RACCONTI === 'undefined' ? null : v.slug ? RACCONTI[v.slug]
+      : Object.values(RACCONTI).find(r => r && r.negozio === v.negozio) || null;
+    const breve = String((casa && casa.inBreve) || d.in_breve || d.categoria || '');
+    const foto = d.foto ? fotoUrl(fotoMini(String(d.foto))) : (v.logo || '');
+    const nome = esc(typeof v.testo === 'function' ? v.testo() : v.testo);
+    return `<button type="button" class="sc-quadro" data-id="${v.id}" aria-label="${nome}"
+      onclick="toccaScoperta(this.dataset.id)"><span class="sc-quadro-foto">${foto
+        ? `<img src="${esc(foto)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
+        : ''}<span class="sc-quadro-emoji" aria-hidden="true">${esc(v.emoji || '🏪')}</span></span
+      ><b>${breve ? esc(breve) : nome}</b></button>`;
+  }).join('');
+  box.style.display = html ? '' : 'none';
+  if (html === quadriFirma) return;
+  quadriFirma = html;
+  box.innerHTML = html;
+}
+/* la foto e la categoria di ogni negozio: UNA domanda per insieme di
+   negozi (la chiave e' l'elenco ordinato), e un guasto lascia i quadrati
+   col logo e senza riga — un ornamento non rompe la home */
+async function chiediNegoziVetrina(codici){
+  const chiave = Array.from(new Set(codici)).sort().join(',');
+  if (!chiave || chiave === negoziVetrinaChiesti) return;
+  negoziVetrinaChiesti = chiave;
+  try {
+    const r = await fetch(`${API_BASE}/negozi/vetrina?codici=${encodeURIComponent(chiave)}`);
+    if (!r.ok) return;
+    const d = await r.json().catch(() => ({}));
+    negoziVetrina = (d && d.negozi && typeof d.negozi === 'object') ? d.negozi : {};
+    renderScoprire();
+  } catch(e) {}
 }
 
 /* LO SCORRIMENTO DA SOLO DI «Da scoprire» (23 nov 2026, idea di Andrea):
@@ -27132,7 +27252,10 @@ function armaScorriScoprire(){
       if (fotogramma) return;
       fotogramma = requestAnimationFrame(() => { fotogramma = 0; centroScoprire(); });
     }, {passive: true});
-    if (mqNetflix.addEventListener) mqNetflix.addEventListener('change', centroScoprire);
+    if (mqNetflix.addEventListener) mqNetflix.addEventListener('change', () => {
+      renderScoprire();
+      centroScoprire();
+    });
     if ('IntersectionObserver' in window)
       new IntersectionObserver(e => { scoprireVisto = e.some(x => x.isIntersecting); },
                                {threshold: .5}).observe(s);
@@ -27709,7 +27832,10 @@ function chipsSpente(){
 if (window.IntersectionObserver) {
   new IntersectionObserver(
     ([voce]) => (voce.boundingClientRect.width || voce.boundingClientRect.height)
-      ? chipsAppiccicate(!voce.isIntersecting) : chipsSpente(),
+      /* da quando le categorie stanno sotto «In evidenza» (23 nov 2026)
+         all'apertura sono SOTTO lo schermo: le pillole si appiccicano
+         solo quando la sezione e' passata in alto, non prima */
+      ? chipsAppiccicate(!voce.isIntersecting && voce.boundingClientRect.top < 0) : chipsSpente(),
     {threshold: 0}
   ).observe(el('catSez'));
 }

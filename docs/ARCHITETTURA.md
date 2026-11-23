@@ -38504,3 +38504,17 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `/?assistenza=mia` e i moderatori ricevono «Da preparare la pagina di…»
   (argomento moderazione). Tutto solo con `ASSISTENZA_ATTIVA`. La pagina
   resta un racconto a mano (`racconti.py`).
+  I QUADRATI DEI NEGOZI (23 nov 2026 sera): sul telefono `#scoprireQuadri`
+  sotto la fila grande, disegnati da `renderQuadriScoprire`; la divisione
+  la fa `spartisciScoprire` (dei negozi della fila, nell'ordine del
+  turno, uno si' e uno no va nei quadrati; card nostre e computer: tutte
+  grandi). Foto, categoria e riga «cosa vende» da `GET
+  /api/negozi/vetrina?codici=` (`negozi_vetrina_pubblici`: al piu'
+  `NEGOZI_VETRINA_MAX` codici passati da `_CODICE_NEGOZIO`, la prima foto
+  dell'annuncio attivo piu' recente, la categoria piu' frequente,
+  `in_breve` del racconto solo se pubblicato; mai un tg_id). La riga di
+  casa sta in `RACCONTI[slug].inBreve` (client) e
+  `RACCONTI_NEGOZI[slug]["in_breve"]` (server). L'ordine della home sul
+  ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (senza titolo),
+  `#catSez`, `#lavSez`, `#p2pVetrinaSez`; le pillole si appiccicano solo a
+  `#catSez` passata in ALTO (`boundingClientRect.top < 0`).

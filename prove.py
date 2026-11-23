@@ -52049,8 +52049,11 @@ def prove_scoprire():
     con.close()
 
     # ---- 4. IL CLIENT: la sezione, il renderer, il gesto.
-    prova("la sezione sta fra le categorie e gli strumenti", True,
-          mini.index('id="catSez"') < mini.index('id="scoprireSez"')
+    # L'ORDINE NUOVO (23 nov 2026, Andrea): «Da scoprire» in testa, poi
+    # «In evidenza», POI le categorie, poi gli scambi P2P e gli strumenti
+    prova("la sezione sta in testa, prima di «In evidenza» e delle categorie",
+          True, mini.index('id="scoprireSez"') < mini.index('id="evidenzaSez"')
+          < mini.index('id="catSez"') < mini.index('id="p2pVetrinaSez"')
           < mini.index('<div class="strumenti">'))
     prova("...e nasce nascosta: la accendono i flag", True,
           '<div id="scoprireSez" style="display:none">' in mini)
@@ -52116,22 +52119,16 @@ def prove_scoprire():
     prova("l'anello e' quello della card categoria", True,
           ".scoprire-card.attiva{outline:2.5px solid var(--sats);"
           in mini)
-    # LA SEZIONE STA ADDOSSO ALLE CATEGORIE (ago 2026, decisione di
-    # Andrea): mezzo respiro sopra l'etichetta invece dei 16px di ogni
-    # .section-label. La regola dev'essere SCOPED, ed e' meta' della
-    # prova: il respiro intero e' di TUTTE le altre sezioni, e
-    # stringerlo sul selettore nudo cambierebbe il ritmo di mezza app
-    # senza che nessuno se ne accorga.
-    _eti = re.search(r"#scoprireSez \.section-label\{padding-top:(\d+)px\}",
-                     mini)
-    prova("l'etichetta di «Da scoprire» ha un respiro suo, scoped",
-          True, bool(_eti))
-    _base = re.search(r"\.section-label\{\s*display:flex[^}]*?"
-                      r"padding:(\d+)px", mini, re.S)
-    prova("...e le sorelle tengono quello intero", True,
-          bool(_base) and int(_base.group(1)) == 16)
-    prova("...che e' il doppio del suo", int(_base.group(1)),
-          int(_eti.group(1)) * 2)
+    # SENZA TITOLO (23 nov 2026, Andrea: «c'e' gia' la scritta
+    # Consigliato»): niente etichetta nella sezione, e nemmeno la sua
+    # regola orfana; il nome resta sulla fila per chi legge ad alta voce.
+    _sez = mini[mini.index('<div id="scoprireSez"'):mini.index('id="evidenzaSez"')]
+    prova("«Da scoprire» non ha piu' il titolo", False,
+          'section-label' in _sez)
+    prova("...ne' la regola dell'etichetta", False,
+          "#scoprireSez .section-label" in mini)
+    prova("...e la fila si presenta da sola a chi non vede", True,
+          'id="scoprireStrip" role="region" aria-label="Da scoprire"' in _sez)
     # I DUE PADDING DELLA STRISCIA NON SCENDONO SOTTO L'ANELLO, e il
     # 4,5 NON si ribatte qui: si DERIVA dall'outline della card accesa
     # (spessore + offset), che e' l'unico posto dove quel numero e'
@@ -75578,8 +75575,13 @@ def prove_morfosi_vendi():
     prova("le pillole: la sezione nascosta con la vista le spegne di colpo, "
           "quella scorsa via le accende come prima", True,
           "(voce.boundingClientRect.width || voce.boundingClientRect.height)"
-          in _io and "? chipsAppiccicate(!voce.isIntersecting) : chipsSpente()"
-          in _io)
+          in _io and "? chipsAppiccicate(!voce.isIntersecting && "
+          "voce.boundingClientRect.top < 0) : chipsSpente()" in _io)
+    # da quando le categorie stanno SOTTO «In evidenza» (23 nov 2026)
+    # all'apertura sono sotto lo schermo, cioe' non intersecano: senza la
+    # guardia del «passata in alto» le pillole comparirebbero subito
+    prova("...e solo a sezione passata in ALTO, non ancora da venire",
+          True, "voce.boundingClientRect.top < 0" in _io)
     prova("...e spegnere di colpo vuol dire senza corsa, e rimessa subito",
           True, _cs2.index("c.style.transition = 'none';")
           < _cs2.index("c.classList.remove('appiccicate');")
@@ -220738,6 +220740,142 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
           "fermo e' quello finale, i fotogrammi partono da prima", True,
           "@keyframes pa-r1{0%,25%{top:84px}55%,100%{top:8px}}" in mini
           and ".pa-r1{top:8px;" in mini)
+
+    # ---- 7c. I QUADRATI DEI NEGOZI SOTTO LA CARD GRANDE (23 nov 2026,
+    # Andrea in video): sul telefono una fila FERMA di quadrati, uno per
+    # negozio della fila, con la foto di un prodotto e sotto SOLO «cosa
+    # vende» (la riga che scriviamo noi, o la categoria). Il server da'
+    # foto, categoria e riga per codice; mai un tg_id, mai una bozza.
+    prova("il contenitore dei quadrati sta nella sezione, dopo la fila", True,
+          mini.index('id="scoprireStrip"') < mini.index('id="scoprireQuadri"')
+          < mini.index('id="evidenzaSez"'))
+    _q = re.search(r"\.sc-quadri\{([^}]*)\}", mini)
+    prova("...e fuori dal telefono non si vede", True,
+          bool(_q) and "display:none" in _q.group(1)
+          and bool(re.search(r"@media \(max-width:767px\)\{\s*\.sc-quadri\{display:flex", mini)))
+    prova("fra i quadrati e «In evidenza» il respiro che faceva il titolo",
+          True, "scrollbar-width:none;padding:0 var(--pad) 16px}" in mini)
+    prova("il quadrato e' grande abbastanza per la foto (96px) e la riga "
+          "va su due righe invece di tagliarsi", (True, True),
+          (".sc-quadro{flex:0 0 96px;width:96px;" in mini,
+           "-webkit-line-clamp:2" in pezzo_js(mini, "  .sc-quadro b{", "}")))
+    # e quando la card grande scorre, sotto NIENTE si accende (Andrea,
+    # 23 nov 2026: «sotto non si deve evidenziare il quadrato»)
+    prova("mentre la card grande scorre nessun quadrato si evidenzia",
+          (0, 0, 0), (mini.count("accendiQuadro"), mini.count(".sc-quadro.on"),
+                      pezzo_js(mini, "function centroScoprire(){").count("sc-quadro")))
+    _qr = (pezzo_js(mini, "function renderQuadriScoprire(vive){", "\n}\n") + "\n}\n"
+)
+    r = _node_banco("""
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const box = {style: {}, innerHTML: '', querySelectorAll: () => []};
+const el = id => id === 'scoprireQuadri' ? box : null;
+const fotoUrl = f => '/foto/' + f, fotoMini = f => f.replace('.jpg', '_min.jpg');
+let mqNetflix = {matches: false};
+const RACCONTI = {'to-the-moon': {negozio: 'aaa111', inBreve: 'Gioco da tavolo'}};
+let negoziVetrina = {bbb222: {foto: 'x_0.jpg', categoria: 'Alimenti', in_breve: ''},
+                     ccc333: {foto: '', categoria: 'Libri', in_breve: 'Fumetti usati'}};
+let negoziVetrinaChiesti = '', quadriFirma = '';
+const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
+""" + _qr + """
+renderQuadriScoprire([
+  {id: 'casa-1', slug: 'to-the-moon', negozio: 'aaa111', testo: 'To The Mooon', logo: '/l.webp'},
+  {id: 'promo-bbb222', negozio: 'bbb222', testo: () => 'Una Garlanda', emoji: '🏪'},
+  {id: 'promo-ccc333', negozio: 'ccc333', testo: 'Libreria'},
+  {id: 'sp-1', testo: 'Sponsor senza negozio'},
+  {id: 'promo-x', negozio: 'no/va', testo: 'Codice storto'}]);
+const h = box.innerHTML;
+const righe = [...h.matchAll(/<b>([^<]*)<\/b>/g)].map(m => m[1]);
+console.log(JSON.stringify([righe, h.includes('src="/foto/x_0_min.jpg"'),
+  h.includes('src="/l.webp"'), (h.match(/class="sc-quadro"/g) || []).length,
+  h.includes('aria-label="Una Garlanda"'), h.includes('<b>Una Garlanda</b>')]));""")
+    if r is None:
+        salta("i quadrati, girati in node", "node non c'e'")
+    else:
+        prova("in node: sotto il quadrato solo «cosa vende» (la nostra riga, "
+              "poi quella del server, poi la categoria), la miniatura del "
+              "prodotto o il logo, e niente quadrato senza un codice buono",
+              [["Gioco da tavolo", "Alimenti", "Fumetti usati"], True, True, 3,
+               True, False], r)
+
+    # GRANDI E QUADRATI SI DIVIDONO I NEGOZI (23 nov 2026, Andrea): sul
+    # telefono un negozio sta in una sola delle due file, uno si' e uno
+    # no nell'ordine del turno; le card nostre restano grandi; sul
+    # computer tutti grandi
+    _sp = pezzo_js(mini, "function spartisciScoprire(tutte){", "\n}\n") + "\n}\n"
+    r = _node_banco("""
+const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
+let mqNetflix = {matches: true};
+""" + _sp + """
+const V = [{id: 'A', negozio: 'aaa111'}, {id: 'B', negozio: 'bbb222'},
+  {id: 'C', negozio: 'ccc333'}, {id: 'D', negozio: 'ddd444'},
+  {id: 'p2p'}, {id: 'aste'}];
+const ids = x => x.map(v => v.id);
+const t = spartisciScoprire(V);
+const uno = spartisciScoprire([V[0], V[4]]);
+const giro = spartisciScoprire(V.slice(1, 4).concat(V[0], V[4], V[5]));
+mqNetflix = {matches: false};
+const pc = spartisciScoprire(V);
+console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(uno.grandi), ids(uno.quadri),
+  ids(giro.grandi), ids(giro.quadri), ids(pc.grandi), ids(pc.quadri)]));""")
+    if r is None:
+        salta("grandi e quadrati, girati in node", "node non c'e'")
+    else:
+        prova("in node: un negozio grande e uno quadrato, mai in tutti e due; "
+              "con un negozio solo resta grande; il turno dopo si scambiano; "
+              "sul computer tutti grandi",
+              [["A", "C", "p2p", "aste"], ["B", "D"], ["A", "p2p"], [],
+               ["B", "D", "p2p", "aste"], ["C", "A"],
+               ["A", "B", "C", "D", "p2p", "aste"], []], r)
+    _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
+    prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
+          "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"
+          "  renderQuadriScoprire(quadri);" in _rs)
+
+    _nv = pezzo("negozi_vetrina_pubblici")
+    prova("il server non fa uscire tg_id dai quadrati", False,
+          '"tg_id"' in _nv.split("fuori[cod] = ", 1)[1])
+    prova("...la riga «cosa vende» solo da pagina pubblicata", True,
+          'racconto_stato(slug) == "pubblicato"' in _nv)
+    prova("...e chiede al piu' NEGOZI_VETRINA_MAX negozi", True,
+          "for cod in codici[:NEGOZI_VETRINA_MAX]:" in _nv)
+    _c = _sq.connect(":memory:")
+    _c.row_factory = _sq.Row
+    _c.executescript("""
+CREATE TABLE utenti(tg_id INTEGER, negozio TEXT);
+CREATE TABLE annunci(id INTEGER, venditore_id INTEGER, stato TEXT,
+  foto TEXT, categoria TEXT, creato INTEGER);
+INSERT INTO utenti VALUES(1,'aaa111'),(2,'bbb222');
+INSERT INTO annunci VALUES
+  (1,1,'attivo','["vecchia_0.jpg"]','Libri',10),
+  (2,1,'attivo','["nuova_0.jpg","nuova_1.jpg"]','Giochi',20),
+  (3,1,'attivo','["x.jpg"]','Giochi',5),
+  (4,1,'venduto','["venduta_0.jpg"]','Giochi',30),
+  (5,2,'attivo','','Libri',1);""")
+    _amb = {"json": json, "NEGOZI_VETRINA_MAX": 16,
+            "RACCONTI_NEGOZI": {"pub": {"negozio": "aaa111", "in_breve": "Giochi da tavolo"},
+                                "bozza": {"negozio": "bbb222", "in_breve": "Segreto"}},
+            "_e_suo": lambda rr, cod, tg: rr.get("negozio") == cod,
+            "racconto_stato": lambda slug: "pubblicato" if slug == "pub" else "bozza"}
+    exec(_nv, _amb)
+    prova("in un db finto: la foto dell'annuncio attivo piu' recente, la "
+          "categoria piu' frequente, la riga solo se pubblicata, e del "
+          "negozio che non c'e' niente",
+          {"aaa111": {"foto": "nuova_0.jpg", "categoria": "Giochi",
+                      "in_breve": "Giochi da tavolo"},
+           "bbb222": {"foto": "", "categoria": "Libri", "in_breve": ""}},
+          _amb["negozi_vetrina_pubblici"](_c, ["aaa111", "bbb222", "zzz999"]))
+    _c.close()
+    _rt = pezzo("negozi_vetrina")
+    prova("la rotta passa i codici dalla forma e non ripete", True,
+          "_CODICE_NEGOZIO.fullmatch(c) and c not in lista" in _rt)
+    _evs = mini[mini.index('<div id="evidenzaSez"'):mini.index('id="catSez"')]
+    prova("anche «In evidenza» senza titolo: bastano le etichette delle card "
+          "(Andrea, 23 nov 2026), e il nome resta sulla fila", (False, True),
+          ('section-label' in _evs,
+           'id="evidenzaFila" role="region" aria-label="In evidenza"' in _evs))
+    prova("le card degli scambi P2P in home larghe come quelle in evidenza",
+          True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
 
     # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
     prova("collaudo_promozioni e' fra i collaudi della CI", True,

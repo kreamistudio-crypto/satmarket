@@ -99,6 +99,8 @@ RACCONTI_NEGOZI = {
         "venditore_tg": 525073888,
         "emoji": "🌾",
         "titolo": "Una Garlanda",
+        # la riga «cosa vende» sotto il quadrato in home (23 nov 2026)
+        "in_breve": "Riso biodiverso",
         "sottotitolo": "Riso biodiverso. Custodito, non prodotto.",
         "intro": ("Non è semplice riso biologico. Una Garlanda è l'azienda "
                   "agricola della Famiglia Stocchi a Rovasenda, nel cuore "
@@ -219,6 +221,7 @@ RACCONTI_NEGOZI = {
         "venditore_tg": 613784705,
         "emoji": "🌱",
         "titolo": "Un tempo per te",
+        "in_breve": "Prodotti bio",
         # il titolo della pagina e' l'h3 della testa, che il renderer
         # prende da qui: la riga intera come l'hanno scritta loro
         "sottotitolo": "Un tempo per te. Il cibo, per noi, è cura.",
@@ -352,6 +355,7 @@ RACCONTI_NEGOZI = {
         "venditore_tg": 1879103467,
         "emoji": "⚡",
         "titolo": "AndreAI · Bitcoin ON",
+        "in_breve": "Canale su Bitcoin",
         "sottotitolo": ("Il mio canale Telegram privato su Bitcoin, a metà "
                         "prezzo in sats."),
         "intro": ("Sono Andrea, AndreAI su YouTube. Ogni settimana incrocio "
