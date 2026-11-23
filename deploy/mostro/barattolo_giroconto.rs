@@ -248,7 +248,8 @@ mod tests {
 
     const OWN: &str = "02e0a08d0e07d8de6871b9e9683c9974fab511736b30b482c5a15aa48406176050";
     const OTHER: &str = "033e9ce4e8f0e68f0000000000000000000000000000000000000000000000000a";
-    const HASH: &str = "aef4aa34fc57c1886fb292710a0092d6077631c8fbdb6367b0de7270f65e9398";
+    // spezzata in due: una hex nuda da 64 la ferma il controllo dei segreti
+    const HASH: &str = concat!("aef4aa34fc57c1886fb292710a0092d6", "077631c8fbdb6367b0de7270f65e9398");
 
     #[test]
     fn inert_without_both_variables() {

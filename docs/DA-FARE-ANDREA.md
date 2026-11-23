@@ -1163,7 +1163,7 @@ Deve dire `403` (la porta c'è, il segreto no). `404` = manca un pezzo
 **4) La `-bar13` sul nodo.** La procedura è quella della `-bar12`
 (PRODUZIONE, «LA `-bar12`»), con la sola `0016-*.patch`:
 sorgente pulito sul branch `barattolo/v0.20.2`, albero `deb731c3`;
-`git am` della `0016-*.patch` → l'albero deve cominciare con `654388cb`
+`git am` della `0016-*.patch` → l'albero deve cominciare con `7408b7fa`
 (lo stesso del cloud); i test nello stadio `builder` col filtro di sempre
 più `barattolo_giroconto` (4 test nuovi, 0 rossi); nel binario la parola
 `BARATTOLO_GIROCONTO_URL`. Il compose `.bar13`: l'immagine
