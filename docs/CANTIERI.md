@@ -95150,3 +95150,51 @@ con «🔄 Rifornisci»; non per servizi e importati da Nostr, come
 annunci non ce ne sono. Solo testo del sapere e `conoscenza.md` rifatto.
 PROVATO: `prove_conoscenza_tappo`, `prove_assistente_bot` e le sezioni
 che leggono i documenti, verdi.
+
+## Il marchio da solo: via «il mercatino in sats» e il fulmine, il barattolo nella barra Cerca (23 nov 2026, cantiere logo-home; Andrea: «la scritta sotto il mercatino in sats non ha più senso di esistere perché Barattolo sta diventando un aggregatore di servizi», poi, scegliendo fra 36 prove: «la 24 con la scritta 11, però la B della scritta barattolo deve essere in linea con il logo della barra di ricerca»)
+
+COSA. In testata (solo telefono: sopra i 768 la `.brand` non c'è) resta
+SOLO «₿arattolo», a 34px (`clamp(26px,8.7vw,34px)`), senza la sottolinea
+«il mercatino in sats» e senza il ⚡. La tessera del barattolo è scesa
+nella barra Cerca, tonda (`.q-jar`, 32px, lo stesso `assets/barattolo.jpeg`),
+al posto della lente. La barra ha il contorno arancione a sinistra che
+sfuma nel bordo neutro verso destra, con un alone che nasce dal barattolo;
+toccata per cercare si accende tutta d'arancione. La ₿ sta in colonna col
+barattolo: `margin-left:calc(22px - .265em)` (centro del barattolo a 22px
+dal bordo del campo; l'inchiostro della ₿ ha il centro a ~.31em).
+
+DECISIONI. Le prove si sono fatte su un Barattolo di prova in locale
+(MODALITA_COLLAUDO, `semina_collaudo.py`, CSS iniettato con Playwright),
+senza toccare develop: 36 varianti in `/mnt/project-files/logo-home/`
+(scritte oro, al centro, capsula, ₿ gigante, testata arancione, 3D,
+caramelle…), scelte da Andrea una per una. Il bordo sfumato è un doppio
+sfondo (padding-box pieno + border-box sfumato) su bordo trasparente,
+perché `border-color` non fa gradienti. L'alone è un `box-shadow` del
+campo spostato a sinistra, NON un `filter:blur`: nelle prove era un
+`::before` sfocato, e `prove_effetti_ridotti` l'ha fermato (i blur della
+casa sono contati, e la classe degli effetti ridotti li spegne uno per
+uno); a schermo è quasi uguale alla prova 24. Senza `:has()` (prove_tastiera_iphone): se l'onerror
+toglie il barattolo, `.q-jar + .q-lente` e `.q-jar ~ #q` smettono di
+combaciare e tornano lente e rientro di prima. La regola «sotto i 360 la
+tessera cede il posto» se n'è andata con la tessera: il marchio da solo
+chiede 130px, e il `clamp` lo stringe sui telefoni piccoli (a 320 col
+podio acceso andava a capo a 34px fissi; misurato). La topbar da desktop
+NON cambia: lì restano tessera e ⚡ (non chiesto). Il `<title>` e
+`TITOLO_HOME` dicono ancora «il mercatino in sats» (non chiesto). Tolta
+da `lingua/en.js` la chiave della sottolinea (orfana = rossa), e rifatto
+`LINGUA_VER`.
+
+PROVATO. Misure a schermo, tema scuro e chiaro, 320/360/390/412, con e
+senza carattere «Grande» (--fs-zoom 1.15) e col podio acceso: nessuno
+scorrimento laterale, la riga resta alta 38px (44 con «Grande»), centro
+della ₿ a 39,5px contro 38 del barattolo; a 320 col «Grande» il marchio va
+a capo, il caso estremo già accettato dall'airbag. Emendate
+`prove_barattolo_in_striscia` (sezione 10: niente tessera né sottolinea in
+testata, via la regola dei 360) e `prove_tessera_testata` (il file chiesto
+per nome dalla barra e dalla topbar). Suite severa e collaudi della CI nel
+venv senza coincurve: vedi il verbale del commit.
+
+DA FARE. La frase verde «Ogni acquisto è protetto dal deposito di
+garanzia» e un lucchetto agganciato alla «o»: prove mandate ad Andrea
+(f0-f6, L1-L3), aspettano la sua scelta. NOVITA.md non toccato (testi
+nuovi solo col suo ok).

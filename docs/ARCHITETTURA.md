@@ -19769,7 +19769,9 @@
   placeholder «Cerca su Barattolo…», MAI rimettere un ascoltatore
   keydown sull'Invio (doppia ricerca), e dentro il campo a sinistra
   c'è la lente decorativa `.q-lente` (emoji sbiadita con
-  grayscale+opacity, grigia in entrambi i temi); il banner web arancione ha la
+  grayscale+opacity, grigia in entrambi i temi) — dal 23 nov 2026 al
+  suo posto c'è il barattolo `.q-jar`, e la lente torna solo se il JPEG
+  non arriva (Cantieri, «Il marchio da solo»); il banner web arancione ha la
   ✕ «ho capito» (`chiudiBarraWeb`, hint `barraweb` nel solito
   `localStorage['barattolo_hint']` — chiuso una volta, mai più su
   quel dispositivo; Esci resta nel banner finché visibile e comunque
