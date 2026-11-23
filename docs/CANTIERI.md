@@ -94730,8 +94730,42 @@ dell'ordine, porta 404/403, garanzia non incassata o corta, saldo una
 volta sola, seconda domanda senza ripagare, garanzia riusata, registro,
 l'uscita unica con la sua riga, la chiave della riserva, pulizia).
 
-DA FARE PRIMA DI ACCENDERE. 1) La parte «via euro» dell'ordine: deposito
-con fattura lunga (consiglio 4 h) e le schermate guidate (fasi F1-F2 dello
+IL DEPOSITO LUNGO (F1, stessa sera). `compra()` accetta `metodo:
+"giroconto"`: solo a porta aperta (`giroconto_attivo()`), un oggetto alla
+volta, cassaforte nodo, totale sotto `GIROCONTO_TETTO_SATS`; la fattura
+nasce con `GIROCONTO_FATTURA_SECONDI` (4 ore) e l'ordine la ricorda nella
+colonna nuova `fattura_scade` (0 = la fattura di sempre). PERCHÉ UNA
+COLONNA e non la sola `vita_fattura`: i posti che decidevano «un 'creato'
+è vivo» contavano mezz'ora dalla nascita DENTRO l'SQL, e lì una bolt11 non
+si legge. Ora dicono «mezz'ora dalla nascita, oppure fattura lunga scaduta
+da meno di un quarto d'ora»: la prenotazione dello stock (`_riservati`,
+solo i mono: il giroconto non fa set), le ferie, la chiusura dell'account,
+gli usi del codice sconto (`USI_CODICE_DOVE` ha due segnaposto),
+`controlla_annullati` (una lapide a fattura lunga si guarda finché quella
+fattura può essere pagata) e la purga delle lapidi (che aspetta un'ora
+DOPO la scadenza vera). Senza, un altro compratore avrebbe ripreso il
+pezzo a scambio in corso, e una lapide spazzata avrebbe lasciato un
+pagamento senza riga. LA RIPRESA NON MESCOLA: la fattura lunga si
+ripresenta solo a chi chiede di nuovo il giroconto e solo se le resta più
+di un'ora e dieci (Mostro vuole un'ora davanti); chi paga come sempre non
+si vede mai ripresentare la fattura lunga (l'ordine di prima prende la
+lapide, e se Mostro chiede dopo, il giroconto risponde no: i sats di Luca
+restano nella sua garanzia e Mostro chiede una fattura nuova). LA CIFRA LA
+DECIDE MOSTRO: chiede a chi compra una fattura per i sats esatti dello
+scambio meno la commissione, calcolati da lui alla presa. Quindi la cassa
+riceve anche `sats_giroconto` e il deposito nasce per QUELLA cifra, purché
+copra il totale e lo superi al massimo dell'1% (almeno 10 sats:
+`giroconto_cifra_giusta`); l'avanzo entra in `prezzo_sats` e va a chi vende
+(l'arrotondamento ad Anna, deciso). Di meno = 409, e il telefono riprova
+con qualche centesimo in più prima che chi compra abbia pagato niente. La
+ripresa confronta anche la cifra. I no della cassa («Giroconto non
+disponibile», «cifra fuori misura») sono la cintura del body scritto a
+mano: la schermata li evita prima. Provato: `prove_giroconto_interno`
+sale a 32 spunte (un mondo vero: prenota e conta l'uso solo a fattura
+lunga viva, la lapide a fattura viva resta; la cifra giusta; i pezzi della
+cassa).
+
+DA FARE PRIMA DI ACCENDERE. 1) Le schermate guidate (fase F2 dello
 studio, testi con Andrea). 2) La prova: il P2P del collaudo usa il nodo di
 produzione, quindi la `-bar13` va sul nodo (a variabili spente è identica
 alla `-bar12`) e il giroconto si prova con un ordine piccolo, deciso con

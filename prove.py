@@ -21854,7 +21854,8 @@ def prove_ferie():
     con.row_factory = sqlite3.Row
     con.executescript("""
     CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
-      venditore_id INT, stato TEXT, consegna_scelta TEXT, creato INT);
+      venditore_id INT, stato TEXT, consegna_scelta TEXT, creato INT,
+      fattura_scade INT DEFAULT 0);
     CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
       annuncio_id INT, quantita INT, titolo TEXT);
     CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
@@ -21872,13 +21873,13 @@ def prove_ferie():
     # 1) un ordine pagato e mai spedito
     con.execute("INSERT INTO annunci VALUES(1,7,'Bici',"
                 "'attivo',0,0,0,0)")
-    con.execute("INSERT INTO ordini VALUES(10,1,7,'locked',"
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(10,1,7,'locked',"
                 "'spedizione',?)", (ora,))
     v = amb2["_impegni_aperti"](con, 7)
     prova("impegno: l'ordine locked trattiene, e dice cosa fare",
           True, len(v) == 1 and "#10" in v[0] and "spedizione" in v[0])
     # IL CASO SET: annuncio_id=0, il titolo arriva dalle righe
-    con.execute("INSERT INTO ordini VALUES(11,0,7,'locked',"
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(11,0,7,'locked',"
                 "'spedizione',?)", (ora,))
     con.execute("INSERT INTO ordine_righe VALUES(1,11,1,1,'Casco')")
     con.execute("INSERT INTO ordine_righe VALUES(2,11,1,1,'Guanti')")
@@ -21888,7 +21889,7 @@ def prove_ferie():
     con.execute("DELETE FROM ordini")
     con.execute("DELETE FROM ordine_righe")
     # gli ordini gia' spediti NON trattengono (regola di Andrea)
-    con.execute("INSERT INTO ordini VALUES(12,1,7,'shipped',"
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(12,1,7,'shipped',"
                 "'spedizione',?)", (ora,))
     prova("gli ordini gia' spediti seguono il loro corso", [],
           amb2["_impegni_aperti"](con, 7))
@@ -21914,7 +21915,7 @@ def prove_ferie():
           amb2["_impegni_aperti"](con, 7))
     con.execute("DELETE FROM offerte")
     # 4) un pagamento in viaggio, e il suo gemello stantio
-    con.execute("INSERT INTO ordini VALUES(13,1,7,'creato','',?)",
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(13,1,7,'creato','',?)",
                 (ora - 60,))
     v = amb2["_impegni_aperti"](con, 7)
     prova("impegno: il pagamento in corso trattiene", True,
@@ -119360,7 +119361,8 @@ def prove_paracadute_motivo():
           CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT,
             payment_hash TEXT, creato INT, aggiornato INT,
             cassaforte TEXT DEFAULT 'saas',
-            pagata_da_annullata_il INT DEFAULT 0);
+            pagata_da_annullata_il INT DEFAULT 0,
+            fattura_scade INT DEFAULT 0);
           CREATE TABLE rilanci(id INTEGER PRIMARY KEY, stato TEXT,
             payment_hash TEXT, creato INT, aggiornato INT,
             cassaforte TEXT DEFAULT 'saas');
@@ -189165,7 +189167,8 @@ console.log(JSON.stringify(c));
     con.row_factory = _sq.Row
     con.executescript("""
     CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
-      venditore_id INT, stato TEXT, consegna_scelta TEXT, creato INT);
+      venditore_id INT, stato TEXT, consegna_scelta TEXT, creato INT,
+      fattura_scade INT DEFAULT 0);
     CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
       annuncio_id INT, quantita INT, titolo TEXT);
     CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT,
@@ -189180,12 +189183,12 @@ console.log(JSON.stringify(c));
     # un annuncio D'ASTA gia' chiusa (la base c'e', la scadenza e' passata)
     con.execute("INSERT INTO annunci VALUES(2,7,'Quadro a olio','venduto',1000,?,0,0)", (ora,))
     for oid, strada in ((10, "servizio"), (11, "digitale"), (12, "spedizione"), (13, "ritiro")):
-        con.execute("INSERT INTO ordini VALUES(?,1,7,'locked',?,?)", (oid, strada, ora))
+        con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(?,1,7,'locked',?,?)", (oid, strada, ora))
     # 14: l'asta vinta, la strada non ancora scelta; 15: asta, strada scelta;
     # 16: uno storico senza strada che NON e' un'asta
-    con.execute("INSERT INTO ordini VALUES(14,2,7,'locked','',?)", (ora,))
-    con.execute("INSERT INTO ordini VALUES(15,2,7,'locked','spedizione',?)", (ora,))
-    con.execute("INSERT INTO ordini VALUES(16,1,7,'locked','',?)", (ora,))
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(14,2,7,'locked','',?)", (ora,))
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(15,2,7,'locked','spedizione',?)", (ora,))
+    con.execute("INSERT INTO ordini(id,annuncio_id,venditore_id,stato,consegna_scelta,creato) VALUES(16,1,7,'locked','',?)", (ora,))
     prova("LE FERIE: un affare pagato trattiene ancora chi parte, e a ognuno si dice la SUA "
           "via d'uscita — il servizio si porta a termine, il codice si consegna, il pacco si "
           "segna spedito, e il ritiro a mano si segna consegnato A MANO (non «spedito»)",
@@ -193904,7 +193907,8 @@ def prove_annullata_pagata():
             protezione_sats INT DEFAULT 0, sconto_sats INT DEFAULT 0,
             annullato_venditore_il INT DEFAULT 0,
             pagata_da_annullata_il INT DEFAULT 0,
-            payout_stato TEXT DEFAULT '', payout_verso TEXT DEFAULT '');
+            payout_stato TEXT DEFAULT '', payout_verso TEXT DEFAULT '',
+            fattura_scade INT DEFAULT 0);
           CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
             annuncio_id INT, quantita INT, unitario_sats INT DEFAULT 0,
             titolo TEXT DEFAULT 'Cosa');
@@ -194483,7 +194487,8 @@ def prove_accordo_una_volta():
             annullato_venditore_il INT DEFAULT 0,
             pagata_da_annullata_il INT DEFAULT 0,
             payout_stato TEXT DEFAULT '', payout_verso TEXT DEFAULT '',
-            da_offerte TEXT DEFAULT '');
+            da_offerte TEXT DEFAULT '',
+            fattura_scade INT DEFAULT 0);
           CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
             annuncio_id INT, quantita INT, unitario_sats INT DEFAULT 0,
             titolo TEXT DEFAULT 'Cosa');
@@ -213123,6 +213128,97 @@ def prove_giroconto_interno():
           "ancora viva (vita_fattura)", True,
           "and (vita_fattura(o[\"invoice\"]) or 0) > 0)]" in _SORGENTE
           and "\"SELECT * FROM ordini WHERE stato='creato' \"" in pezzo("controlla_abbandonati"))
+
+    # --- LA FATTURA LUNGA (F1): il deposito vive 4 ore --------------------
+    # Un mondo vero: un ordine 'creato' nato 2 ore fa. Con la fattura di
+    # sempre e' stantio (non prenota, non conta come uso); con la fattura
+    # lunga ancora viva prenota lo stock e il suo uso del codice resta.
+    ora = int(time.time())
+    amb2 = {"time": time}
+    exec("USI_CODICE_DOVE = " + re.search(
+        r"USI_CODICE_DOVE = (\(.*?\))\n", _SORGENTE, re.S).group(1), amb2)
+    for nome in ("_riservati", "_usi_codice", "pulisci_ordini_fantasma"):
+        exec(pezzo(nome), amb2)
+
+    def mondo(scade, stato="creato", aggiornato=0):
+        c = _sq.connect(":memory:")
+        c.row_factory = _sq.Row
+        c.executescript("""
+          CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+            stato TEXT, quantita INT DEFAULT 1, creato INT, aggiornato INT,
+            codice_sconto_id INT DEFAULT 0, fattura_scade INT DEFAULT 0);
+          CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
+            annuncio_id INT, quantita INT);
+          CREATE TABLE rilanci(id INTEGER PRIMARY KEY, stato TEXT, creato INT,
+            puntata_id INT);
+          CREATE TABLE puntate(id INTEGER PRIMARY KEY, stato TEXT,
+            versato_sats INT);
+        """)
+        c.execute("INSERT INTO ordini(id,annuncio_id,stato,creato,aggiornato,"
+                  "codice_sconto_id,fattura_scade) VALUES(1,7,?,?,?,5,?)",
+                  (stato, ora - 7200, aggiornato, scade))
+        return c
+    amb2["RILANCIO_STANTIO"] = 3600
+    prova("fattura di sempre, nata 2 ore fa: non prenota e non conta come uso",
+          (0, 0), (amb2["_riservati"](mondo(0), 7),
+                   amb2["_usi_codice"](mondo(0), 5)))
+    prova("fattura lunga ancora viva: prenota lo stock e conta come uso",
+          (1, 1), (amb2["_riservati"](mondo(ora + 7200), 7),
+                   amb2["_usi_codice"](mondo(ora + 7200), 5)))
+    prova("...scaduta da piu' di un quarto d'ora: libera, come le altre",
+          (0, 0), (amb2["_riservati"](mondo(ora - 1000), 7),
+                   amb2["_usi_codice"](mondo(ora - 1000), 5)))
+
+    def purga(scade):
+        c = mondo(scade, stato="annullato", aggiornato=ora - 7200)
+        amb2["pulisci_ordini_fantasma"](c)
+        return c.execute("SELECT COUNT(*) FROM ordini").fetchone()[0]
+    prova("la lapide di una fattura lunga ancora viva NON si spazza; quella "
+          "di sempre si'", (1, 0), (purga(ora + 3600), purga(0)))
+
+    ann = pezzo("controlla_annullati")
+    prova("controlla_annullati guarda anche le lapidi a fattura lunga",
+          True, "COALESCE(fattura_scade,0) >= ?" in ann)
+    prova("ferie e chiusura dell'account vedono il deposito lungo in corso",
+          2, _SORGENTE.count("stato='creato' AND (creato>=? OR "
+                             "COALESCE(fattura_scade,0)>=?)")
+          + _SORGENTE.count("\"(creato>=? OR COALESCE(fattura_scade,0)>=?) \""))
+
+    cmp = pezzo("compra")
+    prova("la cassa: metodo «giroconto» solo a porta aperta e per un oggetto",
+          True, 'giroconto = d.get("metodo") == "giroconto"' in cmp
+          and 'if giroconto and (not giroconto_attivo() or not d.get("annuncio_id")):' in cmp)
+    prova("...solo sulla cassaforte nodo e sotto il tetto, PRIMA della fattura",
+          True, cmp.index("cf != CASSAFORTE_NODO\n                      or sats_giroconto > GIROCONTO_TETTO_SATS")
+          < cmp.index("inv = await crea_invoice_escrow("))
+    amb3 = {"GIROCONTO_AVANZO_PERCENTO": 1}
+    exec(pezzo("giroconto_cifra_giusta"), amb3)
+    cg = amb3["giroconto_cifra_giusta"]
+    prova("la cifra di Mostro: mai meno dell'ordine, al massimo l'1% in piu' "
+          "(almeno 10 sats), e solo un intero vero",
+          [True, True, False, False, True, False, False, False],
+          [cg(100_000, 100_000), cg(100_000, 101_000), cg(100_000, 101_001),
+           cg(100_000, 99_999), cg(500, 510), cg(500, 511),
+           cg(1000, True), cg(1000, "1000")])
+    prova("...il deposito nasce per QUELLA cifra (l'avanzo a chi vende), "
+          "controllata prima della fattura", True,
+          cmp.index("if not giroconto_cifra_giusta(totale, sats_giroconto):")
+          < cmp.index("totale = sats_giroconto")
+          < cmp.index("inv = await crea_invoice_escrow("))
+    prova("...e la ripresa la confronta: un'altra cifra e' un'altra fattura",
+          True, 'mio["prezzo_sats"] == sats_giroconto' in cmp)
+    prova("...la fattura nasce con la vita lunga, e l'ordine se lo scrive",
+          True, "expiry=GIROCONTO_FATTURA_SECONDI if giroconto else INVOICE_EXPIRY" in cmp
+          and "UPDATE ordini SET fattura_scade=? WHERE id=?" in cmp)
+    prova("...la ripresa non mescola: lunga a chi chiede giroconto (con piu' "
+          "di un'ora davanti), di sempre agli altri", True,
+          "stessa = (stessa and bool(scade) == giroconto" in cmp
+          and "scade - int(time.time()) >= GIROCONTO_RIPRESA_MIN_S" in cmp)
+    prova("quattro ore, e la ripresa vuole piu' dell'ora di Mostro", True,
+          "GIROCONTO_FATTURA_SECONDI = 4 * 3600" in _SORGENTE
+          and "GIROCONTO_RIPRESA_MIN_S = 3600 + 600" in _SORGENTE)
+    prova("la colonna nasce con la migrazione", True,
+          '"ALTER TABLE ordini ADD COLUMN fattura_scade "' in _SORGENTE)
 
 
 def prove_guida_wallet():
