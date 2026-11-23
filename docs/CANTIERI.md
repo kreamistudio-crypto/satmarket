@@ -94479,3 +94479,23 @@ ha il suo promemoria delle sei ore (`_p2p_onchain_promemoria_tab`: «Se non
 puoi più, tocca ↩️ Rinuncio»), anche se lì il server la scadenza la sa e
 manda già quello delle quattro ore prima: non era nella scelta di Andrea,
 è in fondo al rapporto.
+
+## Tappo sa l'arrotondamento di Barattozon (23 nov 2026, cantiere sapere-arrotondamento; un utente chiedeva «barattolo arrotonda gli importi di barattozon per eccesso?», e Tappo rispondeva che la differenza la mette «chi pubblica»; Andrea: «Si aggiungi al sapere di tappo»)
+
+COSA. Una frase nel paragrafo Barattozon di `assistente/sapere.md` (e
+`conoscenza.md` rifatto): al tabacchino si paga l'importo esatto del
+PayCode; solo per i sats, su Lightning a mercato, l'importo va all'euro
+intero per eccesso (`euroFiloTabacchinoP2P`); la differenza la mette
+sempre chi VENDE sats, cioè chi ha il PayCode: in «Vendi BTC» chi
+pubblica, in «Compra BTC» chi prende (`valePresaBzP2P`). A prezzo fisso e
+on-chain (`p2p_onchain_sats_mercato` sui centesimi della presa) niente
+arrotondamento.
+
+PERCHÉ. Tappo aveva solo la guida in app, che racconta il caso «Vendi
+BTC» («la differenza la mette chi pubblica»), e l'ha applicato a un
+utente che aveva pubblicato un ordine d'acquisto: lì chi pubblica è chi
+compra, e ci guadagna. Nessun codice cambiato.
+
+PROVATO. Suite severa sull'albero del commit (le sezioni che leggono il
+sapere comprese, `prove_conoscenza_tappo` dice conoscenza.md aggiornato).
+Tappo lo sa dopo la promozione: legge da main.
