@@ -123825,8 +123825,9 @@ def icona_apple():
 
 
 # Le icone della SECONDA APP, Barattolo Negozio (20 nov 2026, Andrea:
-# «deve avere un'icona completamente diversa»): la bottega con la tenda,
-# su fondo verde. Le chiede il twa-manifest del suo involucro (iconUrl,
+# «deve avere un'icona completamente diversa»; 23 nov: «il logo deve
+# ricordare Barattolo»): due barattoli sul bancone di un mercato, sotto
+# la tenda a strisce, sull'arancio di Barattolo. Le chiede il twa-manifest del suo involucro (iconUrl,
 # maskableIconUrl: il disegno sta nel cerchio sicuro, quindi la stessa
 # immagine serve tutte e due) e la scheda Zapstore.
 @app.get("/assets/negozio-icona-512.png")

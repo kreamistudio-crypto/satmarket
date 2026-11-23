@@ -94499,3 +94499,10 @@ compra, e ci guadagna. Nessun codice cambiato.
 PROVATO. Suite severa sull'albero del commit (le sezioni che leggono il
 sapere comprese, `prove_conoscenza_tappo` dice conoscenza.md aggiornato).
 Tappo lo sa dopo la promozione: legge da main.
+
+
+## L'icona di Barattolo Negozio ricorda Barattolo (23 nov 2026, cantiere icona-negozio-banco; Andrea: «il logo deve ricordare Barattolo, questo quasi non c'entra nulla, metterei un Barattolo o due in un bancone, tipo da mercato proprio per intenderci»)
+COSA. La bottega verde del 20 nov lascia il posto a due barattoli (il disegno vero dell'icona di Barattolo, ritagliato con `scontorna` di `genera_icone_apk.py`, uno grande e uno piccolo) sul piano di un bancone di legno, sotto una tenda a strisce bianche e rosse, sull'arancio di Barattolo. Stessi file (`assets/negozio-icona-sorgente.png` 1024, 512, 192), stesse rotte.
+DECISIONI E PERCHÉ. Il barattolo vero e non uno ridisegnato: si riconosce al primo colpo. Il disegno sta all'84% del quadrato, perché la stessa immagine fa anche da `maskableIconUrl` (il cerchio taglia solo le punte della tenda); nel progetto Android lo scontorno di `--sorgente` lo rimette nella zona sicura da sé. La tenda rossa e il legno separano l'icona da quella di Barattolo anche in piccolo.
+PROVATO. Le sentinelle delle misure in `prove_app_negozio`; l'anteprima nelle maschere quadrata, rotonda e del cerchio sicuro.
+DA GUARDARE. Il parere di Andrea; dopo la promozione, la nuova build sul PC (update, icone con `--sorgente`).
