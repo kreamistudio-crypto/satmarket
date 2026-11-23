@@ -44239,8 +44239,10 @@ def prove_seo():
     # con find() e non index(): se la barra esce dall'header questa
     # prova dev'essere ROSSA, non esplodere portandosi dietro tutte
     # quelle dopo (la lezione, alla terza volta)
-    prova("...come ULTIMO figlio, sotto la riga di fiducia", True,
-          0 <= testa.find('class="trust-line"')
+    # EMENDATA (23 nov 2026, logo-home): la riga di fiducia e' uscita
+    # dalla testata, e l'ultimo prima delle pillole e' la barra Cerca
+    prova("...come ULTIMO figlio, sotto la barra Cerca", True,
+          0 <= testa.find('class="searchbar"')
           < testa.find('class="chips"'))
     prova("...ancorata al suo bordo inferiore", True,
           "position:absolute;top:100%;left:0;right:0" in testo_mini)
@@ -54174,14 +54176,19 @@ def prove_sponsor():
     _vn = mini[_i:_j] if 0 <= _i < _j else ""
     prova("il negozio non ha piu' la riga del deposito", (True, False),
           (bool(_vn), 'class="trust-line"' in _vn))
-    # ...E QUELLA DI ESPLORA RESTA, ed e' la meta' che conta: il tour
-    # la cerca per classe dentro `#view-esplora` (`TAPPE_TOUR`), e una
-    # tappa senza bersaglio non entra nel giro — il contatore «N di M»
-    # scenderebbe senza che niente fallisca.
-    prova("...ma quella di Esplora c'e' ancora", 1,
+    # EMENDATA (23 nov 2026, logo-home, decisione di Andrea): se n'e'
+    # andata anche quella di Esplora — lo dice gia' il recinto della
+    # scheda. La meta' che conta resta: una tappa senza bersaglio non
+    # entra nel giro, e il contatore «N di M» scenderebbe senza che
+    # niente fallisca. Quindi la tappa del deposito cerca un bersaglio
+    # che c'e' sempre quando c'e' la prima tappa: il prezzo della prima
+    # card, e nessuno cerca piu' la riga.
+    prova("...e non c'e' piu' nemmeno quella di Esplora", 0,
           mini.count('class="trust-line"'))
-    prova("...ed e' quella che il tour cerca", True,
-          "#view-esplora .trust-line" in mini)
+    prova("...e la tappa del deposito indica il prezzo della prima card",
+          (True, False),
+          ("trova: () => document.querySelector('#grid .card .tag-price')," in mini,
+           ".trust-line'" in mini))
 
     # ---- 3g. LE DUE PROMESSE, SOTTO LA VETRINA ------------------
     # (ago 2026, decisione di Andrea) Erano in TESTATA, sopra il nome

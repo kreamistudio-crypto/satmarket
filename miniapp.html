@@ -677,13 +677,14 @@
      36 di /mnt/project-files/logo-home): senza sottolinea e senza
      fulmine il marchio cresce a 34px, e la ₿ sta in colonna col
      barattolo della barra Cerca. Il conto: il barattolo ha il centro a
-     6+16 = 22px dal bordo del campo, che parte dove parte la .brand;
+     1,5+21,5 = 23px dal bordo del campo (prova 45: il barattolo alto
+     quasi quanto la barra, col bordo arancione che gli gira intorno; chi
+     lo cambia tenga il centro li', o rifaccia questo conto), che parte dove parte la .brand;
      l'inchiostro della ₿ ha il centro a ~.31em dal bordo del glifo, e
-     a 34px fa 10,5 — quindi 22 - 9 = 13px di rientro, misurati a
-     schermo (centro ₿ 39,5 contro 38 del barattolo: e' l'inchiostro a
-     contare, non la scatola). In em la parte che scala col carattere,
+     a 34px fa 10,5 — quindi 23 - 9 = 14px di rientro, misurati a
+     schermo (e' l'inchiostro a contare, non la scatola della ₿). In em la parte che scala col carattere,
      in px quella che non scala. */
-  header .brand .lockup{font-size:clamp(26px,8.7vw,34px);margin-left:calc(22px - .265em)}
+  header .brand .lockup{font-size:clamp(26px,8.7vw,34px);margin-left:calc(23px - .265em)}
   /* L'AIRBAG della riga (ago 2026): la testata non ritaglia da nessuna
      parte e in tutto il foglio non esiste un overflow-x:hidden globale,
      quindi quando lo spazio finisce a scorrere e' la PAGINA — successo
@@ -874,8 +875,9 @@
   }
   .searchbar input:focus{border-color:var(--ink)}
   /* LA BARRA COL BARATTOLO (23 nov 2026, decisione di Andrea, prove
-     24 e 35 di /mnt/project-files/logo-home): il barattolo della
-     testata e' sceso qui, tondo, al posto della lente; il contorno e'
+     24, 35 e 45 di /mnt/project-files/logo-home): il barattolo della
+     testata e' sceso qui, tondo e alto quasi quanto la barra, al posto
+     della lente; il contorno e'
      arancione a sinistra e sfuma nel bordo neutro verso destra, con un
      alone che nasce dal barattolo. Toccata per cercare, la barra si
      accende TUTTA d'arancione. Il bordo sfumato e' un doppio sfondo
@@ -890,11 +892,11 @@
      il barattolo sta prima (col ~, niente `:has()`: prove_tastiera_iphone).
      SCOPATO su #q: la .q-wrap e' una sola, ma la ricetta del campo
      `.searchbar input` resta quella di base. */
-  .q-jar{position:absolute;left:6px;top:50%;transform:translateY(-50%);
-    width:32px;height:32px;border-radius:50%;object-fit:cover;z-index:1;
+  .q-jar{position:absolute;left:1.5px;top:50%;transform:translateY(-50%);
+    width:43px;height:43px;border-radius:50%;object-fit:cover;z-index:1;
     pointer-events:none}
   .q-jar + .q-lente{display:none}
-  .searchbar .q-jar ~ #q{padding-left:46px}
+  .searchbar .q-jar ~ #q{padding-left:53px}
   .searchbar input#q{border-color:transparent;
     box-shadow:-9px 0 16px -7px rgba(247,147,26,.7),-3px 0 7px -3px rgba(247,147,26,.45);
     background:linear-gradient(var(--card),var(--card)) padding-box,
@@ -957,14 +959,6 @@
     padding:7px 15px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;
   }
   .chip.active{background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:800}
-  /* La riga di fiducia sotto la ricerca: una sola, per tutta la vetrina */
-  /* E' un <button>: porta alla pagina «Il pagamento protetto». Il
-     reset serve perche' i default del bottone (font, bordo, fondo)
-     vincerebbero sull'ereditarieta'. */
-  .trust-line{display:flex;align-items:center;justify-content:center;gap:6px;
-    padding:10px 0 2px;font-size:12px;font-weight:800;color:var(--trust-text);
-    border:0;background:none;font-family:inherit;width:100%;cursor:pointer}
-  .trust-line .fr{font-size:15px;line-height:1;opacity:.75}
   .swap-vuoto{display:block;margin-top:10px;font-weight:700}
 
   /* ---------- strumenti di vetrina (ordina + filtri) ---------- */
@@ -14633,7 +14627,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'd056bd7c7f';
+const LINGUA_VER = 'cf026dc000';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -14765,10 +14759,12 @@ document.getElementById('cartello')?.remove();</script>
              la busta del server porta almeno un pallino. -->
         <span class="merc-mappa-posto" id="mercMappaTondo"></span>
       </form>
-      <!-- La riga di fiducia e' anche la porta alla pagina che la
-           spiega: stesso testo di sempre, col › che dice che si tocca
-           (il tour la cerca per classe, e la classe non cambia) -->
-      <button type="button" class="trust-line" onclick="apriSicurezza()">🔒 Ogni acquisto è protetto dal deposito di garanzia <span class="fr">›</span></button>
+      <!-- LA RIGA DI FIDUCIA E' USCITA DALLA TESTATA (23 nov 2026,
+           decisione di Andrea, cantiere logo-home): «Ogni acquisto è
+           protetto dal deposito di garanzia» lo dice gia' il recinto
+           della scheda, sopra «🔒 Compra in sicurezza», dove serve, col
+           suo «Scopri di più». La spiegazione resta nel giro di
+           benvenuto, che ora indica il prezzo della prima card. -->
       <!-- LE PILLOLE COMPAIONO QUANDO LE CARD SE NE VANNO (ago 2026,
            decisione di Andrea): in cima il reparto si sceglie dalle
            card, e i nomi qui non si vedono; appena la striscia esce di
@@ -15975,8 +15971,8 @@ document.getElementById('cartello')?.remove();</script>
 
   <!-- ============ VISTA: IL PAGAMENTO PROTETTO ============ -->
   <!-- La pagina lunga del deposito di garanzia: ci si arriva dal
-       «Scopri di più» del recinto, dalla riga di fiducia in vetrina e
-       dal Profilo. Statica per intero (nessun dato utente dentro: mai
+       «Scopri di più» del recinto e dal Profilo (la riga di fiducia
+       in vetrina e' uscita il 23 nov 2026). Statica per intero (nessun dato utente dentro: mai
        un esc() da ricordare) e raggiungibile anche dagli anonimi in
        vetrina — la fiducia si spiega prima di chiedere di entrare. -->
   <div class="view" id="view-sicurezza">
@@ -17532,9 +17528,9 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" class="acc-h" onclick="go('assistenza')"><span class="em">💬</span>Assistenza<span id="assistenzaPallino"></span><span class="fr">›</span></button>
       </div>
 
-      <!-- La porta alla pagina del pagamento protetto (le altre due
-           sono il recinto del dettaglio e la riga di fiducia della
-           vetrina): qui la si cerca a mente fredda, non davanti a un
+      <!-- La porta alla pagina del pagamento protetto (l'altra e' il
+           recinto del dettaglio; la riga di fiducia della vetrina e'
+           uscita il 23 nov 2026): qui la si cerca a mente fredda, non davanti a un
            acquisto. Era un bottone a tutta larghezza in fondo alla
            pagina; dal set 2026 e' una voce-porta di «Quando compri». -->
       <div class="acc voce-porta" id="vocSicurezza">
@@ -32265,7 +32261,12 @@ const TAPPE_TOUR = [
     testo: `🫙 <b>Benvenuto su Barattolo!</b> Questo è il mercatino: sfoglia le offerte, cerca e filtra con calma.` },
   { trova: () => document.querySelector('#grid .card-jar'), tondo: true,
     testo: `Ti piace qualcosa? Tocca il <b>barattolino</b> per metterla via tra i preferiti.` },
-  { trova: () => document.querySelector('#view-esplora .trust-line'),
+  /* la tappa del deposito indicava la riga di fiducia sotto la barra
+     Cerca; uscita quella (23 nov 2026, decisione di Andrea: «nella tappa
+     comunque spiega che cos'è il deposito di garanzia») indica il PREZZO
+     della prima card, cioe' i sats che entreranno nel deposito. Il
+     testo e' quello di sempre. */
+  { trova: () => document.querySelector('#grid .card .tag-price'),
     testo: `🔒 Ogni acquisto è protetto da un <b>deposito di garanzia</b> (escrow): i sats restano al sicuro e si sbloccano al venditore solo quando confermi la consegna.` },
   { trova: () => [...document.querySelectorAll('.avatar-btn.on')].find(a => a.offsetParent !== null), tondo: true,
     testo: `Questo è il tuo <b>tappo</b>: da qui completi il profilo, colleghi il wallet e trovi i tuoi annunci. Buon mercatino! 🎉` },
@@ -32631,7 +32632,7 @@ async function modaleTest(dopo){
   el('testModale').classList.add('open');
   document.body.style.overflow = 'hidden';   // sotto non si scorre
 }
-/* La fascia sotto la trust-line di Esplora: la porta al canale che
+/* La fascia sotto la barra Cerca di Esplora: la porta al canale che
    resta anche quando il cartello ha gia' fatto il suo giro. Stesso
    interruttore del cartello, mai in DEMO, anche per gli anonimi. */
 function renderFasciaTest(){

@@ -95156,12 +95156,16 @@ che leggono i documenti, verdi.
 COSA. In testata (solo telefono: sopra i 768 la `.brand` non c'è) resta
 SOLO «₿arattolo», a 34px (`clamp(26px,8.7vw,34px)`), senza la sottolinea
 «il mercatino in sats» e senza il ⚡. La tessera del barattolo è scesa
-nella barra Cerca, tonda (`.q-jar`, 32px, lo stesso `assets/barattolo.jpeg`),
+nella barra Cerca, tonda (`.q-jar`, 43px su una barra di 46: prova 45, «dentro il bordo», lo stesso `assets/barattolo.jpeg`),
 al posto della lente. La barra ha il contorno arancione a sinistra che
 sfuma nel bordo neutro verso destra, con un alone che nasce dal barattolo;
 toccata per cercare si accende tutta d'arancione. La ₿ sta in colonna col
-barattolo: `margin-left:calc(22px - .265em)` (centro del barattolo a 22px
-dal bordo del campo; l'inchiostro della ₿ ha il centro a ~.31em).
+barattolo: `margin-left:calc(23px - .265em)` (centro del barattolo a 23px
+dal bordo del campo; l'inchiostro della ₿ ha il centro a ~.31em). Provate e
+scartate da Andrea: il barattolo a filo del bordo (44), l'arancione che
+continua dentro la barra e si spegne (46-48, «Cerca» si leggeva meno), il
+bordo arancione lungo e la barra colorata dentro (40-42), la frase verde
+sotto il marchio (f0-f6, 37) e il lucchetto sulla «o» (L1-L3).
 
 DECISIONI. Le prove si sono fatte su un Barattolo di prova in locale
 (MODALITA_COLLAUDO, `semina_collaudo.py`, CSS iniettato con Playwright),
@@ -95194,7 +95198,19 @@ testata, via la regola dei 360) e `prove_tessera_testata` (il file chiesto
 per nome dalla barra e dalla topbar). Suite severa e collaudi della CI nel
 venv senza coincurve: vedi il verbale del commit.
 
-DA FARE. La frase verde «Ogni acquisto è protetto dal deposito di
-garanzia» e un lucchetto agganciato alla «o»: prove mandate ad Andrea
-(f0-f6, L1-L3), aspettano la sua scelta. NOVITA.md non toccato (testi
-nuovi solo col suo ok).
+LA RIGA VERDE È USCITA (decisione di Andrea: «levalo, però nella tappa del
+giro di benvenuto comunque spiega che cos'è il deposito di garanzia»).
+«🔒 Ogni acquisto è protetto dal deposito di garanzia ›» sotto la barra
+lo dice già il recinto della scheda, sopra «🔒 Compra in sicurezza», col
+suo «Scopri di più»; e Barattolo non è più solo il mercatino. La tappa 3
+del giro di benvenuto la indicava: ora indica il prezzo della prima card
+(`#grid .card .tag-price`, c'è sempre quando c'è la tappa 1), col testo di
+sempre — guardata a schermo, «3 di 4». Via anche le regole `.trust-line` e
+la chiave di `lingua/en.js`. Le porte alla pagina «Il pagamento protetto»
+restano il recinto della scheda e il Profilo. Emendate `prove_seo` (le
+pillole ora stanno sotto la barra Cerca) e `prove_sponsor` (nessuna riga
+di fiducia, e la tappa cerca il prezzo).
+
+DA FARE. NOVITA.md non toccato (testi nuovi solo col suo ok). Non chiesti
+e lasciati: il ⚡ e la tessera nella topbar da desktop, «il mercatino in
+sats» nel `<title>` e in `TITOLO_HOME`.
