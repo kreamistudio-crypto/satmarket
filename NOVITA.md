@@ -936,7 +936,7 @@ leva: ONCHAIN_SOLO_SOPRA_SOGLIA accesa di serie (soglia ONCHAIN_CONSIGLIATO_SOPR
 pubblico: sì
 
 ## 2026-11-23 · promozioni
-frase: Adesso puoi far vedere di più quello che vendi, pagando in sats. Dalla scheda dell'annuncio, «🚀 Promuovi»: «⬆️ In cima» lo riporta primo e lo fa riuscire nel canale Barattolo Vetrina, «⭐ In evidenza» lo mette nella nuova fila in home. Il tuo negozio può avere la sua card in «Da scoprire» per 30 giorni. E sul telefono «Da scoprire» scorre da sola.
-dove: Scheda dell'annuncio → «🚀 Promuovi»; Profilo → cassetto del banner del negozio → «🚀 Promuovi»; home: la fila «In evidenza» sotto «Da scoprire».
+frase: Adesso puoi far vedere di più quello che vendi, pagando in sats. Dalla scheda dell'annuncio, «Promuovi»: «In cima» lo riporta primo e lo fa riuscire nel canale Barattolo Vetrina, «In evidenza» lo mette nella nuova fila in home. Il tuo negozio può avere la sua card in «Da scoprire» per 30 giorni. E sul telefono «Da scoprire» scorre da sola.
+dove: Scheda dell'annuncio → «Promuovi»; Profilo → cassetto del banner del negozio → «Promuovi»; home: la fila «In evidenza» sotto «Da scoprire».
 leva: PROMOZIONI_ATTIVE (accesa di serie)
 pubblico: sì

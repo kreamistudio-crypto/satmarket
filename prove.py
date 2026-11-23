@@ -220564,6 +220564,66 @@ console.log(JSON.stringify([a, b, c]));""")
     prova("il paySheet sa che sta pagando una promozione", True,
           "promoInCorso.pid === pagamentoCorrente)\n    verificaPromo(" in mini)
 
+    # ---- 7b. IL FOGLIO «Promuovi» RITOCCATO (23 nov 2026 sera, Andrea
+    # dal collaudo): TRE voci (i 7 e i 15 giorni sono una voce sola con
+    # la durata dentro, e la terza e' il negozio in Da scoprire), icone
+    # disegnate e non emoji, e accanto a ogni voce il tasto che apre
+    # l'anteprima animata. Il tasto «Promuovi» ha la carta lucida della
+    # porta della Classifica Streak, in brace.
+    ap = pezzo_js(mini, "async function apriPromuovi(aid){", "\n}\n")
+    prova("il foglio ha tre voci: In cima, In evidenza, il negozio",
+          (1, 1, 1, 0),
+          (ap.count("tipo: 'cima'"), ap.count("tipo: 'evidenza'"),
+           ap.count("tipo: 'scoprire'"), ap.count("tipo: 'evidenza:'")))
+    prova("...e «Paga» compra la durata scelta, o il negozio", (True, True),
+          ("pagaPromo('evidenza:' + promoGiorni, aid)" in ap,
+           "pagaPromo('scoprire', 0)" in ap))
+    _emoji = re.compile("[\U0001F300-\U0001FAFF\u2B06\u2B50\u2600-\u27BF]")
+    prova("nel foglio nessuna emoji: le icone sono disegnate", [],
+          _emoji.findall(_senza_commenti_js(
+              ap + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n"))))
+    prova("...e il tasto Promuovi, nella scheda e nel cassetto, porta il "
+          "razzo disegnato e la carta lucida", (2, 0),
+          (mini.count('class="btn promo-porta"'), mini.count("🚀 Promuovi</button>")))
+    prova("...la carta lucida e' la ricetta della porta Streak", True,
+          ".btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,"
+          "rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%)," in mini)
+    _v = (pezzo_js(mini, "const ICONA_PROMO = {", "\n};") + "\n};\n"
+          + "const FRECCIA_GUARDA = '';\n"
+          + pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};") + "\n};\n"
+          + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n") + "\n}\n")
+    r = _node_banco("""
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => String(n);
+let promoGiorni = 15;
+""" + _v + """
+const ev = vocePromoHTML({tipo: 'evidenza', titolo: 'In evidenza', testo: 't',
+  durate: [{giorni: 7, sats: 1}, {giorni: 15, sats: 2}]}, true);
+const sp = vocePromoHTML({tipo: 'scoprire', titolo: 'N', testo: 't', no: 'serve il banner'}, false);
+const conta = (h, x) => h.split(x).length - 1;
+console.log(JSON.stringify([conta(ev, 'class="promo-durata"'),
+  conta(ev, 'aria-pressed="true"'), ev.includes('onclick="scegliGiorniPromo(this, 15)"'),
+  conta(ev, 'class="promo-guarda"'), ev.includes('class="promo-ante" hidden>'),
+  ev.includes('pa-eti'), ev.includes('<svg'),
+  sp.includes(' disabled'), conta(sp, 'class="promo-guarda"'), sp.includes('pa-s2'),
+  sp.includes('serve il banner')]));""")
+    if r is None:
+        salta("la voce del foglio, girata in node", "node non c'e'")
+    else:
+        prova("la voce: la durata accesa dentro In evidenza, il tasto "
+              "dell'anteprima e il riquadro chiuso; anche la voce spenta "
+              "si puo' guardare", [2, 1, True, 1, True, True, True,
+                                   True, 1, True, True], r)
+    prova("il tasto apre e chiude la SUA anteprima, e la fa ripartire",
+          (True, True, True),
+          ("b.closest('.promo-voce')" in pezzo_js(mini, "function guardaPromo(b){"),
+           "a.innerHTML = a.innerHTML;" in pezzo_js(mini, "function guardaPromo(b){"),
+           "b.setAttribute('aria-expanded'" in pezzo_js(mini, "function guardaPromo(b){")))
+    prova("...e con gli effetti ridotti resta il disegno d'arrivo: lo stato "
+          "fermo e' quello finale, i fotogrammi partono da prima", True,
+          "@keyframes pa-r1{0%,25%{top:84px}55%,100%{top:8px}}" in mini
+          and ".pa-r1{top:8px;" in mini)
+
     # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
     prova("collaudo_promozioni e' fra i collaudi della CI", True,
           "\ncollaudo_promozioni\n" in

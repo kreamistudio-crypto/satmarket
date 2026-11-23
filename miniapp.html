@@ -1491,19 +1491,105 @@
     padding:6px var(--pad) 10px}
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
-  /* LE VOCI DI «🚀 Promuovi» (23 nov 2026): radio dentro la testata del
-     foglio di casa, una per riga, la scelta accesa in arancio ₿ */
+  /* LE VOCI DI «Promuovi» (23 nov 2026; ritoccate la sera, Andrea: tre
+     voci e non quattro, icone disegnate e non emoji, e un tasto accanto a
+     ogni voce che apre sotto l'anteprima animata di cosa succede). Radio
+     dentro la testata del foglio di casa, la scelta accesa in arancio ₿. */
   .promo-scelte{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left}
-  .promo-voce{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;
-    border:1.5px solid var(--line);border-radius:12px;cursor:pointer}
-  .promo-voce input{margin:3px 0 0;accent-color:var(--sats-deep);flex:none}
+  .promo-voce{display:grid;grid-template-columns:1fr auto;align-items:center;
+    column-gap:8px;padding:10px 10px 10px 12px;border:1.5px solid var(--line);
+    border-radius:12px}
+  .promo-riga{display:flex;gap:10px;align-items:center;cursor:pointer;min-width:0}
+  .promo-riga input{margin:0;accent-color:var(--sats-deep);flex:none}
+  .promo-ico{flex:none;width:38px;height:38px;border-radius:11px;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--sats-soft);color:var(--sats-deep)}
+  .promo-ico svg{width:24px;height:24px}
+  .ip-l{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .ip-p{fill:currentColor}
+  .promo-testo{min-width:0}
   .promo-voce b{display:block;font-size:14px;color:var(--ink);line-height:1.3}
   .promo-voce small{display:block;font-size:12.5px;color:var(--ink-soft);
     font-weight:600;line-height:1.4;margin-top:2px}
-  .promo-voce.spenta{opacity:.55;cursor:default}
+  .promo-voce.spenta .promo-riga{opacity:.55;cursor:default}
   /* la scelta accesa la dice il titolo in arancio, dal fratello del
      radio: `:has()` in questo file non entra (prove_tastiera_iphone) */
-  .promo-voce input:checked + span b{color:var(--sats-deep)}
+  .promo-riga input:checked ~ .promo-testo b{color:var(--sats-deep)}
+  .promo-guarda{width:38px;height:38px;border-radius:50%;flex:none;cursor:pointer;
+    border:1.5px solid var(--line);background:var(--card);color:var(--sats-deep);
+    display:flex;align-items:center;justify-content:center;padding:0}
+  .promo-guarda svg{width:16px;height:16px;transition:transform .25s}
+  .promo-guarda[aria-expanded="true"]{background:var(--sats-soft);border-color:var(--sats-deep)}
+  .promo-guarda[aria-expanded="true"] svg{transform:rotate(90deg)}
+  .promo-durate{grid-column:1 / -1;display:flex;gap:6px;margin-top:8px;padding-left:24px}
+  .promo-durata{flex:1;min-width:0;font:inherit;font-size:12.5px;font-weight:800;
+    padding:8px 6px;border-radius:10px;cursor:pointer;color:var(--ink);
+    border:1.5px solid var(--line);background:var(--card)}
+  .promo-durata[aria-pressed="true"]{border-color:var(--sats-deep);color:var(--sats-deep);
+    background:var(--sats-soft)}
+  .promo-durata:disabled{opacity:.55;cursor:default}
+  /* L'ANTEPRIMA: un disegnino che si muove da solo, in un riquadro sotto
+     la voce. Lo stato FERMO di ogni pezzo e' quello d'ARRIVO, e i
+     fotogrammi partono da quello di prima: con gli effetti ridotti la
+     regola universale spegne l'animazione, e resta il risultato. */
+  .promo-ante{grid-column:1 / -1;position:relative;height:124px;margin-top:10px;
+    border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--line)}
+  .promo-ante[hidden]{display:none}
+  .pa-riga,.pa-card,.pa-sc{position:absolute;border-radius:7px;background:var(--card);
+    border:1px solid var(--line);box-sizing:border-box}
+  .pa-riga{left:12px;right:12px;height:30px}
+  .pa-riga::before{content:"";position:absolute;left:5px;top:4px;width:20px;height:20px;
+    border-radius:5px;background:var(--line)}
+  .pa-riga::after{content:"";position:absolute;left:32px;top:8px;width:45%;height:5px;
+    border-radius:3px;background:var(--line);box-shadow:0 8px 0 -1px var(--line)}
+  .pa-tuo{border:1.5px solid var(--sats-deep);z-index:2}
+  .pa-tuo::before{background:var(--sats)}
+  .pa-r1{top:8px;animation:pa-r1 4s ease-in-out infinite}
+  .pa-r2{top:46px;animation:pa-r2 4s ease-in-out infinite}
+  .pa-r3{top:84px;animation:pa-r3 4s ease-in-out infinite}
+  @keyframes pa-r1{0%,25%{top:84px}55%,100%{top:8px}}
+  @keyframes pa-r2{0%,25%{top:8px}55%,100%{top:46px}}
+  @keyframes pa-r3{0%,25%{top:46px}55%,100%{top:84px}}
+  .pa-aereo{position:absolute;right:20px;top:9px;width:22px;height:22px;
+    color:var(--sats-deep);animation:pa-aereo 4s ease-out infinite}
+  @keyframes pa-aereo{0%,58%{opacity:0;transform:translate(-40px,8px) scale(.6)}
+    75%,100%{opacity:1;transform:none}}
+  .pa-card{top:22px;width:70px;height:88px}
+  .pa-card::after{content:"";position:absolute;left:6px;right:6px;bottom:8px;height:5px;
+    border-radius:3px;background:var(--line);box-shadow:0 -9px 0 0 var(--line)}
+  .pa-c1{left:12px;animation:pa-c1 4s ease-in-out infinite}
+  .pa-c2{left:90px;animation:pa-c2 4s ease-in-out infinite}
+  .pa-c3{left:168px;animation:pa-c3 4s ease-in-out infinite}
+  .pa-c4{left:246px}
+  @keyframes pa-c1{0%,20%{top:130px;opacity:0}50%,100%{top:22px;opacity:1}}
+  @keyframes pa-c2{0%,20%{left:12px}50%,100%{left:90px}}
+  @keyframes pa-c3{0%,20%{left:90px}50%,100%{left:168px}}
+  .pa-eti{position:absolute;left:4px;top:4px;padding:2px 5px;border-radius:5px;
+    background:var(--sats-deep);color:#fff;font-size:8.5px;font-weight:800;
+    letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;
+    animation:pa-eti 4s ease-out infinite}
+  @keyframes pa-eti{0%,52%{opacity:0;transform:scale(.6)}65%,100%{opacity:1;transform:none}}
+  .pa-sc{top:30px;width:96px;height:62px;background:var(--line);opacity:.6}
+  .pa-s1{left:-60px}
+  .pa-s3{left:224px}
+  .pa-s2{left:76px;top:20px;width:124px;height:82px;opacity:1;border:0;
+    background:linear-gradient(135deg,#F7931A,#B45309);
+    box-shadow:0 6px 16px rgba(0,0,0,.35);animation:pa-s2 4s ease-in-out infinite}
+  .pa-s2::after{content:"";position:absolute;left:8px;bottom:8px;width:22px;height:22px;
+    border-radius:50%;background:#FFF7EC;border:2px solid #fff}
+  @keyframes pa-s2{0%,20%{left:224px;top:30px;width:96px;height:62px;opacity:.6}
+    55%,100%{left:76px;top:20px;width:124px;height:82px;opacity:1}}
+  /* IL TASTO «Promuovi» (23 nov 2026 sera, Andrea: «colorato in un certo
+     modo, simile al tasto della classifica degli streak»): la stessa carta
+     lucida della porta della Classifica Streak (il riflesso chiaro
+     nell'angolo, la discesa verso lo scuro, il filo bianco), ma BRACE,
+     una delle quattro tinte che Andrea aveva visto per quella porta: cosi'
+     i due tasti si riconoscono come fratelli e non si confondono. */
+  .btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(160deg,#C2410C 0%,#6B1D04 100%),#6B1D04;
+    border:1px solid rgba(255,255,255,.14);color:#FFF7EC;
+    display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn.promo-porta svg{width:18px;height:18px;flex:none}
   /* IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea, che
      ROVESCIA il dondolio alla mascotte vissuto un'ora: il bottone
      resta FERMO — e con lui bersaglio, anello e :active — quindi il
@@ -37572,7 +37658,7 @@ function openDetail(id){
                 ferie (l'annuncio si vede ma non si compra) e solo a
                 cassa aperta, che un bottone verso un muro e' peggio di
                 nessun bottone. */''}${promoAttive && !inFerie(l) && !DEMO && !VETRINA
-             ? `<button class="btn ghost" onclick="apriPromuovi(${l.id})">🚀 Promuovi</button>` : ''}
+             ? `<button class="btn promo-porta" onclick="apriPromuovi(${l.id})">${ICONA_PROMO.porta}Promuovi</button>` : ''}
            <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
            <!-- LA PORTA DEL DUPLICATO (ago 2026), e sta SUBITO DOPO
                 la modifica perche' sono i due gesti che partono da
@@ -52568,9 +52654,9 @@ function renderBanner(){
            pagamento): nasce solo col banner in vetrina, che e' la card */''}${promoAttive ? `
       <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:12px">${
         myPromoScoprireFino * 1000 > Date.now()
-          ? `🏪 Il tuo negozio è in «Da scoprire» fino al <b style="color:var(--ink)">${dataPromo(myPromoScoprireFino)}</b>.`
-          : '🏪 La card del tuo negozio in home, dopo l\'ok del moderatore.'}</div>
-      <button class="btn ghost" style="margin-top:8px" onclick="chiediPromoScoprire()">🚀 Promuovi</button>` : ''}` : ''}
+          ? `Il tuo negozio è in «Da scoprire» fino al <b style="color:var(--ink)">${dataPromo(myPromoScoprireFino)}</b>.`
+          : 'La card del tuo negozio in home, dopo l\'ok del moderatore.'}</div>
+      <button class="btn promo-porta" style="margin-top:8px" onclick="chiediPromoScoprire()">${ICONA_PROMO.porta}Promuovi</button>` : ''}` : ''}
     ${attesa ? `
       <div class="trust-note" style="margin-top:12px">⏳ <span>Il banner
         che hai caricato è in attesa: lo guarda un moderatore, di solito
@@ -52984,7 +53070,7 @@ async function verificaSlugNegozio(pid){
   } catch(e) {}
 }
 
-/* ---- «🚀 Promuovi» (23 nov 2026, le promozioni a pagamento) ----
+/* ---- «Promuovi» (23 nov 2026, le promozioni a pagamento) ----
    Tre promozioni, decise con Andrea dallo spunto di Subito: «⬆️ In
    cima» e «⭐ In evidenza» per un annuncio (dalla sua scheda), «🏪 Il
    negozio in Da scoprire» per il negozio (dal cassetto del banner, che
@@ -52995,55 +53081,131 @@ async function verificaSlugNegozio(pid){
    La scelta passa dal foglio di casa (chiediConferma): le voci sono
    radio dentro la testata, e la prima disponibile e' gia' scelta,
    cosi' «Paga» non e' mai un tocco a vuoto. Poi il paySheet, come il
-   banner, col suo poll sul giro GENERICO dei pagamenti. */
+   banner, col suo poll sul giro GENERICO dei pagamenti.
+   TRE VOCI E NON QUATTRO (23 nov 2026 sera, Andrea: «ho 2 tasti in
+   evidenza uguali»): i 7 e i 15 giorni sono una voce sola con la durata
+   dentro, e la terza e' il negozio in «Da scoprire», che si compra anche
+   da qui oltre che dal cassetto del banner. */
 let promoScelta = '';
+let promoGiorni = 0;         // la durata scelta dentro «In evidenza»
 let promoInCorso = null;     // {pid, tipo} della fattura aperta
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
   {day: 'numeric', month: 'long'});
 const oraPromo = ts => new Date(ts * 1000).toLocaleString('it-IT',
   {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'});
+/* LE ICONE DELLE PROMOZIONI (23 nov 2026 sera, Andrea: «niente emoji di
+   base»): disegnate qui, col tratto delle icone di casa, e colorate dal
+   `color` di chi le ospita. Il razzo e' quello del tasto «Promuovi». */
+const ICONA_PROMO = {
+  cima: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M12 13.5V3.5M7.5 8 12 3.5 16.5 8"/><rect class="ip-p" x="4" y="16" width="16" height="3" rx="1.5"/><rect class="ip-p" x="4" y="20.5" width="16" height="2" rx="1" opacity=".5"/></svg>',
+  evidenza: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="ip-l" x="3.5" y="4" width="17" height="16" rx="3.5"/><path class="ip-p" d="M12 7.3l1.4 2.9 3.2.46-2.3 2.25.54 3.17L12 14.6l-2.84 1.48.54-3.17-2.3-2.25 3.2-.46z"/></svg>',
+  scoprire: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M4 9.5 5.4 4.5h13.2L20 9.5"/><path class="ip-l" d="M4 9.5c0 1.4 1 2.4 2.2 2.4s2.3-1 2.3-2.4c0 1.4 1 2.4 2.3 2.4h.4c1.3 0 2.3-1 2.3-2.4 0 1.4 1.1 2.4 2.3 2.4S20 10.9 20 9.5"/><path class="ip-l" d="M5.5 12.3V20h13v-7.7M10 20v-4.3h4V20"/></svg>',
+  porta: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M13.5 15.5 8.5 10.5C10 6 13.5 3.5 20.5 3.5c0 7-2.5 10.5-7 12z"/><circle class="ip-l" cx="15" cy="9" r="1.6"/><path class="ip-l" d="M8.5 10.5H5l2.5-3.2h3.4M13.5 15.5V19l3.2-2.5v-3.4M6.6 15.4c-1.5.6-2.3 2.3-2.4 4.4 2.1-.1 3.8-.9 4.4-2.4"/></svg>'
+};
+const FRECCIA_GUARDA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-p" d="M8 5.5v13l10-6.5z"/></svg>';
+/* L'ANTEPRIMA DI OGNI VOCE: un disegnino, mai una schermata vera, e
+   nessuna parola tranne l'etichetta che l'annuncio prende davvero.
+   «In cima»: il tuo annuncio (bordo arancio) risale la lista e parte
+   l'aeroplanino del canale. «In evidenza»: entra per primo nella fila e
+   si accende l'etichetta. «Da scoprire»: la tua card arriva al centro e
+   diventa la grande, come nella fila vera. */
+const ANTEPRIMA_PROMO = {
+  cima: '<div class="pa-riga pa-tuo pa-r1"></div><div class="pa-riga pa-r2"></div>'
+      + '<div class="pa-riga pa-r3"></div><svg class="pa-aereo" viewBox="0 0 24 24" aria-hidden="true">'
+      + '<path class="ip-l" d="M21 3.5 3 10.8l6.6 2.6L12.2 20 21 3.5zM9.6 13.4 21 3.5"/></svg>',
+  evidenza: '<div class="pa-card pa-tuo pa-c1"><span class="pa-eti">In evidenza</span></div>'
+      + '<div class="pa-card pa-c2"></div><div class="pa-card pa-c3"></div><div class="pa-card pa-c4"></div>',
+  scoprire: '<div class="pa-sc pa-s1"></div><div class="pa-sc pa-s3"></div><div class="pa-sc pa-s2"></div>'
+};
 function vocePromoHTML(v, prima){
-  return `<label class="promo-voce${v.no ? ' spenta' : ''}">
-    <input type="radio" name="promoTipo" value="${esc(v.tipo)}"${v.no ? ' disabled' : ''}${prima ? ' checked' : ''}
-           onchange="promoScelta=this.value">
-    <span><b>${esc(v.titolo)}</b><small>${esc(v.no || v.testo)}</small></span></label>`;
+  const durate = (v.durate || []).map(x => `<button type="button" class="promo-durata"
+      aria-pressed="${x.giorni === promoGiorni ? 'true' : 'false'}"${v.no ? ' disabled' : ''}
+      onclick="scegliGiorniPromo(this, ${x.giorni})">${x.giorni} giorni, ${fmt(x.sats)} sats</button>`).join('');
+  return `<div class="promo-voce${v.no ? ' spenta' : ''}">
+    <label class="promo-riga">
+      <input type="radio" name="promoTipo" value="${esc(v.tipo)}"${v.no ? ' disabled' : ''}${prima ? ' checked' : ''}
+             onchange="promoScelta=this.value">
+      <span class="promo-ico">${ICONA_PROMO[v.tipo] || ''}</span>
+      <span class="promo-testo"><b>${esc(v.titolo)}</b><small>${esc(v.no || v.testo)}</small></span>
+    </label>
+    <button type="button" class="promo-guarda" aria-expanded="false"
+            aria-label="Guarda cosa succede" onclick="guardaPromo(this)">${FRECCIA_GUARDA}</button>
+    ${durate ? `<div class="promo-durate">${durate}</div>` : ''}
+    <div class="promo-ante" hidden>${ANTEPRIMA_PROMO[v.tipo] || ''}</div>
+  </div>`;
+}
+/* il tasto accanto alla voce apre e chiude la sua anteprima; l'animazione
+   riparte da capo a ogni apertura (il riquadro nasce di nuovo) */
+function guardaPromo(b){
+  const v = b.closest('.promo-voce');
+  const a = v && v.querySelector('.promo-ante');
+  if (!a) return;
+  const apri = a.hidden;
+  if (apri) a.innerHTML = a.innerHTML;
+  a.hidden = !apri;
+  b.setAttribute('aria-expanded', apri ? 'true' : 'false');
+}
+/* la durata dentro «In evidenza»: sceglierla sceglie anche la voce */
+function scegliGiorniPromo(b, giorni){
+  promoGiorni = giorni;
+  const v = b.closest('.promo-voce');
+  v.querySelectorAll('.promo-durata').forEach(x =>
+    x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  const r = v.querySelector('input[name="promoTipo"]');
+  if (r && !r.disabled) { r.checked = true; promoScelta = r.value; }
 }
 async function apriPromuovi(aid){
   haptic();
   if (DEMO || VETRINA) { toast('Qui non si paga: apri Barattolo'); return; }
-  let d = {};
+  /* le due voci dell'annuncio e quella del negozio: due domande al
+     listino, insieme (la seconda puo' mancare: allora la voce non c'e') */
+  let d = {}, n = {};
   try {
-    const r = await fetch(`${API_BASE}/promo/listino?annuncio=${encodeURIComponent(aid)}`,
-      {headers: {'X-Tg-Init-Data': authHdr()}});
+    const h = {headers: {'X-Tg-Init-Data': authHdr()}};
+    const [r, rn] = await Promise.all([
+      fetch(`${API_BASE}/promo/listino?annuncio=${encodeURIComponent(aid)}`, h),
+      fetch(`${API_BASE}/promo/listino`, h).catch(() => null)]);
     d = await r.json().catch(() => ({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    if (rn && rn.ok) n = await rn.json().catch(() => ({}));
   } catch(e) { toast('Rete assente: riprova'); return; }
   if (!d.attive) { toast('Le promozioni non sono attive al momento', 5000); return; }
   const voci = [];
   const c = d.cima || {};
   if (c.sats > 0)
-    voci.push({tipo: 'cima', titolo: `⬆️ In cima, ${fmt(c.sats)} sats`,
+    voci.push({tipo: 'cima', titolo: `In cima, ${fmt(c.sats)} sats`,
       testo: 'Torna primo tra i più recenti e riesce nel canale Barattolo Vetrina.',
       no: c.da ? `È già fra i primi: di nuovo dal ${oraPromo(c.da)}` : ''});
   const e = d.evidenza || {};
-  const pieni = !!e.libero_da && !e.fino;
-  (Array.isArray(e.durate) ? e.durate : []).forEach(x =>
-    voci.push({tipo: 'evidenza:' + x.giorni,
-      titolo: `⭐ In evidenza, ${x.giorni} giorni ${fmt(x.sats)} sats`,
+  const durate = (Array.isArray(e.durate) ? e.durate : []).filter(x => x.giorni > 0 && x.sats > 0);
+  if (durate.length) {
+    if (!durate.some(x => x.giorni === promoGiorni)) promoGiorni = durate[0].giorni;
+    voci.push({tipo: 'evidenza', titolo: 'In evidenza', durate,
       testo: e.fino ? `È in evidenza fino al ${dataPromo(e.fino)}: i giorni si aggiungono.`
                     : 'Nella fila In evidenza della home, con l\'etichetta. Il primo giorno anche in cima.',
-      no: pieni ? `I posti sono tutti presi: il prossimo si libera il ${dataPromo(e.libero_da)}` : ''}));
+      no: (!!e.libero_da && !e.fino)
+        ? `I posti sono tutti presi: il prossimo si libera il ${dataPromo(e.libero_da)}` : ''});
+  }
+  const sc = n.scoprire || {};
+  if (sc.sats > 0)
+    voci.push({tipo: 'scoprire',
+      titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
+      testo: sc.fino ? `È già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
+                     : 'La card del tuo negozio in home, dopo l\'ok del moderatore.',
+      no: sc.banner ? '' : 'Prima serve il banner del negozio approvato: la card è fatta con quello'});
+  if (!voci.length) { toast('Le promozioni non sono attive al momento', 5000); return; }
   const libera = voci.find(v => !v.no);
   promoScelta = libera ? libera.tipo : '';
-  if (!voci.length) { toast('Le promozioni non sono attive al momento', 5000); return; }
   chiediConferma({
-    titolo: '🚀 Promuovi',
+    titolo: 'Promuovi',
     testata: `<div class="promo-scelte">${voci.map(v =>
       vocePromoHTML(v, libera && v.tipo === libera.tipo)).join('')}</div>`,
     corpo: 'Si paga una volta, in sats. Non è un abbonamento.',
     etichetta: 'Paga', soldi: true,
     poi: () => {
       if (!promoScelta) { toast('Per ora non c\'è una promozione libera', 5000); return; }
+      if (promoScelta === 'scoprire') return pagaPromo('scoprire', 0);
+      if (promoScelta === 'evidenza') return pagaPromo('evidenza:' + promoGiorni, aid);
       return pagaPromo(promoScelta, aid);
     }});
 }
@@ -53126,7 +53288,7 @@ async function chiediPromoScoprire(){
   if (!d.attive || !(sc.sats > 0)) { toast('Le promozioni non sono attive al momento', 5000); return; }
   if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
   chiediConferma({
-    titolo: `🏪 Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
+    titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
     corpo: 'La card del tuo negozio in home, dopo l\'ok del moderatore.'
          + (sc.fino ? `\n\nÈ già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
          + '\n\nSi paga una volta, in sats. Non è un abbonamento.',
