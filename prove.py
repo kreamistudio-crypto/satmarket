@@ -21287,19 +21287,21 @@ def prove_barattolo_in_striscia():
     prova("...e la clip resta a id unico per istanza", True,
           "'jarClip' + (++jarClipN)" in mini)
 
-    # --- 10) LO SPAZIO: LA TESSERA CEDE, E C'E' L'AIRBAG ---
-    # A 320px il terzo cerchietto non ci stava: il lockup chiede 124px,
-    # la sottolinea 139, il fisso 152, e di contenuto ce n'e' 288. Il
-    # conto non cambia col podio: i cerchietti restano tre.
-    prova("sotto i 360 la tessera del logo cede il posto", True,
-          "@media (max-width:359.98px){" in css
-          and "header .brand-jar{display:none}" in css)
-    prova("...ed e' scopata su header: quella classe veste anche la topbar",
-          0, css.count("\n    .brand-jar{display:none}"))
+    # --- 10) LO SPAZIO E L'AIRBAG ---
+    # EMENDATA (23 nov 2026, il marchio da solo, decisione di Andrea):
+    # prima a 320px il terzo cerchietto non ci stava (lockup 124px,
+    # sottolinea 139, fisso 152, contenuto 288) e sotto i 360 la tessera
+    # del logo cedeva il posto. Oggi in testata la tessera e la
+    # sottolinea non ci sono piu' — il barattolo e' sceso nella barra
+    # Cerca — e il marchio a 34px chiede 130px: la regola che spegneva
+    # la tessera sarebbe morta, e se ne va con lei.
+    prova("in testata niente tessera e niente sottolinea", (0, 0),
+          (fetta('<div class="brand">', '<form class="searchbar"').count('class="brand-jar"'),
+           fetta('<div class="brand">', '<form class="searchbar"').count("<small>")))
+    prova("...e la regola della tessera che cede se n'e' andata", 0,
+          css.count("header .brand-jar{display:none}"))
     prova("l'airbag: il testo cede invece di far scorrere la PAGINA", True,
           ".brand > div{min-width:0}" in css)
-    prova("...e a cedere e' la sottolinea, coi puntini", True,
-          ".brand small{overflow:hidden;text-overflow:ellipsis" in css)
 
 
 def prove_barattolo_filtra():
@@ -93434,8 +93436,12 @@ def prove_tessera_testata():
     import os as _os
     mini = open("miniapp.html", encoding="utf-8").read()
     raw = open("assets/barattolo.jpeg", "rb").read()
-    prova("la testata la chiede ancora per nome", True,
-          '<img class="brand-jar" src="/assets/barattolo.jpeg"' in mini)
+    # EMENDATA (23 nov 2026): in testata il barattolo e' sceso nella
+    # barra Cerca (`.q-jar`); la tessera `.brand-jar` resta nella topbar
+    # da desktop. Lo stesso file, chiesto per nome in tutti e due i posti.
+    prova("la barra Cerca e la topbar la chiedono ancora per nome", (1, 1),
+          (mini.count('<img class="q-jar" src="/assets/barattolo.jpeg"'),
+           mini.count('<img class="brand-jar" src="/assets/barattolo.jpeg"')))
     prova("...ed e' un JPEG davvero", b"\xff\xd8\xff", raw[:3])
     prova("...leggero come la tessera di prima (sotto i 16 KB)", True,
           _os.path.getsize("assets/barattolo.jpeg") < 16000)

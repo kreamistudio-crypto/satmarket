@@ -658,26 +658,12 @@
      misurata, a 320px non ne avanzava nemmeno uno */
   .brand{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   /* Il barattolo accanto al lockup: JPEG su fondo arancione pieno,
-     arrotondato a tessera come nel mockup (niente scontorno) */
+     arrotondato a tessera come nel mockup (niente scontorno). Dal 23
+     nov 2026 vive solo nella topbar da desktop: in testata il
+     barattolo e' sceso nella barra Cerca (`.q-jar`) */
   /* 42px ma col margine negativo la riga resta alta come la colonna
      di testo (~38px): la testata non cresce di un pixel */
   .brand-jar{width:42px;height:42px;border-radius:13px;flex:0 0 auto;margin:-2px 0}
-  /* SOTTO I 360px LA TESSERA CEDE IL POSTO (ago 2026, col terzo
-     cerchietto in testata — il barattolo allora, il podio oggi).
-     La riga .brand e' MISURATA: il lockup «Barattolo⚡» chiede
-     124px, la sottolinea 139 (e' lei la piu' larga, non il titolo), il
-     fisso 152 — e di contenuto a 320px ce n'e' 288. Questi 42+8 sono
-     esattamente i pixel che mancavano al terzo cerchietto: senza la
-     tessera restano 158px per un testo che ne chiede 139, e non si
-     tronca piu' niente (a 320 la sottolinea andava a capo GIA' PRIMA
-     di questo cantiere). Sotto i 360 il marchio resta il lockup con la
-     B che diventa ₿, che e' il marchio vero.
-     SCOPATA su header, mai `.brand-jar` nudo: la stessa classe veste
-     anche il logo della topbar, che qui non c'entra. */
-  @media (max-width:359.98px){
-    header .brand-jar{display:none}
-  }
-  .brand small{display:block;margin-top:2px}
   /* Il lockup: Baloo 2 con la B che diventa ₿ — quattro trattini
      disegnati da due pseudo-elementi (ognuno sdoppiato via box-shadow) */
   .lockup{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:22px;line-height:1;letter-spacing:0}
@@ -687,18 +673,28 @@
     background:currentColor;border-radius:.04em;box-shadow:.18em 0 0 currentColor}
   .bmark::before{top:-.02em}
   .bmark::after{bottom:.09em}
-  .brand small{color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
+  /* LA ₿ SOPRA IL BARATTOLO (23 nov 2026, decisione di Andrea, prova
+     36 di /mnt/project-files/logo-home): senza sottolinea e senza
+     fulmine il marchio cresce a 34px, e la ₿ sta in colonna col
+     barattolo della barra Cerca. Il conto: il barattolo ha il centro a
+     6+16 = 22px dal bordo del campo, che parte dove parte la .brand;
+     l'inchiostro della ₿ ha il centro a ~.31em dal bordo del glifo, e
+     a 34px fa 10,5 — quindi 22 - 9 = 13px di rientro, misurati a
+     schermo (centro ₿ 39,5 contro 38 del barattolo: e' l'inchiostro a
+     contare, non la scatola). In em la parte che scala col carattere,
+     in px quella che non scala. */
+  header .brand .lockup{font-size:clamp(26px,8.7vw,34px);margin-left:calc(22px - .265em)}
   /* L'AIRBAG della riga (ago 2026): la testata non ritaglia da nessuna
      parte e in tutto il foglio non esiste un overflow-x:hidden globale,
      quindi quando lo spazio finisce a scorrere e' la PAGINA — successo
      gia' due volte in casa (la card a 320px, il badge da ~300px).
      Col min-width:0 il blocco di testo puo' scendere sotto il suo
-     min-content e a cedere e' la SOTTOLINEA, coi puntini. Il lockup
-     resta SENZA nowrap, com'e' sempre stato: nel caso estremo — 320px
-     col carattere «Grande», dove --fs-zoom porta il contenuto a 246px —
-     va a capo invece di far scorrere la pagina di lato. */
+     min-content. Il lockup resta SENZA nowrap, com'e' sempre stato: nel
+     caso estremo — 320px col carattere «Grande», dove --fs-zoom porta
+     il contenuto a 246px — va a capo invece di far scorrere la pagina
+     di lato. (La sottolinea che cedeva coi puntini non c'e' piu': 23
+     nov 2026, vedi «IL MARCHIO DA SOLO» nel markup.) */
   .brand > div{min-width:0}
-  .brand small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* Il tasto Profilo in alto a destra: il TAPPO del barattolo
      (assets/tappo.jpeg, 128px ritagliato sul diametro) reso tondo da
      border-radius+cover — il fondo arancione del JPEG vive solo
@@ -877,6 +873,35 @@
     padding:11px 92px 11px 38px;font:inherit;font-weight:600;outline:none;
   }
   .searchbar input:focus{border-color:var(--ink)}
+  /* LA BARRA COL BARATTOLO (23 nov 2026, decisione di Andrea, prove
+     24 e 35 di /mnt/project-files/logo-home): il barattolo della
+     testata e' sceso qui, tondo, al posto della lente; il contorno e'
+     arancione a sinistra e sfuma nel bordo neutro verso destra, con un
+     alone che nasce dal barattolo. Toccata per cercare, la barra si
+     accende TUTTA d'arancione. Il bordo sfumato e' un doppio sfondo
+     (padding-box pieno + border-box sfumato) su un bordo trasparente:
+     un border-color non sa fare un gradiente. L'alone e' un box-shadow
+     del campo spostato a sinistra, che segue la curva della barra e
+     sfuma da se', e NON un filter:blur: i blur della casa sono contati e
+     la classe degli effetti ridotti li deve spegnere uno per uno
+     (prove_effetti_ridotti). Acceso, l'ombra gira tutto intorno.
+     Se il JPEG non arriva l'onerror lo toglie e torna la lente: le
+     regole che spengono lei e allargano il rientro vivono solo finche'
+     il barattolo sta prima (col ~, niente `:has()`: prove_tastiera_iphone).
+     SCOPATO su #q: la .q-wrap e' una sola, ma la ricetta del campo
+     `.searchbar input` resta quella di base. */
+  .q-jar{position:absolute;left:6px;top:50%;transform:translateY(-50%);
+    width:32px;height:32px;border-radius:50%;object-fit:cover;z-index:1;
+    pointer-events:none}
+  .q-jar + .q-lente{display:none}
+  .searchbar .q-jar ~ #q{padding-left:46px}
+  .searchbar input#q{border-color:transparent;
+    box-shadow:-9px 0 16px -7px rgba(247,147,26,.7),-3px 0 7px -3px rgba(247,147,26,.45);
+    background:linear-gradient(var(--card),var(--card)) padding-box,
+      linear-gradient(90deg,var(--sats) 0%,var(--sats) 25%,var(--field-line) 70%) border-box}
+  .searchbar input#q:focus{background:linear-gradient(var(--card),var(--card)) padding-box,
+      linear-gradient(var(--sats),var(--sats)) border-box}
+  .searchbar input#q:focus{box-shadow:0 0 0 3px rgba(247,147,26,.14),0 0 18px rgba(247,147,26,.38)}
   /* Il selettore ₿/€: due pillole compatte dentro il campo Cerca,
      quella accesa e' la valuta in cui stai leggendo la vetrina — si
      vede subito che l'altra e' cliccabile */
@@ -14608,7 +14633,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'e8adf4f5d8';
+const LINGUA_VER = 'd056bd7c7f';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -14700,11 +14725,14 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ VISTA: ESPLORA ============ -->
   <div class="view active" id="view-esplora">
     <header>
+      <!-- IL MARCHIO DA SOLO (23 nov 2026, decisione di Andrea): via la
+           sottolinea e il fulmine — Barattolo non e' piu' solo il
+           mercatino in sats — e il barattolo e' sceso nella barra Cerca,
+           qui sotto. La ₿ sta in colonna col barattolo della barra
+           (vedi «LA ₿ SOPRA IL BARATTOLO» nel foglio). -->
       <div class="brand">
-        <img class="brand-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()">
         <div>
-          <h1 class="lockup"><span class="bmark">B</span>arattolo<span class="bolt">⚡</span></h1>
-          <small>il mercatino in sats</small>
+          <h1 class="lockup"><span class="bmark">B</span>arattolo</h1>
         </div>
         <button class="tema-btn" onclick="alternaTema()"><span class="tema-ico" aria-hidden="true">🌙</span></button>
         <button class="podio-testa" onclick="apriClassifica()" title="La classifica del mercatino" aria-label="La classifica del mercatino"><svg viewBox="2 2 20 20" width="20" height="20" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"><rect x="9.1" y="6.5" width="5.8" height="13" rx="1" fill="currentColor" fill-opacity=".12" stroke="none"/><rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/><rect x="3.4" y="11" width="5.7" height="8.5" rx="1"/><rect x="14.9" y="13.5" width="5.7" height="6" rx="1"/></svg></button>
@@ -14722,6 +14750,7 @@ document.getElementById('cartello')?.remove();</script>
            tastiera mobile), cioe' col submit del form -->
       <form class="searchbar" onsubmit="event.preventDefault();doSearch()">
         <div class="q-wrap">
+          <img class="q-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()">
           <span class="q-lente" aria-hidden="true">🔍</span>
           <input id="q" type="search" enterkeyhint="search" placeholder="Cerca su Barattolo…">
           <div class="cur-seg" id="curSeg" title="Mostra i prezzi in euro o in sats">

@@ -23,7 +23,6 @@
 
   /* ---- la testata, la barra in basso, il guscio ---- */
   "Barattolo — il mercatino in sats": "Barattolo — the marketplace in sats",
-  "il mercatino in sats": "the marketplace in sats",
   "La classifica del mercatino": "The marketplace leaderboard",
   "Il tuo profilo": "Your profile",
   "🛍️ Mercato": "🛍️ Market",
