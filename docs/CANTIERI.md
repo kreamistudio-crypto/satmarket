@@ -94785,16 +94785,24 @@ foglio mostra un numero solo e da cosa è fatto, il metodo e «Continua»;
 «Continua» prende l'ordine (`eseguiPresaP2P`), e quando il coordinatore
 chiede la fattura la conia la cassa come deposito lungo
 (`viaEuroDeposito`, metodo giroconto con i suoi `satsMiei`). Il corpo
-dell'acquisto (indirizzo compreso) resta SOLO in memoria. Da lì, in questo
-primo giro, lo scambio prosegue nella sua pagina di sempre (garanzia,
-recapito di chi vende, «Ho inviato»): le schermate semplificate di quei
-passi sono il giro dopo. Provato: `prove_non_hai_sats`, 17 spunte (porte,
-condizioni, niente «paga in euro», il gancio, la scelta in node).
+dell'acquisto (indirizzo compreso) resta SOLO in memoria. SECONDO GIRO (stessa
+sera, scritte approvate): lo stesso foglio segue lo scambio, una cosa per
+volta (`viaEuroPasso`, puro): «Sto preparando il pagamento…» finché chi
+vende non ha bloccato i sats e lasciato il recapito; «Manda N € a Luca»
+col riquadro del recapito di sempre (`recapitoCompratoreP2P`), il tempo
+della pagina (`rigaTempoPagareP2P`) e «Ho pagato», che è il gesto della
+pagina (`euroInviatiP2P`, con la sua conferma); poi «Luca sta controllando
+il pagamento. Puoi chiudere l'app, ti avvisiamo noi.» Disputa, annullo,
+pagamento da rifare: il foglio si fa da parte e resta la pagina dello
+scambio, dove c'è «Riprendi il pagamento» finché un passo del foglio è da
+fare. Il deposito rifiutato (prezzo saltato) dice «Il prezzo è cambiato:
+annulla lo scambio e riprova» e porta alla pagina (scritta mia, da far
+approvare). Provato: `prove_non_hai_sats`, 22 spunte (porte, condizioni,
+niente «paga in euro», il gancio, la scelta e il passo in node).
 
-DA FARE PRIMA DI ACCENDERE. 1) Le schermate semplificate dei passi dopo
-«Continua» (attesa, dati per pagare, «Ho pagato», «Riprendi il pagamento»
-sulla card); il caso del prezzo saltato (oggi un avviso: si annulla lo
-scambio dalla sua pagina). 2) La prova: il P2P del collaudo usa il nodo di
+DA FARE PRIMA DI ACCENDERE. 1) La scritta del prezzo saltato, da far
+approvare; le difese della F3 (la spunta dei venditori di sats e la lista
+di fiducia, il limite per i nuovi). 2) La prova: il P2P del collaudo usa il nodo di
 produzione, quindi la `-bar13` va sul nodo (a variabili spente è identica
 alla `-bar12`) e il giroconto si prova con un ordine piccolo, deciso con
 Andrea. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta

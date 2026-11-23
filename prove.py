@@ -213328,6 +213328,46 @@ console.log(JSON.stringify(r));
     prova("...a parita' di cifra il piu' recente", "b", r["pari"]["id"])
     prova("...e senza sats, cambio o libro: niente", [None, None, None], r["storti"])
 
+    # --- i passi dopo «Continua» (secondo giro) ------------------------------
+    rp = _fn_js(mini, "function renderViaEuroPasso(){")
+    prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
+          "…», «Ho pagato», «… sta controllando il pagamento», «Puoi chiudere "
+          "l'app, ti avvisiamo noi.»", True,
+          "Sto preparando il pagamento…" in rp and "'Manda ' + String(o.euro) + ' € a ' + nome" in rp
+          and ">Ho pagato</button>" in rp and "' sta controllando il pagamento'" in rp
+          and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
+    prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
+          "«Ho pagato» e' il suo gesto", True,
+          "recapitoCompratoreP2P(o)" in rp and "rigaTempoPagareP2P(o)" in rp
+          and "euroInviatiP2P();" in _fn_js(mini, "function viaEuroHoPagato(){"))
+    prova("«Riprendi il pagamento» nella pagina dello scambio nato dalla cassa",
+          True, "(typeof viaEuroRiprendiP2P === 'function' ? viaEuroRiprendiP2P(o) : '') +" in mini
+          and ">Riprendi il pagamento</button>" in _fn_js(mini, "function viaEuroRiprendiP2P(o){"))
+    prova("il deposito rifiutato non lascia il foglio a girare", True,
+          "ve.fallito = true;" in dep and ".fallito) passo = 'pagina';" in rp)
+    prog2 = (_riga_js(mini, "const P2P_FINALI = ")
+             + _fn_js(mini, "function recapitoEuroArrivatoP2P(o){")
+             + _fn_js(mini, "function viaEuroPasso(o){")
+             + r"""
+const P = s => viaEuroPasso(s);
+console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia_fattura'}),
+  P({stato: 'attesa_hold_venditore'}), P({stato: 'attivo'}), P({stato: 'attivo', campiLoro: {euro: {testo: 'IBAN'}}}),
+  P({stato: 'euro_inviati'}), P({stato: 'rilasciato'}), P({stato: 'concluso'}), P({stato: 'annullato'}),
+  P({stato: 'in_disputa'}), P({stato: 'pagamento_ritentato'})]));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog2)
+        nome2 = f.name
+    try:
+        out2 = _sp.run(["node", nome2], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome2)
+    prova("il passo del foglio: attesa fino al recapito, poi paga, poi controllo; "
+          "fine e pagina per il resto",
+          ["fine", "attesa", "attesa", "attesa", "attesa", "paga", "controllo",
+           "fine", "fine", "fine", "pagina", "pagina"],
+          _js.loads(out2.stdout) if out2.returncode == 0 else out2.stderr[-300:])
+
 
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
@@ -217964,7 +218004,8 @@ console.log(JSON.stringify(out));
           [mini.count("const tempoPagare = typeof sezioneTempoPagareNuovoP2P === 'function' "
                       "? sezioneTempoPagareNuovoP2P() : '';"),
            mini.count("(typeof rigaTempoPagareDettP2P === 'function' ? rigaTempoPagareDettP2P(o, tuo) : '')"),
-           mini.count("(typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')"),
+           # due: la pagina dello scambio e il foglio «Manda N € a Luca» di «Non hai sats?»
+           mini.count("(typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')") - 1,
            mini.count("if (typeof battitoTempoPagareP2P === 'function') battitoTempoPagareP2P();")])
     prova("...e le tre risposte del server che portano i tempi li prendono", 3,
           mini.count("prendiMinutiPagareP2P(d && d.minuti_pagare)"))
