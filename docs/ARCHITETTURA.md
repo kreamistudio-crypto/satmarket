@@ -38518,3 +38518,16 @@ mai il kind 0 di nessuno: regola ferrea 2).
   ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (senza titolo),
   `#catSez`, `#lavSez`, `#p2pVetrinaSez`; le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
+  I quadrati escono solo se sono almeno `QUADRI_MIN` (4), sennò tutti
+  grandi. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,
+  due `<i>` col `.su` che si scambiano): la foto della card al centro,
+  sfocata, messa da `sfondoScoprire` alla fine di `centroScoprire`.
+  LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
+  `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
+  Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);
+  niente piu' `#fasciaTest`. A rodaggio spento `modaleTest` chiama
+  `modaleNotizie`: timbro `notizie` (in `VISTI_NOTI`), ogni
+  `NOTIZIE_OGNI_MS`, chiede `GET /api/me/canale-notizie`
+  (`getChatMember` su `CANALE_NOTIZIE_CHAT`, cache `NOTIZIE_CACHE_S`;
+  `iscritto` vero, falso o null) e non si ripresenta a chi e' iscritto,
+  ne' a chi non si sa se e' gia' stato visto una volta.

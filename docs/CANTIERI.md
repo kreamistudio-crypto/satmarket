@@ -94862,7 +94862,44 @@ scambi P2P e gli annunci. Le card P2P in home sono larghe 150px come
 quelle in evidenza (erano più larghe). Con le categorie più in basso le
 pillole si appiccicavano subito all'apertura (la sezione sotto lo schermo
 non interseca): ora solo a sezione passata in alto. Fra i quadrati e «In evidenza»
-16px sotto i quadrati, il respiro che prima faceva il titolo (sì di Andrea).
+30px sotto i quadrati, il respiro che prima faceva il titolo (sì di Andrea).
+LO SFONDO DIETRO: card grande e quadrati stanno sulla foto della card al
+centro, sfocata e smorzata (`.sc-sfondo`, due strati `<i>` che si passano
+la mano in 1s quando la card al centro cambia, `sfondoScoprire` chiamata
+da `centroScoprire`; blur 44px, saturazione 1, luminosità .6 col tema
+scuro, 1.15 col chiaro, lo strato al 55%), che negli ultimi 50px sfuma
+nella pagina. La strada è stata lunga: un velo scuro (no), una fascia
+arancio (no), quattro tinte neutre («sono morti 'sti colori»), poi la foto
+sfocata ma troppo viva («creano troppo casino»), infine questa: «Ottimo,
+così è perfetto». La riga scura fra card grande e quadrati era l'ombra
+della card al centro tagliata dal bordo della fila: ombra più corta e
+fila con più spazio sotto.
+
+ALMENO QUATTRO QUADRATI (`QUADRI_MIN`): sotto i quattro la fila resta
+mezza vuota (Andrea: «non mi piace che lasci vuoti»), e allora tutti i
+negozi tornano grandi. Con la divisione uno sì e uno no servono otto
+negozi di chi paga.
+
+NELLO STESSO CANTIERE, LA TESTA DELLA HOME (Andrea: «leva via quel
+banner», «un toggle con un'icona dedicata che porta al canale ufficiale
+di barattolo per le notizie», «quel toggle lì della classifica lo metti
+nel profilo»). (1) La fascia «Barattolo è in fase di test» è tolta dal
+codice (`#fasciaTest`, `renderFasciaTest`); `fasciaPrima` disegna solo
+la riga di Tor. (2) Al posto del podio in testa, un megafono
+(`.notizie-testa`, `apriNotizie`) che apre https://t.me/barattolostore.
+(3) La classifica del mercatino va nel Profilo sotto «Classifica Streak»:
+«Il Podio di Barattolo» (`mercatoClassificaPortaHTML`, stesso disegno del
+podio, solo con la leva della classifica accesa, mai in demo o vetrina;
+Andrea: «Il podio di barattolo mi piace»). (4) Il cartello giornaliero
+del rodaggio si spegne dal config del VPS (`BANNER_TEST = False`,
+DA-FARE-ANDREA 31: «spegnilo dalla lista»); a rodaggio spento
+`modaleTest` passa a `modaleNotizie`, il riquadro che invita nel canale
+delle notizie: dopo il tour, al più ogni 3 giorni (decisione di Andrea,
+«Ogni 3 giorni»; timbro `notizie` in `VISTI_NOTI`), e mai più a chi è
+già nel canale. Lo dice `GET /api/me/canale-notizie` col `getChatMember`
+del bot (che Andrea ha fatto admin di @barattolostore), con cache di 6
+ore; se il bot non risponde, o per chi entra solo con Nostr, il riquadro
+esce una volta sola.
 
 IL SERVER. `GET /api/negozi/vetrina?codici=` (`negozi_vetrina_pubblici`):
 codici pubblici passati dalla forma, al più 16, per ognuno foto,
@@ -94881,7 +94918,10 @@ PROVATO. `prove_promozioni` 7c: il contenitore, il CSS solo telefono, i
 server o categoria; miniatura o logo; niente quadrato senza codice
 buono), la divisione girata in node (uno sì e uno no, un negozio solo,
 il turno dopo, il computer), la funzione del server in un db finto, la
-rotta, i 150px, i due titoli tolti; l'ordine nuovo e le pillole nelle
-prove di sempre. Guardato con Playwright a 390px, video mandati ad Andrea.
-RESTA: le quattro righe «cosa vende» dei negozi di casa, da scegliere con
-Andrea.
+rotta, i 150px, i due titoli tolti, lo sfondo girato in node, l'ombra
+che sta nella fila, i quattro quadrati minimi; l'ordine nuovo e le
+pillole nelle prove di sempre. `prove_barattolo_in_striscia` 7: il
+megafono, il Podio, la fascia morta, `modaleNotizie` e la sua rotta. Guardato con
+Playwright a 390px, video e foto mandati ad Andrea (anche con i due
+negozi veri di oggi, AndreAI e To The Moon).
+RESTA: dopo il deploy, `BANNER_TEST = False` sul VPS (DA-FARE-ANDREA 31).

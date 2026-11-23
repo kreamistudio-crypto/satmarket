@@ -1112,3 +1112,32 @@ rifiutato. L'espulsione si vede solo dopo 33 giorni: la ronda gira da sola.
 **ROLLBACK.** Togliere la riga (`cp -p
 /srv/barattolo/config.py.prima-abbonamento /srv/barattolo/config.py`) e
 riavviare: niente link né espulsioni, e gli abbonati già dentro restano.
+
+## 31. Spegnere il riquadro «fase di test» in produzione (23 nov 2026, cantiere scoprire-quadrati; Andrea: «levamelo quello lì anche, spegnilo dalla lista, il riquadro fase di test»)
+
+**Perché.** La fascia in home se ne va col codice (alla prossima
+promozione). Il riquadro che compare una volta al giorno all'apertura
+invece lo accende la riga `BANNER_TEST` del config del VPS: si spegne lì,
+senza codice. Si può fare anche subito, prima della promozione.
+
+**Sola lettura:**
+```
+grep -n "^BANNER_TEST" /srv/barattolo/config.py
+```
+Se non esce `BANNER_TEST = True`, non c'è niente da fare.
+
+**Scrive** (dopo il sì di Andrea, già dato il 23 nov):
+```
+cp -a /srv/barattolo/config.py /root/config-prima-banner-test-$(date +%F).py
+```
+```
+sudo sed -i 's/^BANNER_TEST = True/BANNER_TEST = False/' /srv/barattolo/config.py && grep -n "^BANNER_TEST " /srv/barattolo/config.py
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo && sleep 5 && curl -s -o /dev/null -w 'salute %{http_code}\n' http://127.0.0.1:8080/api/salute
+```
+Atteso `BANNER_TEST = False`, `ok` e `salute 200`. Riaprendo l'app il
+riquadro non compare più.

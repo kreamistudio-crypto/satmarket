@@ -21216,36 +21216,74 @@ def prove_barattolo_in_striscia():
     prova("...e quello che la pillola d'uscita dice in vetrina", True,
           "🫙 Nel tuo barattolo ✕" in mini)
 
-    # --- 7) IL PODIO IN TESTATA ---
-    testa = "".join(_re.findall(r'<button class="podio-testa".*?</button>',
+    # --- 7) IL MEGAFONO IN TESTATA (23 nov 2026, al posto del podio) ---
+    # Andrea: «levami il toggle della classifica... fammi un toggle con
+    # un'icona dedicata che porta al canale ufficiale per le news», e la
+    # classifica scende nel Profilo sotto la Classifica Streak
+    testa = "".join(_re.findall(r'<button class="notizie-testa".*?</button>',
                                 mini, _re.S))
-    r = pezzo_js(mini, "function renderPodioTesta(){", "\n}\n")
-    prova("le istanze del podio sono DUE", 2,
-          mini.count('class="podio-testa"'))
+    prova("le istanze del megafono sono DUE", 2,
+          mini.count('class="notizie-testa"'))
     prova("una in testata e una in topbar", (1, 1),
-          (mini[:mini.index("</header>")].count('class="podio-testa"'),
+          (mini[:mini.index("</header>")].count('class="notizie-testa"'),
            mini[mini.index("<nav"):mini.index("</nav>")]
-           .count('class="podio-testa"')))
-    prova("...e la regia le prende per classe, in un giro solo", 1,
-          r.count("querySelectorAll('.podio-testa')"))
-    # il gate e' la leva della classifica: la stessa condizione che
-    # accendeva il bottone del Profilo, morto con questo cantiere
-    prova("il gate e' la leva della classifica", True,
-          "myClassifica && !DEMO && !VETRINA" in r)
-    prova("l'SVG e' statico nel markup: niente lampo, niente innerHTML",
-          0, r.count("innerHTML"))
-    prova("...e il disegno sta nei due bottoni", 2,
-          mini.count('<rect x="9.1" y="6.5" width="5.8" height="13" rx="1"/>'))
-    prova("il tocco apre la classifica, dalle due istanze", 2,
-          testa.count('onclick="apriClassifica()"'))
+           .count('class="notizie-testa"')))
+    prova("il tocco apre il canale delle notizie, dalle due istanze", 2,
+          testa.count('onclick="apriNotizie()"'))
+    _an = pezzo_js(mini, "function apriNotizie(){", "\n}\n")
+    prova("...che e' il canale ufficiale, per Telegram e fuori", (True, True, True),
+          ("const CANALE_NOTIZIE = 'https://t.me/barattolostore';" in mini,
+           "tg.openTelegramLink(CANALE_NOTIZIE)" in _an,
+           "window.open(CANALE_NOTIZIE, '_blank', 'noopener')" in _an))
     prova("niente aria-pressed: naviga, non toggla", 0,
           testa.count("aria-pressed"))
-    prova("l'anello «sei in classifica» lo scrive go(), come il tappo",
-          True, "classList.toggle('attivo', view==='classifica')" in mini)
-    # PROVA CHE HA CAMBIATO LATO (ago 2026, decisione di Andrea: una
-    # porta sola): certificava il bottone in fondo al Profilo.
-    prova("la porta del Profilo e' morta", 0,
-          mini.count("profiloClassifica"))
+    prova("il podio in testata e' morto, con la sua regia", (0, 0, 0),
+          (mini.count("podio-testa"), mini.count("renderPodioTesta"),
+           mini.count("classList.toggle('attivo', view==='classifica')")))
+    _mp = pezzo_js(mini, "function mercatoClassificaPortaHTML(){", "\n}\n")
+    prova("la classifica del mercatino ha la porta nel Profilo, col gate della "
+          "leva e mai in DEMO o in vetrina", (True, True),
+          ("if (!myClassifica || DEMO || VETRINA) return '';" in _mp,
+           'onclick="apriClassifica()"' in _mp))
+    prova("...subito sotto la Classifica Streak", True,
+          "${serieClassificaPortaHTML(mySerie)}\n    ${mercatoClassificaPortaHTML()}"
+          in mini)
+    prova("...e si chiama come ha scelto Andrea", True,
+          ">Il Podio di Barattolo</span>" in _mp)
+    # LA FASCIA «FASE DI TEST» NON C'E' PIU' (23 nov 2026, Andrea), e al
+    # posto del cartello del rodaggio, a leva spenta, il riquadro che
+    # invita nel canale delle notizie: ogni 3 giorni finche' non ci
+    # entra, mai alla prima apertura, mai in demo o in vetrina
+    prova("la fascia del rodaggio e' morta", (0, 0),
+          (mini.count('id="fasciaTest"'), mini.count("renderFasciaTest")))
+    _mt = pezzo_js(mini, "async function modaleTest(dopo){", "\n}\n")
+    _mn = pezzo_js(mini, "function modaleNotizie(){", "\n}\n")
+    prova("a rodaggio spento tocca al riquadro delle notizie", True,
+          "if (!d) return modaleNotizie();" in _mt)
+    prova("...dopo il tour, mai in demo o in vetrina, ogni 3 giorni", (True, True, True),
+          ("if (!hintAttivi() || !hintDismesso('tour')) return finiscoModaleTest();" in _mn,
+           "if (visto && Date.now() - visto < NOTIZIE_OGNI_MS) return finiscoModaleTest();" in _mn,
+           "const NOTIZIE_OGNI_MS = 3 * 86400000;" in mini))
+    prova("...mai piu' a chi e' entrato, e una volta sola se non si sa", True,
+          _mn.index("if (iscritto === true) return finiscoModaleTest();")
+          < _mn.index("if (iscritto !== false && visto) return finiscoModaleTest();")
+          < _mn.index("timbraVisto('notizie');"))
+    _cn = pezzo("mio_canale_notizie")
+    prova("il server chiede a Telegram di CHI BUSSA, con tre risposte", (True, True, True),
+          ('"user_id": tg}' in _cn and 'tg = int(user["id"])' in _cn,
+           "esito = None" in _cn,
+           'res["status"] in ("member", "administrator", "creator",' in _cn))
+    prova("...e il suo tasto apre il canale come il megafono", True,
+          'onclick="chiudiModaleTest(); apriNotizie()"' in _mn)
+    prova("...e l'altro tasto riporta all'app (Andrea: «Esplora l'app» al posto di «Più tardi»)",
+          (True, False),
+          ('onclick="chiudiModaleTest()">Esplora l\'app</button>' in _mn, "Più tardi" in _mn))
+    prova("...e il timbro lo conosce anche il server", True,
+          '"notizie"' in _SORGENTE[_SORGENTE.index("VISTI_NOTI = ("):
+                                   _SORGENTE.index(")", _SORGENTE.index("VISTI_NOTI = ("))])
+    prova("...con la carta della sorella, in petrolio", True,
+          'class="serie-cl-porta merc-cl-porta"' in _mp
+          and ".merc-cl-porta{background:radial-gradient(" in mini)
 
     # --- 8) L'ORDINE NEL MARKUP E LA CATENA DEI MARGINI ---
     def fetta(dopo, prima):
@@ -21254,13 +21292,13 @@ def prove_barattolo_in_striscia():
 
     for nome, f in (("testata", fetta('<div class="brand">', "</header>")),
                     ("topbar", fetta('<button id="nav-affari"', "</nav>"))):
-        prova(f"{nome}: l'ordine e' levetta → podio → tappo", True,
-              f.index('class="tema-btn"') < f.index('class="podio-testa"')
+        prova(f"{nome}: l'ordine e' levetta → megafono → tappo", True,
+              f.index('class="tema-btn"') < f.index('class="notizie-testa"')
               < f.index('class="avatar-btn"'))
     prova("la spinta a destra e' della levetta, che c'e' sempre", True,
           ".tema-btn{display:inline-flex;margin-left:auto}" in css)
-    i = css.index(".podio-testa{")
-    prova("...e non del podio, che si spegne a leva spenta", True,
+    i = css.index(".notizie-testa{")
+    prova("...e non del megafono in mezzo", True,
           "margin-left:auto" not in css[i:i + 90])
     # col + la regola smette di combaciare col podio in mezzo, e il
     # tappo ricade sul suo auto: DUE auto-margini, e la levetta migra
@@ -21269,13 +21307,14 @@ def prove_barattolo_in_striscia():
           css.count(".tema-btn + .avatar-btn"))
     prova("...ma dalla sola PRECEDENZA, in tutte e due le regole", 2,
           css.count(".tema-btn ~ .avatar-btn"))
-    prova("il podio nasce spento", True, ".podio-testa{display:none" in css)
-    prova("...e si accende solo dove deve, mai nudo", (1, 1, 0),
-          (css.count("header .brand .podio-testa.on{display:inline-flex}"),
-           css.count("nav .podio-testa.on{display:inline-flex"),
-           css.count("\n  .podio-testa.on{")))
+    # la classe vive anche nella barra in basso del telefono: nasce spenta
+    # e la accendono le sole regole di testata e topbar
+    prova("il megafono nasce spento", True, ".notizie-testa{display:none" in css)
+    prova("...e si accende solo in testata e in topbar", (1, 1),
+          (css.count("header .brand .notizie-testa{display:inline-flex}"),
+           css.count("nav .notizie-testa{display:inline-flex")))
     prova("il bersaglio di tocco e' piu' largo del cerchietto", True,
-          ".podio-testa::after{content:'';position:absolute;inset:-6px" in css)
+          ".notizie-testa::after{content:'';position:absolute;inset:-6px" in css)
 
     # --- 9) UN DISEGNO SOLO PER IL VETRO ---
     prova("il vetro e' disegnato in un posto solo", 1,
@@ -34739,10 +34778,10 @@ def prove_classifica():
     apri = apri[:apri.index("\n}")]
     prova("in DEMO e in VETRINA la pagina non si apre", True,
           "if (DEMO || VETRINA) return;" in apri)
-    # dall'ago 2026 la porta e' il PODIO in testata (il bottone del
-    # Profilo e' morto: le sue prove stanno in prove_barattolo_in_striscia)
+    # dal 23 nov 2026 la porta e' «Il Podio di Barattolo» nel Profilo
+    # (il podio in testata e' morto: le prove in prove_barattolo_in_striscia)
     prova("la porta si accende solo a leva accesa", True,
-          "myClassifica && !DEMO && !VETRINA" in html)
+          "if (!myClassifica || DEMO || VETRINA) return '';" in html)
     # «offertapresto» e' uscita dall'elenco con la sua vista (ago 2026,
     # l'offerta sul carrello): le entry vecchie degradano in
     # navRendiVista, come quelle di 'sfoglia'
@@ -41940,11 +41979,11 @@ def prove_onion():
     # chiede la RIGA INTERA e dentro il suo chiamante, che il nome da
     # solo vive anche in un commento.
     fp = pezzo_js(mini, "async function fasciaPrima(", "\n}\n")
-    prova("...e a disegnarla c'e' fasciaPrima, prima del giro di rete",
-          True,
-          "  renderFasciaOnion();" in fp
-          and fp.index("renderFasciaOnion();")
-          < fp.index("await caricaBannerTest();"))
+    # (23 nov 2026: la fascia sorella del rodaggio e' morta, e
+    # fasciaPrima non aspetta piu' nessun giro di rete)
+    prova("...e a disegnarla c'e' fasciaPrima, senza aspettare la rete",
+          (True, False),
+          ("  renderFasciaOnion();" in fp, "await " in fp))
     prova("...e non chiede niente: nessun bottone, nessun dismiss",
           (False, False),
           ("onclick" in fo, "hint" in fo.lower()))
@@ -44334,8 +44373,11 @@ def prove_seo():
           or "backdrop-filter" in _fetta("  .chips.appiccicate{"))
     prova("...ma la testata resta posizionata, o la barra si stacca",
           True, "position:sticky;top:0;z-index:20" in _fetta("\n  header{"))
-    prova("...col verso giusto (fuori vista = barra accesa)", True,
-          "chipsAppiccicate(!voce.isIntersecting)" in testo_mini)
+    # (23 nov 2026) e solo a categorie passate in ALTO: sotto «In
+    # evidenza» all'apertura sono sotto lo schermo, e non intersecano
+    prova("...col verso giusto (fuori vista IN ALTO = barra accesa)", True,
+          "chipsAppiccicate(!voce.isIntersecting && voce.boundingClientRect.top < 0)"
+          in testo_mini)
     # LE TRE PROVE DELL'ASCOLTATORE SONO MORTE COL CODICE CHE
     # SORVEGLIAVANO: il `top` non si scrive piu' a mano, quindi non
     # c'e' piu' niente da rincorrere allo scroll. A tenere chiusa
@@ -52066,14 +52108,16 @@ def prove_scoprire():
     # cambierebbe comunque. La prova ha CAMBIATO LATO e chiede che il
     # voto NON sia un chiamante: e' l'affermazione forte, e rimetterlo
     # sarebbe un giro che non puo' cambiare niente.
-    prova("renderScoprire ha i suoi quattro chiamanti", 4,
+    # (23 nov 2026) PIU' DUE: la risposta delle foto dei quadrati e il
+    # cambio telefono/computer, che spostano negozi fra fila e quadrati
+    prova("renderScoprire ha i suoi sei chiamanti", 6,
           mini.count("renderScoprire();"))
     prova("...e il voto non e' piu' uno di loro", False,
           "renderScoprire();" in pezzo_js(
               mini, "async function toggleInteresse(f){", "\n}"))
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}")
     prova("senza card vive sparisce la sezione intera", True,
-          "el('scoprireSez').style.display = vive.length ? '' : 'none';"
+          "el('scoprireSez').style.display = tutte.length ? '' : 'none';"
           in _rs)
     # il display si scrive PRIMA della firma (la lezione di
     # renderStriscia: scritto dopo, tornando dal barattolo la firma
@@ -139857,9 +139901,14 @@ def prove_effetti_ridotti():
     # la pagina dietro il tour del P2P — un filtro SULLA pagina, fermo
     # mentre il tour e' aperto, e con gli effetti ridotti non c'e'
     # (il suo `filter:none` e il fondo pieno stanno nel blocco)
-    prova("i `filter:blur` sono due: la luce dell'icona Nostr (1.2px, "
-          "fermo) e la pagina dietro il tour del P2P",
-          [".ico-nostr .lux",
+    # EMENDATA (23 nov 2026, lo sfondo coi colori della card scelto da
+    # Andrea): la terza e' la foto sfocata dietro «Da scoprire», ferma
+    # (cambia solo l'opacita' fra i due strati), due regole per i due temi
+    prova("i `filter:blur` sono quattro regole: la luce dell'icona Nostr "
+          "(1.2px, fermo), la pagina dietro il tour del P2P e lo sfondo "
+          "di «Da scoprire» nei due temi",
+          [".sc-sfondo i", 'html:not([data-tema="scuro"]) .sc-sfondo i',
+           ".ico-nostr .lux",
            "html.p2p-sfocata #app>.view.active,html.p2p-sfocata #app>nav"],
           [" ".join(s.split()) for s, c in regole
            if re.search(r"(?<![a-z-])filter:[^;]*blur\(", c)])
@@ -215580,6 +215629,9 @@ def prove_serie_giorni():
               # classifica dei giorni di fila
               r'\$\{tondi\}\s*</div>\s*\$\{serieSettimanaHTML\(mySerie\)\}\s*'
               r'\$\{serieClassificaPortaHTML\(mySerie\)\}\s*'
+              # (23 nov 2026, scoprire-quadrati) e subito sotto il Podio
+              # di Barattolo, la classifica del mercatino scesa dalla testa
+              r'\$\{mercatoClassificaPortaHTML\(\)\}\s*'
               r'\$\{guidaWalletBoxHTML\(\)\}`;', rp)))
     prova("la busta arriva da /api/me, e l'orecchio del ritorno si accende li'",
           True, "    serieArrivata(me.serie, 1600);\n    serieAscolta();\n" in mini)
@@ -220596,6 +220648,7 @@ const fila = {children: figli,
   getBoundingClientRect: () => ({left: 0, width: 390})};
 const el = () => fila;
 let mqNetflix = {matches: true};
+const sfondoScoprire = () => {};
 """ + pezzo_js(mini, "function centroScoprire(){") + """
 const chi = () => figli.map(f => f.cls.has('sc-centro'));
 centroScoprire(); const a = chi();
@@ -220753,8 +220806,53 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
     prova("...e fuori dal telefono non si vede", True,
           bool(_q) and "display:none" in _q.group(1)
           and bool(re.search(r"@media \(max-width:767px\)\{\s*\.sc-quadri\{display:flex", mini)))
+    # l'ombra della card al centro deve stare dentro il padding sotto della
+    # fila (che ritaglia): sennò esce una riga scura sopra i quadrati
+    _ps = re.search(r"#scoprireStrip\{gap:0;padding-top:\d+px;padding-bottom:(\d+)px;", mini)
+    _om = re.search(r"\.sc-centro\{transform:scale\(([\d.]+)\);opacity:1;\s*"
+                    r"z-index:3;box-shadow:0 (\d+)px (\d+)px", mini)
+    prova("l'ombra della card grande ci sta intera nella fila (niente riga "
+          "scura sopra i quadrati)", True,
+          bool(_ps and _om) and int(_om.group(2)) + int(_om.group(3))
+          + (float(_om.group(1)) - 1) / 2 * 140 <= int(_ps.group(1)))
     prova("fra i quadrati e «In evidenza» il respiro che faceva il titolo",
-          True, "scrollbar-width:none;padding:0 var(--pad) 16px}" in mini)
+          True, "scrollbar-width:none;padding:0 var(--pad) 30px}" in mini)
+    # LO SFONDO COI COLORI DELLA CARD (23 nov 2026, la «fascia 1» scelta
+    # da Andrea): la foto della card al centro, sfocata e tenue, che
+    # sfuma in fondo; acceso solo sul telefono, cambiato dal ricalcolo
+    _sf = re.search(r"@media \(max-width:767px\)\{[^@]*?\.sc-sfondo\{display:block;"
+                    r"[^}]*?transparent 100%\)\}", mini, re.S)
+    prova("lo sfondo della card sta solo sul telefono e sfuma in fondo (niente "
+          "taglio netto)", (True, True, True),
+          (bool(_sf), "  .sc-sfondo{display:none}\n" in mini,
+           'id="scoprireSfondo" aria-hidden="true"><i></i><i></i></div>'
+           in mini[mini.index('<div id="scoprireSez"'):mini.index('id="scoprireStrip"')]))
+    prova("...tenue (spento e sfocato) e con la dissolvenza di un secondo", True,
+          "transition:opacity 1s ease;\n      filter:blur(44px) saturate(1) brightness(.6)}" in mini)
+    prova("...e lo cambia il ricalcolo del centro", True,
+          "sfondoScoprire(meglio);" in pezzo_js(mini, "function centroScoprire(){"))
+    r = _node_banco('''
+const mk = () => { const c = new Set(); return {style: {}, classList: {
+  contains: x => c.has(x), add: x => c.add(x), remove: x => c.delete(x)}}; };
+const a = mk(), b = mk(), box = {children: [a, b]};
+const el = () => box;
+const CSS = {escape: s => s};
+''' + pezzo_js(mini, "let sfondoOra = '';", "\n}\n") + "\n}\n" + '''
+const carta = src => ({querySelector: () => src ? {src} : null});
+const su = () => [a.classList.contains('su'), b.classList.contains('su')];
+sfondoScoprire(carta('/x.jpg')); const p1 = su();
+sfondoScoprire(carta('/x.jpg')); const p2 = su();
+sfondoScoprire(carta('/y.jpg')); const p3 = su();
+sfondoScoprire(carta('')); const p4 = su();
+console.log(JSON.stringify([p1, p2, p3, p4, b.style.backgroundImage]));''')
+    if r is None:
+        salta("lo sfondo, girato in node", "node non c'e'")
+    else:
+        prova("in node: la prima foto accende uno strato, la stessa non rifà "
+              "niente, una nuova accende l'altro e spegne il primo, una card "
+              "senza foto lascia quel che c'era",
+              [[True, False], [True, False], [False, True], [False, True],
+               'url("/y.jpg")'], r)
     prova("il quadrato e' grande abbastanza per la foto (96px) e la riga "
           "va su due righe invece di tagliarsi", (True, True),
           (".sc-quadro{flex:0 0 96px;width:96px;" in mini,
@@ -220806,27 +220904,29 @@ console.log(JSON.stringify([righe, h.includes('src="/foto/x_0_min.jpg"'),
     r = _node_banco("""
 const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
 let mqNetflix = {matches: true};
-""" + _sp + """
-const V = [{id: 'A', negozio: 'aaa111'}, {id: 'B', negozio: 'bbb222'},
-  {id: 'C', negozio: 'ccc333'}, {id: 'D', negozio: 'ddd444'},
-  {id: 'p2p'}, {id: 'aste'}];
+""" + pezzo_js(mini, "const QUADRI_MIN = ", "\n") + "\n" + _sp + """
+const N = 'ABCDEFGH'.split('').map(x => ({id: x, negozio: x.repeat(3) + '111'}));
+const V = N.concat({id: 'p2p'}, {id: 'aste'});
 const ids = x => x.map(v => v.id);
 const t = spartisciScoprire(V);
-const uno = spartisciScoprire([V[0], V[4]]);
-const giro = spartisciScoprire(V.slice(1, 4).concat(V[0], V[4], V[5]));
+const giro = spartisciScoprire(V.slice(1, 8).concat(V[0], V[8], V[9]));
+const sette = spartisciScoprire(N.slice(0, 7).concat({id: 'p2p'}));
 mqNetflix = {matches: false};
 const pc = spartisciScoprire(V);
-console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(uno.grandi), ids(uno.quadri),
-  ids(giro.grandi), ids(giro.quadri), ids(pc.grandi), ids(pc.quadri)]));""")
+console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(giro.grandi),
+  ids(giro.quadri), ids(sette.grandi).length, ids(sette.quadri), ids(pc.grandi).length,
+  ids(pc.quadri)]));""")
     if r is None:
         salta("grandi e quadrati, girati in node", "node non c'e'")
     else:
         prova("in node: un negozio grande e uno quadrato, mai in tutti e due; "
-              "con un negozio solo resta grande; il turno dopo si scambiano; "
-              "sul computer tutti grandi",
-              [["A", "C", "p2p", "aste"], ["B", "D"], ["A", "p2p"], [],
-               ["B", "D", "p2p", "aste"], ["C", "A"],
-               ["A", "B", "C", "D", "p2p", "aste"], []], r)
+              "il turno dopo si scambiano; sotto i 4 quadrati niente fila e "
+              "tutti grandi; sul computer tutti grandi",
+              [["A", "C", "E", "G", "p2p", "aste"], ["B", "D", "F", "H"],
+               ["B", "D", "F", "H", "p2p", "aste"], ["C", "E", "G", "A"],
+               8, [], 10, []], r)
+    prova("...e la soglia e' 4, la parola di Andrea", True,
+          "const QUADRI_MIN = 4;" in mini)
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
     prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
           "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"
