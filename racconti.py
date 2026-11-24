@@ -627,4 +627,77 @@ RACCONTI_NEGOZI = {
             ]},
         ],
     },
+    # BITCOINLABS (24 nov 2026): il progetto di Carmrain per imparare
+    # Bitcoin, sicurezza e privacy, coi suoi corsi in sats. I testi sono
+    # quelli che ha mandato Carmrain, approvati da Andrea. Il negozio lo
+    # apre Carmrain col suo account, e il moderatore lo collega dal
+    # pannello come Piano B. L'ultima foto porta al suo bot
+    # (@ilragiondomobot), col link referral di Barattolo quando c'e'.
+    #   bitcoinlabs-cop.webp  lo scudo col bitcoin, 1360x583
+    #   bitcoinlabs-1.webp    Carmrain con la maschera, il quadrato in home
+    #   bitcoinlabs-2.webp    Bitcoin, Linux e sicurezza
+    #   bitcoinlabs-3.webp    la comunita' intorno allo scudo, apre il bot
+    "bitcoinlabs": {
+        "negozio": "",
+        "collega_dal_pannello": True,
+        "emoji": "🧡",
+        "titolo": "BitcoinLabs",
+        "in_breve": "Bitcoin, sicurezza e privacy",
+        "sottotitolo": ("Bitcoin è accessibile a tutti, serve solo avere a "
+                        "cuore la propria Libertà e un minimo impegno."),
+        "intro": ("BitcoinLabs è un progetto che promuove l'alfabetizzazione "
+                  "tecnologica e la conoscenza di Bitcoin utilizzato come "
+                  "strumento di Libertà in Sicurezza e Privacy."),
+        "foto": True, "logo": True, "banner": True,
+        # la foto del quadrato in home (assets/racconti/<slug>-1.webp)
+        "quadro": 1,
+        "blocchi": [
+            {"t": "punti", "h": "PERCHÉ COMPRARE I CORSI SU BARATTOLO", "voci": [
+                {"e": "🔒", "h": "I tuoi sats sono al sicuro",
+                 "p": "Paghi nel deposito di garanzia, e i sats arrivano a BitcoinLabs solo quando hai ricevuto il corso."},
+                {"e": "⚡", "h": "Paghi in bitcoin",
+                 "p": "Dal tuo wallet, in sats."},
+                {"e": "⚖️", "h": "Se qualcosa va storto, non sei solo",
+                 "p": "Apri una disputa e un moderatore guarda le prove."},
+            ]},
+            {"t": "testo", "h": "COS'È",
+             "p": ("Su BitcoinLabs è possibile sia trovare articoli, un "
+                   "Podcast e contenuti Liberi per tutti che interi Percorsi "
+                   "e Videocorsi per padroneggiare Bitcoin, Sicurezza, "
+                   "Privacy e Sovranità digitale.")},
+            {"t": "foto", "n": 1, "etichetta": "Carmrain",
+             "alt": "Carmrain, il fondatore di BitcoinLabs"},
+            {"t": "testo", "h": "DA CHI È NATO IL PROGETTO",
+             "p": ("Il fondatore è Carmrain, persona che da tempo è "
+                   "appassionata ai sistemi distribuiti. Il suo sogno è "
+                   "quello di semplificare la comprensione di Bitcoin e "
+                   "renderlo accessibile a chiunque abbia a cuore la Libertà "
+                   "senza mai rinunciare alla sua Decentralizzazione, "
+                   "Sicurezza e Privacy. Vivendo ormai da quasi 10 anni "
+                   "fuori dall'Europa, Carmrain si dedica a creare contenuti "
+                   "online che servono a far comprendere l'importanza e la "
+                   "potenza di una tecnologia come Bitcoin.")},
+            {"t": "foto", "n": 2, "etichetta": "Bitcoin, Linux e sicurezza",
+             "alt": "Bitcoin, Linux e uno scudo: i temi di BitcoinLabs"},
+            {"t": "testo", "h": "DI COSA NON SI OCCUPA",
+             "p": ("BitcoinLabs NON si occupa e NON propone in alcun modo "
+                   "trading, investimenti, concorsi a premi, modi facili per "
+                   "guadagnare.")},
+            {"t": "testo", "h": "ATTENZIONE AI TRUFFATORI",
+             "p": ("Carmrain NON scrive mai a nessuno in privato se prima "
+                   "non chiede esplicitamente il permesso su un gruppo "
+                   "pubblico. Se entri in BitcoinLabs e qualcuno ti contatta "
+                   "in privato, è un truffatore con un profilo simile a "
+                   "Carmrain o a uno degli admin: segnala e blocca senza "
+                   "pensarci due volte.")},
+            # la foto che apre il bot di BitcoinLabs: il link nudo finche'
+            # Andrea non incolla il suo link referral (`?start=...`)
+            {"t": "foto", "n": 3, "etichetta": "la comunità",
+             "alt": "La comunità di BitcoinLabs intorno allo scudo col bitcoin",
+             "link": "https://t.me/ilragiondomobot",
+             "link_testo": "Entra in BitcoinLabs"},
+            {"t": "firma", "h": "Bitcoin è accessibile a tutti.",
+             "p": "Carmrain, BitcoinLabs"},
+        ],
+    },
 }

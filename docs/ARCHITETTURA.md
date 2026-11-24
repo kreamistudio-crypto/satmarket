@@ -38610,6 +38610,15 @@ mai il kind 0 di nessuno: regola ferrea 2).
   gesto) lo rimette nella voce in memoria: i giudici leggono sempre e
   solo `r["negozio"]`. Nel pannello «🔗 Collega il negozio», con
   `collegabile` dall'elenco admin.
+  LA FOTO CHE APRE UN BOT DI TELEGRAM (24 nov 2026, BitcoinLabs): il
+  `link` di un blocco foto, che dal 20 nov apriva solo un video di
+  YouTube, apre anche `https://t.me/<nome>` (5-32 caratteri, lettera in
+  testa) con al piu' `?start=<lettere, cifre, _ e ->` — il link
+  referral di un bot partner. Il giudice resta `linkVideoRacconto`
+  (nome storico: lo chiamano il renderer e tre banchi delle prove), e
+  `apriVideoRacconto` dentro Telegram apre i t.me con
+  `openTelegramLink`, gli altri con `openLink`. Il catalogo lo guarda
+  `prove_racconti_bozza` con la stessa forma.
   LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
   `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
   Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);

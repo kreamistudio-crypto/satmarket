@@ -55439,14 +55439,27 @@ def prove_racconti_bozza():
              "https://www.youtube.com/watch?v=5Y2g7uexfXA",
              "https://youtu.be/5Y2g7uexfXA?t=1", "javascript:alert(1)",
              "https://evil.example/youtu.be/5Y2g7uexfXA",
-             'https://youtu.be/5Y2g7uexf"A', ""]
+             'https://youtu.be/5Y2g7uexf"A', "",
+             # E UN BOT O UN CANALE DI TELEGRAM (24 nov 2026)
+             "https://t.me/ilragiondomobot",
+             "https://t.me/ilragiondomobot?start=ref_Ab-12",
+             "http://t.me/ilragiondomobot", "https://t.me/+NFNHpWpBvbc5ZWNk",
+             "https://t.me/abc", "https://t.me/ilragiondomobot?start=a b",
+             'https://t.me/ilragiondomobot?start=a"b',
+             "https://t.me/ilragiondomobot/../x",
+             "https://t.me.evil.example/ilragiondomobot",
+             "https://t.me/ilragiondomobot?start=ok&x=1"]
     _out = subprocess.run(["node", "-e", _lv + "for (const u of "
                            + json.dumps(_casi) + ") console.log("
                            "JSON.stringify(linkVideoRacconto(u)))"],
                           capture_output=True, text=True, timeout=30)
-    prova("...che accetta solo le due forme del link di YouTube",
+    prova("...che accetta solo le due forme del link di YouTube e il "
+          "link nudo di un bot o canale di Telegram",
           ['"https://www.youtube.com/watch?v=5Y2g7uexfXA"'] * 2
-          + ['""'] * 5, _out.stdout.split())
+          + ['""'] * 5
+          + ['"https://t.me/ilragiondomobot"',
+             '"https://t.me/ilragiondomobot?start=ref_Ab-12"']
+          + ['""'] * 8, _out.stdout.split())
     # ---- 2. LA FORMA DEL CATALOGO ----------------------------------
     _f = re.search(r'FORMA_RACCONTO = re\.compile\(r"([^"]+)"\)', src)
     FORMA = re.compile(_f.group(1)) if _f else re.compile("$^")
@@ -55473,12 +55486,16 @@ def prove_racconti_bozza():
               [], [b.get("n") for b in foto if not b.get("etichetta")])
         # LA FOTO CHE APRE UN VIDEO (20 nov 2026): solo un link di
         # YouTube nelle due forme di condivisione, e con la sua scritta
-        prova("...e una foto con un link porta solo a un video di YouTube, "
-              "con la sua scritta", [],
+        # E UN BOT O UN CANALE DI TELEGRAM (24 nov 2026)
+        prova("...e una foto con un link porta solo a un video di YouTube "
+              "o a un bot di Telegram, con la sua scritta", [],
               [b.get("n") for b in foto if "link" in b and not (
-                  re.fullmatch(r"https://(?:youtu\.be/|www\.youtube\.com/"
-                               r"watch\?v=)[A-Za-z0-9_-]{11}",
-                               str(b["link"]))
+                  (re.fullmatch(r"https://(?:youtu\.be/|www\.youtube\.com/"
+                                r"watch\?v=)[A-Za-z0-9_-]{11}",
+                                str(b["link"]))
+                   or re.fullmatch(r"https://t\.me/[A-Za-z][A-Za-z0-9_]{4,31}"
+                                   r"(?:\?start=[A-Za-z0-9_-]{1,64})?",
+                                   str(b["link"])))
                   and isinstance(b.get("link_testo"), str)
                   and b["link_testo"])])
         # LA RIGA DEL CANTIERE DI UNA RIGA: `foto` e' un vero booleano,

@@ -30031,16 +30031,31 @@ function raccontoNegozio(v){
 /* IL VIDEO DI UNA FOTO (20 nov 2026): solo YouTube, nelle due forme
    del link di condivisione, con l'id di 11 caratteri — e nient'altro
    dopo, cosi' l'indirizzo che finisce nell'href e' sempre uno di
-   questi due. Tutto il resto vale «nessun video». */
+   questi due. Tutto il resto vale «nessun video».
+   E UN BOT O UN CANALE DI TELEGRAM (24 nov 2026, AndreAI: la foto
+   porta al bot del partner col link referral di Barattolo): solo
+   `https://t.me/<nome>` col nome come lo vuole Telegram (5-32 caratteri,
+   comincia con una lettera), al piu' con `?start=` e un parametro di
+   lettere, cifre, `_` e `-`. Il nome della funzione e' rimasto quello
+   del video: la chiamano il renderer e tre banchi delle prove. */
 function linkVideoRacconto(u){
   const m = /^https:\/\/(?:youtu\.be\/|www\.youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})$/
     .exec(String(u || ''));
-  return m ? `https://www.youtube.com/watch?v=${m[1]}` : '';
+  if (m) return `https://www.youtube.com/watch?v=${m[1]}`;
+  const t = /^https:\/\/t\.me\/([A-Za-z][A-Za-z0-9_]{4,31})(\?start=[A-Za-z0-9_-]{1,64})?$/
+    .exec(String(u || ''));
+  return t ? `https://t.me/${t[1]}${t[2] || ''}` : '';
 }
 /* dentro Telegram il link esce dalla Mini App col suo openLink (come i
-   link dei banner); fuori, l'<a> fa da se' in una scheda nuova */
+   link dei banner), e quello di Telegram con openTelegramLink, che apre
+   il bot senza passare dal browser; fuori, l'<a> fa da se' in una
+   scheda nuova */
 function apriVideoRacconto(url){
-  if (!linkVideoRacconto(url)) return false;
+  const giusto = linkVideoRacconto(url);
+  if (!giusto) return false;
+  if (giusto.startsWith('https://t.me/') && tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(giusto); return false; } catch(e){}
+  }
   if (tg?.initData && tg.openLink) { try { tg.openLink(url); return false; } catch(e){} }
   return true;
 }

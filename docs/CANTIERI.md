@@ -95761,3 +95761,61 @@ STRADE SCARTATE. Una leva nel config: le scelte sono per annuncio e cambiano, e 
 PROVATO. `collaudo_promozioni` (il server vero coi sats di cartone): dal link, 7 giorni e oggi in cima senza nessuna riga in `pagamenti`; il post nel canale e l'avviso ai moderatori; la busta lo porta in `in_evidenza`; ridato, i giorni si sommano; senza giorni sono 7; a fila piena (2 posti) non entra e lo dice; giorni 0 e 91, chi non è admin e un annuncio venduto non cambiano niente. Controprova: senza il post e senza la guardia della fila, tre rossi. `prove_promozioni`: `_id_annuncio` sui tre link di Andrea, l'ordine guardia → data → canale.
 
 DA GUARDARE. Dopo la promozione, i due annunci scelti da Andrea (288 SeedSigner e 169 Arachidata: «metti solo i primi due») col comando dal bot.
+
+## La pagina di BitcoinLabs, e la foto che apre un bot di Telegram (24 nov 2026, cantiere bitcoinlabs; Andrea: «dobbiamo fare la stessa cosa con quest'altro collaboratore», poi «I testi sì, vanno bene. Preparami la pagina»)
+
+COSA. Entra in `racconti.py` la pagina «BitcoinLabs», il progetto di
+Carmrain (bitcoinlabs.space, gruppo t.me/bitcoinprincipianti) per
+imparare Bitcoin, sicurezza e privacy. Lo schema e' quello di Piano B
+Panama (vedi sopra, «La pagina di Piano B Panama, pronta prima del
+negozio»): in bozza, `negozio` vuoto, `collega_dal_pannello`, `quadro: 1`
+(Carmrain con la maschera), logo arancio nei Consigliati, banner in «Da
+scoprire». Quando Carmrain ha aperto il negozio col suo account: «🔗
+Collega il negozio» → «✅ Pubblica la pagina» → `/sponsor bitcoinlabs 60`.
+Nessun deploy serve.
+
+L'ACCORDO (chat Telegram del 23 nov, incollata da Andrea): Barattolo
+mette BitcoinLabs in home; Carmrain scrive un post su Barattolo nel suo
+gruppo (programmato venerdi' 27 nov alle 11:21, col link della pagina);
+il referral passa dal suo bot @ilragiondomobot, che paga il 10% di quel
+che versano gli utenti portati, a inizio mese, su un Lightning address.
+Deciso: zap@barattolo.store, il salvadanaio solo-ricevere che c'e' gia'
+(i sats del referral si mescolano agli zap: detto ad Andrea).
+
+I TESTI sono quelli che ha mandato Carmrain («Cos'e'», «Da chi e' nato il
+progetto», «Di cosa NON si occupa», l'avviso sui truffatori), approvati
+da Andrea il 24 nov. Nuovi e approvati: il riquadro «Perche' comprare i
+corsi su Barattolo» (come Piano B), la scritta della foto «Entra in
+BitcoinLabs». «I tuoi sats sono al sicuro» e non «restano al sicuro»: la
+seconda e' gia' una frase del client, e la prova «il testo non viaggia
+nel client» la prende per una fuga. Sulla card niente «Col deposito di
+garanzia» (Andrea: ce l'ha tutto), al suo posto «🎙️ Podcast e contenuti
+liberi», dalle parole di Carmrain.
+
+LA FOTO CHE APRE UN BOT. Il bottone verso il bot di Carmrain e' la foto 3
+col suo `link`, che fino a ieri apriva solo YouTube. `linkVideoRacconto`
+accetta anche `https://t.me/<nome>` con al piu' `?start=<parametro>`, e
+dentro Telegram `apriVideoRacconto` lo apre con `openTelegramLink`. Il
+nome della funzione resta quello del video: rinominarla voleva dire
+toccare tre banchi delle prove per niente. Oggi il link e' il bot nudo:
+il `?start=` del referral lo genera Andrea nel bot e si incolla quando
+c'e'.
+
+STRADE SCARTATE. Un tipo di blocco «bottone» nuovo: piu' codice, e la
+foto col link c'era gia'. Accettare qualsiasi t.me (gruppi `+invito`,
+messaggi `/c/...`): non serviva, e il giudice stretto e' la difesa.
+
+PROVATO. `prove_racconti_bozza` (286 spunte) con i casi nuovi del
+giudice in node: i due t.me giusti passano, http, `+invito`, nome corto,
+spazio, virgolette, `/../`, dominio finto e `&` no; CONTROPROVA: col
+giudice allargato a `https?` la prova diventa rossa. `collaudo_racconti_
+bozza` (222, nel venv senza coincurve): la pagina si collega, si pubblica
+e il quadrato porta la foto 1. Anteprime dal telefono sul server vero in
+/mnt/project-files/bitcoinlabs/anteprima/.
+
+DA GUARDARE. La card in «Da scoprire»: Andrea non ha ancora scelto fra la
+1 (maschera) e la 2 (comunita'); dentro c'e' la 1. Il link referral. I
+CORSI: Carmrain li vende con un suo bot, che i coupon non li fa ancora
+(«posso implementarlo in questi giorni»); su Barattolo il codice
+digitale oggi lo scrive chi vende dopo ogni vendita, e la scorta di
+codici caricata prima e' proposta ad Andrea come pezzo a parte.
