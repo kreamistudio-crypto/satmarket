@@ -2760,11 +2760,10 @@
   `renderOccasioni` chiamato in testa a `renderScoprire`), uno sopra
   l'altro a 328/80 (accanto da 768px), stessi disegni, titoli, giudici di
   vita e tocco (`toccaScoperta`, che ora scorre in cima alla griglia).
-  Stanno DENTRO la griglia dopo le prime sei card, a tutta riga
-  (`posaOccasioni`; con meno card in fondo, a griglia vuota soli): chi
-  riscrive #grid (renderGrid, svuotaGrigliaFerma) li riporta prima a casa
-  davanti a #grid (`parcheggiaOccasioni`), o l'innerHTML li butterebbe; spenti col
-  barattolo e nella sezione lavoro. Quel che segue vale per loro dove
+  Stanno SOPRA le card, al loro posto davanti a #grid, e nessuno li sposta
+  (dal 24 nov notte; per qualche ora erano dentro la griglia dopo la sesta
+  card, ma filtrando si spostavano con le card: Cantieri, «Niente doppioni
+  in griglia»); spenti col barattolo e nella sezione lavoro. Quel che segue vale per loro dove
   parla di filtri, immagini e titolo; la fila resta dei negozi e delle
   card che navigano. Verbale: Cantieri, «La home ripulita».
   LA SEZIONE «DA SCOPRIRE» (ago 2026, decisione di Andrea): sotto la
@@ -38665,8 +38664,10 @@ mai il kind 0 di nessuno: regola ferrea 2).
   arancio ferma, disegnata sullo sfondo di `.ev-strip`, al posto delle due
   onde di `ondeEvidenza`, tolte: Cantieri, «La home ripulita», «La luce
   sotto In evidenza» e «La mensola di luce»; sul telefono le sue card sono larghe quanto serve per vederne due e mezza, `calc((100vw - var(--pad) - 20px) / 2.5)`, e sul computer 150: «Il primo schermo del telefono», col calcolo che c'era prima e perché è andato via),
-  `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e dentro la griglia dopo sei card
-  i due banner `#occasioniBanner` (dal 24 nov). Il tocco su un negozio della
+  `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e sopra la griglia i due banner
+  `#occasioniBanner` (dal 24 nov). A vetrina nuda la griglia salta gli
+  annunci che la fila «In evidenza» sta mostrando (`nellaFilaEvidenza`,
+  la stessa domanda di renderEvidenza). Il tocco su un negozio della
   fila (card o quadrato) passa da `apriNegozioDaScoprire`: la pagina sale
   dal basso (`.sale-dal-basso`, tolta a `animationend`) GIA' PIENA, perche'
   `preparaNegoziScoprire` chiede le pagine della fila 1,5 s dopo il disegno,

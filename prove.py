@@ -52337,46 +52337,17 @@ def prove_scoprire():
           (True, True),
           ("if (!acceso) scorriSottoHeader(el('grid'));" in _ts,
            0 <= _ts.find("scorriSottoHeader") < _ts.find("if (DEMO)")))
-    # I BANNER DELLE OCCASIONI DOPO LE PRIME SEI CARD (24 nov 2026,
-    # Andrea): posaOccasioni e parcheggiaOccasioni VERI su una griglia di
-    # cartone — davanti alla settima card, in fondo con meno card, soli
-    # nella griglia vuota, e di nuovo a casa prima di ogni riscrittura
-    # (un innerHTML se li porterebbe via)
-    _posa = (pezzo_js(mini, "function parcheggiaOccasioni(){", "\n}") + "\n}\n"
-             + pezzo_js(mini, "function posaOccasioni(){", "\n}") + "\n}\n")
-    _esito = _node_banco("""
-function Nodo(id){ this.id = id; this.children = []; this.parentNode = null; }
-Nodo.prototype.appendChild = function(n){ return this.insertBefore(n, null); };
-Nodo.prototype.insertBefore = function(n, rif){
-  if (n.parentNode) n.parentNode.children.splice(n.parentNode.children.indexOf(n), 1);
-  const i = rif ? this.children.indexOf(rif) : this.children.length;
-  this.children.splice(i, 0, n); n.parentNode = this; return n; };
-const casa = new Nodo('casa'), g = new Nodo('grid'), b = new Nodo('occasioniBanner');
-casa.appendChild(b); casa.appendChild(g);
-const nodi = {grid: g, occasioniBanner: b};
-const el = id => nodi[id];
-const riempi = n => { g.children.forEach(c => c.parentNode = null); g.children = [];
-  for (let i = 1; i <= n; i++) g.appendChild(new Nodo('c' + i)); };
-const ordine = () => g.children.map(c => c.id).join(',');
-""" + _posa + """
-const r = {};
-riempi(9); posaOccasioni(); r.nove = ordine();
-parcheggiaOccasioni(); r.casa = casa.children.map(c => c.id).join(',') + '|' + ordine();
-riempi(3); posaOccasioni(); r.tre = ordine();
-for (let i = 4; i <= 8; i++) g.appendChild(new Nodo('c' + i));
-posaOccasioni(); r.appese = ordine();
-parcheggiaOccasioni(); riempi(0); posaOccasioni(); r.vuota = ordine();
-console.log(JSON.stringify(r));
-""")
-    if _esito is None:
-        salta("i banner dopo le prime sei card", "serve node")
-    else:
-        prova("i banner stanno dopo le prime sei card, in fondo con meno, soli a griglia vuota",
-              {"nove": "c1,c2,c3,c4,c5,c6,occasioniBanner,c7,c8,c9",
-               "casa": "occasioniBanner,grid|c1,c2,c3,c4,c5,c6,c7,c8,c9",
-               "tre": "c1,c2,c3,occasioniBanner",
-               "appese": "c1,c2,c3,c4,c5,c6,occasioniBanner,c7,c8",
-               "vuota": "occasioniBanner"}, _esito)
+    # I BANNER DELLE OCCASIONI SOPRA LE CARD (24 nov 2026 notte, Andrea:
+    # «spostali in cima alle card, perché quando li seleziono per filtrare
+    # fa casino con le card»): per qualche ora erano dentro la griglia dopo
+    # la sesta card; ora stanno al loro posto di casa, davanti a #grid, e
+    # nessuno li sposta piu'
+    _casa = mini[mini.index('<div class="occ-banner" id="occasioniBanner"'):]
+    prova("i banner delle occasioni stanno sopra la griglia e nessuno li sposta",
+          (True, 0, 0, 0),
+          (_casa.index('<div class="grid" id="grid">') < 200,
+           mini.count("function posaOccasioni("), mini.count("function parcheggiaOccasioni("),
+           mini.count("#grid > #occasioniBanner")))
     # IL NEGOZIO DI «DA SCOPRIRE» SALE GIA' PIENO (24 nov 2026, Andrea: «il
     # negozio si deve vedere subito, non deve caricarsi»): la preparazione
     # non conta visite ne' aperture, il pronto vale solo sulle APERTURE, la
@@ -52435,15 +52406,39 @@ console.log(JSON.stringify(r));
           ("vola.remove();" in _vo, "velo.remove();" in _vo,
            "card.style.visibility = '';" in _vo,
            "try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _vo))
-    # ...e chi riscrive la griglia li parcheggia PRIMA
+    # GIA' NELLA FILA, NON ANCHE IN GRIGLIA (24 nov 2026 notte, Andrea: «le
+    # card in evidenza sono già nella loro fascia apposita, non devono
+    # essere mostrate così nella pagina normale del mercatino»): la griglia
+    # salta, a vetrina nuda, quel che la fila sta mostrando; la domanda e'
+    # quella di renderEvidenza, quindi un annuncio non sparisce mai da tutte
+    # e due
     _rg = pezzo_js(mini, "function renderGrid(items){", "\n}")
-    _sv = pezzo_js(mini, "function svuotaGrigliaFerma(){", "\n}")
-    prova("...e chi riscrive la griglia li rimette a casa prima, e li riposa dopo",
-          (True, True, True),
-          (_rg.find("parcheggiaOccasioni();") < _rg.find("el('grid').innerHTML")
-           < _rg.find("posaOccasioni();"),
-           0 <= _sv.find("parcheggiaOccasioni();") < _sv.find("g.innerHTML = ''"),
-           "#grid > #occasioniBanner{grid-column:1/-1" in mini))
+    _nf = pezzo_js(mini, "function nellaFilaEvidenza(l){", "\n}") + "\n}\n"
+    _esito = _node_banco("""
+let nuda = true;
+const adesso = Date.now() / 1000;
+const vetrinaNuda = () => nuda;
+function inEvidenza(l){ return (l.evidenzaFino||0)*1000 > Date.now(); }
+let inEvidenzaServer = [{id: 1, evidenzaFino: adesso + 999}, {id: 2, evidenzaFino: adesso - 5}];
+""" + _nf + """
+const griglia = [{id: 1, evidenzaFino: adesso + 999}, {id: 2, evidenzaFino: adesso - 5},
+  {id: 3, evidenzaFino: adesso + 999}, {id: 4}];
+const tieni = () => griglia.filter(l => !nellaFilaEvidenza(l)).map(l => l.id).join(',');
+const r = {nuda: tieni()};
+nuda = false; r.cerca = tieni(); nuda = true;
+inEvidenzaServer = []; r.senza_fila = tieni();
+console.log(JSON.stringify(r));
+""")
+    if _esito is None:
+        salta("la griglia senza le card della fila «In evidenza»", "serve node")
+    else:
+        prova("a vetrina nuda la griglia salta solo l'annuncio che la fila mostra "
+              "(non lo scaduto, non quello fuori dalla busta); con una ricerca, "
+              "o senza fila, tornano tutti",
+              {"nuda": "2,3,4", "cerca": "1,2,3,4", "senza_fila": "1,2,3,4"}, _esito)
+    prova("...e lo saltano la prima pagina e quelle appese", (True, True),
+          ("el('grid').innerHTML = data.filter(l => !nellaFilaEvidenza(l)).map(cardHTML).join('');" in _rg,
+           "nuovi.filter(l => !nellaFilaEvidenza(l)).map(cardHTML).join('')" in mini))
     # IL GIUDICE UNICO DELLO SCROLL: la meccanica in un posto solo per
     # le due strisce — a cambiare e' solo il punto d'arrivo.
     _ss = pezzo_js(mini, "function scorriSottoHeader(sez){", "\n}")
@@ -52517,7 +52512,7 @@ console.log(JSON.stringify(r));
     prova("...renderGrid la riaccende appena disegnati i nuovi, che "
           "risalgono in dissolvenza da dove era arrivata",
           (True, True, True, False),
-          ("el('grid').innerHTML = data.map(cardHTML).join('');\n"
+          ("el('grid').innerHTML = data.filter(l => !nellaFilaEvidenza(l)).map(cardHTML).join('');\n"
            "  grigliaArrivata();" in _rgx,
            "el('grid').classList.remove('in-attesa');" in _ga,
            "#grid{transition:opacity .25s}" in mini,

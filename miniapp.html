@@ -1762,9 +1762,6 @@
   /* sul computer (e sul tablet) uno ACCANTO all'altro: uno sotto l'altro
      a tutta larghezza sarebbero due cartelloni da 300px d'altezza */
   @media (min-width:768px){#occasioniBanner{grid-template-columns:1fr 1fr}}
-  /* dentro la griglia (dopo le prime sei card) occupa la riga intera, e
-     i margini sono gia' quelli della griglia */
-  #grid > #occasioniBanner{grid-column:1/-1;padding:0}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -15295,8 +15292,8 @@ document.getElementById('cartello')?.remove();</script>
     <!-- I DUE BANNER DELLE OCCASIONI (24 nov 2026, cantiere
          home-card-pulite): «Offerte a tempo» e «Sconti dei negozi»
          escono da «Da scoprire», uno sopra l'altro — sono filtri della
-         griglia. Questo e' il loro posto di CASA: posaOccasioni li porta
-         dentro la griglia dopo le prime sei card. Li disegna
+         griglia, e stanno SOPRA le card (24 nov notte, Andrea: dentro la
+         griglia, filtrando, «fa casino con le card»). Li disegna
          renderOccasioni; senza occasioni vive il riquadro e' spento. -->
     <div class="occ-banner" id="occasioniBanner" style="display:none"></div>
     <div class="grid" id="grid"></div>
@@ -22358,8 +22355,8 @@ async function caricaAltri(){
     vetrina = vetrina.concat(nuovi);
     inCatalogo(nuovi);
     if (nuovi.length) {
-      el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
-      posaOccasioni();   /* con meno di sei card stava in fondo */
+      el('grid').insertAdjacentHTML('beforeend',
+        nuovi.filter(l => !nellaFilaEvidenza(l)).map(cardHTML).join(''));
     }
     armaViste();
     /* il patto di `osservaSentinella`: true = ho appeso righe, chiedi
@@ -27413,26 +27410,15 @@ function renderScoprire(){
    ridisegna anche loro. Col barattolo aperto stanno spenti, per la stessa
    ragione delle card-interruttore di la' (vedi renderScoprire). La firma
    come la fila: si ridisegna solo quando cambia qualcosa. */
-/* ...E STANNO DOPO LE PRIME SEI CARD (24 nov 2026, Andrea: «i nuovi
-   banner, offerte a tempo e sconti nei negozi, mettili dopo le prime 6
-   card»): il riquadro entra NELLA griglia, a tutta riga, davanti alla
-   settima card; con meno card sta in fondo, e con la griglia vuota resta
-   solo lui — un filtro acceso che non trova niente deve potersi spegnere
-   da dove si e' acceso. Chi riscrive la griglia (renderGrid,
-   svuotaGrigliaFerma) prima lo PARCHEGGIA al suo posto di casa, davanti
-   a #grid: un innerHTML se lo porterebbe via, e getElementById non lo
-   troverebbe piu'. */
-function parcheggiaOccasioni(){
-  const b = el('occasioniBanner'), g = el('grid');
-  if (b && g && b.parentNode === g) g.parentNode.insertBefore(b, g);
-}
-function posaOccasioni(){
-  const b = el('occasioniBanner'), g = el('grid');
-  if (!b || !g) return;
-  const card = Array.from(g.children).filter(c => c !== b);
-  if (card[6]) g.insertBefore(b, card[6]);
-  else g.appendChild(b);
-}
+/* ...E STANNO SOPRA LE CARD (24 nov 2026 notte, Andrea: «i filtri offerte
+   a tempo e sconti dei negozi spostali in cima alle card, perché quando
+   li seleziono per filtrare fa casino con le card»): per qualche ora
+   sono stati DENTRO la griglia, dopo le prime sei card (posaOccasioni e
+   parcheggiaOccasioni, tolte); ma un filtro che rimescola le card da'
+   mezzo all'elenco si sposta con loro. Ora restano al loro posto di
+   casa, davanti a #grid: sopra le card, e anche con la griglia vuota,
+   cosi' un filtro acceso che non trova niente si spegne da dove si e'
+   acceso. */
 let occasioniFirma = '';
 function renderOccasioni(){
   const box = el('occasioniBanner');
@@ -28293,7 +28279,6 @@ function svuotaGrigliaFerma(){
   const g = el('grid');
   clearTimeout(grigliaFermaTimer);
   g.style.minHeight = g.offsetHeight + 'px';
-  parcheggiaOccasioni();
   g.innerHTML = '';
   el('gridEmpty').style.display = 'none';
 }
@@ -28650,10 +28635,8 @@ function renderGrid(items){
   const ba = el('btnAvvisami');
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
-  parcheggiaOccasioni();
-  el('grid').innerHTML = data.map(cardHTML).join('');
+  el('grid').innerHTML = data.filter(l => !nellaFilaEvidenza(l)).map(cardHTML).join('');
   grigliaArrivata();
-  posaOccasioni();
   /* la fila «In evidenza» (23 nov 2026) e le card P2P in vetrina: le
      due file si accendono o si spengono con la vista */
   renderEvidenza();
@@ -31583,6 +31566,18 @@ function lampoAttiva(l){
    la scadenza pagata e' nel futuro, lo stesso giudizio della lampo */
 function inEvidenza(l){
   return (l.evidenzaFino||0)*1000 > Date.now();
+}
+/* GIA' NELLA FILA, NON ANCHE IN GRIGLIA (24 nov 2026 notte, Andrea: «le
+   card in evidenza sono già nella loro fascia apposita, non devono
+   essere mostrate così nella pagina normale del mercatino [...] anche
+   perché lì andranno poi le card "in cima"»): a vetrina nuda la griglia
+   salta l'annuncio che la fila «In evidenza» sta mostrando. La domanda e'
+   la stessa di renderEvidenza (vetrina nuda, nella busta, scadenza nel
+   futuro), cosi' un annuncio non sparisce mai da tutte e due: con una
+   ricerca, un reparto o un filtro la fila si spegne e l'annuncio torna
+   in griglia, con la sua etichetta. */
+function nellaFilaEvidenza(l){
+  return vetrinaNuda() && inEvidenza(l) && inEvidenzaServer.some(e => e.id === l.id);
 }
 /* La vista scontata del listino: stessa forma di l, prezzi ridotti
    nella SUA valuta (floor sui sats e 2 decimali sull'euro, identici
