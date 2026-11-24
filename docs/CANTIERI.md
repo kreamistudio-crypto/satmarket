@@ -95597,3 +95597,29 @@ sqlite: l'ordine in Monero a chi ha «Euro + Monero» con «0,25 XMR», non a
 chi ha solo «Euro» né a chi non vede le monete. Suite intera severa.
 
 RESTA. Guardarlo dal telefono dopo la promozione.
+
+## Tappo e le recensioni nascoste: l'esame sulle novità del 24 nov (24 nov 2026, cantiere sapere-recensioni-nascoste; Andrea: «Sì, a tappo fallo verificare.»)
+
+COSA. Dopo la promozione del 24 nov (main 85cb23a4) Tappo ha avuto 15
+domande da utente sulle novità uscite, girate su una copia usa-e-getta
+della sua catena in n8n (stesso libro, stesso modello, nessun utente vero).
+14 giuste; sbagliata quella sulle recensioni nascoste: Tappo inventava
+(«nel Profilo compaiono solo le vendite concluse»), dava la strada
+«Livello e inviti» e non sapeva se le negative si nascondono. In
+`assistente/sapere.md`: il paragrafo nuovo «Nascondere le recensioni dal
+profilo pubblico» (i due interruttori, cosa sparisce, cosa resta sempre:
+stelle e numero, le negative da 1 e 2 stelle, non completati e dispute
+perse; le nascoste le vede solo il proprietario), «Livello e inviti» →
+«Livello e recensioni» (il gruppo vero del Profilo) e la strada
+dell'Assistenza nelle promozioni a pagamento (Profilo → «Aiuto» →
+«💬 Assistenza», non «Impostazioni»). Conoscenza rifatta.
+
+PERCHÉ COSÌ. I fatti vengono dal codice di develop
+(`recensioniVisibiliHTML`, `_sql_recensioni_visibili`,
+`VOTO_SEMPRE_VISIBILE = 2`) e dal commit e9c290e0, non dal post: il post
+del canale non dice ancora che le negative restano.
+
+PROVATO. `PROVE_SEVERE=1 python prove.py --dai-file=origin/develop`:
+240 passate, 0 fallite (conoscenza di Tappo e assistente del bot
+comprese). Tappo legge da main: la correzione arriva con la prossima
+promozione, e allora la domanda sulle recensioni va rifatta.
