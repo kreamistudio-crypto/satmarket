@@ -21507,7 +21507,7 @@ def prove_barattolo_filtra():
     # card VESTE .cat-cella.attiva come le sorelle.
     prova("l'anello e' quello gia' imparato sulle card di categoria",
           True,
-          ".cat-cella.attiva .cat-quad{outline:1.5px solid var(--sats)"
+          ".cat-cella.attiva .cat-quad{outline:1px solid var(--sats)"
           in css)
     prova("Ordina e Filtri si nascondono col barattolo acceso", True,
           "body.solo-barattolo .strumenti #ordinaSelBtn," in css
@@ -44202,7 +44202,7 @@ def prove_seo():
     prova("la card del reparto si accende", True,
           "${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" in st)
     prova("...e l'anello e' l'arancio di casa", True,
-          ".cat-cella.attiva .cat-quad{outline:1.5px solid var(--sats)"
+          ".cat-cella.attiva .cat-quad{outline:1px solid var(--sats)"
           in testo_mini)
     # CAMBIA LATO (ago 2026): la formula non vive piu' qui dentro —
     # la barra delle pillole fa lo stesso gesto, e due copie direbbero
@@ -222510,11 +222510,11 @@ console.log(JSON.stringify([p1, p2, p3, p4, b.style.backgroundImage]));''')
     # si somigliavano) i quadrati diventano CERCHI da 84px con l'anello
     # arancio fine; le categorie restano quadrate col loro anello fine
     prova("il cerchio del negozio (84px, tondo, l'anello sfumato sottile "
-          "di 2px) e la riga va su due righe invece di tagliarsi",
+          "di 1px) e la riga va su due righe invece di tagliarsi",
           (True, True, True),
           (".sc-quadro{flex:0 0 84px;width:84px;" in mini,
            "border-radius:50%;\n    overflow:hidden;box-sizing:border-box;"
-           "border:0;padding:2px;\n    background:conic-gradient(#FFBE5A,"
+           "border:0;padding:1px;\n    background:conic-gradient(#FFBE5A,"
            "#F7931A,#C2410C,#F7931A,#FFBE5A)}" in mini,
            "-webkit-line-clamp:2" in pezzo_js(mini, "  .sc-quadro b{", "}")))
     # e quando la card grande scorre, sotto NIENTE si accende (Andrea,
@@ -222523,7 +222523,8 @@ console.log(JSON.stringify([p1, p2, p3, p4, b.style.backgroundImage]));''')
           (0, 0, 0), (mini.count("accendiQuadro"), mini.count(".sc-quadro.on"),
                       pezzo_js(mini, "function centroScoprire(){").count("sc-quadro")))
     _qr = (pezzo_js(mini, "function renderQuadriScoprire(vive){", "\n}\n") + "\n}\n"
-)
+           # (24 nov 2026 sera) i cerchi chiedono di rifare il primo schermo
+           + "const adattaPrimoSchermo = () => {};\n")
     r = _node_banco("""
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const box = {style: {}, innerHTML: '', querySelectorAll: () => []};
@@ -222716,11 +222717,60 @@ INSERT INTO annunci VALUES
           (True, True, True, True, False, False, 0, False),
           ("  #evidenzaSez{margin-top:0;padding:2px 0 0}\n" in _sez,
            "#evidenzaSez .ev-strip{padding-top:10px;padding-bottom:18px;" in _sez,
-           "#FFBE5A 50%" in _sez and "0 calc(100% - 12px)/100% 3px no-repeat" in _sez,
+           "#FFBE5A 50%" in _sez and "0 calc(100% - 12px)/100% 1.5px no-repeat" in _sez,
            "linear-gradient(0deg,rgba(247,147,26,.32),rgba(247,147,26,0)) "
-           "0 calc(100% - 15px)/100% 90px no-repeat}" in _sez,
+           "0 calc(100% - 13.5px)/100% 90px no-repeat}" in _sez,
            "svg" in _sez, "--onda-" in mini, _css.count("--ev-fascia"),
            "var(--bg)" in _sez))
+    # IL PRIMO SCHERMO FINISCE SOTTO LA MENSOLA (24 nov 2026 sera, Andrea:
+    # «appena apro l'app lo schermo in basso non deve terminare con le
+    # icone delle categorie tagliate»): le card della fila si allargano o
+    # si stringono finche' il fondo della sezione tocca la barra in basso
+    _adatta = pezzo_js(mini, "const EV_LARGA_MIN = ", "\naddEventListener('resize'")
+    out = _node_banco("""
+let larga = 150, fisso = 600, nav = 70, innerHeight = 857, scrollY = 0;
+let nuda = true, mostra = '', carte = true;
+const mqNetflix = {matches: true};
+const radice = {style: {v: {}, setProperty(k, x){ this.v[k] = x; larga = parseFloat(x); },
+  removeProperty(k){ delete this.v[k]; larga = 150; }}};
+const document = {documentElement: radice, querySelector: s => s === 'nav'
+  ? {getBoundingClientRect: () => ({height: nav})} : null};
+const sez = {style: {get display(){ return mostra; }},
+  getBoundingClientRect: () => ({bottom: fisso + larga + (larga < 160 ? 18 : 0) - scrollY})};
+const fila = {querySelector: () => carte ? {getBoundingClientRect: () => ({width: larga})} : null};
+const el = id => ({evidenzaSez: sez, evidenzaFila: fila})[id];
+const vetrinaNuda = () => nuda;
+""" + _adatta + """
+const giro = () => { adattaPrimoSchermo(); return [radice.style.v['--ev-larga'] || null,
+  Math.round(sez.getBoundingClientRect().bottom + scrollY)]; };
+const fuori = {};
+fuori.andrea = giro();
+scrollY = 400; fuori.scorsa = giro(); scrollY = 0;
+innerHeight = 667; fuori.piccolo = giro();
+innerHeight = 1100; fuori.alto = giro();
+innerHeight = 857; nuda = false; fuori.cerca = giro(); nuda = true;
+mostra = 'none'; fuori.spenta = giro(); mostra = '';
+mqNetflix.matches = false; fuori.computer = giro();
+console.log(JSON.stringify(fuori));
+""")
+    if out is None:
+        salta("il primo schermo che finisce sotto la mensola", "node non c'e'")
+    else:
+        prova("in node: il fondo della fila cade sulla barra in basso (857 "
+              "meno 70), anche con la pagina scorsa e col testo che va a "
+              "capo (due passi); sul telefono piccolo si ferma a 130, su "
+              "quello alto a 220; a vetrina non nuda, fila spenta o sul "
+              "computer le card tornano a 150",
+              {"andrea": ["187px", 787], "scorsa": ["187px", 787],
+               "piccolo": ["130px", 748], "alto": ["220px", 820],
+               "cerca": [None, 768], "spenta": [None, 768],
+               "computer": [None, 768]}, out)
+    prova("...la chiamano la fila, i cerchi e il cambio di misura", True,
+          "  aggiornaFrecce('evidenzaFila');\n  adattaPrimoSchermo();\n}" in mini
+          and "  adattaPrimoSchermo();     // i cerchi spostano la fila" in mini
+          and "addEventListener('resize', () => adattaPrimoSchermo());" in mini
+          and "#evidenzaSez .ev-strip .card{flex-basis:var(--ev-larga,150px);"
+              "width:var(--ev-larga,150px)}" in mini)
     prova("...le card della fila sollevate dall'ombra, senza etichetta e "
           "senza cornice (nella griglia restano)",
           (True, True, True, True),
