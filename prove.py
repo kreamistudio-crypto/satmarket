@@ -52258,12 +52258,12 @@ def prove_scoprire():
     # Con find() e non index(): una riga tolta deve far ROSSA questa
     # prova, non farla esplodere portandosi via le sorelle.
     prova("il tocco che naviga esce prima di ogni filtro", True,
-          0 <= _ts.find("if (voce && voce.tocca) { voce.tocca(); return; }")
+          0 <= _ts.find("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }")
           < _ts.find("filtroLampo = !acceso;"))
     # ...e prima anche dell'haptic: vaiP2P ha il suo, e batterlo due
     # volte si sente
     prova("...e l'haptic lo da' la strada che si prende", True,
-          _ts.find("voce.tocca(); return;") < _ts.find("haptic();"))
+          0 <= _ts.find("voce.tocca(); cardToccata = ''; return;") < _ts.find("haptic();"))
     # LA VOCE: in TESTA (decisione di Andrea, col costo sulle offerte
     # a tempo accettato e misurato), e NON e' un interruttore.
     _cat = mini[mini.index("const SCOPRIRE = ["):
@@ -52399,6 +52399,42 @@ console.log(JSON.stringify(r));
            _ds.find("if (negozioPronto(chi))") < _ds.find("negozioInAttesa(chi);"),
            "@keyframes negozio-sale{from{transform:translateY(100%)}" in mini,
            "e.currentTarget.classList.remove('sale-dal-basso')" in mini))
+    # IL VOLO DELLA CARD (24 nov 2026, Andrea: «si ingrandisce un po', ma
+    # rimane comunque il bordo» e «la parte in basso [...] falla vedere un
+    # po' prima»): solo dal telefono, solo col negozio pronto, mai con gli
+    # effetti ridotti; il negozio si apre a corsa non finita; la testata
+    # tiene margini e angoli; e resta solo per il negozio dove si e' volati
+    _vo = pezzo_js(mini, "function voloNegozio(card, chi, aperto, da){", "\n}")
+    _vm = re.search(r"const VOLO_MS = (\d+), VOLO_APRI_MS = (\d+);", mini)
+    prova("il volo parte solo dal telefono, col negozio pronto, senza effetti ridotti",
+          (True, True, True),
+          ("cardToccata && mqNetflix.matches ? document.querySelector(" in _ds,
+           _ds.find("if (negozioPronto(chi)) {") < _ds.find("voloNegozio(card, chi, aperto, da)")
+           < _ds.find("negozioInAttesa(chi);"),
+           "if (card && !effettiRidotti() && voloNegozio(card, chi, aperto, da)) return;" in _ds))
+    prova("...il negozio si apre prima che la card arrivi",
+          True, bool(_vm) and 0 < int(_vm.group(2)) < int(_vm.group(1)))
+    prova("...la testata tiene margini e angoli tondi, come l'arrivo del volo",
+          (True, True),
+          (re.search(r"\.negozio-testata\{margin:10px var\(--pad\) 0;aspect-ratio:272/130;\s*border-radius:14px;", mini) is not None,
+           "const w = vw - 2 * pad, h = w * 130 / 272;" in _vo))
+    prova("...la card toccata si dimentica a ogni tocco, e la testata e' solo del volo",
+          (True, True, True),
+          ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }" in mini,
+           "cardToccata = '';" in _ds,
+           "if (!ridisegno && !negozioInVolo) negozioTestataDi = {chi: '', src: ''};" in _an.split("try {")[0]))
+    # (Andrea, sul video: «appena tocchi la card sembra che prima di
+    # allargarsi si rimpicciolisca per un attimo») il `:active` di tutte le
+    # card toglieva lo scale della fila: premuta, ogni card tiene la misura
+    prova("...la card premuta non cambia misura prima del volo",
+          (True, True),
+          ("#scoprireStrip .scoprire-card:active{transform:scale(.82) translateY(1px)}" in mini,
+           "#scoprireStrip .scoprire-card.sc-centro:active{transform:scale(1.1) translateY(1px)}" in mini))
+    prova("...e il volo non lascia niente in giro (copia, velo, card nascosta)",
+          (True, True, True, True),
+          ("vola.remove();" in _vo, "velo.remove();" in _vo,
+           "card.style.visibility = '';" in _vo,
+           "try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _vo))
     # ...e chi riscrive la griglia li parcheggia PRIMA
     _rg = pezzo_js(mini, "function renderGrid(items){", "\n}")
     _sv = pezzo_js(mini, "function svuotaGrigliaFerma(){", "\n}")
@@ -54589,6 +54625,7 @@ const inCatalogo = () => {}, renderNegozio = () => {}, armaViste = () => {};
 const cardHTML = () => '', el = () => ({insertAdjacentHTML(){}, style: {}});
 let negozioInArrivo = '';
 async function bozzaDelVenditore(){ return null; }
+let negozioInVolo = false, negozioTestataDi = {}; function testataNegozio(){}  // il volo di «Da scoprire» (24 nov 2026), qui fermo
 async function fetch(u){ url.push(u);
   return {ok: true, json: async () => ({annunci: [1], cursore: 'c2',
                                         venditore: {negozio: 'ab'}})}; }
@@ -55119,6 +55156,7 @@ const inCatalogo = () => {}, renderNegozio = () => {}, armaViste = () => {};
 const cardHTML = () => '';
 let gruppi = 0; function aggiornaGruppiProfilo(){ gruppi++; }
 async function bozzaDelVenditore(){ return null; }
+let negozioInVolo = false, negozioTestataDi = {}; function testataNegozio(){}  // il volo di «Da scoprire» (24 nov 2026), qui fermo
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
   .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const RACCONTI = {'to-the-moon': {titolo: 'To The Mooon!'}};
@@ -93618,6 +93656,16 @@ def prove_tessera_testata():
     prova("la barra Cerca e la topbar la chiedono ancora per nome", (1, 1),
           (mini.count('<img class="q-jar" src="/assets/barattolo.jpeg"'),
            mini.count('<img class="brand-jar" src="/assets/barattolo.jpeg"')))
+    # INCASTONATO AL PIXEL (24 nov 2026, Andrea: «lo spazio del bordino
+    # sembra diverso tra l'alto e il basso»): barra alta 47 px tondi e
+    # barattolo contato dagli spigoli, 3 px da sopra e da sinistra, 41 di
+    # lato — 47 - 41 - 3 = 3 anche sotto — e mai piu' centrato a mezzo pixel
+    _qj = re.search(r"\.q-jar\{([^}]*)\}", mini).group(1)
+    prova("...e sta incastonato uguale sopra, sotto e a sinistra",
+          (True, True, False, True),
+          ("left:3px;top:3px;" in _qj, "width:41px;height:41px;" in _qj,
+           "translateY" in _qj,
+           ".searchbar .q-jar ~ #q{padding-left:53px;height:47px}" in mini))
     prova("...ed e' un JPEG davvero", b"\xff\xd8\xff", raw[:3])
     prova("...leggero come la tessera di prima (sotto i 16 KB)", True,
           _os.path.getsize("assets/barattolo.jpeg") < 16000)
@@ -98471,6 +98519,7 @@ let FERMI = [];
 function authHdr(){ return ''; }
 function mapListing(x){ return x; } function inCatalogo(){}
 async function bozzaDelVenditore(){ return null; }
+let negozioInVolo = false, negozioTestataDi = {}; function testataNegozio(){}  // il volo di «Da scoprire» (24 nov 2026), qui fermo
 async function fetch(url){
   const chi = decodeURIComponent(url.split('/negozio/')[1].split('?')[0]);
   await pausa();
@@ -140202,12 +140251,20 @@ def prove_effetti_ridotti():
     prova("`corto` (galleria, tour del P2P) porta il giudice nella sua riga",
           js.count("corto ? 'smooth' : 'auto'"),
           len(re.findall(r"const corto = [^;]*&& !tourRidotto\(\);", js)))
-    # le strade per animare che oggi NESSUNO usa: chi ne apre una la
+    # le strade per animare che la classe non vede: chi ne apre una la
     # fa passare da effettiRidotti() e la dichiara qui
+    #   voloNegozio (24 nov 2026): la card di «Da scoprire» che vola in
+    #     cima al negozio — Web Animations, quattro corse; chi la chiama
+    #     ha gia' chiesto al giudice (e senza vola la salita dal basso)
+    _vo = pezzo_js(mini, "function voloNegozio(card, chi, aperto, da){", "\n}")
     prova("nessuno anima per strade che la classe non vede (Web "
           "Animations, View Transitions, SMIL)", [0, 0, 0],
-          [js.count(".animate("), js.count("startViewTransition"),
+          [js.count(".animate(") - _vo.count(".animate("), js.count("startViewTransition"),
            len(re.findall(r"<animate(?:Transform|Motion)?\b", mini))])
+    prova("...e il volo, l'unico che anima cosi', chiede al giudice prima di partire",
+          (3, 1),
+          (_vo.count(".animate("),
+           mini.count("!effettiRidotti() && voloNegozio(card, chi, aperto, da)")))
     # requestAnimationFrame non e' un effetto, ma e' da li' che ne nasce
     # uno a mano: si censisce CHI lo chiama, col suo perche'
     #   avviaTour, mostraTappa: attese di fotogramma (una classe che
@@ -142769,6 +142826,7 @@ const authHdr = () => 'x', toast = m => { disegni.push('toast:' + m); };
 const mapListing = x => x, inCatalogo = () => {};
 let bozza = null;
 async function bozzaDelVenditore(){ return bozza; }
+let negozioInVolo = false, negozioTestataDi = {}; function testataNegozio(){}  // il volo di «Da scoprire» (24 nov 2026), qui fermo
 const disegni = [];
 function renderNegozio(v){ disegni.push({aperto: raccontoAperto,
                                          html: raccontoNegozio(v)}); }

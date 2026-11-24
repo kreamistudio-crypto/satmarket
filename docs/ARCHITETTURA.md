@@ -38650,7 +38650,15 @@ mai il kind 0 di nessuno: regola ferrea 2).
   senza `vista`/`da` (preparare non e' visitare), valide
   `NEGOZIO_PRONTO_MS`; `apriNegozio` su un'apertura disegna il pronto e
   manda lo stesso la richiesta che conta, senza aspettarla. Senza pronto,
-  l'anello di `negozioInAttesa`; le pillole si appiccicano solo a
+  l'anello di `negozioInAttesa`. Dalla card GRANDE sul telefono, col
+  pronto e senza effetti ridotti, al posto della salita c'e' il VOLO
+  (`voloNegozio`, Web Animations): una copia della card si allarga fino
+  a `#negozioTestata` (margini `--pad`, 272:130, angoli 14) sopra un velo
+  `.negozio-velo`; a `VOLO_APRI_MS` (260) su `VOLO_MS` (420) il negozio
+  si apre sotto e si scopre dall'alto, e la testata prende il posto della
+  copia. La testata vale solo per il negozio del volo (`negozioTestataDi`,
+  azzerata in cima ad `apriNegozio` salvo `ridisegno` o `negozioInVolo`);
+  la card la segna `toccaScoperta` in `cardToccata`. Le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
   La divisione parte da 8 negozi (`2 * QUADRI_MIN`); sotto, ogni negozio
   sta in TUTTE E DUE le file, da `QUADRI_POCHI` (2) negozi in su (24 nov).

@@ -889,11 +889,19 @@
      il barattolo sta prima (col ~, niente `:has()`: prove_tastiera_iphone).
      SCOPATO su #q: la .q-wrap e' una sola, ma la ricetta del campo
      `.searchbar input` resta quella di base. */
-  .q-jar{position:absolute;left:1.5px;top:50%;transform:translateY(-50%);
-    width:43px;height:43px;border-radius:50%;object-fit:cover;z-index:1;
+  /* INCASTONATO AL PIXEL (24 nov 2026, Andrea: «il logo barattolo dentro
+     la barra di ricerca non è perfettamente incastonato, sembra che lo
+     spazio del bordino sia diverso tra l'alto e il basso»): la barra era
+     alta 45,75 px (la riga del font) e il barattolo centrato col
+     translateY(-50%), cioe' su mezzi pixel che ogni telefono arrotonda a
+     modo suo. Ora la barra e' alta 47 px TONDI e il barattolo sta a 3 px
+     dai tre bordi, contato dagli spigoli e non dal centro: 1,5 px di
+     bordo e 1,5 px di fondo uguali sopra, sotto e a sinistra. */
+  .q-jar{position:absolute;left:3px;top:3px;
+    width:41px;height:41px;border-radius:50%;object-fit:cover;z-index:1;
     pointer-events:none}
   .q-jar + .q-lente{display:none}
-  .searchbar .q-jar ~ #q{padding-left:53px}
+  .searchbar .q-jar ~ #q{padding-left:53px;height:47px}
   .searchbar input#q{border-color:transparent;
     box-shadow:-9px 0 16px -7px rgba(247,147,26,.7),-3px 0 7px -3px rgba(247,147,26,.45);
     background:linear-gradient(var(--card),var(--card)) padding-box,
@@ -1859,8 +1867,16 @@
     #scoprireStrip .scoprire-card{scroll-snap-align:center;margin:0 -10px;
       transform:scale(.82);opacity:.55;
       transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease}
+    #scoprireStrip .scoprire-card:active{transform:scale(.82) translateY(1px)}
     #scoprireStrip .scoprire-card.sc-centro{transform:scale(1.1);opacity:1;
       z-index:3;box-shadow:0 6px 12px rgba(0,0,0,.45)}
+    /* IL TOCCO NON LA RIMPICCIOLISCE (24 nov 2026, Andrea sul volo:
+       «appena tocchi la card sembra che prima di allargarsi si
+       rimpicciolisca per un attimo»): il `:active` di tutte le card
+       (translateY(1px)) qui toglieva lo scale(1.1), e la card tornava
+       piccola nel mezzo secondo della transizione, proprio mentre partiva
+       il volo. Ogni card tiene la sua misura anche premuta. */
+    #scoprireStrip .scoprire-card.sc-centro:active{transform:scale(1.1) translateY(1px)}
     /* L'OMBRA STA DENTRO LA FILA (23 nov 2026, Andrea: «c'e' una linea
        scura fra la card grossa e le quadrate»): la fila scorre di lato,
        quindi ritaglia anche in verticale al bordo del padding, e l'ombra
@@ -8215,6 +8231,19 @@
      spegne come ogni altra corsa */
   #view-negozio.active.sale-dal-basso{animation:negozio-sale .34s cubic-bezier(.2,.8,.2,1)}
   @keyframes negozio-sale{from{transform:translateY(100%)}to{transform:none}}
+  /* IL VOLO DELLA CARD (24 nov 2026, voloNegozio): la card toccata si
+     allarga fino alla testata del negozio, coi margini e gli angoli tondi
+     («si ingrandisce un po', ma rimane comunque il bordo»), sopra un velo
+     del colore di fondo che lascia scoperta la barra in basso */
+  .negozio-testata{margin:10px var(--pad) 0;aspect-ratio:272/130;
+    border-radius:14px;overflow:hidden;box-shadow:0 6px 16px rgba(0,0,0,.28)}
+  .negozio-testata img,.negozio-volo img{width:100%;height:100%;
+    object-fit:cover;display:block}
+  .negozio-volo{position:fixed;z-index:9001;overflow:hidden;
+    border-radius:14px;pointer-events:none;
+    box-shadow:0 18px 40px rgba(0,0,0,.45)}
+  .negozio-velo{position:fixed;left:0;right:0;top:0;z-index:9000;
+    background:var(--bg)}   /* prende i tocchi: niente doppio tocco a meta' volo */
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
   nav{
@@ -15274,6 +15303,9 @@ document.getElementById('cartello')?.remove();</script>
 
   <!-- ============ VISTA: NEGOZIO DEL VENDITORE ============ -->
   <div class="view" id="view-negozio" onanimationend="salitaNegozioFinita(event)">
+    <!-- LA TESTATA DEL VOLO (24 nov 2026): la card di «Da scoprire» che e'
+         volata fin qui; c'e' solo arrivando col volo (voloNegozio) -->
+    <div class="negozio-testata" id="negozioTestata" hidden></div>
     <div class="negozio-su">
       <button class="back" id="negozioTorna" onclick="tornaDalNegozio()">← Torna</button>
       <!-- (20 nov 2026) in Barattolo Negozio la vetrina e' la cassa: da qui
@@ -28099,7 +28131,10 @@ function toccaScoperta(id){
      L'HAPTIC lo da' la strada che si prende — vaiP2P ha il suo, e
      batterlo due volte si sente. */
   const voce = vociScoprire().find(v => v.id === id);
-  if (voce && voce.tocca) { voce.tocca(); return; }
+  /* (24 nov 2026) la card grande toccata, per il volo del negozio:
+     solo la card della fila, mai un quadrato */
+  cardToccata = id;
+  if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }
   haptic();
   const acceso = id === 'sconto' ? filtroSconto : filtroLampo;
   if (id === 'sconto') {
@@ -29609,6 +29644,11 @@ const DAL_LINK = 'link';
 async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   raccontoAperto = !!aperto;
+  /* la testata del volo resta solo per il negozio dove si e' volati,
+     anche ai ridisegni (il ritorno da un annuncio); ogni altra apertura
+     la spegne. Qui in cima, prima di ogni attesa: il volo alza
+     `negozioInVolo` solo per il giro sincrono della chiamata */
+  if (!ridisegno && !negozioInVolo) negozioTestataDi = {chi: '', src: ''};
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const url = `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`
@@ -29648,6 +29688,7 @@ async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){
        bozza che il venditore vede sul suo negozio resta chiusa, come
        per chi naviga */
     if (anteprima && aperto === DAL_LINK) raccontoAperto = false;
+    testataNegozio(chi);
     renderNegozio(d.venditore, annunci, d.feedback||[], d.esauriti||[]);
   } catch(e) { if (!ancora || ancora()) toast('Negozio non trovato'); }
 }
@@ -29695,7 +29736,11 @@ function apriNegozioDaScoprire(chi, aperto, da){
      apriNegozio lo disegna nello stesso giro del tocco, e la salita parte
      sulla pagina piena. L'anello resta solo per un tocco arrivato prima
      che la home finisse di prepararlo. */
+  const card = cardToccata && mqNetflix.matches ? document.querySelector(
+    `#scoprireStrip .scoprire-card[data-id="${CSS.escape(cardToccata)}"]`) : null;
+  cardToccata = '';
   if (negozioPronto(chi)) {
+    if (card && !effettiRidotti() && voloNegozio(card, chi, aperto, da)) return;
     const fatto = apriNegozio(chi, aperto, undefined, da);
     saleDalBasso();
     return fatto;
@@ -29749,6 +29794,81 @@ function preparaNegoziScoprire(codici){
         .then(() => negoziInCorsa.delete(chi));
     });
   }, 1500);
+}
+/* IL VOLO (24 nov 2026, Andrea, sul video di prova: «bellissimo così»,
+   poi «rimane comunque il bordo» e «la parte in basso […] falla vedere un
+   po' prima»): una copia della card parte dal suo posto e si allarga fino
+   alla testata del negozio (margini e angoli tondi restano), mentre un
+   velo del colore di fondo copre la home. A 260 ms su 420, quando la corsa
+   e' quasi finita, sotto la copia si apre il negozio GIA' PRONTO: la
+   testata vera prende il posto della copia, e il resto della pagina si
+   apre dall'alto. Solo sul telefono, solo col negozio pronto, mai con gli
+   effetti ridotti (chi chiama ha gia' guardato); torna false se non puo'
+   partire, e chi chiama prende la salita dal basso. */
+let cardToccata = '', negozioInVolo = false;
+let negozioTestataDi = {chi: '', src: ''};
+function testataNegozio(chi){
+  const t = el('negozioTestata');
+  if (!t) return;
+  const src = negozioTestataDi.chi === chi ? negozioTestataDi.src : '';
+  t.hidden = !src;
+  t.innerHTML = src ? `<img src="${esc(src)}" alt="" decoding="async"
+    onerror="this.parentNode.hidden=true">` : '';
+}
+const VOLO_MS = 420, VOLO_APRI_MS = 260;
+function voloNegozio(card, chi, aperto, da){
+  const img = card.querySelector('img');
+  const src = img && (img.currentSrc || img.src);
+  const v = el('view-negozio'), casa = el('view-esplora');
+  if (!src || !v || !casa || typeof card.animate !== 'function'
+      || document.querySelector('.negozio-volo')) return false;
+  const r = card.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+  const pad = parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--pad')) || 16;
+  /* l'arrivo: dove la testata stara' a pagina in cima — la cima delle
+     viste (sono sorelle) piu' il suo margine */
+  const w = vw - 2 * pad, h = w * 130 / 272;
+  const top = casa.getBoundingClientRect().top + window.scrollY
+    + (parseFloat(getComputedStyle(v).paddingTop) || 0) + 10;
+  const nav = document.querySelector('nav');
+  const velo = document.createElement('div');
+  velo.className = 'negozio-velo';
+  velo.style.bottom = (nav ? nav.getBoundingClientRect().height : 0) + 'px';
+  const vola = document.createElement('div');
+  vola.className = 'negozio-volo';
+  vola.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+  vola.innerHTML = `<img src="${esc(src)}" alt="">`;
+  document.body.append(velo, vola);
+  card.style.visibility = 'hidden';
+  const curva = 'cubic-bezier(.2,.8,.2,1)';
+  velo.animate([{opacity: 0}, {opacity: 1}], {duration: VOLO_APRI_MS, easing: 'ease-out', fill: 'forwards'});
+  vola.animate([{transform: 'none'},
+    {transform: `translate(${pad - r.left}px, ${top - r.top}px)`, width: w + 'px',
+     height: h + 'px', boxShadow: '0 6px 16px rgba(0,0,0,.28)'}],
+    {duration: VOLO_MS, easing: curva, fill: 'forwards'});
+  setTimeout(() => {
+    /* il negozio si apre sotto la copia, che finisce la sua corsa */
+    negozioTestataDi = {chi, src};
+    negozioInVolo = true;
+    try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
+    window.scrollTo(0, 0);
+    fermaCorse(v);
+    v.classList.remove('sale-dal-basso');
+    velo.remove();
+    card.style.visibility = '';
+    const t = el('negozioTestata');
+    if (t) t.style.visibility = 'hidden';
+    Array.from(v.children).filter(c => c !== t).forEach((c, i) => c.animate([
+      {clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-14px)', opacity: 0},
+      {clipPath: 'inset(0 0 0% 0)', transform: 'none', opacity: 1}],
+      {duration: 280, delay: i * 12, easing: curva, fill: 'backwards'}));
+    setTimeout(() => {
+      if (t) t.style.visibility = '';
+      vola.remove();
+    }, VOLO_MS - VOLO_APRI_MS);
+  }, VOLO_APRI_MS);
+  return true;
 }
 function salitaNegozioFinita(e){
   if (e.animationName === 'negozio-sale') e.currentTarget.classList.remove('sale-dal-basso');
