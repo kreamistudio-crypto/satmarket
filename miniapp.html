@@ -1726,6 +1726,9 @@
   /* sul computer (e sul tablet) uno ACCANTO all'altro: uno sotto l'altro
      a tutta larghezza sarebbero due cartelloni da 300px d'altezza */
   @media (min-width:768px){#occasioniBanner{grid-template-columns:1fr 1fr}}
+  /* dentro la griglia (dopo le prime sei card) occupa la riga intera, e
+     i margini sono gia' quelli della griglia */
+  #grid > #occasioniBanner{grid-column:1/-1;padding:0}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -8207,6 +8210,11 @@
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
   .view.active{display:block;animation:fadein .18s ease}
+  /* il negozio aperto da «Da scoprire» sale dal basso (24 nov 2026,
+     apriNegozioDaScoprire); la regola universale degli effetti ridotti la
+     spegne come ogni altra corsa */
+  #view-negozio.active.sale-dal-basso{animation:negozio-sale .34s cubic-bezier(.2,.8,.2,1)}
+  @keyframes negozio-sale{from{transform:translateY(100%)}to{transform:none}}
   @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
   nav{
@@ -15208,10 +15216,10 @@ document.getElementById('cartello')?.remove();</script>
     <div id="mercMappaBox"></div>
     <!-- I DUE BANNER DELLE OCCASIONI (24 nov 2026, cantiere
          home-card-pulite): «Offerte a tempo» e «Sconti dei negozi»
-         escono da «Da scoprire» e stanno qui, uno sopra l'altro, subito
-         prima delle card del mercatino — sono filtri della griglia. Li
-         disegna renderOccasioni; senza occasioni vive il riquadro e'
-         spento. -->
+         escono da «Da scoprire», uno sopra l'altro — sono filtri della
+         griglia. Questo e' il loro posto di CASA: posaOccasioni li porta
+         dentro la griglia dopo le prime sei card. Li disegna
+         renderOccasioni; senza occasioni vive il riquadro e' spento. -->
     <div class="occ-banner" id="occasioniBanner" style="display:none"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
@@ -15265,7 +15273,7 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ VISTA: NEGOZIO DEL VENDITORE ============ -->
-  <div class="view" id="view-negozio">
+  <div class="view" id="view-negozio" onanimationend="salitaNegozioFinita(event)">
     <div class="negozio-su">
       <button class="back" id="negozioTorna" onclick="tornaDalNegozio()">← Torna</button>
       <!-- (20 nov 2026) in Barattolo Negozio la vetrina e' la cassa: da qui
@@ -22268,8 +22276,10 @@ async function caricaAltri(){
     vetrinaCursore = j.cursore || null;
     vetrina = vetrina.concat(nuovi);
     inCatalogo(nuovi);
-    if (nuovi.length)
+    if (nuovi.length) {
       el('grid').insertAdjacentHTML('beforeend', nuovi.map(cardHTML).join(''));
+      posaOccasioni();   /* con meno di sei card stava in fondo */
+    }
     armaViste();
     /* il patto di `osservaSentinella`: true = ho appeso righe, chiedi
        ancora se lo schermo e' scoperto. Le vie d'uscita qui sopra
@@ -27115,7 +27125,7 @@ function vociSponsor(){
       testo: String((casa ? casa.titolo : s.titolo) || ''),
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
-      tocca: () => apriNegozio(negozio, true, undefined, 'sponsor:' + slug)});
+      tocca: () => apriNegozioDaScoprire(negozio, true, 'sponsor:' + slug)});
   });
   return fuori;
 }
@@ -27186,7 +27196,7 @@ function vociNegoziPromossi(){
       logo: nomeFotoPromo(n.logo) ? fotoUrl(nomeFotoPromo(n.logo)) : '',
       testo: String(n.nome || ''),
       vivo: () => true, accesa: () => false,
-      tocca: () => apriNegozio(cod)});
+      tocca: () => apriNegozioDaScoprire(cod)});
   });
   return fuori;
 }
@@ -27240,6 +27250,7 @@ function renderScoprire(){
   el('scoprireSez').style.display = tutte.length ? '' : 'none';
   const {grandi: vive, quadri} = spartisciScoprire(tutte);
   renderQuadriScoprire(quadri);
+  preparaNegoziScoprire(tutte.filter(v => v.negozio).map(v => v.negozio));
   if (!vive.length) return;
   /* La firma dice quali card ci sono E quale e' accesa: si ridisegna
      solo quando cambia qualcosa, mai mentre si guarda.
@@ -27321,6 +27332,26 @@ function renderScoprire(){
    ridisegna anche loro. Col barattolo aperto stanno spenti, per la stessa
    ragione delle card-interruttore di la' (vedi renderScoprire). La firma
    come la fila: si ridisegna solo quando cambia qualcosa. */
+/* ...E STANNO DOPO LE PRIME SEI CARD (24 nov 2026, Andrea: «i nuovi
+   banner, offerte a tempo e sconti nei negozi, mettili dopo le prime 6
+   card»): il riquadro entra NELLA griglia, a tutta riga, davanti alla
+   settima card; con meno card sta in fondo, e con la griglia vuota resta
+   solo lui — un filtro acceso che non trova niente deve potersi spegnere
+   da dove si e' acceso. Chi riscrive la griglia (renderGrid,
+   svuotaGrigliaFerma) prima lo PARCHEGGIA al suo posto di casa, davanti
+   a #grid: un innerHTML se lo porterebbe via, e getElementById non lo
+   troverebbe piu'. */
+function parcheggiaOccasioni(){
+  const b = el('occasioniBanner'), g = el('grid');
+  if (b && g && b.parentNode === g) g.parentNode.insertBefore(b, g);
+}
+function posaOccasioni(){
+  const b = el('occasioniBanner'), g = el('grid');
+  if (!b || !g) return;
+  const card = Array.from(g.children).filter(c => c !== b);
+  if (card[6]) g.insertBefore(b, card[6]);
+  else g.appendChild(b);
+}
 let occasioniFirma = '';
 function renderOccasioni(){
   const box = el('occasioniBanner');
@@ -28094,9 +28125,10 @@ function toccaScoperta(id){
      IL RITOCCO CHE SPEGNE NON SCORRE: e' un annulla, si resta dove
      si e' — la regola di tutta la famiglia (card categoria, e
      dall'ago 2026 anche la card del barattolo). */
-  /* (dal 24 nov 2026 il punto d'arrivo e' il riquadro dei banner sopra
-     la griglia, dove la card ora sta) */
-  if (!acceso) scorriSottoHeader(el('occasioniBanner'));
+  /* (dal 24 nov 2026 il punto d'arrivo e' la GRIGLIA: i banner stanno
+     dopo le prime sei card, e le card filtrate arrivano SOPRA di loro —
+     scorrere fino al banner le lascerebbe fuori dallo schermo) */
+  if (!acceso) scorriSottoHeader(el('grid'));
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }
@@ -28202,6 +28234,7 @@ function svuotaGrigliaFerma(){
   const g = el('grid');
   clearTimeout(grigliaFermaTimer);
   g.style.minHeight = g.offsetHeight + 'px';
+  parcheggiaOccasioni();
   g.innerHTML = '';
   el('gridEmpty').style.display = 'none';
 }
@@ -28558,8 +28591,10 @@ function renderGrid(items){
   const ba = el('btnAvvisami');
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
+  parcheggiaOccasioni();
   el('grid').innerHTML = data.map(cardHTML).join('');
   grigliaArrivata();
+  posaOccasioni();
   /* la fila «In evidenza» (23 nov 2026) e le card P2P in vetrina: le
      due file si accendono o si spengono con la vista */
   renderEvidenza();
@@ -29576,12 +29611,22 @@ async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){
   raccontoAperto = !!aperto;
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
-    const r = await fetch(
-      `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`
+    const url = `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`
       + (da ? `&da=${encodeURIComponent(da)}` : '')
-      + (ridisegno || anteprima ? '' : '&vista=1'), opz);
-    if (!r.ok) throw new Error('negozio non trovato');
-    const d = await r.json();
+      + (ridisegno || anteprima ? '' : '&vista=1');
+    /* IL NEGOZIO GIA' PRONTO (24 nov 2026, vedi preparaNegoziScoprire): su
+       un'APERTURA si disegna subito quel che la home ha gia' chiesto, e la
+       richiesta vera parte lo stesso — e' lei che conta la visita e
+       l'apertura dello spazio — senza che nessuno aspetti la risposta */
+    const pronto = (ridisegno || anteprima || typeof negozioPronto !== 'function')
+      ? null : negozioPronto(chi);
+    let d = pronto;
+    if (pronto) fetch(url, opz).catch(() => {});
+    else {
+      const r = await fetch(url, opz);
+      if (!r.ok) throw new Error('negozio non trovato');
+      d = await r.json();
+    }
     if (ancora && !ancora()) return;
     /* arrivato: l'anello, se c'era, se ne va col primo disegno vero */
     negozioInArrivo = '';
@@ -29627,6 +29672,86 @@ function negozioInAttesa(chi){
     .forEach(id => { const n = el(id); if (n) n.innerHTML = ''; });
   const tit = el('negozioVetrinaTit');
   if (tit) tit.style.display = 'none';
+}
+
+/* DA «DA SCOPRIRE» IL NEGOZIO SALE DAL BASSO, SUBITO (24 nov 2026,
+   cantiere home-card-pulite, Andrea: «quando clicco su una card, quella
+   grande, la pagina ci mette un po' ad aprirsi […] non avevamo detto che
+   appena cliccavi lì la card saltava fuori dal basso verso l'alto?»; era
+   la prima delle tre strade proposte il 23 nov). Fino a oggi il tocco
+   ASPETTAVA la rete e poi la pagina compariva di colpo. Ora e' la strada
+   del dettaglio P2P (apriNegozioDettP2P): la pagina si apre nello stesso
+   istante con l'anello (`negozioInAttesa`), sale dal basso, e si riempie
+   quando i dati arrivano; se nel frattempo si e' tornati indietro, il
+   negozio non salta addosso (`qui`). La salita e' del CSS
+   (`.sale-dal-basso`), si toglie a corsa finita — o tornando alla vista
+   ripartirebbe — e con gli effetti ridotti non c'e'. Vale per le card
+   grandi e per i quadrati dei negozi (tutti passano da `tocca`). */
+function apriNegozioDaScoprire(chi, aperto, da){
+  if (!chi) return apriNegozio(chi);
+  haptic();
+  /* ...E SE LA HOME L'HA GIA' PREPARATO NON C'E' NEMMENO L'ANELLO (Andrea,
+     subito dopo: «il negozio si deve vedere subito, non deve caricarsi»):
+     apriNegozio lo disegna nello stesso giro del tocco, e la salita parte
+     sulla pagina piena. L'anello resta solo per un tocco arrivato prima
+     che la home finisse di prepararlo. */
+  if (negozioPronto(chi)) {
+    const fatto = apriNegozio(chi, aperto, undefined, da);
+    saleDalBasso();
+    return fatto;
+  }
+  negozioInAttesa(chi);
+  go('negozio');
+  saleDalBasso();
+  const qui = () => negozioInArrivo === chi
+                 && !!el('view-negozio')?.classList.contains('active');
+  return apriNegozio(chi, aperto, undefined, da, undefined, qui);
+}
+function saleDalBasso(){
+  const v = el('view-negozio');
+  if (v && !effettiRidotti()) {
+    v.classList.remove('sale-dal-basso');
+    void v.offsetWidth;   /* la classe tolta e rimessa fa ripartire la corsa */
+    v.classList.add('sale-dal-basso');
+  }
+}
+/* I NEGOZI DI «DA SCOPRIRE» PREPARATI IN ANTICIPO (24 nov 2026): la
+   home chiede in silenzio la pagina di ogni negozio della fila (card
+   grandi e quadrati), SENZA `vista` e senza `da` — preparare non e'
+   visitare, e il termometro dello spazio resta del tocco. Si chiede un
+   secondo e mezzo dopo il disegno, per non stare in mezzo alla prima
+   pagina della vetrina, e al piu' una volta ogni NEGOZIO_PRONTO_MS per
+   negozio; dopo quel tempo il pronto non vale piu' e il tocco torna a
+   chiedere (con l'anello). Un guasto non lascia niente: si chiedera' al
+   tocco, come prima. */
+const NEGOZIO_PRONTO_MS = 5 * 60 * 1000;
+let negoziPronti = {};          // codice -> {d, t}
+function negozioPronto(chi){
+  const x = negoziPronti[chi];
+  return x && Date.now() - x.t < NEGOZIO_PRONTO_MS ? x.d : null;
+}
+let negoziDaPreparare = [], preparaTimer = 0;
+const negoziInCorsa = new Set();
+function preparaNegoziScoprire(codici){
+  if (DEMO || typeof fetch !== 'function') return;
+  negoziDaPreparare = Array.from(new Set(codici.map(String)
+    .filter(c => CODICE_NEGOZIO.test(c))));
+  clearTimeout(preparaTimer);
+  preparaTimer = setTimeout(() => {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    negoziDaPreparare.forEach(chi => {
+      if (negozioPronto(chi) || negoziInCorsa.has(chi)) return;
+      negoziInCorsa.add(chi);
+      fetch(`${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`, opz)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && d.venditore) negoziPronti[chi] = {d, t: Date.now()}; })
+        .catch(() => {})
+        .then(() => negoziInCorsa.delete(chi));
+    });
+  }, 1500);
+}
+function salitaNegozioFinita(e){
+  if (e.animationName === 'negozio-sale') e.currentTarget.classList.remove('sale-dal-basso');
 }
 
 /* LA PAGINA DEL NEGOZIO RIDISEGNATA, non aperta: stessa strada di

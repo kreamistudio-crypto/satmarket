@@ -2759,7 +2759,11 @@
   BANNER sopra la griglia (`#occasioniBanner`, catalogo `OCCASIONI`,
   `renderOccasioni` chiamato in testa a `renderScoprire`), uno sopra
   l'altro a 328/80 (accanto da 768px), stessi disegni, titoli, giudici di
-  vita e tocco (`toccaScoperta`, che ora scorre fino a loro); spenti col
+  vita e tocco (`toccaScoperta`, che ora scorre in cima alla griglia).
+  Stanno DENTRO la griglia dopo le prime sei card, a tutta riga
+  (`posaOccasioni`; con meno card in fondo, a griglia vuota soli): chi
+  riscrive #grid (renderGrid, svuotaGrigliaFerma) li riporta prima a casa
+  davanti a #grid (`parcheggiaOccasioni`), o l'innerHTML li butterebbe; spenti col
   barattolo e nella sezione lavoro. Quel che segue vale per loro dove
   parla di filtri, immagini e titolo; la fila resta dei negozi e delle
   card che navigano. Verbale: Cantieri, «La home ripulita».
@@ -38638,8 +38642,15 @@ mai il kind 0 di nessuno: regola ferrea 2).
   titolo al centro e le DUE ONDE sotto le card, che scorrono con la fila
   via `ondeEvidenza` e le variabili `--onda-x`/`--onda-h`, ferme con gli
   effetti ridotti: Cantieri, «La home ripulita»),
-  `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e sopra la griglia i due banner
-  `#occasioniBanner` (dal 24 nov); le pillole si appiccicano solo a
+  `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e dentro la griglia dopo sei card
+  i due banner `#occasioniBanner` (dal 24 nov). Il tocco su un negozio della
+  fila (card o quadrato) passa da `apriNegozioDaScoprire`: la pagina sale
+  dal basso (`.sale-dal-basso`, tolta a `animationend`) GIA' PIENA, perche'
+  `preparaNegoziScoprire` chiede le pagine della fila 1,5 s dopo il disegno,
+  senza `vista`/`da` (preparare non e' visitare), valide
+  `NEGOZIO_PRONTO_MS`; `apriNegozio` su un'apertura disegna il pronto e
+  manda lo stesso la richiesta che conta, senza aspettarla. Senza pronto,
+  l'anello di `negozioInAttesa`; le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
   La divisione parte da 8 negozi (`2 * QUADRI_MIN`); sotto, ogni negozio
   sta in TUTTE E DUE le file, da `QUADRI_POCHI` (2) negozi in su (24 nov).

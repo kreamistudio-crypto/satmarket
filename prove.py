@@ -52335,8 +52335,79 @@ def prove_scoprire():
     # ferma
     prova("...solo nel ramo che accende, e anche in DEMO",
           (True, True),
-          ("if (!acceso) scorriSottoHeader(el('occasioniBanner'));" in _ts,
+          ("if (!acceso) scorriSottoHeader(el('grid'));" in _ts,
            0 <= _ts.find("scorriSottoHeader") < _ts.find("if (DEMO)")))
+    # I BANNER DELLE OCCASIONI DOPO LE PRIME SEI CARD (24 nov 2026,
+    # Andrea): posaOccasioni e parcheggiaOccasioni VERI su una griglia di
+    # cartone — davanti alla settima card, in fondo con meno card, soli
+    # nella griglia vuota, e di nuovo a casa prima di ogni riscrittura
+    # (un innerHTML se li porterebbe via)
+    _posa = (pezzo_js(mini, "function parcheggiaOccasioni(){", "\n}") + "\n}\n"
+             + pezzo_js(mini, "function posaOccasioni(){", "\n}") + "\n}\n")
+    _esito = _node_banco("""
+function Nodo(id){ this.id = id; this.children = []; this.parentNode = null; }
+Nodo.prototype.appendChild = function(n){ return this.insertBefore(n, null); };
+Nodo.prototype.insertBefore = function(n, rif){
+  if (n.parentNode) n.parentNode.children.splice(n.parentNode.children.indexOf(n), 1);
+  const i = rif ? this.children.indexOf(rif) : this.children.length;
+  this.children.splice(i, 0, n); n.parentNode = this; return n; };
+const casa = new Nodo('casa'), g = new Nodo('grid'), b = new Nodo('occasioniBanner');
+casa.appendChild(b); casa.appendChild(g);
+const nodi = {grid: g, occasioniBanner: b};
+const el = id => nodi[id];
+const riempi = n => { g.children.forEach(c => c.parentNode = null); g.children = [];
+  for (let i = 1; i <= n; i++) g.appendChild(new Nodo('c' + i)); };
+const ordine = () => g.children.map(c => c.id).join(',');
+""" + _posa + """
+const r = {};
+riempi(9); posaOccasioni(); r.nove = ordine();
+parcheggiaOccasioni(); r.casa = casa.children.map(c => c.id).join(',') + '|' + ordine();
+riempi(3); posaOccasioni(); r.tre = ordine();
+for (let i = 4; i <= 8; i++) g.appendChild(new Nodo('c' + i));
+posaOccasioni(); r.appese = ordine();
+parcheggiaOccasioni(); riempi(0); posaOccasioni(); r.vuota = ordine();
+console.log(JSON.stringify(r));
+""")
+    if _esito is None:
+        salta("i banner dopo le prime sei card", "serve node")
+    else:
+        prova("i banner stanno dopo le prime sei card, in fondo con meno, soli a griglia vuota",
+              {"nove": "c1,c2,c3,c4,c5,c6,occasioniBanner,c7,c8,c9",
+               "casa": "occasioniBanner,grid|c1,c2,c3,c4,c5,c6,c7,c8,c9",
+               "tre": "c1,c2,c3,occasioniBanner",
+               "appese": "c1,c2,c3,c4,c5,c6,occasioniBanner,c7,c8",
+               "vuota": "occasioniBanner"}, _esito)
+    # IL NEGOZIO DI «DA SCOPRIRE» SALE GIA' PIENO (24 nov 2026, Andrea: «il
+    # negozio si deve vedere subito, non deve caricarsi»): la preparazione
+    # non conta visite ne' aperture, il pronto vale solo sulle APERTURE, la
+    # richiesta che conta parte lo stesso, e il tocco della fila ci passa
+    _pr = pezzo_js(mini, "function preparaNegoziScoprire(codici){", "\n}")
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno, ancora){", "\n}")
+    _ds = pezzo_js(mini, "function apriNegozioDaScoprire(chi, aperto, da){", "\n}")
+    prova("la home prepara i negozi della fila senza contare visite ne' aperture",
+          (True, False, False, True),
+          ("/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`, opz)" in _pr,
+           "vista" in _pr, "da=" in _pr,
+           "preparaNegoziScoprire(tutte.filter(v => v.negozio)" in mini))
+    prova("...il pronto si usa solo aprendo, e la richiesta che conta parte lo stesso",
+          (True, True),
+          ("const pronto = (ridisegno || anteprima || typeof negozioPronto !== 'function')\n      ? null : negozioPronto(chi);" in _an,
+           "if (pronto) fetch(url, opz).catch(() => {});" in _an))
+    prova("...e le card e i quadrati dei negozi salgono dal basso, pieni se pronti",
+          (2, True, True, True),
+          (mini.count("tocca: () => apriNegozioDaScoprire("),
+           _ds.find("if (negozioPronto(chi))") < _ds.find("negozioInAttesa(chi);"),
+           "@keyframes negozio-sale{from{transform:translateY(100%)}" in mini,
+           "e.currentTarget.classList.remove('sale-dal-basso')" in mini))
+    # ...e chi riscrive la griglia li parcheggia PRIMA
+    _rg = pezzo_js(mini, "function renderGrid(items){", "\n}")
+    _sv = pezzo_js(mini, "function svuotaGrigliaFerma(){", "\n}")
+    prova("...e chi riscrive la griglia li rimette a casa prima, e li riposa dopo",
+          (True, True, True),
+          (_rg.find("parcheggiaOccasioni();") < _rg.find("el('grid').innerHTML")
+           < _rg.find("posaOccasioni();"),
+           0 <= _sv.find("parcheggiaOccasioni();") < _sv.find("g.innerHTML = ''"),
+           "#grid > #occasioniBanner{grid-column:1/-1" in mini))
     # IL GIUDICE UNICO DELLO SCROLL: la meccanica in un posto solo per
     # le due strisce — a cambiare e' solo il punto d'arrivo.
     _ss = pezzo_js(mini, "function scorriSottoHeader(sez){", "\n}")
@@ -53078,6 +53149,12 @@ function aggiornaFrecce(){}
 /* ...e muto per la stessa ragione lo scorrimento da solo (23 nov 2026),
    che ha la sua prova in prove_promozioni */
 function armaScorriScoprire(){}
+/* ...e muta la preparazione dei negozi (24 nov 2026): e' rete, e il suo
+   gate ha la sua prova in prove_scoprire. Il tocco delle card negozio
+   passa da apriNegozioDaScoprire, che qui porta al cartone di apriNegozio
+   con gli stessi argomenti (la salita e il pronto sono di prove_scoprire) */
+function preparaNegoziScoprire(){}
+function apriNegozioDaScoprire(chi, aperto, da){ apriNegozio(chi, aperto, undefined, da); }
 /* le promozioni (23 nov 2026): nessun negozio pagato, e il turno fermo
    allo zero — un banco che cambiasse ordine a ogni giro non direbbe
    niente */
@@ -54552,11 +54629,14 @@ async function fetch(u){ url.push(u);
           False, "da=" in _u[1])
     prova("...e le altre strade verso il negozio nemmeno",
           ["/api/negozio/ab12cd34?limit=12&vista=1"] * 2, _u[2:])
+    # (dal 24 nov 2026 la card passa da apriNegozioDaScoprire, che sale dal
+    # basso e gira il `da` ad apriNegozio tale e quale)
     # E L'UNICO A MANDARLO E' LA CARD DI «DA SCOPRIRE»: le altre chiamate
     # di apriNegozio non passano il quarto argomento (i Consigliati
     # compresi: lo spazio conta solo «Da scoprire», come deciso in 9821f3c)
     _chi = [l_ for l_ in mini.split("\n")
-            if "'sponsor:' +" in l_ and "apriNegozio(" in l_]
+            if "'sponsor:' +" in l_ and ("apriNegozio(" in l_
+                                         or "apriNegozioDaScoprire(" in l_)]
     prova("a mandare «sponsor:» e' la sola card sponsorizzata", 1,
           len(_chi))
 

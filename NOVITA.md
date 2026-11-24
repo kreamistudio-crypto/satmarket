@@ -972,7 +972,7 @@ leva: P2P_COIN_ATTIVO (le monete; accesa di serie)
 pubblico: sì
 
 ## 2026-11-24 · home-card-pulite
-frase: La home è più pulita. Le card degli scambi P2P sono più corte, col tempo per pagare e la cauzione come due icone, e accanto a «Scambi P2P» c'è un interruttore per nasconderle. Gli annunci in evidenza stanno sopra due onde arancio che scorrono mentre sfogli le card. Le offerte a tempo e gli sconti dei negozi sono due banner subito prima degli annunci: un tocco e vedi solo quelli.
-dove: Esplora → «Scambi P2P» (l'interruttore accanto al titolo); la fila «In evidenza» sotto «Da scoprire»; i due banner sopra gli annunci.
+frase: La home è più pulita. Le card degli scambi P2P sono più corte, col tempo per pagare e la cauzione come due icone, e accanto a «Scambi P2P» c'è un interruttore per nasconderle. Gli annunci in evidenza stanno sopra due onde arancio che scorrono mentre sfogli le card. Le offerte a tempo e gli sconti sono due banner dopo i primi sei annunci, e i negozi di «Da scoprire» si aprono subito.
+dove: Esplora → «Scambi P2P» (l'interruttore accanto al titolo); la fila «In evidenza» sotto «Da scoprire»; i due banner fra gli annunci.
 leva: nessuna
 pubblico: no
