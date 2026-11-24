@@ -27539,7 +27539,7 @@ function renderQuadriScoprire(vive){
     const foto = v.quadro || (d.foto ? fotoUrl(fotoMini(String(d.foto))) : (v.logo || ''));
     const nome = esc(typeof v.testo === 'function' ? v.testo() : v.testo);
     return `<button type="button" class="sc-quadro" data-id="${v.id}" aria-label="${nome}"
-      onclick="toccaScoperta(this.dataset.id)"><span class="sc-quadro-foto">${foto
+      onclick="toccaScoperta(this.dataset.id, true)"><span class="sc-quadro-foto">${foto
         ? `<img src="${esc(foto)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`
         : ''}<span class="sc-quadro-emoji" aria-hidden="true">${esc(v.emoji || '🏪')}</span></span
       ><b>${breve ? esc(breve) : nome}</b></button>`;
@@ -28157,7 +28157,7 @@ function scorriSottoHeader(sez){
    sono mai stati in chiaveVetrina — un'entry che navApplica non sa
    ricostruire e' una bugia del motore — e il ramo resta alle sole
    Aste. L'indietro si comporta come coi filtri dal pannello. */
-function toccaScoperta(id){
+function toccaScoperta(id, daQuadro){
   /* IL SECONDO TIPO DI TOCCO (ago 2026): una voce che dichiara un
      `tocca` NAVIGA, e se ne va di qui PRIMA di sfiorare i filtri —
      niente stato, niente checkbox, niente scroll, nessuna richiesta.
@@ -28168,8 +28168,11 @@ function toccaScoperta(id){
      batterlo due volte si sente. */
   const voce = vociScoprire().find(v => v.id === id);
   /* (24 nov 2026) la card grande toccata, per il volo del negozio:
-     solo la card della fila, mai un quadrato */
-  cardToccata = id;
+     solo la card della fila, mai un quadrato. ⚠️ Il quadrato porta lo
+     stesso id della card grande dello stesso negozio: senza `daQuadro`
+     il volo partiva dalla card grande, ovunque fosse nella fila (anche
+     mezza fuori schermo: il video di Andrea del 24 nov sera) */
+  cardToccata = daQuadro ? '' : id;
   if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }
   haptic();
   const acceso = id === 'sconto' ? filtroSconto : filtroLampo;
@@ -29822,7 +29825,13 @@ function preparaNegoziScoprire(codici){
       negoziInCorsa.add(chi);
       fetch(`${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`, opz)
         .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d && d.venditore) negoziPronti[chi] = {d, t: Date.now()}; })
+        .then(d => {
+          if (!d || !d.venditore) return;
+          negoziPronti[chi] = {d, t: Date.now()};
+          /* la foto del banner gia' nella cache: il volo ci atterra sopra */
+          const b = d.venditore.banner;
+          if (b && b.foto && typeof Image === 'function') new Image().src = fotoUrl(b.foto);
+        })
         .catch(() => {})
         .then(() => negoziInCorsa.delete(chi));
     });
@@ -29837,7 +29846,16 @@ function preparaNegoziScoprire(codici){
    testata vera prende il posto della copia, e il resto della pagina si
    apre dall'alto. Solo sul telefono, solo col negozio pronto, mai con gli
    effetti ridotti (chi chiama ha gia' guardato); torna false se non puo'
-   partire, e chi chiama prende la salita dal basso. */
+   partire, e chi chiama prende la salita dal basso.
+   IL NEGOZIO CHE HA GIA' L'INSEGNA (24 nov 2026 sera, Andrea dal
+   telefono, in produzione: la stessa immagine due volte, la testata e
+   subito sotto «← Torna» il banner del negozio, che e' la stessa foto
+   della card): se la pagina ha il banner (`bannerNegozio`, lo stesso
+   giudice che lo disegna), la testata non si accende e la copia atterra
+   SUL BANNER — che resta com'era, col suo link e il dominio sotto. Il
+   posto vero si misura quando la pagina c'e' (a VOLO_APRI_MS), e la copia
+   ci scivola negli ultimi 160 ms; si toglie quando la foto del banner e'
+   pronta (al piu' 400 ms dopo), mai su un riquadro vuoto. */
 let cardToccata = '', negozioInVolo = false;
 let negozioTestataDi = {chi: '', src: ''};
 function testataNegozio(chi){
@@ -29849,6 +29867,7 @@ function testataNegozio(chi){
     onerror="this.parentNode.hidden=true">` : '';
 }
 const VOLO_MS = 420, VOLO_APRI_MS = 260;
+let scartoInsegna = 48;
 function voloNegozio(card, chi, aperto, da){
   const img = card.querySelector('img');
   const src = img && (img.currentSrc || img.src);
@@ -29857,13 +29876,20 @@ function voloNegozio(card, chi, aperto, da){
       || document.querySelector('.negozio-volo')) return false;
   const r = card.getBoundingClientRect();
   const vw = document.documentElement.clientWidth;
+  /* una card fuori dallo schermo non vola: si vedrebbe partire dal nulla */
+  if (r.right <= 0 || r.left >= vw || !r.width) return false;
+  const pronto = negozioPronto(chi);
+  const insegna = !!bannerNegozio(pronto && pronto.venditore);
   const pad = parseFloat(getComputedStyle(document.documentElement)
     .getPropertyValue('--pad')) || 16;
   /* l'arrivo: dove la testata stara' a pagina in cima — la cima delle
-     viste (sono sorelle) piu' il suo margine */
-  const w = vw - 2 * pad, h = w * 130 / 272;
-  const top = casa.getBoundingClientRect().top + window.scrollY
-    + (parseFloat(getComputedStyle(v).paddingTop) || 0) + 10;
+     viste (sono sorelle) piu' il suo margine. Col banner si mira gia' al
+     suo posto (3:1, sotto «← Torna»): lo scarto e' quello misurato
+     all'ultimo volo, e la prima volta quello del telefono di prova */
+  const w = vw - 2 * pad, h = insegna ? w / 3 : w * 130 / 272;
+  const cima = casa.getBoundingClientRect().top + window.scrollY
+    + (parseFloat(getComputedStyle(v).paddingTop) || 0);
+  const top = cima + (insegna ? scartoInsegna : 10);
   const nav = document.querySelector('nav');
   const velo = document.createElement('div');
   velo.className = 'negozio-velo';
@@ -29876,13 +29902,13 @@ function voloNegozio(card, chi, aperto, da){
   card.style.visibility = 'hidden';
   const curva = 'cubic-bezier(.2,.8,.2,1)';
   velo.animate([{opacity: 0}, {opacity: 1}], {duration: VOLO_APRI_MS, easing: 'ease-out', fill: 'forwards'});
-  vola.animate([{transform: 'none'},
+  const corsa = vola.animate([{transform: 'none'},
     {transform: `translate(${pad - r.left}px, ${top - r.top}px)`, width: w + 'px',
      height: h + 'px', boxShadow: '0 6px 16px rgba(0,0,0,.28)'}],
     {duration: VOLO_MS, easing: curva, fill: 'forwards'});
   setTimeout(() => {
     /* il negozio si apre sotto la copia, che finisce la sua corsa */
-    negozioTestataDi = {chi, src};
+    negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};
     negozioInVolo = true;
     try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
     window.scrollTo(0, 0);
@@ -29891,14 +29917,33 @@ function voloNegozio(card, chi, aperto, da){
     velo.remove();
     card.style.visibility = '';
     const t = el('negozioTestata');
-    if (t) t.style.visibility = 'hidden';
+    /* dove atterra: la testata, o il banner del negozio */
+    const meta = insegna ? v.querySelector('.negozio-banner') : t;
+    const fine = meta && meta.getBoundingClientRect();
+    if (meta) meta.style.visibility = 'hidden';
+    if (fine && fine.width) {
+      if (insegna) scartoInsegna = fine.top - cima;
+      const ora = vola.getBoundingClientRect();
+      const ombra = getComputedStyle(vola).boxShadow;
+      corsa.cancel();
+      vola.style.cssText = `left:${ora.left}px;top:${ora.top}px;width:${ora.width}px;height:${ora.height}px;box-shadow:${ombra}`;
+      vola.animate([
+        {left: ora.left + 'px', top: ora.top + 'px', width: ora.width + 'px', height: ora.height + 'px'},
+        {left: fine.left + 'px', top: fine.top + 'px', width: fine.width + 'px', height: fine.height + 'px',
+         borderRadius: getComputedStyle(meta).borderRadius}],
+        {duration: VOLO_MS - VOLO_APRI_MS, easing: 'ease-out', fill: 'forwards'});
+    }
     Array.from(v.children).filter(c => c !== t).forEach((c, i) => c.animate([
       {clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-14px)', opacity: 0},
       {clipPath: 'inset(0 0 0% 0)', transform: 'none', opacity: 1}],
       {duration: 280, delay: i * 12, easing: curva, fill: 'backwards'}));
     setTimeout(() => {
-      if (t) t.style.visibility = '';
-      vola.remove();
+      const foto = meta && meta.querySelector('img');
+      const via = () => { if (meta) meta.style.visibility = ''; vola.remove(); };
+      if (foto && !foto.complete && typeof foto.decode === 'function')
+        Promise.race([foto.decode().catch(() => {}),
+                      new Promise(z => setTimeout(z, 400))]).then(via);
+      else via();
     }, VOLO_MS - VOLO_APRI_MS);
   }, VOLO_APRI_MS);
   return true;

@@ -52232,7 +52232,7 @@ def prove_scoprire():
           min(int(_pad.group(1)), int(_pad.group(2))) >= _sporge)
     # IL GESTO: il ritocco spegne, e si scrive quel che scriverebbe
     # il pannello (stato + checkbox + bottone Filtri + campo-bottone)
-    _ts = pezzo_js(mini, "function toccaScoperta(id){", "\n}")
+    _ts = pezzo_js(mini, "function toccaScoperta(id, daQuadro){", "\n}")
     prova("il ritocco della card accesa spegne", True,
           "filtroLampo = !acceso;" in _ts
           and "filtroSconto = !acceso;" in _ts)
@@ -52389,7 +52389,7 @@ def prove_scoprire():
     prova("...la testata tiene margini e angoli tondi, come l'arrivo del volo",
           (True, True),
           (re.search(r"\.negozio-testata\{margin:10px var\(--pad\) 0;aspect-ratio:272/130;\s*border-radius:14px;", mini) is not None,
-           "const w = vw - 2 * pad, h = w * 130 / 272;" in _vo))
+           "const w = vw - 2 * pad, h = insegna ? w / 3 : w * 130 / 272;" in _vo))
     prova("...la card toccata si dimentica a ogni tocco, e la testata e' solo del volo",
           (True, True, True),
           ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }" in mini,
@@ -52402,6 +52402,25 @@ def prove_scoprire():
           (True, True),
           ("#scoprireStrip .scoprire-card:active{transform:scale(.82) translateY(1px)}" in mini,
            "#scoprireStrip .scoprire-card.sc-centro:active{transform:scale(1.1) translateY(1px)}" in mini))
+    # IL VIDEO DI ANDREA DEL 24 NOV SERA (in produzione): 1) la stessa
+    # immagine due volte — la testata e, sotto «← Torna», il banner del
+    # negozio: col banner la testata non si accende e la copia atterra sul
+    # banner (stesso giudice che lo disegna); 2) il quadratino faceva
+    # volare la card GRANDE, da dove stava nella fila (mezza fuori)
+    prova("col banner del negozio il volo atterra sul banner, senza testata",
+          (True, True, True),
+          ("const insegna = !!bannerNegozio(pronto && pronto.venditore);" in _vo,
+           "negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};" in _vo,
+           "const meta = insegna ? v.querySelector('.negozio-banner') : t;" in _vo))
+    prova("...e la copia si toglie solo a foto pronta, mai su un riquadro vuoto",
+          (True, True),
+          ("Promise.race([foto.decode().catch(() => {})," in _vo,
+           "new Promise(z => setTimeout(z, 400))]).then(via);" in _vo))
+    prova("il quadratino non fa volare la card grande, e una card fuori schermo non vola",
+          (True, True, True),
+          ('onclick="toccaScoperta(this.dataset.id, true)"><span class="sc-quadro-foto">' in mini,
+           "cardToccata = daQuadro ? '' : id;" in mini,
+           "if (r.right <= 0 || r.left >= vw || !r.width) return false;" in _vo))
     prova("...e il volo non lascia niente in giro (copia, velo, card nascosta)",
           (True, True, True, True),
           ("vola.remove();" in _vo, "velo.remove();" in _vo,
@@ -53121,7 +53140,7 @@ def prove_scoprire_p2p(mini=None, node=None):
              + "\nlet scoprireFirma = '';\n"
              + _fetta("let battitoLancioFatto = false;", "\n}") + "\n"
              + _fetta("function renderScoprire(){", "\n}") + "\n"
-             + _fetta("function toccaScoperta(id){", "\n}"))
+             + _fetta("function toccaScoperta(id, daQuadro){", "\n}"))
     js = _CARTONE_SCOPRIRE + pezzi + _BANCO_SCOPRIRE
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                 encoding="utf-8") as f:
@@ -140349,7 +140368,8 @@ def prove_effetti_ridotti():
     # le strade per animare che la classe non vede: chi ne apre una la
     # fa passare da effettiRidotti() e la dichiara qui
     #   voloNegozio (24 nov 2026): la card di «Da scoprire» che vola in
-    #     cima al negozio — Web Animations, quattro corse; chi la chiama
+    #     cima al negozio — Web Animations, quattro chiamate (velo, copia,
+    #     copia che corregge l'arrivo, pagina); chi la chiama
     #     ha gia' chiesto al giudice (e senza vola la salita dal basso)
     _vo = pezzo_js(mini, "function voloNegozio(card, chi, aperto, da){", "\n}")
     prova("nessuno anima per strade che la classe non vede (Web "
@@ -140357,7 +140377,7 @@ def prove_effetti_ridotti():
           [js.count(".animate(") - _vo.count(".animate("), js.count("startViewTransition"),
            len(re.findall(r"<animate(?:Transform|Motion)?\b", mini))])
     prova("...e il volo, l'unico che anima cosi', chiede al giudice prima di partire",
-          (3, 1),
+          (4, 1),
           (_vo.count(".animate("),
            mini.count("!effettiRidotti() && voloNegozio(card, chi, aperto, da)")))
     # requestAnimationFrame non e' un effetto, ma e' da li' che ne nasce

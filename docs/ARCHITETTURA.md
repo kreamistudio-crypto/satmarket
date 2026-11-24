@@ -38692,7 +38692,12 @@ mai il kind 0 di nessuno: regola ferrea 2).
   si apre sotto e si scopre dall'alto, e la testata prende il posto della
   copia. La testata vale solo per il negozio del volo (`negozioTestataDi`,
   azzerata in cima ad `apriNegozio` salvo `ridisegno` o `negozioInVolo`);
-  la card la segna `toccaScoperta` in `cardToccata`. Le pillole si appiccicano solo a
+  la card la segna `toccaScoperta` in `cardToccata` (mai dal quadratino:
+  `toccaScoperta(id, true)`). Se il negozio ha il BANNER (`bannerNegozio`
+  sui dati pronti) la testata resta spenta e la copia atterra sulla
+  `.negozio-banner` (3:1, misurata a `VOLO_APRI_MS`, scarto ricordato in
+  `scartoInsegna`), tolta a foto decodificata (al piu' 400 ms); la
+  preparazione mette gia' in cache la foto del banner. Le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
   La divisione parte da 8 negozi (`2 * QUADRI_MIN`); sotto, ogni negozio
   sta in TUTTE E DUE le file, da `QUADRI_POCHI` negozi in su (2 il 24 nov; 5 la sera stessa, «sono troppo pochi», e di nuovo 2 mezz'ora dopo, «anche se sono 2 adesso facciamoli vedere»).
