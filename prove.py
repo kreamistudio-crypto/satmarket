@@ -222155,7 +222155,8 @@ const apriNegozio = () => {};
 let sponsorizzati = [{slug: 'pagina-a', negozio: 'bbb222', quadro: 4},
   {slug: 'pagina-b', negozio: 'bbb222', quadro: '4"><img'},
   {slug: 'pagina-c', negozio: 'bbb222', quadro: 12},
-  {slug: 'pagina-d', negozio: 'bbb222'}];
+  {slug: 'pagina-d', negozio: 'bbb222'},
+  {slug: 'pagina-e', negozio: 'bbb222', quadro: 'logo'}];
 """ + _qr + "\n" + pezzo_js(mini, "function vociSponsor(){", "\n}") + "\n}\n" + """
 const v = vociSponsor();
 renderQuadriScoprire([v[0], v[3]]);
@@ -222166,8 +222167,19 @@ console.log(JSON.stringify([v.map(x => x.quadro),
         salta("la foto del quadrato, girata in node", "node non c'e'")
     else:
         prova("in node: la foto scelta dalla pagina vince sulla miniatura, "
-              "e nasce solo da un numero da 1 a 9",
-              [["/assets/racconti/pagina-a-4.webp", "", "", ""], True, True], r)
+              "e nasce solo da un numero da 1 a 9 o da 'logo'",
+              [["/assets/racconti/pagina-a-4.webp", "", "", "",
+                "/assets/consigliati/pagina-e.webp"], True, True], r)
+    # (24 nov 2026, Andrea sceglie le foto dei quadratini) il ritratto di
+    # AndreAI e la scatola di To The Moon; il server fa uscire 'logo' solo
+    # per una pagina che il logo ce l'ha
+    prova("i quadratini partono tutti dall'alto, qualunque sia la scritta", True,
+          ".sc-quadri{display:flex;align-items:flex-start;" in mini)
+    prova("le foto dei quadratini scelte da Andrea", (True, True, True),
+          ('"quadro": "logo",' in open("racconti.py", encoding="utf-8").read(),
+           "    inBreve: 'Si gioca in sats',\n" in mini
+           and "    quadro: 2," in mini[mini.index("'to-the-moon': {"):][:900],
+           'elif q == "logo" and r.get("logo") is True:' in _SORGENTE))
 
     # GRANDI E QUADRATI SI DIVIDONO I NEGOZI (23 nov 2026, Andrea): sul
     # telefono un negozio sta in una sola delle due file, uno si' e uno
@@ -222184,22 +222196,28 @@ const ids = x => x.map(v => v.id);
 const t = spartisciScoprire(V);
 const giro = spartisciScoprire(V.slice(1, 8).concat(V[0], V[8], V[9]));
 const sette = spartisciScoprire(N.slice(0, 7).concat({id: 'p2p'}));
+const due = spartisciScoprire(N.slice(0, 2).concat({id: 'p2p'}));
+const uno = spartisciScoprire(N.slice(0, 1).concat({id: 'p2p'}));
 mqNetflix = {matches: false};
 const pc = spartisciScoprire(V);
 console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(giro.grandi),
   ids(giro.quadri), ids(sette.grandi).length, ids(sette.quadri), ids(pc.grandi).length,
-  ids(pc.quadri)]));""")
+  ids(pc.quadri), ids(due.grandi), ids(due.quadri), ids(uno.grandi), ids(uno.quadri)]));""")
     if r is None:
         salta("grandi e quadrati, girati in node", "node non c'e'")
     else:
-        prova("in node: un negozio grande e uno quadrato, mai in tutti e due; "
-              "il turno dopo si scambiano; sotto i 4 quadrati niente fila e "
-              "tutti grandi; sul computer tutti grandi",
+        # (24 nov 2026, Andrea: «2 grandi e 2 quadratini») sotto gli 8
+        # negozi ognuno sta in tutte e due le file, da 2 negozi in su
+        prova("in node: da 8 negozi uno grande e uno quadrato, mai in tutti "
+              "e due, e il turno dopo si scambiano; sotto gli 8 ogni negozio "
+              "e' grande E quadrato; con uno solo niente quadrati; sul "
+              "computer tutti grandi",
               [["A", "C", "E", "G", "p2p", "aste"], ["B", "D", "F", "H"],
                ["B", "D", "F", "H", "p2p", "aste"], ["C", "E", "G", "A"],
-               8, [], 10, []], r)
-    prova("...e la soglia e' 4, la parola di Andrea", True,
-          "const QUADRI_MIN = 4;" in mini)
+               8, ["A", "B", "C", "D", "E", "F", "G"], 10, [],
+               ["A", "B", "p2p"], ["A", "B"], ["A", "p2p"], []], r)
+    prova("...e le soglie sono 4 quadrati divisi e 2 negozi, le parole di Andrea",
+          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 2;" in mini)
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
     prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
           "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"

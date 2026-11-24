@@ -1540,8 +1540,12 @@
   .sc-quadri{display:none}
   .sc-sfondo{display:none}
   @media (max-width:767px){
-    .sc-quadri{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;
+    .sc-quadri{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;
       scrollbar-width:none;padding:0 var(--pad) 30px}
+    /* TUTTI IN RIGA DALL'ALTO (24 nov 2026, Andrea: «come mai i
+       quadratini sono sfalsati?»): un bottone allungato dalla fila
+       centra il suo contenuto, e un quadrato con la scritta su una riga
+       scendeva rispetto a quello con due righe */
     /* i 30 sotto (23 nov 2026, Andrea: «sì, va bene» allo spazio): senza
        il titolo di «In evidenza» le due file si toccavano, e qui dentro
        sfuma la fascia scura */
@@ -26851,6 +26855,9 @@ const RACCONTI = {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
     /* la riga «cosa vende» sotto il suo quadrato in home (23 nov 2026) */
     inBreve: 'Si gioca in sats',
+    /* la foto del suo quadrato: la 2 della storia, la scatola col libro
+       (24 nov 2026, scelta di Andrea) */
+    quadro: 2,
     /* CONSIGLIATO (set 2026): true = fra i Consigliati (card e
        pagina) e con la storia sul suo negozio, a spazio in vetrina
        acceso o spento. false = TOLTO A MANO: esce dalla card e dalla
@@ -27069,6 +27076,10 @@ const OCCASIONI = [
      L'ID PORTA LO SLUG (`sponsor-<slug>`): due card sponsor devono potersi
      distinguere al tocco e nella firma della fila. */
 function vociSponsor(){
+  /* la foto del quadrato: un numero da 1 a 9 (una foto della storia) o
+     'logo' (il ritratto della card «Consigliati»), e nient'altro */
+  const quadroSponsor = (slug, q) => Number.isInteger(q) && q >= 1 && q <= 9
+    ? `/assets/racconti/${slug}-${q}.webp` : q === 'logo' ? `/assets/consigliati/${slug}.webp` : '';
   const fuori = [];
   (Array.isArray(sponsorizzati) ? sponsorizzati : []).forEach(s => {
     const slug = String((s && s.slug) || '');
@@ -27080,9 +27091,11 @@ function vociSponsor(){
       emoji: String((casa ? casa.emoji : s.emoji) || '📣'),
       titoloDentro: true, sponsor: true, file: slug + '.webp',
       /* la foto del quadrato in home, se la pagina ne sceglie una
-         (`quadro` del server: il numero di una foto della storia) */
-      quadro: Number.isInteger(s.quadro) && s.quadro >= 1 && s.quadro <= 9
-        ? `/assets/racconti/${slug}-${s.quadro}.webp` : '',
+         (`quadro` del server, o del catalogo di casa per le sue pagine:
+         il numero di una foto della storia, oppure 'logo', il ritratto
+         della card «Consigliati» — 24 nov 2026, Andrea sceglie le foto
+         dei quadratini di AndreAI e To The Moon) */
+      quadro: quadroSponsor(slug, casa && casa.quadro != null ? casa.quadro : s.quadro),
       testo: String((casa ? casa.titolo : s.titolo) || ''),
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
@@ -27345,18 +27358,25 @@ const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
    quadrato e' grande. Le card nostre (P2P, aste...) restano sempre
    nella fila grande. Sul computer i quadrati non ci sono: tutti grandi,
    come prima. MAI UNA FILA MEZZA VUOTA (Andrea, 23 nov 2026: «almeno ce
-   ne devono essere 4, non mi piace che lasci vuoti»): sotto i
-   QUADRI_MIN quadrati la fila non c'e' e tornano tutti grandi. */
-const QUADRI_MIN = 4;
+   ne devono essere 4, non mi piace che lasci vuoti»): la divisione
+   parte solo quando da' almeno QUADRI_MIN quadrati, cioe' da 8 negozi.
+   FINCHE' I NEGOZI SONO POCHI (24 nov 2026, Andrea: «iniziamo a
+   metterne 2, mano a mano che aggiungiamo ce ne saranno altri»; scelta
+   «2 grandi e 2 quadratini»): sotto gli 8 ogni negozio sta IN TUTTE E
+   DUE, nella fila grande e nei quadrati, appena i negozi sono almeno
+   QUADRI_POCHI. Con un negozio solo la fila dei quadrati non c'e'. */
+const QUADRI_MIN = 4, QUADRI_POCHI = 2;
 function spartisciScoprire(tutte){
   if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
+  const negozi = tutte.filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));
+  if (negozi.length < 2 * QUADRI_MIN)
+    return {grandi: tutte, quadri: negozi.length >= QUADRI_POCHI ? negozi : []};
   const grandi = [], quadri = [];
   let k = 0;
   tutte.forEach(v => {
     const negozio = v.negozio && CODICE_NEGOZIO.test(String(v.negozio));
     (negozio && (k++ % 2) ? quadri : grandi).push(v);
   });
-  if (quadri.length < QUADRI_MIN) return {grandi: tutte, quadri: []};
   return {grandi, quadri};
 }
 function renderQuadriScoprire(vive){

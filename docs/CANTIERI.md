@@ -95721,3 +95721,31 @@ l'arrivo (con gli effetti ridotti resta la tua card prima).
 PROVATO. `prove_promozioni`: quattro card e la tua, niente righe né
 aeroplanino, il percorso della tua sopra le altre, lo stato d'arrivo.
 Guardato con Playwright nel foglio vero, video mandato ad Andrea.
+
+## I quadratini da due negozi, con le foto scelte da Andrea (24 nov 2026, cantiere quadrati-da-due; Andrea: «iniziamo a metterne 2, adesso ce ne sono 2, mano a mano che aggiungiamo ce ne saranno altri», scelta «2 grandi e 2 quadratini»)
+
+COSA. In produzione i negozi in «Da scoprire» sono due (AndreAI e To
+The Moon) e la regola del 23 nov (la divisione uno grande e uno
+quadrato, e la fila dei quadrati solo da 4 in su) lasciava la home
+senza quadratini fino a 8 negozi. Ora sotto gli 8 ogni negozio sta in
+TUTTE E DUE le file, la grande e i quadrati, da 2 negozi in su
+(`QUADRI_POCHI`); da 8 torna la divisione. Con un negozio solo niente
+quadrati. Le foto le ha scelte Andrea: AndreAI il ritratto della card
+«Consigliati» (`quadro: "logo"`, nuova forma accanto al numero 1-9,
+che il server fa uscire solo per una pagina col `logo` vero), To The
+Moon la foto 2 della storia, la scatola col libro (`quadro: 2` nel
+catalogo di casa: vociSponsor lo legge dal catalogo prima che dal
+server, che per le pagine di casa manda solo lo slug). La riga di
+AndreAI diventa «Bitcoin e grafici» (Andrea: «troppo lungo, sta in una
+linea»). I quadratini partono tutti dall'alto (`align-items:flex-start`):
+un bottone allungato dalla fila centrava il contenuto, e quello con la
+scritta su una riga scendeva (Andrea: «come mai sono sfalsati?»).
+SCARTATE. Riempire i quadratini con altri negozi attivi del mercatino
+(scelta sulla prima card, poi superata da Andrea: «mano a mano che
+aggiungiamo ce ne saranno altri»).
+DA SAPERE. La foto 2 di To The Moon porta la scritta «Limited Edition»
+sulla scatola; quella dell'annuncio senza scritta sta solo sul server.
+Se Andrea la manda, va in `assets/racconti/` e si cambia il numero.
+PROVATO. `prove_promozioni` 7c: la divisione in node anche con 2 e con
+1 negozio, la foto 'logo' in node, le scelte di Andrea, l'allineamento.
+Guardato con Playwright coi due negozi veri, schermate ad Andrea.

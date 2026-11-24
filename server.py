@@ -4268,9 +4268,13 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
             # (una foto con le scritte, a 96px, non si legge). Solo un
             # numero da 1 a 9, la forma di FORMA_RACCONTO: senza, il
             # quadrato resta com'era.
+            # (24 nov 2026, AndreAI) oppure "logo": il ritratto della card
+            # «Consigliati», per una pagina che il logo ce l'ha
             q = r.get("quadro")
             if type(q) is int and 1 <= q <= 9:
                 voce["quadro"] = q
+            elif q == "logo" and r.get("logo") is True:
+                voce["quadro"] = "logo"
             fuori.append(voce)
     except Exception as e:
         print(f"⚠️ [sponsor] la fila non si legge: {e}")

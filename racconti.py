@@ -69,7 +69,8 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
   - `quadro` (23 nov 2026, Piano B): il numero di una foto della storia
     (`{slug}-N.webp`, da 1 a 9) che fa da foto al QUADRATO del negozio
     in home, al posto della prima foto dell'ultimo annuncio. Esce nella
-    busta dello spazio sponsorizzato.
+    busta dello spazio sponsorizzato. Dal 24 nov 2026 puo' essere anche
+    "logo": il ritratto della card «Consigliati» (solo con `logo` vero).
   - `collega_dal_pannello` (23 nov 2026, Piano B): la pagina nasce col
     `negozio` vuoto e il moderatore la lega a un negozio dal pannello,
     finche' e' in bozza; il codice vive in `impostazioni`
@@ -366,7 +367,7 @@ RACCONTI_NEGOZI = {
         "venditore_tg": 1879103467,
         "emoji": "⚡",
         "titolo": "AndreAI · Bitcoin ON",
-        "in_breve": "Bitcoin, grafici e mosse",
+        "in_breve": "Bitcoin e grafici",
         "sottotitolo": ("Il mio canale Telegram privato su Bitcoin, a metà "
                         "prezzo in sats."),
         "intro": ("Sono Andrea, AndreAI su YouTube. Ogni settimana incrocio "
@@ -400,6 +401,9 @@ RACCONTI_NEGOZI = {
         # nel riquadro col margine)
         "logo": True,
         "logo_pieno": True,
+        # la foto del suo quadrato in home: il ritratto del logo (24 nov
+        # 2026, scelta di Andrea)
+        "quadro": "logo",
         # il banner della card nella pagina «Consigliati» e dello spazio
         # sponsorizzato di «Da scoprire», 1040x498, col nome nel disegno
         "banner": True,

@@ -38586,8 +38586,11 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e sopra la griglia i due banner
   `#occasioniBanner` (dal 24 nov); le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
-  I quadrati escono solo se sono almeno `QUADRI_MIN` (4), sennò tutti
-  grandi. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,
+  La divisione parte da 8 negozi (`2 * QUADRI_MIN`); sotto, ogni negozio
+  sta in TUTTE E DUE le file, da `QUADRI_POCHI` (2) negozi in su (24 nov).
+  La foto del quadrato: `quadro` della pagina (1-9 una foto della storia,
+  o "logo", il ritratto dei Consigliati; il catalogo di casa la scrive in
+  `RACCONTI[slug].quadro`), sennò la prima foto dell'ultimo annuncio. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,
   due `<i>` col `.su` che si scambiano): la foto della card al centro,
   sfocata, messa da `sfondoScoprire` alla fine di `centroScoprire`.
   LA FOTO DEL QUADRATO SCELTA DALLA PAGINA (23 nov 2026 notte, Piano
