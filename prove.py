@@ -53097,7 +53097,7 @@ const rifai = () => { scoprireFirma = ''; renderScoprire(); };
 
 occasioniServer = {lampo: 1, sconto: 1};
 rifai();
-dice("il P2P e il primo della fila", ['p2p','aste','lampo','sconto'], idCard());
+dice("il P2P e il primo della fila", ['p2p','lampo','sconto'], idCard());
 const suo = nodi['scoprireStrip'].innerHTML
   .split('data-id="p2p"')[1].split('>')[0];
 dice("...e non porta l aria-pressed dell interruttore", false,
@@ -53124,12 +53124,14 @@ filtroLampo = false;
 // dimostrare che non la legge e' proprio questo giro.
 interessiMiei = ['p2p'];
 rifai();
-dice("a chi ha gia votato la card RESTA", ['p2p','aste','lampo','sconto'],
+dice("a chi ha gia votato la card RESTA", ['p2p','lampo','sconto'],
      idCard());
 
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
-dice('...e senza occasioni restano lei e la card delle aste', ['p2p','aste'], idCard());
+// (fino al 24 nov 2026 con lei restava la card delle aste: tolta,
+// cantiere home-card-pulite)
+dice('...e senza occasioni resta lei sola', ['p2p'], idCard());
 // IL PREZZO DICHIARATO: con una card fissa la sezione non puo' piu'
 // sparire — il display:none era la proprieta' piu' forte del blocco,
 // e questa riga e' il posto dove il suo prezzo si vede.
@@ -53138,7 +53140,7 @@ dice('...e la sezione resta, per lei', '',
 
 vistaBarattolo = true;
 rifai();
-dice('col barattolo restano le card che navigano', ['p2p','aste'], idCard());
+dice('col barattolo restano le card che navigano', ['p2p'], idCard());
 dice('...anche col voto gia dato', '',
      nodi['scoprireSez'].style.display);
 
@@ -53154,7 +53156,7 @@ occasioniServer = {lampo: 1, sconto: 1};
 sponsorizzati = [];
 rifai();
 dice('senza spazio venduto la fila e quella di sempre',
-     ['p2p','aste','lampo','sconto'], idCard());
+     ['p2p','lampo','sconto'], idCard());
 
 // FAIL-CLOSED: lo slug c'e', il codice negozio no — e la card NON
 // nasce. Meglio nessuna card che una che porta al negozio
@@ -53172,7 +53174,7 @@ const codiceVero = RACCONTI['to-the-moon'].negozio;
 RACCONTI['to-the-moon'].negozio = '';
 rifai();
 dice('...e con lo slug ma senza codice negozio nemmeno',
-     ['p2p','aste','lampo','sconto'], idCard());
+     ['p2p','lampo','sconto'], idCard());
 
 // ...e col codice la card e' la PRIMA: la posizione che a 320px si
 // vede senza scorrere e' quella che si vende. Si rimette QUELLO DEL
@@ -53188,16 +53190,17 @@ rifai();
 // i negozi — spazi e negozi pagati, a turno — stanno davanti, e le
 // nostre card (P2P, aste) dopo di loro
 dice('col codice e la prima, davanti alla card P2P',
-     ['sponsor-to-the-moon','p2p','aste','lampo','sconto'], idCard());
+     ['sponsor-to-the-moon','p2p','lampo','sconto'], idCard());
 
 const cardDi = id => nodi['scoprireStrip'].innerHTML
   .split('data-id="' + id + '"')[1].split('</div>')[0];
 const cardSp = cardDi('sponsor-to-the-moon');
-// META' DEL PUNTO 1: e' pubblicita' e si dice sulla card. L'altra
-// meta' — la riga sulla pagina — vive in prove_sponsor, e nessuna
-// delle due basta da sola.
-dice('...con la pastiglia che dice Sponsor', true,
-     cardSp.includes('class="sc-sponsor"'));
+// LA PASTIGLIA «Consigliato» NON C'E' PIU' (24 nov 2026, cantiere
+// home-card-pulite, Andrea: «tanto si capisce già che è consigliato»):
+// rovescia la regola di ago 2026. La parola resta sulla pagina, che
+// vive in prove_sponsor.
+dice('...senza la pastiglia «Consigliato»', false,
+     cardSp.includes('class="sc-sponsor"') || cardSp.includes('>Consigliato<'));
 // ...e SENZA il titolo dell'app: il progetto manda la sua grafica
 // col nome dentro, e sovrapporgli il nostro lo direbbe due volte.
 dice('...e senza il titolo scritto dall app', false,
@@ -53233,11 +53236,11 @@ const utpt = {slug: 'un-tempo-per-te', titolo: 'Un tempo per te',
 sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 rifai();
 dice('due spazi: due card davanti alla P2P, nell ordine della busta',
-     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','aste','lampo','sconto'],
+     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','lampo','sconto'],
      idCard());
 const cardU = cardDi('sponsor-un-tempo-per-te');
-dice('...e la pagina del server ha lo stesso aspetto: banner, pastiglia, niente titolo dell app',
-     [true, true, false, true],
+dice('...e la pagina del server ha lo stesso aspetto: banner, niente pastiglia, niente titolo dell app',
+     [true, false, false, true],
      [cardU.includes('src="/assets/scoprire/un-tempo-per-te.webp"'),
       cardU.includes('class="sc-sponsor"'),
       cardU.includes('class="sc-titolo"'),
@@ -53255,7 +53258,7 @@ dice('...e quello dell altra al suo, col suo slug',
 sponsorizzati = [{slug: 'to-the-moon'}, utpt];
 rifai();
 dice('l ordine rovesciato nella busta rovescia le card',
-     ['sponsor-to-the-moon','sponsor-un-tempo-per-te','p2p','aste','lampo','sconto'],
+     ['sponsor-to-the-moon','sponsor-un-tempo-per-te','p2p','lampo','sconto'],
      idCard());
 
 // LA SCADENZA DI UNO NON TOCCA L'ALTRO: il server smette di mandare
@@ -53263,7 +53266,7 @@ dice('l ordine rovesciato nella busta rovescia le card',
 sponsorizzati = [utpt];
 rifai();
 dice('scaduto To The Mooon resta Un tempo per te',
-     ['sponsor-un-tempo-per-te','p2p','aste','lampo','sconto'], idCard());
+     ['sponsor-un-tempo-per-te','p2p','lampo','sconto'], idCard());
 
 // FAIL-CLOSED PER VOCE: una pagina senza codice non nasce, e le altre
 // restano; uno slug fuori forma nemmeno; un doppione conta una volta.
@@ -53272,7 +53275,7 @@ sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'X', negozio: ''},
                  {slug: 'to-the-moon'}];
 rifai();
 dice('una voce senza codice o fuori forma non nasce, e le altre restano',
-     ['sponsor-to-the-moon','p2p','aste','lampo','sconto'], idCard());
+     ['sponsor-to-the-moon','p2p','lampo','sconto'], idCard());
 
 // IL TITOLO DAL SERVER PASSA DA esc(): niente di un catalogo entra nudo
 sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'A <b>"B"</b>',
@@ -53290,7 +53293,7 @@ sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 vistaBarattolo = true;
 rifai();
 dice('col barattolo restano le card che navigano',
-     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','aste'], idCard());
+     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p'], idCard());
 
 // E ALLA SCADENZA SE NE VANNO DA SOLE, senza che nessuna scopa passi:
 // il server smette di mandarle, e la fila guarda quella.
@@ -53298,7 +53301,7 @@ vistaBarattolo = false;
 sponsorizzati = [];
 rifai();
 dice('alla scadenza le card se ne vanno da sole',
-     ['p2p','aste','lampo','sconto'], idCard());
+     ['p2p','lampo','sconto'], idCard());
 
 // ---- LA CARD «P2P IN ARRIVO» (30 set 2026) ------------------------
 // La scritta la decide la BUSTA, la data si scrive dalla leva spezzando
@@ -53359,18 +53362,16 @@ dice('...e il tocco prende la strada del tasto', ['vaiP2P'], scritte);
 // SENZA BUSTA NON C'E': server di ieri, DEMO, card spenta o finita
 p2pArrivo = null;
 rifai();
-dice('senza la busta la card non c e', ['aste','lampo','sconto'], idCard());
+dice('senza la busta la card non c e', ['lampo','sconto'], idCard());
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
-// ⚠️ DAL 16 NOV 2026 LA SEZIONE NON SPARISCE PIU' (cantiere nav-nostr,
-// decisione di Andrea): la card quadrata delle aste c'e' sempre — ad
-// aste spente porta al «in arrivo» con l'Avvisami, che e' proprio dove
-// serve — quindi senza busta e senza occasioni resta lei sola, e la
-// sezione con lei. Prima qui si provava che spariva: e' il prezzo
-// dichiarato della card fissa, come lo fu per il P2P di ago 2026.
-dice('...e senza niente da scoprire resta la card delle aste', ['aste'],
-     idCard());
-dice('...e la sezione resta, per lei', '',
+// ⚠️ DAL 24 NOV 2026 LA SEZIONE TORNA A SPARIRE (cantiere
+// home-card-pulite, Andrea: «leviamo anche la card aste in arrivo»): dal
+// 16 nov la card quadrata delle aste c'era sempre e teneva la sezione
+// accesa; tolta lei, senza busta e senza occasioni non resta niente, e
+// la sezione si spegne come prima del 16 nov.
+// (la striscia non si riscrive a sezione spenta: si guarda la sezione)
+dice('...e senza niente da scoprire la sezione sparisce', 'none',
      nodi['scoprireSez'].style.display);
 
 // FAIL-CLOSED SULLA FORMA: una data storta o uno stato sconosciuto non
@@ -53381,47 +53382,30 @@ for (const storto of [{stato: 'arrivo', fino: '10/10/2026'},
                       'arrivo']) {
   p2pArrivo = storto;
   rifai();
-  // (fino al 16 nov 2026 qui si guardava la sezione spenta; da quando
-  // la card delle aste c'e' sempre, si guarda la fila: resta lei sola)
+  // (dal 16 al 24 nov 2026 restava la card delle aste; adesso la fila
+  // e' vuota e la sezione spenta, come prima)
   dice('una busta storta non accende la card: ' + JSON.stringify(storto),
-       ['aste'], idCard());
+       'none', nodi['scoprireSez'].style.display);
 }
 // ...e un testo che arrivasse dal server passerebbe da esc()
 p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
 occasioniServer = {lampo: 1, sconto: 1};
 rifai();
-dice('di nuovo in testa, davanti alle occasioni', ['p2p','aste','lampo','sconto'],
+dice('di nuovo in testa, davanti alle occasioni', ['p2p','lampo','sconto'],
      idCard());
 
-// ---- LA CARD QUADRATA DELLE ASTE (16 nov 2026, cantiere nav-nostr) ----
-// Il tocco e' QUELLO DEL TASTO (vaiAste, che sceglie fra «in arrivo» e
-// vetrina), la forma e' quadrata, e la scritta segue la leva.
-const cardA = () => nodi['scoprireStrip'].innerHTML
-  .split('data-id="aste"')[1].split('</div>')[0];
-const apreA = () => nodi['scoprireStrip'].innerHTML
-  .split('data-id="aste"')[0].split('<div').pop();
-dice('la card delle aste e quadrata', true, apreA().includes('sc-quadra'));
-dice('...ed e la sola quadrata', 1,
-     (nodi['scoprireStrip'].innerHTML.match(/sc-quadra"/g) || []).length
-     + (nodi['scoprireStrip'].innerHTML.match(/sc-quadra /g) || []).length);
-dice('ad aste spente dice «In arrivo», sul velo e nel nome',
-     [true, true, false],
-     [cardA().includes('<span class="sc-q-riga">In arrivo</span>'),
-      cardA().includes('aria-label="Aste: in arrivo"'),
-      cardA().includes('aria-pressed')]);
-dice('...senza il titolo dell app sopra il disegno', false,
-     cardA().includes('sc-titolo'));
-dice('...e il banner e il suo', true,
-     cardA().includes('src="/assets/scoprire/aste.webp"'));
-scritte = [];
-toccaScoperta('aste');
-dice('il suo tocco e quello del tasto', ['vaiAste'], scritte);
-dice('...e non sfiora nessun filtro', [false, false],
-     [filtroLampo, filtroSconto]);
+// ---- LA CARD QUADRATA DELLE ASTE NON C'E' PIU' (24 nov 2026) ----
+// Cantiere home-card-pulite, Andrea: «leviamo anche la card aste in
+// arrivo, rimane solo nelle icone sfoglia per categorie». Ne ad aste
+// spente ne' accese: la porta delle aste e' la tessera delle categorie.
+dice('nessuna card delle aste nella fila, e nessuna quadrata',
+     [false, false],
+     [nodi['scoprireStrip'].innerHTML.includes('data-id="aste"'),
+      nodi['scoprireStrip'].innerHTML.includes('sc-quadra')]);
 asteSu = true;
-renderScoprire();
-dice('ad aste accese la scritta cambia da sola (entra nella firma)', true,
-     cardA().includes('<span class="sc-q-riga">Fai la tua offerta</span>'));
+rifai();
+dice('...nemmeno ad aste accese', false,
+     nodi['scoprireStrip'].innerHTML.includes('data-id="aste"'));
 asteSu = false;
 """
 
@@ -53883,50 +53867,21 @@ def prove_sponsor():
     _rn = pezzo_js(mini, "function raccontoNegozio(v){")
     prova("la pastiglia c'e' anche sulla pagina", True,
           'class="rac-pill"' in _rn)
-    # E DICE LA STESSA PAROLA DELLA CARD (difetto trovato DAL VIVO, non
-    # leggendo: la pagina diceva «Progetto in vetrina» — piu' caldo e
-    # piu' debole, e soprattutto un'ALTRA parola). Chi tocca la
-    # pastiglia deve ritrovare la stessa parola, o la dichiarazione
-    # non si riconosce come la stessa cosa.
+    # ⚠️ LA PASTIGLIA DELLA CARD NON C'E' PIU' (24 nov 2026, cantiere
+    # home-card-pulite, Andrea: «la pastiglia consigliato nelle card
+    # leviamola perché tanto si capisce già che è consigliato»): fino a
+    # quel giorno qui si provava che la card e la pagina dicessero la
+    # stessa parola, nello stesso angolo, con la sua ombra. Adesso la
+    # parola resta SOLO sulla pagina, e qui si prova che sia ancora
+    # «Consigliato» (il lessico della categoria) e che la card non la
+    # dica piu', ne' nel renderer ne' nel CSS.
     _sc = pezzo_js(mini, "function renderScoprire(){")
-    _par = re.search(r'class="sc-sponsor"[^>]*>([^<]+)<', _sc)
-    prova("...e dice la stessa parola della card", True,
-          bool(_par) and _par.group(1).strip() in _rn)
-    # ...E LA PAROLA E' «Consigliato» (ago 2026, decisione di Andrea):
-    # e' il lessico della CATEGORIA futura, quella dove finiranno i
-    # progetti che segnaliamo noi. La prova qui sopra tiene i due
-    # posti d'accordo fra loro, questa inchioda QUALE parola — senza,
-    # il lessico si potrebbe rovesciare in un giro senza che nessuno
-    # se ne accorga. La CHIAVE resta `sponsor` dappertutto: si
-    # rinominano i testi, mai le chiavi.
-    prova("...e la parola e' quella della categoria futura",
-          "Consigliato", _par.group(1).strip() if _par else "")
-    # ...E STA NELL'ANGOLO IN BASSO A DESTRA (ago 2026, decisione di
-    # Andrea guardando la card a schermo): in alto copriva la coda di
-    # «TO THE MOOON!», che su questa card e' scritto DENTRO il
-    # disegno — la card sponsor porta `titoloDentro`, quindi il
-    # titolo dell'app non si disegna affatto e l'angolo in basso e'
-    # libero per costruzione.
-    # ⚠️ NON E' UN NUMERO RIBATTUTO MA UN LATO: si chiede che ancori
-    # in BASSO e che non porti piu' un `top`, che con tutti e due
-    # verrebbe stirata per l'altezza della card. La misura degli 8px
-    # e' la stessa dei badge lampo e asta, e resta libera di cambiare.
-    _pill = mini[mini.index("  .sc-sponsor{"):]
-    _pill = " ".join(_pill[:_pill.index("}")].split())
-    prova("...e vive nell'angolo in basso a destra", (True, True, False),
-          ("bottom:8px" in _pill, "right:8px" in _pill, "top:" in _pill))
-    # ...E L'OMBRA C'E', ed e' LEI a farla staccare — non il contrasto
-    # col fondo, che qui non si puo' promettere: sotto c'e' il disegno
-    # dello sponsor, e ci puo' finire QUALUNQUE colore. MISURATO dal
-    # vivo sul disegno vero, col pixel peggiore: il contrasto fra la
-    # carta e il fondo accanto vale 1,00 — e vale 1,00 anche con la
-    # pastiglia IN ALTO, cioe' non e' un difetto di questa posizione
-    # ma la condizione normale di un'etichetta appoggiata su una foto.
-    # A far LEGGERE la parola e' il contrasto INTERNO (14,08 fra la
-    # carta e l'inchiostro, tutti e due letterali qui sopra); a far
-    # vedere il BORDO e' questa riga, come sui badge lampo e asta.
-    prova("...e l'ombra la stacca da qualunque disegno", True,
-          "box-shadow:0 1px 3px rgba(0,0,0,.28)" in _pill)
+    prova("...e sulla pagina la parola e' «Consigliato»", True,
+          "Consigliato</span>" in _rn)
+    prova("la card di Da scoprire non porta piu' la pastiglia",
+          (False, False, False),
+          ('class="sc-sponsor"' in _sc, ">Consigliato<" in _sc,
+           "  .sc-sponsor{" in mini))
     # ⚠️ LA RIGA IN CHIARO NON C'E' PIU', e queste TRE prove hanno
     # CAMBIATO LATO in due giri (ago 2026, decisioni di Andrea): la
     # prima chiedeva che la riga stesse in fondo al cassetto, le altre
@@ -58403,7 +58358,9 @@ def prove_strisce_web():
         # la striscia sta DENTRO il wrapper, o le frecce non avrebbero
         # niente rispetto a cui posizionarsi (`position:relative` e'
         # suo) e finirebbero ancorate alla pagina
-        _i_w = mini.rindex('<div class="strip-wrap">', 0,
+        # (24 nov 2026, home-card-pulite) il guscio della fila P2P porta
+        # anche il suo id, che l'interruttore spegne: si cerca l'apertura
+        _i_w = mini.rindex('<div class="strip-wrap"', 0,
                            mini.index('id="%s"' % _id))
         _w = mini[_i_w:]
         _w = _w[:_w.index("</div>")]
@@ -67324,12 +67281,18 @@ def prove_card_p2p_vetrina():
     prova("i due timbri della scelta sono nel catalogo del server", [True, True],
           ['"p2p_home_via"' in re.search(r"VISTI_NOTI = \(([^)]*)\)", _SORGENTE, re.S).group(1),
            '"p2p_home_su"' in re.search(r"VISTI_NOTI = \(([^)]*)\)", _SORGENTE, re.S).group(1)])
-    _via = re.search(r'<div id="p2pVetrinaVia"[^>]*>(.*?)</div>', mini, re.S)
-    prova("la riga «Scambi P2P nascosti · Mostra» nasce spenta, sopra la fila, e riaccende",
-          [True, True, True],
-          [bool(_via) and 'style="display:none"' in _via.group(0),
-           bool(_via) and mini.index('id="p2pVetrinaVia"') < mini.index('id="p2pVetrinaSez"'),
-           bool(_via) and 'onclick="setFilaP2P(true)">Mostra</button>' in _via.group(1)])
+    # L'INTERRUTTORE ACCANTO AL TITOLO (24 nov 2026, cantiere home-card-pulite,
+    # Andrea: «affianco alla scritta scambi P2P metti un tasto tipo toggle»):
+    # al posto della riga «Scambi P2P nascosti · Mostra», che non c'e' piu'
+    _testa = mini[mini.index('<div class="p2p-vt-testa">'):mini.index('id="p2pVetrinaGuscio"')]
+    prova("l'interruttore della fila sta accanto al titolo, e la riga «nascosti · Mostra» non c'e' piu'",
+          [True, True, False],
+          ['<span id="p2pVetrinaLeva"' in _testa,
+           _testa.index('Scambi P2P <span class="conta"') < _testa.index('id="p2pVetrinaLeva"'),
+           'p2pVetrinaVia' in mini])
+    _fc = pezzo_js(mini, "function filaCardP2P(html, spenta){", "\n}\n")
+    prova("...e dice il suo stato a chi legge ad alta voce, col nome che c'era gia'", True,
+          'role="switch" aria-checked="${spenta ? \'false\' : \'true\'}" aria-label="Scambi P2P nella home"' in _fc)
     prova("l'interruttore vive in «Aspetto», sotto gli effetti ridotti", True,
           0 < mini.index('<div id="fxRiga"></div>') < mini.index('<div id="filaP2PRiga"></div>')
           < mini.index('id="accIdentita"'))
@@ -67734,7 +67697,9 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   out.levaAccesa = el('filaP2PRiga').innerHTML.includes('aria-checked="true"')
     && el('filaP2PRiga').innerHTML.includes('ogni dispositivo') && TIMERS.length === 1;
   setFilaP2P(false);
-  out.spenta2 = {sez: el('p2pVetrinaSez').style.display, riga: el('p2pVetrinaVia').style.display,
+  out.spenta2 = {sez: el('p2pVetrinaSez').style.display, guscio: el('p2pVetrinaGuscio').style.display,
+    casa: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="false"')
+      && el('p2pVetrinaLeva').innerHTML.includes('onclick="setFilaP2P(true)"'),
     giri: TIMERS.length, leva: el('filaP2PRiga').innerHTML.includes('aria-checked="false"'),
     timbri: TIMBRATI.slice()};
   await giro();
@@ -67747,7 +67712,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   await giro();
   out.spentaNonChiede = [FETCH.length, TIMERS.length, armatiDaSpenta];
   setFilaP2P(true);                      // dal «Mostra» della home o dal Profilo: la stessa
-  out.riaccesa = {sez: el('p2pVetrinaSez').style.display, riga: el('p2pVetrinaVia').style.display,
+  out.riaccesa = {sez: el('p2pVetrinaSez').style.display, guscio: el('p2pVetrinaGuscio').style.display,
+    casa: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
     giri: TIMERS.map(t => t.ms), timbri: TIMBRATI.slice()};
   await giro();
   out.riaccesaChiede = [FETCH.length, FETCH.length ? FETCH[FETCH.length - 1].cache : ''];
@@ -67755,12 +67721,12 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   const giaChieste = FETCH.length;
   HINT = {p2p_home_su: 1000, p2p_home_via: 2000};  // l'ha spenta un ALTRO dispositivo
   renderVetrinaP2P();
-  out.altroDispositivo = [el('p2pVetrinaSez').style.display, el('p2pVetrinaVia').style.display];
+  out.altroDispositivo = [el('p2pVetrinaSez').style.display, el('p2pVetrinaGuscio').style.display];
   await giro();                                      // il giro gia' armato non chiede
   out.altroNonChiede = [FETCH.length - giaChieste, TIMERS.length];
   HINT = {};
   p2pInVetrina = false; renderVetrinaP2P();
-  out.nonLaVede = [el('filaP2PRiga').innerHTML, el('p2pVetrinaVia').style.display];
+  out.nonLaVede = [el('filaP2PRiga').innerHTML, el('p2pVetrinaSez').style.display];
   p2pInVetrina = true;
   myTgId = null; renderVetrinaP2P();
   out.anonimoLeva = el('filaP2PRiga').innerHTML.includes('questo dispositivo');
@@ -67955,19 +67921,24 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           "non somiglia a niente", [["alan2", "alan3", "alan4"], ["alan1"]],
           [o["provvisorioDiversi"], o["provvisorioAnnullato"]])
     prova("LA SCELTA: l'interruttore c'e', acceso, e vale su ogni dispositivo", True, o["levaAccesa"])
-    prova("...spento: via la fila, la riga «nascosti · Mostra», nessun giro, il timbro sul profilo",
-          {"sez": "none", "riga": "", "giri": 0, "leva": True, "timbri": ["p2p_home_via"]},
+    # ⚠️ DAL 24 NOV 2026 (cantiere home-card-pulite) LA SEZIONE RESTA: al
+    # posto della riga «Scambi P2P nascosti · Mostra» il titolo con
+    # l'interruttore spento accanto, e a sparire e' solo il guscio delle card
+    prova("...spento: via le card, resta il titolo con l'interruttore spento, nessun giro, "
+          "il timbro sul profilo",
+          {"sez": "", "guscio": "none", "casa": True, "giri": 0, "leva": True,
+           "timbri": ["p2p_home_via"]},
           o["spenta2"])
     prova("...e spento non chiede niente al server, nemmeno tornando in Esplora o sulla pagina "
           "(nessun giro si arma)", [0, 0, 0], o["spentaNonChiede"])
     prova("...riacceso (dalla home o dal Profilo): la fila torna e chiede SUBITO la fotografia",
-          {"sez": "", "riga": "none", "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"]},
+          {"sez": "", "guscio": "", "casa": True, "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"]},
           o["riaccesa"])
     prova("...senza cache", [1, "no-cache"], o["riaccesaChiede"])
     prova("...spento su un ALTRO dispositivo (il timbro piu' nuovo arriva con /api/me): spento qui",
-          ["none", ""], o["altroDispositivo"])
+          ["", "none"], o["altroDispositivo"])
     prova("...e il giro che era gia' armato non chiede e non si riarma", [0, 0], o["altroNonChiede"])
-    prova("...chi la fila non la vedrebbe non vede ne' l'interruttore ne' la riga", ["", "none"],
+    prova("...chi la fila non la vedrebbe non vede ne' l'interruttore ne' la sezione", ["", "none"],
           o["nonLaVede"])
     prova("...e per chi non e' entrato la scelta vale su questo dispositivo", True, o["anonimoLeva"])
     prova("L'ANONIMO chiede la fotografia senza initData", [1, False], o["anonimo"])
@@ -140154,6 +140125,11 @@ def prove_effetti_ridotti():
     #     ricalcolo per fotogramma di QUALE card sta al centro mentre la
     #     fila scorre (anche col dito) — sposta una classe, non anima
     #     niente; la corsa e' del CSS, e la regola universale la spegne
+    #   ondeEvidenza (24 nov 2026, le due onde di «In evidenza»): una
+    #     scrittura per fotogramma di --onda-x/--onda-h mentre la fila
+    #     scorre — segue il DITO come lbApplica, non si muove da sola; con
+    #     gli effetti ridotti toglie le variabili e le onde stanno ferme
+    #     (2: il controllo `typeof` e la chiamata)
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -140163,7 +140139,7 @@ def prove_effetti_ridotti():
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
            "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
            "arenaAccendi": 1, "arenaGiro": 1, "latoApri": 1, "latoGiro": 2,
-           "zoomQuiMappaP2P": 1, "armaScorriScoprire": 1},
+           "zoomQuiMappaP2P": 1, "armaScorriScoprire": 1, "ondeEvidenza": 2},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
@@ -168503,9 +168479,12 @@ process.stdout.write(JSON.stringify(out));
           "di Bitcoin on-chain o del fulmine per il Lightning»): la moneta della pagina "
           "Cambio, ₿ per la card on-chain e ⚡ per le altre",
           [True, True, True],
-          ["${premio}${typeof reteVetrinaP2P === 'function' ? reteVetrinaP2P(z.rete === 'btc' ? 'btc' : 'ln') : ''}</div>" in mini,
+          # (24 nov 2026, home-card-pulite) la moneta sta in fondo a destra
+          # insieme alle icone ⏱ 🔐, dentro `.p2p-vt-simboli`: e' lui a
+          # spingersi a destra, la moneta resta l'ultima
+          ["${premio}<span class=\"p2p-vt-simboli\">${regole}${typeof reteVetrinaP2P === 'function' ? reteVetrinaP2P(z.rete === 'btc' ? 'btc' : 'ln') : ''}</span></div>" in mini,
            "{faccia, sats, rete: 'btc'}" in mini,
-           ".card-p2p .p2p-vt-rete{margin-left:auto;flex:0 0 auto;display:inline-flex}" in mini])
+           ".card-p2p .p2p-vt-simboli{margin-left:auto;flex:0 0 auto;display:inline-flex;" in mini])
     cvo = _fn_js(mini, "function cardVetrinaOnchainP2P(o){")
     prova("la card on-chain della fila: id «oc-N», volto e scudo dalla riga, i sats "
           "della sua card del libro",
@@ -218741,9 +218720,19 @@ console.log(JSON.stringify(out));
           "on-chain il ⏱ solo su «Compra BTC» e sotto le 24 ore; la 🔐 solo se "
           "chiesta E con la leva che il server manda a chi guarda; senza niente, vuota",
           [True, False, "", True, False, "", "", "", True, True, False, True, False, False, True],
-          ["⏱ 4 h" in V[0], "🔐" in V[0], V[1], "⏱ 30 min" in V[2], "🔐" in V[2],
-           V[3], V[4], V[5], "⏱ 30 min" in V[6], "🔐 Cauzione" in V[6],
-           "⏱" in V[7], "🔐 Cauzione" in V[7], "🔐" in V[8], "🔐" in V[9], "⏱ 4 h" in V[9]])
+          ['>⏱</span>' in V[0] and 'aria-label="Tempo per pagare 4 h"' in V[0], "🔐" in V[0], V[1],
+           '>⏱</span>' in V[2] and 'aria-label="Tempo per pagare 30 min"' in V[2], "🔐" in V[2],
+           V[3], V[4], V[5], '>⏱</span>' in V[6], '>🔐</span>' in V[6],
+           "⏱" in V[7], '>🔐</span>' in V[7], "🔐" in V[8], "🔐" in V[9],
+           'aria-label="Tempo per pagare 4 h"' in V[9]])
+    # SOLO LE ICONE (24 nov 2026, cantiere home-card-pulite, Andrea: «leva le
+    # scritte e lascia solo il simbolo timer e il lucchetto uno affianco
+    # all'altro»): a schermo niente «30 min» e niente «Cauzione»; le parole
+    # restano nell'etichetta e nel title, quelle di sempre
+    prova("...solo le icone sulla card, le parole nell'etichetta",
+          [False, False, True],
+          [any(">⏱ " in v for v in V), any("Cauzione</span>" in v for v in V),
+           'aria-label="Chi prende blocca una cauzione in Lightning"' in V[6]])
     # (20 nov 2026, bottoni-fissi) a chi prende la riga CORTA scelta da Andrea
     prova("la riga del dettaglio: a chi prende «Hai 4 ore per inviare gli euro e toccare "
           "«Ho inviato gli euro».» e cosa succede altrimenti, a chi ha pubblicato «Chi lo prende ha 30 minuti», con "
@@ -222211,10 +222200,80 @@ INSERT INTO annunci VALUES
     prova("la rotta passa i codici dalla forma e non ripete", True,
           "_CODICE_NEGOZIO.fullmatch(c) and c not in lista" in _rt)
     _evs = mini[mini.index('<div id="evidenzaSez"'):mini.index('id="catSez"')]
-    prova("anche «In evidenza» senza titolo: bastano le etichette delle card "
-          "(Andrea, 23 nov 2026), e il nome resta sulla fila", (False, True),
-          ('section-label' in _evs,
+    # ⚠️ EMENDATA (24 nov 2026, cantiere home-card-pulite; Andrea: «le card
+    # in evidenza mi danno fastidio così con la pastiglia sopra in ogni card
+    # e anche il contorno arancio», scelta l'opzione 2): il titolo torna, al
+    # centro, sulla fascia; le card della fila senza etichetta e cornice
+    prova("«In evidenza» ha il suo titolo al centro, e il nome resta sulla fila",
+          (True, True),
+          ('<div class="section-label centrato">In evidenza</div>' in _evs,
            'id="evidenzaFila" role="region" aria-label="In evidenza"' in _evs))
+    _css = mini[mini.index("<style"):mini.index("</style>")]
+    # LE DUE ONDE (24 nov 2026, scelte da Andrea dopo una ventina di
+    # prove): l'arancio davanti e la dorata dietro, sul fondo della pagina
+    # (nessun token di fascia: niente blocco di colore, niente scalino),
+    # ripetute ogni 360px, che scorrono con le card a meta' e a tre decimi
+    # e cambiano altezza in senso opposto. Le card della fila hanno
+    # l'ombra profonda; senza etichetta e senza cornice come prima.
+    _sez = _css[_css.index("  #evidenzaSez{margin-top:6px;"):]
+    _sez = _sez[:_sez.index("}") + 1]
+    prova("...sulle due onde: arancio davanti e dorata dietro, che scorrono "
+          "con le card piu' lente e salgono una mentre l'altra scende",
+          (True, True, True, True, True, 0, False),
+          ("fill%3D%22%23F7931A%22" in _sez,
+           "rgba(255%2C196%2C107%2C0.55)" in _sez,
+           "calc(var(--onda-x,0px) * .5) 100%/360px calc(50% + var(--onda-h,0%)) repeat-x" in _sez,
+           "calc(40px + var(--onda-x,0px) * .3) 100%/360px calc(66% - var(--onda-h,0%)) repeat-x" in _sez,
+           _sez.index("%23F7931A") < _sez.index("rgba(255%2C196"),
+           _css.count("--ev-fascia"),
+           "var(--bg)" in _sez))
+    prova("...le card della fila sollevate dall'ombra, senza etichetta e "
+          "senza cornice (nella griglia restano)",
+          (True, True, True, True),
+          ("#evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}" in _css,
+           "#evidenzaSez .card.ev .card-evidenza{display:none}" in _css,
+           "#evidenzaSez .card.ev{outline:none}" in _css,
+           ".card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}" in _css))
+    _re = pezzo_js(mini, "function renderEvidenza(){", "\n}\n")
+    prova("renderEvidenza arma le onde dopo aver riscritto la fila", True,
+          _re.index("el('evidenzaFila').innerHTML = html;") < _re.index("ondeEvidenza();"))
+    _onde = pezzo_js(mini, "let ondeEvidenzaArmate = false;", "\n}\n")
+    out = _node_banco("""
+const nodi = {};
+const fintoEl = id => (nodi[id] = nodi[id] || {id, scrollLeft: 0, ascolta: [],
+  addEventListener(t, fn, o){ this.ascolta.push([t, fn, o]); },
+  style: {v: {}, setProperty(k, x){ this.v[k] = x; }, removeProperty(k){ delete this.v[k]; }}});
+const el = id => fintoEl(id);
+let ridotti = false;
+const effettiRidotti = () => ridotti;
+const coda = [];
+const requestAnimationFrame = fn => coda.push(fn);
+const gira = () => { while (coda.length) coda.shift()(); };
+""" + _onde + """
+}
+ondeEvidenza(); ondeEvidenza(); ondeEvidenza();
+const f = nodi.evidenzaFila, s = nodi.evidenzaSez;
+const fuori = {ascoltatori: f.ascolta.length, tipo: f.ascolta[0][0],
+               passivo: f.ascolta[0][2].passive === true};
+f.scrollLeft = 140; f.ascolta[0][1](); f.ascolta[0][1](); f.ascolta[0][1]();
+fuori.inCoda = coda.length; gira();
+fuori.dopo = Object.assign({}, s.style.v);
+ridotti = true; f.scrollLeft = 300; f.ascolta[0][1](); gira();
+fuori.ridotti = Object.assign({}, s.style.v);
+console.log(JSON.stringify(fuori));
+""")
+    if out is None:
+        salta("le onde seguono la fila", "node non installato")
+    else:
+        prova("le onde si armano UNA volta sola, su uno scorrimento passivo",
+              [1, "scroll", True],
+              [out.get("ascoltatori"), out.get("tipo"), out.get("passivo")])
+        prova("...al piu' una scrittura per fotogramma",
+              1, out.get("inCoda"))
+        prova("...scorrendo di 140px: le onde vanno nel verso delle card e "
+              "cambiano altezza",
+              {"--onda-x": "-140px", "--onda-h": "6.73%"}, out.get("dopo"))
+        prova("...e con gli effetti ridotti restano ferme", {}, out.get("ridotti"))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",
           True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
 

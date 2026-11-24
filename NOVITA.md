@@ -970,3 +970,9 @@ frase: Negli avvisi dei nuovi ordini P2P adesso le valute si scelgono una per un
 dove: Libro P2P → la campanella 🔔 → «Valuta»; Profilo → «🔔 Avvisi» → «Valuta».
 leva: P2P_COIN_ATTIVO (le monete; accesa di serie)
 pubblico: sì
+
+## 2026-11-24 · home-card-pulite
+frase: La home è più pulita. Le card degli scambi P2P sono più corte, con il tempo per pagare e la cauzione come due icone, e accanto al titolo «Scambi P2P» c'è un interruttore per nasconderle o farle tornare con un tocco. Gli annunci in evidenza stanno sopra due onde arancio che scorrono piano mentre sfogli le card, sotto il loro titolo.
+dove: Esplora → «Scambi P2P» (l'interruttore accanto al titolo); la fila «In evidenza» sotto «Da scoprire».
+leva: nessuna
+pubblico: no

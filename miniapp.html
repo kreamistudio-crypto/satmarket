@@ -852,7 +852,7 @@
      non su una classe della vista, che e' quel che guarda l'occhio
      della cronologia (navRiflette). `!important` perche' quelle
      sezioni si accendono a mano con lo style in linea. */
-  #app[data-sez="lavoro"] :is(#catSez,#scoprireSez,#chips,#p2pVetrinaSez,#p2pVetrinaVia){display:none!important}
+  #app[data-sez="lavoro"] :is(#catSez,#scoprireSez,#chips,#p2pVetrinaSez){display:none!important}
   #app:not([data-sez="lavoro"]) #lavSez{display:none}
   /* le card del lavoro non hanno un'illustrazione loro: l'emoji fa da
      figura, un filo piu' grande di quella di ripiego delle categorie */
@@ -1503,6 +1503,36 @@
     padding:6px var(--pad) 10px}
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
+  /* LE DUE ONDE DI «In evidenza» (24 nov 2026, cantiere home-card-pulite).
+     Andrea: «non si potrebbe proprio mettere lo sfondo di quelle card di
+     un altro colore con la sezione in evidenza e le card disegnate come
+     sempre? La barra colorata di sfondo inviterebbe a scorrere verso
+     destra». Dopo una ventina di prove (fasce piene, sfumate, mensole,
+     fari, stili semplici: Cantieri, «La home ripulita») ha scelto queste:
+     due onde grandi sotto le card, quella dorata dietro e quella arancio
+     davanti, sul fondo della pagina (nessun blocco di colore, quindi
+     nessuno scalino con la sezione sopra), uguali nei due temi.
+     LE ONDE SCORRONO CON LE CARD, piu' lente («si muovono nella stessa
+     direzione di dove scorri le card, ma lentamente», e «cambiano
+     forma»): `ondeEvidenza` scrive due variabili allo scorrimento della
+     fila, `--onda-x` (lo spostamento, che l'arancio segue a meta' e la
+     dorata a tre decimi) e `--onda-h` (l'altezza, che sale per l'una e
+     scende per l'altra: provate anche insieme, Andrea ha tenuto queste). Ogni onda si ripete ogni 360px, quindi scorre
+     senza bordo; con gli effetti ridotti le variabili non si scrivono
+     e le onde restano ferme dove sono di serie.
+     Il titolo «In evidenza» sta al centro come gli altri. Le card della
+     fila sono quelle della griglia SENZA la pastiglia e la cornice (e'
+     pubblicita' pagata, e a dirlo una volta basta il titolo), con
+     un'ombra piu' profonda: sembrano sollevate, come le card grandi di
+     sopra. Nella griglia di sotto restano come prima. */
+  #evidenzaSez{margin-top:6px;padding:2px 0 4px;
+    background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20360%2060%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%2030%20C60%204%20120%2056%20180%2030%20C240%204%20300%2056%20360%2030%20L360%2060%20L0%2060%20Z%22%20fill%3D%22%23F7931A%22%2F%3E%3C%2Fsvg%3E") calc(var(--onda-x,0px) * .5) 100%/360px calc(50% + var(--onda-h,0%)) repeat-x,
+      url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20360%2060%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%2030%20C60%204%20120%2056%20180%2030%20C240%204%20300%2056%20360%2030%20L360%2060%20L0%2060%20Z%22%20fill%3D%22rgba(255%2C196%2C107%2C0.55)%22%2F%3E%3C%2Fsvg%3E") calc(40px + var(--onda-x,0px) * .3) 100%/360px calc(66% - var(--onda-h,0%)) repeat-x}
+  #evidenzaSez .ev-strip{padding-top:10px;padding-bottom:30px}
+  #evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}
+  #evidenzaSez .card.ev .card-evidenza{display:none}
+  #evidenzaSez .card.ev{outline:none}
+  #evidenzaSez .card.ev :is(.card-lampo,.card-sconto,.card-asta,.card-ferie,.card-ultimo){top:8px}
   /* I QUADRATI DEI NEGOZI sotto la card grande (23 nov 2026, vedi
      renderQuadriScoprire): fermi, in una fila che si scorre col dito,
      solo sul telefono. Nessun bordo che segue la card grande (Andrea,
@@ -1881,31 +1911,6 @@
     50%{transform:scale(1);text-shadow:0 0 .15em rgba(255,190,60,.35)}
     70%{transform:scale(1.06);text-shadow:0 0 .3em rgba(255,190,60,.6)}
   }
-  /* LA PASTIGLIA CHE DICE «e' pubblicita'» (ago 2026): sta in alto a
-     DESTRA, l'angolo libero — il titolo delle sorelle vive a
-     sinistra. DI CARTA, crema fissa su inchiostro: la lingua di
-     tutto cio' che sta sopra una foto (.tag-price, .share-btn,
-     .back-float), uguale nei due temi perche' un'etichetta di carta
-     non cambia colore di notte. Non prende nessuno dei colori
-     parlanti — arancio e' l'acquisto, verde la fiducia, rosso la
-     lampo, petrolio l'asta, viola Nostr — perche' non e'
-     un'occasione ne' una promessa: e' una dichiarazione.
-     L'OMBRA C'E' come sui badge lampo e asta: deve staccare da
-     qualunque disegno ci finisca sotto. E si vede SEMPRE, anche
-     senza l'immagine (niente `img ~`, al contrario del titolo): la
-     dichiarazione non puo' dipendere da un file che arriva.
-     IN BASSO A DESTRA (ago 2026, decisione di Andrea): in alto
-     copriva la coda di «TO THE MOOON!», che su questa card e'
-     scritto DENTRO il disegno. Sotto non ha niente da coprire — il
-     titolo dell'app qui non esiste (`titoloDentro`), quindi la
-     «fascia col titolo» che si teme e' del disegno e sta in ALTO —
-     e il fondo li' e' scuro, quindi la carta stacca meglio di prima
-     (misurato a schermo, non dedotto). Resta l'angolo che il titolo
-     non usa: la regola non cambia, cambia quale angolo e' libero. */
-  .sc-sponsor{position:absolute;bottom:8px;right:8px;
-    background:#FFF8EA;color:#23282C;border-radius:999px;
-    padding:3px 9px;font-size:10.5px;font-weight:800;
-    letter-spacing:.02em;box-shadow:0 1px 3px rgba(0,0,0,.28)}
   /* LA PAGINA DEI CONSIGLIATI (set 2026): le card di «Da scoprire» una
      sotto l'altra, larghe quanto la colonna della pagina — la STESSA
      card, qui solo allargata. L'id batte anche la misura del web (520px
@@ -2561,8 +2566,21 @@
   .card-p2p .p2p-vt-premio{gap:6px;align-items:center}
   /* i bollini del libro sulla card della fila (19 nov 2026): vanno a capo
      fra loro, mai fuori dalla card */
-  .card-p2p .p2p-vt-regole{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-start}
-  .card-p2p .p2p-vt-rete{margin-left:auto;flex:0 0 auto;display:inline-flex}
+  .card-p2p .p2p-vt-rete{flex:0 0 auto;display:inline-flex}
+  /* LA CARD CORTA (24 nov 2026, cantiere home-card-pulite, Andrea: «le
+     card P2P sono troppo lunghe, rendile lunghe al massimo come le card
+     del mercatino»): i metodi su una riga coi puntini (per intero
+     nell'etichetta ad alta voce), e ⏱ 🔐 come sole icone accanto alla
+     moneta della rete, in fondo a destra sulla riga del premio */
+  .card-p2p .info .title{display:block;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;-webkit-line-clamp:unset;min-height:0}
+  .card-p2p .p2p-vt-simboli{margin-left:auto;flex:0 0 auto;display:inline-flex;
+    align-items:center;gap:3px}
+  .card-p2p .p2p-vt-icona{font-size:14px;line-height:1}
+  /* ...e la foto un filo piu' bassa del quadrato (150x139,5 nella fila):
+     cosi' la card resta sotto quella del mercatino anche a 320 px, dove
+     la sorella e' alta 240 */
+  .card-p2p .ph{aspect-ratio:150/139.5}
   .card-p2p .p2p-vt-rete .cambio-moneta.p2p-oc-moneta{width:22px;height:22px}
   .card-p2p .p2p-vt-rete .cambio-moneta.p2p-oc-moneta .cambio-svg{width:13px;height:13px}
   .card-p2p .p2p-vt-premio .p2p-affarone,.card-p2p .p2p-vt-premio .p2p-badge{min-width:0}
@@ -2583,16 +2601,29 @@
      card degli scambi P2P, sono troppo lunghe rispetto alle altre»):
      erano mezza fila (173 px a 390), adesso 150 come la fila di sopra */
   .p2p-vt-fila .card{flex:0 0 150px;width:150px}
-  .p2p-vt-testa{display:flex;align-items:baseline;justify-content:space-between;
+  /* IL TITOLO AL CENTRO, «Vedi tutti» a destra (24 nov 2026, cantiere
+     home-card-pulite): tre colonne, quella di sinistra vuota, cosi' il
+     titolo con l'interruttore sta in mezzo alla riga e non si sposta col
+     numero delle card. A 320 px la colonna di destra si allarga quanto
+     serve a «Vedi tutti →», e il titolo scivola di qualche pixel. */
+  .p2p-vt-testa{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
     gap:8px;padding:16px var(--pad) 0}
-  .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
+  .p2p-vt-titolo{grid-column:2;display:flex;align-items:center;gap:8px}
+  .p2p-vt-leva{display:inline-flex}
+  .p2p-vt-tutti{grid-column:3;justify-self:end;white-space:nowrap;
+    background:none;border:0;padding:4px 0;cursor:pointer;
     font:800 13px Nunito,sans-serif;color:var(--sats-text)}
+  /* l'interruttore della fila: quello del pannello delle leve, in piccolo
+     (sta accanto a un titolo da 11 px); il dito ha comunque 40x24 */
+  .leva-interruttore.piccola{width:40px;height:24px}
+  .leva-interruttore.piccola span{top:3px;left:3px;width:18px;height:18px}
+  .leva-interruttore.piccola.su span{transform:translateX(16px)}
+  /* «Esplora per categorie» e «Scambi P2P» al centro, senza puntini
+     (24 nov 2026, cantiere home-card-pulite): sopra una fila che scorre
+     di lato il titolo fa da intestazione */
+  .section-label.centrato{justify-content:center}
+  .section-label.centrato::after{display:none}
   .p2p-cosa-corpo p{margin:0 0 10px;font-size:14px;line-height:1.5}
-  /* la fila spenta: una riga piccola e discreta, col solo «Mostra» a colore */
-  .p2p-vt-via{padding:12px var(--pad) 0;font-size:12px;font-weight:700;
-    color:var(--muted);line-height:1.3}
-  .p2p-vt-via button{background:none;border:0;padding:6px 4px;margin:-6px 0;
-    font:inherit;font-weight:800;color:var(--sats-text);cursor:pointer}
 
   /* Etichetta di sezione con la linea puntinata che riempie fino al
      conteggio (quando c'e'): IN VETRINA ······· 42 oggetti */
@@ -14928,9 +14959,11 @@ document.getElementById('cartello')?.remove();</script>
          accende renderEvidenza solo con annunci in evidenza e nella
          vetrina nuda. Lo stesso guscio e le stesse frecce delle altre. -->
     <div id="evidenzaSez" style="display:none">
-      <!-- SENZA TITOLO (23 nov 2026, Andrea: «bastano le card, che fanno
-           capire tutto»): ogni card porta gia' l'etichetta «In evidenza»;
-           il nome resta sulla fila per chi legge ad alta voce -->
+      <!-- IL TITOLO TORNA (24 nov 2026, cantiere home-card-pulite): dal 23
+           nov la fila era senza titolo e ogni card portava l'etichetta «In
+           evidenza»; adesso il titolo al centro sulla fascia, e le card
+           senza etichetta (vedi LA FASCIA DI «In evidenza» nel CSS) -->
+      <div class="section-label centrato">In evidenza</div>
       <div class="strip-wrap">
         <div class="ev-strip" id="evidenzaFila" role="region" aria-label="In evidenza"></div>
         <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
@@ -14958,7 +14991,7 @@ document.getElementById('cartello')?.remove();</script>
          categorie: la pagina Sfoglia non esiste piu'. Con un filtro
          acceso la sezione sparisce: lo stato lo dicono le pillole. -->
     <div id="catSez">
-      <div class="section-label">Esplora per categorie</div>
+      <div class="section-label centrato">Esplora per categorie</div>
       <div class="strip-wrap">
         <div class="cat-strip" id="catStrip"></div>
         <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
@@ -14995,13 +15028,17 @@ document.getElementById('cartello')?.remove();</script>
     <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
          Nasce spenta: la accende renderVetrinaP2P solo con la leva del
          server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
-    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): una riga sola, per
-         riaccenderla senza passare dal Profilo -->
-    <div id="p2pVetrinaVia" class="p2p-vt-via" style="display:none">Scambi P2P nascosti ·
-      <button type="button" onclick="setFilaP2P(true)">Mostra</button></div>
+    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): fino al 24 nov 2026 una
+         riga sua, «Scambi P2P nascosti · Mostra»; adesso e' l'interruttore
+         accanto al titolo (cantiere home-card-pulite, Andrea: «affianco
+         alla scritta scambi P2P metti un tasto tipo toggle per nascondere
+         quelle card velocemente»): spento, restano titolo e interruttore -->
     <div id="p2pVetrinaSez" style="display:none">
       <div class="p2p-vt-testa">
-        <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
+        <div class="p2p-vt-titolo">
+          <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
+          <span id="p2pVetrinaLeva" class="p2p-vt-leva"></span>
+        </div>
         <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
       </div>
       <!-- LE FRECCE ANCHE QUI (6 ott 2026, ritocco di Andrea): dal PC la
@@ -15010,7 +15047,7 @@ document.getElementById('cartello')?.remove();</script>
            frecce e la stessa rotellina delle due strisce di sopra (vedi
            LE FRECCE DELLE DUE STRISCE): nascono spente, sul telefono non
            esistono, e le accende il solo blocco del web. -->
-      <div class="strip-wrap">
+      <div class="strip-wrap" id="p2pVetrinaGuscio">
         <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
         <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
           onclick="scorriFila('p2pVetrinaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -26933,28 +26970,13 @@ const SCOPRIRE = [
    vivo: () => !!lancioP2P(),
    accesa: () => false,
    tocca: () => toccaLancioP2P()},
-  /* LA CARD QUADRATA DELLE ASTE (16 nov 2026, cantiere nav-nostr,
-     decisione di Andrea): prende il posto della porta «🔨 Aste ›» che
-     stava in cima alla home, sopra il banner della fase di test, e che
-     ad Andrea li' non piaceva. E' la PRIMA FORMA NUOVA della fila: un
-     quadrato piccolo (`quadra`) accanto ai rettangoli, perche' «un
-     banner piccolo, quadrato, non rettangolare come adesso» e' la sua
-     richiesta alla lettera. Il disegno l'abbiamo fatto con Google Flow.
-     NAVIGA come la card del P2P, e il tocco e' QUELLO DEL TASTO
-     (vaiAste): ad aste spente porta alla pagina «in arrivo» con
-     «🔔 Avvisami», ad aste accese alla vetrina delle aste. Quindi C'E'
-     SEMPRE, anche a leva spenta — e' proprio li' che serve, a chiedere
-     di essere avvisati — e la sezione «Da scoprire» da oggi non sparisce
-     piu': il prezzo e' dichiarato nel banco, alla riga che lo diceva.
-     LA SCRITTA LA METTE L'APP su un velo suo in basso (il disegno non ha
-     testo: Flow le lettere le storpia), e cambia con la leva: e' una
-     funzione, quindi entra nella firma della fila. */
-  {id: 'aste', file: 'aste.webp', emoji: '🔨', quadra: true,
-   riga: () => asteAccese() ? 'Fai la tua offerta' : 'In arrivo',
-   testo: () => 'Aste: ' + (asteAccese() ? 'fai la tua offerta' : 'in arrivo'),
-   vivo: () => true,
-   accesa: () => false,
-   tocca: () => vaiAste()},
+  /* LA CARD QUADRATA DELLE ASTE NON C'E' PIU' (24 nov 2026, cantiere
+     home-card-pulite, Andrea: «leviamo anche la card aste in arrivo,
+     rimane solo nelle icone sfoglia per categorie»): era qui dal 16 nov
+     (cantiere nav-nostr). Le aste restano la tessera di «Esplora per
+     categorie»; la forma `quadra` del template resta, senza voci. Con
+     lei se ne va anche la garanzia che «Da scoprire» non sparisca: senza
+     card vive la sezione torna a nascondersi, com'era prima. */
   {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
    vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
                     : !!(occasioniServer && occasioniServer.lampo),
@@ -27178,19 +27200,11 @@ function renderScoprire(){
        arrivano anche dal server, niente di un catalogo entra nudo nel
        markup — il patto di raccontoNegozio. */
     const testo = esc(typeof v.testo === 'function' ? v.testo() : v.testo);
-    /* LA PASTIGLIA CHE DICE «e' pubblicita'», e sta SEMPRE dove il
-       titolo non c'e' — angolo in BASSO a destra: il titolo delle
-       sorelle vive a sinistra, e quello di questa card sta dentro il
-       disegno, in alto, dove la pastiglia lo copriva. Di CARTA: crema fissa su inchiostro,
-       la lingua di tutto cio' che sta SOPRA una foto (.tag-price,
-       .share-btn, .back-float), uguale nei due temi perche'
-       un'etichetta di carta non cambia colore di notte. Non prende
-       nessuno dei colori parlanti — arancio e' l'acquisto, verde la
-       fiducia, rosso la lampo, petrolio l'asta, viola Nostr.
-       E NON ENTRA NELLA FASCIA del contrasto: e' carta opaca sopra
-       il disegno, non testo sul disegno. */
-    const pastiglia = v.sponsor
-      ? `<span class="sc-sponsor" aria-hidden="true">Consigliato</span>` : '';
+    /* NIENTE PIU' PASTIGLIA «Consigliato» SULLE CARD (24 nov 2026, cantiere
+       home-card-pulite, Andrea: «la pastiglia consigliato nelle card
+       leviamola perché tanto si capisce già che è consigliato»): rovescia
+       la regola di agosto («la pastiglia non si toglie»). La parola resta
+       sulla pagina del progetto o del negozio, dove la card porta. */
     /* IL TITOLO LO SCRIVE L'APP, TRANNE DOVE STA GIA' DENTRO IL
        DISEGNO: sovrapporre il nostro a una grafica che porta il suo
        lo direbbe due volte. La RISERVA invece resta sempre — e' il
@@ -27221,7 +27235,7 @@ function renderScoprire(){
       <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}${pastiglia}
+      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');
@@ -27450,6 +27464,37 @@ function renderEvidenza(){
   evidenzaFirma = html;
   el('evidenzaFila').innerHTML = html;
   aggiornaFrecce('evidenzaFila');
+  ondeEvidenza();
+}
+
+/* LE ONDE SEGUONO LA FILA (24 nov 2026, vedi «LE DUE ONDE DI «In
+   evidenza»» nel foglio): un ascoltatore solo, attaccato una volta alla
+   fila (che resta: si riscrive solo il suo contenuto), e al piu' una
+   scrittura per fotogramma. Con gli effetti ridotti le variabili si
+   tolgono e le onde tornano ferme. */
+let ondeEvidenzaArmate = false;
+function ondeEvidenza(){
+  const f = el('evidenzaFila'), s = el('evidenzaSez');
+  if (ondeEvidenzaArmate || !f || !s || typeof f.addEventListener !== 'function') return;
+  ondeEvidenzaArmate = true;
+  let chiesto = false;
+  const scrivi = () => {
+    chiesto = false;
+    if (effettiRidotti()) {
+      s.style.removeProperty('--onda-x');
+      s.style.removeProperty('--onda-h');
+      return;
+    }
+    const x = f.scrollLeft;
+    s.style.setProperty('--onda-x', (-x) + 'px');
+    s.style.setProperty('--onda-h', (8 * Math.sin(x / 140)).toFixed(2) + '%');
+  };
+  f.addEventListener('scroll', () => {
+    if (chiesto) return;
+    chiesto = true;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(scrivi);
+    else setTimeout(scrivi, 16);
+  }, {passive: true});
 }
 
 /* ================ I CONSIGLIATI (set 2026) ========================
@@ -115634,8 +115679,7 @@ function cardVetrinaP2P(o, opz){
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>
         ${zona ? `<div class="meta p2p-vt-zona" title="Zona di scambio indicativa"><span class="luogo">📍 ${esc(zona)}</span></div>` : ''}
-        ${regole ? `<div class="meta p2p-vt-regole">${regole}</div>` : ''}
-        <div class="meta p2p-vt-premio">${premio}${typeof reteVetrinaP2P === 'function' ? reteVetrinaP2P(z.rete === 'btc' ? 'btc' : 'ln') : ''}</div>
+        <div class="meta p2p-vt-premio">${premio}<span class="p2p-vt-simboli">${regole}${typeof reteVetrinaP2P === 'function' ? reteVetrinaP2P(z.rete === 'btc' ? 'btc' : 'ln') : ''}</span></div>
       </div>
     </div>`;
 }
@@ -115649,14 +115693,27 @@ function cardVetrinaP2P(o, opz){
    chiesta E la leva e' accesa per chi guarda (`p2pOnchainLibro.cauzione`:
    il server la manda solo a chi la puo' usare — oggi i moderatori).
    Senza bollini, niente riga: la card resta quella di prima. PURA. */
+/* SOLO LE ICONE (24 nov 2026, cantiere home-card-pulite, Andrea: «leva le
+   scritte e lascia solo il simbolo timer e il lucchetto uno affianco
+   all'altro così occupano meno spazio»): ⏱ e 🔐 senza «30 min» e senza
+   «Cauzione», accanto alla moneta della rete. I giudici sono gli stessi;
+   le parole restano per chi legge ad alta voce e al dito che si ferma
+   sopra (le scritte di sempre: «Tempo per pagare», coi minuti, e «Chi
+   prende blocca una cauzione in Lightning»). Le card del libro, che lo
+   spazio ce l'hanno, tengono i bollini con le scritte. */
 function bolliniVetrinaP2P(o, oc){
   if (!o || typeof bollinoTempoPagareP2P !== 'function') return '';
-  const tempo = oc
-    ? (o.lato === 'sell' ? bollinoTempoPagareP2P(Number(o.minuti_pagamento) || 0) : '')
-    : bollinoTempoPagareP2P(typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P(o) : 0);
+  const minuti = oc
+    ? (o.lato === 'sell' ? Number(o.minuti_pagamento) || 0 : 0)
+    : (typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P(o) : 0);
+  const icona = (segno, voce) => '<span class="p2p-vt-icona" role="img" aria-label="'
+    + esc(voce) + '" title="' + esc(voce) + '">' + segno + '</span>';
+  /* il tempo, col giudice del bollino del libro: solo sotto le 24 ore */
+  const tempo = bollinoTempoPagareP2P(minuti)
+    ? icona('⏱', 'Tempo per pagare ' + minutiPagareCortiP2P(minutiPagareSceltaP2P(minuti))) : '';
   const cauz = oc && o.cauzione_chiesta === true && typeof p2pOnchainLibro !== 'undefined'
       && p2pOnchainLibro.cauzione
-    ? '<span class="p2p-bollino-tempo p2p-bollino-cauz" title="Chi prende blocca una cauzione in Lightning">🔐 Cauzione</span>' : '';
+    ? icona('🔐', 'Chi prende blocca una cauzione in Lightning') : '';
   return tempo + cauz;
 }
 /* LA FILA: una striscia sua sopra la griglia, «Scambi P2P», con le card
@@ -115705,10 +115762,20 @@ function cardVetrinaOnchainP2P(o){
   return cardVetrinaP2P(Object.assign({}, o, {id: 'oc-' + Number(o.id), premium: Number(o.premio) || 0,
                                               euroMax: 0, sats}), {faccia, sats, rete: 'btc'});
 }
-function filaCardP2P(html){
+/* `spenta` (24 nov 2026, cantiere home-card-pulite): chi guarda l'ha
+   spenta con l'interruttore accanto al titolo. La sezione resta, col solo
+   titolo e l'interruttore spento; le card e le frecce no. */
+function filaCardP2P(html, spenta){
   const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
   if (!sez || !fila) return;
-  sez.style.display = html.length ? '' : 'none';
+  sez.style.display = (html.length || spenta) ? '' : 'none';
+  const guscio = el('p2pVetrinaGuscio');
+  if (guscio) guscio.style.display = spenta ? 'none' : '';
+  /* l'interruttore si riscrive intero: lo stato sta tutto nel markup */
+  const leva = el('p2pVetrinaLeva');
+  if (leva) leva.innerHTML = `<button type="button" class="leva-interruttore piccola${spenta ? '' : ' su'}"
+    role="switch" aria-checked="${spenta ? 'false' : 'true'}" aria-label="Scambi P2P nella home"
+    onclick="setFilaP2P(${spenta ? 'true' : 'false'})"><span></span></button>`;
   fila.innerHTML = html.join('');
   /* le frecce seguono il contenuto, come nelle due strisce: sei card
      o due cambiano quanto c'e' da scorrere, e la riga riporta all'inizio */
@@ -115718,11 +115785,9 @@ function filaCardP2P(html){
 }
 function renderVetrinaP2P(){
   const qui = vetrinaNudaP2P();
-  /* SPENTA DA CHI GUARDA: al posto della fila una riga sola per
-     riaccenderla, e nessuna domanda al server */
+  /* SPENTA DA CHI GUARDA: resta il titolo con l'interruttore spento
+     (`filaCardP2P`), e nessuna domanda al server */
   const via = qui && filaP2PNascosta();
-  const riga = el('p2pVetrinaVia');
-  if (riga) riga.style.display = via ? '' : 'none';
   renderLevaFilaP2P();
   const vede = qui && !via;
   if (vede) armaFotoVetrinaP2P();
@@ -115747,10 +115812,10 @@ function renderVetrinaP2P(){
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
      ogni pagina di annunci che arriva */
-  const firma = html.join('');
+  const firma = (via ? 'spenta|' : '') + html.join('');
   if (firma === p2pVetrinaFirma) return;
   p2pVetrinaFirma = firma;
-  filaCardP2P(html);
+  filaCardP2P(html, via);
 }
 /* LA FOTOGRAFIA PER LA FILA: una GET leggera, che il server serve dalla
    memoria (cache privata di 30 s: un rientro in Esplora subito dopo non
@@ -115872,9 +115937,11 @@ function apriCardP2P(id){
 /* ---- SCAMBI P2P NELLA HOME: LA SCELTA DI CHI GUARDA (27 set 2026,
    richiesta di Andrea) ----
    Un interruttore nel Profilo («Avvisi e aspetto» › Aspetto), acceso di
-   serie; spento, la fila non c'e' e al suo posto resta una riga piccola
-   «Scambi P2P nascosti · Mostra» che la riaccende con un tocco. Compaiono
-   tutt'e due SOLO a chi la fila la vedrebbe (`p2pInVetrina`).
+   serie, e dal 24 nov 2026 il suo gemello accanto al titolo della fila
+   (`p2pVetrinaLeva`, cantiere home-card-pulite): spenta, le card non ci
+   sono e restano il titolo e l'interruttore, che la riaccende con un
+   tocco (fino a quel giorno una riga «Scambi P2P nascosti · Mostra»).
+   Compaiono SOLO a chi la fila la vedrebbe (`p2pInVetrina`).
    LA SCELTA SONO DUE TIMBRI, come gli effetti ridotti: `p2p_home_via` e
    `p2p_home_su`, e vince il piu' recente. Stanno sul profilo (/api/me/visti:
    valgono su ogni dispositivo, e /api/me li riporta) e nella memoria del

@@ -3393,6 +3393,13 @@
   temi come tutto cio' che sta sopra una foto — e sulla PAGINA la
   stessa pastiglia piu' UNA RIGA IN CHIARO. Nessuna delle due basta
   da sola.
+  ⚠️ DAL 24 NOV 2026 LA CARD NON LA DICE PIU' (cantiere
+  home-card-pulite, Andrea: «la pastiglia consigliato nelle card
+  leviamola perché tanto si capisce già che è consigliato»): la
+  pastiglia `.sc-sponsor` e la sua regola CSS sono tolte, anche dalle
+  card dei negozi che pagano la promozione. La parola resta sulla
+  PAGINA (`.rac-pill`). Le righe qui sotto sulla posizione della
+  pastiglia sono storia.
   ⚠️ LA PAROLA E' «Consigliato» E NON «Sponsor» (ago 2026, decisione
   di Andrea): e' il lessico della CATEGORIA futura — quella dove
   finiranno tutti i progetti e i negozi che segnaliamo noi — e
@@ -7870,8 +7877,15 @@
   l'archivio del dispositivo, e `miei` che la rotta da' a chi ha la
   sessione, dagli `autori` che l'orologio fotografa e che non escono mai
   interi), e il taglio a sei dopo. Chi guarda puo' spegnerla («Scambi P2P nella home», in
-  Aspetto; timbri `p2p_home_via`/`p2p_home_su`): al suo posto la riga
-  `#p2pVetrinaVia` con «Mostra», e nessuna domanda al server.
+  Aspetto; timbri `p2p_home_via`/`p2p_home_su`), e nessuna domanda al
+  server. Dal 24 nov 2026 (cantiere home-card-pulite) anche
+  dall'interruttore accanto al titolo (`#p2pVetrinaLeva`, lo riscrive
+  `filaCardP2P(html, spenta)`): spenta, la sezione RESTA col titolo e
+  l'interruttore e sparisce solo il guscio delle card
+  (`#p2pVetrinaGuscio`); la riga `#p2pVetrinaVia` «Mostra» non c'e' piu'.
+  Titolo al centro (griglia a tre colonne, «Vedi tutti» a destra). La
+  card e' alta 240 px (foto 150x139,5, metodi su una riga coi puntini,
+  ⏱ e 🔐 come sole icone accanto alla moneta della rete).
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
@@ -35387,6 +35401,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.sc-quadra-eti` su velo pieno, testo funzione della leva quindi nella
   firma). Tutte e due sempre visibili, tocco `vaiAste()`: ad aste spente
   `astepresto`, accese la vetrina. Con lei «Da scoprire» non sparisce più.
+  ⚠️ LA CARD QUADRATA E' TOLTA il 24 nov 2026 (cantiere
+  home-card-pulite, Andrea: «rimane solo nelle icone sfoglia per
+  categorie»): resta la sola tessera. La forma `quadra` del template di
+  «Da scoprire» resta senza voci, e la sezione torna a sparire quando non
+  ha card vive.
   A cella vestita da
   Swap `voceNav` accende Esplora e non la quarta cella, per il ramo aste
   e per `astepresto`.
@@ -38551,7 +38570,10 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `in_breve` del racconto solo se pubblicato; mai un tg_id). La riga di
   casa sta in `RACCONTI[slug].inBreve` (client) e
   `RACCONTI_NEGOZI[slug]["in_breve"]` (server). L'ordine della home sul
-  ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (senza titolo),
+  ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (dal 24 nov col
+  titolo al centro e le DUE ONDE sotto le card, che scorrono con la fila
+  via `ondeEvidenza` e le variabili `--onda-x`/`--onda-h`, ferme con gli
+  effetti ridotti: Cantieri, «La home ripulita»),
   `#catSez`, `#lavSez`, `#p2pVetrinaSez`; le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
   I quadrati escono solo se sono almeno `QUADRI_MIN` (4), sennò tutti
