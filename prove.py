@@ -143781,13 +143781,41 @@ def _consigliati_porte(src, mini, _pz):
           "la pagina no", (True, False, False),
           # (23 nov 2026, promozioni) il negozio pagato senza logo
           # resta fuori dal giro: sta nella pagina, col suo banner
-          ("const loghi = ordinaLoghiConsigliati(voci.filter(v => !v.promo "
-           "|| v.logoUrl));"
+          ("const loghi = ordinaLoghiConsigliati(voci.filter(v => (!v.promo || v.logoUrl)"
            in _pz(mini, "function cardConsigliati(voci){", "\n}\n"),
            "ordinaLoghiConsigliati"
            in _pz(mini, "function renderConsigliati(){", "\n}\n"),
            "Math.random"
            in _pz(mini, "function consigliatiPubblicati(){", "\n}\n")))
+    # NIENTE DOPPIONI VICINI (24 nov 2026 sera, Andrea, scelta sulla
+    # scheda): un negozio con la card viva in «Da scoprire» non gira nella
+    # card «Consigliati» — per slug (le pagine di casa) e per codice (i
+    # negozi che hanno pagato); una card spenta non conta
+    _banco = (
+        "const esc = x => String(x), CAT_CONSIGLIATI = 'cons';\n"
+        "const giuLogoConsigliato = () => 0, logoConsigliato = v => '/l/' + v.slug + '.webp';\n"
+        "const ordinaLoghiConsigliati = l => l;\n"
+        "let SP = [], PR = [];\n"
+        "const vociSponsor = () => SP, vociNegoziPromossi = () => PR;\n"
+        + _pz(mini, "function negoziInScoprire(){", "\n}\n") + "\n}\n"
+        + _pz(mini, "function cardConsigliati(voci){", "\n}\n") + "\n}\n"
+        + "const giro = () => (cardConsigliati(VOCI).match(/\\/l\\/[a-z0-9-]+/g) || []).map(x => x.slice(3)).join(',');\n"
+        "const VOCI = [{slug: 'to-the-moon', negozio: 'aa11'}, {slug: 'andreai-bitcoin-on', negozio: 'bb22'},\n"
+        "  {slug: 'un-tempo-per-te', negozio: 'cc33'}, {slug: 'promo-dd44', negozio: 'dd44', promo: true, logoUrl: '/x'}];\n"
+        "const r = {};\n"
+        "r.nessuno = giro();\n"
+        "SP = [{slug: 'to-the-moon', negozio: 'aa11', vivo: () => true}, {slug: 'andreai-bitcoin-on', negozio: 'bb22', vivo: () => false}];\n"
+        "PR = [{negozio: 'dd44', vivo: () => true}];\n"
+        "r.sopra = giro();\n"
+        "console.log(JSON.stringify(r));\n")
+    _out = _node_banco(_banco)
+    if _out is None:
+        salta("i Consigliati senza i negozi di «Da scoprire»", "serve node")
+    else:
+        prova("la card «Consigliati» non ripete i negozi che hanno la card viva "
+              "in «Da scoprire» (per pagina e per codice), le spente non contano",
+              {"nessuno": "to-the-moon,andreai-bitcoin-on,un-tempo-per-te,promo-dd44",
+               "sopra": "andreai-bitcoin-on,un-tempo-per-te"}, _out)
     # LA MEMORIA DEL PRIMO SI TOCCA SOLO DENTRO UN TRY: dove il
     # localStorage non c'e' o esplode la card deve nascere lo stesso, e
     # l'ordine si decide UNA volta per apertura
@@ -144175,6 +144203,9 @@ let sponsorizzati = [], consigliatiServer = [];
 /* i negozi che hanno pagato la card in Da scoprire (23 nov 2026): la
    forma del nome e la cartella delle foto sono quelle vere */
 let negoziPromossi = [];
+/* le card di «Da scoprire» che la card Consigliati non ripete (24 nov
+   2026, niente doppioni vicini): qui nessuna, il giudice ha il suo banco */
+const vociSponsor = () => [], vociNegoziPromossi = () => [];
 const nomeFotoPromo = f => String(f || '').replace(/[^A-Za-z0-9_.-]/g, '');
 const fotoUrl = f => '/foto/' + f;
 let ridotti = false, premutaFatta = false;

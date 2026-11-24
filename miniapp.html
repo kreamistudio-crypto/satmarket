@@ -27774,6 +27774,18 @@ function consigliatiPubblicati(){
   return fuori;
 }
 const urlLogoConsigliato = slug => `/assets/consigliati/${slug}.webp`;
+/* i negozi che hanno gia' una card viva in «Da scoprire» (le pagine di
+   casa per slug, e ogni negozio per codice): la card «Consigliati» non li
+   ripete (vedi cardConsigliati) */
+function negoziInScoprire(){
+  const sopra = new Set();
+  vociSponsor().concat(vociNegoziPromossi()).forEach(v => {
+    if (!v.vivo()) return;
+    if (v.slug) sopra.add('slug:' + v.slug);
+    if (v.negozio) sopra.add('neg:' + v.negozio);
+  });
+  return sopra;
+}
 /* il logo di una voce: quello del server per un negozio che ha pagato,
    quello della cartella di casa per gli altri */
 const logoConsigliato = v => v.logoUrl || urlLogoConsigliato(v.slug);
@@ -27859,8 +27871,15 @@ function mescolaConsigliati(slug, prima, caso){
    traduce in uno spostamento: girando, ognuno sta dove gli sta bene. */
 function cardConsigliati(voci){
   /* un negozio che ha pagato ma non mostra la sua foto non ha un logo
-     da far girare: sta nella pagina, col suo banner, e non qui */
-  const loghi = ordinaLoghiConsigliati(voci.filter(v => !v.promo || v.logoUrl));
+     da far girare: sta nella pagina, col suo banner, e non qui.
+     NIENTE DOPPIONI VICINI (24 nov 2026 sera, Andrea, scelta sulla
+     scheda: «non devono esserci due immagini uguali troppo vicine»): un
+     negozio che ha gia' la sua card in «Da scoprire», subito sopra, non
+     gira anche qui. Restano gli altri Consigliati; se non ne resta
+     nessuno la card tiene il suo 📣 */
+  const sopra = negoziInScoprire();
+  const loghi = ordinaLoghiConsigliati(voci.filter(v => (!v.promo || v.logoUrl)
+    && !sopra.has('slug:' + v.slug) && !(v.negozio && sopra.has('neg:' + v.negozio))));
   return `
     <a class="cat-cella cella-consigliati" data-cat="${CAT_CONSIGLIATI}" href="/consigliati"
        title="Consigliati" aria-label="Consigliati"
