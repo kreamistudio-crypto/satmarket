@@ -1911,6 +1911,19 @@
        4 (24 nov 2026 sera, Andrea, coi cerchi: «i tondi leggermente più
        staccati dalle card grosse»): 8px d'aria in piu'. */
     #scoprireQuadri{margin-top:-4px}
+    /* LE SEZIONI PIU' VICINE (24 nov 2026 sera, Andrea: «anzi più
+       ravvicinati i paragrafi», poi l'ordine di prima con le distanze
+       strette; «i paragrafi vanno ravvicinati non così lontani come sono
+       adesso in produzione»). Rimisurate sulla mensola senza titolo di «In
+       evidenza» (3945e16e): dalla card grande alle card in evidenza 18 px
+       invece di 30 (meno di cosi' l'ombra della card grande ci finisce
+       sopra), e dalla riga della mensola al titolo delle categorie ~20 px
+       invece di 34. Senza «In evidenza» i due margini negativi si fondono
+       (vince il piu' grande). Solo sul telefono, dove c'e' quell'aria; il
+       CSS di «In evidenza» non si tocca: si accorciano le code delle
+       sezioni intorno */
+    #scoprireSez{margin-bottom:-12px}
+    #catSez{margin-top:-10px}
     #scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}
     #scoprireStrip .scoprire-card{width:240px}
     #scoprireStrip .sc-titolo{left:12.4px;width:84.7px;font-size:15px}

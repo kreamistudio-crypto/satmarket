@@ -222360,6 +222360,14 @@ def prove_promozioni():
     prova("la card in evidenza porta l'etichetta, e mai da esaurita", True,
           "const ev = !esa && inEvidenza(l);" in mini
           and '<div class="card-evidenza">In evidenza</div>' in mini)
+    # «anzi più ravvicinati i paragrafi» (Andrea, 24 nov 2026 sera): sul
+    # telefono «In evidenza» sale verso la card grande e le categorie
+    # verso «In evidenza», senza toccare il CSS di «In evidenza»
+    prova("...e sul telefono le sezioni stanno piu' vicine",
+          True, "#scoprireQuadri{margin-top:-4px}" in mini
+          and mini.index("#scoprireQuadri{margin-top:-4px}")
+          < mini.index("#scoprireSez{margin-bottom:-12px}")
+          < mini.index("#catSez{margin-top:-10px}"))
     prova("la fila «In evidenza» sta fra «Da scoprire» e gli scambi P2P",
           True, mini.index('id="scoprireSez"') < mini.index('id="evidenzaSez"')
           < mini.index('id="p2pVetrinaSez"'))
