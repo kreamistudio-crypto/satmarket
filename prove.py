@@ -222717,9 +222717,9 @@ INSERT INTO annunci VALUES
           (True, True, True, True, False, False, 0, False),
           ("  #evidenzaSez{margin-top:0;padding:2px 0 0}\n" in _sez,
            "#evidenzaSez .ev-strip{padding-top:10px;padding-bottom:18px;" in _sez,
-           "#FFBE5A 50%" in _sez and "0 calc(100% - 12px)/100% 1.5px no-repeat" in _sez,
+           "#FFBE5A 50%" in _sez and "0 calc(100% - 12px)/100% 3px no-repeat" in _sez,
            "linear-gradient(0deg,rgba(247,147,26,.32),rgba(247,147,26,0)) "
-           "0 calc(100% - 13.5px)/100% 90px no-repeat}" in _sez,
+           "0 calc(100% - 15px)/100% 90px no-repeat}" in _sez,
            "svg" in _sez, "--onda-" in mini, _css.count("--ev-fascia"),
            "var(--bg)" in _sez))
     # IL PRIMO SCHERMO FINISCE SOTTO LA MENSOLA (24 nov 2026 sera, Andrea:
