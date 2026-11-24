@@ -17730,6 +17730,316 @@ async def giroconto_p2p(req: Request):
     return si
 
 
+#  ============ CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026, cantiere
+#  chiedi-al-venditore; Andrea: «se il venditore gli dice di no, passa ad
+#  un altro e così via finché non riesce a trovare il match») ============
+#  Mario vuole 50 € di sats per l'oggetto di Anna, e nel libro ci sono
+#  solo ordini a cifra FISSA piu' grandi (Tizio vende 200 € esatti): su
+#  Mostro un ordine fisso non si spezza. Barattolo chiede a Tizio se gli
+#  va di vendere solo quei 50 €; col suo «Si'» il telefono di Tizio
+#  trasforma l'ordine in «da 50 a 200 €» (la chiave dell'ordine e' sua,
+#  il server non firma niente), e il foglio di Mario lo trova nel libro
+#  come un match qualsiasi. Uno alla volta, nell'ordine che ha mandato
+#  il telefono di Mario (dal piu' conveniente): 10 minuti a testa, NESSUN
+#  limite di venditori (Andrea: «tanto a Mario gli arriva la notifica»).
+#  Un «No» mette QUELL'ordine in pausa per un'ora; a un venditore arriva
+#  una domanda sola per volta. Il server non crede alla lista del
+#  telefono: chiede solo agli ordini che SA essere in vendita, ancora nel
+#  libro, pubblicati da un nostro iscritto che non e' Mario.
+VIA_EURO_CHIEDI_S = 10 * 60
+VIA_EURO_NO_PAUSA_S = 60 * 60
+VIA_EURO_CANDIDATI_MAX = 50
+VIA_EURO_VIVE = ("chiedo", "allargo")
+
+
+def _tabelle_via_euro(con) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS via_euro_richieste("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " compratore INTEGER NOT NULL,"
+        " annuncio_id INTEGER NOT NULL,"
+        # [[ordine, euro], ...] nell'ordine del telefono di Mario
+        " candidati TEXT NOT NULL,"
+        " indice INTEGER DEFAULT -1,"
+        " ordine TEXT DEFAULT '',"
+        " venditore INTEGER DEFAULT 0,"
+        " euro INTEGER DEFAULT 0,"
+        " chiesto INTEGER DEFAULT 0,"
+        # chiedo | allargo (Tizio ha detto si' e il suo telefono lavora) |
+        # accettato | nessuno | annullato
+        " stato TEXT DEFAULT 'chiedo',"
+        " creato INTEGER, aggiornato INTEGER)")
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS via_euro_no("
+        " ordine TEXT PRIMARY KEY, fino INTEGER NOT NULL)")
+
+
+def _euro_fisso_libro(testo) -> int:
+    """PURA: dalla cifra del libro come la scrive `_euro_libro` ('200,00 €')
+    gli euro interi di un ordine a cifra FISSA; 0 per un intervallo
+    ('da 20,00 a 100,00 €'), una moneta o una cifra che non si legge."""
+    m = re.fullmatch(r"\s*(\d{1,7})(?:,(\d{1,2}))?\s*€\s*", str(testo or ""))
+    if not m:
+        return 0
+    return int(m.group(1)) if not m.group(2) or int(m.group(2)) == 0 else int(m.group(1)) + 1
+
+
+def _candidati_via_euro(grezzi) -> list:
+    """PURA: la lista del telefono di Mario, pulita: `[[ordine, euro]]`,
+    forma dell'id giusta, euro interi positivi, senza doppioni, al piu'
+    VIA_EURO_CANDIDATI_MAX."""
+    fuori, visti = [], set()
+    for c in grezzi if isinstance(grezzi, list) else []:
+        if isinstance(c, dict):
+            oid, euro = c.get("id"), c.get("euro")
+        elif isinstance(c, (list, tuple)) and len(c) == 2:
+            oid, euro = c
+        else:
+            continue
+        oid = str(oid or "")
+        if (not FORMA_ORDINE_P2P.fullmatch(oid) or oid in visti
+                or isinstance(euro, bool) or not isinstance(euro, int) or euro <= 0):
+            continue
+        visti.add(oid)
+        fuori.append([oid, euro])
+        if len(fuori) >= VIA_EURO_CANDIDATI_MAX:
+            break
+    return fuori
+
+
+def _chiedibile_via_euro(con, oid: str, euro: int, compratore: int, adesso: int):
+    """La riga del libro di un ordine a cui si puo' chiedere ADESSO, o
+    None: in vendita, nel libro, pubblicato da un nostro iscritto che non
+    e' chi compra, a cifra fissa piu' grande di quella chiesta, senza un
+    «No» nell'ultima ora, e col venditore libero da altre domande."""
+    r = con.execute(
+        "SELECT ordine, tg_id, stato, lato, maker, euro FROM p2p_ordini "
+        "WHERE ordine=?", (oid,)).fetchone()
+    if (not r or (r["stato"] or "") != "pending" or (r["lato"] or "") != "sell"
+            or not int(r["maker"] or 0) or not int(r["tg_id"] or 0)
+            or int(r["tg_id"]) == int(compratore)):
+        return None
+    tot = _euro_fisso_libro(r["euro"])
+    if tot <= euro:
+        return None
+    no = con.execute("SELECT fino FROM via_euro_no WHERE ordine=?", (oid,)).fetchone()
+    if no and int(no["fino"]) > adesso:
+        return None
+    occupato = con.execute(
+        "SELECT 1 FROM via_euro_richieste WHERE venditore=? AND stato IN (?, ?) "
+        "AND chiesto>=?", (int(r["tg_id"]), *VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)).fetchone()
+    if occupato:
+        return None
+    return {"ordine": oid, "venditore": int(r["tg_id"]), "euro": euro, "tot": tot}
+
+
+def _avanza_via_euro(con, rid: int, adesso: int):
+    """Passa al prossimo venditore della fila e lo timbra (il timbro PRIMA
+    dell'avviso: un giro che muore a meta' perde un avviso, mai lo
+    raddoppia). Torna `("chiedi", riga)` col venditore da avvisare,
+    `("nessuno", compratore)` a fila finita, o None."""
+    r = con.execute("SELECT * FROM via_euro_richieste WHERE id=?", (rid,)).fetchone()
+    if not r or r["stato"] not in VIA_EURO_VIVE:
+        return None
+    try:
+        fila = json.loads(r["candidati"] or "[]")
+    except Exception:
+        fila = []
+    i = int(r["indice"] if r["indice"] is not None else -1) + 1
+    while i < len(fila):
+        oid, euro = fila[i][0], int(fila[i][1])
+        c = _chiedibile_via_euro(con, oid, euro, int(r["compratore"]), adesso)
+        if c:
+            con.execute(
+                "UPDATE via_euro_richieste SET indice=?, ordine=?, venditore=?, euro=?, "
+                "chiesto=?, stato='chiedo', aggiornato=? WHERE id=?",
+                (i, oid, c["venditore"], euro, adesso, adesso, rid))
+            con.commit()
+            return ("chiedi", dict(c, richiesta=rid))
+        i += 1
+    con.execute(
+        "UPDATE via_euro_richieste SET indice=?, ordine='', venditore=0, "
+        "stato='nessuno', aggiornato=? WHERE id=?", (i, adesso, rid))
+    con.commit()
+    return ("nessuno", int(r["compratore"]), int(r["annuncio_id"]))
+
+
+def _testo_chiedi_venditore(euro: int, tot: int) -> str:
+    return (f"🙋 Un compratore del mercatino vuole <b>{euro} €</b> dei tuoi "
+            f"<b>{tot} €</b> in vendita.\nSe ti va bene, il tuo ordine diventa "
+            f"«da {euro} a {tot} €» e il resto resta nel libro. "
+            f"Hai {VIA_EURO_CHIEDI_S // 60} minuti per rispondere.")
+
+
+async def _dopo_avanza_via_euro(esito) -> None:
+    """L'avviso che segue un passo della fila."""
+    if not esito:
+        return
+    if esito[0] == "chiedi":
+        c = esito[1]
+        link = _link_ordine_avviso_p2p({"ordine": c["ordine"]})
+        await notifica(c["venditore"], _testo_chiedi_venditore(c["euro"], c["tot"]),
+                       bottone=("Rispondi", link) if link else None)
+    elif esito[0] == "nessuno":
+        await notifica(esito[1], "Nessun venditore ha accettato: per ora l'annuncio "
+                       "si può pagare solo in sats.")
+
+
+async def _giro_via_euro(adesso: int = 0) -> int:
+    """Nel battito pieno dell'orologio P2P: le domande senza risposta da
+    10 minuti passano al venditore dopo. Torna quante ne ha mosse."""
+    adesso = adesso or int(time.time())
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        ferme = [int(r["id"]) for r in con.execute(
+            "SELECT id FROM via_euro_richieste WHERE stato IN (?, ?) AND chiesto<?",
+            (*VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)).fetchall()]
+        esiti = [_avanza_via_euro(con, rid, adesso) for rid in ferme]
+    finally:
+        con.close()
+    for e in esiti:
+        try:
+            await _dopo_avanza_via_euro(e)
+        except Exception as ex:
+            print(f"⚠️ Chiedi al venditore: avviso saltato ({ex})", flush=True)
+    return len(ferme)
+
+
+def _stato_via_euro(con, tg_id: int, adesso: int) -> dict:
+    """Per il telefono: la MIA ricerca (di Mario) e le domande A ME (di
+    Tizio), ancora dentro i loro 10 minuti."""
+    mia = con.execute(
+        "SELECT * FROM via_euro_richieste WHERE compratore=? ORDER BY id DESC LIMIT 1",
+        (tg_id,)).fetchone()
+    a_me = [{"richiesta": int(r["id"]), "ordine": r["ordine"], "euro": int(r["euro"]),
+             "stato": r["stato"], "scade": int(r["chiesto"]) + VIA_EURO_CHIEDI_S}
+            for r in con.execute(
+                "SELECT * FROM via_euro_richieste WHERE venditore=? AND stato IN (?, ?) "
+                "AND chiesto>=?", (tg_id, *VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)).fetchall()]
+    return {"mia": ({"richiesta": int(mia["id"]), "annuncio_id": int(mia["annuncio_id"]),
+                     "stato": mia["stato"], "aggiornato": int(mia["aggiornato"] or 0)}
+                    if mia else None),
+            "a_me": a_me}
+
+
+@app.get("/api/via-euro/stato")
+def stato_via_euro(x_tg_init_data: str = Header(""), barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        d = _stato_via_euro(con, int(user["id"]), int(time.time()))
+    finally:
+        con.close()
+    return JSONResponse(d, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/via-euro/chiedi")
+async def chiedi_via_euro(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Mario: `{annuncio_id, candidati: [{id, euro}]}`. Una ricerca viva
+    per persona: la nuova sostituisce la vecchia."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not via_euro_ammesso(user["id"]):
+        raise HTTPException(404, "Non trovato")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta illeggibile")
+    try:
+        annuncio = int(d.get("annuncio_id") or 0)
+    except (TypeError, ValueError):
+        annuncio = 0
+    fila = [c for c in _candidati_via_euro(d.get("candidati"))
+            if c[1] <= int(VIA_EURO_MAX_EURO or 0)]
+    if annuncio <= 0 or not fila:
+        raise HTTPException(400, "Niente da chiedere")
+    adesso = int(time.time())
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        con.execute(
+            "UPDATE via_euro_richieste SET stato='annullato', aggiornato=? "
+            "WHERE compratore=? AND stato IN (?, ?)", (adesso, user["id"], *VIA_EURO_VIVE))
+        cur = con.execute(
+            "INSERT INTO via_euro_richieste(compratore, annuncio_id, candidati, "
+            "creato, aggiornato) VALUES (?, ?, ?, ?, ?)",
+            (user["id"], annuncio, json.dumps(fila), adesso, adesso))
+        con.commit()
+        rid = int(cur.lastrowid)
+        esito = _avanza_via_euro(con, rid, adesso)
+    finally:
+        con.close()
+    if esito and esito[0] == "chiedi":
+        await _dopo_avanza_via_euro(esito)
+        return {"ok": True, "richiesta": rid, "stato": "chiedo"}
+    return {"ok": False, "richiesta": rid, "stato": "nessuno"}
+
+
+@app.post("/api/via-euro/rispondi")
+async def rispondi_via_euro(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Tizio: `{richiesta, risposta}` fra `si` (il suo telefono sta per
+    allargare l'ordine), `no`, `fatto` (l'ordine nuovo e' partito) e
+    `fallito`. Mario: `{richiesta, risposta: 'annulla'}`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+        rid = int(d.get("richiesta") or 0)
+        risposta = str(d.get("risposta") or "")
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    adesso = int(time.time())
+    esito, avvisa_mario = None, None
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        r = con.execute("SELECT * FROM via_euro_richieste WHERE id=?", (rid,)).fetchone()
+        if not r:
+            raise HTTPException(404, "Non trovato")
+        if risposta == "annulla":
+            if int(r["compratore"]) != int(user["id"]):
+                raise HTTPException(404, "Non trovato")
+            con.execute("UPDATE via_euro_richieste SET stato='annullato', aggiornato=? "
+                        "WHERE id=? AND stato IN (?, ?)", (adesso, rid, *VIA_EURO_VIVE))
+            con.commit()
+            return {"ok": True, "stato": "annullato"}
+        if int(r["venditore"] or 0) != int(user["id"]) or r["stato"] not in VIA_EURO_VIVE:
+            raise HTTPException(409, "La domanda non c'è più")
+        if risposta == "si" and r["stato"] == "chiedo":
+            # il tempo riparte: e' quello del telefono di Tizio per rifare l'ordine
+            con.execute("UPDATE via_euro_richieste SET stato='allargo', chiesto=?, "
+                        "aggiornato=? WHERE id=?", (adesso, adesso, rid))
+            con.commit()
+            return {"ok": True, "stato": "allargo"}
+        if risposta == "fatto" and r["stato"] == "allargo":
+            con.execute("UPDATE via_euro_richieste SET stato='accettato', aggiornato=? "
+                        "WHERE id=?", (adesso, rid))
+            con.commit()
+            avvisa_mario = (int(r["compratore"]), int(r["annuncio_id"]))
+        elif risposta in ("no", "fallito"):
+            if risposta == "no":
+                con.execute("INSERT OR REPLACE INTO via_euro_no(ordine, fino) VALUES (?, ?)",
+                            (r["ordine"], adesso + VIA_EURO_NO_PAUSA_S))
+                con.commit()
+            esito = _avanza_via_euro(con, rid, adesso)
+        else:
+            raise HTTPException(400, "Risposta sconosciuta")
+    finally:
+        con.close()
+    if avvisa_mario:
+        await notifica(avvisa_mario[0],
+                       "✅ Un venditore ha accettato. Torna all'annuncio e tocca "
+                       "«Non hai sats?» per continuare.",
+                       bottone=("Apri l'annuncio", link_telegram("annuncio", avvisa_mario[1])))
+        return {"ok": True, "stato": "accettato"}
+    await _dopo_avanza_via_euro(esito)
+    return {"ok": True, "stato": risposta}
+
+
 def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
     """Quando e' NATA e quando SCADE una bolt11, letto dalla bolt11.
     Con `con_hash` dice anche il PAYMENT HASH (il campo `p`, 52 gruppi =
@@ -80207,6 +80517,14 @@ async def orologio_p2p():
                 await asyncio.wait_for(_giro_paracadute_p2p(), P2P_PASSATA_MAX_S)
             except Exception as e:
                 print(f"⚠️ Paracadute P2P: battito saltato "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
+            # CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026): le domande
+            # senza risposta da 10 minuti passano al venditore dopo
+            try:
+                await asyncio.wait_for(_giro_via_euro(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Chiedi al venditore: battito saltato "
                       f"({type(e).__name__}: {e})", flush=True)
             _P2P_BATTITO["vivo"] = time.time()
         # LA FOTOGRAFIA DEL LIBRO (26 set 2026): nella passata intera, col

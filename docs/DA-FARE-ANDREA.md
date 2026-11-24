@@ -1183,6 +1183,12 @@ Nel log del nodo NON deve esserci «giroconto … not set».
   «Continua», poi segue il foglio fino a «Ho pagato» (manda davvero gli
   euro ad Alan).
 - Alan riceve gli euro e rilascia.
+- (24 nov, cantiere chiedi-al-venditore) Una seconda volta con Alan che
+  vende a CIFRA FISSA più grande (per esempio 30 € esatti per un oggetto
+  da 5 €): a «Continua» il foglio dice che sta cercando; ad Alan arriva il
+  bot «Un compratore del mercatino vuole…»; «Sì, va bene» dalla pagina del
+  suo ordine lo trasforma in «da 5 a 30 €», e il foglio dell'altro account
+  torna al prezzo col «Continua» di sempre.
 
 Deve succedere: l'ordine passa a pagato (locked) da solo; la riserva scende
 di quanto il deposito; nel log del nodo

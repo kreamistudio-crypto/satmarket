@@ -95623,3 +95623,62 @@ PROVATO. `PROVE_SEVERE=1 python prove.py --dai-file=origin/develop`:
 240 passate, 0 fallite (conoscenza di Tappo e assistente del bot
 comprese). Tappo legge da main: la correzione arriva con la prossima
 promozione, e allora la domanda sulle recensioni va rifatta.
+
+## Chiedere a chi vende a cifra fissa: «Non hai sats?» quando nel libro c'è solo un ordine più grande (24 nov 2026, cantiere chiedi-al-venditore; Andrea: «il barattolo dovrebbe chiedere prima ad un venditore, poi se il venditore gli dice di no, passa ad un altro e così via»)
+
+IL PERCHÉ. Andrea: «se tipo io compro qualcosa da 50 euro ma tizio vende
+200 euro di bitcoin, non c'è match». Su Mostro un ordine a cifra fissa
+non si spezza: o si prende intero o niente. Un intervallo («da 50 a 200 €»)
+invece sì, e il resto torna nel libro. Quindi, quando per l'ordine di
+Mario non c'è un match ma ci sono venditori a cifra fissa più grande,
+Barattolo CHIEDE a loro, uno alla volta, se trasformano l'ordine in un
+intervallo.
+
+COME VA. Il telefono di Mario manda al server la fila (`viaEuroFissi`, pura:
+venditori di sats in euro, a mercato, coi metodi decisi, a cifra fissa
+PIÙ GRANDE di quel che serve, non miei; dal più conveniente, a parità il
+più recente). Il server non crede alla fila: chiede solo a un ordine che
+SA (`p2p_ordini`) in vendita, nel libro, pubblicato da un nostro iscritto
+che non è Mario, a cifra fissa più grande (`_euro_fisso_libro` sulla cifra
+del libro), senza un «No» nell'ultima ora, col venditore libero da altre
+domande (`_chiedibile_via_euro`). Il timbro prima dell'avviso
+(`_avanza_via_euro`). A Tizio arriva il bot col tasto sulla pagina del suo
+ordine; lì il riquadro con «Sì, va bene» / «No». Il «Sì» lo fa il SUO
+telefono (la chiave dell'ordine è sua, il server non firma niente):
+ritira il fisso e lo rifà uguale «da 50 a 200 €» (`allargaOrdineP2P`, con
+`pubblicaDaSoloP2P` che ora accetta i campi da cambiare). Prima il ritiro:
+due ordini insieme venderebbero due volte. Poi Mario: il foglio, se è
+aperto, guarda il libro ogni 20 secondi e appena c'è il match torna al
+foglio del prezzo col «Continua» di sempre; se l'ha chiuso, il bot lo
+avvisa col tasto all'annuncio. Le domande senza risposta passano al
+prossimo nel battito pieno dell'orologio P2P (`_giro_via_euro`).
+
+LE SCELTE DI ANDREA (24 nov): 10 minuti per venditore («dai almeno 10
+minuti»), NESSUN limite di venditori («tanto a Mario gli arriva la
+notifica»), Mario non vede la fila («il procedimento per Mario è quello
+più semplice»). Mie, dette nel piano e non contestate: un «No» mette
+QUELL'ordine in pausa un'ora; un venditore ha una domanda sola per volta;
+una ricerca viva per persona (la nuova sostituisce la vecchia). La fila
+è quella del momento in cui Mario tocca «Continua» (al più 50).
+
+STRADE SCARTATE. Prendere l'ordine fisso intero e rimandare il resto a
+Mario: i sats in più non sono suoi da tenere, e il deposito ha un tetto.
+Che il server rifaccia l'ordine di Tizio: dovrebbe avere la sua chiave
+(regola ferrea 2). Chiedere a tutti insieme: più rumore per i venditori,
+e chi accetta per secondo resterebbe con l'ordine cambiato per niente.
+
+LE SCRITTE (sei, mostrate nel thread con l'esempio dei 50 € su 200)
+approvate da Andrea il 24 nov alle 14:00: «Sì, anche per le scritte va
+bene». E il premio: l'ordine allargato è la copia di quello di Tizio, col
+suo premio («se un venditore vende 200 € al 10% di premio, anche i
+relativi 50 saranno impostati al 10% in più, giusto?» — sì).
+
+PROVATO. `prove_chiedi_al_venditore`, 19 spunte: la cifra fissa del libro,
+la fila pulita, la fila del server su un banco (saltati l'ordine di Mario,
+l'intervallo, il preso, chi compra, chi vende meno; un venditore occupato;
+la pausa di un'ora e la sua fine; fila finita), le rotte, il battito, il
+tasto, il foglio che aspetta, il riquadro e l'ordine allargato, la fila
+in node. Le tre sentinelle che contavano i try dell'orologio P2P (ora
+nove) e la firma di `pubblicaDaSoloP2P` (ora con `cambia`) aggiornate.
+NON provato dal vivo: va con la prova coi moderatori della voce
+31 di DA-FARE (il tasto è chiuso a loro come tutto «Non hai sats?»).

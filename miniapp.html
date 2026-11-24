@@ -31431,6 +31431,8 @@ setInterval(() => {
   try { if (typeof battitoParacaduteP2P === 'function') battitoParacaduteP2P(); } catch(e) {}
   /* ...e la ripubblica dei miei ordini scaduti (16 nov 2026): stessa cadenza */
   try { if (typeof battitoRipubblicaP2P === 'function') battitoRipubblicaP2P(); } catch(e) {}
+  /* ...e le domande di chi compra a cifra diversa dai miei ordini fissi (24 nov 2026) */
+  try { if (typeof battitoChiesteP2P === 'function') battitoChiesteP2P(); } catch(e) {}
   /* ...e col libro davanti, gli ordini usciti col paracadute (una volta al minuto) */
   try { if (typeof rinfrescaFuoriLibroP2P === 'function') rinfrescaFuoriLibroP2P(); } catch(e) {}
   document.querySelectorAll('.lampo-count').forEach(n => {
@@ -84363,7 +84365,8 @@ function viaEuroLibro(poi){
   caricaLibroP2P().then(() => { if (typeof poi === 'function') poi(); }).catch(() => {});
 }
 function viaEuroTasto(sats, dove){
-  if (!viaEuroOfferta(sats)) return '';
+  /* ...o chi vende a cifra fissa, a cui chiedere (24 nov 2026) */
+  if (!viaEuroOfferta(sats) && !viaEuroFissiOra(sats).length) return '';
   viaEuroSats = sats;
   const qr = dove === 'qr';
   return '<button type="button" class="btn orange via-euro-btn" onclick="apriViaEuro(\''
@@ -84381,7 +84384,7 @@ function viaEuroAccanto(paga, sats){
 function payViaEuroVista(sats){
   const b = el('payViaEuro');
   if (!b) return;
-  const si = sats > 0 && !!viaEuroOfferta(sats);
+  const si = sats > 0 && (!!viaEuroOfferta(sats) || viaEuroFissiOra(sats).length > 0);
   if (si) viaEuroSats = sats;
   b.style.display = si ? '' : 'none';
 }
@@ -84391,10 +84394,28 @@ function payViaEuroVista(sats){
 const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay'};
 let viaEuroScelto = null;   // {id, euro, metodo} dell'offerta mostrata
 let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in memoria
-function apriViaEuro(dove){
+async function apriViaEuro(dove){
   haptic();
   const o = viaEuroOfferta(viaEuroSats);
-  if (!o) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
+  /* NESSUN MATCH, MA CHI VENDE A CIFRA FISSA (24 nov 2026): si chiede a
+     loro; se una ricerca per questo annuncio e' gia' viva, si riprende */
+  if (!o) {
+    const fissi = viaEuroFissiOra(viaEuroSats);
+    const l = currentListing;
+    if (!viaEuroCerca && l) {
+      const st = await viaEuroStato();
+      const mia = st && st.mia;
+      if (mia && mia.annuncio_id === l.id && (mia.stato === 'chiedo' || mia.stato === 'allargo'))
+        viaEuroCerca = mia;
+    }
+    if (!fissi.length && !viaEuroCerca) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
+    if (dove === 'qr') closeSheet();
+    if (viaEuroCerca) { viaEuroAspetta(); return; }
+    renderViaEuroChiedi(fissi);
+    el('sheetBg').classList.add('open');
+    el('viaEuroSheet').classList.add('open');
+    return;
+  }
   /* dal foglio del QR: il foglio della fattura si chiude (il suo ordine
      da 15 minuti lo sostituisce il server col deposito lungo) */
   if (dove === 'qr') closeSheet();
@@ -84585,6 +84606,227 @@ function viaEuroRiprendiP2P(o){
   if (passo !== 'attesa' && passo !== 'paga') return '';
   return '<button type="button" class="btn orange" onclick="viaEuroSegui(\'' + esc(o.id) + '\')">Riprendi il pagamento</button>';
 }
+/* ============ CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026, cantiere
+   chiedi-al-venditore; Andrea: «il barattolo dovrebbe chiedere prima ad un
+   venditore, poi se il venditore gli dice di no, passa ad un altro»).
+   Nel libro c'e' solo chi vende 200 € esatti e Mario ne vuole 50: su Mostro
+   un ordine fisso non si spezza. Il telefono di Mario manda al server la
+   fila dei venditori a cifra fissa (dal piu' conveniente), il server
+   chiede a uno alla volta (10 minuti a testa, nessun limite), e al «Si'»
+   il telefono di Tizio trasforma il suo ordine in «da 50 a 200 €»: da li'
+   il foglio di Mario lo trova come un match qualunque. ============ */
+/* PURA: i venditori a cifra FISSA che potrebbero vendere a Mario una parte
+   del loro ordine, dal piu' conveniente (meno euro per Mario; a parita' il
+   piu' recente). Stesse regole di `viaEuroScelta`, ma l'importo unico e'
+   PIU' GRANDE di quel che serve. [{id, euro, tot}] */
+function viaEuroFissi(ordini, sats, perSat, fee, miei){
+  if (!(sats > 0) || !(perSat > 0) || !(fee >= 0) || fee >= 2 || !Array.isArray(ordini)) return [];
+  const lordo = Math.ceil(sats / (1 - fee / 2)) + 1;
+  const fuori = [];
+  for (const o of ordini) {
+    if (!o || o.lato !== 'sell' || o.fiat !== 'EUR' || o.euroMax > 0) continue;
+    if (o.stato && o.stato !== 'pending') continue;
+    if (o.sats > 0 || o.coin) continue;
+    if (miei && miei[o.id]) continue;
+    if (!(o.metodi || []).some(m => VIA_EURO_METODI.indexOf(m) >= 0)) continue;
+    const quota = 1 - (Number(o.premium) || 0) / 100;
+    if (!(quota > 0)) continue;
+    const euro = Math.ceil(lordo * perSat * (1 + VIA_EURO_MARGINE) / quota);
+    if (!(o.euro > euro + 1)) continue;
+    fuori.push({id: o.id, euro: euro, tot: o.euro, creato: o.creato || 0});
+  }
+  fuori.sort((a, b) => a.euro - b.euro || b.creato - a.creato);
+  return fuori.slice(0, 50).map(c => ({id: c.id, euro: c.euro, tot: c.tot}));
+}
+function viaEuroFissiOra(sats){
+  if (!viaEuroPerMe() || !p2pLibro || !(sats > 0) || !(myViaEuroMax > 0)) return [];
+  const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
+  const fee = commissioneVivaP2P();
+  if (fee === null) return [];
+  return viaEuroFissi(p2pLibro.ordini, sats, perSat, fee, ordiniP2P()).filter(c => c.euro <= myViaEuroMax);
+}
+/* la ricerca di Mario, come la dice il server: {richiesta, annuncio_id, stato} */
+let viaEuroCerca = null;
+let viaEuroCercaBattito = null;
+let viaEuroCercaLibro = 0;
+async function viaEuroStato(){
+  try {
+    const r = await fetch(`${API_BASE}/via-euro/stato`, {headers: {'X-Tg-Init-Data': authHdr()}, cache: 'no-store'});
+    return r.ok ? await r.json() : null;
+  } catch(e) { return null; }
+}
+/* IL FOGLIO QUANDO SERVE CHIEDERE: lo stesso prezzo (quello del venditore
+   piu' conveniente) e lo stesso «Continua»; Mario non vede la fila */
+function renderViaEuroChiedi(fissi){
+  const box = el('viaEuroCorpo'), tit = el('viaEuroTit');
+  if (!box) return;
+  if (tit) tit.textContent = 'Non hai sats?';
+  const c = fissi[0];
+  const prezzo = viaEuroSats * eurPerSat;
+  box.innerHTML = '<div class="via-euro-cifra">' + c.euro + ' €</div>'
+    + '<div class="via-euro-sotto">prezzo ' + centesimiTestoP2P(prezzo) + ' € + '
+    + centesimiTestoP2P(Math.max(0, c.euro - prezzo)) + ' € di cambio</div>'
+    + '<div class="via-euro-sotto">Chiediamo a chi vende sats se te li vende: può volerci qualche minuto.</div>'
+    + '<button type="button" class="btn primary" onclick="viaEuroChiedi()">Continua</button>';
+}
+function renderViaEuroCerco(){
+  const box = el('viaEuroCorpo'), tit = el('viaEuroTit');
+  if (!box) return;
+  if (tit) tit.textContent = 'Sto cercando chi ti vende i sats';
+  box.innerHTML = '<div class="via-euro-attesa"><span class="attesa-anello"></span>Puoi chiudere l\'app, ti avvisiamo noi.</div>'
+    + '<button type="button" class="btn ghost" onclick="viaEuroSmetti()">Annulla</button>';
+}
+async function viaEuroChiedi(){
+  const l = currentListing;
+  const fissi = viaEuroFissiOra(viaEuroSats);
+  if (!l || !fissi.length) { chiudiFoglioP2P('viaEuroSheet'); return; }
+  haptic();
+  try {
+    const r = await fetch(`${API_BASE}/via-euro/chiedi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({annuncio_id: l.id, candidati: fissi.map(c => ({id: c.id, euro: c.euro}))})});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      chiudiFoglioP2P('viaEuroSheet');
+      toast('Nessun venditore è disponibile adesso', 6000);
+      return;
+    }
+    viaEuroCerca = {richiesta: d.richiesta, annuncio_id: l.id, stato: 'chiedo'};
+  } catch(e) { toast('Non sono riuscito a chiedere: riprova', 5000); return; }
+  viaEuroAspetta();
+}
+/* IL FOGLIO CHE ASPETTA: ogni 5 secondi guarda se nel libro c'e' il match
+   (e allora torna il foglio del prezzo, col «Continua» di sempre); ogni 20
+   rilegge il libro e chiede al server com'e' andata */
+function viaEuroAspetta(){
+  renderViaEuroCerco();
+  el('sheetBg').classList.add('open');
+  el('viaEuroSheet').classList.add('open');
+  if (viaEuroCercaBattito) return;
+  viaEuroCercaBattito = setInterval(async () => {
+    const f = el('viaEuroSheet');
+    if (!viaEuroCerca || !f || !f.classList.contains('open')) {
+      clearInterval(viaEuroCercaBattito); viaEuroCercaBattito = null; return;
+    }
+    if (viaEuroOfferta(viaEuroSats)) {
+      clearInterval(viaEuroCercaBattito); viaEuroCercaBattito = null;
+      viaEuroCerca = null;
+      viaEuroScelto = null;
+      apriViaEuro('cassa');
+      return;
+    }
+    if (Date.now() - viaEuroCercaLibro < 20000) return;
+    viaEuroCercaLibro = Date.now();
+    caricaLibroP2P(true).catch(() => {});
+    const s = await viaEuroStato();
+    const mia = s && s.mia;
+    if (mia && mia.richiesta === (viaEuroCerca || {}).richiesta && mia.stato === 'nessuno') {
+      viaEuroCerca = null;
+      chiudiFoglioP2P('viaEuroSheet');
+      toast('Nessun venditore ha accettato: per ora puoi pagare solo in sats', 7000);
+    }
+  }, 5000);
+}
+async function viaEuroSmetti(){
+  const c = viaEuroCerca;
+  viaEuroCerca = null;
+  chiudiFoglioP2P('viaEuroSheet');
+  if (!c) return;
+  try {
+    await fetch(`${API_BASE}/via-euro/rispondi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({richiesta: c.richiesta, risposta: 'annulla'})});
+  } catch(e) {}
+}
+/* ---- la parte di chi vende: la domanda sulla pagina del SUO ordine ---- */
+let p2pChieste = {};          // ordine -> {richiesta, euro, stato, scade}
+let p2pChiesteBattito = 0;
+let p2pChiesteInCorso = {};   // richiesta -> true mentre il telefono allarga
+function battitoChiesteP2P(forza){
+  if (!forza && Date.now() - p2pChiesteBattito < 60000) return false;
+  if (DEMO || VETRINA || !myTgId || document.visibilityState === 'hidden') return false;
+  const mie = ordiniP2P();
+  if (!Object.keys(mie).some(id => mie[id] && mie[id].mio && mie[id].stato === 'pubblicato')) return false;
+  p2pChiesteBattito = Date.now();
+  viaEuroStato().then(s => {
+    if (!s || !Array.isArray(s.a_me)) return;
+    const nuove = {};
+    for (const q of s.a_me) if (q && q.ordine) nuove[q.ordine] = q;
+    const cambiato = JSON.stringify(nuove) !== JSON.stringify(p2pChieste);
+    p2pChieste = nuove;
+    if (cambiato && p2pOrdineAperto && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+  }).catch(() => {});
+  return true;
+}
+/* il riquadro, nella pagina del mio ordine ancora nel libro */
+function viaEuroChiestaP2P(o){
+  const q = o && o.mio && o.stato === 'pubblicato' ? p2pChieste[o.id] : null;
+  if (!q || q.stato !== 'chiedo' || Date.now() / 1000 > q.scade) return '';
+  if (p2pChiesteInCorso[q.richiesta]) return '<div class="p2p-box">Sto cambiando il tuo ordine…</div>';
+  return '<div class="p2p-box">Un compratore del mercatino vuole <b>' + q.euro + ' €</b> dei tuoi <b>'
+    + esc(String(o.euro)) + ' €</b>. Se ti va bene, il tuo ordine diventa «da ' + q.euro + ' a '
+    + esc(String(o.euro)) + ' €» e il resto resta nel libro.'
+    + '<div class="via-euro-fila"><button type="button" class="btn orange" onclick="viaEuroRispondiP2P(\''
+    + esc(o.id) + '\',\'si\')">Sì, va bene</button><button type="button" class="btn ghost" onclick="viaEuroRispondiP2P(\''
+    + esc(o.id) + '\',\'no\')">No</button></div></div>';
+}
+async function rispostaViaEuro(rid, risposta){
+  try {
+    const r = await fetch(`${API_BASE}/via-euro/rispondi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({richiesta: rid, risposta: risposta})});
+    return r.ok;
+  } catch(e) { return false; }
+}
+async function viaEuroRispondiP2P(id, risposta){
+  const o = ordiniP2P()[id];
+  const q = p2pChieste[id];
+  if (!o || !q) return;
+  haptic();
+  if (risposta === 'no') {
+    await rispostaViaEuro(q.richiesta, 'no');
+    delete p2pChieste[id];
+    renderOrdineP2P();
+    return;
+  }
+  if (!(await rispostaViaEuro(q.richiesta, 'si'))) {
+    toast('La richiesta non c\'è più', 5000);
+    delete p2pChieste[id];
+    renderOrdineP2P();
+    return;
+  }
+  p2pChiesteInCorso[q.richiesta] = true;
+  renderOrdineP2P();
+  let fatto = false;
+  try { fatto = await allargaOrdineP2P(o, q.euro); } catch(e) { fatto = false; }
+  delete p2pChiesteInCorso[q.richiesta];
+  delete p2pChieste[id];
+  await rispostaViaEuro(q.richiesta, fatto ? 'fatto' : 'fallito');
+  toast(fatto ? 'Fatto: il tuo ordine adesso va da ' + q.euro + ' a ' + o.euro + ' €'
+              : 'Non sono riuscito a cambiare il tuo ordine', 6000);
+  if (typeof renderP2P === 'function') renderP2P();
+  if (vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+}
+/* L'ORDINE ALLARGATO: si ritira il fisso e si rifa' uguale, ma «da `minimo`
+   al suo importo». Prima il ritiro: due ordini nel libro insieme
+   venderebbero due volte. Se il ritiro va e la ripubblica no, l'ordine
+   si rifa' dal + come sempre. */
+async function allargaOrdineP2P(o, minimo){
+  if (!o || !o.mio || o.soloVista || o.stato !== 'pubblicato' || o.euroMax > 0) return false;
+  const tot = Number(o.euro) || 0;
+  if (!(minimo > 0) || !(tot > minimo)) return false;
+  if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) return false;
+  if (typeof caricaNostrTools === 'function') await caricaNostrTools();
+  if (typeof mostroRiascolta === 'function') await mostroRiascolta();
+  try {
+    const chiamata = chiamataOrdineP2P(o, 'cancel');
+    await (typeof attendiGestoP2P === 'function' ? attendiGestoP2P(o.id, 'ritira', chiamata) : chiamata);
+  } catch(e) {
+    if (!(typeof annulloGiaFattoP2P === 'function' && annulloGiaFattoP2P(e, o.id))) return false;
+  }
+  return await pubblicaDaSoloP2P(o, {euro: String(minimo), euroMax: String(tot)});
+}
+/* ============ fine del chiedere a chi vende a cifra fissa ============ */
 /* Il terzo passo, l'unica parte viva della guida.
    'paga': i primi sats (un amico, o il P2P se e' acceso e c'e' un
    account) e poi il QR; 'incassa': l'indirizzo — il campo per chi non
@@ -98365,6 +98607,7 @@ function renderOrdineP2P(){
     /* «Riprendi il pagamento» (23 nov 2026): lo scambio nato da «Non hai
        sats?» riapre il suo foglio */
     (typeof viaEuroRiprendiP2P === 'function' ? viaEuroRiprendiP2P(o) : '') +
+    (typeof viaEuroChiestaP2P === 'function' ? viaEuroChiestaP2P(o) : '') +
     /* i recapiti stanno FRA il passo da fare e le uscite (fase 6, al
        posto della chat): quel che e' arrivato si mostra, quel che
        manca si chiede. Compaiono solo quando si sa con chi si sta
@@ -117799,13 +118042,15 @@ async function gestoRipubblicaP2P(id, gesto){
    ripubblica e il paracadute di prima — cosi' alla scadenza dopo si
    rifa' ancora. NON apre la pagina e non annuncia nel canale: e' un
    gesto di sfondo. Vero se il coordinatore l'ha preso. */
-async function pubblicaDaSoloP2P(o){
+async function pubblicaDaSoloP2P(o, cambia){
   /* Barattozon in compra si', in vendita mai (il PayCode: vedi
      `ripubblicaPossibileP2P`) */
   if (!o || !o.mio || o.soloVista || o.tabacchino
       || (tabacchinoP2P(o.metodi || []) && o.lato !== 'compro')) return false;
   const adesso = Math.floor(Date.now() / 1000);
-  const campi = campiRipubblicaUgualeP2P(o, adesso);
+  /* `cambia`: l'ordine allargato di chi vende a cifra fissa (24 nov 2026),
+     lo stesso ordine «da… a…» */
+  const campi = Object.assign(campiRipubblicaUgualeP2P(o, adesso), cambia || {});
   if (!valeNuovoOrdineP2P(campi).ok) return false;
   const lato = campi.lato;
   /* in moneta col cambio di adesso e i tetti del nodo (16 nov 2026,

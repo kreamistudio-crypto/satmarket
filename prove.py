@@ -105957,8 +105957,11 @@ def prove_p2p_avvisi_libro():
     # EMENDATA (18 nov 2026, «la vetrina che si pulisce»): OTTO — il giro
     # dei post P2P nei canali ha il suo, dopo la fotografia
     # (prove_vetrina_pulita guarda che stia li')
+    # EMENDATA (24 nov 2026, «chiedi al venditore»): NOVE — la fila delle
+    # domande a chi vende a cifra fissa ha il suo, dopo il paracadute
+    # (prove_chiedi_al_venditore guarda che ci sia)
     prova("...e ognuno ha il suo try (un battito storto non ferma gli altri)",
-          8, codice(orologio).count("except Exception as e:"))
+          9, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
           "for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):" in giro)
     prova("...e solo per due ore: un id che il libro non mostra smette di farsi cercare",
@@ -169126,7 +169129,7 @@ console.log(JSON.stringify(out));
     ev = _fn_js(mini, "function ordineDaEvento(ev, adesso){")
     ep = _fn_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){")
     cd = _fn_js(mini, "function confermaDettaglioP2P(){")
-    ps = _fn_js(mini, "async function pubblicaDaSoloP2P(o){")
+    ps = _fn_js(mini, "async function pubblicaDaSoloP2P(o, cambia){")
     rp = _fn_js(mini, "async function riprovaPubblicazioneP2P(){")
     rn = _fn_js(mini, "function renderOrdineP2P(){")
     prova("le strade del mercato in moneta: lettore, presa, risposta del nodo, scarto, ripubblica, Riprova",
@@ -192998,7 +193001,7 @@ console.log(JSON.stringify(c));
           c.get("daCampi"))
     prova("...e il telefono rifa' da solo anche Barattozon in compra, mai in vendita", True,
           "|| (tabacchinoP2P(o.metodi || []) && o.lato !== 'compro')) return false;"
-          in fn("async function pubblicaDaSoloP2P(o){"))
+          in fn("async function pubblicaDaSoloP2P(o, cambia){"))
     prova("si dichiarano solo le MIE righe", {ID: {"minimo": 90000, "massimo": 100000},
                                               ID3: {"minimo": 80000, "massimo": 90000}},
           c.get("dichiara"))
@@ -214033,6 +214036,165 @@ console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia
           _js.loads(out2.stdout) if out2.returncode == 0 else out2.stderr[-300:])
 
 
+def prove_chiedi_al_venditore():
+    """CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026, cantiere
+    chiedi-al-venditore; Andrea: uno alla volta, 10 minuti a testa,
+    nessun limite di venditori). Mario vuole 50 € e nel libro c'e' solo
+    chi vende 200 € esatti: Barattolo chiede a Tizio se gli va di vendere
+    solo quei 50 €, e il telefono di Tizio allarga l'ordine a «da 50 a
+    200 €». Il server chiede solo a ordini in vendita, nel libro, di un
+    nostro iscritto che non e' Mario, a cifra fissa piu' grande; un «No»
+    mette l'ordine in pausa un'ora; un venditore ha una domanda sola alla
+    volta; a fila finita Mario lo sa."""
+    print("\n[chiedi al venditore a cifra fissa]")
+    import asyncio
+    import json as _js, subprocess as _sp, tempfile as _tf
+    import sqlite3 as _sq
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    amb = {"re": re, "time": time, "json": _js,
+           "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$")}
+    exec(re.search(r"^VIA_EURO_CHIEDI_S = .*?^VIA_EURO_VIVE = .*?$", srv, re.S | re.M).group(0), amb)
+    for nome in ("_tabelle_via_euro", "_euro_fisso_libro", "_candidati_via_euro",
+                 "_chiedibile_via_euro", "_avanza_via_euro"):
+        exec(pezzo(nome), amb)
+
+    ef = amb["_euro_fisso_libro"]
+    prova("la cifra fissa del libro: «200,00 €» -> 200, i centesimi per "
+          "eccesso, un intervallo o una moneta -> 0",
+          [200, 26, 0, 0, 0], [ef("200,00 €"), ef("25,47 €"), ef("da 20,00 a 100,00 €"),
+                              ef("0,0153 ETH"), ef("")])
+    cv = amb["_candidati_via_euro"]
+    A, B, C = "aaaaaaaa1", "bbbbbbbb2", "cccccccc3"
+    prova("la fila del telefono si pulisce: forma dell'id, euro interi "
+          "positivi, niente doppioni", [[A, 50], [B, 60]],
+          cv([{"id": A, "euro": 50}, {"id": "x", "euro": 5}, {"id": B, "euro": 60},
+              {"id": A, "euro": 70}, {"id": C, "euro": "50"}, {"id": C, "euro": 0},
+              {"id": C, "euro": True}]))
+
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute("CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER, "
+                "stato TEXT, lato TEXT, maker INTEGER, euro TEXT)")
+    amb["_tabelle_via_euro"](con)
+    D, E, F, G = "dddddddd4", "eeeeeeee5", "ffffffff6", "gggggggg7"
+    for oid, tg, st, lato, mk, euro in [
+            (A, 501, "pending", "sell", 1, "200,00 €"),          # Tizio
+            (B, 111, "pending", "sell", 1, "300,00 €"),          # di Mario stesso
+            (C, 502, "pending", "sell", 1, "da 20,00 a 200,00 €"),
+            (D, 503, "in-progress", "sell", 1, "200,00 €"),
+            (E, 504, "pending", "buy", 1, "200,00 €"),
+            (F, 505, "pending", "sell", 1, "40,00 €"),           # troppo piccolo
+            (G, 506, "pending", "sell", 1, "150,00 €")]:          # Caio
+        con.execute("INSERT INTO p2p_ordini VALUES (?, ?, ?, ?, ?, ?)",
+                    (oid, tg, st, lato, mk, euro))
+    con.commit()
+    av = amb["_avanza_via_euro"]
+    T = 1_000_000
+
+    def nuova(fila, compratore=111):
+        cur = con.execute(
+            "INSERT INTO via_euro_richieste(compratore, annuncio_id, candidati, creato, "
+            "aggiornato) VALUES (?, 7, ?, ?, ?)", (compratore, _js.dumps(fila), T, T))
+        con.commit()
+        return cur.lastrowid
+    fila = [[B, 50], [C, 50], [D, 50], [E, 50], [F, 50], [A, 50], [G, 50]]
+    r1 = nuova(fila)
+    e = av(con, r1, T)
+    prova("si chiede al primo che si puo': saltati l'ordine di Mario, "
+          "l'intervallo, il preso, chi compra e chi vende meno di quel che serve",
+          ["chiedi", A, 501, 50, 200], [e[0], e[1]["ordine"], e[1]["venditore"],
+                                        e[1]["euro"], e[1]["tot"]])
+    r2 = nuova([[A, 40], [G, 40]], compratore=112)
+    e2 = av(con, r2, T + 1)
+    prova("un venditore ha una domanda sola alla volta: il secondo compratore "
+          "passa a Caio", ["chiedi", G], [e2[0], e2[1]["ordine"]])
+    e3 = av(con, r1, T + 2)
+    prova("dopo Tizio (un no o i 10 minuti) tocca a Caio... che pero' e' "
+          "occupato: fila finita, Mario lo sa", ("nessuno", 111, 7), e3)
+    prova("...e la ricerca resta chiusa", "nessuno",
+          con.execute("SELECT stato FROM via_euro_richieste WHERE id=?", (r1,)).fetchone()[0])
+    con.execute("INSERT OR REPLACE INTO via_euro_no(ordine, fino) VALUES (?, ?)", (A, T + 3600))
+    con.commit()
+    r3 = nuova([[A, 50]], compratore=113)
+    prova("un «No» mette l'ordine in pausa per un'ora", ("nessuno", 113, 7),
+          av(con, r3, T + 600 + 5))
+    r4 = nuova([[A, 50]], compratore=114)
+    prova("...passata l'ora gli si puo' richiedere", "chiedi", av(con, r4, T + 3601)[0])
+
+    prova("la rotta di Mario: la leva, la fila pulita sotto il tetto in euro, "
+          "una ricerca viva per persona", True,
+          "if not via_euro_ammesso(user[\"id\"]):" in pezzo("chiedi_via_euro")
+          and "if c[1] <= int(VIA_EURO_MAX_EURO or 0)]" in pezzo("chiedi_via_euro")
+          and "WHERE compratore=? AND stato IN (?, ?)\", (adesso, user[\"id\"], *VIA_EURO_VIVE))" in pezzo("chiedi_via_euro"))
+    rs = pezzo("rispondi_via_euro")
+    prova("la rotta delle risposte: solo il venditore chiesto risponde, solo "
+          "Mario annulla; il «No» mette la pausa e passa al prossimo; il «fatto» "
+          "avvisa Mario con l'annuncio", True,
+          "if int(r[\"venditore\"] or 0) != int(user[\"id\"])" in rs
+          and "if int(r[\"compratore\"]) != int(user[\"id\"]):" in rs
+          and "adesso + VIA_EURO_NO_PAUSA_S" in rs
+          and "link_telegram(\"annuncio\", avvisa_mario[1])" in rs)
+    prova("le domande scadute passano al prossimo nel battito pieno "
+          "dell'orologio P2P", True,
+          "await asyncio.wait_for(_giro_via_euro(), P2P_PASSATA_MAX_S)" in srv
+          and "chiesto<?\",\n            (*VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)" in srv)
+
+    # --- il telefono --------------------------------------------------------
+    prova("il tasto si accende anche con solo chi vende a cifra fissa", True,
+          "if (!viaEuroOfferta(sats) && !viaEuroFissiOra(sats).length) return '';" in mini
+          and "(!!viaEuroOfferta(sats) || viaEuroFissiOra(sats).length > 0)" in mini)
+    ap = _fn_js(mini, "async function apriViaEuro(dove){")
+    prova("...e il foglio chiede, o riprende la ricerca viva per l'annuncio",
+          True, "renderViaEuroChiedi(fissi);" in ap and "viaEuroAspetta(); return;" in ap
+          and "mia.annuncio_id === l.id" in ap)
+    asp = _fn_js(mini, "function viaEuroAspetta(){")
+    prova("il foglio che aspetta va avanti da solo quando il match arriva nel "
+          "libro", True, "if (viaEuroOfferta(viaEuroSats)) {" in asp
+          and "apriViaEuro('cassa');" in asp and "caricaLibroP2P(true)" in asp)
+    prova("chi vende: il riquadro nella pagina del suo ordine, e il battito", True,
+          "(typeof viaEuroChiestaP2P === 'function' ? viaEuroChiestaP2P(o) : '') +" in mini
+          and "if (typeof battitoChiesteP2P === 'function') battitoChiesteP2P();" in mini)
+    al = _fn_js(mini, "async function allargaOrdineP2P(o, minimo){")
+    prova("...il «Sì» ritira il fisso e lo rifa' «da… a…» dal SUO telefono", True,
+          "chiamataOrdineP2P(o, 'cancel')" in al
+          and "pubblicaDaSoloP2P(o, {euro: String(minimo), euroMax: String(tot)})" in al
+          and "Object.assign(campiRipubblicaUgualeP2P(o, adesso), cambia || {})" in mini)
+
+    prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
+            + _riga_js(mini, "const VIA_EURO_MARGINE = ")
+            + _fn_js(mini, "function viaEuroFissi(ordini, sats, perSat, fee, miei){")
+            + r"""
+const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
+  euro: 200, euroMax: 0, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
+const per = 0.001;
+const r = {};
+r.base = viaEuroFissi([O('a'), O('b', {premium: 5}), O('c', {euroMax: 300, euro: 10}),
+  O('d', {euro: 42}), O('e', {metodi: ['PayPal']}), O('f', {lato: 'buy'}), O('g'),
+  O('h', {sats: 50000})], 40000, per, 0.02, {g: {}});
+r.pari = viaEuroFissi([O('a', {creato: 5}), O('b', {creato: 9})], 40000, per, 0.02, {}).map(c => c.id);
+r.storti = [viaEuroFissi([O('a')], 0, per, 0.02, {}).length, viaEuroFissi(null, 1, per, 0.02, {}).length];
+console.log(JSON.stringify(r));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog)
+        nome = f.name
+    try:
+        out = _sp.run(["node", nome], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome)
+    if out.returncode != 0:
+        prova("la fila gira in node", "", out.stderr[-300:])
+        return
+    r = _js.loads(out.stdout)
+    prova("la fila: solo ordini a cifra fissa piu' grande di quel che serve, coi "
+          "metodi decisi, non miei; dal piu' conveniente",
+          [["a", 41, 200], ["b", 43, 200]],
+          [[c["id"], c["euro"], c["tot"]] for c in r["base"]])
+    prova("...a parita' il piu' recente", ["b", "a"], r["pari"])
+    prova("...e senza sats o libro: fila vuota", [0, 0], r["storti"])
+
+
 def prove_guida_wallet():
     """LA GUIDA «👛 IL TUO PRIMO WALLET» (17 nov 2026, cantiere
     primo-wallet). Andrea voleva un wallet custodial per i neofiti; dallo
@@ -222301,7 +222463,7 @@ CATEGORIE = {
     meta_cauzione_auto
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno non_hai_sats mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
@@ -223331,6 +223493,7 @@ def main():
     prove_guida_wallet,
     prove_giroconto_interno,
     prove_non_hai_sats,
+    prove_chiedi_al_venditore,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,
