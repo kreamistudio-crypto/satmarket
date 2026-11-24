@@ -852,7 +852,7 @@
      non su una classe della vista, che e' quel che guarda l'occhio
      della cronologia (navRiflette). `!important` perche' quelle
      sezioni si accendono a mano con lo style in linea. */
-  #app[data-sez="lavoro"] :is(#catSez,#scoprireSez,#chips,#p2pVetrinaSez){display:none!important}
+  #app[data-sez="lavoro"] :is(#catSez,#scoprireSez,#occasioniBanner,#chips,#p2pVetrinaSez){display:none!important}
   #app:not([data-sez="lavoro"]) #lavSez{display:none}
   /* le card del lavoro non hanno un'illustrazione loro: l'emoji fa da
      figura, un filo piu' grande di quella di ripiego delle categorie */
@@ -1697,6 +1697,23 @@
      siamo piu' al sicuro di prima, non meno. */
   .scoprire-card[data-id="lampo"] img{
     animation:sc-onda 5s ease-in-out infinite}
+  /* I DUE BANNER DELLE OCCASIONI sopra la griglia (24 nov 2026, cantiere
+     home-card-pulite): uno sopra l'altro, larghi quanto la griglia, a
+     328/80 — la misura vista e scelta da Andrea. L'id e non la classe
+     perche' deve battere la card piu' grande del sito (LE DUE STRISCE,
+     PIU' GRANDI SUL WEB). IL CONTO
+     DELL'ONDA QUI NON TORNA: 328/80 fa 4,1, oltre il 3,58 della sveglia
+     (sopra), e la rotazione scoprirebbe ~0,3px negli angoli; l'immagine
+     esce allora di 3px per lato, e il fondo resta coperto con margine. */
+  #occasioniBanner{display:grid;grid-template-columns:1fr;gap:8px;
+    padding:10px var(--pad) 4px}
+  #occasioniBanner .scoprire-card{width:auto;aspect-ratio:328/80;
+    box-shadow:0 4px 10px rgba(0,0,0,.25)}
+  #occasioniBanner .scoprire-card img{inset:-3px;width:calc(100% + 6px);
+    height:calc(100% + 6px)}
+  /* sul computer (e sul tablet) uno ACCANTO all'altro: uno sotto l'altro
+     a tutta larghezza sarebbero due cartelloni da 300px d'altezza */
+  @media (min-width:768px){#occasioniBanner{grid-template-columns:1fr 1fr}}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -15177,6 +15194,13 @@ document.getElementById('cartello')?.remove();</script>
       </div>
     </div>
     <div id="mercMappaBox"></div>
+    <!-- I DUE BANNER DELLE OCCASIONI (24 nov 2026, cantiere
+         home-card-pulite): «Offerte a tempo» e «Sconti dei negozi»
+         escono da «Da scoprire» e stanno qui, uno sopra l'altro, subito
+         prima delle card del mercatino — sono filtri della griglia. Li
+         disegna renderOccasioni; senza occasioni vive il riquadro e'
+         spento. -->
+    <div class="occ-banner" id="occasioniBanner" style="display:none"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -26977,6 +27001,16 @@ const SCOPRIRE = [
      categorie»; la forma `quadra` del template resta, senza voci. Con
      lei se ne va anche la garanzia che «Da scoprire» non sparisca: senza
      card vive la sezione torna a nascondersi, com'era prima. */
+];
+/* LE DUE CARD-INTERRUTTORE ORA SONO BANNER SOPRA LA GRIGLIA (24 nov
+   2026, cantiere home-card-pulite, Andrea: «le offerte a tempo e sconti
+   nei negozi, mettimeli come 2 banner stretti dove ci sono prima che
+   iniziano le card del mercatino. Ovviamente con i suoi disegni», poi
+   «una sopra l'altro»): accendono un filtro della GRIGLIA, quindi stanno
+   accanto a lei e non piu' in «Da scoprire», che resta dei negozi e
+   delle card che navigano. Stessi disegni, stessi testi, stesso tocco
+   (toccaScoperta) e stesso anello: cambia solo il posto. */
+const OCCASIONI = [
   {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
    vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
                     : !!(occasioniServer && occasioniServer.lampo),
@@ -27163,6 +27197,7 @@ function renderScoprire(){
      si scrive PRIMA del controllo della firma (la lezione storica di
      renderStriscia: scritto dopo, tornando dal barattolo la firma
      uguale lascerebbe la sezione spenta per sempre). */
+  renderOccasioni();
   const tutte = vociScoprire().filter(v =>
     (!vistaBarattolo || v.tocca) && v.vivo());
   el('scoprireSez').style.display = tutte.length ? '' : 'none';
@@ -27240,6 +27275,35 @@ function renderScoprire(){
   }).join('');
   aggiornaFrecce('scoprireStrip');
   armaScorriScoprire();
+}
+
+/* I DUE BANNER DELLE OCCASIONI sopra la griglia (24 nov 2026): la card di
+   «Da scoprire» ridotta all'osso — disegno, riserva e titolo — perche'
+   qui ci sono solo interruttori. Chiamato in testa a renderScoprire, cosi'
+   ogni strada che ridisegna la fila (il tocco, la busta, il barattolo)
+   ridisegna anche loro. Col barattolo aperto stanno spenti, per la stessa
+   ragione delle card-interruttore di la' (vedi renderScoprire). La firma
+   come la fila: si ridisegna solo quando cambia qualcosa. */
+let occasioniFirma = '';
+function renderOccasioni(){
+  const box = el('occasioniBanner');
+  if (!box) return;
+  const vive = vistaBarattolo ? [] : OCCASIONI.filter(v => v.vivo());
+  box.style.display = vive.length ? '' : 'none';
+  const firma = vive.map(v => v.id + (v.accesa() ? '!' : '')).join('|');
+  if (firma === occasioniFirma) return;
+  occasioniFirma = firma;
+  box.innerHTML = vive.map(v => `
+    <div class="scoprire-card${v.accesa() ? ' attiva' : ''}" role="button"
+         tabindex="0" data-id="${v.id}" aria-label="${esc(v.testo)}"
+         aria-pressed="${v.accesa() ? 'true' : 'false'}"
+         onclick="toccaScoperta(this.dataset.id)"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
+      <img src="/assets/scoprire/${v.file}" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"
+      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${esc(v.testo)}</span
+      ><span class="sc-titolo" aria-hidden="true">${esc(v.testo)}</span>
+    </div>`).join('');
 }
 
 /* I QUADRATI DEI NEGOZI SOTTO LA CARD GRANDE (23 nov 2026, Andrea:
@@ -27986,7 +28050,9 @@ function toccaScoperta(id){
      IL RITOCCO CHE SPEGNE NON SCORRE: e' un annulla, si resta dove
      si e' — la regola di tutta la famiglia (card categoria, e
      dall'ago 2026 anche la card del barattolo). */
-  if (!acceso) scorriSottoHeader(el('scoprireSez'));
+  /* (dal 24 nov 2026 il punto d'arrivo e' il riquadro dei banner sopra
+     la griglia, dove la card ora sta) */
+  if (!acceso) scorriSottoHeader(el('occasioniBanner'));
   if (DEMO) { renderGrid(); return; }
   loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
 }

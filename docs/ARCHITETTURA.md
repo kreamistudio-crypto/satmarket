@@ -2754,6 +2754,15 @@
   del catalogo nel client e' `SOTTOCAT`, voce per voce uguale
   all'albero (`prove_sottocategorie_vetrina`). Il pregresso: lo script
   `assegna_sottocategorie.py`, gesto di Andrea (DA-FARE, voce 23).
+  ⚠️ DAL 24 NOV 2026 (cantiere home-card-pulite) LE DUE CARD-INTERRUTTORE
+  NON STANNO PIU' QUI: «Offerte a tempo» e «Sconti dei negozi» sono i due
+  BANNER sopra la griglia (`#occasioniBanner`, catalogo `OCCASIONI`,
+  `renderOccasioni` chiamato in testa a `renderScoprire`), uno sopra
+  l'altro a 328/80 (accanto da 768px), stessi disegni, titoli, giudici di
+  vita e tocco (`toccaScoperta`, che ora scorre fino a loro); spenti col
+  barattolo e nella sezione lavoro. Quel che segue vale per loro dove
+  parla di filtri, immagini e titolo; la fila resta dei negozi e delle
+  card che navigano. Verbale: Cantieri, «La home ripulita».
   LA SEZIONE «DA SCOPRIRE» (ago 2026, decisione di Andrea): sotto la
   striscia delle categorie una fila di card RETTANGOLARI (250x115) che
   accendono i filtri dell'occasione — oggi due fisse, le offerte a
@@ -38574,7 +38583,8 @@ mai il kind 0 di nessuno: regola ferrea 2).
   titolo al centro e le DUE ONDE sotto le card, che scorrono con la fila
   via `ondeEvidenza` e le variabili `--onda-x`/`--onda-h`, ferme con gli
   effetti ridotti: Cantieri, «La home ripulita»),
-  `#catSez`, `#lavSez`, `#p2pVetrinaSez`; le pillole si appiccicano solo a
+  `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e sopra la griglia i due banner
+  `#occasioniBanner` (dal 24 nov); le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
   I quadrati escono solo se sono almeno `QUADRI_MIN` (4), sennò tutti
   grandi. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,

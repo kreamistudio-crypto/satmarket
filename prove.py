@@ -51947,6 +51947,11 @@ def prove_scoprire():
     # qui. Un elenco a mano se ne accorgerebbe solo guardandolo.
     _cat = mini[mini.index("const SCOPRIRE = ["):]
     _cat = _cat[:_cat.index("\n];")]
+    # (24 nov 2026, cantiere home-card-pulite) le due card-interruttore
+    # sono diventate i banner sopra la griglia: stessi file, stessi
+    # titoli, e la stessa fascia da misurare — il catalogo e' anche il loro
+    _occ = mini[mini.index("const OCCASIONI = ["):]
+    _cat += _occ[:_occ.index("\n];")]
     _voci = re.split(r"\n  \{id: ", _cat)[1:]
     _senza = {re.match(r"'([a-z0-9]+)'", v).group(1) + ".webp"
               for v in _voci
@@ -52324,7 +52329,7 @@ def prove_scoprire():
     # ferma
     prova("...solo nel ramo che accende, e anche in DEMO",
           (True, True),
-          ("if (!acceso) scorriSottoHeader(el('scoprireSez'));" in _ts,
+          ("if (!acceso) scorriSottoHeader(el('occasioniBanner'));" in _ts,
            0 <= _ts.find("scorriSottoHeader") < _ts.find("if (DEMO)")))
     # IL GIUDICE UNICO DELLO SCROLL: la meccanica in un posto solo per
     # le due strisce — a cambiare e' solo il punto d'arrivo.
@@ -52987,6 +52992,9 @@ def prove_scoprire_p2p(mini=None, node=None):
     pezzi = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
              + _fetta("const RACCONTI = {", "\n};")
              + _fetta("const SCOPRIRE = [", "\n];")
+             # (24 nov 2026) i due banner sopra la griglia, VERI
+             + "\n" + _fetta("const OCCASIONI = [", "\n];")
+             + "\n" + _fetta("let occasioniFirma = '';", "\n}")
              + "\n" + _fetta("function vociSponsor(){", "\n}") + "\n"
              # (23 nov 2026, promozioni) i negozi pagati e il turno
              # VERI: la fila passa da loro prima di arrivare qui
@@ -53090,13 +53098,28 @@ function dice(che, atteso, avuto){
   console.log((ok ? 'ok' : 'atteso ' + JSON.stringify(atteso)
     + ', avuto ' + JSON.stringify(avuto)) + '|' + che);
 }
-const idCard = () =>
-  (nodi['scoprireStrip'].innerHTML.match(/data-id="([a-z0-9-]+)"/g)
+/* LE CARD DI CASA, IN ORDINE: la fila e poi i due banner sopra la
+   griglia (24 nov 2026, cantiere home-card-pulite: «Offerte a tempo» e
+   «Sconti dei negozi» sono usciti dalla fila). Le attese di sotto
+   leggono la home intera; dove sta ciascuna lo dicono le due righe
+   subito dopo il primo giro. */
+const idDi = box => (nodi[box].innerHTML.match(/data-id="([a-z0-9-]+)"/g)
    || []).map(s => s.slice(9, -1));
-const rifai = () => { scoprireFirma = ''; renderScoprire(); };
+/* ...e si legge quel che SI VEDE: una sezione spenta tiene il suo
+   markup di prima (renderScoprire esce senza ridisegnare), ma a schermo
+   non c'e' — e dal 24 nov la fila puo' restare vuota davvero */
+const vista = (sez, box) => nodi[sez].style.display === 'none' ? [] : idDi(box);
+const idCard = () => vista('scoprireSez', 'scoprireStrip')
+  .concat(vista('occasioniBanner', 'occasioniBanner'));
+const rifai = () => { scoprireFirma = ''; occasioniFirma = null; renderScoprire(); };
 
 occasioniServer = {lampo: 1, sconto: 1};
 rifai();
+dice("nella fila resta il P2P", ['p2p'], idDi('scoprireStrip'));
+dice("...e le occasioni sono i banner sopra la griglia", ['lampo','sconto'],
+     idDi('occasioniBanner'));
+dice("...che hanno l aria-pressed dell interruttore", 2,
+     (nodi['occasioniBanner'].innerHTML.match(/aria-pressed="false"/g) || []).length);
 dice("il P2P e il primo della fila", ['p2p','lampo','sconto'], idCard());
 const suo = nodi['scoprireStrip'].innerHTML
   .split('data-id="p2p"')[1].split('>')[0];
@@ -53141,6 +53164,8 @@ dice('...e la sezione resta, per lei', '',
 vistaBarattolo = true;
 rifai();
 dice('col barattolo restano le card che navigano', ['p2p'], idCard());
+dice('...e i banner delle occasioni si spengono', 'none',
+     nodi['occasioniBanner'].style.display);
 dice('...anche col voto gia dato', '',
      nodi['scoprireSez'].style.display);
 
