@@ -140408,11 +140408,8 @@ def prove_effetti_ridotti():
     #     ricalcolo per fotogramma di QUALE card sta al centro mentre la
     #     fila scorre (anche col dito) — sposta una classe, non anima
     #     niente; la corsa e' del CSS, e la regola universale la spegne
-    #   ondeEvidenza (24 nov 2026, le due onde di «In evidenza»): una
-    #     scrittura per fotogramma di --onda-x/--onda-h mentre la fila
-    #     scorre — segue il DITO come lbApplica, non si muove da sola; con
-    #     gli effetti ridotti toglie le variabili e le onde stanno ferme
-    #     (2: il controllo `typeof` e la chiamata)
+    #   (ondeEvidenza, le due onde di «In evidenza», c'e' stata dal 24
+    #     nov 2026 a mezzogiorno alla sera: Andrea ha voluto la luce ferma)
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
@@ -140422,7 +140419,7 @@ def prove_effetti_ridotti():
            "avviaTour": 2, "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1,
            "passo": 2, "mondoAccendi": 1, "mondoGiro": 1, "apriMissione": 1,
            "arenaAccendi": 1, "arenaGiro": 1, "latoApri": 1, "latoGiro": 2,
-           "zoomQuiMappaP2P": 1, "armaScorriScoprire": 1, "ondeEvidenza": 2},
+           "zoomQuiMappaP2P": 1, "armaScorriScoprire": 1},
           dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
@@ -222598,27 +222595,32 @@ const t = spartisciScoprire(V);
 const giro = spartisciScoprire(V.slice(1, 8).concat(V[0], V[8], V[9]));
 const sette = spartisciScoprire(N.slice(0, 7).concat({id: 'p2p'}));
 const due = spartisciScoprire(N.slice(0, 2).concat({id: 'p2p'}));
+const quattro = spartisciScoprire(N.slice(0, 4).concat({id: 'p2p'}));
+const cinque = spartisciScoprire(N.slice(0, 5).concat({id: 'p2p'}));
 const uno = spartisciScoprire(N.slice(0, 1).concat({id: 'p2p'}));
 mqNetflix = {matches: false};
 const pc = spartisciScoprire(V);
 console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(giro.grandi),
   ids(giro.quadri), ids(sette.grandi).length, ids(sette.quadri), ids(pc.grandi).length,
-  ids(pc.quadri), ids(due.grandi), ids(due.quadri), ids(uno.grandi), ids(uno.quadri)]));""")
+  ids(pc.quadri), ids(due.grandi), ids(due.quadri), ids(uno.grandi), ids(uno.quadri),
+  ids(quattro.quadri), ids(cinque.grandi), ids(cinque.quadri)]));""")
     if r is None:
         salta("grandi e quadrati, girati in node", "node non c'e'")
     else:
         # (24 nov 2026, Andrea: «2 grandi e 2 quadratini») sotto gli 8
-        # negozi ognuno sta in tutte e due le file, da 2 negozi in su
+        # negozi ognuno sta in tutte e due le file; (24 nov sera, Andrea:
+        # «sono troppo pochi… almeno 5 o 6») da 5 negozi in su
         prova("in node: da 8 negozi uno grande e uno quadrato, mai in tutti "
-              "e due, e il turno dopo si scambiano; sotto gli 8 ogni negozio "
-              "e' grande E quadrato; con uno solo niente quadrati; sul "
+              "e due, e il turno dopo si scambiano; da 5 a 7 negozi ognuno "
+              "e' grande E quadrato; con 4 o meno niente quadrati; sul "
               "computer tutti grandi",
               [["A", "C", "E", "G", "p2p", "aste"], ["B", "D", "F", "H"],
                ["B", "D", "F", "H", "p2p", "aste"], ["C", "E", "G", "A"],
                8, ["A", "B", "C", "D", "E", "F", "G"], 10, [],
-               ["A", "B", "p2p"], ["A", "B"], ["A", "p2p"], []], r)
-    prova("...e le soglie sono 4 quadrati divisi e 2 negozi, le parole di Andrea",
-          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 2;" in mini)
+               ["A", "B", "p2p"], [], ["A", "p2p"], [], [],
+               ["A", "B", "C", "D", "E", "p2p"], ["A", "B", "C", "D", "E"]], r)
+    prova("...e le soglie sono 4 quadrati divisi e 5 negozi, le parole di Andrea",
+          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 5;" in mini)
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
     prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
           "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"
@@ -222678,23 +222680,17 @@ INSERT INTO annunci VALUES
           ('<div class="section-label centrato">Esplora per categorie</div>' in mini,
            '<div class="section-label centrato">Esplora il lavoro</div>' in mini))
     _css = mini[mini.index("<style"):mini.index("</style>")]
-    # LE DUE ONDE (24 nov 2026, scelte da Andrea dopo una ventina di
-    # prove): l'arancio davanti e la dorata dietro, sul fondo della pagina
-    # (nessun token di fascia: niente blocco di colore, niente scalino),
-    # ripetute ogni 360px, che scorrono con le card a meta' e a tre decimi
-    # e cambiano altezza in senso opposto. Le card della fila hanno
-    # l'ombra profonda; senza etichetta e senza cornice come prima.
+    # LA LUCE SOTTO LE CARD (24 nov 2026 sera): via le due onde viste
+    # in produzione, Andrea indica il collaudo («Cosi»): fondo della
+    # pagina e un chiarore arancio sul bordo di sotto, fermo.
     _sez = _css[_css.index("  #evidenzaSez{margin-top:6px;"):]
     _sez = _sez[:_sez.index("}") + 1]
-    prova("...sulle due onde: arancio davanti e dorata dietro, che scorrono "
-          "con le card piu' lente e salgono una mentre l'altra scende",
-          (True, True, True, True, True, 0, False),
-          ("fill%3D%22%23F7931A%22" in _sez,
-           "rgba(255%2C196%2C107%2C0.55)" in _sez,
-           "calc(var(--onda-x,0px) * .5) 100%/360px calc(50% + var(--onda-h,0%)) repeat-x" in _sez,
-           "calc(40px + var(--onda-x,0px) * .3) 100%/360px calc(66% - var(--onda-h,0%)) repeat-x" in _sez,
-           _sez.index("%23F7931A") < _sez.index("rgba(255%2C196"),
-           _css.count("--ev-fascia"),
+    prova("...sul fondo della pagina, con la luce arancio ferma sul bordo "
+          "di sotto: niente onde, niente blocco di colore",
+          (True, False, False, 0, False),
+          ("background:radial-gradient(75% 48px at 50% 100%,"
+           "rgba(247,147,26,.45),rgba(247,147,26,0))}" in _sez,
+           "svg" in _sez, "--onda-" in mini, _css.count("--ev-fascia"),
            "var(--bg)" in _sez))
     prova("...le card della fila sollevate dall'ombra, senza etichetta e "
           "senza cornice (nella griglia restano)",
@@ -222703,46 +222699,6 @@ INSERT INTO annunci VALUES
            "#evidenzaSez .card.ev .card-evidenza{display:none}" in _css,
            "#evidenzaSez .card.ev{outline:none}" in _css,
            ".card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}" in _css))
-    _re = pezzo_js(mini, "function renderEvidenza(){", "\n}\n")
-    prova("renderEvidenza arma le onde dopo aver riscritto la fila", True,
-          _re.index("el('evidenzaFila').innerHTML = html;") < _re.index("ondeEvidenza();"))
-    _onde = pezzo_js(mini, "let ondeEvidenzaArmate = false;", "\n}\n")
-    out = _node_banco("""
-const nodi = {};
-const fintoEl = id => (nodi[id] = nodi[id] || {id, scrollLeft: 0, ascolta: [],
-  addEventListener(t, fn, o){ this.ascolta.push([t, fn, o]); },
-  style: {v: {}, setProperty(k, x){ this.v[k] = x; }, removeProperty(k){ delete this.v[k]; }}});
-const el = id => fintoEl(id);
-let ridotti = false;
-const effettiRidotti = () => ridotti;
-const coda = [];
-const requestAnimationFrame = fn => coda.push(fn);
-const gira = () => { while (coda.length) coda.shift()(); };
-""" + _onde + """
-}
-ondeEvidenza(); ondeEvidenza(); ondeEvidenza();
-const f = nodi.evidenzaFila, s = nodi.evidenzaSez;
-const fuori = {ascoltatori: f.ascolta.length, tipo: f.ascolta[0][0],
-               passivo: f.ascolta[0][2].passive === true};
-f.scrollLeft = 140; f.ascolta[0][1](); f.ascolta[0][1](); f.ascolta[0][1]();
-fuori.inCoda = coda.length; gira();
-fuori.dopo = Object.assign({}, s.style.v);
-ridotti = true; f.scrollLeft = 300; f.ascolta[0][1](); gira();
-fuori.ridotti = Object.assign({}, s.style.v);
-console.log(JSON.stringify(fuori));
-""")
-    if out is None:
-        salta("le onde seguono la fila", "node non installato")
-    else:
-        prova("le onde si armano UNA volta sola, su uno scorrimento passivo",
-              [1, "scroll", True],
-              [out.get("ascoltatori"), out.get("tipo"), out.get("passivo")])
-        prova("...al piu' una scrittura per fotogramma",
-              1, out.get("inCoda"))
-        prova("...scorrendo di 140px: le onde vanno nel verso delle card e "
-              "cambiano altezza",
-              {"--onda-x": "-140px", "--onda-h": "6.73%"}, out.get("dopo"))
-        prova("...e con gli effetti ridotti restano ferme", {}, out.get("ridotti"))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",
           True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
 

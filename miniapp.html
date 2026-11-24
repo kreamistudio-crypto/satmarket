@@ -1511,31 +1511,21 @@
     padding:6px var(--pad) 10px}
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
-  /* LE DUE ONDE DI «In evidenza» (24 nov 2026, cantiere home-card-pulite).
-     Andrea: «non si potrebbe proprio mettere lo sfondo di quelle card di
-     un altro colore con la sezione in evidenza e le card disegnate come
-     sempre? La barra colorata di sfondo inviterebbe a scorrere verso
-     destra». Dopo una ventina di prove (fasce piene, sfumate, mensole,
-     fari, stili semplici: Cantieri, «La home ripulita») ha scelto queste:
-     due onde grandi sotto le card, quella dorata dietro e quella arancio
-     davanti, sul fondo della pagina (nessun blocco di colore, quindi
-     nessuno scalino con la sezione sopra), uguali nei due temi.
-     LE ONDE SCORRONO CON LE CARD, piu' lente («si muovono nella stessa
-     direzione di dove scorri le card, ma lentamente», e «cambiano
-     forma»): `ondeEvidenza` scrive due variabili allo scorrimento della
-     fila, `--onda-x` (lo spostamento, che l'arancio segue a meta' e la
-     dorata a tre decimi) e `--onda-h` (l'altezza, che sale per l'una e
-     scende per l'altra: provate anche insieme, Andrea ha tenuto queste). Ogni onda si ripete ogni 360px, quindi scorre
-     senza bordo; con gli effetti ridotti le variabili non si scrivono
-     e le onde restano ferme dove sono di serie.
+  /* LA LUCE SOTTO «In evidenza» (24 nov 2026 sera). Le due onde
+     arancioni del cantiere home-card-pulite, viste in produzione, ad
+     Andrea non sono piaciute («la fascia in evidenza non mi piace»): ha
+     indicato la schermata del collaudo, dove la fila sta sul fondo della
+     pagina e sotto le card c'e' solo un chiarore arancio, piu' forte al
+     centro, che sfuma in alto e ai lati («Cosi»). Niente onde, niente
+     blocco di colore, niente movimento: un'ellisse sul bordo di sotto,
+     dentro i 30px che la fila lascia sotto le card, uguale nei due temi.
      Il titolo «In evidenza» sta al centro come gli altri. Le card della
      fila sono quelle della griglia SENZA la pastiglia e la cornice (e'
      pubblicita' pagata, e a dirlo una volta basta il titolo), con
      un'ombra piu' profonda: sembrano sollevate, come le card grandi di
      sopra. Nella griglia di sotto restano come prima. */
   #evidenzaSez{margin-top:6px;padding:2px 0 4px;
-    background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20360%2060%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%2030%20C60%204%20120%2056%20180%2030%20C240%204%20300%2056%20360%2030%20L360%2060%20L0%2060%20Z%22%20fill%3D%22%23F7931A%22%2F%3E%3C%2Fsvg%3E") calc(var(--onda-x,0px) * .5) 100%/360px calc(50% + var(--onda-h,0%)) repeat-x,
-      url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20360%2060%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%2030%20C60%204%20120%2056%20180%2030%20C240%204%20300%2056%20360%2030%20L360%2060%20L0%2060%20Z%22%20fill%3D%22rgba(255%2C196%2C107%2C0.55)%22%2F%3E%3C%2Fsvg%3E") calc(40px + var(--onda-x,0px) * .3) 100%/360px calc(66% - var(--onda-h,0%)) repeat-x}
+    background:radial-gradient(75% 48px at 50% 100%,rgba(247,147,26,.45),rgba(247,147,26,0))}
   #evidenzaSez .ev-strip{padding-top:10px;padding-bottom:30px}
   #evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}
   #evidenzaSez .card.ev .card-evidenza{display:none}
@@ -27445,8 +27435,11 @@ const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
    metterne 2, mano a mano che aggiungiamo ce ne saranno altri»; scelta
    «2 grandi e 2 quadratini»): sotto gli 8 ogni negozio sta IN TUTTE E
    DUE, nella fila grande e nei quadrati, appena i negozi sono almeno
-   QUADRI_POCHI. Con un negozio solo la fila dei quadrati non c'e'. */
-const QUADRI_MIN = 4, QUADRI_POCHI = 2;
+   QUADRI_POCHI. PRIMA DEI CINQUE NIENTE QUADRATI (24 nov 2026 sera,
+   Andrea, visti in produzione: «Anche i quadrati sotto le card grosse
+   levale, sono troppo pochi; ora si vedranno quando le card grosse
+   saranno almeno 5 o 6»): la soglia sale da 2 a 5 negozi. */
+const QUADRI_MIN = 4, QUADRI_POCHI = 5;
 function spartisciScoprire(tutte){
   if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
   const negozi = tutte.filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));
@@ -27637,37 +27630,6 @@ function renderEvidenza(){
   evidenzaFirma = html;
   el('evidenzaFila').innerHTML = html;
   aggiornaFrecce('evidenzaFila');
-  ondeEvidenza();
-}
-
-/* LE ONDE SEGUONO LA FILA (24 nov 2026, vedi «LE DUE ONDE DI «In
-   evidenza»» nel foglio): un ascoltatore solo, attaccato una volta alla
-   fila (che resta: si riscrive solo il suo contenuto), e al piu' una
-   scrittura per fotogramma. Con gli effetti ridotti le variabili si
-   tolgono e le onde tornano ferme. */
-let ondeEvidenzaArmate = false;
-function ondeEvidenza(){
-  const f = el('evidenzaFila'), s = el('evidenzaSez');
-  if (ondeEvidenzaArmate || !f || !s || typeof f.addEventListener !== 'function') return;
-  ondeEvidenzaArmate = true;
-  let chiesto = false;
-  const scrivi = () => {
-    chiesto = false;
-    if (effettiRidotti()) {
-      s.style.removeProperty('--onda-x');
-      s.style.removeProperty('--onda-h');
-      return;
-    }
-    const x = f.scrollLeft;
-    s.style.setProperty('--onda-x', (-x) + 'px');
-    s.style.setProperty('--onda-h', (8 * Math.sin(x / 140)).toFixed(2) + '%');
-  };
-  f.addEventListener('scroll', () => {
-    if (chiesto) return;
-    chiesto = true;
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(scrivi);
-    else setTimeout(scrivi, 16);
-  }, {passive: true});
 }
 
 /* ================ I CONSIGLIATI (set 2026) ========================
