@@ -95700,3 +95700,24 @@ SCARTATI. Per i banner: le pillole strette senza disegno («non mi piacciono com
 PROVATO. `prove_scoprire` (la fila senza «aste» in ogni giro, la sezione che torna a sparire, nessuna card quadrata nemmeno ad aste accese, la card sponsor senza pastiglia), `prove_sponsor` (la parola sulla pagina, nessuna pastiglia nel renderer né nel CSS), `prove_card_p2p_vetrina` (l'interruttore accanto al titolo, l'aria-label di prima, spenta/riaccesa/altro dispositivo con la sezione che resta e il guscio che sparisce), `prove_tempo_pagare_p2p` (le icone senza «30 min» e «Cauzione», le parole nell'etichetta), `prove_strisce_web` (il guscio con l'id), `prove_promozioni` (il titolo di «In evidenza», le due onde nel CSS e l'ombra delle card, la cornice che resta nella griglia; un banco node su `ondeEvidenza`: armata una volta, passiva, una scrittura per fotogramma, -140px e 6,73% dopo 140px, ferme con gli effetti ridotti — controprova: verso invertito, onde in fase e effetti ridotti ignorati fanno tre rossi). Per i banner: `prove_scoprire` (il catalogo delle fasce e dei file legge anche `OCCASIONI`, lo scroll del tocco va a `#occasioniBanner`), il banco di `prove_scoprire_p2p` con `OCCASIONI` e `renderOccasioni` veri (nella fila solo il P2P, le occasioni nei banner con l'aria-pressed, banner spenti col barattolo; le attese leggono quel che si vede), `prove_strisce_web`; il censimento di `requestAnimationFrame` in `prove_effetti_ridotti` conta `ondeEvidenza`. Scatti con Playwright sulla pagina vera in collaudo locale, prima e dopo, a 320 (chiaro), 360 e 390 (scuro), l'interruttore acceso e spento, la vista del computer a 1100 px; in /mnt/project-files/home-card-pulite/.
 
 DA GUARDARE. Sul telefono di Andrea, dopo la promozione: la fila P2P con un ordine Barattozon (metodi coi puntini) e uno on-chain con la cauzione (da moderatore), l'interruttore spento e riacceso, la fila «In evidenza» di giorno e di notte, e le onde che scorrono col dito (nei video del browser di prova si vedono a scatti, lì no). I due banner sopra la griglia con offerte e sconti veri: il tocco che filtra e scorre fino a loro, e il ritocco.
+
+## L'anteprima di «In cima» diventa la vetrina (24 nov 2026, cantiere in-cima-anteprima; Andrea, dopo la promozione: «quell'animazione lì non rispecchia quello che succede. Dovresti far vedere un'animazione della vetrina com'è adesso, dove ci sono tutti gli annunci, e che porti una card sopra tutte le altre»)
+
+COSA. Nel foglio «Promuovi» il disegnino della prima voce, «In cima»,
+era una lista a righe (la tua riga risaliva) con l'aeroplanino del
+canale: non somigliava alla vetrina. Ora è la vetrina in piccolo: card
+a due colonne come quelle vere (la foto, il cartellino bianco del
+prezzo, le due righe del titolo), la seconda fila tagliata dal bordo
+perché la vetrina continua. La tua card, bordo arancio e foto arancio,
+parte dalla seconda fila a destra, si solleva (più grande, con
+l'ombra) e passa SOPRA le altre fino al primo posto; le altre scalano
+di uno, nell'ordine di «Più recenti». Il riquadro di questa voce è alto
+196px (`.promo-ante.pa-alta`, la classe la mette `vocePromoHTML` alla
+sola voce «In cima»: `:has()` in questo file non entra), le altre due
+voci restano a 124.
+DECISIONI. Niente aeroplanino (Andrea: «Stop», solo la card che sale).
+Le regole di sempre: nessuna parola nel disegno, lo stato fermo è
+l'arrivo (con gli effetti ridotti resta la tua card prima).
+PROVATO. `prove_promozioni`: quattro card e la tua, niente righe né
+aeroplanino, il percorso della tua sopra le altre, lo stato d'arrivo.
+Guardato con Playwright nel foglio vero, video mandato ad Andrea.

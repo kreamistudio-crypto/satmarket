@@ -222015,8 +222015,26 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
           "linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%)" in mini)
     prova("...e con gli effetti ridotti resta il disegno d'arrivo: lo stato "
           "fermo e' quello finale, i fotogrammi partono da prima", True,
-          "@keyframes pa-r1{0%,25%{top:84px}55%,100%{top:8px}}" in mini
-          and ".pa-r1{top:8px;" in mini)
+          "@keyframes pa-va{0%,30%{top:8px;left:21%}58%,100%{top:8px;left:52%}}" in mini
+          and ".pa-vt{top:8px;left:21%;" in mini)
+    # «IN CIMA» E' LA VETRINA (24 nov 2026, Andrea: «un'animazione della
+    # vetrina com'è adesso... che porti una card sopra tutte le altre»):
+    # le card a due colonne, la tua che parte dalla seconda fila e
+    # arriva prima, sollevata sopra le altre; niente piu' righe ne'
+    # aeroplanino
+    _ci = pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};")
+    _ci = _ci[_ci.index("  cima:"):_ci.index("  evidenza:")]
+    prova("«In cima» disegna la vetrina: quattro card, la tua col bordo arancio",
+          (4, 1, False, False),
+          (_ci.count('class="pa-v '), _ci.count("pa-tuo pa-vt"),
+           "pa-riga" in _ci, "pa-aereo" in _ci))
+    prova("...in un riquadro piu' alto, solo per lei", (True, True),
+          (".promo-ante.pa-alta{height:196px}" in mini,
+           "class=\"promo-ante${v.tipo === 'cima' ? ' pa-alta' : ''}\"" in mini))
+    prova("...la tua parte dalla seconda fila e passa SOPRA le altre", True,
+          "@keyframes pa-vt{0%,22%{top:134px;left:52%;" in mini
+          and "62%{top:8px;left:21%;transform:scale(1.12)" in mini
+          and ".pa-tuo{border:1.5px solid var(--sats-deep);z-index:2}" in mini)
 
     # ---- 7c. I QUADRATI DEI NEGOZI SOTTO LA CARD GRANDE (23 nov 2026,
     # Andrea in video): sul telefono una fila FERMA di quadrati, uno per

@@ -1615,25 +1615,33 @@
   .promo-ante{grid-column:1 / -1;position:relative;height:124px;margin-top:10px;
     border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--line)}
   .promo-ante[hidden]{display:none}
-  .pa-riga,.pa-card,.pa-sc{position:absolute;border-radius:7px;background:var(--card);
+  .pa-v,.pa-card,.pa-sc{position:absolute;border-radius:7px;background:var(--card);
     border:1px solid var(--line);box-sizing:border-box}
-  .pa-riga{left:12px;right:12px;height:30px}
-  .pa-riga::before{content:"";position:absolute;left:5px;top:4px;width:20px;height:20px;
+  /* «In cima»: la vetrina in piccolo, due colonne di card (foto, il
+     cartellino del prezzo, il titolo) come quelle vere */
+  .promo-ante.pa-alta{height:196px}
+  .pa-v{width:27%;height:118px;overflow:hidden}
+  .pa-v::before{content:"";position:absolute;left:3px;right:3px;top:3px;height:72px;
     border-radius:5px;background:var(--line)}
-  .pa-riga::after{content:"";position:absolute;left:32px;top:8px;width:45%;height:5px;
-    border-radius:3px;background:var(--line);box-shadow:0 8px 0 -1px var(--line)}
+  .pa-v::after{content:"";position:absolute;left:6px;width:70%;top:92px;height:5px;
+    border-radius:3px;background:var(--line);box-shadow:0 9px 0 0 var(--line)}
+  .pa-v i{position:absolute;left:6px;top:64px;width:46%;height:16px;border-radius:5px;
+    background:#FFF7EC;z-index:1}
   .pa-tuo{border:1.5px solid var(--sats-deep);z-index:2}
-  .pa-tuo::before{background:var(--sats)}
-  .pa-r1{top:8px;animation:pa-r1 4s ease-in-out infinite}
-  .pa-r2{top:46px;animation:pa-r2 4s ease-in-out infinite}
-  .pa-r3{top:84px;animation:pa-r3 4s ease-in-out infinite}
-  @keyframes pa-r1{0%,25%{top:84px}55%,100%{top:8px}}
-  @keyframes pa-r2{0%,25%{top:8px}55%,100%{top:46px}}
-  @keyframes pa-r3{0%,25%{top:46px}55%,100%{top:84px}}
-  .pa-aereo{position:absolute;right:20px;top:9px;width:22px;height:22px;
-    color:var(--sats-deep);animation:pa-aereo 4s ease-out infinite}
-  @keyframes pa-aereo{0%,58%{opacity:0;transform:translate(-40px,8px) scale(.6)}
-    75%,100%{opacity:1;transform:none}}
+  .pa-v.pa-tuo::before{background:linear-gradient(135deg,#F7931A,#B45309)}
+  /* lo stato fermo e' l'ARRIVO: il tuo primo, gli altri scalati di uno;
+     la seconda fila esce dal riquadro, che la vetrina continua */
+  .pa-vt{top:8px;left:21%;animation:pa-vt 4s ease-in-out infinite}
+  .pa-va{top:8px;left:52%;animation:pa-va 4s ease-in-out infinite}
+  .pa-vb{top:134px;left:21%;animation:pa-vb 4s ease-in-out infinite}
+  .pa-vc{top:134px;left:52%;animation:pa-vc 4s ease-in-out infinite}
+  @keyframes pa-vt{0%,22%{top:134px;left:52%;transform:none;box-shadow:none}
+    40%{transform:scale(1.12);box-shadow:0 10px 22px rgba(0,0,0,.45)}
+    62%{top:8px;left:21%;transform:scale(1.12);box-shadow:0 10px 22px rgba(0,0,0,.45)}
+    76%,100%{top:8px;left:21%;transform:none;box-shadow:none}}
+  @keyframes pa-va{0%,30%{top:8px;left:21%}58%,100%{top:8px;left:52%}}
+  @keyframes pa-vb{0%,30%{top:8px;left:52%}58%,100%{top:134px;left:21%}}
+  @keyframes pa-vc{0%,30%{top:134px;left:21%}58%,100%{top:134px;left:52%}}
   .pa-card{top:22px;width:70px;height:88px}
   .pa-card::after{content:"";position:absolute;left:6px;right:6px;bottom:8px;height:5px;
     border-radius:3px;background:var(--line);box-shadow:0 -9px 0 0 var(--line)}
@@ -53736,14 +53744,18 @@ const ICONA_PROMO = {
 };
 /* L'ANTEPRIMA DI OGNI VOCE: un disegnino, mai una schermata vera, e
    nessuna parola tranne l'etichetta che l'annuncio prende davvero.
-   «In cima»: il tuo annuncio (bordo arancio) risale la lista e parte
-   l'aeroplanino del canale. «In evidenza»: entra per primo nella fila e
+   «In cima» (24 nov 2026, Andrea: «far vedere un'animazione della
+   vetrina com'è adesso, dove ci sono tutti gli annunci, e che porti una
+   card sopra tutte le altre»): la griglia a due colonne della vetrina,
+   e il tuo annuncio (bordo arancio) sale dalla seconda fila al primo posto
+   mentre gli altri scalano di uno, come in «Più recenti». Prima era
+   una lista a righe con l'aeroplanino del canale: non somigliava alla
+   vetrina. «In evidenza»: entra per primo nella fila e
    si accende l'etichetta. «Da scoprire»: la tua card arriva al centro e
    diventa la grande, come nella fila vera. */
 const ANTEPRIMA_PROMO = {
-  cima: '<div class="pa-riga pa-tuo pa-r1"></div><div class="pa-riga pa-r2"></div>'
-      + '<div class="pa-riga pa-r3"></div><svg class="pa-aereo" viewBox="0 0 24 24" aria-hidden="true">'
-      + '<path class="ip-l" d="M21 3.5 3 10.8l6.6 2.6L12.2 20 21 3.5zM9.6 13.4 21 3.5"/></svg>',
+  cima: '<div class="pa-v pa-va"><i></i></div><div class="pa-v pa-vb"><i></i></div>'
+      + '<div class="pa-v pa-vc"><i></i></div><div class="pa-v pa-tuo pa-vt"><i></i></div>',
   evidenza: '<div class="pa-card pa-tuo pa-c1"><span class="pa-eti">In evidenza</span></div>'
       + '<div class="pa-card pa-c2"></div><div class="pa-card pa-c3"></div><div class="pa-card pa-c4"></div>',
   scoprire: '<div class="pa-sc pa-s1"></div><div class="pa-sc pa-s3"></div><div class="pa-sc pa-s2"></div>'
@@ -53761,7 +53773,7 @@ function vocePromoHTML(v, prima){
         v.serve ? `<small class="promo-serve">${esc(v.serve)}</small>` : ''}</span>
     </label>
     ${durate ? `<div class="promo-durate">${durate}</div>` : ''}
-    <div class="promo-ante"${prima ? '' : ' hidden'}>${ANTEPRIMA_PROMO[v.tipo] || ''}</div>
+    <div class="promo-ante${v.tipo === 'cima' ? ' pa-alta' : ''}"${prima ? '' : ' hidden'}>${ANTEPRIMA_PROMO[v.tipo] || ''}</div>
   </div>`;
 }
 /* SCEGLIERE UNA VOCE APRE LA SUA ANTEPRIMA (23 nov 2026, Andrea:
