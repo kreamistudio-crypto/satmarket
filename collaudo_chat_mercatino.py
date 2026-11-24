@@ -148,6 +148,19 @@ const PASSI = process.argv.slice(7);
 vm.runInThisContext(fs.readFileSync(BUNDLE, 'utf8'));
 const NT = NostrTools;
 const window = {NostrTools: NT, innerHeight: 800};
+/* I GESTI «SUBITO» DELLA PAGINA (24 nov 2026, cantiere chat-stabili-sorelle,
+   la stessa cura di `collaudo_chat_scambio`): la pagina rimanda a un
+   setTimeout(…, 0) il ritiro (`bloccoChatScambioP2P`). Finche' non e'
+   partito niente e' «in volo», e `quieto` poteva fotografare prima del
+   ritiro. Qui si contano: finche' uno non e' scattato la pagina non e'
+   quieta. */
+const tempoVero = setTimeout;
+let subito = 0;
+globalThis.setTimeout = (fn, ms, ...a) => {
+  if (ms) return tempoVero(fn, ms, ...a);
+  subito++;
+  return tempoVero(() => { subito--; fn(...a); }, 0);
+};
 const _box = fs.existsSync(STATO) ? JSON.parse(fs.readFileSync(STATO, 'utf-8')) : {};
 const localStorage = {getItem: k => (k in _box ? _box[k] : null), setItem: (k, v) => { _box[k] = String(v); }};
 function chiaveP2P(k){ return k; }
@@ -191,7 +204,7 @@ const dormi = ms => new Promise(r => setTimeout(r, ms));
 async function quieto(){
   for (let i = 0; i < 80; i++) {
     await dormi(25);
-    const inVolo = Object.keys(p2pChatScInVolo).length + (p2pChatScNovitaInVolo ? 1 : 0);
+    const inVolo = Object.keys(p2pChatScInVolo).length + (p2pChatScNovitaInVolo ? 1 : 0) + subito;
     if (!inVolo && i >= 4) return;
   }
 }
