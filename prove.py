@@ -123052,6 +123052,54 @@ def prove_avvisi_nuovi_ordini():
            and "{rete: 'ethereum', nome: 'Ethereum', metodo: 'USDT (Ethereum)'" in mini,
            "return P2P_RETI_USDT.find(r => r.metodo.toLowerCase() === t) || null;" in mini,
            "const metodi = tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean);" in mini))
+    # I FRANCHI COI METODI ALTRUI (24 nov 2026, cantiere avvisi-chf-metodi):
+    # il gemello degli USDT. 911 vede i franchi e vuole tutto; 912 no
+    con6 = sqlite3.connect(":memory:")
+    con6.row_factory = sqlite3.Row
+    con6.executescript(schema.replace("avvisi_nuovi_soglia TEXT DEFAULT '');",
+                                      "avvisi_nuovi_soglia TEXT DEFAULT '', "
+                                      "avvisi_nuovi_rete TEXT DEFAULT '', "
+                                      "avvisi_nuovi_valuta TEXT DEFAULT '', "
+                                      "avvisi_nuovi_metodi TEXT DEFAULT '');"))
+    con6.execute("INSERT INTO utenti VALUES(911,1,1,'','','','','')")
+    con6.execute("INSERT INTO utenti VALUES(912,1,1,'','','','','')")
+    con6.commit()
+    exec(pezzo("_chf_visto_avviso_p2p"), amb)
+    amb["P2P_METODI_CHF_LIBRO"] = ast.literal_eval(
+        re.search(r"P2P_METODI_CHF_LIBRO = (\([^)]*\))", src).group(1))
+    chf_visto = amb["_chf_visto_avviso_p2p"]
+    _chf_prima = amb.get("p2p_chf_ammesso"), amb.get("cambio_noto_ora")
+    amb.update(p2p_chf_ammesso=lambda tg: tg == 911, cambio_noto_ora=lambda v: 0.0)
+
+    def ev_chf(d, pm):
+        # i metodi in UN tag solo, come per gli USDT qui sopra
+        e = ev(d, T, pm=(), fa=("50",))
+        e["tags"] += [["pm", *pm], ["f", "CHF"]]
+        return e
+    accoda(con6, [ev_chf("c1", ("TWINT", "Revolut")),
+                  ev_chf("c2", ("Postfinance",)),
+                  ev_chf("c3", ("TWINT", "Bonifico SEPA")),
+                  ev_chf("c4", (" Wise ",)),
+                  ev_chf("c5", ("twint",))], CAMBIO, T)
+    amb.update(p2p_chf_ammesso=_chf_prima[0], cambio_noto_ora=_chf_prima[1])
+    prova("I FRANCHI COI METODI ALTRUI: la 🔔 suona per l'ordine in CHF coi NOSTRI metodi "
+          "(anche con gli spazi ai lati, come le legge l'app), non per «Postfinance», ne' per "
+          "uno che mescola un metodo nostro e uno no, ne' per «twint» piccolo (l'app vuole il "
+          "nome esatto); e chi i franchi non li vede non riceve niente",
+          {911: ["c1", "c4"], 912: []},
+          {tg: sorted(r[0] for r in con6.execute(
+              "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (911, 912)})
+    prova("...il giudice puro: niente metodi, o solo vuoti, non e' un ordine che l'app mostra",
+          [True, False, False, False],
+          [chf_visto(["Contanti", "Contante per posta"]), chf_visto([]), chf_visto(["", " "]),
+           chf_visto(None)])
+    _chf_tel = re.search(r"const P2P_METODI_CHF = \[([^\]]*)\];", mini)
+    prova("...la lista del server e' quella del telefono, nello stesso ordine, e il telefono "
+          "la confronta col nome esatto",
+          (True, True),
+          ((_chf_tel is not None and tuple(re.findall(r"'([^']*)'", _chf_tel.group(1)))
+            == ast.literal_eval(re.search(r"P2P_METODI_CHF_LIBRO = (\([^)]*\))", src).group(1))),
+           "return mc.length > 0 && mc.every(x => P2P_METODI_CHF.indexOf(String(x)) >= 0);" in mini))
     prova("il prefisso degli on-chain e' lo stesso del nome che nasce alla pubblica", True,
           'P2P_ONCHAIN_PREFISSO = "bar-onchain-"' in src
           and '.startswith("bar-onchain-")' in pezzo("_avviso_onchain_p2p"))

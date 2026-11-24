@@ -80637,6 +80637,28 @@ def _usdt_visto_avviso_p2p(metodi) -> bool:
     return len(m) > 0 and all(x.lower() in nostre for x in m)
 
 
+# I METODI DEI FRANCHI COME LI SCRIVE IL TELEFONO (`P2P_METODI_CHF` della
+# Mini App, la stessa lista nello stesso ordine: una sentinella di
+# prove.py le tiene uguali). Servono solo al giudice qui sotto.
+P2P_METODI_CHF_LIBRO = ("TWINT", "Bonifico CH", "Revolut", "Wise", "Contanti",
+                        "Contante per posta")
+
+
+def _chf_visto_avviso_p2p(metodi) -> bool:
+    """PURA: un ordine in franchi che il libro dell'app MOSTRA? Il calco di
+    `valutaVistaP2P` del telefono per i CHF: almeno un metodo, e OGNUNO
+    sta in `P2P_METODI_CHF` col nome esatto (spazi ai lati via, vuoti via,
+    come `ordineDaEvento`; le maiuscole contano, come la' l'`indexOf`).
+    PERCHE' (24 nov 2026, cantiere avvisi-chf-metodi, dopo il gemello
+    `_usdt_visto_avviso_p2p`): un altro client Mostro puo' pubblicare sul
+    nostro nodo un ordine in CHF con «Postfinance» o «Bonifico SEPA»; il
+    telefono lo nasconde (non avrebbe il suo form ne' il suo controllo),
+    e la 🔔 del server, che guardava solo la valuta, suonava lo stesso."""
+    m = [str(x).strip() for x in (metodi if isinstance(metodi, list) else [])]
+    m = [x for x in m if x]
+    return len(m) > 0 and all(x in P2P_METODI_CHF_LIBRO for x in m)
+
+
 def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
     """Per ogni ordine nuovo, le persone che lo vogliono: in CODA, una
     riga per (persona, ordine). Qui stanno le regole 1 e 3 — le
@@ -80664,6 +80686,10 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         # (`_usdt_visto_avviso_p2p`), o la 🔔 suona per un ordine che al
         # tocco «non c'e' piu'»
         if fiat == "USDT" and not _usdt_visto_avviso_p2p(o["metodi"]):
+            continue
+        # ...e in franchi solo coi NOSTRI metodi (24 nov 2026, cantiere
+        # avvisi-chf-metodi): lo stesso scarto, lo stesso rimedio
+        if fiat == "CHF" and not _chf_visto_avviso_p2p(o["metodi"]):
             continue
         # ...e un ordine IN MONETA (24 nov 2026, avvisi-p2p-valute): sul
         # filo e' EUR, la moneta la dicono i metodi; arriva solo a chi le
