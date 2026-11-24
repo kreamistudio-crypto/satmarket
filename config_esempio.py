@@ -529,6 +529,12 @@ DIGITALE_MIN_VENDITE = 0     # es. 1: per pubblicare annunci digitali
 # compra. Acceso di serie; False = interruttore d'emergenza: gli ordini
 # nuovi tornano al campo unico (quelli gia' a riquadri restano cosi').
 CODICI_UNO_ALLA_VOLTA = True
+# LA SCORTA DI CODICI (24 nov 2026): chi vende un digitale incolla prima
+# una lista di codici o link, uno per riga, e al pagamento Barattolo ne
+# consegna uno da solo. I pezzi dell'annuncio sono i codici rimasti.
+# Acceso di serie; False = interruttore d'emergenza: si torna alla
+# consegna a mano.
+SCORTA_CODICI = True
 # L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026): un annuncio digitale
 # a prezzo fisso diventa un mese d'ingresso a un canale privato. Chi paga
 # riceve un link valido solo per lui; i sats arrivano a chi vende quando

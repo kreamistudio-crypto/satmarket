@@ -1448,6 +1448,10 @@ Annulla
 Chi ha l'annuncio nel barattolo riceve l'avviso. Lo sconto vale per tutti finché dura; alla scadenza il prezzo torna pieno da solo.
 ⚡ Lancia
 Annulla
+## 🔑 Codici pronti
+Incolla qui i codici o i link, uno per riga. Quando qualcuno paga, Barattolo gliene consegna uno da solo. I pezzi dell'annuncio diventano i codici pronti.
+🔑 Aggiungi i codici
+Togli i codici non consegnati
 ## 🔄 Rifornisci l'annuncio
  Quanti pezzi hai ora
  pezzi

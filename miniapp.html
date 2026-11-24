@@ -19096,6 +19096,19 @@ document.getElementById('cartello')?.remove();</script>
        sono in pagamento proprio ora: scegli un numero piu' alto»,
        cioe' un numero da correggere — col prompt si perdeva tutto.
        Scrittura ASSOLUTA, come l'endpoint: quanti pezzi hai ORA. -->
+  <!-- LA SCORTA DI CODICI (24 nov 2026): i codici pronti di un annuncio
+       a codice online. Li scrive apriScorta; i codici non tornano mai
+       indietro dal server, il foglio dice solo QUANTI. -->
+  <div class="sheet" id="scortaSheet">
+    <div class="grab"></div>
+    <h3>🔑 Codici pronti</h3>
+    <div id="scortaTestata" style="display:flex;align-items:center;gap:10px;margin-bottom:10px"></div>
+    <div class="hint" style="margin-bottom:8px">Incolla qui i codici o i link, uno per riga. Quando qualcuno paga, Barattolo gliene consegna uno da solo. I pezzi dell'annuncio diventano i codici pronti.</div>
+    <div class="field"><textarea id="scortaTesto" rows="6" autocomplete="off" spellcheck="false" placeholder="CODICE-1&#10;CODICE-2&#10;https://t.me/..."></textarea></div>
+    <div id="scortaNota" style="font-size:12.5px;font-weight:700;margin-top:8px;min-height:18px"></div>
+    <button class="btn orange" id="scortaInvia" style="margin-top:12px" onclick="aggiungiScorta(this)">🔑 Aggiungi i codici</button>
+    <button class="btn ghost" id="scortaTogli" style="margin-top:8px" hidden onclick="togliScorta(this)">Togli i codici non consegnati</button>
+  </div>
   <div class="sheet" id="rifornisciSheet">
     <div class="grab"></div>
     <!-- Titolo e verbo del bottone cambiano col numero: da un annuncio
@@ -21566,6 +21579,9 @@ function mapOrder(o){
     /* l'ordine di un ABBONAMENTO a un canale (21 nov 2026): il suo link
        d'invito lo scrive il server, e qui diventa toccabile */
     abbonamento:o.abbonamento === true,
+    /* consegnato da solo dai CODICI PRONTI (24 nov 2026): qui un link
+       a un bot di Telegram diventa toccabile (`linkBotToccabile`) */
+    dallaScorta:o.dalla_scorta === true,
     /* della FOTO del contenuto arrivano il solo flag e il conto delle
        correzioni: i byte stanno dietro la loro rotta, e il nome del
        file e' la maniglia sul disco — non serve a nessun client */
@@ -31541,6 +31557,7 @@ const bloccoMioEsaurito = l => `
     : l.consegna === 'servizio'
     ? `<div class="trust-note">📅 <span>I servizi non hanno scorte: modifica l'annuncio per riattivarlo.</span></div>`
     : `<button class="btn orange" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}
+  ${scortaPossibile(l) ? `<button class="btn ghost" onclick="apriScorta(${l.id})">🔑 Codici pronti</button>` : ''}
   ${/* E L'USCITA PER CHI NON RIFORNIRA' (16 nov 2026, richiesta di
        Andrea): il pezzo unico venduto non ha niente da rimettere.
        Stesso vestito velato dell'«Elimina» dell'annuncio attivo, e
@@ -38214,6 +38231,10 @@ function openDetail(id){
                 (cantiere quantita-servizi): non ha scorte, e la
                 stessa rotta lo rifiuta per lo stesso motivo. -->
            ${(l.nostr || l.consegna === 'servizio') ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
+           ${/* LA SCORTA DI CODICI (24 nov 2026): i codici pronti, che
+                partono da soli al pagamento. Solo sul codice online puro:
+                la stessa guardia del server (scortaPossibile). */
+              scortaPossibile(l) ? `<button class="btn ghost" onclick="apriScorta(${l.id})">🔑 Codici pronti</button>` : ''}
            ${/* NASCONDERE UN ANNUNCIO SOLO (23 nov 2026): esce dalla
                 vetrina senza scadenza, e torna da «I tuoi annunci». Sta
                 dopo lo stock perche' e' il suo parente (l'esaurito resta
@@ -40511,6 +40532,7 @@ function closeSheet(){
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
+  el('scortaSheet').classList.remove('open');
   el('spedStdSheet').classList.remove('open');
   el('mmSheet').classList.remove('open');
   el('widgetSheet').classList.remove('open');
@@ -56796,7 +56818,8 @@ function pannelloContenutoDigitale(o){
       <div class="hint">${testa}</div>
       ${resaCodice(testo, {copia: 'copiaContenuto()',
                            aria: 'Copia il contenuto',
-                           linkCanale: o.abbonamento === true})}
+                           linkCanale: o.abbonamento === true,
+                           linkBot: o.dallaScorta === true})}
       ${bloccoFotoContenuto(o, c)}
       ${correggibile ? `<button class="btn ghost" style="margin-top:10px" onclick="apriCorrezioneContenuto(this)">✏️ Correggi</button>` : ''}
     </div>`;
@@ -56922,7 +56945,8 @@ function pannelloCodici(o){
       : 'aperto';
     return `
       <div class="hint" style="margin-top:12px"><b>Codice ${x.n}</b> · ${stato}</div>
-      ${resaCodice(x.testo, {copia: `copiaCodice(${x.n})`, aria: `Copia il codice ${x.n}`})}`;
+      ${resaCodice(x.testo, {copia: `copiaCodice(${x.n})`, aria: `Copia il codice ${x.n}`,
+                             linkBot: o.dallaScorta === true})}`;
   }).join('');
   let azioni = '';
   if (o.role==='buyer' && vivo && !inPagamento(o) && o.codiciConfermati === k-1 && k >= 1) {
@@ -58192,7 +58216,8 @@ function resaCodice(testo, o){
         style="margin-top:10px" aria-label="${esc(op.aria||'Copia')}"
         onclick="${copia}"><span class="mono codice-cifre">${esc(testo)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
   const scappato = esc(testo);
-  const corpo = op.linkCanale ? linkCanaleToccabile(scappato) : scappato;
+  const corpo = op.linkCanale ? linkCanaleToccabile(scappato)
+              : op.linkBot ? linkBotToccabile(scappato) : scappato;
   return `
       <div class="codice-blocco">${corpo}</div>
       <button class="btn ghost" style="margin-top:8px"
@@ -58216,6 +58241,29 @@ function linkCanaleToccabile(testoEsc){
 }
 function apriInvitoCanale(url){
   if (!/^https:\/\/t\.me\/\+[A-Za-z0-9_-]{8,64}$/.test(String(url || ''))) return false;
+  if (tg?.initData && tg.openTelegramLink) {
+    try { tg.openTelegramLink(url); return false; } catch(e){}
+  }
+  return true;
+}
+
+/* IL LINK A UN BOT SI TOCCA, MA SOLO DAI CODICI PRONTI (24 nov 2026,
+   scelta di Andrea sulla scheda: «Sì, solo link a bot Telegram»; il
+   caso e' il corso di un partner che si apre col suo bot). Qui il testo
+   l'ha scritto chi vende, quindi la porta e' stretta due volte: solo
+   sugli ordini consegnati dalla scorta (`dallaScorta`), e solo la forma
+   https://t.me/<nome>bot con al piu' ?start=<parametro> — il nome di un
+   bot Telegram finisce per «bot» per regola di Telegram, quindi un
+   canale, un gruppo o un sito restano testo da copiare, come ogni
+   altro digitale. Come l'invito: la forma non ha caratteri che esc()
+   cambi, si lavora sul testo gia' passato da esc(). */
+const RE_LINK_BOT = /(?<![\w\/.:=?&+-])https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{1,28}bot(?:\?start=[A-Za-z0-9_-]{1,64})?(?![\w\/?&=+.%#-])/gi;
+function linkBotToccabile(testoEsc){
+  return String(testoEsc || '').replace(RE_LINK_BOT, u =>
+    `<a href="${u}" target="_blank" rel="noopener noreferrer" onclick="return apriLinkBot(this.href)">${u}</a>`);
+}
+function apriLinkBot(url){
+  if (!/^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{1,28}bot(\?start=[A-Za-z0-9_-]{1,64})?$/i.test(String(url || ''))) return false;
   if (tg?.initData && tg.openTelegramLink) {
     try { tg.openTelegramLink(url); return false; } catch(e){}
   }
@@ -59671,6 +59719,107 @@ const rifQta = () => {
   return Number.isFinite(n) ? Math.max(rifMin, n) : 1;
 };
 
+/* LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici): la stessa
+   guardia di `_annuncio_con_scorta` sul server — solo il codice online
+   puro, non abbonamento, non asta, non importato. */
+function scortaPossibile(l){
+  return !!l && l.consegna === 'digitale' && !l.ancheDigitale
+    && !l.abbonamento && !astaE(l) && !l.nostr && !daNegozioCollegato(l);
+}
+let scortaId = 0;
+async function apriScorta(id){
+  haptic();
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const l = listings.find(x=>x.id===id) || myListings.find(x=>x.id===id);
+  if (!l) { toast('Annuncio non trovato'); return; }
+  scortaId = id;
+  el('scortaTesto').value = '';
+  el('scortaNota').textContent = '';
+  el('scortaTestata').innerHTML = `
+    ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44)}
+    <div style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.title)}</b>
+    <span id="scortaConto" style="font-size:12.5px;color:var(--ink-soft);font-weight:700">…</span></div>`;
+  el('sheetBg').classList.add('open');
+  el('scortaSheet').classList.add('open');
+  await contaScorta();
+}
+async function contaScorta(){
+  try {
+    const r = await fetch(`${API_BASE}/listings/${scortaId}/codici`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { el('scortaNota').style.color = 'var(--danger)';
+      el('scortaNota').textContent = d.detail || 'Non riesco a leggere i codici'; return; }
+    el('scortaConto').textContent = `${fmt(d.liberi)} pront${d.liberi===1?'o':'i'}`
+      + (d.consegnati ? ` · ${fmt(d.consegnati)} già consegnat${d.consegnati===1?'o':'i'}` : '');
+    el('scortaTogli').hidden = !d.liberi;
+    el('scortaInvia').disabled = !d.attiva;
+    if (!d.attiva) { el('scortaNota').style.color = 'var(--danger)';
+      el('scortaNota').textContent = 'I codici pronti sono spenti in questo momento'; }
+  } catch(e) {
+    el('scortaNota').style.color = 'var(--danger)';
+    el('scortaNota').textContent = 'Rete assente: riprova';
+  }
+}
+/* I PEZZI LI SCRIVE LA ROTTA DI SEMPRE (`/quantita`), col numero dei
+   codici liberi che il server ha appena contato: e' lei che conosce i
+   passaggi esaurito <-> in vetrina e i loro ganci. */
+async function pezziDaScorta(id, n){
+  const r = await fetch(`${API_BASE}/listings/${id}/quantita`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({quantita: n})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(d.detail || 'Quantità non aggiornata');
+  return d;
+}
+async function aggiungiScorta(btn){
+  haptic();
+  const id = scortaId, testo = el('scortaTesto').value;
+  const ripristina = bottoneInAttesa(btn, '🔑 Salvo…');
+  const nota = el('scortaNota');
+  try {
+    const r = await fetch(`${API_BASE}/listings/${id}/codici`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({aggiungi: testo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { nota.style.color = 'var(--danger)';
+      nota.textContent = d.detail || 'Codici non salvati'; return; }
+    await pezziDaScorta(id, d.liberi);
+    closeSheet();
+    toast(`🔑 ${fmt(d.liberi)} codic${d.liberi===1?'e pronto':'i pronti'}`
+          + (d.doppioni ? ` (${fmt(d.doppioni)} doppion${d.doppioni===1?'e scartato':'i scartati'})` : ''));
+    await dopoRifornimento(id);
+  } catch(e) {
+    nota.style.color = 'var(--danger)';
+    nota.textContent = e.message || 'Rete assente: riprova';
+  } finally { ripristina(); }
+}
+/* Prima i pezzi a zero e POI i codici: se un pagamento e' in volo la
+   rotta dei pezzi dice di no, e i codici restano dove sono. */
+async function togliScorta(btn){
+  haptic();
+  const id = scortaId;
+  const ripristina = bottoneInAttesa(btn, 'Tolgo…');
+  const nota = el('scortaNota');
+  try {
+    await pezziDaScorta(id, 0);
+    const r = await fetch(`${API_BASE}/listings/${id}/codici`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({togli: true})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { nota.style.color = 'var(--danger)';
+      nota.textContent = d.detail || 'Codici non tolti'; return; }
+    closeSheet();
+    toast('Codici tolti: l\'annuncio è esaurito');
+    await dopoRifornimento(id);
+  } catch(e) {
+    nota.style.color = 'var(--danger)';
+    nota.textContent = e.message || 'Rete assente: riprova';
+  } finally { ripristina(); }
+}
 function apriRifornisci(id){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }

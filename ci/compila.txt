@@ -240,3 +240,4 @@ collaudo_promozioni.py
 collaudo_profilo_mio.py
 collaudo_nascondi_annuncio.py
 collaudo_foto_varianti.py
+collaudo_scorta_codici.py

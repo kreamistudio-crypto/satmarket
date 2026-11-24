@@ -95819,3 +95819,65 @@ CORSI: Carmrain li vende con un suo bot, che i coupon non li fa ancora
 («posso implementarlo in questi giorni»); su Barattolo il codice
 digitale oggi lo scrive chi vende dopo ogni vendita, e la scorta di
 codici caricata prima e' proposta ad Andrea come pezzo a parte.
+
+## La scorta di codici: chi vende incolla i codici prima, e il server consegna da solo (24 nov 2026, cantiere scorta-codici; Andrea: «c'è modo di precaricare una serie di codici coupon (che potrebbe essere a questo punto un link cliccabile) che il cliente usa quindi in autonomia?»)
+
+PERCHÉ. I corsi di BitcoinLabs si vendono con un bot di Carmrain che
+darà un coupon per corso. Col digitale di prima, a ogni vendita chi
+vende doveva entrare nell'ordine e incollare il codice a mano: per un
+negozio di corsi venduti a qualsiasi ora vuol dire compratori che
+aspettano ore. Ora chi vende incolla i codici PRIMA, dal foglio «🔑
+Codici pronti» del suo annuncio a codice online, e all'incasso il
+server ne prende uno per pezzo e consegna da solo.
+
+COME. Tabella `codici_scorta` (cifrati come ogni digitale, impronta HMAC
+per scartare i doppioni anche contro i già consegnati), le rotte GET/POST
+`/api/listings/{id}/codici` che dicono QUANTI e mai quali, il gancio in
+fondo a `_incassa_ordine` (`_scorta_dopo_incasso`), riquadri dai due
+pezzi in su come la consegna a mano. Il dettaglio in ARCHITETTURA, «LA
+SCORTA DI CODICI».
+
+LE SCELTE. (1) I pezzi dell'annuncio DIVENTANO i codici pronti: il
+client, dopo aver aggiunto, chiama la `/quantita` di sempre col numero
+del server, e per togliere mette prima i pezzi a zero e poi cancella i
+codici. Così un annuncio non vende mai più pezzi dei codici, e chi
+toglie non lascia un pagamento in volo senza codice. (2) FAIL-OPEN come
+l'abbonamento: se i codici non bastano o qualcosa si rompe, l'ordine
+resta 'locked', chi vende riceve «I codici pronti sono finiti» e
+consegna a mano come sempre. (3) Un codice uscito resta dell'ordine per
+sempre, anche col rimborso: chi l'ha visto potrebbe averlo usato. (4) Il
+link a un bot si tocca, ma solo dalla scorta e solo la forma
+`t.me/<nome>bot(?start=..)`: scelta di Andrea sulla scheda («Sì, solo
+link a bot Telegram»), perché il corso si apre con un tocco e i link a
+siti esterni, dove stanno le trappole, restano da copiare.
+
+STRADE SCARTATE. Riscrivere `ricarica_quantita` in pezzi riusabili per
+allineare i pezzi dal server: le sentinelle di prove.py ne leggono il
+corpo e contano i suoi tre avvisi di esaurito; il client che chiama la
+rotta di sempre fa lo stesso senza toccarla. Rendere cliccabile ogni
+link https scritto da chi vende (scartata da Andrea sulla scheda).
+Tenere i codici in chiaro per mostrarli a chi vende: un codice che torna
+al client è un codice che può finire in uno screenshot; il foglio dice
+solo quanti.
+
+PROVATO. `collaudo_scorta_codici` sul server vero, sette scene: le
+guardie (spedito, annuncio altrui, lista vuota, riga troppo lunga,
+doppioni nella lista e contro i caricati, tetto), un pezzo (consegnato,
+timbrato «dalla scorta», avvisi a chi compra e a chi vende col conto,
+rivelazione), tre pezzi a riquadri, la scorta che non basta (resta a
+mano, il codice rimasto resta libero, poi un pezzo prende l'ultimo), un
+annuncio senza scorta come ieri, la leva spenta, il togli. Controprove:
+senza il controllo dei doppioni e senza il gancio, rosso.
+`prove_scorta_codici`: l'ordine commit → gancio, la presa con
+`ordine_id=0` (controprova: tolta, rosso), le scritture solo su
+'locked', la lettura senza contenuto, la leva accesa, l'impronta con la
+chiave, il tasto solo dove il server dice sì (in node, negozio collegato
+compreso), l'ordine dei due gesti del foglio, i link toccabili in node
+(due sì, nove no: canale, invito, http, sottopagina, parametro in più,
+dominio finto, nome corto, caratteri scappati).
+
+DA GUARDARE. La prova dal vivo sulla VM di collaudo prima della
+produzione (le funzioni coi soldi si provano lì, regola del 17 nov): un
+annuncio a codice online con tre codici, due acquisti da un pezzo e uno
+da due. E il giorno che il bot di Carmrain dà i coupon, il primo
+caricamento vero.

@@ -20367,6 +20367,9 @@ def prove_notifica_fail_open():
               # la sua prova in `prove_premi_fedelta`: qui tace
               "premio_al_pagamento": lambda con, o: None,
               "riga_premio_pagato": lambda p, chi: "",
+              # (24 nov 2026, scorta-codici) i codici pronti hanno il
+              # loro collaudo in `collaudo_scorta_codici`: qui tacciono
+              "scorta_per_ordine": lambda o: False,
               "WEB_PUSH_ATTIVO": False,
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
@@ -40993,6 +40996,9 @@ def prove_ricevuta_compratore():
                # prova in `prove_premi_fedelta`: qui tace
                "premio_al_pagamento": lambda con, o: None,
                "riga_premio_pagato": lambda p, chi: "",
+               # (24 nov 2026) i codici pronti hanno il loro collaudo in
+               # `collaudo_scorta_codici`: qui tacciono
+               "scorta_per_ordine": lambda o: False,
                # il registro dei negozi collegati (tappa 4) passa dal
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
@@ -142917,7 +142923,10 @@ def prove_link_invito_canale():
           "abbonamento:o.abbonamento === true," in mini)
     prova("il pannello del contenuto passa il link toccabile solo "
           "all'abbonamento", True,
-          "linkCanale: o.abbonamento === true})}" in mini)
+          # (24 nov 2026) dopo c'e' `linkBot`, il link a un bot dei
+          # codici pronti: l'invito resta dell'abbonamento soltanto
+          "linkCanale: o.abbonamento === true," in mini
+          and mini.count("linkCanale: ") == 1)
     node = _sh.which("node")
     if not node:
         salta("il banco del link d'invito", "serve node")
@@ -176115,6 +176124,125 @@ console.log(JSON.stringify(fuori));
           [o.get("scad"), o.get("scadNuovo")])
 
 
+def prove_scorta_codici():
+    """LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici). Il giro
+    vero lo fa `collaudo_scorta_codici` (server vero: compra, incasso,
+    consegna da sola, riquadri, scorta finita, leva). Qui le righe che un
+    riordino toglierebbe senza rompere niente di visibile:
+
+    QUEL CHE SI ROMPE IN SILENZIO: il gancio nell'incasso che scivola
+    PRIMA del commit (un codice consegnato su un ordine non ancora
+    'locked'); la presa del codice che perde `ordine_id=0` (due ordini
+    con lo stesso coupon); un codice che esce verso il client nella
+    lettura; la leva che nasce spenta; il foglio che toglie i codici
+    PRIMA di mettere i pezzi a zero (un pagamento in volo resterebbe
+    senza codice e senza che chi vende lo sappia); il tasto che compare
+    dove il server dice di no."""
+    import subprocess
+    print("\n[la scorta di codici]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    es = open("config_esempio.py", encoding="utf-8").read()
+    src = _SORGENTE
+    fn = lambda firma: _fn_js(mini, firma)
+
+    # --- 1) IL SERVER -------------------------------------------------
+    inc = pezzo("_incassa_ordine")
+    prova("l'incasso chiama la scorta DOPO il commit, solo sui mono",
+          [True, True],
+          [inc.index("con.commit()") < inc.index("_scorta_dopo_incasso("),
+           "elif not e_set and scorta_per_ordine(o):" in inc])
+    dopo = pezzo("_scorta_dopo_incasso")
+    prova("la presa ripete ordine_id=0 e conta i presi, senza await in mezzo",
+          [True, True, True],
+          ['"WHERE id=? AND ordine_id=0",' in dopo,
+           "if presi != n:" in dopo,
+           # le due attese prima di `adesso` chiudono con un return
+           "await" not in dopo[dopo.index("adesso = int(time.time())"):
+                               dopo.index("con.commit()")]])
+    prova("si consegna solo un ordine ancora 'locked'", 2,
+          dopo.count("WHERE id=? AND stato='locked'"))
+    let = pezzo("scorta_codici")
+    prova("la lettura dice quanti e non legge mai il contenuto", [True, False],
+          ['"liberi": codici_liberi(con, annuncio_id)' in let,
+           "contenuto" in let])
+    gua = pezzo("_annuncio_con_scorta")
+    prova("la guardia: solo codice online puro, non abbonamento, asta, "
+          "importato", [True] * 4,
+          ['a["consegna"] != "digitale"' in gua, "e_abbonamento(a)" in gua,
+           'a["asta_base_sats"]' in gua, "origine_annuncio(a)" in gua])
+    prova("la leva nasce accesa, nel codice e nell'esempio", [True, True],
+          ["except ImportError:\n    SCORTA_CODICI = True" in src,
+           "\nSCORTA_CODICI = True\n" in es])
+    prova("l'impronta dei doppioni ha la chiave, non lo SHA nudo", True,
+          "hmac.new(chiave" in pezzo("_impronta_scorta"))
+    prova("il collaudo e' nella gabbia della CI", [True, True],
+          ["collaudo_scorta_codici\n" in open("ci/collaudi.txt",
+                                                encoding="utf-8").read(),
+           "collaudo_scorta_codici.py\n" in open("ci/compila.txt",
+                                                   encoding="utf-8").read()])
+
+    # --- 2) IL CLIENT, in node ----------------------------------------
+    prova("il foglio c'e' e la chiusura di tutti i fogli lo chiude",
+          [True, True], ['id="scortaSheet"' in mini,
+                         "el('scortaSheet').classList.remove('open');" in mini])
+    prog = (r"""
+const astaE = l => !!l.asta;
+const myListings = [{id: 7, connettore_id: 3}];
+""" + fn("function daNegozioCollegato(l){")
+          + fn("function scortaPossibile(l){") + r"""
+const base = {consegna: 'digitale'};
+const casi = [base, {consegna: 'spedizione'}, {...base, ancheDigitale: true},
+  {...base, abbonamento: true}, {...base, asta: true}, {...base, nostr: true},
+  {...base, id: 7}, {...base, id: 8}];
+console.log(JSON.stringify(casi.map(scortaPossibile)));
+""")
+    out = subprocess.run(["node", "-e", prog], capture_output=True,
+                         text=True, timeout=30)
+    prova("il tasto solo dove il server dice si'",
+          "[true,false,false,false,false,false,false,true]", out.stdout.strip())
+    if out.returncode:
+        print(out.stderr[:400])
+    # IL LINK A UN BOT SI TOCCA (24 nov 2026, scelta di Andrea): solo
+    # t.me/<nome>bot(?start=..), solo sugli ordini della scorta
+    prova("il server timbra e fa uscire il «dalla scorta»", [2, True],
+          [pezzo("_scorta_dopo_incasso").count("dalla_scorta=1"),
+           'r["dalla_scorta"] = bool(int(r.get("dalla_scorta", 0) or 0))'
+           in src])
+    prova("le due rese del contenuto passano linkBot solo dalla scorta", 2,
+          mini.count("linkBot: o.dallaScorta === true"))
+    prog = (r"""
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tg = null;
+""" + mini[mini.index("const RE_LINK_BOT ="):mini.index("\n", mini.index("const RE_LINK_BOT ="))]
+          + fn("function linkBotToccabile(testoEsc){")
+          + fn("function apriLinkBot(url){") + r"""
+const casi = ['https://t.me/CorsiLabsBot', 'Il tuo corso: https://t.me/corsi_bot?start=AB-12_x\nGrazie',
+  'https://t.me/bitcoinprincipianti', 'https://t.me/+AbCdEf123456', 'http://t.me/corsibot',
+  'https://t.me/corsibot/12', 'https://t.me/corsibot?start=a&x=1', 'https://evil.com/t.me/corsibot',
+  'https://t.me.evil.com/corsibot', 'https://t.me/corsibot?start=<b>', 'https://t.me/abot'];
+console.log(JSON.stringify(casi.map(t => (linkBotToccabile(esc(t)).match(/href="([^"]*)"/g) || []).join(' '))));
+console.log(JSON.stringify(['https://t.me/corsibot?start=xy', 'https://t.me/canale', 'javascript:alert(1)']
+  .map(apriLinkBot)));
+""")
+    out = subprocess.run(["node", "-e", prog], capture_output=True,
+                         text=True, timeout=30)
+    righe = out.stdout.strip().split("\n")
+    prova("toccabili solo i link a un bot, interi",
+          '["href=\\"https://t.me/CorsiLabsBot\\"",'
+          '"href=\\"https://t.me/corsi_bot?start=AB-12_x\\"",'
+          '"","","","","","","","",""]', righe[0] if righe else "")
+    prova("e il tocco riapre solo la stessa forma", "[true,false,false]",
+          righe[1] if len(righe) > 1 else "")
+    if out.returncode:
+        print(out.stderr[:400])
+    tog = fn("async function togliScorta(btn){")
+    prova("togli: prima i pezzi a zero, poi i codici", True,
+          tog.index("pezziDaScorta(id, 0)") < tog.index("{togli: true}"))
+    agg = fn("async function aggiungiScorta(btn){")
+    prova("aggiungi: prima i codici, poi i pezzi col numero del server", True,
+          agg.index("{aggiungi: testo}") < agg.index("pezziDaScorta(id, d.liberi)"))
+
+
 def prove_nascondi_annuncio():
     """NASCONDERE UN ANNUNCIO SOLO (23 nov 2026, cantiere
     nascondi-annuncio). Lo stato nuovo 'nascosto' esce da ogni filtro
@@ -176427,6 +176555,8 @@ def prove_esauriti_eliminabili():
             + fn("function esaurito(l){")
             # (22 nov 2026) l'etichetta: «Rimuovi da qui» dal negozio collegato
             + fn("function daNegozioCollegato(l){")
+            # (24 nov 2026) il tasto «🔑 Codici pronti» chiede questa
+            + fn("function scortaPossibile(l){")
             + fn("function etichettaElimina(l, lunga){") + blocco
             + "let myListings = [], listings = [], DEMO = true, chiesto = null;\n"
             + "function haptic(){}\nfunction chiediConferma(o){ chiesto = o; }\n"
@@ -222681,7 +222811,7 @@ CATEGORIE = {
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
-    venduto_canale esauriti_eliminabili nascondi_annuncio chat_mercatino chat_dalla_notifica
+    venduto_canale esauriti_eliminabili nascondi_annuncio scorta_codici chat_mercatino chat_dalla_notifica
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
     etichetta_alimenti fotografia_annuncio
@@ -223792,6 +223922,7 @@ def main():
               prove_contanti_zona,
               prove_esauriti_eliminabili,
               prove_nascondi_annuncio,
+              prove_scorta_codici,
               prove_etichetta_alimenti,
               prove_fotografia_annuncio,
               prove_mappa_contanti,

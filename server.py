@@ -1458,6 +1458,20 @@ try:
         CODICI_UNO_ALLA_VOLTA = True
 except ImportError:
     CODICI_UNO_ALLA_VOLTA = True
+# LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici, idea e ok
+# di Andrea, per i corsi di BitcoinLabs): chi vende un digitale incolla
+# PRIMA una lista di codici (o di link), uno per riga, e al pagamento
+# Barattolo ne consegna uno da solo: chi vende non deve fare niente.
+# Acceso di serie (regola delle leve del 14 nov); False = interruttore
+# d'emergenza: gli ordini nuovi tornano alla consegna a mano di ieri, e
+# la scorta resta li'.
+try:
+    from config import SCORTA_CODICI
+    if not isinstance(SCORTA_CODICI, bool):
+        print("[digitale] SCORTA_CODICI non e' True/False: resta acceso")
+        SCORTA_CODICI = True
+except ImportError:
+    SCORTA_CODICI = True
 # L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026, cantiere abbonamento-
 # canale, idea e ok di Andrea: il negozio AndreAI vende un mese del suo
 # canale privato «Bitcoin On»). Chi paga riceve da solo un link d'invito
@@ -12108,6 +12122,31 @@ def init_db():
                 "correzioni INTEGER DEFAULT 0, "
                 "corretto_il INTEGER DEFAULT 0, "
                 "PRIMARY KEY (ordine_id, n))")
+    # LA SCORTA DI CODICI (24 nov 2026): i codici caricati PRIMA della
+    # vendita, uno per riga. Cifrati come `contenuto_digitale`; non
+    # escono mai verso nessun client, nemmeno verso chi li ha caricati
+    # (li ha gia'): le rotte dicono solo QUANTI. `ordine_id` 0 = libero;
+    # un codice uscito resta di quell'ordine per sempre, anche se si
+    # rimborsa: chi l'ha visto potrebbe averlo usato. `impronta` serve a
+    # rifiutare i doppioni senza decifrare.
+    con.execute("CREATE TABLE IF NOT EXISTS codici_scorta ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "annuncio_id INTEGER NOT NULL, "
+                "contenuto TEXT NOT NULL, "
+                "impronta TEXT NOT NULL, "
+                "ordine_id INTEGER DEFAULT 0, "
+                "creato INTEGER DEFAULT 0, "
+                "usato_il INTEGER DEFAULT 0)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_codici_scorta_annuncio "
+                "ON codici_scorta(annuncio_id, ordine_id)")
+    # sull'ordine, 1 = consegnato dalla scorta: e' il SI' che rende
+    # toccabile un link a un bot di Telegram (decisione di Andrea, 24 nov
+    # 2026: «Sì, solo link a bot Telegram»), il client non vede altro
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN "
+                    "dalla_scorta INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # L'ABBONAMENTO A UN CANALE (20 nov 2026, cantiere abbonamento-
     # canale). Sull'ordine, l'id del canale che ha pagato (0 = non e' un
     # abbonamento): lo scrive `_incassa_ordine`, e da li' l'ordine si
@@ -51939,6 +51978,10 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         # il link (o il rinnovo), dopo tutto il resto: fail-open, e un
         # guasto lo riprende la ronda
         await _abbonamento_dopo_incasso(ordine_id, canale_abbo)
+    elif not e_set and scorta_per_ordine(o):
+        # LA SCORTA DI CODICI (24 nov 2026): il codice pronto, dopo tutto
+        # il resto e fail-open; senza scorta non succede niente
+        await _scorta_dopo_incasso(ordine_id)
     return {"stato": "locked"}
 
 
@@ -53955,6 +53998,30 @@ def _impronta(testo: str) -> str:
     return hashlib.sha256(testo.encode("utf-8")).hexdigest()[:16]
 
 
+async def _avvisa_consegna_digitale(compratore_id: int, n: int,
+                                    riquadri: bool):
+    """L'avviso a chi compra che il contenuto c'e': lo stesso dalla
+    consegna a mano e dalla scorta (24 nov 2026), cosi' chi compra non
+    vede differenze. `riquadri`: i codici si aprono uno alla volta."""
+    if riquadri:
+        await notifica(compratore_id,
+                       f"💾 <b>Il venditore ha consegnato i {n} codici</b> "
+                       f"del tuo acquisto digitale! Si aprono <b>uno alla "
+                       f"volta</b>: apri il primo nella Mini App, provalo e "
+                       f"tocca «Funziona» per vedere il successivo. Ogni "
+                       f"codice ha {ORE_CONFERMA_DIGITALE} ore per una "
+                       f"disputa se non va. ⚠️ Un codice aperto non torna "
+                       f"indietro.")
+        return
+    await notifica(compratore_id,
+                   f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
+                   f"tuo acquisto digitale! Rivelalo nella Mini App e "
+                   f"provalo subito: dalla rivelazione hai "
+                   f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
+                   f"se qualcosa non va, poi l'acquisto è definitivo. "
+                   f"⚠️ Un codice, una volta rivelato, non torna indietro.")
+
+
 async def _consegna_codici(con, o, d: dict) -> dict:
     """La consegna (e la correzione) di un ordine a riquadri: il ramo
     di `consegna_digitale` quando `codici_uno_alla_volta` dice si'.
@@ -54050,14 +54117,7 @@ async def _consegna_codici(con, o, d: dict) -> dict:
         print(f"💾 Ordine #{ordine_id}: {n} codici consegnati uno per "
               f"riquadro (impronte "
               f"{', '.join(_impronta(c) for c in finali)})")
-        await notifica(o["compratore_id"],
-                       f"💾 <b>Il venditore ha consegnato i {n} codici</b> "
-                       f"del tuo acquisto digitale! Si aprono <b>uno alla "
-                       f"volta</b>: apri il primo nella Mini App, provalo e "
-                       f"tocca «Funziona» per vedere il successivo. Ogni "
-                       f"codice ha {ORE_CONFERMA_DIGITALE} ore per una "
-                       f"disputa se non va. ⚠️ Un codice aperto non torna "
-                       f"indietro.")
+        await _avvisa_consegna_digitale(o["compratore_id"], n, True)
         return {"ok": True, "stato": "shipped", "codici_n": n,
                 "correzioni": 0, "documento": False}
     cambiati = [k for k in range(1, n + 1) if finali[k - 1] != vecchi.get(k, "")]
@@ -54835,6 +54895,263 @@ async def ronda_abbonamenti():
         con.close()
 
 
+# LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici; Andrea:
+# «c'e' modo di precaricare una serie di codici coupon che il cliente usa
+# in autonomia?», per i corsi di BitcoinLabs). Chi vende un DIGITALE
+# incolla prima i codici, uno per riga; al pagamento `_incassa_ordine`
+# chiama `_scorta_dopo_incasso`, che ne prende uno libero e consegna da
+# solo, con le stesse colonne e gli stessi avvisi della consegna a mano.
+# Tutto il resto non cambia: il deposito, la rivelazione che fa da
+# ricevuta, «Funziona» sui riquadri, la disputa, le 24 ore.
+# I PEZZI DELL'ANNUNCIO li scrive la rotta di sempre (`/quantita`), che
+# il client chiama col numero dei codici liberi dopo averli salvati:
+# un secondo scrittore dello stock avrebbe voluto le sue sentinelle.
+# Se i pezzi superano i codici (o due pagamenti arrivano insieme
+# sull'ultimo), l'ordine senza codice resta 'locked' e chi vende lo
+# consegna a mano come ieri: e' avvisato.
+# I TESTI DELLA SCORTA (24 nov 2026): approvati da Andrea prima del push
+MSG_SCORTA_SOLO_DIGITALE = ("I codici pronti valgono solo per gli annunci "
+                            "a codice online")
+MSG_SCORTA_SPENTA = "I codici pronti sono spenti in questo momento"
+MSG_SCORTA_VUOTA = "Incolla almeno un codice, uno per riga"
+
+
+def msg_scorta_consegnato(n: int, restano: int) -> str:
+    cosa = "Un codice" if n == 1 else f"{n} codici"
+    return (f"🔑 <b>Venduto!</b> {cosa} dei tuoi codici pronti "
+            f"{'è partito' if n == 1 else 'sono partiti'} da solo. "
+            + ("Non ne restano più: l'annuncio è esaurito." if not restano
+               else f"Ne restano {restano}."))
+
+
+def msg_scorta_finita(ordine_id: int) -> str:
+    return (f"🔑 <b>I codici pronti sono finiti</b> e l'ordine "
+            f"#{int(ordine_id)} è pagato: consegnalo tu dall'ordine, come "
+            f"sempre.")
+
+
+MAX_CODICI_SCORTA = 500
+
+
+def _impronta_scorta(testo: str) -> str:
+    """L'impronta di un codice per i doppioni: con la chiave dei
+    contenuti, non lo SHA nudo — un coupon corto si indovinerebbe."""
+    chiave = _SALE_CONTENUTI + (CHIAVE_CONTENUTI_DIGITALI or "").encode()
+    return hmac.new(chiave, testo.encode("utf-8"),
+                    hashlib.sha256).hexdigest()[:32]
+
+
+def codici_liberi(con, annuncio_id: int) -> int:
+    return con.execute("SELECT COUNT(*) AS n FROM codici_scorta WHERE "
+                       "annuncio_id=? AND ordine_id=0",
+                       (int(annuncio_id),)).fetchone()["n"]
+
+
+def _annuncio_con_scorta(con, annuncio_id: int, venditore_id: int):
+    """L'annuncio di chi vende, se la scorta ci sta: solo il codice
+    online puro (non «anche digitale», che puo' partire per posta), non
+    un abbonamento (il link lo fa il bot), non un'asta, non una riga
+    importata (lo stock vive dove vive la merce)."""
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('attivo','venduto','nascosto')",
+                    (annuncio_id, venditore_id)).fetchone()
+    if not a:
+        raise HTTPException(400, "Operazione non permessa")
+    if (a["consegna"] != "digitale" or int(_campo(a, "anche_digitale", 0) or 0)
+            or e_abbonamento(a) or int(a["asta_base_sats"] or 0) > 0
+            or origine_annuncio(a)):
+        raise HTTPException(400, MSG_SCORTA_SOLO_DIGITALE)
+    return a
+
+
+@app.get("/api/listings/{annuncio_id}/codici")
+async def scorta_codici(annuncio_id: int, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Quanti codici ci sono: i liberi e quelli gia' consegnati. Mai i
+    codici: chi li ha caricati li ha gia'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        _annuncio_con_scorta(con, annuncio_id, user["id"])
+        usati = con.execute("SELECT COUNT(*) AS n FROM codici_scorta WHERE "
+                            "annuncio_id=? AND ordine_id<>0",
+                            (annuncio_id,)).fetchone()["n"]
+        return {"attiva": SCORTA_CODICI,
+                "liberi": codici_liberi(con, annuncio_id),
+                "consegnati": usati, "massimo": MAX_CODICI_SCORTA}
+    finally:
+        con.close()
+
+
+@app.post("/api/listings/{annuncio_id}/codici")
+async def scrivi_scorta_codici(annuncio_id: int, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """`{"aggiungi": "<un codice per riga>"}` o `{"togli": true}` (via i
+    codici non ancora consegnati). Toglierli si puo' sempre, anche a
+    leva spenta: e' il modo di riprenderli."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        _annuncio_con_scorta(con, annuncio_id, user["id"])
+        if d.get("togli") is True:
+            via = con.execute("DELETE FROM codici_scorta WHERE annuncio_id=? "
+                              "AND ordine_id=0", (annuncio_id,)).rowcount
+            con.commit()
+            print(f"🔑 Annuncio #{annuncio_id}: tolti {via} codici dalla "
+                  f"scorta")
+            return {"ok": True, "tolti": via, "liberi": 0}
+        if not SCORTA_CODICI:
+            raise HTTPException(400, MSG_SCORTA_SPENTA)
+        testo = d.get("aggiungi")
+        if not isinstance(testo, str):
+            raise HTTPException(400, MSG_SCORTA_VUOTA)
+        righe = [r.strip() for r in testo.splitlines() if r.strip()]
+        if not righe:
+            raise HTTPException(400, MSG_SCORTA_VUOTA)
+        for k, r in enumerate(righe, 1):
+            if len(r) > MAX_CARATTERI_CODICE:
+                raise HTTPException(400, f"Il codice della riga {k} è "
+                                         f"troppo lungo (massimo "
+                                         f"{MAX_CARATTERI_CODICE} caratteri)")
+        # I DOPPIONI non entrano, ne' quelli della lista ne' quelli gia'
+        # caricati (anche consegnati): lo stesso coupon a due persone e'
+        # il guaio che la scorta deve rendere impossibile
+        visti = {x["impronta"] for x in con.execute(
+            "SELECT impronta FROM codici_scorta WHERE annuncio_id=?",
+            (annuncio_id,))}
+        nuovi = []
+        for r in righe:
+            imp = _impronta_scorta(r)
+            if imp in visti:
+                continue
+            visti.add(imp)
+            nuovi.append((r, imp))
+        liberi = codici_liberi(con, annuncio_id)
+        if liberi + len(nuovi) > MAX_CODICI_SCORTA:
+            raise HTTPException(400, f"Al massimo {MAX_CODICI_SCORTA} codici "
+                                     f"pronti per annuncio: ne hai già "
+                                     f"{liberi}")
+        adesso = int(time.time())
+        con.executemany(
+            "INSERT INTO codici_scorta(annuncio_id, contenuto, impronta, "
+            "creato) VALUES(?,?,?,?)",
+            [(annuncio_id, _cifra_contenuto(r), imp, adesso)
+             for r, imp in nuovi])
+        con.commit()
+        print(f"🔑 Annuncio #{annuncio_id}: {len(nuovi)} codici nella scorta "
+              f"({len(righe) - len(nuovi)} doppioni scartati)")
+        return {"ok": True, "aggiunti": len(nuovi),
+                "doppioni": len(righe) - len(nuovi),
+                "liberi": liberi + len(nuovi)}
+    finally:
+        con.close()
+
+
+def scorta_per_ordine(o) -> bool:
+    """PURA: quest'ordine puo' consegnarsi dalla scorta? Un mono (un set
+    ha righe di annunci diversi) a codice online, non ancora consegnato,
+    a leva accesa."""
+    return bool(SCORTA_CODICI
+                and (_campo(o, "consegna_scelta") or "") == "digitale"
+                and int(_campo(o, "annuncio_id", 0) or 0) > 0
+                and not (_campo(o, "contenuto_digitale") or "")
+                and not int(_campo(o, "abbonamento_canale", 0) or 0))
+
+
+async def _scorta_dopo_incasso(ordine_id: int):
+    """I sats sono nel deposito: se l'annuncio ha codici pronti, se ne
+    prende uno per pezzo e si consegna. Fail-open come l'abbonamento: un
+    guasto lascia l'ordine 'locked', e chi vende consegna a mano.
+    NIENTE AWAIT fra la lettura dei liberi e la loro presa: nel server
+    mono-processo e' il patto anti-doppione di compra(); in piu' la presa
+    ripete `ordine_id=0`, e si conta che li abbia presi tutti."""
+    con = db()
+    try:
+        o = con.execute("SELECT * FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        if not o or o["stato"] != "locked" or not scorta_per_ordine(o):
+            return
+        n = int(o["quantita"] or 1)
+        liberi = con.execute(
+            "SELECT id, contenuto FROM codici_scorta WHERE annuncio_id=? "
+            "AND ordine_id=0 ORDER BY id LIMIT ?",
+            (o["annuncio_id"], n)).fetchall()
+        if not liberi:
+            # nessuna scorta (l'annuncio non la usa): niente da dire
+            if con.execute("SELECT 1 FROM codici_scorta WHERE annuncio_id=? "
+                           "LIMIT 1", (o["annuncio_id"],)).fetchone():
+                await _avvisa_scorta_finita(o)
+            return
+        if len(liberi) < n:
+            await _avvisa_scorta_finita(o)
+            return
+        adesso = int(time.time())
+        presi = 0
+        for c in liberi:
+            presi += con.execute(
+                "UPDATE codici_scorta SET ordine_id=?, usato_il=? "
+                "WHERE id=? AND ordine_id=0",
+                (ordine_id, adesso, c["id"])).rowcount
+        if presi != n:
+            con.rollback()
+            return
+        cifrati = [c["contenuto"] for c in liberi]
+        if n >= 2 and codici_uno_alla_volta(o):
+            cur = con.execute(
+                "UPDATE ordini SET stato='shipped', "
+                "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                "contenuto_digitale=?, contenuto_file='', "
+                "contenuto_file_tipo='', contenuto_file_nome='', "
+                "codici_n=?, codici_aperti=0, codici_confermati=0, "
+                "codice_aperto_il=0, dalla_scorta=1, aggiornato=? "
+                "WHERE id=? AND stato='locked'",
+                (adesso, _cifra_contenuto(""), n, adesso, ordine_id))
+            if cur.rowcount == 1:
+                con.execute("DELETE FROM codici_digitali WHERE ordine_id=?",
+                            (ordine_id,))
+                con.executemany(
+                    "INSERT INTO codici_digitali(ordine_id, n, contenuto) "
+                    "VALUES(?,?,?)",
+                    [(ordine_id, k, cif) for k, cif in enumerate(cifrati, 1)])
+        else:
+            # il campo unico: un codice, o (a leva dei riquadri spenta)
+            # tutti, uno per riga
+            testo = "\n".join(_decifra_contenuto(cif) for cif in cifrati)
+            cur = con.execute(
+                "UPDATE ordini SET stato='shipped', "
+                "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                "contenuto_digitale=?, contenuto_file='', "
+                "contenuto_file_tipo='', contenuto_file_nome='', "
+                "dalla_scorta=1, aggiornato=? WHERE id=? AND stato='locked'",
+                (adesso, cifrati[0] if n == 1 else _cifra_contenuto(testo),
+                 adesso, ordine_id))
+        if cur.rowcount != 1:
+            con.rollback()
+            return
+        con.commit()
+        restano = codici_liberi(con, o["annuncio_id"])
+        print(f"🔑 Ordine #{ordine_id}: {n} "
+              f"{'codice consegnato' if n == 1 else 'codici consegnati'} "
+              f"dalla scorta (ne restano {restano})")
+        await _avvisa_consegna_digitale(o["compratore_id"], n,
+                                        n >= 2 and codici_uno_alla_volta(o))
+        await notifica(o["venditore_id"], msg_scorta_consegnato(n, restano))
+    except Exception as e:
+        print(f"⚠️ Ordine #{ordine_id}: scorta dopo l'incasso interrotta: "
+              f"{e}")
+    finally:
+        con.close()
+
+
+async def _avvisa_scorta_finita(o):
+    """A chi vende: i codici pronti non bastano, quest'ordine va
+    consegnato a mano come ieri."""
+    print(f"🔑 Ordine #{o['id']}: la scorta non basta, consegna a mano")
+    await notifica(o["venditore_id"], msg_scorta_finita(o["id"]))
+
+
 @app.post("/api/orders/{ordine_id}/consegna-digitale")
 async def consegna_digitale(ordine_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
@@ -55032,13 +55349,7 @@ async def consegna_digitale(ordine_id: int, req: Request,
                        "del tuo acquisto digitale: apri l'ordine e rivela "
                        "quello nuovo.")
     else:
-        await notifica(o["compratore_id"],
-                       f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
-                       f"tuo acquisto digitale! Rivelalo nella Mini App e "
-                       f"provalo subito: dalla rivelazione hai "
-                       f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
-                       f"se qualcosa non va, poi l'acquisto è definitivo. "
-                       f"⚠️ Un codice, una volta rivelato, non torna indietro.")
+        await _avvisa_consegna_digitale(o["compratore_id"], 1, False)
     return {"ok": True, "stato": "shipped",
             "correzioni": o["contenuto_correzioni"] + (1 if correzione else 0),
             "documento": bool(file_nome)}
@@ -100638,6 +100949,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # (chi vende non lo puo' riscrivere: MSG_ABBONAMENTO_DA_SOLO).
         # Esce il booleano, mai l'id del canale.
         r["abbonamento"] = bool(int(r.pop("abbonamento_canale", 0) or 0))
+        # LA SCORTA DI CODICI (24 nov 2026): consegnato da solo dai codici
+        # pronti. Sul SI' il client rende toccabili i soli link a un bot
+        # di Telegram (`linkBotToccabile`), decisione di Andrea.
+        r["dalla_scorta"] = bool(int(r.get("dalla_scorta", 0) or 0))
         # I PUNTI PROPOSTI escono come LISTA e non come stringa JSON:
         # in colonna sono JSON perche' SQLite non ha un tipo lista, ma
         # quella e' una scelta dello schema e il client non deve

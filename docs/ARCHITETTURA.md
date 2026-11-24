@@ -12473,6 +12473,57 @@
   sblocco di sempre. FUORI, dichiarato: on-chain la decisione resta
   tutto-o-niente (la nota al moderatore lo dice), e un set di annunci
   diversi resta al campo unico.
+  LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici, chiesta da
+  Andrea per i corsi di BitcoinLabs: «precaricare una serie di codici
+  coupon che il cliente usa in autonomia»). Chi vende un annuncio a
+  codice online incolla i codici PRIMA, uno per riga, dal foglio «🔑
+  Codici pronti» del suo annuncio; quando un ordine si incassa, il
+  server ne prende uno per pezzo e consegna da solo. LA TABELLA
+  `codici_scorta (annuncio_id, contenuto, impronta, ordine_id, creato,
+  usato_il)`: il contenuto CIFRATO come ogni digitale
+  (`_cifra_contenuto`), l'impronta HMAC con la chiave dei contenuti
+  (`_impronta_scorta`: lo SHA nudo di un coupon corto si rovescia a
+  forza bruta) per scartare i DOPPIONI, anche contro i già consegnati
+  — lo stesso coupon a due persone è il guaio che la scorta deve
+  rendere impossibile. `ordine_id = 0` è «libero». LE ROTTE: `GET
+  /api/listings/{id}/codici` dice QUANTI (liberi, consegnati, attiva,
+  massimo) e MAI quali — i codici non tornano più al client, nemmeno a
+  chi li ha scritti; `POST` con `{"aggiungi": testo}` (righe ≤
+  `MAX_CARATTERI_CODICE`, al più `MAX_CODICI_SCORTA` = 500 liberi) o
+  `{"togli": true}` (cancella i liberi; ammesso anche a leva spenta).
+  IL PERIMETRO (`_annuncio_con_scorta` e `scorta_per_ordine`): annuncio
+  proprio, consegna 'digitale', non «anche digitale», non abbonamento,
+  non asta, non importato da Nostr o da un negozio collegato; ordine
+  mono-annuncio. IL GANCIO sta in fondo a `_incassa_ordine`, DOPO il
+  commit e in `elif` dell'abbonamento: `_scorta_dopo_incasso` legge i
+  liberi e li prende SENZA AWAIT IN MEZZO (il patto anti-doppione di
+  compra() nel server mono-processo), con la presa che ripete
+  `ordine_id=0` e conta i presi (altrimenti rollback). Con due pezzi o
+  più e `codici_uno_alla_volta(o)` i codici vanno nei riquadri
+  (`codici_digitali`), sennò nel campo unico; l'ordine passa a
+  'shipped' solo se è ancora 'locked'. Avvisi: al compratore gli stessi
+  della consegna a mano (`_avvisa_consegna_digitale`, ora condiviso), a
+  chi vende `msg_scorta_consegnato` col conto dei rimasti. FAIL-OPEN:
+  scorta insufficiente o guasto → l'ordine resta 'locked' e chi vende
+  riceve `msg_scorta_finita` e consegna a mano come sempre. I PEZZI
+  DELL'ANNUNCIO li allinea il CLIENT chiamando la rotta `/quantita` di
+  sempre (le sentinelle leggono il corpo di `ricarica_quantita`, e i
+  suoi tre avvisi di esaurito non si duplicano): aggiungi → prima i
+  codici, poi i pezzi col numero del server; togli → prima i pezzi a
+  zero, poi i codici (al contrario, un pagamento in volo resterebbe
+  senza codice). Leva `SCORTA_CODICI`, accesa di serie. Prove:
+  `collaudo_scorta_codici` (il giro vero) e `prove_scorta_codici`.
+  IL LINK A UN BOT SI TOCCA, SOLO DALLA SCORTA (scelta di Andrea sulla
+  scheda, 24 nov: «Sì, solo link a bot Telegram»). L'ordine consegnato
+  dalla scorta ha `dalla_scorta = 1` e in `/api/orders` esce il solo
+  booleano; sul SI' `resaCodice(.., {linkBot})` passa il testo (già
+  scappato) da `linkBotToccabile`, che rende `<a>` SOLO la forma
+  `https://t.me/<nome>bot` con al più `?start=<parametro>` — il nome
+  di un bot finisce per «bot» per regola di Telegram, quindi canali,
+  gruppi e siti restano testo da copiare come in ogni altro digitale
+  (la regola dell'abbonamento, `linkCanaleToccabile`, resta com'è).
+  Il tocco passa da `apriLinkBot`, che riprova la forma e dentro
+  Telegram usa openTelegramLink.
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il
