@@ -95553,3 +95553,47 @@ RESTA. Domani, a negozio aperto da Piano B: «🔗 Collega il negozio»,
 «✅ Pubblica la pagina», `/sponsor piano-b-panama 60`. Il link verso
 pianobmaps.com (oggi le foto aprono solo YouTube). La consegna
 «servizio» adattata alla pratica (appuntamento, offerta, quantità).
+
+## Le altre valute negli avvisi P2P, a scelta multipla (24 nov 2026, avvisi-p2p-valute)
+
+LA RICHIESTA. Andrea, con la foto del foglio «🔔 Avvisami dei nuovi ordini
+P2P»: «Sarebbe utile poter selezionare in VALUTA oltre a euro anche
+eventualmente qualche shitcoin». La sezione Valuta aveva quattro chip a
+scelta unica (Tutte, Solo euro, Solo franchi, Solo USDT), mentre il libro
+dal 16 nov ha anche ETH, Monero e USDe come valute (cantiere
+p2p-monete-valute, leva `P2P_COIN_ATTIVO` accesa di serie).
+
+COSA SI È FATTO. Le chip diventano Tutte, Euro, Franchi, USDT, Ethereum,
+Monero, USDe, e si accendono e si spengono una per una come i metodi
+(«Tutte» = lista vuota; i nomi non dicono più «Solo»). Ogni chip a chi
+quella valuta la vede (`valutaAvvisiVistaP2P`: USDT, franchi, monete coi
+loro cancelli); la sezione c'è se se ne vede almeno una oltre all'euro.
+Server: `VALUTE_AVVISI_NUOVI_P2P` coi sei codici, la colonna resta
+`avvisi_nuovi_valuta` con la lista fra stanghette («|EUR|XMR|»); la riga
+di ieri (un codice solo) si rilegge come lista di uno
+(`_valute_avvisi_p2p`). La rotta accetta `valute` (lista) e, dal telefono
+di ieri, `valuta` (codice solo). Le preferenze tornano con `valute`.
+
+LA VALUTA DI UN ORDINE IN MONETA. Sul filo di Mostro un ordine in ETH è
+EUR (il nodo non conosce le monete): la moneta la dicono i metodi con la
+cifra. `_valuta_avviso_p2p` la ricava col giudice del libro
+(`_coin_ordine_libro`), quindi «Euro» non lascia più passare un ordine in
+Monero. Sul Lightning un ordine in moneta ora arriva solo a chi le monete
+le vede (`p2p_coin_ammesso`, come già l'on-chain), e la riga del
+messaggio dice la cifra nella moneta («0,25 XMR») coi metodi senza cifra,
+come l'on-chain. Chi perde una valuta (beta che si stringe, leva spenta)
+la perde dalla lista; se non ne resta nessuna valgono tutte.
+
+SCARTATE. Una chip «Altcoin» cumulativa: Andrea chiede di poter scegliere
+«qualche» moneta, e la lista c'è già nel libro. Tenere la scelta unica
+con le monete in più: «euro e Monero» non si sarebbe potuto dire.
+
+PROVATO. `prove_avvisi_nuovi_ordini`: rilettura della lista e della riga
+di ieri, il giudice della valuta (filo, moneta, misto = euro), il passa
+a scelta multipla (Lightning e on-chain), il foglio in node (chip delle
+monete solo a chi le vede, accese le salvate, gesti che accendono,
+spengono, tornano a «Tutte», ignorano lo sconosciuto), e la coda vera su
+sqlite: l'ordine in Monero a chi ha «Euro + Monero» con «0,25 XMR», non a
+chi ha solo «Euro» né a chi non vede le monete. Suite intera severa.
+
+RESTA. Guardarlo dal telefono dopo la promozione.

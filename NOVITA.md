@@ -964,3 +964,9 @@ frase: Le foto del tuo annuncio adesso si mettono in ordine con le frecce ◀ �
 dove: Vendi → le foto (frecce ◀ ▶ e «Descrizione della foto (facoltativa)»), «🎨 Varianti (facoltative)» sotto la quantità, «Prezzo o pezzi diversi per ogni variante»; I tuoi annunci → Modifica → «Le tue foto (fino a 5)».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-24 · avvisi-p2p-valute
+frase: Negli avvisi dei nuovi ordini P2P adesso le valute si scelgono una per una, e puoi accenderne più di una insieme: per esempio «Euro» e «USDT». Ci sono anche Ethereum, Monero e USDe: un ordine in Monero ti arriva solo se hai acceso «Monero» (o lasciato «Tutte»).
+dove: Libro P2P → la campanella 🔔 → «Valuta»; Profilo → «🔔 Avvisi» → «Valuta».
+leva: P2P_COIN_ATTIVO (le monete; accesa di serie)
+pubblico: sì

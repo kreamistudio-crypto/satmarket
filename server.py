@@ -62401,17 +62401,26 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         r = con.execute("SELECT avvisi_nuovi_rete FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
         rete = str(r[0] or "") if r else ""
-    # LA VALUTA (2 nov 2026): '' = tutte, 'EUR', 'USDT'. Un telefono di
-    # ieri non la manda, e allora resta quella scritta
-    if "valuta" in d:
-        valuta = str(d.get("valuta") or "").strip().upper()
-        if valuta not in ("",) + VALUTE_AVVISI_NUOVI_P2P:
+    # LE VALUTE (24 nov 2026, avvisi-p2p-valute): una lista dal catalogo,
+    # [] = tutte. Il telefono di ieri mandava `valuta`, un codice solo ('' =
+    # tutte): vale come lista di uno. Chi non manda niente tiene la scritta;
+    # un codice che il catalogo non ha e' un 400, non un filtro muto
+    if "valute" in d or "valuta" in d:
+        grezze = d.get("valute") if "valute" in d else (
+            [d.get("valuta")] if d.get("valuta") else [])
+        if grezze is None:
+            grezze = []
+        if not isinstance(grezze, list) or \
+                any(str(v or "").strip().upper() not in VALUTE_AVVISI_NUOVI_P2P for v in grezze):
             con.close()
-            raise HTTPException(400, "Valuta sconosciuta: tutte, euro, USDT o franchi")
+            raise HTTPException(400, "Valuta sconosciuta")
+        scelte = [str(v).strip().upper() for v in grezze]
+        valute = [v for v in VALUTE_AVVISI_NUOVI_P2P if v in scelte]
     else:
         r = con.execute("SELECT avvisi_nuovi_valuta FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
-        valuta = str(r[0] or "") if r else ""
+        valute = _valute_avvisi_p2p(r[0] if r else "")
+    valuta = ("|" + "|".join(valute) + "|") if valute else ""
     # I METODI (18 nov 2026, cantiere vetrina-pulita): una lista dal catalogo,
     # [] = tutti. Un telefono di ieri non la manda, e allora resta quella
     # scritta; un nome che il catalogo non ha e' un 400, non un filtro muto
@@ -79432,7 +79441,20 @@ NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BT
 # X% meglio» col segno girato — il giudice resta `conv >= soglia`
 SOGLIE_AVVISI_NUOVI_P2P = ("-10", "-5", "-2", "0", "2", "5")   # le sei chip, gemelle di P2P_AVVISI_SOGLIE nel client
 RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
-VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
+VALUTE_AVVISI_NUOVI_P2P = ("EUR", "CHF", "USDT", "ETH", "XMR", "USDE")   # [] = tutte; gemelle di P2P_AVVISI_VALUTE nel client
+# LE ALTRE VALUTE DEGLI AVVISI, A SCELTA MULTIPLA (24 nov 2026, cantiere
+# avvisi-p2p-valute, Andrea: «poter selezionare in VALUTA oltre a euro anche
+# eventualmente qualche shitcoin»). Fino ad allora una scelta sola fra euro,
+# franchi e USDT; adesso ci sono anche le tre monete del P2P (ETH, Monero,
+# USDe: `P2P_COIN_METODI`, i codici della pagina in maiuscolo) e le valute
+# si accendono e si spengono una per una, come i metodi: «euro e Monero» si
+# puo' dire. Nessuna scelta = tutte. La colonna resta `avvisi_nuovi_valuta`:
+# la forma nuova e' la lista fra le stanghette («|EUR|XMR|»), quella di
+# ieri un codice solo («EUR») e si rilegge come lista di uno.
+# Un ordine in moneta viaggia sul filo come EUR (il nodo non conosce ETH):
+# la sua valuta per gli avvisi la dicono i metodi (`_valuta_avviso_p2p`),
+# quindi «solo euro» non lascia piu' passare un ordine in Monero, e un
+# ordine in moneta arriva solo a chi le monete le vede (`p2p_coin_ammesso`).
 # IL METODO DI PAGAMENTO DEGLI AVVISI (18 nov 2026, cantiere vetrina-pulita;
 # un utente: «Si possono filtrare le notifiche del bot per buy e per sell
 # oltre che per tipo di pagamento?», Andrea: «Sì, aprila»). Nessuno scelto =
@@ -79478,6 +79500,26 @@ def _avvisi_da_ieri(tipi, metodi):
                   else [m for m in METODI_AVVISI_NUOVI_P2P if m != METODO_BZ_AVVISI_P2P])
 
 
+def _valute_avvisi_p2p(testo) -> list:
+    """PURA: le valute scritte nella colonna → la lista nell'ordine del
+    catalogo, [] = tutte. Legge la forma nuova («|EUR|XMR|») e quella di
+    ieri (un codice solo, «EUR» o «usdt»); un codice che il catalogo non
+    ha si perde."""
+    t = str(testo or "").strip().upper()
+    scelte = t.strip("|").split("|") if t else []
+    return [v for v in VALUTE_AVVISI_NUOVI_P2P if v in scelte]
+
+
+def _valuta_avviso_p2p(fiat, metodi) -> str:
+    """PURA: la valuta di un ordine per gli avvisi — quella del filo
+    ('EUR', 'CHF', 'USDT'), salvo un ordine IN MONETA, che sul filo e' EUR
+    e la cui moneta la dicono i metodi (`_coin_ordine_libro`): 'ETH',
+    'XMR', 'USDE'. Il `globals()` e' quello delle sorelle, per i banchi."""
+    giudice = globals().get("_coin_ordine_libro")
+    c = giudice(metodi) if giudice else None
+    return str(c[0]).upper() if c else str(fiat or "EUR").upper()
+
+
 def _pref_avvisi_nuovi_p2p(riga) -> dict:
     """PURA: le tre colonne di `utenti` come le legge il client —
     {attivo, tipi, soglia}. Una riga assente, o di ieri senza le colonne,
@@ -79485,7 +79527,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     non un default del database."""
     if not riga:
         return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": "", "rete": "",
-                "valuta": "", "metodi": []}
+                "valute": [], "metodi": []}
     try:
         attivo = bool(int(_campo_riga(riga, "avvisi_nuovi_p2p", 0) or 0))
     except (TypeError, ValueError):
@@ -79501,9 +79543,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     rete = str(_campo_riga(riga, "avvisi_nuovi_rete", "") or "").strip()
     if rete not in RETI_AVVISI_NUOVI_P2P:
         rete = ""
-    valuta = str(_campo_riga(riga, "avvisi_nuovi_valuta", "") or "").strip().upper()
-    if valuta not in VALUTE_AVVISI_NUOVI_P2P:
-        valuta = ""
+    valute = _valute_avvisi_p2p(_campo_riga(riga, "avvisi_nuovi_valuta", ""))
     # i metodi (18 nov 2026): nell'ordine del catalogo, [] = tutti; un nome
     # che il catalogo non ha piu' si perde, e se non ne resta nessuno vale tutti
     metodi_txt = str(_campo_riga(riga, "avvisi_nuovi_metodi", "") or "")
@@ -79511,7 +79551,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     # una riga di prima del 19 nov 2026 si traduce (`_avvisi_da_ieri`)
     if not nuova:
         tipi, metodi = _avvisi_da_ieri(tipi, metodi)
-    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valuta": valuta,
+    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valute": valute,
             "metodi": metodi}
 
 
@@ -79592,7 +79632,8 @@ def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
         return False
     if pref.get("rete") and pref.get("rete") != rete:
         return False
-    if pref.get("valuta") and pref.get("valuta") != valuta:
+    # LE VALUTE (24 nov 2026): una lista, [] = tutte
+    if pref.get("valute") and str(valuta or "").upper() not in pref.get("valute"):
         return False
     # IL METODO (18 nov 2026, cantiere vetrina-pulita): con dei metodi scelti
     # passa l'ordine che ne accetta almeno uno — i nomi come li DICE il libro
@@ -79774,22 +79815,23 @@ def _pref_rete_vista_p2p(riga) -> dict:
     pref = _pref_avvisi_nuovi_p2p(riga)
     if pref["rete"] and not p2p_onchain_ammesso(int(riga["tg_id"])):
         pref["rete"] = ""
-    # ...e la VALUTA (2 nov 2026) conta solo se gli USDT lei li vede: chi
-    # aveva scelto «solo USDT» e li ha persi torna a sentire l'euro
-    # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» conta solo se i
-    # franchi lei li vede; «solo euro» resta finche' vede almeno un'altra
-    # valuta, sennò e' gia' tutto quel che vede
-    valuta = pref["valuta"]
-    if valuta:
+    # ...e le VALUTE (2 nov 2026) contano solo se lei le vede: chi aveva
+    # scelto «solo USDT» e li ha persi torna a sentire tutto (14 nov 2026,
+    # cantiere p2p-chf: i franchi; 24 nov 2026, avvisi-p2p-valute: le
+    # monete). Si toglie ogni valuta che non vede; se non ne resta nessuna,
+    # valgono tutte
+    if pref["valute"]:
         tg = int(riga["tg_id"])
-        if valuta == "USDT":
-            vista = p2p_usdt_ammesso(tg)
-        elif valuta == "CHF":
-            vista = p2p_chf_ammesso(tg)
-        else:
-            vista = p2p_usdt_ammesso(tg) or p2p_chf_ammesso(tg)
-        if not vista:
-            pref["valuta"] = ""
+        coin = globals().get("p2p_coin_ammesso")
+        def _vista(v):
+            if v == "USDT":
+                return p2p_usdt_ammesso(tg)
+            if v == "CHF":
+                return p2p_chf_ammesso(tg)
+            if v in ("ETH", "XMR", "USDE"):
+                return bool(coin and coin(tg))
+            return True
+        pref["valute"] = [v for v in pref["valute"] if _vista(v)]
     return pref
 
 
@@ -79849,7 +79891,8 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
             if (chf and not p2p_chf_ammesso(tg)) or (coin and not p2p_coin_ammesso(tg)):
                 continue
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "onchain",
-                                           p2p_onchain_valuta(o), _metodi_libro(metodi),
+                                           (str(coin["moneta"]).upper() if coin
+                                            else p2p_onchain_valuta(o)), _metodi_libro(metodi),
                                            str(o["lato"] or "")):
                 continue
             if not _avvisi_p2p_accesi(con, tg):
@@ -79906,6 +79949,11 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         fiat = o.get("fiat") or "EUR"
         if fiat not in ("EUR", "USDT", "CHF"):
             continue
+        # ...e un ordine IN MONETA (24 nov 2026, avvisi-p2p-valute): sul
+        # filo e' EUR, la moneta la dicono i metodi; arriva solo a chi le
+        # monete le vede, e il messaggio dice la cifra nella moneta
+        valuta = _valuta_avviso_p2p(fiat, o["metodi"])
+        moneta = _coin_ordine_libro(o["metodi"]) if valuta != fiat else None
         tipo = _tipo_nuovo_p2p(o["lato"], o["metodi"])
         if not tipo:
             continue
@@ -79924,11 +79972,14 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         if fiat == "CHF" and euro_txt.endswith(" €"):
             euro_txt = euro_txt[:-2] + " CHF"
         metodi_txt = ", ".join(_metodi_libro(o["metodi"]))
+        if moneta:
+            euro_txt = f"{moneta[1]} {moneta[0]}"
+            metodi_txt = ", ".join(_metodi_libro(moneta[2]))
         for p in persone:
             tg = int(p["tg_id"])
             if autore and tg == autore:
                 continue                      # mai per i suoi
-            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,
+            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", valuta,
                                            _metodi_libro(o["metodi"]), str(o["lato"] or "")):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
@@ -79936,6 +79987,8 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             if fiat == "USDT" and not p2p_usdt_ammesso(tg):
                 continue
             if fiat == "CHF" and not p2p_chf_ammesso(tg):
+                continue
+            if moneta and not p2p_coin_ammesso(tg):
                 continue
             cur = con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "

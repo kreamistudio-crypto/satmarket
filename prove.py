@@ -122412,7 +122412,7 @@ def prove_avvisi_nuovi_ordini():
         exec(src[i:src.index("\n", i)].split("   #")[0], amb)
     i = src.index("\nNOMI_TIPI_AVVISI_NUOVI_P2P = {") + 1
     exec(src[i:src.index("}\n", i) + 2], amb)
-    for f in ("_campo_riga", "_avvisi_da_ieri", "_pref_avvisi_nuovi_p2p", "_euro_tabacchino", "_metodi_libro",
+    for f in ("_campo_riga", "_avvisi_da_ieri", "_valute_avvisi_p2p", "_valuta_avviso_p2p", "_pref_avvisi_nuovi_p2p", "_euro_tabacchino", "_metodi_libro",
               "_tabacchino_libro", "_euro_libro", "_tipo_nuovo_p2p", "_euro_nuovo_p2p",
               "_convenienza_nuovo_p2p", "_passa_avviso_nuovo_p2p", "_frase_convenienza_p2p",
               "_testo_avviso_nuovi_p2p", "_nuovi_dalla_foto_p2p", "_tag_evento_p2p",
@@ -122425,16 +122425,16 @@ def prove_avvisi_nuovi_ordini():
     # preferenze «tutto» delle prove qui sotto
     T3 = ["vendita", "acquisto"]
     BZ = "Contanti al tabacchino"
-    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []}
+    SPENTO = {"attivo": False, "tipi": T3, "soglia": "", "rete": "", "valute": [], "metodi": []}
     prova("SPENTO DI SERIE: riga assente, riga di ieri senza le colonne, riga coi default",
           [SPENTO, SPENTO, SPENTO],
           [pref(None), pref({"tg_id": 1}),
            pref({"avvisi_nuovi_p2p": 0, "avvisi_nuovi_tipi": "", "avvisi_nuovi_soglia": ""})])
     prova("le preferenze scritte si rileggono: tipi nell'ordine delle chip, soglia solo se e' una delle sei",
-          [{"attivo": True, "tipi": ["vendita"], "soglia": "2", "rete": "", "valuta": "",
+          [{"attivo": True, "tipi": ["vendita"], "soglia": "2", "rete": "", "valute": [],
             "metodi": []},
-           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": []},
-           {"attivo": True, "tipi": ["acquisto"], "soglia": "", "rete": "", "valuta": "",
+           {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valute": [], "metodi": []},
+           {"attivo": True, "tipi": ["acquisto"], "soglia": "", "rete": "", "valute": [],
             "metodi": [BZ, "SEPA"]}],
           [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_tipi": "|barattozon|vendita|", "avvisi_nuovi_soglia": "2"}),
            pref({"avvisi_nuovi_p2p": "1", "avvisi_nuovi_tipi": "|x|", "avvisi_nuovi_soglia": "7"}),
@@ -122471,10 +122471,27 @@ def prove_avvisi_nuovi_ordini():
            for r in ("onchain", "ln", "tutte", None)])
     # LA VALUTA (2 nov 2026, Andrea: «nelle notifiche dare la possibilita'
     # di scegliere usdt»)
+    # EMENDATA (24 nov 2026, avvisi-p2p-valute): una LISTA, e la riga di
+    # ieri (un codice solo) si rilegge come lista di uno
     prova("...la valuta si rilegge se e' euro o USDT (anche scritta piccola), sennò tutte",
-          ["EUR", "USDT", "USDT", "", ""],
-          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_valuta": v})["valuta"]
+          [["EUR"], ["USDT"], ["USDT"], [], []],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_valuta": v})["valute"]
            for v in ("EUR", "USDT", "usdt", "BTC", None)])
+    prova("LE ALTRE VALUTE (24 nov 2026): la lista fra le stanghette si rilegge nell'ordine del "
+          "catalogo, con le monete, e perde lo sconosciuto",
+          [["EUR", "XMR"], ["CHF", "ETH", "USDE"], ["USDT"]],
+          [pref({"avvisi_nuovi_p2p": 1, "avvisi_nuovi_valuta": v})["valute"]
+           for v in ("|XMR|EUR|", "|usde|eth|chf|", "|BTC|USDT|DOGE|")])
+    amb["P2P_COIN_METODI"] = {"ETH (Ethereum)": "ETH", "XMR (Monero)": "XMR", "USDe (Base)": "USDe"}
+    for _n in ("_coin_pm_libro", "_coin_ordine_libro"):
+        exec(pezzo(_n), amb)
+    va = amb["_valuta_avviso_p2p"]
+    prova("...e la valuta di un ordine per gli avvisi: quella del filo, salvo l'ordine IN MONETA "
+          "(sul filo EUR), che la dicono i metodi; un misto resta in euro",
+          ["EUR", "USDT", "CHF", "ETH", "XMR", "USDE", "EUR"],
+          [va("EUR", ["SEPA"]), va("USDT", ["USDT (Tron)"]), va("CHF", ["TWINT"]),
+           va("EUR", ["ETH (Ethereum) 0.0153"]), va("EUR", ["XMR (Monero) 0.25"]),
+           va("EUR", ["USDe (Base) 50"]), va("EUR", ["SEPA", "XMR (Monero) 0.25"])])
     tipo = amb["_tipo_nuovo_p2p"]
     prova("il tipo: sell = vendita, buy = acquisto, il tabacchino = Barattozon qualunque sia il lato",
           ["vendita", "acquisto", "barattozon", "barattozon", ""],
@@ -122502,7 +122519,7 @@ def prove_avvisi_nuovi_ordini():
            passa(PR("onchain"), "vendita", None, "onchain"), passa(PR("onchain"), "vendita", None, "ln"),
            passa(PR("onchain"), "vendita", None), passa(PR("ln"), "vendita", None),
            passa(PR("ln"), "vendita", None, "ln"), passa(PR("ln"), "vendita", None, "onchain")])
-    PV = lambda v: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": v}
+    PV = lambda v: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valute": [v] if v else []}
     prova("LA VALUTA: «tutte» passa euro e USDT, «solo euro» solo l'euro, «solo USDT» "
           "solo l'USDT; chi non la dice e' euro",
           [True, True, True, False, True, False, True, False],
@@ -122511,8 +122528,18 @@ def prove_avvisi_nuovi_ordini():
            passa(PV("EUR"), "vendita", None), passa(PV("USDT"), "vendita", None),
            passa(PV("USDT"), "vendita", None, "onchain", "USDT"),
            passa(PV("USDT"), "acquisto", None, "ln", "EUR")])
+    PVS = lambda vs: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valute": vs}
+    prova("...A SCELTA MULTIPLA (24 nov 2026): «euro e Monero» passa l'euro e il Monero, non "
+          "l'ETH ne' l'USDT; «solo USDe» passa l'USDe anche on-chain",
+          [True, True, False, False, True, False],
+          [passa(PVS(["EUR", "XMR"]), "vendita", None, "ln", "EUR"),
+           passa(PVS(["EUR", "XMR"]), "vendita", None, "ln", "XMR"),
+           passa(PVS(["EUR", "XMR"]), "vendita", None, "ln", "ETH"),
+           passa(PVS(["EUR", "XMR"]), "vendita", None, "ln", "USDT"),
+           passa(PVS(["USDE"]), "vendita", None, "onchain", "USDE"),
+           passa(PVS(["USDE"]), "vendita", None, "onchain", "EUR")])
     # IL METODO (18 nov 2026, cantiere vetrina-pulita)
-    PM = lambda ms: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valuta": "", "metodi": ms}
+    PM = lambda ms: {"attivo": True, "tipi": T3, "soglia": "", "rete": "", "valute": [], "metodi": ms}
     # EMENDATA (19 nov 2026): Barattozon e' un metodo — passa se e' scelto
     # fra i metodi, e dal suo lato: «Compra BTC» (sell) vendita, «Vendi BTC»
     # (buy) acquisto
@@ -122797,6 +122824,33 @@ def prove_avvisi_nuovi_ordini():
           ({tg: sorted(r[0] for r in con3.execute(
               "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (701, 702)},
            {r[0] for r in con3.execute("SELECT lato FROM p2p_avvisi_nuovi")}))
+    # LE MONETE NELLA CODA (24 nov 2026, avvisi-p2p-valute): un ordine in
+    # Monero sul Lightning e' EUR sul filo; 801 vuole solo l'euro, 802 euro e
+    # Monero, 803 tutto ma le monete non le vede
+    con4 = sqlite3.connect(":memory:")
+    con4.row_factory = sqlite3.Row
+    con4.executescript(schema.replace("avvisi_nuovi_soglia TEXT DEFAULT '');",
+                                      "avvisi_nuovi_soglia TEXT DEFAULT '', "
+                                      "avvisi_nuovi_rete TEXT DEFAULT '', "
+                                      "avvisi_nuovi_valuta TEXT DEFAULT '', "
+                                      "avvisi_nuovi_metodi TEXT DEFAULT '');"))
+    con4.execute("INSERT INTO utenti VALUES(801,1,1,'','','','EUR','')")
+    con4.execute("INSERT INTO utenti VALUES(802,1,1,'','','','|EUR|XMR|','')")
+    con4.execute("INSERT INTO utenti VALUES(803,1,1,'','','','','')")
+    con4.commit()
+    _coin_prima = amb.get("p2p_coin_ammesso"), amb.get("P2P_COIN_METODI")
+    amb.update(p2p_coin_ammesso=lambda tg: tg != 803,
+               P2P_COIN_METODI={"ETH (Ethereum)": "ETH", "XMR (Monero)": "XMR"})
+    accoda(con4, [ev("x1", T, amt="51500"), ev("x2", T, pm=("XMR (Monero) 0.25",), amt="51500")],
+           CAMBIO, T)
+    amb.update(p2p_coin_ammesso=_coin_prima[0], P2P_COIN_METODI=_coin_prima[1])
+    prova("LE MONETE NELLA CODA: l'ordine in Monero non arriva a chi vuole solo l'euro ne' a chi "
+          "le monete non le vede; arriva a chi ha scelto «Euro» e «Monero», con la cifra in XMR",
+          ({801: ["x1"], 802: ["x1", "x2"], 803: ["x1"]}, ("0,25 XMR", "XMR (Monero)")),
+          ({tg: sorted(r[0] for r in con4.execute(
+              "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (801, 802, 803)},
+           tuple(con4.execute("SELECT euro, metodi FROM p2p_avvisi_nuovi WHERE ordine LIKE 'x2%'")
+                 .fetchone() or ())))
     prova("il prefisso degli on-chain e' lo stesso del nome che nasce alla pubblica", True,
           'P2P_ONCHAIN_PREFISSO = "bar-onchain-"' in src
           and '.startswith("bar-onchain-")' in pezzo("_avviso_onchain_p2p"))
@@ -122958,15 +123012,29 @@ out.rete = [senzaOc.indexOf('>Rete<') < 0, conOc.indexOf('<div class="section-la
 myP2POnchain = false;
 // LA VALUTA (2 nov 2026): la sezione solo a chi gli USDT li vede, una
 // scelta sola, e il gesto manda la valuta al server
+// (24 nov 2026, avvisi-p2p-valute) A SCELTA MULTIPLA, con le monete: il
+// gesto accende e spegne, '' torna a «Tutte», un codice fuori catalogo tace
 myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', valuta: 'USDT'});
 const senzaUsdt = contenutoAvvisiNuoviP2P();
 globalThis.usdtVistoP2P = () => true;
 const conUsdt = contenutoAvvisiNuoviP2P();
-INVII = []; scegliValutaAvvisiNuoviP2P('EUR'); scegliValutaAvvisiNuoviP2P('BTC');
+INVII = []; scegliValutaAvvisiNuoviP2P('EUR'); scegliValutaAvvisiNuoviP2P('USDT');
+scegliValutaAvvisiNuoviP2P(''); scegliValutaAvvisiNuoviP2P('BTC');
 out.valuta = [senzaUsdt.indexOf('>Valuta<') < 0, conUsdt.indexOf('<div class="section-label">Valuta</div>') >= 0,
   attive(conUsdt).filter(a => /Valuta/.test(a)), INVII.slice(),
-  normalizzaAvvisiNuoviP2P({valuta: 'btc'}).valuta, normalizzaAvvisiNuoviP2P({valuta: 'usdt'}).valuta];
+  normalizzaAvvisiNuoviP2P({valuta: 'btc'}).valute, normalizzaAvvisiNuoviP2P({valuta: 'usdt'}).valute,
+  normalizzaAvvisiNuoviP2P({valute: ['xmr', 'BTC', 'EUR']}).valute];
+const senzaCoin = conUsdt;
+globalThis.coinVistoP2P = () => true;
+myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', valute: ['EUR', 'XMR']});
+const conCoin = contenutoAvvisiNuoviP2P();
 delete globalThis.usdtVistoP2P;
+const soloCoin = contenutoAvvisiNuoviP2P();
+delete globalThis.coinVistoP2P;
+out.monete = [senzaCoin.indexOf('>Monero<') < 0,
+  ['>Ethereum<', '>Monero<', '>USDe<'].map(t => conCoin.indexOf(t) >= 0),
+  attive(conCoin).filter(a => /Valuta/.test(a)),
+  soloCoin.indexOf('<div class="section-label">Valuta</div>') >= 0 && soloCoin.indexOf('>USDT<') < 0];
 // I METODI (18 nov 2026, cantiere vetrina-pulita): «Tutti» e' la lista
 // vuota, ogni chip si accende da sola, i due svizzeri solo coi franchi
 myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P({attivo: true, soglia: '', metodi: ['Revolut', 'x', 'SEPA']});
@@ -123047,7 +123115,7 @@ console.log(JSON.stringify(out));
     prova("...e da «Tutti» il tocco su «Con un limite» parte da «A prezzo di mercato o meglio», non dal −10",
           "scegliSogliaAvvisiNuoviP2P('0')", out["limiteParte"])
     prova("il normalizzatore: tipi nell'ordine delle chip, soglia fuori dalle sei = «tutti»",
-          {"attivo": True, "tipi": ["vendita"], "soglia": "", "rete": "", "valuta": "",
+          {"attivo": True, "tipi": ["vendita"], "soglia": "", "rete": "", "valute": [],
            "metodi": []},
           out["normalizza"])
     prova("LA RETE: la sezione solo a chi l'on-chain lo vede, accesa la scelta salvata, il "
@@ -123055,33 +123123,49 @@ console.log(JSON.stringify(out));
           [True, True, ["scegliReteAvvisiNuoviP2P('onchain')"], [{"rete": "ln"}, {"rete": ""}], "", "ln"],
           out["rete"])
     prova("...e il gesto la porta al server, coi nomi del server", True,
-          "rete: voluto.rete || '', valuta: voluto.valuta || ''," in m
+          "rete: voluto.rete || '', valute: voluto.valute || []," in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_RETI = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_RETI = ["))])
           == ["", "onchain", "ln"]
           and 'RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")' in src)
-    prova("LA VALUTA: la sezione solo a chi gli USDT li vede, accesa la scelta salvata, il "
-          "gesto manda la valuta (una sconosciuta vale «tutte»), e il normalizzatore tiene le due",
-          [True, True, ["scegliValutaAvvisiNuoviP2P('USDT')"], [{"valuta": "EUR"}, {"valuta": ""}],
-           "", "USDT"],
+    # EMENDATA (24 nov 2026, avvisi-p2p-valute): A SCELTA MULTIPLA
+    prova("LA VALUTA: la sezione solo a chi vede un'altra valuta, accesa la scelta salvata (anche "
+          "quella di un server di ieri), il gesto accende e spegne, '' torna a «Tutte», una "
+          "sconosciuta non manda niente, e il normalizzatore tiene la lista nell'ordine del catalogo",
+          [True, True, ["scegliValutaAvvisiNuoviP2P('USDT')"],
+           [{"valute": ["EUR", "USDT"]}, {"valute": []}, {"valute": []}],
+           [], ["USDT"], ["EUR", "XMR"]],
           out["valuta"])
+    prova("LE MONETE: Ethereum, Monero e USDe solo a chi le vede, accese le scelte salvate "
+          "(«Euro» e «Monero»), e la sezione c'e' anche a chi vede le monete e non gli USDT",
+          [True, [True, True, True],
+           ["scegliValutaAvvisiNuoviP2P('EUR')", "scegliValutaAvvisiNuoviP2P('XMR')"], True],
+          out["monete"])
     prova("...e il gesto la porta al server, coi nomi del server, che la salva e la rilegge", True,
-          "valuta: voluto.valuta || ''," in m
+          "valute: voluto.valute || []," in m
           and re.findall(r"\['(\w*)', '[^']+'\]", m[m.index("const P2P_AVVISI_VALUTE = ["):
                                                  m.index("];", m.index("const P2P_AVVISI_VALUTE = ["))])
-          == ["", "EUR", "CHF", "USDT"]  # (16 nov 2026) il franco dopo l'euro
-          and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")' in src
+          # (16 nov 2026) il franco dopo l'euro; (24 nov 2026) le tre monete
+          == ["", "EUR", "CHF", "USDT", "ETH", "XMR", "USDE"]
+          and 'VALUTE_AVVISI_NUOVI_P2P = ("EUR", "CHF", "USDT", "ETH", "XMR", "USDE")' in src
           and '"avvisi_nuovi_valuta TEXT DEFAULT \'\'",' in src
           and "avvisi_nuovi_rete=?, avvisi_nuovi_valuta=?, " in src)
     prova("...e i due giri la passano al giudice: la valuta dell'ordine Lightning, "
           "USDT o EUR per l'on-chain; e a chi gli USDT non li vede la scelta vale «tutte»",
           (True, True, True),
-          ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,' in src,
+          # (24 nov 2026) la valuta del Lightning la dice `_valuta_avviso_p2p`,
+          # la moneta compresa
+          ('_passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", valuta,' in src
+           and 'valuta = _valuta_avviso_p2p(fiat, o["metodi"])' in pezzo("_accoda_nuovi_p2p")
+           and 'if moneta and not p2p_coin_ammesso(tg):' in pezzo("_accoda_nuovi_p2p"),
            # (16 nov 2026) USDT, CHF o EUR: il giudice unico della valuta on-chain
-           'p2p_onchain_valuta(o), _metodi_libro(metodi),' in pezzo("_accoda_onchain_nuovo_p2p"),
+           # ...e la moneta prima (24 nov 2026)
+           'else p2p_onchain_valuta(o)), _metodi_libro(metodi),' in pezzo("_accoda_onchain_nuovo_p2p"),
            # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» a chi i franchi li vede
-           'vista = p2p_usdt_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
-           and 'vista = p2p_chf_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")))
+           # ...e le monete a chi le vede (24 nov 2026)
+           'return p2p_usdt_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
+           and 'return p2p_chf_ammesso(tg)' in pezzo("_pref_rete_vista_p2p")
+           and 'return bool(coin and coin(tg))' in pezzo("_pref_rete_vista_p2p")))
     # I METODI (18 nov 2026, cantiere vetrina-pulita; un utente: «filtrare le
     # notifiche del bot per buy e per sell oltre che per tipo di pagamento»)
     prova("I METODI: «Tutti» di serie, il normalizzatore tiene l'ordine del catalogo e perde "
