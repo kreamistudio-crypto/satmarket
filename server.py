@@ -80615,6 +80615,28 @@ def _onchain_vivi_avvisi_p2p() -> set:
         return set()
 
 
+def _usdt_visto_avviso_p2p(metodi) -> bool:
+    """PURA: un ordine in USDT che il libro dell'app MOSTRA? Il calco di
+    `valutaVistaP2P` del telefono: almeno un metodo, e OGNUNO e' una
+    nostra rete, «USDT (Tron)» o «USDT (Ethereum)» (le chiavi di
+    `P2P_ONCHAIN_RETI_USDT`, la grafia di `P2P_RETI_USDT`), spazi ai lati
+    e maiuscole a parte come la' (`reteUsdtDaMetodoP2P`).
+    PERCHE' (24 nov 2026, cantiere avvisi-usdt-metodi). Andrea riceve
+    «🔔 1 nuovo ordine nel libro P2P · 🟢 Compra BTC · da 15,00 a 120,00
+    USDT · USDT/USDC (Solana - Arbitrum - Polygon - Avalanche), USDC
+    (Base - Optimism), USDT (BSC - Tron - Ethereum)» e al tocco l'app
+    dice che l'ordine non c'e' piu'. L'ordine era vero, sul nostro nodo,
+    pubblicato in USDT da un altro client Mostro coi metodi scritti a
+    mano: il server guardava solo la valuta, l'app anche i metodi, e
+    l'ordine coi metodi altrui non lo mostra (non avrebbe ne' la rete
+    ne' il controllo dell'indirizzo). Ora il server chiede la stessa
+    cosa."""
+    nostre = {str(k).lower() for k in P2P_ONCHAIN_RETI_USDT}
+    m = [str(x).strip() for x in (metodi if isinstance(metodi, list) else [])]
+    m = [x for x in m if x]
+    return len(m) > 0 and all(x.lower() in nostre for x in m)
+
+
 def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
     """Per ogni ordine nuovo, le persone che lo vogliono: in CODA, una
     riga per (persona, ordine). Qui stanno le regole 1 e 3 — le
@@ -80636,6 +80658,12 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         # un'altra valuta per nessuno — il libro di Barattolo non la mostra
         fiat = o.get("fiat") or "EUR"
         if fiat not in ("EUR", "USDT", "CHF"):
+            continue
+        # ...e in USDT solo con le NOSTRE reti (24 nov 2026, cantiere
+        # avvisi-usdt-metodi): il giudice e' quello del libro dell'app
+        # (`_usdt_visto_avviso_p2p`), o la 🔔 suona per un ordine che al
+        # tocco «non c'e' piu'»
+        if fiat == "USDT" and not _usdt_visto_avviso_p2p(o["metodi"]):
             continue
         # ...e un ordine IN MONETA (24 nov 2026, avvisi-p2p-valute): sul
         # filo e' EUR, la moneta la dicono i metodi; arriva solo a chi le

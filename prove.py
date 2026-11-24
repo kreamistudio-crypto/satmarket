@@ -123002,6 +123002,56 @@ def prove_avvisi_nuovi_ordini():
               "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (801, 802, 803)},
            tuple(con4.execute("SELECT euro, metodi FROM p2p_avvisi_nuovi WHERE ordine LIKE 'x2%'")
                  .fetchone() or ())))
+    # GLI USDT COI METODI ALTRUI (24 nov 2026, cantiere avvisi-usdt-metodi):
+    # la 🔔 di Andrea per un ordine in USDT scritto da un altro client Mostro
+    # («USDT/USDC (Solana - …)»), che l'app nasconde e al tocco «non c'e'
+    # piu'». 901 vede gli USDT e vuole tutto; 902 non li vede
+    con5 = sqlite3.connect(":memory:")
+    con5.row_factory = sqlite3.Row
+    con5.executescript(schema.replace("avvisi_nuovi_soglia TEXT DEFAULT '');",
+                                      "avvisi_nuovi_soglia TEXT DEFAULT '', "
+                                      "avvisi_nuovi_rete TEXT DEFAULT '', "
+                                      "avvisi_nuovi_valuta TEXT DEFAULT '', "
+                                      "avvisi_nuovi_metodi TEXT DEFAULT '');"))
+    con5.execute("INSERT INTO utenti VALUES(901,1,1,'','','','','')")
+    con5.execute("INSERT INTO utenti VALUES(902,1,1,'','','','','')")
+    con5.commit()
+    exec(pezzo("_usdt_visto_avviso_p2p"), amb)
+    usdt_visto = amb["_usdt_visto_avviso_p2p"]
+    _usdt_prima = amb.get("p2p_usdt_ammesso"), amb.get("cambio_noto_ora")
+    amb.update(p2p_usdt_ammesso=lambda tg: tg == 901, cambio_noto_ora=lambda v: 0.0)
+
+    def ev_usdt(d, pm):
+        # i metodi in UN tag solo, come li scrive il NIP-69 («pm», a, b…):
+        # il cartone `ev` ne fa uno per metodo, e il libro legge il primo
+        e = ev(d, T, pm=(), fa=("15", "120"))
+        e["tags"] += [["pm", *pm], ["f", "USDT"]]
+        return e
+    DI_ANDREA = ("USDT/USDC (Solana - Arbitrum - Polygon - Avalanche)",
+                 "USDC (Base - Optimism)", "USDT (BSC - Tron - Ethereum)")
+    accoda(con5, [ev_usdt("u1", ("USDT (Tron)",)),
+                  ev_usdt("u2", DI_ANDREA),
+                  ev_usdt("u3", ("USDT (Tron)", "USDC (Base)")),
+                  ev_usdt("u4", (" usdt (ethereum) ", "USDT (Tron)"))], CAMBIO, T)
+    amb.update(p2p_usdt_ammesso=_usdt_prima[0], cambio_noto_ora=_usdt_prima[1])
+    prova("GLI USDT COI METODI ALTRUI: la 🔔 suona per l'ordine in USDT con le NOSTRE reti "
+          "(anche scritte piccole e con gli spazi, come le legge l'app), non per quello di "
+          "Andrea del 24 nov ne' per uno che mescola una rete nostra e una no; e chi gli "
+          "USDT non li vede non riceve niente",
+          {901: ["u1", "u4"], 902: []},
+          {tg: sorted(r[0] for r in con5.execute(
+              "SELECT ordine FROM p2p_avvisi_nuovi WHERE tg_id=?", (tg,))) for tg in (901, 902)})
+    prova("...il giudice e' il calco di `valutaVistaP2P` del telefono: niente metodi, o "
+          "solo vuoti, non e' un ordine che l'app mostra",
+          [True, True, False, False, False, False],
+          [usdt_visto(["USDT (Tron)"]), usdt_visto(["USDT (Ethereum)", "USDT (Tron)"]),
+           usdt_visto(list(DI_ANDREA)), usdt_visto([]), usdt_visto(["", " "]), usdt_visto(None)])
+    prova("...le reti sono quelle del telefono, e il telefono le legge cosi' (nome esatto, "
+          "piccolo, coi lati puliti; vuoti via)", (True, True, True),
+          ("{rete: 'tron', nome: 'Tron', metodo: 'USDT (Tron)'" in mini
+           and "{rete: 'ethereum', nome: 'Ethereum', metodo: 'USDT (Ethereum)'" in mini,
+           "return P2P_RETI_USDT.find(r => r.metodo.toLowerCase() === t) || null;" in mini,
+           "const metodi = tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean);" in mini))
     prova("il prefisso degli on-chain e' lo stesso del nome che nasce alla pubblica", True,
           'P2P_ONCHAIN_PREFISSO = "bar-onchain-"' in src
           and '.startswith("bar-onchain-")' in pezzo("_avviso_onchain_p2p"))
