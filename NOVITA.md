@@ -979,6 +979,6 @@ pubblico: no
 
 ## 2026-11-24 · p2p-incasso-da-solo
 frase: Nel P2P, quando compri sats e hai salvato un indirizzo Lightning negli incassi, non devi più dire ogni volta dove riceverli: l'app lo manda da sola appena prendi l'ordine, e lo scambio parte subito. Se l'indirizzo non passa, si apre il foglio di sempre.
-dove: P2P → prendi un ordine di chi vende sats → «⚡ Ricevi su …»; Profilo → «⚡ Attiva incassi automatici» per salvare l'indirizzo.
+dove: P2P → prendi un ordine di chi vende sats → «⚡ Ricevi su …»; per riceverli on-chain, «₿ Ricevi on-chain» nel foglio dell'ordine prima di «Compra»; Profilo → «⚡ Attiva incassi automatici» per salvare l'indirizzo.
 leva: P2P_INCASSO_DA_SOLO (accesa di serie)
 pubblico: no

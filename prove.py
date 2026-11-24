@@ -223824,11 +223824,13 @@ def prove_incasso_da_solo_p2p():
         fn("function fatturaPassataP2P(o){"),
         fn("function incassoDaSoloAttivoP2P(){"),
         fn("function indirizzoDaSoloP2P(o){"),
+        fn("function riceviOnchainOffertoP2P(riga){"),
         fn("function incassoAManoP2P(id, ind, perche, fermo){"),
         fn("async function incassoDaSoloP2P(id){"),
     ]) + r"""
 const P2P_TOAST_FATTURA = 'DOVE', P2P_NON_PARTITO = 'NON PARTITO';
-let leve = {incassoDaSolo: true}, myLnAddress = 'Io@Blink.sv', nwc = false;
+let leve = {incassoDaSolo: true}, myLnAddress = 'Io@Blink.sv', nwc = false, cambio = true;
+function swapP2PAcceso(){ return cambio; }
 const p2pCoord = () => leve;
 function walletNwcFattura(){ return nwc; }
 let righe = {}, toasts = [], chiamate = [], tentativi = [], aperti = 0, veli = 0, chiusi = 0,
@@ -223887,7 +223889,19 @@ const out = {};
   nuovo({daSolo: true}); giudici.push(g());
   nuovo({lato: 'vendo'}); giudici.push(g());
   giudici.push(indirizzoDaSoloP2P(null));
+  nuovo({riceviOc: true}); giudici.push(g());
   out.giudici = giudici;
+  // a2) «RICEVI ON-CHAIN» PRIMA DELLA PRESA: solo a chi lo perderebbe
+  const offre = r => riceviOnchainOffertoP2P(r);
+  const vendo = {lato: 'sell'};
+  const offerte = [offre(vendo), offre({lato: 'buy'}), offre({lato: 'sell', mio: true}), offre(null)];
+  cambio = false; offerte.push(offre(vendo)); cambio = true;
+  myLnAddress = ''; offerte.push(offre(vendo));
+  myLnAddress = 'mario@walletofsatoshi.com'; offerte.push(offre(vendo));
+  myLnAddress = 'Io@Blink.sv';
+  leve = {incassoDaSolo: false}; offerte.push(offre(vendo)); leve = {incassoDaSolo: true};
+  nwc = true; offerte.push(offre(vendo)); nwc = false;
+  out.offerte = offerte;
   // b) PASSA: un invio solo, l'indirizzo cosi' com'e', il velo chiuso, la riga di Andrea
   nuovo();
   out.ok = [await incassoDaSoloP2P('x'), chiamate, tentativi, righe.x.daSolo, righe.x.fatturaScade,
@@ -223950,7 +223964,31 @@ const out = {};
           "non senza indirizzo, non Wallet of Satoshi ne' un wallet che il server dice no, non un "
           "testo storto, non uno gia' rifiutato QUI (un altro rifiutato non conta), non col wallet "
           "NWC, non due volte, non a chi vende",
-          ["Io@Blink.sv", "", "", "", "", "", "", "", "Io@Blink.sv", "", "", "", ""], out["giudici"])
+          ["Io@Blink.sv", "", "", "", "", "", "", "", "Io@Blink.sv", "", "", "", "", ""], out["giudici"])
+    prova("«RICEVI ON-CHAIN» PRIMA DELLA PRESA (24 nov 2026, «Ok va bene»): il link solo a chi "
+          "compra su un ordine altrui, col cambio acceso, e con l'indirizzo che partirebbe da solo "
+          "(non a chi vende, non sul mio, non senza cambio, non senza indirizzo, non con WoS, non a "
+          "leva spenta, non col wallet NWC) — e la scelta ferma l'invio da solo (ultimo giudice qui sopra)",
+          [True, False, False, False, False, False, False, False, False], out["offerte"])
+    dett = nudo(fn("function renderDettaglioP2P(){"))
+    i_link = dett.find("!tuo && typeof riceviOnchainOffertoP2P === 'function' && riceviOnchainOffertoP2P(o)")
+    prova("...il link sta solo nel piede della presa, sopra «Annulla», dopo le prese chiuse; "
+          "acceso dice ✓", True,
+          0 < dett.find("preseChiuseP2P()") < i_link
+          < dett.find("onclick=\"navIndietro()\">Annulla</button>", i_link)
+          and "(p2pDettOnchain === o.id ? '✓' : '₿') + ' Ricevi on-chain</button>'" in dett)
+    prova("...si spegne aprendo un altro ordine, e si accende/spegne sul tocco", [True, True],
+          ["p2pDettOnchain = '';" in fn("function apriDettaglioP2P(id){"),
+           "p2pDettOnchain = p2pDettOnchain === p2pDettOrdine ? '' : p2pDettOrdine;\n  renderDettaglioP2P();"
+           in fn("function riceviOnchainP2P(){")])
+    presa = nudo(fn("async function eseguiPresaP2P(id, scelto, metodo){"))
+    prova("...alla presa va sulla riga (solo a chi compra), PRIMA che la riga si scriva", True,
+          0 < presa.find("if (p2pDettOnchain === id && ord.lato === 'compro') ord.riceviOc = true;")
+          < presa.find("scriviOrdineP2P(ord);"))
+    ap_inc = nudo(fn("function apriIncassoP2P(){"))
+    prova("...e il foglio nasce sul cambio (se c'e'), UNA volta: poi decidono i due tasti", True,
+          0 < ap_inc.find("if (o.riceviOc) {") < ap_inc.find("if (cambioP2PDisponibile(o)) p2pIncassoRete[id] = 'oc';")
+          < ap_inc.find("delete o.riceviOc;") < ap_inc.find("if (p2pIncassoRete[id] === 'oc') { caricaCambioP2P(id); return; }"))
     prova("PASSA: un `add-invoice` col solo indirizzo, il tentativo segnato, la riga marcata, "
           "il ritorno, «⚡ Ricevi su …», niente foglio, il velo alzato e chiuso",
           [True, [["add-invoice", {"payment_request": [None, "Io@Blink.sv", None]}]],

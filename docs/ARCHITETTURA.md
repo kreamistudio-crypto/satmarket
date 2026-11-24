@@ -34242,6 +34242,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `invalid-invoice` e `wallet_non_passa` ricordano l'indirizzo come
   rifiutato. La fattura nuova dopo un payout fallito (`fattura_nuova`)
   resta a mano. Prove: `prove_incasso_da_solo_p2p`.
+  «RICEVI ON-CHAIN» PRIMA DELLA PRESA (stesso cantiere, secondo giro):
+  senza foglio sparirebbe la scelta «₿ On-chain» del cambio, e allora la
+  si fa nel foglio dell'ordine. `riceviOnchainOffertoP2P(riga)` decide se
+  mostrare il link (chi compra, ordine altrui, `swapP2PAcceso`, e
+  `indirizzoDaSoloP2P({lato: 'compro'})` non vuoto: solo a chi la
+  perderebbe), `riceviOnchainP2P` lo accende/spegne (`p2pDettOnchain`,
+  azzerato da `apriDettaglioP2P`), `eseguiPresaP2P` scrive `riceviOc` sulla
+  riga, `indirizzoDaSoloP2P` con `riceviOc` tace, e `apriIncassoP2P` la
+  trasforma una volta in `p2pIncassoRete[id] = 'oc'` (se il cambio c'è) e
+  la cancella.
 
 - IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
   "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con

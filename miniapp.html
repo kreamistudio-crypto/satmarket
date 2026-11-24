@@ -96000,6 +96000,7 @@ function rigaPresaBzP2P(bz){
 let p2pDettOrdine = '';     // l'id dell'ordine aperto nel dettaglio
 let p2pDettMetodo = '';     // il metodo scelto con le pillole, prima della presa
 let p2pDettImporto = 0;     // su un intervallo, la cifra scelta col foglio «Quanto»
+let p2pDettOnchain = '';    // (24 nov 2026) l'ordine per cui chi compra ha scelto «Ricevi on-chain» prima della presa
 
 /* ---- IL TEMPO GRANDE (fino al 16 nov 2026 un anello a sessanta tacche,
    il calco di Mostro; adesso una riga, vedi `anelloneP2P`) ----
@@ -97009,6 +97010,7 @@ function apriDettaglioP2P(id){
   /* la cifra scelta e' di QUELL'ordine: aprendone un altro si riparte
      dalla frase che chiede di sceglierla */
   p2pDettImporto = 0;
+  p2pDettOnchain = '';
   p2pDettBz = null;
   /* con un metodo solo la scelta e' gia' fatta: non c'e' niente da
      chiedere, e il bottone non deve restare spento per una domanda che
@@ -97254,7 +97256,17 @@ function renderDettaglioP2P(){
           '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
           '<button type="button" class="btn ghost" id="p2pDettVai" disabled>' + P2P_PRESE_DOMANI + '</button>' +
         '</div>'
-      : '<div class="foglio-piede">' +
+      /* «RICEVI ON-CHAIN» PRIMA DELLA PRESA (24 nov 2026, p2p-incasso-da-
+         solo, Andrea: «Ok va bene»): chi ha l'indirizzo degli incassi che
+         parte da solo non vede piu' il foglio, e con lui la scelta «₿
+         On-chain». La si fa qui, prima di prendere: il link si accende
+         (✓) e alla presa il foglio si apre sul cambio */
+      : (!tuo && typeof riceviOnchainOffertoP2P === 'function' && riceviOnchainOffertoP2P(o)
+        ? '<button type="button" class="btn link" style="margin:0 0 8px" aria-pressed="'
+          + (p2pDettOnchain === o.id) + '" onclick="riceviOnchainP2P()">'
+          + (p2pDettOnchain === o.id ? '✓' : '₿') + ' Ricevi on-chain</button>'
+        : '') +
+      '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
       '<button type="button" class="btn ' + (daScegliere ? 'orange' : compro ? 'primary p2p-ico-3d' : 'rosso p2p-ico-3d')
         + '" id="p2pDettVai"' +
@@ -97396,6 +97408,19 @@ function rigaImportoSceltoP2P(o, scelto){
    sempre. Su un intervallo il primo tocco e' «Scegli»: apre il foglio
    «Quanto» SOPRA questa pagina (che resta aperta sotto), e scelta la
    cifra il bottone torna «Compra»/«Vendi» (7 ott 2026). */
+/* il link «Ricevi on-chain» del foglio dell'ordine: solo a chi compra su
+   un ordine Lightning col cambio acceso, e solo se l'indirizzo degli incassi
+   partirebbe da solo — chi non ce l'ha la scelta la trova nel foglio */
+function riceviOnchainOffertoP2P(riga){
+  return !!riga && riga.lato === 'sell' && !riga.mio
+    && typeof swapP2PAcceso === 'function' && swapP2PAcceso()
+    && typeof indirizzoDaSoloP2P === 'function' && !!indirizzoDaSoloP2P({lato: 'compro'});
+}
+function riceviOnchainP2P(){
+  haptic();
+  p2pDettOnchain = p2pDettOnchain === p2pDettOrdine ? '' : p2pDettOrdine;
+  renderDettaglioP2P();
+}
 function confermaDettaglioP2P(){
   /* PRIMA IL METODO (9 ott 2026, cantiere prendi-metodo): con piu'
      metodi e nessuna scelta il tocco non parte, chiede — e lo chiede
@@ -97603,6 +97628,9 @@ async function eseguiPresaP2P(id, scelto, metodo){
   if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(riga.fiat))
     ord.euroNodo = scelta || Number(riga.euroNodo) || 0;
   if (riga.coinMercato) ord.coinMercato = true;
+  /* «Ricevi on-chain» scelto nel foglio dell'ordine (24 nov 2026): la riga
+     lo ricorda, e l'indirizzo degli incassi non parte da solo */
+  if (p2pDettOnchain === id && ord.lato === 'compro') ord.riceviOc = true;
   /* BARATTOZON IN COMPRA (31 ott 2026): chi vende prendendo ha scritto
      il SUO PayCode — sta sulla riga come quello di chi pubblica, gia'
      composto, e parte da solo verso chi compra appena si sa chi e'
@@ -99797,6 +99825,14 @@ function apriIncassoP2P(){
      ragione scritta */
   /* (presa-altra-rete) chi ha gia' scelto on-chain non chiede al wallet:
      si rilegge il conto del cambio */
+  /* (24 nov 2026) «Ricevi on-chain» scelto prima della presa: il foglio
+     nasce sul cambio, una volta — poi la scelta e' quella dei due tasti */
+  if (o.riceviOc) {
+    if (cambioP2PDisponibile(o)) p2pIncassoRete[id] = 'oc';
+    delete o.riceviOc;
+    scriviOrdineP2P(o);
+    renderIncassoP2P();
+  }
   if (p2pIncassoRete[id] === 'oc') { caricaCambioP2P(id); return; }
   if (walletNwcFattura()) fatturaDalWalletP2P(id);
 }
@@ -100695,7 +100731,7 @@ function incassoDaSoloAttivoP2P(){
 /* l'indirizzo da mandare da solo, o '' — legge la leva e l'indirizzo
    degli incassi, e la riga dello scambio */
 function indirizzoDaSoloP2P(o){
-  if (!o || o.lato !== 'compro' || o.daSolo || !incassoDaSoloAttivoP2P()) return '';
+  if (!o || o.lato !== 'compro' || o.daSolo || o.riceviOc || !incassoDaSoloAttivoP2P()) return '';
   const ind = String(myLnAddress || '').trim();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ind) || walletNonPassaP2P(ind)) return '';
   if (Array.isArray(o.indirizziRifiutati) && o.indirizziRifiutati.indexOf(ind.toLowerCase()) >= 0) return '';
