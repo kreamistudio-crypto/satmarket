@@ -202741,7 +202741,7 @@ def prove_miniature_leggere():
 
     # --- 3) il riquadro delle liste piccole ---------------------------
     prova("nessun 💰 al posto della foto, nessuna foto piena nelle "
-          "liste piccole", (0, 7),
+          "liste piccole", (0, 8),   # l'ottava: la testata dei codici pronti (24 nov 2026)
           (mini.count("replaceWith('💰')"), mini.count("riquadroMini(")
            - 1))
     # fino alla funzione dopo: dentro ci sono funzioni annidate
@@ -202755,7 +202755,9 @@ def prove_miniature_leggere():
     for firma, nome in (("function apriPunta(modo){", "della puntata"),
                         ("function aggiornaFoglioOfferta(){", "dell'offerta"),
                         ("function apriLampo(){", "del lampo"),
-                        ("function apriRifornisci(id){", "del rifornisci")):
+                        ("function apriRifornisci(id){", "del rifornisci"),
+                        # (24 nov 2026, scorta-codici) il foglio dei codici pronti
+                        ("function apriScorta(id){", "dei codici pronti")):
         i = mini.index(firma)
         corpo = mini[i:re.compile(r"^(async )?function ", re.M).search(mini, i + 1).start()]
         prova(f"la testata {nome}: il riquadro a 44, niente <img> sciolta "
