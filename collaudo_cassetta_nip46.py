@@ -312,9 +312,10 @@ def main():
            S.CASSETTA_ORECCHI_MAX))
     secchio = S._SECCHI
     secchio.clear()
-    esiti = [c.post(VIA, json={"pub": "6" * 64, "relays": [RELAY_CASA]},
-                    headers={"x-forwarded-for": "8.8.8.8"}).status_code
-             for _ in range(31)]
+    with banco.freno_fermo(S):          # il conto, non la velocita' del runner
+        esiti = [c.post(VIA, json={"pub": "6" * 64, "relays": [RELAY_CASA]},
+                        headers={"x-forwarded-for": "8.8.8.8"}).status_code
+                 for _ in range(31)]
     prova("il deposito ha il freno delle porte del login: trenta al minuto "
           "per IP, il trentunesimo e' un 429", (30, 429),
           (esiti.count(200), esiti[-1]))
@@ -433,10 +434,13 @@ def main():
     S.CASSETTA_SPEDITI_MAX = tetto
     S._SECCHI.clear()
     S.CASSETTA_SPEDITI_MAX = 1000       # qui si prova il freno per IP, non il tetto
-    esiti = [c.post(SP, json={"pub": mia, "biglietto": big,
-                              "evento": ventiquattro(sk, FIRMATARIO, f"giro {k}")},
-                    headers={"x-forwarded-for": "8.8.4.4"}).status_code
-             for k in range(61)]
+    # (24 nov 2026, freno-fermo) sul runner lento le 61 duravano piu' di un
+    # minuto e la sessantunesima passava: l'orologio del freno e' fermo
+    with banco.freno_fermo(S):
+        esiti = [c.post(SP, json={"pub": mia, "biglietto": big,
+                                  "evento": ventiquattro(sk, FIRMATARIO, f"giro {k}")},
+                        headers={"x-forwarded-for": "8.8.4.4"}).status_code
+                 for k in range(61)]
     prova("il freno per IP: sessanta al minuto, il sessantunesimo e' un 429",
           (True, 429), (esiti[:60].count(429) == 0, esiti[-1]))
     S._SECCHI.clear()

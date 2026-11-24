@@ -36,7 +36,8 @@ def main():
 
     print("\n[la sfida del login, per IP e solo in chiaro]")
     chiaro = {"X-Forwarded-For": "93.184.216.34"}   # un IP pubblico VERO (198.51.100.x e' «di documentazione», e per ipaddress privato)
-    stati = [c.get("/api/login/nostr/sfida", headers=chiaro).status_code for _ in range(31)]
+    with banco.freno_fermo(S):          # il conto, non la velocita' del runner
+        stati = [c.get("/api/login/nostr/sfida", headers=chiaro).status_code for _ in range(31)]
     # senza coincurve (la gabbia della CI non lo installa) la sfida e' un
     # 503 «login Nostr spento», e il freno viene PRIMA di quel controllo
     # apposta: quel che si prova e' «mai 429 per trenta, 429 al 31°»
@@ -58,9 +59,10 @@ def main():
         Image.new("RGB", (8, 8), (200, 100, 50)).save(out, "JPEG")
         uri = "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode()
         stati = []
-        for _ in range(61):
-            stati.append(c.post("/api/foto/anteprima", json={"foto": uri},
-                                headers={"X-Tg-Init-Data": "collaudo:111:Compratore"}).status_code)
+        with banco.freno_fermo(S):      # il conto, non la velocita' del runner
+            for _ in range(61):
+                stati.append(c.post("/api/foto/anteprima", json={"foto": uri},
+                                    headers={"X-Tg-Init-Data": "collaudo:111:Compratore"}).status_code)
         prova("sessanta anteprime passano, la sessantunesima e' un 429", [200] * 60 + [429], stati)
         prova("...e un'altra persona ha il suo secchio", 200,
               c.post("/api/foto/anteprima", json={"foto": uri},

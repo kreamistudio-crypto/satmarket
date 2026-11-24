@@ -458,12 +458,22 @@ def main():
     # ------------------------------------------------------------------
     print("\n[10) il freno: un dito non ci arriva, un ciclo si']")
     NUOVO = 555
-    codici = [c.post("/api/me/carrello", json={"tg_id": NUOVO, "righe": []},
-                     headers=chi(NUOVO)).status_code for _ in range(120)]
+    # (24 nov 2026, freno-fermo) l'orologio del freno fermo: si prova il
+    # conto del secchio, non la velocita' del runner (vedi
+    # collaudo_lnbits_muto.freno_fermo; qui il banco e' un altro)
+    vero_secchio = SRV._secchio_passa
+    ora_ferma = time.time()
+    SRV._secchio_passa = (lambda chiave, tetto, finestra, adesso:
+                          vero_secchio(chiave, tetto, finestra, ora_ferma))
+    try:
+        codici = [c.post("/api/me/carrello", json={"tg_id": NUOVO, "righe": []},
+                         headers=chi(NUOVO)).status_code for _ in range(120)]
+        ultimo = c.post("/api/me/carrello", json={"tg_id": NUOVO, "righe": []},
+                        headers=chi(NUOVO)).status_code
+    finally:
+        SRV._secchio_passa = vero_secchio
     prova("centoventi salvataggi in un minuto passano", {200}, set(codici))
-    prova("...il centoventunesimo no (429)", 429, c.post(
-        "/api/me/carrello", json={"tg_id": NUOVO, "righe": []},
-        headers=chi(NUOVO)).status_code)
+    prova("...il centoventunesimo no (429)", 429, ultimo)
 
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

@@ -488,8 +488,9 @@ def main():
 
     print("\n[il freno delle occhiate]")
     S._SECCHI.clear()
-    stati = [c.post(f"{B}/guarda", json={"annuncio_id": 99999}, headers=COMPRA).status_code
-             for i in range(61)]
+    with banco.freno_fermo(S):          # il conto, non la velocita' del runner
+        stati = [c.post(f"{B}/guarda", json={"annuncio_id": 99999}, headers=COMPRA).status_code
+                 for i in range(61)]
     prova("sessanta l'ora, la sessantunesima e' un 429", (60, 429),
           (len([x for x in stati[:60] if x != 429]), stati[60]))
     S._SECCHI.clear()

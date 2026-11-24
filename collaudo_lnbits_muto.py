@@ -51,6 +51,7 @@ USO:  python collaudo_lnbits_muto.py
 """
 
 import asyncio
+import contextlib
 import hashlib
 import os
 import sqlite3
@@ -103,6 +104,26 @@ def prova(nome, atteso, avuto):
         FALLITE += 1
         print(f"  ✗ {nome}\n      atteso: {atteso!r}"
               f"\n      avuto:  {avuto!r}")
+
+
+@contextlib.contextmanager
+def freno_fermo(srv):
+    """L'OROLOGIO DEI FRENI FERMO (24 nov 2026, cantiere freno-fermo). Un
+    collaudo che conta «sessanta al minuto, il sessantunesimo e' un 429»
+    con l'orologio vero dipende dalla macchina: sul runner lento le 61
+    richieste sono durate piu' di un minuto, la finestra si e' rinnovata e
+    il 429 non e' arrivato (CI 45467820047, collaudo_cassetta_nip46).
+    Dentro il blocco ogni gettone cade nello stesso istante: si prova il
+    conto del secchio, non la velocita' della macchina. Fuori dal blocco
+    l'orologio torna quello vero."""
+    vero = srv._secchio_passa
+    ora = time.time()
+    srv._secchio_passa = (lambda chiave, tetto, finestra, adesso:
+                          vero(chiave, tetto, finestra, ora))
+    try:
+        yield
+    finally:
+        srv._secchio_passa = vero
 
 
 class _Risposta:
