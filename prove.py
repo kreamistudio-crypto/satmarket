@@ -222572,6 +222572,13 @@ INSERT INTO annunci VALUES
           (True, True),
           ('<div class="section-label centrato">In evidenza</div>' in _evs,
            'id="evidenzaFila" role="region" aria-label="In evidenza"' in _evs))
+    # «Esplora il lavoro» prende il posto di «Esplora per categorie» in
+    # Lavoro, e ne prende anche il titolo al centro (24 nov 2026, Andrea:
+    # «sistemalo», era rimasto a sinistra con la linea puntinata)
+    prova("i titoli delle file della home stanno al centro, anche in Lavoro",
+          (True, True),
+          ('<div class="section-label centrato">Esplora per categorie</div>' in mini,
+           '<div class="section-label centrato">Esplora il lavoro</div>' in mini))
     _css = mini[mini.index("<style"):mini.index("</style>")]
     # LE DUE ONDE (24 nov 2026, scelte da Andrea dopo una ventina di
     # prove): l'arancio davanti e la dorata dietro, sul fondo della pagina
