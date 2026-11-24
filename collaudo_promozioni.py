@@ -515,6 +515,56 @@ def main():
           uno("SELECT evidenza_fino FROM annunci WHERE id=?",
               (di_altro,))["evidenza_fino"] > 0)
 
+    # L'EVIDENZA REGALATA (24 nov 2026): la stessa della pagata, senza
+    # fattura, dal link che il moderatore ha in mano
+    print("\n[/promossi evidenza, il regalo del moderatore]")
+    regalo = annuncio(3, "Crema spalmabile", adesso - 3 * 86400)
+    POST.clear(); ADMIN.clear()
+    pagamenti = uno("SELECT COUNT(*) FROM pagamenti")[0]
+
+    async def _regala(chi, testo):
+        await server.comando_promossi({"id": chi}, testo)
+        await asyncio.sleep(0.05)      # il post del canale e' un task
+    asyncio.run(_regala(999, "/promossi evidenza https://barattolo.store/"
+                        f"annuncio/{regalo}-crema-spalmabile 7"))
+    a = uno("SELECT evidenza_fino, creato FROM annunci WHERE id=?", (regalo,))
+    prova("dal link: in evidenza 7 giorni e oggi in cima, senza fattura",
+          (True, True, pagamenti),
+          (abs(a["evidenza_fino"] - (adesso + 7 * 86400)) < 120,
+           a["creato"] >= adesso, uno("SELECT COUNT(*) FROM pagamenti")[0]))
+    prova("...esce di nuovo nel canale, e i moderatori lo sanno", (1, True),
+          (len(POST), any(f"/promossi evidenza {regalo} 7" in x[0]
+                          for x in ADMIN)))
+    prova("...e la busta lo porta nella fila", True,
+          regalo in [x["id"] for x in busta().get("in_evidenza", [])])
+    asyncio.run(_regala(999, f"/promossi evidenza {regalo} 3"))
+    prova("ridato a chi ce l'ha, i giorni si sommano", True,
+          abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",
+                  (regalo,))[0] - (adesso + 10 * 86400)) < 120)
+    asyncio.run(_regala(999, f"/promossi evidenza {regalo}"))
+    prova("senza giorni sono 7", True,
+          abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",
+                  (regalo,))[0] - (adesso + 17 * 86400)) < 120)
+    server.PROMO_EVIDENZA_POSTI = 2
+    AVVISI.clear()
+    asyncio.run(_regala(999, f"/promossi evidenza {vecchio} 7"))
+    prova("a fila piena non scavalca: dice quando si libera il posto",
+          (0, True), (uno("SELECT evidenza_fino FROM annunci WHERE id=?",
+                          (vecchio,))[0],
+                      "sono tutti presi" in (AVVISI[-1][1] if AVVISI else "")))
+    server.PROMO_EVIDENZA_POSTI = 8
+    for testo in (f"/promossi evidenza {vecchio} 0",
+                  f"/promossi evidenza {vecchio} 91"):
+        asyncio.run(_regala(999, testo))
+    asyncio.run(_regala(1, f"/promossi evidenza {vecchio} 7"))
+    scrivi("UPDATE annunci SET stato='venduto' WHERE id=?", (regalo,))
+    asyncio.run(_regala(999, f"/promossi evidenza {regalo} 7"))
+    prova("giorni fuori misura, chi non e' admin, un annuncio venduto: "
+          "niente", (0, True),
+          (uno("SELECT evidenza_fino FROM annunci WHERE id=?", (vecchio,))[0],
+           abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",
+                   (regalo,))[0] - (adesso + 17 * 86400)) < 120))
+
     print(f"\n=== {VERDI[0]} verdi, {ROSSE[0]} rotte ===")
     return 1 if ROSSE[0] else 0
 

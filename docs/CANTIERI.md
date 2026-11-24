@@ -95749,3 +95749,15 @@ Se Andrea la manda, va in `assets/racconti/` e si cambia il numero.
 PROVATO. `prove_promozioni` 7c: la divisione in node anche con 2 e con
 1 negozio, la foto 'logo' in node, le scelte di Andrea, l'allineamento.
 Guardato con Playwright coi due negozi veri, schermate ad Andrea.
+
+## «In evidenza» regalata dal moderatore: `/promossi evidenza` (24 nov 2026, cantiere evidenza-gratis; Andrea: «dobbiamo mettere anche delle card in evidenza, in maniera gratuita… decidiamo noi chi mettere»)
+
+COSA. Una quarta forma di `/promossi`, solo admin, nel gruppo e in privato: `/promossi evidenza 288 7` mette l'annuncio 288 nella fila «In evidenza» per 7 giorni senza pagare (senza giorni sono 7, da 1 a 90). L'id si può scrivere nudo o incollare il link che Andrea ha in mano (`https://barattolo.store/annuncio/288-seedsigner-...`): lo legge `_id_annuncio`. L'aiuto di `/promossi` la elenca.
+
+DECISIONI. È LA STESSA EVIDENZA DI QUELLA PAGATA, senza la fattura: la data si somma a quella che c'è (`max(adesso, evidenza_fino) + giorni`), il primo giorno l'annuncio è anche in cima (`creato` a adesso), ed esce di nuovo nel canale Vetrina (`promo_in_cima_canale`) — due strade diverse per la stessa etichetta avrebbero voluto due spiegazioni. Occupa UNO DEGLI OTTO POSTI come le altre: a fila piena non scavalca chi ha pagato, e la risposta dice quando se ne libera uno (`posti_evidenza`). Solo annunci attivi. Si toglie col gesto di sempre, `/promossi annuncio ID`. Nessun pagamento nel libro mastro: niente da rimborsare.
+
+STRADE SCARTATE. Una leva nel config: le scelte sono per annuncio e cambiano, e un deploy per ognuna è troppo. Un comando nuovo `/evidenza` (proposto ad Andrea): stava già tutto in `/promossi`, che elenca chi è in evidenza e toglie; una forma in più non tocca i due smistatori del bot.
+
+PROVATO. `collaudo_promozioni` (il server vero coi sats di cartone): dal link, 7 giorni e oggi in cima senza nessuna riga in `pagamenti`; il post nel canale e l'avviso ai moderatori; la busta lo porta in `in_evidenza`; ridato, i giorni si sommano; senza giorni sono 7; a fila piena (2 posti) non entra e lo dice; giorni 0 e 91, chi non è admin e un annuncio venduto non cambiano niente. Controprova: senza il post e senza la guardia della fila, tre rossi. `prove_promozioni`: `_id_annuncio` sui tre link di Andrea, l'ordine guardia → data → canale.
+
+DA GUARDARE. Dopo la promozione, i due annunci scelti da Andrea (288 SeedSigner e 169 Arachidata: «metti solo i primi due») col comando dal bot.

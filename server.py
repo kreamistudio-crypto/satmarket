@@ -24844,6 +24844,19 @@ async def comando_sponsor(mittente: dict, testo: str):
 
 
 
+MAX_GIORNI_EVIDENZA_GRATIS = 90
+
+
+def _id_annuncio(chi: str) -> int:
+    """L'id di un annuncio da quel che scrive il moderatore: il numero
+    nudo (`288`) o il link che ha in mano
+    (`https://barattolo.store/annuncio/288-seedsigner-...`). 0 se non
+    c'e' un numero da prendere."""
+    m = (re.search(r"/annuncio/(\d+)", chi or "")
+         or re.fullmatch(r"#?(\d+)(?:-[\w-]*)?", chi or ""))
+    return int(m.group(1)) if m else 0
+
+
 async def comando_promossi(mittente: dict, testo: str):
     """`/promossi` — le promozioni a pagamento viste dal moderatore (23
     nov 2026). Solo admin. Tre forme:
@@ -24851,6 +24864,15 @@ async def comando_promossi(mittente: dict, testo: str):
       `/promossi negozio <codice>`   toglie il negozio da Da scoprire
                                      E dai Consigliati
       `/promossi annuncio <id>`      toglie l'annuncio da In evidenza
+      `/promossi evidenza <id> [giorni]`  mette l'annuncio In evidenza
+                                     GRATIS (24 nov 2026), 7 giorni se
+                                     non si dice; l'id o il link
+    L'EVIDENZA REGALATA (24 nov 2026, Andrea: «dobbiamo mettere anche
+    delle card in evidenza, in maniera gratuita… decidiamo noi chi
+    mettere»): e' la stessa di quella pagata — la data che si somma, il
+    primo giorno in cima, il post nel nostro canale — senza la fattura.
+    Occupa uno degli PROMO_EVIDENZA_POSTI posti come le altre: a fila
+    piena non scavalca chi ha pagato, dice quando si libera un posto.
     LA PORTA DEL MODERATORE: un negozio pagato entra da solo, perche' la
     sua card e' il banner GIA' approvato (il patto della fattura); se poi
     va tolto si toglie da qui, e i sats, se e' il caso, si restituiscono
@@ -24877,6 +24899,44 @@ async def comando_promossi(mittente: dict, testo: str):
                          if fatto else
                          f"Il negozio <b>{html.escape(chi)}</b> non era "
                          "promosso.")
+        elif cosa == "evidenza" and _id_annuncio(chi):
+            aid = _id_annuncio(chi)
+            try:
+                giorni = int(pezzi[3]) if len(pezzi) > 3 else 7
+            except ValueError:
+                giorni = 0
+            a = con.execute("SELECT stato, titolo, evidenza_fino FROM annunci "
+                            "WHERE id=?", (aid,)).fetchone()
+            fatto = 0
+            if not 1 <= giorni <= MAX_GIORNI_EVIDENZA_GRATIS:
+                testo_out = (f"I giorni vanno da 1 a "
+                             f"{MAX_GIORNI_EVIDENZA_GRATIS}. Esempio: "
+                             f"<code>/promossi evidenza {aid} 7</code>")
+            elif not a or a["stato"] != "attivo":
+                testo_out = (f"L'annuncio #{aid} non c'e' o non e' in "
+                             "vendita: In evidenza ci vanno solo quelli "
+                             "attivi.")
+            else:
+                _, libero = posti_evidenza(con, adesso, aid)
+                if libero:
+                    testo_out = (f"I {PROMO_EVIDENZA_POSTI} posti di In "
+                                 "evidenza sono tutti presi: il prossimo si "
+                                 f"libera il <b>{_data_sponsor(libero)}</b>.")
+                else:
+                    fino = (max(adesso, int(a["evidenza_fino"] or 0))
+                            + giorni * 86400)
+                    con.execute("UPDATE annunci SET evidenza_fino=?, "
+                                "creato=? WHERE id=?", (fino, adesso, aid))
+                    con.commit()
+                    fatto = 1
+                    chi = f"{aid} {giorni}"
+                    testo_out = (f"✅ L'annuncio #{aid} "
+                                 f"{html.escape(a['titolo'] or '')} e' in "
+                                 f"evidenza gratis fino al "
+                                 f"<b>{_data_sponsor(fino)}</b>: oggi e' "
+                                 "anche in cima, ed esce di nuovo nel "
+                                 "canale Vetrina.")
+                    asyncio.create_task(promo_in_cima_canale(aid))
         elif cosa == "annuncio" and chi.isdigit():
             cur = con.execute("UPDATE annunci SET evidenza_fino=0 "
                               "WHERE id=? AND evidenza_fino>0", (int(chi),))
@@ -24915,7 +24975,10 @@ async def comando_promossi(mittente: dict, testo: str):
                 righe.append("nessuno")
             righe += ["", "<code>/promossi negozio CODICE</code> — toglie un "
                       "negozio", "<code>/promossi annuncio ID</code> — toglie "
-                      "un annuncio da In evidenza", "",
+                      "un annuncio da In evidenza",
+                      "<code>/promossi evidenza ID 7</code> — mette un "
+                      "annuncio In evidenza gratis per 7 giorni (l'ID o il "
+                      "link dell'annuncio)", "",
                       "Togliere non rimborsa: i sats si restituiscono a mano "
                       "dal pannello, come per il banner."]
             testo_out = "\n".join(righe)

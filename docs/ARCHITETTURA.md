@@ -38546,7 +38546,11 @@ mai il kind 0 di nessuno: regola ferrea 2).
   (`negozi_promossi_pubblici`: `scoprire` finché corrono i giorni,
   `consigliato` dopo) e `promozioni_attive`; `evidenza_fino` viaggia con
   ogni card (`CAMPI_VETRINA`). Il moderatore: `/promossi` (elenco,
-  `negozio CODICE`, `annuncio ID`), nel gruppo e in privato. Nella pagina:
+  `negozio CODICE`, `annuncio ID`, e dal 24 nov `evidenza ID [giorni]`:
+  l'evidenza REGALATA, la stessa della pagata senza fattura — data che
+  si somma, `creato` a adesso, `promo_in_cima_canale` — dentro gli stessi
+  posti di `posti_evidenza`, 1-90 giorni, l'id anche dal link
+  (`_id_annuncio`)), nel gruppo e in privato. Nella pagina:
   `inEvidenza(l)` e la cornice `.card.ev`, la fila `#evidenzaFila`
   (`renderEvidenza`, solo vetrina nuda), le voci `vociNegoziPromossi` in
   «Da scoprire» e in `consigliatiPubblicati` (`promo: true`, banner e

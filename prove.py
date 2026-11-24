@@ -221814,6 +221814,22 @@ def prove_promozioni():
     prova("il moderatore ha /promossi nei due smistatori del bot", True,
           '"/promossi": comando_promossi' in src
           and 'if testo.startswith("/promossi"):' in src)
+    # L'EVIDENZA REGALATA (24 nov 2026): il giro vero e' nel collaudo
+    amb = {"re": re}
+    exec(pezzo("_id_annuncio"), amb)
+    prova("/promossi evidenza prende l'id dal numero o dal link che Andrea "
+          "ha in mano, e niente da quel che non lo e'",
+          [288, 169, 188, 12, 0, 0, 0],
+          [amb["_id_annuncio"](x) for x in (
+              "288", "https://barattolo.store/annuncio/169-arachidata-crema-"
+              "dolce-spalmabile", "barattolo.store/annuncio/188-sat-s-oil-"
+              "tester-edition", "#12", "", "ciao", "https://barattolo.store/")])
+    c = codice(pezzo("comando_promossi"))
+    prova("...a fila piena non scavalca chi ha pagato, e il resto e' "
+          "quel che fa la pagata (data che si somma, in cima, il canale)",
+          True, c.index("posti_evidenza(con, adesso, aid)")
+          < c.index("max(adesso, int(a[\"evidenza_fino\"] or 0))")
+          < c.index("promo_in_cima_canale(aid)"))
 
     # ---- 7. L'APP -----------------------------------------------------
     prova("la card in evidenza porta l'etichetta, e mai da esaurita", True,
