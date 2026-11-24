@@ -49382,7 +49382,21 @@ const P2P_AVVISI_RETI = [['', 'Tutte'], ['onchain', 'Solo on-chain'], ['ln', 'So
    possibilita' di scegliere usdt»): una scelta sola, e la sezione solo a
    chi gli USDT li vede (`usdtVistoP2P`). Gemelle di VALUTE_AVVISI_NUOVI_P2P */
 /* il franco subito dopo l'euro, come nel catalogo (16 nov 2026) */
-const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Solo euro'], ['CHF', 'Solo franchi'], ['USDT', 'Solo USDT']];
+/* LE ALTRE VALUTE, A SCELTA MULTIPLA (24 nov 2026, cantiere
+   avvisi-p2p-valute, Andrea: «poter selezionare in VALUTA oltre a euro
+   anche eventualmente qualche shitcoin»): dopo l'USDT le tre monete del
+   P2P (`P2P_VALUTE_COIN`, a chi le vede: `coinVistoP2P`), e ogni chip si
+   accende e si spegne da sola come i metodi — «Tutte» e' la lista vuota.
+   Per questo i nomi non dicono piu' «Solo». */
+const P2P_AVVISI_VALUTE = [['', 'Tutte'], ['EUR', 'Euro'], ['CHF', 'Franchi'], ['USDT', 'USDT'],
+                           ['ETH', 'Ethereum'], ['XMR', 'Monero'], ['USDE', 'USDe']];
+/* PURA: chi guarda la vede, questa chip della valuta? */
+function valutaAvvisiVistaP2P(c){
+  if (c === 'USDT') return typeof usdtVistoP2P === 'function' && usdtVistoP2P();
+  if (c === 'CHF') return typeof chfVistoP2P === 'function' && chfVistoP2P();
+  if (c === 'ETH' || c === 'XMR' || c === 'USDE') return typeof coinVistoP2P === 'function' && coinVistoP2P();
+  return true;
+}
 /* IL METODO DI PAGAMENTO DEGLI AVVISI (18 nov 2026, cantiere vetrina-pulita;
    un utente: «filtrare le notifiche del bot per buy e per sell oltre che per
    tipo di pagamento»): nessuno scelto = «Tutti», come prima; con dei metodi
@@ -49406,12 +49420,14 @@ function normalizzaAvvisiNuoviP2P(p){
   const tipi = (p && Array.isArray(p.tipi)) ? tutti.filter(t => p.tipi.indexOf(t) >= 0) : [];
   const soglia = String((p && p.soglia != null) ? p.soglia : '');
   const rete = String((p && p.rete) || '');
-  const valuta = String((p && p.valuta) || '').toUpperCase();
+  /* le valute: la lista di oggi, o il codice solo di un server di ieri */
+  const vg = (p && Array.isArray(p.valute)) ? p.valute : (p && p.valuta ? [p.valuta] : []);
+  const vs = vg.map(v => String(v || '').toUpperCase());
   const metodi = (p && Array.isArray(p.metodi)) ? P2P_AVVISI_METODI.filter(m => p.metodi.indexOf(m) >= 0) : [];
   return {attivo: !!(p && p.attivo), tipi: tipi.length ? tipi : tutti,
           soglia: P2P_AVVISI_SOGLIE.some(s => s[0] === soglia) ? soglia : '',
           rete: P2P_AVVISI_RETI.some(r => r[0] === rete) ? rete : '',
-          valuta: P2P_AVVISI_VALUTE.some(v => v[0] === valuta) ? valuta : '',
+          valute: P2P_AVVISI_VALUTE.map(v => v[0]).filter(v => v && vs.indexOf(v) >= 0),
           metodi: metodi};
 }
 let myAvvisiNuoviP2P = normalizzaAvvisiNuoviP2P(null);   // spento di serie
@@ -49470,12 +49486,12 @@ function contenutoAvvisiNuoviP2P(){
         : '')
     /* ...e i franchi (14 nov 2026, cantiere p2p-chf): ogni pillola a chi
        quella valuta la vede, la scelta c'e' se ne vede almeno un'altra */
-    + ((typeof usdtVistoP2P === 'function' && usdtVistoP2P()) || (typeof chfVistoP2P === 'function' && chfVistoP2P())
+    /* ...e le monete (24 nov 2026): a scelta multipla, «Tutte» = nessuna */
+    + (P2P_AVVISI_VALUTE.some(v => v[0] && v[0] !== 'EUR' && valutaAvvisiVistaP2P(v[0]))
         ? '<div class="section-label">Valuta</div>'
-          + '<div class="p2p-metodi">' + P2P_AVVISI_VALUTE.filter(v =>
-              v[0] === 'USDT' ? (typeof usdtVistoP2P === 'function' && usdtVistoP2P())
-              : v[0] === 'CHF' ? (typeof chfVistoP2P === 'function' && chfVistoP2P()) : true).map(v =>
-              pill(v[1], p.valuta === v[0], "scegliValutaAvvisiNuoviP2P('" + v[0] + "')")).join('')
+          + '<div class="p2p-metodi">' + P2P_AVVISI_VALUTE.filter(v => valutaAvvisiVistaP2P(v[0])).map(v =>
+              pill(v[1], v[0] ? (p.valute || []).indexOf(v[0]) >= 0 : !(p.valute || []).length,
+                   "scegliValutaAvvisiNuoviP2P('" + v[0] + "')")).join('')
           + '</div>'
         : '')
     + '<div class="section-label">Tipo di ordini</div>'
@@ -49551,7 +49567,7 @@ async function setAvvisiNuoviP2P(patch){
        /* `v: 2` (19 nov 2026): i tipi sono i due lati e Barattozon sta fra
           i metodi — un telefono di ieri non lo manda, e il server traduce */
        body: JSON.stringify({v: 2, attivo: !!voluto.attivo, tipi: voluto.tipi, soglia: voluto.soglia,
-                             rete: voluto.rete || '', valuta: voluto.valuta || '',
+                             rete: voluto.rete || '', valute: voluto.valute || [],
                              metodi: voluto.metodi || []})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
@@ -49576,9 +49592,16 @@ function scegliReteAvvisiNuoviP2P(r){
   if (!myAvvisiNuoviP2P.attivo) return;
   setAvvisiNuoviP2P({rete: r === 'onchain' || r === 'ln' ? r : ''});
 }
+/* (24 nov 2026) ogni valuta si accende e si spegne da sola, '' = «Tutte»;
+   un codice fuori catalogo non fa niente */
 function scegliValutaAvvisiNuoviP2P(v){
   if (!myAvvisiNuoviP2P.attivo) return;
-  setAvvisiNuoviP2P({valuta: v === 'EUR' || v === 'USDT' || v === 'CHF' ? v : ''});
+  if (!v) { setAvvisiNuoviP2P({valute: []}); return; }
+  if (!P2P_AVVISI_VALUTE.some(x => x[0] && x[0] === v)) return;
+  const valute = (myAvvisiNuoviP2P.valute || []).slice();
+  const i = valute.indexOf(v);
+  if (i >= 0) valute.splice(i, 1); else valute.push(v);
+  setAvvisiNuoviP2P({valute: P2P_AVVISI_VALUTE.map(x => x[0]).filter(x => x && valute.indexOf(x) >= 0)});
 }
 /* il metodo arriva come POSIZIONE nel catalogo (1 = SEPA), '' = «Tutti»:
    cosi' nell'onclick non viaggia un nome con gli spazi o gli apici */
