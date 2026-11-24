@@ -95937,3 +95937,11 @@ COSA. La luce ferma della voce di prima («La luce sotto In evidenza») non è p
 STRADE SCARTATE (tutte in /mnt/project-files/promozioni/): la luce sotto in quattro colori (evidenza-luce-varianti.jpg), alone, bordo luminoso e prima mensola (evidenza-stili.jpg), le altre tre mensole (evidenza-mensole.jpg). La 3 della prima tornata gli piaceva, ma ha chiesto altri stili: la scelta è venuta dalla seconda.
 
 PROVATO. `prove_promozioni` (la mensola e la luce nella regola di `.ev-strip`, nessun fondo della sezione, niente onde né SVG; la soglia dei quadratini di nuovo 2, il banco node con 2 e 4 negozi in tutte e due le file), più le sezioni toccate e i collaudi della vetrina. Scatti sulla pagina vera, scuro e chiaro, con foto vere.
+
+## I quadratini dei negozi diventano cerchi, e l'anello delle categorie più fine (24 nov 2026 sera, cantiere luce-evidenza; Andrea: le forme dei quadrati e delle icone delle categorie si somigliavano, «Tu cosa consigli?»)
+
+COSA. Fra quattro forme (cerchi con l'anello, card verticali alte con la scritta sulla foto, pillole con la foto tonda e la scritta accanto, rettangoli larghi; /mnt/project-files/promozioni/quadratini-forme.jpg) ho consigliato i cerchi e Andrea li ha presi, «ma non vorrei che quel cerchio arancio fosse troppo pesante, puoi farlo più fine? Anche il contorno delle categorie è troppo spesso». I quadratini di «Da scoprire» sono cerchi da 84px (`border-radius:50%`) con la scritta centrata sotto. L'anello: prima un bordo arancio pieno di 1.5px, poi («il bordo mi piaceva più quello di prima») quello SFUMATO della prova (oro, arancio, brace, `conic-gradient`) ma sottile, 2px, con un filo scuro fra anello e foto; l'anello della categoria scelta passa da 2.5 a 1.5px (l'`outline` di `.cat-cella.attiva .cat-quad`, che veste anche le card sorelle).
+
+PERCHÉ IL TONDO AI NEGOZI E NON ALLE CATEGORIE. I negozi sono persone e marchi: il tondo è un profilo, una storia. Le categorie sono disegni e filtri, stanno nel quadrato e hanno già il loro anello di «scelta». Le card verticali e i rettangoli larghi spingevano giù la pagina e somigliavano alle card di sotto.
+
+PROVATO. `prove_scoprire` (il cerchio, l'anello fine, le due righe), `prove_barattolo_filtra` e `prove_seo` (l'anello delle categorie, emendate a 1.5px). Scatto della pagina intera coi due negozi veri.

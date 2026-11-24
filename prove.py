@@ -21507,7 +21507,7 @@ def prove_barattolo_filtra():
     # card VESTE .cat-cella.attiva come le sorelle.
     prova("l'anello e' quello gia' imparato sulle card di categoria",
           True,
-          ".cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats)"
+          ".cat-cella.attiva .cat-quad{outline:1.5px solid var(--sats)"
           in css)
     prova("Ordina e Filtri si nascondono col barattolo acceso", True,
           "body.solo-barattolo .strumenti #ordinaSelBtn," in css
@@ -44202,7 +44202,7 @@ def prove_seo():
     prova("la card del reparto si accende", True,
           "${c === activeCat && !vistaBarattolo ? ' attiva' : ''}" in st)
     prova("...e l'anello e' l'arancio di casa", True,
-          ".cat-cella.attiva .cat-quad{outline:2.5px solid var(--sats)"
+          ".cat-cella.attiva .cat-quad{outline:1.5px solid var(--sats)"
           in testo_mini)
     # CAMBIA LATO (ago 2026): la formula non vive piu' qui dentro —
     # la barra delle pillole fa lo stesso gesto, e due copie direbbero
@@ -222506,9 +222506,16 @@ console.log(JSON.stringify([p1, p2, p3, p4, b.style.backgroundImage]));''')
               "senza foto lascia quel che c'era",
               [[True, False], [True, False], [False, True], [False, True],
                'url("/y.jpg")'], r)
-    prova("il quadrato e' grande abbastanza per la foto (96px) e la riga "
-          "va su due righe invece di tagliarsi", (True, True),
-          (".sc-quadro{flex:0 0 96px;width:96px;" in mini,
+    # (24 nov 2026 sera, Andrea: le forme dei quadrati e delle categorie
+    # si somigliavano) i quadrati diventano CERCHI da 84px con l'anello
+    # arancio fine; le categorie restano quadrate col loro anello fine
+    prova("il cerchio del negozio (84px, tondo, l'anello sfumato sottile "
+          "di 2px) e la riga va su due righe invece di tagliarsi",
+          (True, True, True),
+          (".sc-quadro{flex:0 0 84px;width:84px;" in mini,
+           "border-radius:50%;\n    overflow:hidden;box-sizing:border-box;"
+           "border:0;padding:2px;\n    background:conic-gradient(#FFBE5A,"
+           "#F7931A,#C2410C,#F7931A,#FFBE5A)}" in mini,
            "-webkit-line-clamp:2" in pezzo_js(mini, "  .sc-quadro b{", "}")))
     # e quando la card grande scorre, sotto NIENTE si accende (Andrea,
     # 23 nov 2026: «sotto non si deve evidenziare il quadrato»)
