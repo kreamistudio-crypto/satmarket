@@ -982,3 +982,9 @@ frase: Nel P2P, quando compri sats e hai salvato un indirizzo Lightning negli in
 dove: P2P → prendi un ordine di chi vende sats → «⚡ Ricevi su …»; per riceverli on-chain, «₿ Ricevi on-chain» nel foglio dell'ordine prima di «Compra»; Profilo → «⚡ Attiva incassi automatici» per salvare l'indirizzo.
 leva: P2P_INCASSO_DA_SOLO (accesa di serie)
 pubblico: no
+
+## 2026-11-24 · foto-in-fila-incolla
+frase: Sul computer le foto del tuo annuncio stanno in fila, una accanto all'altra, e non scendono più per mezzo schermo. La descrizione di una foto adesso si legge anche sulla foto nella scheda dell'annuncio, non solo a schermo intero. E puoi incollare uno screenshot con Ctrl+V nell'assistenza e nella chat di un ordine, senza salvarlo prima.
+dove: Vendi → le foto (sul computer); la scheda di un annuncio → la foto; Assistenza e chat dell'ordine → Ctrl+V nella casella.
+leva: nessuna
+pubblico: sì

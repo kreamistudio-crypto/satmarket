@@ -47821,7 +47821,7 @@ def prove_fogli_di_casa():
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
     # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
     # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
-    prova("i gesti che passano dalla domanda unica sono centoquarantacinque (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoquarantasei (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47848,8 +47848,9 @@ def prove_fogli_di_casa():
           "pannello, e delle gift card nel P2P l'annuncio di chi vende e il "
           "comprare da un annuncio; dal 23 nov «🚀 Promuovi» e il negozio "
           "in Da scoprire; e il moderatore che rifiuta o toglie nome e "
-          "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza)",
-          145, solo_codice(mini).count("chiediConferma({"))
+          "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza; dal 24 nov "
+          "«Mandi l'immagine incollata?» della chat)",
+          146, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -210827,6 +210828,91 @@ console.log(JSON.stringify(fuori));
           in mini and '<div id="lbDidascalia"></div>' in mini)
 
 
+def prove_foto_in_fila_e_incolla():
+    """LE TRE RICHIESTE DI ZZAP DEL 24 NOV 2026: le foto in fila sul
+    computer nel foglio Vendi, la descrizione della foto anche sulla
+    foto della scheda (non solo a tutto schermo), e lo screenshot
+    incollato con Ctrl+V nell'assistenza e nella chat di un ordine o di
+    uno scambio. I gesti in un banco node, la forma col CSS."""
+    print("\n[le foto in fila, la descrizione sulla scheda, lo screenshot incollato]")
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    try:
+        prog = ("""
+const fuori = {assist: [], conferme: [], allegati: [], fermati: 0};
+let chatPossibile = true, chatAperta = 'm7';
+function chatScAllegatiPossibiliP2P(){ return chatPossibile; }
+function chatScApertoP2P(){ return chatAperta; }
+function chiediConferma(c){ fuori.conferme.push(c.titolo); c.poi(); }
+function allegaChatScambioP2P(inp){ fuori.allegati.push(inp.files.map(f => f.nome)); }
+function screenshotAssistenzaScelti(inp, chi){ fuori.assist.push([chi, inp.files.map(f => f.nome)]); }
+const foto = nome => ({kind: 'file', type: 'image/png', getAsFile: () => ({nome, type: 'image/png'})});
+const testo = {kind: 'string', type: 'text/plain', getAsFile: () => null};
+const evento = (id, items, files) => ({target: {id},
+  clipboardData: {items: items || [], files: files || []},
+  preventDefault(){ fuori.fermati++; }});
+"""
+                + _fn_js(mini, "function immaginiDagliAppunti(dt){")
+                + _fn_js(mini, "function incollaImmagine(e){")
+                + """
+fuori.soloTesto = immaginiDagliAppunti({items: [testo], files: []}).length;
+fuori.daFiles = immaginiDagliAppunti({items: [], files: [{nome: 'ff', type: 'image/jpeg'}, {nome: 'pdf', type: 'application/pdf'}]}).map(f => f.nome);
+fuori.vuoto = immaginiDagliAppunti(null).length;
+incollaImmagine(evento('assistenzaTesto', [testo, foto('a1'), foto('a2')]));
+incollaImmagine(evento('assistenzaAdmTesto', [foto('b1')]));
+incollaImmagine(evento('assistenzaTesto', [testo]));
+incollaImmagine(evento('sellTitle', [foto('x')]));
+incollaImmagine(evento('p2pChatScTesto', [foto('c1'), foto('c2')]));
+chatPossibile = false;
+incollaImmagine(evento('p2pChatScTesto', [foto('c3')]));
+console.log(JSON.stringify(fuori));
+""")
+        out = _node_banco(prog)
+    except ValueError as e:
+        out = {"ancora": str(e)}
+    if out is None:
+        salta("lo screenshot incollato", "node non installato")
+    else:
+        prova("negli appunti solo testo: nessuna immagine, l'incolla resta "
+              "quello di sempre", (0, 0), (out.get("soloTesto"), out.get("vuoto")))
+        prova("...Firefox le da' in `files`: si prendono le immagini, "
+              "non il PDF", ["ff"], out.get("daFiles"))
+        prova("nell'assistenza lo screenshot entra tra gli allegati, "
+              "della casella giusta",
+              [["mio", ["a1", "a2"]], ["adm", ["b1"]]], out.get("assist"))
+        prova("nella chat si chiede prima, e parte la prima immagine",
+              (["Mandi l'immagine incollata?"], [["c1"]]),
+              (out.get("conferme"), out.get("allegati")))
+        prova("...fuori dalle tre caselle non succede niente, e il gesto "
+              "si ferma solo quando c'era un'immagine da prendere", 4,
+              out.get("fermati"))
+    prova("un ascoltatore solo, sul documento", 1,
+          mini.count("document.addEventListener('paste', incollaImmagine);"))
+
+    # --- la descrizione sulla foto della scheda --------------------------
+    dettaglio = _fn_js(mini, "function openDetail(id){")
+    prova("la scheda ha il posto della descrizione solo se qualche foto "
+          "ne ha una", True,
+          "${(l.didascalie||[]).some(t => t) ? `<div class=\"detail-didascalia" in dettaglio)
+    prova("...e la descrizione segue la foto in vista (frecce, pallini, "
+          "swipe)", True,
+          "if (didascaliaFoto) didascaliaFoto.textContent = (l.didascalie || [])[i] || '';"
+          in dettaglio)
+    prova("...vuota non si vede, e il tocco la attraversa", (True, True),
+          (".detail-didascalia:empty{display:none}" in mini,
+           "overflow-wrap:anywhere;pointer-events:none}" in mini))
+
+    # --- le foto in fila sul computer -------------------------------------
+    prova("il campo delle foto ha il suo nome", 1,
+          mini.count('<div class="field field-foto">'))
+    prova("sul computer, con le foto, prende tutta la riga: riquadro a "
+          "sinistra, schede a destra", (True, True, True),
+          ("html.fuori-telegram #view-vendi .field-foto{grid-column:1 / -1;display:grid;" in mini,
+           "html.fuori-telegram #view-vendi .field-foto>#photoPreview{grid-column:2;grid-row:1 / 4;margin-top:0}" in mini,
+           "html.fuori-telegram #view-vendi #photoPreview .foto-card{width:170px;max-width:none}" in mini))
+    prova("...senza foto resta la carta di prima", True,
+          "html.fuori-telegram #view-vendi .field-foto:has(#photoPreview:empty){grid-column:auto;display:block}" in mini)
+
+
 def prove_assistente_bot():
     """L'ASSISTENTE DEL BOT (28 ott 2026, cantiere bot-assistente,
     richiesta di Andrea). A leva accesa chi scrive una domanda al bot
@@ -223050,7 +223136,7 @@ CATEGORIE = {
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
     carrello_salvato bollino_staff anello_ovunque avvisi_mercatino
-    x_risonanza indirizzo_lightning foto_obbligatorie foto_varianti vibrazione
+    x_risonanza indirizzo_lightning foto_obbligatorie foto_varianti foto_in_fila_e_incolla vibrazione
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
@@ -224487,6 +224573,7 @@ def main():
               prove_assistenza_id_nostr,
               prove_incasso_onchain_visto,
               prove_foto_varianti,
+              prove_foto_in_fila_e_incolla,
               prove_relay_risolti,
               prove_certificati_relay,
               prove_config_esempio,

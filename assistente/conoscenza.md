@@ -190,7 +190,7 @@ Su Barattolo non si vendono: armi, droghe, servizi sessuali, refurtiva, contraff
 
 Un venditore può mettere il negozio in ferie (gli annunci restano ma non si comprano) e ha una pagina del negozio col suo link da condividere. Le ferie si mettono da Profilo → «🌴 Negozio in ferie», scegliendo il giorno del rientro: gli annunci restano in vetrina col prezzo in grigio, nessuno li può comprare, e al rientro tornano comprabili da soli. Non si chiude con affari da spedire o aste in corso.
 
-Le foto dell'annuncio (dal 24 novembre 2026): sotto ogni foto ci sono le frecce ◀ ▶ per spostarla, e la prima foto è la copertina. Sotto ogni foto c'è anche «Descrizione della foto (facoltativa)», fino a 80 caratteri: chi compra la legge aprendo la foto a schermo intero. In «Modifica» le foto attuali restano: se ne aggiungono altre fino a 5, si spostano con le frecce e si toglie quella che non si vuole con la ✕. Le descrizioni passano dalla moderazione come il resto.
+Le foto dell'annuncio (dal 24 novembre 2026): sotto ogni foto ci sono le frecce ◀ ▶ per spostarla, e la prima foto è la copertina. Sotto ogni foto c'è anche «Descrizione della foto (facoltativa)», fino a 80 caratteri: chi compra la legge sulla foto nella scheda dell'annuncio e aprendola a schermo intero. Sul computer le foto stanno in fila accanto al riquadro «Aggiungi foto». In «Modifica» le foto attuali restano: se ne aggiungono altre fino a 5, si spostano con le frecce e si toglie quella che non si vuole con la ✕. Le descrizioni passano dalla moderazione come il resto.
 
 <!-- pezzo libro-020 | libro -->
 ## Libro · Vendere nel mercatino (5/10)
@@ -306,10 +306,10 @@ La ripubblica (dal 16 novembre 2026; semplificata il 20 novembre 2026): gli ordi
 
 La disputa nel P2P: si apre solo coi sats già in garanzia, col bottone «⚠️ Apri una disputa» in fondo alla pagina dello scambio (nella scheda «📋 Passi»). Ferma lo scambio e chiama un moderatore, che potrà leggere la chat di quello scambio. Se è solo una domanda o un ritardo, prima scrivi all'altra persona nella chat. Chi vende può sempre liberare i sats anche a disputa aperta, e la disputa si chiude.
 
-La chat dello scambio: da quando l'ordine è preso a quando lo scambio finisce c'è una chat fra voi due, cifrata, con foto e PDF. A fine scambio si cancella. Barattolo non ti scrive mai nella chat dello scambio: chi lì si presenta come «assistenza» è l'altra persona.
-
 <!-- pezzo libro-035 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (9/24)
+
+La chat dello scambio: da quando l'ordine è preso a quando lo scambio finisce c'è una chat fra voi due, cifrata, con foto e PDF (sul computer anche uno screenshot incollato con Ctrl+V: prima di mandarlo l'app chiede «Mandi l'immagine incollata?»). A fine scambio si cancella. Barattolo non ti scrive mai nella chat dello scambio: chi lì si presenta come «assistenza» è l'altra persona.
 
 Contanti di persona (metodo «Contanti»): ci si incontra, chi compra sats porta le banconote, chi vende le conta e libera i sats lì, davanti all'altro. Le regole:
 - i contanti si consegnano solo quando chi vende preme «Libera i sats» davanti a te, e si va via solo con lo scambio concluso;
@@ -576,7 +576,7 @@ Il mercatino gira su un server solo: se si fermasse, Barattolo si fermerebbe. Ma
 <!-- pezzo libro-063 | libro | sempre -->
 ## Libro · Parlare con una persona (1/2)
 
-Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
+Se nei NUMERI DI OGGI l'assistenza in app risulta disponibile, c'è anche una chat con lo staff dentro Barattolo: Profilo → Aiuto → «💬 Assistenza». Ognuno ha la sua conversazione; lo staff risponde col bollino 🛡️ e ti arriva un avviso quando c'è una risposta. Al messaggio si possono allegare fino a tre screenshot (il bottone «📎 Allega screenshot» sotto la casella, oppure sul computer Ctrl+V di uno screenshot copiato, senza salvarlo prima): li vedono solo lo staff e chi li ha mandati. Anche lo staff può rispondere con uno screenshot, che trovi nella stessa conversazione.
 
 Se l'assistente non basta, sotto ogni sua risposta c'è il bottone «🙋 Parla con una persona»: ti dà la chat privata di Barattolo (t.me/barattolostore?direct), dove risponde una persona dello staff. Se quel link ti apre il canale invece della chat: le chat private dei canali ci sono solo nelle versioni recenti di Telegram, quindi aggiorna l'app e riprova dal telefono; oppure apri il canale @barattolostore e cerca in fondo alla pagina il tasto per mandare un messaggio. Se ancora non va, scrivilo a Tappo (@TappoBarattoloBot): passa lui il messaggio allo staff. Per un problema con un ordine o uno scambio preciso, scrivi lì il numero dell'ordine e cosa è successo. Per una lite su un ordine coi sats in garanzia, la strada giusta resta la disputa, dalla pagina dell'ordine o dello scambio.
 
@@ -2856,3 +2856,11 @@ frase: Nel P2P, quando compri sats e hai salvato un indirizzo Lightning negli in
 dove: P2P → prendi un ordine di chi vende sats → «⚡ Ricevi su …»; per riceverli on-chain, «₿ Ricevi on-chain» nel foglio dell'ordine prima di «Compra»; Profilo → «⚡ Attiva incassi automatici» per salvare l'indirizzo.
 leva: P2P_INCASSO_DA_SOLO (accesa di serie)
 pubblico: no
+
+<!-- pezzo novita-158 | novita -->
+## Novità · 2026-11-24 · foto-in-fila-incolla
+
+frase: Sul computer le foto del tuo annuncio stanno in fila, una accanto all'altra, e non scendono più per mezzo schermo. La descrizione di una foto adesso si legge anche sulla foto nella scheda dell'annuncio, non solo a schermo intero. E puoi incollare uno screenshot con Ctrl+V nell'assistenza e nella chat di un ordine, senza salvarlo prima.
+dove: Vendi → le foto (sul computer); la scheda di un annuncio → la foto; Assistenza e chat dell'ordine → Ctrl+V nella casella.
+leva: nessuna
+pubblico: sì

@@ -2513,6 +2513,16 @@
     color:#fff;font:700 14px/1.4 Nunito,sans-serif;
     text-shadow:0 1px 3px rgba(0,0,0,.8);pointer-events:none}
   #lbDidascalia:empty{display:none}
+  /* la stessa descrizione sulla foto della scheda (24 nov 2026): in
+     basso, sopra i pallini, su una striscia scura che si legge anche
+     sulle foto chiare. Il tocco la attraversa e apre il visore. */
+  .detail-didascalia{position:absolute;left:50%;bottom:12px;z-index:2;
+    transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);
+    box-sizing:border-box;padding:5px 12px;border-radius:12px;
+    background:rgba(0,0,0,.55);color:#fff;text-align:center;
+    font:700 13px/1.35 Nunito,sans-serif;overflow-wrap:anywhere;pointer-events:none}
+  .detail-didascalia.con-pallini{bottom:28px}
+  .detail-didascalia:empty{display:none}
   .card .info{padding:32px 12px 12px}
   /* overflow-wrap qui non salva la PAGINA — ci pensa gia' l'overflow
      hidden del clamp, verificato: la griglia non sborda nemmeno con un
@@ -14481,6 +14491,22 @@
     html.fuori-telegram #view-profilo .form>:not(.grp){grid-column:1 / -1}
     /* il bottone che pubblica non diventa una striscia lunga uno schermo */
     html.fuori-telegram #vendiPiede{max-width:560px;margin-left:auto;margin-right:auto}
+    /* LE FOTO IN FILA SUL COMPUTER (24 nov 2026, chiesto da Zzap con lo
+       screenshot): nella carta da 440 px le schede delle foto andavano
+       due per riga e scendevano per mezzo schermo, col resto vuoto.
+       Appena c'e' una foto il campo prende tutta la riga: il riquadro
+       «Aggiungi» a sinistra, le schede in fila a destra, larghe
+       uguali. Senza foto resta la carta di prima (`:has` e' solo un
+       di piu': dove non c'e', il campo resta in fila anche vuoto).
+       La terza riga `1fr` si prende l'altezza delle schede: senza, la
+       riga dell'avviso sotto il riquadro scivolerebbe giu'. */
+    html.fuori-telegram #view-vendi .field-foto{grid-column:1 / -1;display:grid;
+      grid-template-columns:minmax(260px,380px) minmax(0,1fr);
+      grid-template-rows:auto auto 1fr;column-gap:24px;align-items:start}
+    html.fuori-telegram #view-vendi .field-foto>*{grid-column:1}
+    html.fuori-telegram #view-vendi .field-foto>#photoPreview{grid-column:2;grid-row:1 / 4;margin-top:0}
+    html.fuori-telegram #view-vendi #photoPreview .foto-card{width:170px;max-width:none}
+    html.fuori-telegram #view-vendi .field-foto:has(#photoPreview:empty){grid-column:auto;display:block}
     html.fuori-telegram #ordersList{display:grid;
       grid-template-columns:repeat(auto-fill,minmax(420px,1fr));column-gap:16px;align-items:start}
     html.fuori-telegram #ordersList>:not(.order){grid-column:1 / -1}
@@ -16830,7 +16856,7 @@ document.getElementById('cartello')?.remove();</script>
       </div>
       <div class="sub" id="sellSottotitolo">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.</div>
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
-      <div class="field">
+      <div class="field field-foto">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
         <!-- «📷 SCATTA FOTO» (1 ott 2026): dentro Telegram e nell'app
              Android il selettore qui sopra apriva solo la libreria, e
@@ -38309,7 +38335,7 @@ function openDetail(id){
          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>` : '';
   const foto = (l.photos && l.photos.length)
     ? `<div class="detail-foto"><div class="detail-photos${l.photos.length>1?'':' una'}">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
-       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${frecce}${indietro}${barattolino}${condividi}</div>`
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${(l.didascalie||[]).some(t => t) ? `<div class="detail-didascalia${l.photos.length>1?' con-pallini':''}" aria-live="polite"></div>` : ''}${frecce}${indietro}${barattolino}${condividi}</div>`
     : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
   /* I ponti di contatto NON vivono piu' qui (lug 2026): si trovano
      entrando nella scheda del venditore, dove gia' c'erano. Il
@@ -38614,6 +38640,9 @@ function openDetail(id){
   const striscia = document.querySelector('#detailContent .detail-photos');
   const pallini = document.querySelector('#detailContent .foto-dots');
   const frecceNav = [...document.querySelectorAll('#detailContent .foto-nav')];
+  /* la descrizione della foto anche qui, non solo a tutto schermo
+     (24 nov 2026, chiesto da Zzap): segue la foto in vista */
+  const didascaliaFoto = document.querySelector('#detailContent .detail-didascalia');
   if (striscia) {
     const quante = striscia.children.length;
     const indice = () => Math.round(striscia.scrollLeft / (striscia.clientWidth || 1));
@@ -38622,6 +38651,7 @@ function openDetail(id){
        lo si chiede alla striscia — ed e' la strada dello swipe. */
     const aggiorna = (i = indice()) => {
       if (pallini) [...pallini.children].forEach((p, j) => p.classList.toggle('on', j === i));
+      if (didascaliaFoto) didascaliaFoto.textContent = (l.didascalie || [])[i] || '';
       frecceNav.forEach(b => b.disabled =
         b.classList.contains('prev') ? i <= 0 : i >= quante - 1);
     };
@@ -72009,6 +72039,44 @@ async function screenshotAssistenzaScelti(input, chi){
     ridisegnaAllegatiAssistenza(chi);
   }
 }
+/* INCOLLARE UNO SCREENSHOT (24 nov 2026, chiesto da Zzap): sul
+   computer si copia lo schermo e si incolla con Ctrl+V nella casella,
+   senza salvarlo prima. PURA: le immagini degli appunti, dagli `items`
+   (Chrome e Safari) o dai `files` (Firefox); [] se e' solo testo, e
+   allora l'incolla resta quello di sempre. */
+function immaginiDagliAppunti(dt){
+  if (!dt) return [];
+  const daItems = [...(dt.items || [])]
+    .filter(it => it && it.kind === 'file' && /^image\//.test(it.type || ''))
+    .map(it => it.getAsFile()).filter(Boolean);
+  if (daItems.length) return daItems;
+  return [...(dt.files || [])].filter(f => f && /^image\//.test(f.type || ''));
+}
+/* Dove si incolla: le due caselle dell'assistenza (lo screenshot entra
+   tra gli allegati, con la sua ✕, e parte con «Invia») e la chat di
+   un ordine o di uno scambio, che manda un file appena scelto — li'
+   prima si chiede, perche' un Ctrl+V sbagliato non arrivi all'altra
+   persona. Un ascoltatore solo, sul documento: le caselle rinascono a
+   ogni disegno. */
+function incollaImmagine(e){
+  const t = e && e.target;
+  const id = t && t.id;
+  if (id !== 'assistenzaTesto' && id !== 'assistenzaAdmTesto' && id !== 'p2pChatScTesto') return;
+  const immagini = immaginiDagliAppunti(e.clipboardData);
+  if (!immagini.length) return;
+  e.preventDefault();
+  if (id === 'p2pChatScTesto') {
+    if (!chatScAllegatiPossibiliP2P() || !chatScApertoP2P()) return;
+    chiediConferma({titolo: 'Mandi l\'immagine incollata?',
+      corpo: 'Arriva nella chat come una foto scelta con 📎.',
+      etichetta: 'Mandala',
+      poi: () => allegaChatScambioP2P({files: [immagini[0]]})});
+    return;
+  }
+  screenshotAssistenzaScelti({files: immagini}, id === 'assistenzaTesto' ? 'mio' : 'adm');
+}
+if (typeof document !== 'undefined' && document.addEventListener)
+  document.addEventListener('paste', incollaImmagine);
 /* `chi`: 'mio' o 'adm', la casella e il suo mucchio di screenshot */
 function casellaAssistenzaHTML(id, invia, segnaposto, chi){
   const c = ASSISTENZA_CASELLA[chi];
