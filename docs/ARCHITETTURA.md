@@ -38661,10 +38661,10 @@ mai il kind 0 di nessuno: regola ferrea 2).
   casa sta in `RACCONTI[slug].inBreve` (client) e
   `RACCONTI_NEGOZI[slug]["in_breve"]` (server). L'ordine della home sul
   ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (dal 24 nov col
-  titolo al centro; sotto le card, dalla sera del 24, una LUCE arancio
-  ferma — un `radial-gradient` sul bordo di sotto — al posto delle due
-  onde di `ondeEvidenza`, tolte: Cantieri, «La home ripulita» e «La luce
-  sotto In evidenza»),
+  titolo al centro, tolto di nuovo la sera; sotto le card, dalla sera del 24, una MENSOLA di luce
+  arancio ferma, disegnata sullo sfondo di `.ev-strip`, al posto delle due
+  onde di `ondeEvidenza`, tolte: Cantieri, «La home ripulita», «La luce
+  sotto In evidenza» e «La mensola di luce»),
   `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e dentro la griglia dopo sei card
   i due banner `#occasioniBanner` (dal 24 nov). Il tocco su un negozio della
   fila (card o quadrato) passa da `apriNegozioDaScoprire`: la pagina sale
@@ -38684,7 +38684,7 @@ mai il kind 0 di nessuno: regola ferrea 2).
   la card la segna `toccaScoperta` in `cardToccata`. Le pillole si appiccicano solo a
   `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
   La divisione parte da 8 negozi (`2 * QUADRI_MIN`); sotto, ogni negozio
-  sta in TUTTE E DUE le file, da `QUADRI_POCHI` negozi in su (2 il 24 nov, 5 la sera stessa: «sono troppo pochi»).
+  sta in TUTTE E DUE le file, da `QUADRI_POCHI` negozi in su (2 il 24 nov; 5 la sera stessa, «sono troppo pochi», e di nuovo 2 mezz'ora dopo, «anche se sono 2 adesso facciamoli vedere»).
   La foto del quadrato: `quadro` della pagina (1-9 una foto della storia,
   o "logo", il ritratto dei Consigliati; il catalogo di casa la scrive in
   `RACCONTI[slug].quadro`), sennò la prima foto dell'ultimo annuncio. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,

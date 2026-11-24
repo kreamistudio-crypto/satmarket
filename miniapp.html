@@ -1511,22 +1511,26 @@
     padding:6px var(--pad) 10px}
   .ev-strip::-webkit-scrollbar{display:none}
   .ev-strip .card{flex:0 0 150px;width:150px}
-  /* LA LUCE SOTTO «In evidenza» (24 nov 2026 sera). Le due onde
-     arancioni del cantiere home-card-pulite, viste in produzione, ad
-     Andrea non sono piaciute («la fascia in evidenza non mi piace»): ha
-     indicato la schermata del collaudo, dove la fila sta sul fondo della
-     pagina e sotto le card c'e' solo un chiarore arancio, piu' forte al
-     centro, che sfuma in alto e ai lati («Cosi»). Niente onde, niente
-     blocco di colore, niente movimento: un'ellisse sul bordo di sotto,
-     dentro i 30px che la fila lascia sotto le card, uguale nei due temi.
-     Il titolo «In evidenza» sta al centro come gli altri. Le card della
+  /* LA MENSOLA DI LUCE SOTTO «In evidenza» (24 nov 2026 sera). Le due
+     onde arancioni del cantiere home-card-pulite, viste in produzione, ad
+     Andrea non sono piaciute («la fascia in evidenza non mi piace»); la
+     luce ferma sotto le card nemmeno («cambia stile»). Fra sette stili
+     provati ha scelto questo («Va bene la 4»): le card appoggiate su una
+     MENSOLA sottile di luce, arancio che si fa oro al centro e sfuma ai
+     lati, con un chiarore arancio che sale dietro le card. Niente
+     movimento, uguale nei due temi. LE SEZIONI RAVVICINATE (Andrea, per
+     il thread della home): sotto la mensola restano 12px, e la sezione
+     non aggiunge fondo suo.
+     Il titolo «In evidenza» non c'e' piu' (la sera stessa, «si può anche
+     togliere»): lo dice la mensola. Le card della
      fila sono quelle della griglia SENZA la pastiglia e la cornice (e'
      pubblicita' pagata, e a dirlo una volta basta il titolo), con
      un'ombra piu' profonda: sembrano sollevate, come le card grandi di
      sopra. Nella griglia di sotto restano come prima. */
-  #evidenzaSez{margin-top:6px;padding:2px 0 4px;
-    background:radial-gradient(75% 48px at 50% 100%,rgba(247,147,26,.45),rgba(247,147,26,0))}
-  #evidenzaSez .ev-strip{padding-top:10px;padding-bottom:30px}
+  #evidenzaSez{margin-top:0;padding:2px 0 0}
+  #evidenzaSez .ev-strip{padding-top:10px;padding-bottom:18px;
+    background:linear-gradient(90deg,rgba(247,147,26,0),rgba(247,147,26,.95) 15%,#FFBE5A 50%,rgba(247,147,26,.95) 85%,rgba(247,147,26,0)) 0 calc(100% - 12px)/100% 3px no-repeat,
+      linear-gradient(0deg,rgba(247,147,26,.32),rgba(247,147,26,0)) 0 calc(100% - 15px)/100% 90px no-repeat}
   #evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}
   #evidenzaSez .card.ev .card-evidenza{display:none}
   #evidenzaSez .card.ev{outline:none}
@@ -1539,14 +1543,19 @@
   .sc-sfondo{display:none}
   @media (max-width:767px){
     .sc-quadri{display:flex;align-items:flex-start;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;
-      scrollbar-width:none;padding:0 var(--pad) 30px}
+      scrollbar-width:none;padding:0 var(--pad) 8px}
     /* TUTTI IN RIGA DALL'ALTO (24 nov 2026, Andrea: «come mai i
        quadratini sono sfalsati?»): un bottone allungato dalla fila
        centra il suo contenuto, e un quadrato con la scritta su una riga
        scendeva rispetto a quello con due righe */
     /* i 30 sotto (23 nov 2026, Andrea: «sì, va bene» allo spazio): senza
        il titolo di «In evidenza» le due file si toccavano, e qui dentro
-       sfuma la fascia scura */
+       sfuma la fascia scura. DIVENTANO 10 (24 nov 2026 sera, Andrea: «i
+       paragrafi vanno poi vicini, sono troppo distanti»): il titolo di
+       «In evidenza» e' tornato, e lo spazio lo fa gia' lui. Poi 4, col
+       titolo di «In evidenza» piu' vicino («stringi ancora»). Poi 8,
+       quando il titolo se n'e' andato: fra le scritte dei quadrati e le
+       card in evidenza restano 20px */
     .sc-quadri::-webkit-scrollbar{display:none}
     /* LO SFONDO COI COLORI DELLA CARD (23 nov 2026, Andrea, scelta la
        «fascia 1» fra otto prove: «ottimo, cosi' e' perfetto»): dietro la
@@ -15018,8 +15027,11 @@ document.getElementById('cartello')?.remove();</script>
       <!-- IL TITOLO TORNA (24 nov 2026, cantiere home-card-pulite): dal 23
            nov la fila era senza titolo e ogni card portava l'etichetta «In
            evidenza»; adesso il titolo al centro sulla fascia, e le card
-           senza etichetta (vedi LA FASCIA DI «In evidenza» nel CSS) -->
-      <div class="section-label centrato">In evidenza</div>
+           senza etichetta (vedi LA FASCIA DI «In evidenza» nel CSS).
+           E SE NE VA DI NUOVO la sera stessa (Andrea, vista la mensola di
+           luce: «la scritta in evidenza ora si può anche togliere»): la
+           mensola dice gia' che la fila e' speciale; il nome resta per chi
+           legge ad alta voce (aria-label della fila) -->
       <div class="strip-wrap">
         <div class="ev-strip" id="evidenzaFila" role="region" aria-label="In evidenza"></div>
         <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
@@ -27438,8 +27450,10 @@ const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
    QUADRI_POCHI. PRIMA DEI CINQUE NIENTE QUADRATI (24 nov 2026 sera,
    Andrea, visti in produzione: «Anche i quadrati sotto le card grosse
    levale, sono troppo pochi; ora si vedranno quando le card grosse
-   saranno almeno 5 o 6»): la soglia sale da 2 a 5 negozi. */
-const QUADRI_MIN = 4, QUADRI_POCHI = 5;
+   saranno almeno 5 o 6»): la soglia sale da 2 a 5 negozi. E TORNA A 2
+   mezz'ora dopo (Andrea: «i quadrati anche se sono 2 adesso facciamoli
+   vedere»). */
+const QUADRI_MIN = 4, QUADRI_POCHI = 2;
 function spartisciScoprire(tutte){
   if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
   const negozi = tutte.filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));

@@ -222466,8 +222466,10 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
           "scura sopra i quadrati)", True,
           bool(_ps and _om) and int(_om.group(2)) + int(_om.group(3))
           + (float(_om.group(1)) - 1) / 2 * 140 <= int(_ps.group(1)))
-    prova("fra i quadrati e «In evidenza» il respiro che faceva il titolo",
-          True, "scrollbar-width:none;padding:0 var(--pad) 30px}" in mini)
+    # (24 nov 2026 sera, Andrea: «sono troppo distanti») il titolo e'
+    # tornato e il respiro lo fa lui: sotto i quadrati ne restano 10
+    prova("fra i quadrati e «In evidenza» poco spazio: il respiro lo fa "
+          "il titolo", True, "scrollbar-width:none;padding:0 var(--pad) 8px}" in mini)
     # LO SFONDO COI COLORI DELLA CARD (23 nov 2026, la «fascia 1» scelta
     # da Andrea): la foto della card al centro, sfocata e tenue, che
     # sfuma in fondo; acceso solo sul telefono, cambiato dal ricalcolo
@@ -222620,18 +222622,19 @@ console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(giro.grandi),
     else:
         # (24 nov 2026, Andrea: «2 grandi e 2 quadratini») sotto gli 8
         # negozi ognuno sta in tutte e due le file; (24 nov sera, Andrea:
-        # «sono troppo pochi… almeno 5 o 6») da 5 negozi in su
+        # «sono troppo pochi… almeno 5 o 6») da 5, e mezz'ora dopo di
+        # nuovo da 2 («anche se sono 2 adesso facciamoli vedere»)
         prova("in node: da 8 negozi uno grande e uno quadrato, mai in tutti "
-              "e due, e il turno dopo si scambiano; da 5 a 7 negozi ognuno "
-              "e' grande E quadrato; con 4 o meno niente quadrati; sul "
+              "e due, e il turno dopo si scambiano; da 2 a 7 negozi ognuno "
+              "e' grande E quadrato; con uno solo niente quadrati; sul "
               "computer tutti grandi",
               [["A", "C", "E", "G", "p2p", "aste"], ["B", "D", "F", "H"],
                ["B", "D", "F", "H", "p2p", "aste"], ["C", "E", "G", "A"],
                8, ["A", "B", "C", "D", "E", "F", "G"], 10, [],
-               ["A", "B", "p2p"], [], ["A", "p2p"], [], [],
+               ["A", "B", "p2p"], ["A", "B"], ["A", "p2p"], [], ["A", "B", "C", "D"],
                ["A", "B", "C", "D", "E", "p2p"], ["A", "B", "C", "D", "E"]], r)
-    prova("...e le soglie sono 4 quadrati divisi e 5 negozi, le parole di Andrea",
-          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 5;" in mini)
+    prova("...e le soglie sono 4 quadrati divisi e 2 negozi, le parole di Andrea",
+          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 2;" in mini)
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
     prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
           "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"
@@ -222679,9 +222682,12 @@ INSERT INTO annunci VALUES
     # in evidenza mi danno fastidio così con la pastiglia sopra in ogni card
     # e anche il contorno arancio», scelta l'opzione 2): il titolo torna, al
     # centro, sulla fascia; le card della fila senza etichetta e cornice
-    prova("«In evidenza» ha il suo titolo al centro, e il nome resta sulla fila",
-          (True, True),
-          ('<div class="section-label centrato">In evidenza</div>' in _evs,
+    # (24 nov 2026 sera, Andrea, vista la mensola di luce: «la scritta in
+    # evidenza ora si può anche togliere») il titolo se ne va di nuovo
+    prova("«In evidenza» senza titolo (lo dice la mensola), e il nome resta "
+          "sulla fila per chi legge ad alta voce",
+          (False, True),
+          ('section-label' in _evs,
            'id="evidenzaFila" role="region" aria-label="In evidenza"' in _evs))
     # «Esplora il lavoro» prende il posto di «Esplora per categorie» in
     # Lavoro, e ne prende anche il titolo al centro (24 nov 2026, Andrea:
@@ -222691,16 +222697,21 @@ INSERT INTO annunci VALUES
           ('<div class="section-label centrato">Esplora per categorie</div>' in mini,
            '<div class="section-label centrato">Esplora il lavoro</div>' in mini))
     _css = mini[mini.index("<style"):mini.index("</style>")]
-    # LA LUCE SOTTO LE CARD (24 nov 2026 sera): via le due onde viste
-    # in produzione, Andrea indica il collaudo («Cosi»): fondo della
-    # pagina e un chiarore arancio sul bordo di sotto, fermo.
-    _sez = _css[_css.index("  #evidenzaSez{margin-top:6px;"):]
-    _sez = _sez[:_sez.index("}") + 1]
-    prova("...sul fondo della pagina, con la luce arancio ferma sul bordo "
-          "di sotto: niente onde, niente blocco di colore",
-          (True, False, False, 0, False),
-          ("background:radial-gradient(75% 48px at 50% 100%,"
-           "rgba(247,147,26,.45),rgba(247,147,26,0))}" in _sez,
+    # LA MENSOLA DI LUCE (24 nov 2026 sera): via le due onde viste in
+    # produzione, poi via anche la luce ferma («cambia stile»); fra sette
+    # stili Andrea sceglie la mensola sottile («Va bene la 4»). Le sezioni
+    # ravvicinate: la sezione non ha fondo suo, sotto la mensola 12px.
+    _sez = _css[_css.index("  #evidenzaSez{margin-top:0;"):]
+    _sez = _sez[:_sez.index("  #evidenzaSez .ev-strip .card{")]
+    prova("...le card su una mensola di luce arancio, ferma, con la luce che "
+          "sale dietro le card; niente onde, niente blocco di colore, poco "
+          "fondo sotto",
+          (True, True, True, True, False, False, 0, False),
+          ("  #evidenzaSez{margin-top:0;padding:2px 0 0}\n" in _sez,
+           "#evidenzaSez .ev-strip{padding-top:10px;padding-bottom:18px;" in _sez,
+           "#FFBE5A 50%" in _sez and "0 calc(100% - 12px)/100% 3px no-repeat" in _sez,
+           "linear-gradient(0deg,rgba(247,147,26,.32),rgba(247,147,26,0)) "
+           "0 calc(100% - 15px)/100% 90px no-repeat}" in _sez,
            "svg" in _sez, "--onda-" in mini, _css.count("--ev-fascia"),
            "var(--bg)" in _sez))
     prova("...le card della fila sollevate dall'ombra, senza etichetta e "
