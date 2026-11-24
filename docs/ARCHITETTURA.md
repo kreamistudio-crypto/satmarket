@@ -38664,7 +38664,7 @@ mai il kind 0 di nessuno: regola ferrea 2).
   titolo al centro, tolto di nuovo la sera; sotto le card, dalla sera del 24, una MENSOLA di luce
   arancio ferma, disegnata sullo sfondo di `.ev-strip`, al posto delle due
   onde di `ondeEvidenza`, tolte: Cantieri, «La home ripulita», «La luce
-  sotto In evidenza» e «La mensola di luce»; sul telefono la larghezza delle sue card la sceglie `adattaPrimoSchermo` perché il primo schermo finisca sotto la mensola: «Il primo schermo del telefono»),
+  sotto In evidenza» e «La mensola di luce»; sul telefono le sue card sono larghe quanto serve per vederne due e mezza, `calc((100vw - var(--pad) - 20px) / 2.5)`, e sul computer 150: «Il primo schermo del telefono», col calcolo che c'era prima e perché è andato via),
   `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e dentro la griglia dopo sei card
   i due banner `#occasioniBanner` (dal 24 nov). Il tocco su un negozio della
   fila (card o quadrato) passa da `apriNegozioDaScoprire`: la pagina sale

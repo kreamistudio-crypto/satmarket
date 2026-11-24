@@ -1536,9 +1536,19 @@
     background:linear-gradient(90deg,rgba(247,147,26,0),rgba(247,147,26,.95) 15%,#FFBE5A 50%,rgba(247,147,26,.95) 85%,rgba(247,147,26,0)) 0 calc(100% - 12px)/100% 3px no-repeat,
       linear-gradient(0deg,rgba(247,147,26,.32),rgba(247,147,26,0)) 0 calc(100% - 15px)/100% 90px no-repeat}
   #evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}
-  /* la larghezza la sceglie `adattaPrimoSchermo` sul telefono, perche' il
-     primo schermo finisca sotto la mensola; senza, 150 come sempre */
+  /* DUE CARD E MEZZA SUL TELEFONO (24 nov 2026 sera, Andrea: «se ne
+     devono vedere 2 più metà della terza», poi «va benissimo così»): la
+     larghezza viene dallo schermo, tolti il margine a sinistra e i due
+     spazi da 10 fra le card. Per un'ora l'aveva scelta un calcolo che
+     allargava le card finche' la mensola toccava la barra in basso: dentro
+     Telegram lo schermo e' piu' alto di quello delle prove (niente fascia
+     «COLLAUDO») e le card venivano giganti («le voglio piccole»). In fondo
+     al primo schermo ora spuntano le categorie: scelto sapendolo. Sul
+     computer 150, come sempre. */
   #evidenzaSez .ev-strip .card{flex-basis:var(--ev-larga,150px);width:var(--ev-larga,150px)}
+  @media (max-width:767px){
+    #evidenzaSez .ev-strip{--ev-larga:calc((100vw - var(--pad) - 20px) / 2.5)}
+  }
   #evidenzaSez .card.ev .card-evidenza{display:none}
   #evidenzaSez .card.ev{outline:none}
   #evidenzaSez .card.ev :is(.card-lampo,.card-sconto,.card-asta,.card-ferie,.card-ultimo){top:8px}
@@ -1900,8 +1910,10 @@
        quindi ritaglia anche in verticale al bordo del padding, e l'ombra
        di prima (10+26px, piu' il 5% della card ingrandita) finiva tagliata
        di netto in una riga scura. Ora ombra 6+12 e 26px sotto: ci sta
-       intera. I quadrati risalgono di 12 per non allargare il buco. */
-    #scoprireQuadri{margin-top:-12px}
+       intera. I quadrati risalgono di 12 per non allargare il buco. POI
+       4 (24 nov 2026 sera, Andrea, coi cerchi: «i tondi leggermente più
+       staccati dalle card grosse»): 8px d'aria in piu'. */
+    #scoprireQuadri{margin-top:-4px}
     #scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}
     #scoprireStrip .scoprire-card{width:240px}
     #scoprireStrip .sc-titolo{left:12.4px;width:84.7px;font-size:15px}
@@ -1917,13 +1929,27 @@
     #scoprireStrip .scoprire-card.sc-quadra{width:126.2px}
     #scoprireStrip .sc-quadra-eti{font-size:15.5px}
   }
+  /* DA 375 A 411 LE CARD GRANDI CRESCONO FIN QUASI AI BORDI (24 nov
+     2026 sera, Andrea: «le card di Da scoprire leggermente più grosse,
+     così la linea della mensola si appoggia proprio sulla linea della
+     nav»; fra due misure sceglie quella con le card in alto piu' grandi e
+     quelle in evidenza un po' piu' piccole, «grande così mi piaceva»; le
+     locandine strette in evidenza no, «così allungate no»). Erano 290: ora
+     345, ma mai oltre lo schermo meno 7px per lato una volta ingrandite
+     del 10% (`--sc-larga`); scritte e quadrata in proporzione (i numeri
+     sono quelli dei 316 di sotto, divisi per 316). Sono rimaste cosi'
+     anche quando le card in evidenza sono diventate due e mezza («per il
+     resto è ottimo»). */
   @media (min-width:375px) and (max-width:767px){
-    #scoprireStrip{padding-left:calc((100vw - 290px) / 2);padding-right:calc((100vw - 138.6px) / 2)}
-    #scoprireStrip .scoprire-card{width:290px}
-    #scoprireStrip .sc-titolo{left:14.9px;width:102.4px;font-size:18.1px}
-    #scoprireStrip .sc-lancio{font-size:17.1px}
-    #scoprireStrip .scoprire-card.sc-quadra{width:138.6px}
-    #scoprireStrip .sc-quadra-eti{font-size:17.1px}
+    #scoprireStrip{--sc-larga:min(345px, calc((100vw - 14px) / 1.1));
+      padding-left:calc((100vw - var(--sc-larga)) / 2);
+      padding-right:calc((100vw - var(--sc-larga) * .4778) / 2)}
+    #scoprireStrip .scoprire-card{width:var(--sc-larga)}
+    #scoprireStrip .sc-titolo{left:calc(var(--sc-larga) * .0516);width:calc(var(--sc-larga) * .3528);
+      font-size:calc(var(--sc-larga) * .0627)}
+    #scoprireStrip .sc-lancio{font-size:calc(var(--sc-larga) * .0589)}
+    #scoprireStrip .scoprire-card.sc-quadra{width:calc(var(--sc-larga) * .4778)}
+    #scoprireStrip .sc-quadra-eti{font-size:calc(var(--sc-larga) * .0589)}
   }
   @media (min-width:412px) and (max-width:767px){
     #scoprireStrip{padding-left:calc((100vw - 316px) / 2);padding-right:calc((100vw - 151.0px) / 2)}
@@ -27511,7 +27537,6 @@ function renderQuadriScoprire(vive){
     quadriFirma = html;
     box.innerHTML = html;
   }
-  adattaPrimoSchermo();     // i cerchi spostano la fila «In evidenza»
 }
 /* la foto e la categoria di ogni negozio: UNA domanda per insieme di
    negozi (la chiave e' l'elenco ordinato), e un guasto lascia i quadrati
@@ -27665,41 +27690,7 @@ function renderEvidenza(){
   evidenzaFirma = html;
   el('evidenzaFila').innerHTML = html;
   aggiornaFrecce('evidenzaFila');
-  adattaPrimoSchermo();
 }
-
-/* IL PRIMO SCHERMO FINISCE SOTTO LA MENSOLA (24 nov 2026 sera, Andrea:
-   «sul telefono vorrei che la pagina della home corrispondesse con il
-   mio schermo: appena apro l'app, lo schermo in basso non deve terminare
-   con le icone delle categorie tagliate»; proposta accettata: «Sì, mi va
-   bene»). Sul telefono, a vetrina nuda e con la fila «In evidenza»
-   accesa, le card della fila si allargano o si stringono (da 130 a 220px,
-   la foto e' quadrata: un px di larghezza e' un px di altezza) finche' il
-   fondo della sezione cade sul bordo della barra in basso: sopra restano
-   testata, «Da scoprire» e i cerchi, e le categorie cominciano appena si
-   scorre. Si misura dall'inizio della pagina, non da dove si e' scorso;
-   due passi bastano (il secondo corregge il resto del testo che va a
-   capo). Fuori da quel caso la variabile si toglie e le card tornano a
-   150. La chiamano la fila, i cerchi (arrivano dopo, coi negozi) e il
-   cambio di misura dello schermo. */
-const EV_LARGA_MIN = 130, EV_LARGA_MAX = 220;
-function adattaPrimoSchermo(){
-  const radice = document.documentElement, s = el('evidenzaSez'), f = el('evidenzaFila');
-  const via = () => radice.style.removeProperty('--ev-larga');
-  if (!s || !f || !mqNetflix.matches || s.style.display === 'none' || !vetrinaNuda()) return via();
-  const nav = document.querySelector('nav');
-  const meta = innerHeight - (nav ? nav.getBoundingClientRect().height : 0);
-  for (let passo = 0; passo < 2; passo++) {
-    const card = f.querySelector('.card');
-    if (!card) return via();
-    const larga = card.getBoundingClientRect().width;
-    const fondo = s.getBoundingClientRect().bottom + scrollY;
-    const nuova = Math.max(EV_LARGA_MIN, Math.min(EV_LARGA_MAX, Math.round(larga + meta - fondo)));
-    if (Math.abs(nuova - larga) < 2) return;
-    radice.style.setProperty('--ev-larga', nuova + 'px');
-  }
-}
-addEventListener('resize', () => adattaPrimoSchermo());
 
 /* ================ I CONSIGLIATI (set 2026) ========================
    L'idea annunciata da Andrea col primo spazio in vetrina — «piu'

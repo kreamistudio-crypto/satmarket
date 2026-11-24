@@ -222522,9 +222522,7 @@ console.log(JSON.stringify([p1, p2, p3, p4, b.style.backgroundImage]));''')
     prova("mentre la card grande scorre nessun quadrato si evidenzia",
           (0, 0, 0), (mini.count("accendiQuadro"), mini.count(".sc-quadro.on"),
                       pezzo_js(mini, "function centroScoprire(){").count("sc-quadro")))
-    _qr = (pezzo_js(mini, "function renderQuadriScoprire(vive){", "\n}\n") + "\n}\n"
-           # (24 nov 2026 sera) i cerchi chiedono di rifare il primo schermo
-           + "const adattaPrimoSchermo = () => {};\n")
+    _qr = pezzo_js(mini, "function renderQuadriScoprire(vive){", "\n}\n") + "\n}\n"
     r = _node_banco("""
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const box = {style: {}, innerHTML: '', querySelectorAll: () => []};
@@ -222722,55 +222720,25 @@ INSERT INTO annunci VALUES
            "0 calc(100% - 15px)/100% 90px no-repeat}" in _sez,
            "svg" in _sez, "--onda-" in mini, _css.count("--ev-fascia"),
            "var(--bg)" in _sez))
-    # IL PRIMO SCHERMO FINISCE SOTTO LA MENSOLA (24 nov 2026 sera, Andrea:
-    # «appena apro l'app lo schermo in basso non deve terminare con le
-    # icone delle categorie tagliate»): le card della fila si allargano o
-    # si stringono finche' il fondo della sezione tocca la barra in basso
-    _adatta = pezzo_js(mini, "const EV_LARGA_MIN = ", "\naddEventListener('resize'")
-    out = _node_banco("""
-let larga = 150, fisso = 600, nav = 70, innerHeight = 857, scrollY = 0;
-let nuda = true, mostra = '', carte = true;
-const mqNetflix = {matches: true};
-const radice = {style: {v: {}, setProperty(k, x){ this.v[k] = x; larga = parseFloat(x); },
-  removeProperty(k){ delete this.v[k]; larga = 150; }}};
-const document = {documentElement: radice, querySelector: s => s === 'nav'
-  ? {getBoundingClientRect: () => ({height: nav})} : null};
-const sez = {style: {get display(){ return mostra; }},
-  getBoundingClientRect: () => ({bottom: fisso + larga + (larga < 160 ? 18 : 0) - scrollY})};
-const fila = {querySelector: () => carte ? {getBoundingClientRect: () => ({width: larga})} : null};
-const el = id => ({evidenzaSez: sez, evidenzaFila: fila})[id];
-const vetrinaNuda = () => nuda;
-""" + _adatta + """
-const giro = () => { adattaPrimoSchermo(); return [radice.style.v['--ev-larga'] || null,
-  Math.round(sez.getBoundingClientRect().bottom + scrollY)]; };
-const fuori = {};
-fuori.andrea = giro();
-scrollY = 400; fuori.scorsa = giro(); scrollY = 0;
-innerHeight = 667; fuori.piccolo = giro();
-innerHeight = 1100; fuori.alto = giro();
-innerHeight = 857; nuda = false; fuori.cerca = giro(); nuda = true;
-mostra = 'none'; fuori.spenta = giro(); mostra = '';
-mqNetflix.matches = false; fuori.computer = giro();
-console.log(JSON.stringify(fuori));
-""")
-    if out is None:
-        salta("il primo schermo che finisce sotto la mensola", "node non c'e'")
-    else:
-        prova("in node: il fondo della fila cade sulla barra in basso (857 "
-              "meno 70), anche con la pagina scorsa e col testo che va a "
-              "capo (due passi); sul telefono piccolo si ferma a 130, su "
-              "quello alto a 220; a vetrina non nuda, fila spenta o sul "
-              "computer le card tornano a 150",
-              {"andrea": ["187px", 787], "scorsa": ["187px", 787],
-               "piccolo": ["130px", 748], "alto": ["220px", 820],
-               "cerca": [None, 768], "spenta": [None, 768],
-               "computer": [None, 768]}, out)
-    prova("...la chiamano la fila, i cerchi e il cambio di misura", True,
-          "  aggiornaFrecce('evidenzaFila');\n  adattaPrimoSchermo();\n}" in mini
-          and "  adattaPrimoSchermo();     // i cerchi spostano la fila" in mini
-          and "addEventListener('resize', () => adattaPrimoSchermo());" in mini
-          and "#evidenzaSez .ev-strip .card{flex-basis:var(--ev-larga,150px);"
-              "width:var(--ev-larga,150px)}" in mini)
+    # DUE CARD E MEZZA SUL TELEFONO (24 nov 2026 sera, Andrea: «se ne
+    # devono vedere 2 più metà della terza»): la larghezza la fa il CSS
+    # dallo schermo; il calcolo che le allargava fino alla barra in basso
+    # (adattaPrimoSchermo) e' andato via, le faceva giganti in Telegram
+    _pz = _css[_css.index("  #evidenzaSez .ev-strip .card{flex-basis:"):]
+    prova("...sul telefono due card in evidenza e meta' della terza, sul "
+          "computer 150; nessun calcolo in JS",
+          (True, True, 0, 0),
+          ("#evidenzaSez .ev-strip .card{flex-basis:var(--ev-larga,150px);"
+           "width:var(--ev-larga,150px)}\n  @media (max-width:767px){\n"
+           "    #evidenzaSez .ev-strip{--ev-larga:calc((100vw - var(--pad) - 20px) / 2.5)}\n  }" in _pz,
+           # i 20px sono i due spazi fra le card della fila
+           "gap:10px" in pezzo_js(mini, "  .ev-strip{display:flex;", "}"),
+           mini.count("adattaPrimoSchermo"), mini.count("EV_LARGA")))
+    # i cerchi un po' piu' staccati dalle card grandi («i tondi
+    # leggermente più staccati dalle card grosse»)
+    prova("...i cerchi 8px piu' giu' sotto le card grandi", (1, 0),
+          (mini.count("#scoprireQuadri{margin-top:-4px}"),
+           mini.count("#scoprireQuadri{margin-top:-12px}")))
     prova("...le card della fila sollevate dall'ombra, senza etichetta e "
           "senza cornice (nella griglia restano)",
           (True, True, True, True),
