@@ -34221,6 +34221,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_indirizzo_non_verificato` e le sezioni 4-quater e 4-quinquies
   di `prove_p2p_motore`. La procedura (la prova dal nodo, la riga da
   aggiungere): PRODUZIONE, «I WALLET IL CUI INDIRIZZO NON PASSA».
+  E dal cantiere p2p-incasso-da-solo (24 nov 2026, perché in CANTIERI,
+  «L'indirizzo degli incassi parte da solo nel P2P»): L'INDIRIZZO DEGLI
+  INCASSI PARTE SENZA IL FOGLIO. Il motore (`applicaMessaggioP2P`), al
+  passaggio di chi compra in `attesa_mia_fattura`, chiede a
+  `indirizzoDaSoloP2P(o)` se c'è un indirizzo da mandare (leva
+  `incassoDaSolo` in busta, da `P2P_INCASSO_DA_SOLO`; `myLnAddress` con
+  la forma di un indirizzo; non `walletNonPassaP2P`; non fra gli
+  `indirizziRifiutati` di quella riga; niente wallet NWC, che la fattura
+  la fa già da solo; `daSolo` non ancora scritto sulla riga). Se sì, al
+  posto del toast e del foglio parte `incassoDaSoloP2P` (fuori dal giro,
+  `setTimeout`, e con `typeof`: il motore non chiama il server). Lì
+  dentro: `daSolo = true` sulla riga prima di partire (una volta sola
+  per scambio), il velo solo se `seguibileP2P`, `controlloFatturaP2P`,
+  `segnaTentativoP2P('fattura_inviata')`, l'`add-invoice` col solo
+  indirizzo, `ricordaFatturaP2P(id, 0)`, `dopoGestoP2P` e il toast «⚡
+  Ricevi su …» (testo di Andrea). Ogni «no» passa da `incassoAManoP2P`:
+  il toast e il foglio di sempre (il foglio solo se lo scambio chiede
+  ancora e lo si sta guardando), col fermo del controllo (e l'indirizzo
+  nel campo se c'è «Usa comunque») o col perché del coordinatore;
+  `invalid-invoice` e `wallet_non_passa` ricordano l'indirizzo come
+  rifiutato. La fattura nuova dopo un payout fallito (`fattura_nuova`)
+  resta a mano. Prove: `prove_incasso_da_solo_p2p`.
 
 - IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
   "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con

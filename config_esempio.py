@@ -1286,6 +1286,13 @@ P2P_PARACADUTE = False
 # Spenta per ogni ordine finche' non si scrivono i due prezzi; mai su
 # Barattozon ne' sugli ordini in moneta. Solo False spegne.
 P2P_RIPUBBLICA = True
+# L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO NEL P2P (24 nov 2026): ACCESO di
+# serie. Chi compra sats e ha salvato un indirizzo Lightning negli incassi
+# (che non sia di un wallet che col P2P non passa) non vede il foglio
+# «Dove ricevere i sats»: il telefono controlla l'indirizzo e lo manda da
+# solo al coordinatore. Il foglio si apre solo se il controllo o il
+# coordinatore dicono di no. Solo False spegne.
+P2P_INCASSO_DA_SOLO = True
 # IL TEMPO PER PAGARE (18 nov 2026): ACCESO di serie. Chi vende sceglie
 # entro quanto chi prende manda gli euro (un orologio da 15 minuti a 24
 # ore; sotto le 24 solo coi metodi veloci), e allo scadere senza «Ho

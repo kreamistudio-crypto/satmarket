@@ -40252,6 +40252,15 @@ def _leve_stato():
                          "apertura, on-chain dal server); mai Barattozon",
                   spento="nessun paragrafo «Ripubblica» nel foglio, e gli "
                          "ordini scaduti non si rifanno più"),
+            # L'INCASSO DA SOLO (24 nov 2026): acceso di serie
+            _leva("Indirizzo degli incassi mandato da solo nel P2P",
+                  "P2P_INCASSO_DA_SOLO", P2P_INCASSO_DA_SOLO,
+                  acceso="chi compra sats con un indirizzo Lightning salvato "
+                         "che passa non vede il foglio «Dove ricevere i "
+                         "sats»: il telefono lo controlla e lo manda da "
+                         "solo; il foglio si apre se qualcosa dice di no",
+                  spento="come ieri: il foglio si apre sempre, e l'indirizzo "
+                         "degli incassi è un bottone che scrive nel campo"),
             # IL TEMPO PER PAGARE (18 nov 2026): acceso di serie
             _leva("Tempo per pagare nel P2P (da 15 minuti a 24 ore)",
                   "P2P_TEMPO_PER_PAGARE", P2P_TEMPO_PER_PAGARE,
@@ -66111,6 +66120,23 @@ try:
         P2P_RIPUBBLICA = True
 except ImportError:
     P2P_RIPUBBLICA = True
+# L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO (24 nov 2026, cantiere
+# p2p-incasso-da-solo, ok di Andrea alle 22:31): chi compra sats nel P2P e
+# ha salvato nel Profilo un indirizzo Lightning che passa, alla domanda
+# del coordinatore «dove mando i sats?» non tocca niente: il telefono
+# controlla l'indirizzo e lo manda lui; il foglio si apre solo se il
+# controllo o il coordinatore dicono di no. Il server qui non fa niente:
+# la leva viaggia in busta (`incassoDaSolo`) e la legge il telefono.
+# ACCESA DI SERIE (regola del 14 nov). Interruttore d'emergenza:
+# `P2P_INCASSO_DA_SOLO = False` nel config, e il foglio torna a mano.
+try:
+    from config import P2P_INCASSO_DA_SOLO
+    if not isinstance(P2P_INCASSO_DA_SOLO, bool):
+        print("[p2p] P2P_INCASSO_DA_SOLO non e' True/False: l'incasso da "
+              "solo resta ACCESO come di serie")
+        P2P_INCASSO_DA_SOLO = True
+except ImportError:
+    P2P_INCASSO_DA_SOLO = True
 # IL TEMPO PER PAGARE, SCELTO DA CHI PUBBLICA (18 nov 2026, cantiere
 # tempo-pagamento; Andrea, da JJ che scambia tanto: «se uno ha fretta dice
 # io metto l'ordine però nel momento in cui lo prendi hai un'ora di tempo
@@ -66544,6 +66570,11 @@ def _p2p_leve() -> dict:
             # la ripubblica (16 nov 2026): il paragrafo nel foglio che
             # pubblica e il battito che rifa' gli ordini scaduti
             "ripubblica": bool(P2P_RIPUBBLICA),
+            # l'incasso da solo (24 nov 2026): l'indirizzo degli incassi
+            # parte senza il foglio, se passa
+            # (`globals().get`: i banchi che fanno girare `_p2p_leve` da
+            # sola non conoscono la leva, e di serie e' accesa)
+            "incassoDaSolo": bool(globals().get("P2P_INCASSO_DA_SOLO", True)),
             # il tempo per pagare (18 nov 2026): la scelta nel foglio che
             # pubblica, la riga prima della presa e il timer nello scambio;
             # la pagina la offre solo se ANCHE il nodo la annuncia (38385)

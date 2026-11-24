@@ -89059,9 +89059,10 @@ def prove_p2p_server():
     # (16 nov 2026) DICIANNOVE: la ripubblica degli ordini scaduti
     # (17 nov 2026) VENTI: il contante per posta, spento di serie (Andrea)
     # (18 nov 2026) VENTITRE: il tempo per pagare, la leva e il suo orologio
-    prova("le chiavi sono ventitre e sono sempre quelle",
+    # (24 nov 2026) VENTIQUATTRO: l'indirizzo degli incassi mandato da solo
+    prova("le chiavi sono ventiquattro e sono sempre quelle",
           ["attivo", "avvisiNuovi", "avvisiNuoviMinuti", "cauzione", "cauzioneSulMetodo", "chat", "commissione",
-           "conferma", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz",
+           "conferma", "incassoDaSolo", "indirizziNo", "maxEuro", "maxEuroContanti", "maxSatsProva", "minEuroBz",
            "minutiPagareDiSerie", "minutiPagareLimiti", "mostro", "paracadute", "posta",
            "relay", "ripubblica", "specchio", "tempoPagare", "tempoPubblica"],
           sorted(piena.keys()))
@@ -152382,7 +152383,10 @@ def prove_dopo_gesto_p2p():
     # due della prova d'incontro, che non torna piu'. EMENDATA (1 nov 2026,
     # presa-altra-rete): 11, con «Invia» del cambio on-chain di chi compra
     # (`inviaCambioP2P`), che e' la fattura a mano con un'altra fattura
-    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 11,
+    # EMENDATA (24 nov 2026, p2p-incasso-da-solo): 12, con l'indirizzo
+    # degli incassi mandato da solo (`incassoDaSoloP2P`), che e' la fattura a
+    # mano senza il foglio — il suo banco e' `prove_incasso_da_solo_p2p`
+    prova("i posti che chiamano il ritorno sono quelli detti qui sopra", 12,
           nudo(mini).count("dopoGestoP2P("))
 
     # --- 3) LA CARD ACCESA -------------------------------------------
@@ -160663,7 +160667,10 @@ def prove_indirizzo_non_verificato():
           "  if (fermo) { mostraFermoFatturaP2P(fermo); return; }" in inv
           and inv.index("fermo.esito === 'wallet_non_passa'")
           < inv.index("await chiamataOrdineP2P(o, 'add-invoice'"))
-    prova("...due chiamate, e nessun altro", 2,
+    # EMENDATA (24 nov 2026, p2p-incasso-da-solo): QUATTRO, coi due «no»
+    # dell'indirizzo mandato da solo (`incassoDaSoloP2P`): il nostro
+    # `wallet_non_passa` prima e l'`invalid-invoice` dopo, come nel foglio
+    prova("...quattro chiamate, e nessun altro", 4,
           m.count("segnaIndirizzoRifiutatoP2P(") - 1)
     prova("nel foglio il giudizio viene dopo Wallet of Satoshi e prima della scorciatoia",
           True,
@@ -160683,8 +160690,12 @@ def prove_indirizzo_non_verificato():
     # che passa dallo stesso `add-invoice` e va ricordata come le altre.
     # ...e QUATTRO dal 23 nov 2026: la fattura che e' il deposito
     # dell'ordine pagato in euro (`viaEuroDeposito`, giroconto interno)
+    # ...e SEI dal 24 nov 2026 (p2p-incasso-da-solo): l'indirizzo degli
+    # incassi mandato da solo, accettato subito o dopo una risposta in
+    # ritardo (`incassoDaSoloP2P`)
     prova("...e chi la ricorda e' la strada del foglio, quella del wallet collegato, "
-          "quella del cambio e il deposito di «Non hai sats?»", 4,
+          "quella del cambio, il deposito di «Non hai sats?» e l'indirizzo mandato "
+          "da solo (due uscite)", 6,
           m.count("ricordaFatturaP2P(") - 1)
 
     # --- IL SERVER SA QUALI WALLET NON PASSANO, E LO DICE PRIMA --------
@@ -222885,7 +222896,7 @@ CATEGORIE = {
     "p2p": """
     vetrina_pulita apri_ordine_notifica chiavi_ovunque chiavi_dal_conto
     timer_card_scambi timer_deposito_oc dettaglio_schede pubblica_passi
-    controllo_fattura_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
+    controllo_fattura_p2p incasso_da_solo_p2p dopo_gesto_p2p contanti_a_mano contante_per_posta
     luoghi_appuntamento contanti_pagina_leggera cauzione_p2p
     autocomplete_comuni scambi_p2p_vecchi scambi_ovunque chiavi_parcheggiate
     disputa_per_sbaglio tor_chiavi_scambio chi_e_l_altro
@@ -223723,11 +223734,228 @@ def prove_richiesta_punti():
           False, "assicurat" in (t + c).lower())
 
 
+def prove_incasso_da_solo_p2p():
+    """L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO NEL P2P (24 nov 2026, cantiere
+    p2p-incasso-da-solo; un utente a Tappo: «perche' a ogni presa mi chiede
+    dove ricevere i sats, se ho gli incassi automatici?»; ok di Andrea).
+
+    Il coordinatore chiede a ogni scambio dove mandare i sats (`add-invoice`):
+    se l'indirizzo salvato passa, lo manda il telefono, e il foglio si apre
+    solo quando qualcosa dice di no. Quel che qui si rompe in silenzio: la
+    leva che non spegne; l'indirizzo di Wallet of Satoshi (o uno gia'
+    rifiutato su questo scambio) mandato lo stesso; due invii sullo stesso
+    scambio; il foglio che non si apre dopo un «no» — lo scambio fermo
+    finche' scade la mezz'ora, e il «non completato» a chi compra; il velo
+    che resta su; il gesto da un'altra vista che blocca l'app."""
+    print("\n[l'indirizzo degli incassi parte da solo nel P2P]")
+    import json as _json
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # --- 1) LE SENTINELLE ------------------------------------------------
+    prova("la leva e' ACCESA di serie (le leve nuove dal 14 nov), una storta resta accesa, "
+          "e viaggia in busta", [True, True, True],
+          ["except ImportError:\n    P2P_INCASSO_DA_SOLO = True\n" in src,
+           "resta ACCESO come di serie\")\n        P2P_INCASSO_DA_SOLO = True\n" in src,
+           '"incassoDaSolo": bool(globals().get("P2P_INCASSO_DA_SOLO", True)),' in src])
+    prova("...e sta nel pannello delle leve e nel config d'esempio", [True, True],
+          ['"P2P_INCASSO_DA_SOLO", P2P_INCASSO_DA_SOLO,' in pezzo("_leve_stato"),
+           "\nP2P_INCASSO_DA_SOLO = True\n" in open("config_esempio.py", encoding="utf-8").read()])
+    ap = nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
+    i_auto = ap.find("indirizzoDaSoloP2P(nuovo)")
+    prova("nel motore: dopo la cassa di «Non hai sats?», PRIMA del toast e del foglio di sempre, "
+          "fuori dal giro (setTimeout) e solo con `typeof`", True,
+          0 < ap.find("setTimeout(() => viaEuroDeposito(nuovo.id), 0);") < i_auto
+          < ap.find("setTimeout(() => incassoDaSoloP2P(nuovo.id), 0);")
+          < ap.find("toast(P2P_TOAST_FATTURA, 6000);")
+          and "typeof incassoDaSoloP2P === 'function'" in ap
+          and "typeof indirizzoDaSoloP2P === 'function'" in ap)
+    prova("...e la fattura nuova dopo un pagamento fallito resta a mano", False,
+          "indirizzoDaSoloP2P" in ap[ap.find("nuovo.stato === 'fattura_nuova'"):])
+    corpo = nudo(fn("async function incassoDaSoloP2P(id){"))
+    prova("il motore non chiama il server: il controllo passa da `typeof`, nessuna fetch", [True, False],
+          ["typeof controlloFatturaP2P === 'function'" in corpo, "fetch(" in corpo])
+    prova("il velo si chiude SEMPRE (finally) e prima di aprire il foglio", True,
+          corpo.rstrip().endswith("} finally { chiudi(); }\n}")
+          and corpo.find("chiudi();") < corpo.find("incassoAManoP2P(id, ind, '', fermo);"))
+
+    # --- 2) IL BANCO: le funzioni VERE su un telefono di cartone ----------
+    banco = "\n".join([
+        re.search(r"const P2P_WALLET_NON_PASSANO = [^\n]*;", mini).group(0),
+        re.search(r"const P2P_INDIRIZZO_RIFIUTATO = [^\n]*;", mini).group(0),
+        fn("function walletNonPassaP2P(indirizzo){"),
+        fn("function ragioneGestoP2P(e){"),
+        fn("function ragioneIncassoP2P(e, testo){"),
+        fn("function fatturaPassataP2P(o){"),
+        fn("function incassoDaSoloAttivoP2P(){"),
+        fn("function indirizzoDaSoloP2P(o){"),
+        fn("function incassoAManoP2P(id, ind, perche, fermo){"),
+        fn("async function incassoDaSoloP2P(id){"),
+    ]) + r"""
+const P2P_TOAST_FATTURA = 'DOVE', P2P_NON_PARTITO = 'NON PARTITO';
+let leve = {incassoDaSolo: true}, myLnAddress = 'Io@Blink.sv', nwc = false;
+const p2pCoord = () => leve;
+function walletNwcFattura(){ return nwc; }
+let righe = {}, toasts = [], chiamate = [], tentativi = [], aperti = 0, veli = 0, chiusi = 0,
+    rifiutati = [], fermi = [], ritorni = 0, ridisegni = 0, guardo = true, fermo = null,
+    risposta = null, durante = null, riallinea = null, riletti = 0;
+const nodi = {p2pIncassoInp: {value: ''}, p2pIncassoAvviso: {textContent: '', style: {display: 'none'}}};
+function el(id){ return nodi[id] || null; }
+function ordiniP2P(){ return righe; }
+function scriviOrdineP2P(o){ righe[o.id] = o; return o; }
+function haptic(){}
+function toast(m){ toasts.push(String(m)); }
+function seguibileP2P(id){ return guardo && p2pOrdineAperto === id; }
+let p2pOrdineAperto = 'x';
+function apriIncassoP2P(){ aperti++; nodi.p2pIncassoInp.value = ''; }
+function mostraFermoFatturaP2P(f){ fermi.push(f.messaggio); }
+function attesaP2P(t){ veli++; return () => { chiusi++; }; }
+async function controlloFatturaP2P(o, testo){ if (durante) durante(); return fermo; }
+function segnaTentativoP2P(id, g, m){ tentativi.push(g + (m ? ':' + m : '')); }
+async function chiamataOrdineP2P(o, azione, payload){
+  chiamate.push([azione, payload]);
+  if (risposta) throw risposta;
+}
+function ricordaFatturaP2P(id, scade){ righe[id].fatturaScade = scade; delete righe[id].indirizziRifiutati; }
+async function dopoGestoP2P(id){ ritorni++; return false; }
+function gestoGiaFattoP2P(e, id){ return !!(e && e.gia); }
+async function dopoGestoRilettoP2P(){ riletti++; return false; }
+function segnaIndirizzoRifiutatoP2P(id, t){ rifiutati.push(t); const a = righe[id];
+  a.indirizziRifiutati = (a.indirizziRifiutati || []).concat(String(t).toLowerCase()); }
+function fraseRifiutoIncassoP2P(e, t, o){ return ''; }
+async function riallineaScambioP2P(id, m){ if (riallinea) { righe[id].stato = riallinea; return true; } return false; }
+function renderOrdineP2P(){ ridisegni++; }
+function nuovo(extra){
+  righe = {x: Object.assign({id: 'x', lato: 'compro', stato: 'attesa_mia_fattura'}, extra || {})};
+  toasts = []; chiamate = []; tentativi = []; aperti = 0; veli = 0; chiusi = 0; rifiutati = [];
+  fermi = []; ritorni = 0; ridisegni = 0; fermo = null; risposta = null; durante = null;
+  riallinea = null; riletti = 0; guardo = true; nodi.p2pIncassoInp.value = '';
+  nodi.p2pIncassoAvviso.textContent = ''; nodi.p2pIncassoAvviso.style.display = 'none';
+}
+const out = {};
+(async () => {
+  // a) IL GIUDICE: chi parte da solo e chi no
+  nuovo();
+  const g = () => indirizzoDaSoloP2P(righe.x);
+  const giudici = [g()];
+  leve = {incassoDaSolo: false}; giudici.push(g()); leve = {}; giudici.push(g());
+  leve = {incassoDaSolo: true};
+  myLnAddress = ''; giudici.push(g());
+  myLnAddress = 'mario@walletofsatoshi.com'; giudici.push(g());
+  leve = {incassoDaSolo: true, indirizziNo: {'sbpc.ch': 'SBPC'}};
+  myLnAddress = 'a@sbpc.ch'; giudici.push(g());
+  leve = {incassoDaSolo: true}; myLnAddress = 'non un indirizzo'; giudici.push(g());
+  myLnAddress = 'Io@Blink.sv';
+  nuovo({indirizziRifiutati: ['io@blink.sv']}); giudici.push(g());
+  nuovo({indirizziRifiutati: ['altro@blink.sv']}); giudici.push(g());
+  nuovo(); nwc = true; giudici.push(g()); nwc = false;
+  nuovo({daSolo: true}); giudici.push(g());
+  nuovo({lato: 'vendo'}); giudici.push(g());
+  giudici.push(indirizzoDaSoloP2P(null));
+  out.giudici = giudici;
+  // b) PASSA: un invio solo, l'indirizzo cosi' com'e', il velo chiuso, la riga di Andrea
+  nuovo();
+  out.ok = [await incassoDaSoloP2P('x'), chiamate, tentativi, righe.x.daSolo, righe.x.fatturaScade,
+            ritorni, toasts, aperti, veli, chiusi];
+  out.secondo = [await incassoDaSoloP2P('x'), chiamate.length];
+  // c) IL NOSTRO CONTROLLO AVVISA: niente invio, il foglio con l'indirizzo nel campo e «Usa comunque»
+  nuovo(); fermo = {messaggio: 'NESSUNA STRADA', comunque: true, esito: 'senza_strada'};
+  out.avvisa = [await incassoDaSoloP2P('x'), chiamate.length, toasts, aperti,
+                nodi.p2pIncassoInp.value, fermi, rifiutati, veli, chiusi];
+  // d) ...FERMA senza «comunque»: il campo resta vuoto
+  nuovo(); fermo = {messaggio: 'NON ESISTE', comunque: false, esito: 'indirizzo'};
+  await incassoDaSoloP2P('x');
+  out.ferma = [chiamate.length, aperti, nodi.p2pIncassoInp.value, fermi];
+  // e) ...SA CHE QUEL WALLET NON PASSA: si ricorda sulla riga
+  nuovo(); fermo = {messaggio: 'NON PASSA', comunque: false, esito: 'wallet_non_passa'};
+  await incassoDaSoloP2P('x');
+  out.nonPassa = [rifiutati, righe.x.indirizziRifiutati, indirizzoDaSoloP2P(Object.assign({}, righe.x, {daSolo: false}))];
+  // f) IL «NO» DEL COORDINATORE: tentativo registrato, indirizzo ricordato, foglio col perche'
+  nuovo(); risposta = {cantDo: true, motivo: 'invalid-invoice', message: 'no'};
+  out.rifiutato = [await incassoDaSoloP2P('x'), tentativi, rifiutati, righe.x.cantDo === P2P_INDIRIZZO_RIFIUTATO,
+                   toasts, aperti, nodi.p2pIncassoAvviso.textContent === P2P_INDIRIZZO_RIFIUTATO,
+                   nodi.p2pIncassoAvviso.style.display, veli, chiusi, ridisegni];
+  // g) IL MESSAGGIO MAI PARTITO: il foglio con la ragione di sempre
+  nuovo(); risposta = {relayMuti: true, message: 'muti'};
+  await incassoDaSoloP2P('x');
+  out.muti = [aperti, nodi.p2pIncassoAvviso.textContent, rifiutati.length];
+  // h) LA RISPOSTA IN RITARDO, e lo scambio e' andato avanti: niente foglio
+  nuovo(); risposta = {silenzio: true, message: 'zitto'}; riallinea = 'attesa_hold';
+  out.ritardoPassato = [await incassoDaSoloP2P('x'), aperti, toasts, righe.x.fatturaScade];
+  //    ...e non e' andato avanti: il foglio
+  nuovo(); risposta = {silenzio: true, message: 'zitto'};
+  out.ritardoFermo = [await incassoDaSoloP2P('x'), aperti, toasts];
+  // i) «GIA' FATTO»: si rilegge, niente foglio
+  nuovo(); risposta = {gia: true};
+  out.gia = [await incassoDaSoloP2P('x'), riletti, aperti, toasts];
+  // j) DA UN'ALTRA VISTA: niente velo; sul «no» il toast si', il foglio no
+  nuovo(); guardo = false;
+  await incassoDaSoloP2P('x');
+  out.altraVistaOk = [veli, chiamate.length, toasts];
+  nuovo(); guardo = false; risposta = {cantDo: true, motivo: 'invalid-invoice', message: 'no'};
+  await incassoDaSoloP2P('x');
+  out.altraVistaNo = [veli, toasts, aperti];
+  // k) ANNULLATO MENTRE SI CONTROLLAVA: non parte niente
+  nuovo(); durante = () => { righe.x.stato = 'annullato'; };
+  out.annullato = [await incassoDaSoloP2P('x'), chiamate.length, tentativi, aperti, veli, chiusi];
+  // l) LO SCAMBIO NON CHIEDE PIU' (stato diverso): non parte
+  nuovo({stato: 'attesa_hold'});
+  out.statoAltro = [await incassoDaSoloP2P('x'), chiamate.length, righe.x.daSolo];
+  console.log(JSON.stringify(out));
+})().catch(e => { console.log(JSON.stringify({errore: String(e && e.stack || e)})); });
+"""
+    out = _node_banco(banco)
+    if out is None:
+        salta("il banco dell'incasso da solo", "node non c'e'")
+        return
+    if out.get("errore"):
+        prova("il banco gira", "", out["errore"])
+        return
+    prova("IL GIUDICE: parte solo l'indirizzo salvato che passa — non a leva spenta (o assente), "
+          "non senza indirizzo, non Wallet of Satoshi ne' un wallet che il server dice no, non un "
+          "testo storto, non uno gia' rifiutato QUI (un altro rifiutato non conta), non col wallet "
+          "NWC, non due volte, non a chi vende",
+          ["Io@Blink.sv", "", "", "", "", "", "", "", "Io@Blink.sv", "", "", "", ""], out["giudici"])
+    prova("PASSA: un `add-invoice` col solo indirizzo, il tentativo segnato, la riga marcata, "
+          "il ritorno, «⚡ Ricevi su …», niente foglio, il velo alzato e chiuso",
+          [True, [["add-invoice", {"payment_request": [None, "Io@Blink.sv", None]}]],
+           ["fattura_inviata"], True, 0, 1, ["⚡ Ricevi su Io@Blink.sv"], 0, 1, 1], out["ok"])
+    prova("...e una seconda volta sullo stesso scambio non parte", [False, 1], out["secondo"])
+    prova("IL CONTROLLO AVVISA: niente invio, il toast e il foglio di sempre, l'indirizzo nel campo "
+          "per «Usa comunque», il velo chiuso",
+          [False, 0, ["DOVE"], 1, "Io@Blink.sv", ["NESSUNA STRADA"], [], 1, 1], out["avvisa"])
+    prova("IL CONTROLLO FERMA: il foglio col perche', il campo vuoto", [0, 1, "", ["NON ESISTE"]],
+          out["ferma"])
+    prova("...e se dice che quel wallet non passa, l'indirizzo resta rifiutato sulla riga",
+          [["Io@Blink.sv"], ["io@blink.sv"], ""], out["nonPassa"])
+    prova("IL «NO» DEL COORDINATORE: tentativo e rifiuto registrati, l'indirizzo ricordato, il foglio "
+          "con la frase dell'indirizzo, il velo chiuso, la pagina ridisegnata",
+          [False, ["fattura_inviata", "fattura_rifiutata:invalid-invoice"], ["Io@Blink.sv"], True,
+           ["DOVE"], 1, True, "", 1, 1, 1], out["rifiutato"])
+    prova("IL MESSAGGIO MAI PARTITO: il foglio con la ragione di sempre, l'indirizzo non e' rifiutato",
+          [1, "NON PARTITO: riprova fra un momento", 0], out["muti"])
+    prova("LA RISPOSTA IN RITARDO: se lo scambio e' andato avanti, niente foglio e la riga di Andrea",
+          [True, 0, ["⚡ Ricevi su Io@Blink.sv"], 0], out["ritardoPassato"])
+    prova("...se non e' andato avanti, il foglio", [False, 1, ["DOVE"]], out["ritardoFermo"])
+    prova("«GIA' FATTO»: si rilegge lo stato, niente foglio", [False, 1, 0, []], out["gia"])
+    prova("DA UN'ALTRA VISTA: nessun velo, e sul «no» il toast ma non il foglio",
+          [[0, 1, ["⚡ Ricevi su Io@Blink.sv"]], [0, ["DOVE"], 0]],
+          [out["altraVistaOk"], out["altraVistaNo"]])
+    prova("ANNULLATO MENTRE SI CONTROLLAVA: non parte niente, il velo chiuso",
+          [False, 0, [], 0, 1, 1], out["annullato"])
+    prova("...e uno scambio che non chiede piu' dove ricevere non si tocca", [False, 0, None],
+          [out["statoAltro"][0], out["statoAltro"][1], out["statoAltro"][2]])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
-    tutte = (prove_controllo_fattura_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
+    tutte = (prove_controllo_fattura_p2p, prove_incasso_da_solo_p2p, prove_dopo_gesto_p2p, prove_contanti_a_mano, prove_luoghi_appuntamento, prove_contanti_pagina_leggera, prove_cauzione_p2p, prove_filtro_italiano, prove_autocomplete_comuni,
               prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_chiavi_parcheggiate, prove_disputa_per_sbaglio, prove_tor_chiavi_scambio, prove_chi_e_l_altro, prove_voto_dopo_concluso, prove_giro_nuovo_stesso_id, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_orari_passi, prove_passi_dati_disputa, prove_card_annullati, prove_annullo_in_disputa, prove_dispute_p2p_moderatori, prove_moderazione_p2p, prove_chiave_moderatore_portatile, prove_chiave_moderatore_dal_conto, prove_tocco_scheda_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,

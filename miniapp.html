@@ -95332,6 +95332,14 @@ function applicaMessaggioP2P(ord, dentro){
       && viaEuroInCorso[nuovo.id]) {
     setTimeout(() => viaEuroDeposito(nuovo.id), 0);
   } else if (nuovo.stato === 'attesa_mia_fattura' && prima !== 'attesa_mia_fattura'
+      && nuovo.lato === 'compro' && typeof incassoDaSoloP2P === 'function'
+      && typeof indirizzoDaSoloP2P === 'function' && indirizzoDaSoloP2P(nuovo)) {
+    /* L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO (24 nov 2026, ok di Andrea):
+       niente toast e niente foglio — se l'indirizzo non passa, li apre
+       `incassoDaSoloP2P` stesso. Fuori dal giro, come la cassa qui sopra:
+       il motore non chiama il server, e la riga si scrive prima. */
+    setTimeout(() => incassoDaSoloP2P(nuovo.id), 0);
+  } else if (nuovo.stato === 'attesa_mia_fattura' && prima !== 'attesa_mia_fattura'
       && nuovo.lato === 'compro') {
     haptic();
     toast(P2P_TOAST_FATTURA, 6000);
@@ -100595,6 +100603,131 @@ async function inviaIncassoP2P(){
   } finally {
     if (rip) rip();
   }
+}
+
+/* ---- L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO (24 nov 2026, cantiere
+   p2p-incasso-da-solo; domanda di un utente a Tappo, ok di Andrea alle
+   22:31: «Ok si falla», «diventa anche più veloce il tutto così») ----
+   Prima, a ogni presa, chi compra sats si vedeva aprire il foglio «Dove
+   ricevere i sats» anche con l'indirizzo Lightning salvato negli incassi:
+   la scorciatoia lo SCRIVEVA nel campo e basta, e «Invia» restava suo
+   (17 set 2026: per poterlo correggere per quel solo scambio). Ma la
+   domanda la fa il coordinatore a OGNI scambio (`add-invoice`, mostrod
+   non ricorda niente), e la risposta era sempre la stessa.
+   ADESSO, se l'indirizzo salvato passa, lo manda il telefono: lo stesso
+   controllo del server di `inviaIncassoP2P` (`controlloFatturaP2P`), lo
+   stesso `add-invoice` col solo indirizzo, lo stesso tentativo segnato.
+   E chi vende riceve subito la richiesta della garanzia: lo scambio non
+   aspetta un tocco.
+   IL FOGLIO NON SPARISCE, si apre quando serve (`incassoAManoP2P`): il
+   nostro controllo che ferma o avvisa (col suo «Usa comunque» e
+   l'indirizzo gia' nel campo), il «no» del coordinatore (l'indirizzo si
+   ricorda sulla riga come rifiutato, e la scorciatoia non torna), il
+   messaggio mai partito. In tutti i casi il tempo di chi prende (mezz'ora)
+   e' ancora quasi tutto li'.
+   NON PARTE DA SOLO (`indirizzoDaSoloP2P`): a leva spenta
+   (`incassoDaSolo` in busta); senza indirizzo salvato; con un wallet che
+   col P2P non passa (Wallet of Satoshi); con un indirizzo che su QUESTO
+   scambio e' gia' stato rifiutato; col wallet NWC collegato, che la
+   fattura la fa gia' da solo (`fatturaDalWalletP2P`); una seconda volta
+   sullo stesso scambio (`daSolo` sulla riga); e mai sulla fattura nuova
+   dopo un pagamento fallito, che e' un altro stato e resta a mano.
+   La riga che lo dice e' quella di Andrea («Ricevi su …»), in un toast. */
+function incassoDaSoloAttivoP2P(){
+  const c = typeof p2pCoord === 'function' ? p2pCoord() : null;
+  return !!(c && c.incassoDaSolo === true);
+}
+/* l'indirizzo da mandare da solo, o '' — legge la leva e l'indirizzo
+   degli incassi, e la riga dello scambio */
+function indirizzoDaSoloP2P(o){
+  if (!o || o.lato !== 'compro' || o.daSolo || !incassoDaSoloAttivoP2P()) return '';
+  const ind = String(myLnAddress || '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ind) || walletNonPassaP2P(ind)) return '';
+  if (Array.isArray(o.indirizziRifiutati) && o.indirizziRifiutati.indexOf(ind.toLowerCase()) >= 0) return '';
+  if (typeof walletNwcFattura === 'function' && walletNwcFattura()) return '';
+  return ind;
+}
+/* il ripiego: il toast e il foglio di sempre, piu' — se c'e' — il perche'
+   nell'avviso. Il foglio si apre solo se lo scambio chiede ancora dove
+   ricevere i sats e si sta guardando proprio lui (`seguibileP2P`) */
+function incassoAManoP2P(id, ind, perche, fermo){
+  haptic();
+  toast(P2P_TOAST_FATTURA, 6000);
+  const agg = ordiniP2P()[id];
+  if (!agg || agg.stato !== 'attesa_mia_fattura' || !seguibileP2P(id)) return;
+  apriIncassoP2P();
+  if (fermo) {
+    /* «Usa comunque» rimanda quel che c'e' nel campo */
+    const c = el('p2pIncassoInp');
+    if (c && fermo.comunque) c.value = ind;
+    mostraFermoFatturaP2P(fermo);
+  } else if (perche) {
+    const av = el('p2pIncassoAvviso');
+    if (av) { av.textContent = perche; av.style.display = ''; }
+  }
+}
+async function incassoDaSoloP2P(id){
+  const o = ordiniP2P()[id];
+  const ind = indirizzoDaSoloP2P(o);
+  if (!ind || o.stato !== 'attesa_mia_fattura') return false;
+  /* una volta sola per scambio, scritta PRIMA di partire */
+  o.daSolo = true;
+  scriviOrdineP2P(o);
+  /* il velo solo a chi guarda lo scambio: da un'altra vista l'app non si
+     blocca per un gesto che non ha chiesto */
+  let rip = seguibileP2P(id) ? attesaP2P('Mando dove ricevere i sats…') : null;
+  const chiudi = () => { if (rip) { rip(); rip = null; } };
+  try {
+    const fermo = typeof controlloFatturaP2P === 'function'
+      ? await controlloFatturaP2P(o, ind) : null;
+    if (fermo) {
+      if (fermo.esito === 'wallet_non_passa') segnaIndirizzoRifiutatoP2P(id, ind);
+      chiudi();
+      incassoAManoP2P(id, ind, '', fermo);
+      return false;
+    }
+    const ora = ordiniP2P()[id];
+    if (!ora || ora.stato !== 'attesa_mia_fattura') return false;   /* annullato nel frattempo */
+    if (typeof segnaTentativoP2P === 'function') segnaTentativoP2P(id, 'fattura_inviata');
+    await chiamataOrdineP2P(ora, 'add-invoice', {payment_request: [null, ind, null]});
+    ricordaFatturaP2P(id, 0);
+    /* la spunta del ritorno dentro il velo, come dal foglio */
+    await dopoGestoP2P(id);
+    toast('⚡ Ricevi su ' + ind, 6000);
+    return true;
+  } catch(e) {
+    chiudi();
+    /* «gia' fatto»: si rilegge lo stato, come dal foglio */
+    if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) {
+      if (typeof dopoGestoRilettoP2P === 'function')
+        dopoGestoRilettoP2P(id, fatturaPassataP2P).catch(() => {});
+      return false;
+    }
+    if (e && e.cantDo && typeof segnaTentativoP2P === 'function')
+      segnaTentativoP2P(id, 'fattura_rifiutata', e.motivo);
+    const perche = ragioneIncassoP2P(e, ind);
+    if (perche === P2P_INDIRIZZO_RIFIUTATO) {
+      const agg = ordiniP2P()[id];
+      if (agg) { agg.cantDo = perche; scriviOrdineP2P(agg); }
+      segnaIndirizzoRifiutatoP2P(id, ind);
+    }
+    /* la risposta in ritardo: l'indirizzo puo' essere GIA' passato — si
+       chiede a chi lo sa prima di aprire il foglio */
+    if (e && e.silenzio && typeof riallineaScambioP2P === 'function') {
+      let mosso = false;
+      try { mosso = await riallineaScambioP2P(id, 'attesa'); } catch(_) {}
+      const agg = ordiniP2P()[id];
+      if (mosso && agg && fatturaPassataP2P(agg)) {
+        ricordaFatturaP2P(id, 0);
+        toast('⚡ Ricevi su ' + ind, 6000);
+        return true;
+      }
+    }
+    incassoAManoP2P(id, ind, (typeof fraseRifiutoIncassoP2P === 'function'
+      && fraseRifiutoIncassoP2P(e, ind, o)) || perche, null);
+    if (p2pOrdineAperto === id) renderOrdineP2P();
+    return false;
+  } finally { chiudi(); }
 }
 
 /* l'uscita dal bottone spento: lo dice chi compra, e resta scritto
