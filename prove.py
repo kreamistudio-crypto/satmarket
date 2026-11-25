@@ -222789,6 +222789,7 @@ console.log(JSON.stringify([v.map(x => x.quadro),
     r = _node_banco("""
 const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
 let mqNetflix = {matches: true};
+const TONDI_NEGOZI = true;   // la divisione accantonata gira lo stesso
 """ + pezzo_js(mini, "const QUADRI_MIN = ", "\n") + "\n" + _sp + """
 const N = 'ABCDEFGH'.split('').map(x => ({id: x, negozio: x.repeat(3) + '111'}));
 const V = N.concat({id: 'p2p'}, {id: 'aste'});
@@ -222825,6 +222826,26 @@ console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(giro.grandi),
                ["A", "B", "C", "D", "E", "p2p"], ["A", "B", "C", "D", "E"]], r)
     prova("...e le soglie sono 4 quadrati divisi e 5 negozi, le parole di Andrea",
           True, "const QUADRI_MIN = 4, QUADRI_POCHI = 5;" in mini)
+    # I TONDI ACCANTONATI (25 nov 2026, Andrea: «le card rotonde non le
+    # devo mai più vedere», «non buttare via il lavoro»): spenti a qualunque
+    # numero di negozi, tutti i negozi nella card grande
+    r = _node_banco("""
+const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
+let mqNetflix = {matches: true};
+""" + pezzo_js(mini, "const TONDI_NEGOZI = ", "\n") + "\n"
+        + pezzo_js(mini, "const QUADRI_MIN = ", "\n") + "\n" + _sp + """
+const N = 'ABCDEFGH'.split('').map(x => ({id: x, negozio: x.repeat(3) + '111'}));
+const r = [2, 5, 8].map(n => { const x = spartisciScoprire(N.slice(0, n));
+  return [x.grandi.length, x.quadri.length]; });
+console.log(JSON.stringify(r));""")
+    if r is None:
+        salta("i tondi spenti, in node", "node non c'e'")
+    else:
+        prova("in node: coi tondi spenti, con 2, 5 o 8 negozi tutti grandi e nessun tondo",
+              [[2, 0], [5, 0], [8, 0]], r)
+    prova("...spenti dalla leva, che resta nel codice", (1, 1),
+          (mini.count("const TONDI_NEGOZI = false;"),
+           mini.count("if (!TONDI_NEGOZI || !mqNetflix.matches) return {grandi: tutte, quadri: []};")))
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
     prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
           "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"
