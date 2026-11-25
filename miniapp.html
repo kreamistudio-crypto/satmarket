@@ -1773,7 +1773,13 @@
     height:calc(100% + 6px)}
   /* sul computer (e sul tablet) uno ACCANTO all'altro: uno sotto l'altro
      a tutta larghezza sarebbero due cartelloni da 300px d'altezza */
-  @media (min-width:768px){#occasioniBanner{grid-template-columns:1fr 1fr}}
+  /* PIU' PICCOLI SUL COMPUTER (25 nov 2026, cantiere home-pc, Andrea: «i
+     filtri offerte a tempo e sconti dei negozi nel browser del PC mettili
+     più piccoli»): a meta' riga erano 684x167 a 1440. Ognuno al piu' 420
+     di largo (102 d'alto, sempre 328/80: il disegno cala col riquadro),
+     la coppia al centro; sul tablet stretto si restringono da soli. */
+  @media (min-width:768px){#occasioniBanner{grid-template-columns:repeat(2,minmax(0,420px));
+    justify-content:center}}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -13935,16 +13941,13 @@
        podio in mezzo l'adiacenza non combacia piu' */
     nav .tema-btn ~ .avatar-btn{margin-left:10px}
 
-    /* la hero: titolo grande e mascotte fluttuante, solo qui */
-    .hero{display:flex;align-items:center;gap:40px;padding:28px var(--pad) 0}
-    .hero-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:38px;line-height:1.1}
-    .hero-title span{color:var(--sats)}
-    .hero-sub{font-size:16px;color:var(--ink-soft);font-weight:600;margin-top:8px;max-width:520px}
-    /* Il barattolo scontornato fluttua libero: niente tessera,
-       l'ombra e' un drop-shadow che segue la sagoma */
-    .hero img{width:220px;height:220px;margin-left:auto;flex:0 0 auto;
-      transform:rotate(-6deg);filter:drop-shadow(0 14px 22px rgba(60,45,10,.25));
-      animation:floaty 4s ease-in-out infinite}
+    /* (Qui c'era LA HERO da desktop, «Compra e vendi in sats.» col
+       barattolo che fluttuava: tolta il 25 nov 2026, cantiere home-pc,
+       Andrea: «sistema l'interfaccia PC perché non è al passo con quella
+       della versione mobile». Sul telefono non c'e' mai stata, e dal 23
+       nov Barattolo non e' piu' solo il mercatino in sats: la home da PC
+       parte dalle card grandi come quella del telefono. Il markup resta,
+       spento dalla regola di casa `.hero{display:none}`.) */
     nav button{
       flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
       padding:9px 16px;border-radius:999px;
@@ -14112,6 +14115,17 @@
      Aria-label e title restano sul .nav-logo: il nome non si perde. */
   @media (min-width:768px) and (max-width:899px){
     .nav-logo .lockup{display:none}
+  }
+  /* IL MARCHIO DA SOLO ANCHE DA PC (25 nov 2026, cantiere home-pc,
+     Andrea: «anche il logo non è quello»): come in testata sul telefono
+     dal 23 nov, solo «₿arattolo» — via la tessera del barattolo, che sta
+     gia' dentro la barra Cerca, e via il fulmine. Da 900 in su, dove il
+     lockup c'e': nella fascia stretta qui sopra resta la tessera, che e'
+     l'unico segno che li' ci sta. Da solo a 22 si perdeva nella topbar:
+     30, come il marchio del telefono sta fra 26 e 34. */
+  @media (min-width:900px){
+    .nav-logo .brand-jar,.nav-logo .bolt{display:none}
+    .nav-logo .lockup{font-size:30px}
   }
 
   /* ====== LE DUE STRISCE, PIU' GRANDI SUL WEB (ago 2026) ======
@@ -14439,6 +14453,13 @@
     html.fuori-telegram .p2p-vt-fila{gap:var(--gap-griglia)}
     html.fuori-telegram .p2p-vt-fila .card{
       flex:0 0 calc((100% - (var(--colonne) - 1) * var(--gap-griglia)) / var(--colonne))}
+    /* LA MENSOLA COME LE CARD DEL MERCATINO (25 nov 2026, cantiere
+       home-pc): da PC le card di «Mensola» erano 150, piu' piccole di
+       quelle della griglia sotto (263 a 1440), mentre sul telefono sono
+       piu' grandi. Qui prendono la colonna della griglia, stesso conto
+       e stesso spazio della fila P2P qui sopra. */
+    html.fuori-telegram #evidenzaSez .ev-strip{gap:var(--gap-griglia);
+      --ev-larga:calc((100% - (var(--colonne) - 1) * var(--gap-griglia)) / var(--colonne))}
     /* le pagine che avevano una colonna fissa si allargano: il loro
        contenuto si dispone piu' sotto, soglia per soglia */
     html.fuori-telegram #view-dettaglio,
