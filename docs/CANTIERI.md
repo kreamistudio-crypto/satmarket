@@ -78693,7 +78693,7 @@ il nome della voce, la prova lo toglie prima di guardare).
 
 SCARTATI. Il solo cambio di nome (lasciava la scelta dello swap dentro
 «Lightning address»). Un cassetto nuovo per lo swap (tre posti invece di
-due).
+due). LE STRADE PER LO SFONDO, tutte mostrate a schermo pieno coi due temi e quasi tutte con foto vere (dai racconti dei negozi consigliati) e scartate da Andrea: la fascia arancio unita (#FBDDB5/#4A3215, «troppo sobria»); quattro sfumature arancio-rosso piene («troppo»); le stesse a metà intensità; blu notte, smeraldo, bordeaux, petrolio, grafite, lavanda («cambia colore, cambia stile»); la «mensola» (colore sotto la metà bassa delle card) anche in arancio Bitcoin e sfumata («troppo pasticciato»); il vassoio; i fari su fondo scuro (piaciuti, ma con «troppo stacco di colore» col blocco di sopra; poi sul fondo della pagina, col pavimento lucido, senza la riga arancio); sipario, ₿ in carta da parati, vetro, puntini; diagonale, polaroid, cartella con la linguetta; carosello (piaciuto, poi «non a carosello, card normali»), riflesso, titolo sul fianco; quattro stili semplici. Le onde basse in una striscia sotto le card: si vedevano meglio ma non erano «così» (le grandi di onde.jpg).
 
 PROVATO. `prove_banco_chiavi_onchain` (+1: nome e moneta, swap dentro e
 non più in «Lightning address», dove ricevi prima della scelta, la
@@ -94658,6 +94658,183 @@ dell'animazione; controprove rosse. Guardato con Playwright a 390 px.
 DA GUARDARE. Il modo di aprire il negozio da «Da scoprire» (pagina che sale
 dal basso, appendice, com'è): esempi in video mandati, aspetta la scelta.
 
+## Promuovi senza freccia e in cima alla scheda, nei colori del razzo (23 nov 2026, cantiere promuovi-apre-da-sola; Andrea: «nel foglio promuovi non ci deve essere la freccia, l'appendice si apre nel momento in cui selezioni quella promozione», poi «il tasto promuovi deve essere in cima a tutto, tra la foto e il nome dell'oggetto, col colore del razzo, giallo, rosso, bello evidente»)
+
+COSA. Nel foglio di `apriPromuovi` non c'è più il tasto rotondo con la
+freccia (`guardaPromo`, `FRECCIA_GUARDA` e `.promo-guarda` tolti): scegliere
+una voce (`scegliVocePromo`, dal radio o da una durata di In evidenza) apre
+la SUA anteprima e chiude le altre, e la fa ripartire da capo. La prima voce
+libera è scelta di serie, quindi la sua anteprima è già aperta quando il
+foglio si apre (`vocePromoHTML` la disegna senza `hidden`). Nella scheda del
+proprio annuncio il tasto «Promuovi» è salito in cima a `.detail-body`, fra
+la foto e la data/il titolo (classe `in-cima`), con le guardie del blocco del
+proprietario (mio, non asta, non esaurito) più le sue. La tinta è il razzo:
+fiamma dal giallo al rosso (`#FFC23D → #FF7417 → #E1251B`), scritta bianca
+con ombra calda, alone rosso sotto; resta il riflesso lucido della porta
+Streak. Vale anche per il tasto del cassetto del banner.
+
+IL NEGOZIO SENZA BANNER (stesso giorno, Andrea: «se non ha il banner
+glielo farei fare in questo momento», e la scritta «Prima fai il banner»
+approvata). La voce «Il negozio in Da scoprire» non è più spenta senza
+banner: si sceglie, apre l'anteprima, porta sotto la frase di prima in
+arancio (`serve`, `.promo-serve`), e il tasto in fondo diventa «Prima fai
+il banner» (`etichettaPromo`, rifatto da `scegliVocePromo` a ogni scelta):
+toccato, `apriCassettoProfilo('accBanner')`. Il server rifiutava già la
+compra senza banner, e continua. Col cassetto spento (`bannerLeve.attivo`
+falso) la voce resta spenta come prima: non c'è dove portarlo. In più la
+voce, e il foglio del cassetto (`chiediPromoScoprire`), dicono «Finiti i 30
+giorni, il negozio resta per sempre nei Consigliati.» (`scoprireSempre`,
+frase dettata da Andrea).
+
+DECISIONI. Una sola anteprima aperta alla volta: è l'appendice della scelta.
+Una voce spenta non si sceglie, quindi la sua anteprima non si apre: prima
+la freccia la mostrava. Il banner NON entra nei 50.000 (proposto e
+lasciato, Andrea d'accordo): resta per sempre sul negozio, chi l'ha già
+pagato ci perderebbe, e con la card pagata prima di un banner rifiutato il
+rimborso sarebbe a mano. Tutto in una pagina sola scartato: il moderatore
+fa comunque tornare dopo, e sarebbero due copie del caricamento banner.
+
+PROVATO. `prove_promozioni` 7b: la voce girata in node (nessuna freccia,
+prima voce aperta, le altre chiuse, `onchange` su `scegliVocePromo`), il
+codice di `scegliVocePromo` e il passaggio da `scegliGiorniPromo`, zero
+resti della freccia, il tasto prima di data e titolo e dopo la foto, la
+fiamma; la voce senza banner girata in node (non spenta, il segno, la riga),
+l'etichetta e il ramo verso il cassetto, la frase dei Consigliati due volte;
+controprove rosse. Guardato con Playwright a 390 px, fino al cassetto
+aperto nel Profilo.
+## Gli id Telegram degli utenti in un file, dal pannello admin (23 nov 2026, cantiere scarica-id-utenti; Andrea: «mi servono gli id telegram degli utenti su barattolo», per un grafico di quanti membri di ogni gruppo Telegram sono già su Barattolo)
+
+COSA. Sotto l'elenco utenti delle statistiche admin c'è «📇 Mandami gli id
+Telegram degli utenti» (`admIdUtenti`): `POST /api/admin/id-utenti/telegram`
+manda dal bot, nella chat di chi lo chiede, un `.txt` con un `tg_id` per
+riga (solo `tg_id>0`). Il file si incrocia SUL PC di chi lo ha chiesto coi
+membri dei gruppi letti da uno userbot (fuori dal repo: lo script
+«gruppi in comune» nei file del progetto).
+
+DECISIONI. Solo i numeri: niente nomi, username, npub, perché per il conto
+bastano gli id, e un file che gira con meno dentro fa meno danno. Il file va
+in chat come il backup delle leve, mai nella risposta della rotta (la Mini
+App non scarica file, e una lista intera in un JSON finisce nelle cache).
+Solo admin (`e_admin`, la stessa lista che già vede l'elenco utenti coi
+nomi), freno `id_utenti` 5 l'ora, una riga «📇» nel journal a ogni
+richiesta. In collaudo si ferma prima di Telegram e dice solo quanti.
+SCARTATI: la query sul VPS lanciata a mano (chi la chiedeva non ha accesso
+al VPS); un export CSV con nomi (più dati del necessario).
+
+PROVATO. `collaudo_id_utenti` (nella gabbia e in `ci/collaudi.txt`): 403 a
+chi non è admin, il conto senza i solo-Nostr, il freno alla sesta. Il
+censimento degli indirizzi Telegram di `prove.py` ne conta nove.
+
+DA GUARDARE. Il primo invio vero dal bot in produzione.
+
+## «Scambi P2P» nascosto anche sulle card del P2P, moderatori senza le nascoste, negative sempre visibili (23 nov 2026, cantiere scambi-p2p-nascosti-scheda; Andrea, dopo aver spento le recensioni P2P di AccaSats e averle viste ancora: «Se uno decide di nascondere dal profilo pubblico le recensioni degli scambi peer-to-peer, deve sparire anche da lì», poi «Ovviamente gli scambi non completati non devono sparire, ma quelli conclusi sì»)
+
+LA SEGNALAZIONE, IN DUE PEZZI. Primo: sul profilo di AccaSats Andrea
+vedeva ancora «da uno scambio P2P». Non era un bug: è moderatore, e i
+moderatori le vedono per avere «rimuovi»; guardato da anonimo in
+produzione, il negozio dava 11 recensioni su 14, nessuna dello scambio, e
+`scambi_completati` a 0. Secondo, da un account non moderatore: sulla
+scheda dell'ordine P2P, nel riquadro «Chi ha pubblicato quest'ordine»,
+restava «✅ 3 scambi P2P». Il cantiere del 22 l'aveva tolto dal PROFILO
+(la rotta del negozio), ma le card del P2P prendono il numero da altri
+costruttori, che la scelta non la guardavano.
+
+COSA. Il giudice nuovo `_p2p_nascosti_fra(con, ids)` dice chi, fra quelle
+persone, ha spento le recensioni P2P (insieme vuoto a leva spenta o senza
+la colonna). Lo usano i tre costruttori dei volti del P2P:
+`_facce_ordini_p2p` (la card del libro Lightning e il riquadro «Chi ha
+pubblicato»), la fotografia del libro on-chain (`_rep`) e `_volti_persone`
+(la card dell'altra parte, nello scambio P2P e nel dettaglio di un ordine
+del mercatino). Per chi è fra gli «zitti» escono senza «✅ N scambi P2P»
+e senza «⚡ Risponde in fretta», come il profilo. «Non completati»,
+«dispute perse», stelle e numero restano.
+
+PERCHÉ PER TUTTI SULLE CARD. L'eccezione del proprietario e del
+moderatore sta nella lista delle recensioni, dove il moderatore ha
+«rimuovi»: sul numero di una card non c'è niente da moderare, e vederlo
+da moderatore ha appena fatto credere a un bug. Anche la card dell'altra
+parte: nel dettaglio di un ordine del mercatino quel numero direbbe a chi
+compra un oggetto che il venditore usa il P2P, cioè proprio la cosa da
+nascondere.
+
+E I MODERATORI NON LE VEDONO PIÙ (stesso giorno). Andrea: «aggiungi anche
+nel menu [...] scrivi che [...] il proprietario di quell'account li vede
+comunque, solo lui però». Due frasi proposte; scelta «Quelle nascoste le
+vedi sempre solo tu.», con la conseguenza detta: anche i moderatori
+smettono di vederle sul profilo, e da lì non le possono più rimuovere.
+`_recensioni_nascoste_di` perde `e_admin`; la frase sta sotto «Le stelle
+e il numero di recensioni restano sempre visibili.» nel cassetto.
+
+LE NEGATIVE NON SI NASCONDONO MAI (stesso giorno). Andrea: «le recensioni
+negative, quelle da 1 o 2 stelle, devono restare sempre visibili».
+`_sql_recensioni_visibili` lascia passare `f.voto<=VOTO_SEMPRE_VISIBILE`
+(2) anche quando il loro tipo è spento; con tutte e due spente restano
+solo le negative. Detto ad Andrea il prezzo: una negativa di uno scambio
+dice «da uno scambio P2P», cioè proprio quel che le P2P spente
+nascondono. Le stelle e il numero c'erano già (contano anche le
+nascoste); i marchi «non completati» e «dispute perse» pure. La frase
+del cassetto non lo dice: un testo nuovo aspetta l'ok di Andrea.
+
+SCARTATO. Lasciare il numero sulla card del libro, perché lì chi pubblica
+sta già vendendo sats (era la mia raccomandazione): Andrea ha scelto di
+nasconderlo anche lì. «...solo tu e i moderatori» (la mia
+raccomandazione, perché un moderatore possa togliere una recensione
+offensiva nascosta): scelta l'altra.
+
+PROVATO. `collaudo_recensioni_nascoste.py`, sezione 3b nuova, sul database
+vero: con le P2P nascoste la card del libro e quella dell'altra parte
+senza `completati` né `veloce`, col marchio dei non completati e le
+stelle intatti; con le P2P di nuovo visibili e a leva spenta i numeri
+tornano; il moderatore, sul profilo, non vede più quella dello scambio
+né i numeri del P2P. Controprova: col giudice che risponde
+sempre vuoto, 2 rosse. Sezione 3c: una da 1 stella di uno scambio resta
+all'estraneo con le P2P spente; la sezione 4 tiene la negativa del
+mercatino, la 5 solo quella. 39 su 39. `prove_recensioni_nascondibili`, sezione 2b: il giudice su un
+database in memoria (leva spenta, colonna assente) e le sentinelle nei
+tre costruttori; nella sezione 1 il moderatore ora vede nascosto, e in
+node la quarta scritta.
+
+DA GUARDARE. Dopo la promozione, da un account non moderatore: la scheda
+di un ordine P2P di chi ha spento le P2P, senza «✅ scambi P2P».
+
+
+## La pagina dedicata del negozio in «Da scoprire»: si vende e si chiede in Assistenza (23 nov 2026, cantiere pagina-da-scoprire; Andrea: «la pagina fa parte di quello che vendiamo, quindi bisogna scriverlo», e «dovrebbe arrivarci una notifica… o un messaggio automatico dove gli si dice: incolla qui le foto e il testo»)
+
+COSA. «Il negozio in Da scoprire» vende la card E una pagina dedicata come
+quelle dei Consigliati (To The Mooon, AndreAI, Una Garlanda), scritta a mano
+da noi. Il foglio, il cassetto del banner e la conferma dicono «La card del
+tuo negozio in home e una pagina dedicata, preparata da noi con le tue foto
+e il tuo testo.» (`SCOPRIRE_COSA`, frase approvata; prima «dopo l'ok del
+moderatore», che era l'ok del banner). Dopo il pagamento, alla PRIMA entrata:
+nella chat di Assistenza del negozio compare il messaggio dello staff
+(`PROMO_PAGINA_ASSISTENZA`: da 3 a 6 foto, il logo, un testo; «te la facciamo
+vedere prima di pubblicarla»), il «Fatto!» del bot aggiunge «Per la pagina
+dedicata del tuo negozio mandaci le foto e un testo che lo racconti: tocca
+qui.» col tasto «💬 Apri l'assistenza» (etichetta già esistente), e ai
+moderatori arriva «🏪 Da preparare la pagina di [nome]: gli abbiamo chiesto
+foto e testo in Assistenza.» (argomento moderazione). Le risposte del negozio
+arrivano col solito avviso dell'Assistenza, foto comprese. I tre testi sono
+di Andrea.
+
+DECISIONI. L'Assistenza in app e non un canale nuovo: accetta foto, avvisa
+i moderatori, è accesa in produzione. Solo alla prima entrata
+(`promo_consigliato` era 0): chi rinnova o è già Consigliato la pagina ce
+l'ha. La riga dello staff nasce nella stessa transazione dell'incasso, con
+`autore` 0 (la scrive Barattolo, non un admin col suo nome). Con l'Assistenza
+spenta niente dei tre: non ci sarebbe dove rispondere, e l'avviso ai
+moderatori direbbe il falso. Finché la pagina non c'è, la card apre il
+negozio normale col banner in cima. La pagina resta un racconto a mano
+(`racconti.py`, bozza, pubblicazione dal pannello).
+
+PROVATO. `collaudo_promozioni`: la riga in Assistenza (autore 0, admin 1, il
+testo), il «Fatto!» con la frase e il tasto, l'avviso ai moderatori con il
+nome e l'argomento; il negozio già Consigliato non riceve niente di nuovo;
+mutazione (tolta la guardia del primo ingresso) rossa. `prove_promozioni`: la
+frase in quattro posti, nessun «dopo l'ok del moderatore», la guardia e la
+riga prima del commit.
+
+DA FARE. NOVITA.md non toccato (la frase approvata non nomina la pagina).
+
 ## Il giroconto interno: i sats del P2P nel deposito dell'ordine senza uscire dal nodo (23 nov 2026, cantiere giroconto-interno; Andrea, dall'idea di un utente: «partiamo bene con la B e fammi un bello studio accurato», poi «Giroconto interno» sulla scelta)
 
 IL PERCHÉ. L'idea (girata da Andrea): chi non ha sats compra la felpa di
@@ -94722,7 +94899,7 @@ Ora salta gli ordini la cui bolt11 è ancora viva (`vita_fattura`); per le
 fatture di serie da 15 minuti non cambia niente (a quel punto sono morte).
 
 PROVATO. Fork: `git am` delle sedici `.patch` su un clone pulito della
-`v0.20.2` = albero `654388cb`; `cargo test --release` 2015 verdi, 0 rosse
+`v0.20.2` = albero `7408b7fa`; `cargo test --release` 2015 verdi, 0 rosse
 (2011 + 4 del modulo: inerte senza variabili, solo la nostra chiave ben
 fatta è «nostra», la domanda vuole ogni pezzo, solo un JSON `true` vale).
 Server: `prove_giroconto_interno`, 17 spunte (domanda storta, cinque no
@@ -94796,19 +94973,1063 @@ il pagamento. Puoi chiudere l'app, ti avvisiamo noi.» Disputa, annullo,
 pagamento da rifare: il foglio si fa da parte e resta la pagina dello
 scambio, dove c'è «Riprendi il pagamento» finché un passo del foglio è da
 fare. Il deposito rifiutato (prezzo saltato) dice «Il prezzo è cambiato:
-annulla lo scambio e riprova» e porta alla pagina (scritta mia, da far
-approvare). Provato: `prove_non_hai_sats`, 22 spunte (porte, condizioni,
+annulla lo scambio e riprova» e porta alla pagina (scritta mia, approvata da
+Andrea il 23 nov alle 21:43: «Okay, allora va bene»). Provato: `prove_non_hai_sats`, 22 spunte (porte, condizioni,
 niente «paga in euro», il gancio, la scelta e il passo in node).
 
-DA FARE PRIMA DI ACCENDERE. 1) La scritta del prezzo saltato, da far
-approvare; le difese della F3 (la spunta dei venditori di sats e la lista
-di fiducia, il limite per i nuovi). 2) La prova: il P2P del collaudo usa il nodo di
-produzione, quindi la `-bar13` va sul nodo (a variabili spente è identica
-alla `-bar12`) e il giroconto si prova con un ordine piccolo, deciso con
-Andrea. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta
+DA FARE PRIMA DI ACCENDERE. 1) Le difese della F3 (la spunta dei venditori di sats e la lista
+di fiducia, il limite per i nuovi). 2) La prova: il collaudo ha i pagamenti FINTI
+(LNbits FakeWallet), il deposito non sta sul nodo e Mostro non può
+saldarlo; Andrea alle 21:01 ha scelto la prova in PRODUZIONE coi soli
+moderatori (il tasto è chiuso a loro di serie, `VIA_EURO_SOLO_ADMIN`):
+dopo la promozione, riserva e segreto sul VPS, `-bar13` sul nodo (a
+variabili spente è identica alla `-bar12`), un ordine piccolo. I comandi:
+DA-FARE-ANDREA, voce 31. 3) Sul VPS: il portafoglio «riserva» in LNbits nodo (scorta
 proposta 300.000 sats), `LNBITS_RISERVA_ADMIN_KEY`, `P2P_GIROCONTO_SEGRETO`;
 sul nodo `BARATTOLO_GIROCONTO_URL` e `BARATTOLO_GIROCONTO_SEGRETO`. 4) Il
 rabbocco della riserva e il controllo di quadratura (riserva scesa = sats
 in più sul nodo dal lato di Mostro). 5) La ronda dei pagamenti del nodo
 non vede uscire niente per i giroconti (nessun pagamento LND): da
 verificare che non lo legga come anomalia.
+
+PROVATO PRIMA DEL PUSH SU DEVELOP (23 nov sera, albero sopra
+origin/develop f28d4c69, i cinque commit del cantiere ribasati):
+`PROVE_SEVERE=1 python3 prove.py` 31.219 verdi, 1 rossa preesistente
+anche su develop («il riacciuffo cerca ancora i pagamenti sulle
+lapidi»), 3 saltate per l'ambiente; `collaudi_ci.py --elenco
+ci/collaudi.txt` 169 verdi, 0 rossi; `compileall` ok.
+
+## «Chiudi la storia» diventa «Chiudi» (23 nov 2026, cantiere chiudi-storia; Andrea, guardando l'anteprima del negozio Piano B Panama: «Il tasto chiudi la storia non va bene. Lascia solo chiudi.»)
+
+Il bottone della storia di un negozio consigliato, a storia aperta, dice
+«Chiudi» invece di «Chiudi la storia», in tutti e due i posti dove nasce
+(il disegno della testa e `toggleRacconto`). A storia chiusa resta «Leggi la
+storia ›». Vale per tutti i negozi con la storia, To The Mooon compreso.
+Tolta da `lingua/en.js` la riga di «Chiudi la storia», rimasta senza uso:
+«Chiudi» ha già la sua traduzione.
+
+PROVATO. Il banco del cassetto in `prove.py` («dal link la storia nasce
+APERTA… e il bottone che la chiude») ora cerca `>Chiudi</button>`; aggiornato LINGUA_VER
+(cambia lo sha di `lingua/en.js`). `PROVE_SEVERE=1 python prove.py` 31.173
+passate, 2 rosse e 2 saltate per l'ambiente (lo `config.py` d'esempio con la
+chiave segnaposto dell'assistente, rigirata verde senza; nostr-tools che in
+cloud non c'è); `collaudi_ci.py --elenco ci/collaudi.txt` 169 verdi, 0 rossi.
+Rebase sul giroconto interno: rigirate le sezioni toccate.
+
+## L'Assistenza apre anche i nativi Nostr: l'id come testo, fino a 19 cifre (23 nov 2026, cantiere assistenza-id-nostr; Andrea, col bot che gli diceva «Assistenza: scrive Zzap (n. -5945373116987485543)»: «Clicco, ma non mi trova l'utente. Non so come rispondergli», e «quando clicco sul link di Telegram mi porta alla home del mercatino… Dovrebbe portarmi direttamente lì»)
+
+IL GUASTO. Zzap è un nativo Nostr: il suo tg_id nasce da
+`tg_id_da_pubkey`, in [-2^63, -1], cioè fino a 19 cifre. Due difetti, una
+causa sola. (1) `/api/admin/assistenza` mandava `utente` come NUMERO JSON,
+e oltre il 2^53 di JavaScript il numero arriva arrotondato
+(-5945373116987485543 diventa -5945373116987485696): `Number(c.utente)`
+nell'elenco e nella fetch chiedeva al server un utente che non esiste,
+quindi «Utente non trovato» e la pagina ferma su «Carico la
+conversazione…», anche da «Tutte le conversazioni». (2) Le quattro forme
+del tasto dell'avviso (`_link_dentro_telegram` nel server,
+`percorsoDaStartapp`, `startappDaLink` e `ASSISTENZA_URL` nella Mini App)
+accettavano al massimo 16 cifre: con 19 il link restava quello del sito e
+la Mini App si apriva in home. Era già segnato come «visto strada
+facendo» nella voce di «Da scoprire» (myTgId arrotondato).
+
+COM'È ADESSO. Il server manda `utente` come TESTO nell'elenco e nella
+conversazione (`str(...)`); la Mini App lo tiene testo con
+`idAssistenza(x)` (solo `-?[1-9][0-9]{0,18}`, altrimenti vuoto), che sta
+nel tocco dell'elenco (tra apici), in `apriConversazioneAdmin`, in
+`apriAssistenzaDaUrl` e nelle due fetch. Le quattro forme del tasto
+salgono a 19 cifre. Le rotte del server non cambiano (`utente: int` di
+FastAPI legge le 19 cifre esatte). Nessun testo nuovo.
+
+RISPOSTO A ZZAP NEL FRATTEMPO. Col sì di Andrea («fallo tu»), dal suo
+Chrome entrato su barattolo.store come admin: una fetch POST alla rotta
+con l'id esatto (23 nov, 20:19), `ok: true`, l'avviso è partito.
+
+STRADE SCARTATE. Un BigInt in pagina (l'id non fa conti, è un nome: il
+testo basta ed è quel che fa già `idConto` del portachiavi); due campi,
+numero e testo (un doppione che qualcuno rileggerebbe dal lato
+sbagliato).
+
+PROVATO. `prove_assistenza_id_nostr` (8): in node la catena VERA della
+Mini App — l'elenco come lo manda il server, il tocco, la fetch che ne
+nasce (proprio `/api/admin/assistenza/-5945373116987485543`), nessun
+toast, il tasto dal sito e da Telegram, e forme storte (20 cifre,
+esponente, apici) che restano vuote. `collaudo_assistenza.py` (89, il
+nuovo `il_nativo_nostr`): elenco e conversazione con l'id esatto come
+testo, l'arrotondato che è un 404, la risposta dello staff con l'avviso
+al nativo, il tasto Telegram a 19 cifre e a -2^63, le 20 cifre che
+restano link del sito; le tre righe che confrontavano l'id come numero
+ora lo confrontano come testo. Controprove: Number() nella fetch, tetto 16
+in `percorsoDaStartapp` e in `ASSISTENZA_URL`, il tocco senza apici,
+`str` tolto nel server, tetto 16 nel server → tutte rosse, rimesse a
+posto → verdi.
+
+DA GUARDARE. Altri posti dove un id di nativo Nostr passa per un numero
+in JavaScript (`myTgId`, già noto): non toccati, fuori da questo cantiere.
+
+## L'indirizzo on-chain salvato si vede: l'inizio e la fine (23 nov 2026, cantiere indirizzo-visibile; Zzap in Assistenza: «ho impostato un indirizzo onchain, ma non lo vedo piu visibile», Andrea: «anche io quando ho impostato un indirizzo on-chain non lo vedo effettivamente nelle impostazioni», poi «magari mostralo, solo l'inizio e la fine»)
+
+PERCHÉ. In Profilo → «₿ On-chain» → «Dove ricevi i bitcoin», salvato
+l'indirizzo, la voce diceva solo «✅ Ricevi nel tuo wallet (un tuo
+indirizzo)»: /api/me portava il TIPO (`onchain_incasso`), mai il valore,
+e chi l'aveva salvato pensava di averlo perso.
+COM'È ADESSO. /api/me porta anche `onchain_incasso_vista`: otto
+caratteri, «…», sei (`onchain_accorcia`), solo per chi l'ha salvato e
+solo se la firma vale ancora (`_onchain_destinazione_mia`, la lettura
+che prima stava dentro `_onchain_incasso_mio`, ora condivisa). La pagina
+ha il gemello `accorciaIncassoOnchain` per il momento subito dopo il
+salvataggio, e la riga diventa «(un tuo indirizzo, bc1qw508…v8f3t4)»;
+per la chiave del conto lo stesso, dopo la sua frase. Nessuna parola
+nuova: solo il valore accorciato, in `mono`.
+STRADE SCARTATE. L'indirizzo intero (Andrea ha detto inizio e fine);
+accorciare solo in pagina mandando il valore intero (in /api/me basta
+il pezzo che si mostra).
+PROVATO. `prove_incasso_onchain_visto` (6): in node la pagina accorcia
+come il server valore per valore (corti, 16 e 17 caratteri, xpub), la
+riga del Profilo col pezzo e senza, salvataggio e «Togli» che la
+aggiornano, /api/me che la porta. `collaudo_onchain_incasso.py` (70):
+dopo il salvataggio vero /api/me dà inizio e fine e non l'intero, e
+tolta la scelta niente. Controprove: sei caratteri diventati cinque in
+pagina (2 rosse), la riga senza il pezzo (1 rossa), `onchain_accorcia`
+che restituisce tutto (1 rossa nel collaudo) → rimesse a posto, verdi.
+SAPERE DI TAPPO (Andrea: «Aggiungi al sapere di tappo tutte queste
+cose», dopo le risposte a Zzap): nome e foto vengono da Telegram o
+Nostr e la foto si sceglie o si spegne («📷 La tua foto» → «Nessuna»);
+la pausa degli ordini P2P (dove, i due modi, cosa vede chi guarda il
+libro, che vale solo dentro Barattolo), niente bozze e la pausa prima di
+pubblicare come strada; l'indirizzo on-chain salvato e il suo pezzo
+visibile. `conoscenza.md` rifatto.
+DA FARE. NOVITA.md non toccato: il ritocco è piccolo, e un post vorrebbe
+una frase nuova approvata da Andrea.
+
+## Barattozon on-chain «Vendi BTC» torna nel libro se chi prende annulla (23 nov 2026, cantiere barattozon-rinasce; un utente, persona-apmbpt, nel canale: «è da 2gg che inserisco ordine, utenti accettano e dopo 1 minuto annullano ordine e devo reinserire manualmente»; Andrea dalla card «Sì, se il PayCode ha 12 ore», poi «Sì, 8 ore», poi «ok» al piano)
+
+IL CASO. In produzione (sola lettura, comandi lanciati da Andrea) i suoi
+ordini erano on-chain 76 e 78: Barattozon in «Vendi BTC», 803,88 €, presi e
+annullati da chi li aveva presi dopo 12 e 50 secondi, mai rinati; lui li
+ripubblicava a mano (84). Non un guasto: il ritorno nel libro on-chain del
+19 nov (cantiere ritorno-nel-libro) usciva subito su qualunque riga con
+`paycode` o `tab_min_cent`. Tappo gli aveva detto il contrario. Lezione per
+chi cerca: gli account Nostr hanno id NEGATIVI (`taker_id>0` inganna), e
+l'account Telegram del commento non era quello che pubblicava.
+
+COSA. `p2p_onchain_rinasce_perche`: la fascia («Compra BTC», `tab_min_cent`)
+resta esclusa, un PayCode su un acquisto anche; col PayCode di chi vende
+rinasce SOLO l'annullo di chi ha preso a scambio `preso` («annullato»). La
+ronda di chi pubblica, la rinuncia e il non pagato dopo il deposito no: dal
+deposito confermato chi paga il PayCode l'ha visto. `_p2p_onchain_rinasci`:
+lo stesso PayCode (la colonna copiata com'era) e `scade` del libro da
+`p2p_onchain_scade_libro(adesso, scadenza del PayCode)`, cioè 8 ore prima
+della scadenza; con 8 ore o meno, o un PayCode senza scadenza, torna 0 e chi
+annulla manda l'avviso di sempre («L'altra parte ha annullato»). Nessuna
+scritta nuova nell'app: l'avviso è quello della rinascita.
+
+DECISIONI. 8 ore e non le 12 della pubblicazione (Andrea): torna finché
+potrebbe stare nel libro, lo stesso margine con cui il libro lo toglie
+(`P2P_ONCHAIN_TAB_MARGINE_S`). Prima del deposito il PayCode non è uscito
+(esce solo con `depositato_il`), quindi ripubblicarlo non lo espone a
+nessuno. Gli ordini già annullati non rinascono a mano.
+
+PROVATO. `prove_ritorno_nel_libro_onchain`: chi fa rinascere col PayCode
+(otto casi), la rinascita col PayCode e la scadenza del libro, 8 ore esatte e
+meno, PayCode senza scadenza, colonna vuota senza PayCode; due controprove
+(senza il cancello del PayCode rinasce dalla ronda di chi pubblica; senza il
+margine rinasce a 8 ore) e la mutazione manuale del codice vecchio rossa.
+Tappo: la riga di sapere.md (testo approvato nel piano).
+
+DA GUARDARE. Non provato dal vivo: il primo Barattozon on-chain annullato
+dopo la promozione. Notato e non fatto: chi prende annulla in pochi secondi
+(78 aveva aperto il preventivo dello swap in Lightning prima di annullare).
+
+## Il sapere di Tappo sugli annunci: fermarne uno, le ferie, niente bozze (23 nov 2026, cantiere sapere-annunci-pausa; Zzap in Assistenza: «mi riferivo agli annunci del mercatino», Andrea: «Aggiungi al sapere di tappo tutte queste cose»)
+
+Le risposte date a Zzap sugli annunci, nel sapere: un annuncio solo si
+ferma con «🔄 Aggiorna i pezzi» a 0 (esaurito, visibile in grigio, torna
+con «🔄 Rifornisci»; non per servizi e importati da Nostr, come
+`bottoneRifornisci` e `ricarica_quantita`), il negozio intero con
+«🌴 Negozio in ferie» (le frasi di `renderFerie`), e che bozze degli
+annunci non ce ne sono. Solo testo del sapere e `conoscenza.md` rifatto.
+PROVATO: `prove_conoscenza_tappo`, `prove_assistente_bot` e le sezioni
+che leggono i documenti, verdi.
+
+## Il marchio da solo: via «il mercatino in sats» e il fulmine, il barattolo nella barra Cerca (23 nov 2026, cantiere logo-home; Andrea: «la scritta sotto il mercatino in sats non ha più senso di esistere perché Barattolo sta diventando un aggregatore di servizi», poi, scegliendo fra 36 prove: «la 24 con la scritta 11, però la B della scritta barattolo deve essere in linea con il logo della barra di ricerca»)
+
+COSA. In testata (solo telefono: sopra i 768 la `.brand` non c'è) resta
+SOLO «₿arattolo», a 34px (`clamp(26px,8.7vw,34px)`), senza la sottolinea
+«il mercatino in sats» e senza il ⚡. La tessera del barattolo è scesa
+nella barra Cerca, tonda (`.q-jar`, 43px su una barra di 46: prova 45, «dentro il bordo», lo stesso `assets/barattolo.jpeg`),
+al posto della lente. La barra ha il contorno arancione a sinistra che
+sfuma nel bordo neutro verso destra, con un alone che nasce dal barattolo;
+toccata per cercare si accende tutta d'arancione. La ₿ sta in colonna col
+barattolo: `margin-left:calc(23px - .265em)` (centro del barattolo a 23px
+dal bordo del campo; l'inchiostro della ₿ ha il centro a ~.31em). Provate e
+scartate da Andrea: il barattolo a filo del bordo (44), l'arancione che
+continua dentro la barra e si spegne (46-48, «Cerca» si leggeva meno), il
+bordo arancione lungo e la barra colorata dentro (40-42), la frase verde
+sotto il marchio (f0-f6, 37) e il lucchetto sulla «o» (L1-L3).
+
+DECISIONI. Le prove si sono fatte su un Barattolo di prova in locale
+(MODALITA_COLLAUDO, `semina_collaudo.py`, CSS iniettato con Playwright),
+senza toccare develop: 36 varianti in `/mnt/project-files/logo-home/`
+(scritte oro, al centro, capsula, ₿ gigante, testata arancione, 3D,
+caramelle…), scelte da Andrea una per una. Il bordo sfumato è un doppio
+sfondo (padding-box pieno + border-box sfumato) su bordo trasparente,
+perché `border-color` non fa gradienti. L'alone è un `box-shadow` del
+campo spostato a sinistra, NON un `filter:blur`: nelle prove era un
+`::before` sfocato, e `prove_effetti_ridotti` l'ha fermato (i blur della
+casa sono contati, e la classe degli effetti ridotti li spegne uno per
+uno); a schermo è quasi uguale alla prova 24. Senza `:has()` (prove_tastiera_iphone): se l'onerror
+toglie il barattolo, `.q-jar + .q-lente` e `.q-jar ~ #q` smettono di
+combaciare e tornano lente e rientro di prima. La regola «sotto i 360 la
+tessera cede il posto» se n'è andata con la tessera: il marchio da solo
+chiede 130px, e il `clamp` lo stringe sui telefoni piccoli (a 320 col
+podio acceso andava a capo a 34px fissi; misurato). La topbar da desktop
+NON cambia: lì restano tessera e ⚡ (non chiesto). Il `<title>` e
+`TITOLO_HOME` dicono ancora «il mercatino in sats» (non chiesto). Tolta
+da `lingua/en.js` la chiave della sottolinea (orfana = rossa), e rifatto
+`LINGUA_VER`.
+
+PROVATO. Misure a schermo, tema scuro e chiaro, 320/360/390/412, con e
+senza carattere «Grande» (--fs-zoom 1.15) e col podio acceso: nessuno
+scorrimento laterale, la riga resta alta 38px (44 con «Grande»), centro
+della ₿ a 39,5px contro 38 del barattolo; a 320 col «Grande» il marchio va
+a capo, il caso estremo già accettato dall'airbag. Emendate
+`prove_barattolo_in_striscia` (sezione 10: niente tessera né sottolinea in
+testata, via la regola dei 360) e `prove_tessera_testata` (il file chiesto
+per nome dalla barra e dalla topbar). Suite severa e collaudi della CI nel
+venv senza coincurve: vedi il verbale del commit.
+
+LA RIGA VERDE È USCITA (decisione di Andrea: «levalo, però nella tappa del
+giro di benvenuto comunque spiega che cos'è il deposito di garanzia»).
+«🔒 Ogni acquisto è protetto dal deposito di garanzia ›» sotto la barra
+lo dice già il recinto della scheda, sopra «🔒 Compra in sicurezza», col
+suo «Scopri di più»; e Barattolo non è più solo il mercatino. La tappa 3
+del giro di benvenuto la indicava: ora indica il prezzo della prima card
+(`#grid .card .tag-price`, c'è sempre quando c'è la tappa 1), col testo di
+sempre — guardata a schermo, «3 di 4». Via anche le regole `.trust-line` e
+la chiave di `lingua/en.js`. Le porte alla pagina «Il pagamento protetto»
+restano il recinto della scheda e il Profilo. Emendate `prove_seo` (le
+pillole ora stanno sotto la barra Cerca) e `prove_sponsor` (nessuna riga
+di fiducia, e la tappa cerca il prezzo).
+
+DA FARE. NOVITA.md non toccato (testi nuovi solo col suo ok). Non chiesti
+e lasciati: il ⚡ e la tessera nella topbar da desktop, «il mercatino in
+sats» nel `<title>` e in `TITOLO_HOME`.
+
+## Nome e foto scelti su Barattolo, gratis col moderatore (23 nov 2026, cantiere profilo-mio; Andrea: «implementiamo ora la possibilità di customizzare la foto, e anche di mettere il nome umano sul mercatino, mantenendo nel contempo l'uso del profilo Nostr»)
+
+Nato dalla richiesta di Zzap (entra con Nostr). Il disegno è quello dello
+studio del 6 ott (`docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md`) con
+una decisione nuova di Andrea (23 nov, scheda): GRATIS, ma col moderatore.
+Cade quindi tutto il pagamento (20.000 sats, la porta comprata, i
+rimborsi: decisioni 1-3 del §7). Restano: revisione prima della
+pubblicazione, un cambio approvato ogni 30 giorni (`PROFILO_MIO_GIORNI`),
+niente emoji, parole dello staff vietate anche camuffate, sosia protetti
+(staff, Consigliati, chi ha venduto 10 volte), l'avviso a chi ha un ordine
+aperto (decisione 9). Tolto per semplicità, d'accordo con Andrea: il badge
+✏️ accanto al nome. Login Nostr, npub, kind-0 e Mostro non si toccano: il
+cartellino vale solo dentro Barattolo.
+
+COME. Nel cassetto «🆔 Nostr e identità», sotto «📷 La tua foto», la riga
+«✏️ Nome e foto su Barattolo»: si propone il nome, la foto o tutt'e due
+(quel che manca resta com'è: la foto di adesso si copia). La proposta va al
+moderatore (sendPhoto coi bottoni, gruppo admin se c'è; pannello admin
+«✏️ Nomi e foto da approvare», e gli approvati in un cassetto con
+«🚫 Togli»). Approvata, si applica subito: `nome` e `avatar` riscritti,
+`avatar_scelta='mia'`, e nel selettore compare «✏️ Mia». Si esce verso
+Telegram, Nostr o Nessuna quando si vuole (torna il nome fresco di
+Telegram dalla Mini App, sennò `mio_nome_prima`) e si rientra senza nuova
+revisione. Dettagli: ARCHITETTURA, «NOME E FOTO SCELTI SU BARATTOLO».
+
+DECISIONI MIE (dette nel report). La proposta rifatta in attesa sostituisce
+la precedente, come per il banner. «mod» e «team» solo come parola intera
+(«Modena», «Steam» passano). Gli scambi P2P «aperti» per l'avviso sono
+quelli toccati nelle ultime 24 ore e senza importi di chiusura: il server
+non ha uno stato P2P più preciso. Gli on-chain P2P non ricevono l'avviso.
+Dal sito (cookie) chi lascia «Mia» riprende il nome tenuto da parte, non
+quello di Telegram di oggi: lo riscrive la prossima apertura della Mini App.
+I testi nuovi li ho scritti io: Andrea li ha approvati in anticipo
+(«qualsiasi cosa metta», 23 nov sera).
+
+PROVATO. `collaudo_profilo_mio` (72 verdi, nel venv senza coincurve, in
+`ci/collaudi.txt`): migrazione e leva, forma del nome (18 casi), sosia,
+proposta che non cambia niente, approvazione applicata e non riscritta da
+Telegram né dal giro del social, avviso a chi ha l'ordine aperto e a
+nessun altro, 30 giorni, uscita e rientro coi file intatti, rifiuto col
+motivo, 403 e tocco altrui, «togli», fusione e cancellazione, leva spenta.
+Controprove (codice rotto apposta, collaudo rosso): senza 'mia' in
+`_upsert_da_telegram`, senza la condizione in `_scrivi_avatar`, senza i
+sosia, senza i 30 giorni, senza le controparti, senza la guardia dei file.
+Sentinelle aggiornate: sei chiamanti di `ridimensiona`, la porta del gruppo
+admin a sette ingressi (124 punti d'avviso), ADMIN_IDS in
+`avvisa_profilo_mio`, 144 `chiediConferma`. Schermate dal vivo sul server
+di collaudo locale (modulo, attesa, «✏️ Mia» approvato, testata del
+Profilo, riga del moderatore).
+
+DA GUARDARE. Non provato su Telegram vero: la foto al moderatore nel gruppo
+admin e il tocco ✅/❌. La moderazione AI resta spenta: oggi decide solo un
+moderatore.
+
+## La home coi quadrati dei negozi sotto «Da scoprire» (23 nov 2026 sera, cantiere scoprire-quadrati; Andrea: «sotto alle card da scoprire, sotto a quella principale, dei quadratini con tutte le altre», «si vede l'anteprima del prodotto, quando ci clicchi sopra si apre il negozio», «l'idea è mostrare chi paga, dappertutto, o nelle card quadrate o nelle card grosse»)
+
+COSA. Sul telefono (sotto i 768px), sotto la card grande di «Da scoprire»,
+una fila di quadrati da 96px, fermi (si scorrono col dito, non da soli):
+uno per negozio, con la foto di un prodotto (la prima dell'annuncio attivo
+più recente, la miniatura `_min`; senza annunci il logo) e sotto SOLO la
+riga «cosa vende», su al più due righe. Il tocco è quello della card
+grande (`toccaScoperta`): apre il negozio. La riga la scriviamo noi
+(decisione di Andrea, «La scriviamo noi»): `inBreve` nel catalogo di casa
+del client, `in_breve` in `racconti.py`; finché non c'è, la categoria dove
+il negozio ha più annunci, e senza nemmeno quella il nome.
+
+GRANDI E QUADRATI SI DIVIDONO I NEGOZI (`spartisciScoprire`). Un negozio
+sta o nella fila grande o nei quadrati, mai in tutte e due: nell'ordine
+del turno (`aTurno`, che avanza di uno a ogni apertura) uno sì e uno no, il
+primo grande. Così chi oggi è quadrato alla prossima apertura è grande.
+Con un negozio solo resta grande; le card nostre (P2P, aste) restano
+grandi; sul computer i quadrati non ci sono e la fila è quella di prima.
+
+L'ORDINE DELLA HOME. «Da scoprire» in cima, senza titolo (basta la
+scritta «Consigliato»), poi «In evidenza», anche lei senza titolo (le card
+hanno l'etichetta), poi «Esplora per categorie» (scesa da sopra), poi gli
+scambi P2P e gli annunci. Le card P2P in home sono larghe 150px come
+quelle in evidenza (erano più larghe). Con le categorie più in basso le
+pillole si appiccicavano subito all'apertura (la sezione sotto lo schermo
+non interseca): ora solo a sezione passata in alto. Fra i quadrati e «In evidenza»
+30px sotto i quadrati, il respiro che prima faceva il titolo (sì di Andrea).
+LO SFONDO DIETRO: card grande e quadrati stanno sulla foto della card al
+centro, sfocata e smorzata (`.sc-sfondo`, due strati `<i>` che si passano
+la mano in 1s quando la card al centro cambia, `sfondoScoprire` chiamata
+da `centroScoprire`; blur 44px, saturazione 1, luminosità .6 col tema
+scuro, 1.15 col chiaro, lo strato al 55%), che negli ultimi 50px sfuma
+nella pagina. La strada è stata lunga: un velo scuro (no), una fascia
+arancio (no), quattro tinte neutre («sono morti 'sti colori»), poi la foto
+sfocata ma troppo viva («creano troppo casino»), infine questa: «Ottimo,
+così è perfetto». La riga scura fra card grande e quadrati era l'ombra
+della card al centro tagliata dal bordo della fila: ombra più corta e
+fila con più spazio sotto.
+
+ALMENO QUATTRO QUADRATI (`QUADRI_MIN`): sotto i quattro la fila resta
+mezza vuota (Andrea: «non mi piace che lasci vuoti»), e allora tutti i
+negozi tornano grandi. Con la divisione uno sì e uno no servono otto
+negozi di chi paga.
+
+NELLO STESSO CANTIERE, LA TESTA DELLA HOME (Andrea: «leva via quel
+banner», «un toggle con un'icona dedicata che porta al canale ufficiale
+di barattolo per le notizie», «quel toggle lì della classifica lo metti
+nel profilo»). (1) La fascia «Barattolo è in fase di test» è tolta dal
+codice (`#fasciaTest`, `renderFasciaTest`); `fasciaPrima` disegna solo
+la riga di Tor. (2) Al posto del podio in testa, un megafono
+(`.notizie-testa`, `apriNotizie`) che apre https://t.me/barattolostore.
+(3) La classifica del mercatino va nel Profilo sotto «Classifica Streak»:
+«Il Podio di Barattolo» (`mercatoClassificaPortaHTML`, stesso disegno del
+podio, solo con la leva della classifica accesa, mai in demo o vetrina;
+Andrea: «Il podio di barattolo mi piace»). (4) Il cartello giornaliero
+del rodaggio si spegne dal config del VPS (`BANNER_TEST = False`,
+DA-FARE-ANDREA 32: «spegnilo dalla lista»); a rodaggio spento
+`modaleTest` passa a `modaleNotizie`, il riquadro che invita nel canale
+delle notizie: alla prima apertura prima del tour, che parte alla sua
+chiusura (Andrea: «La prima cosa che uno vede è il riquadro»), poi al
+più ogni 3 giorni (decisione di Andrea,
+«Ogni 3 giorni»; timbro `notizie` in `VISTI_NOTI`), e mai più a chi è
+già nel canale. Lo dice `GET /api/me/canale-notizie` col `getChatMember`
+del bot (che Andrea ha fatto admin di @barattolostore), con cache di 6
+ore; se il bot non risponde, o per chi entra solo con Nostr, il riquadro
+esce una volta sola.
+
+IL SERVER. `GET /api/negozi/vetrina?codici=` (`negozi_vetrina_pubblici`):
+codici pubblici passati dalla forma, al più 16, per ognuno foto,
+categoria e `in_breve` (solo a pagina pubblicata: la bozza non esce). Mai
+un tg_id. Un guasto dà un dizionario vuoto e i quadrati restano col logo.
+
+SCARTATE. Il bordino arancio sul quadrato del negozio che è nella card
+grande: fatto e tolto (Andrea, «sotto non si deve evidenziare il
+quadrato»), e con la divisione non avrebbe più senso. Quadrati che
+scorrono da soli: Andrea li ha voluti fermi («si anima già la card
+sopra»). Il nome del negozio sotto il quadrato: tolto, resta solo «cosa
+vende» (il nome va a chi legge ad alta voce, `aria-label`).
+
+PROVATO. `prove_promozioni` 7c: il contenitore, il CSS solo telefono, i
+96px e le due righe, i quadrati girati in node (la riga da catalogo,
+server o categoria; miniatura o logo; niente quadrato senza codice
+buono), la divisione girata in node (uno sì e uno no, un negozio solo,
+il turno dopo, il computer), la funzione del server in un db finto, la
+rotta, i 150px, i due titoli tolti, lo sfondo girato in node, l'ombra
+che sta nella fila, i quattro quadrati minimi; l'ordine nuovo e le
+pillole nelle prove di sempre. `prove_barattolo_in_striscia` 7: il
+megafono, il Podio, la fascia morta, `modaleNotizie` e la sua rotta. Guardato con
+Playwright a 390px, video e foto mandati ad Andrea (anche con i due
+negozi veri di oggi, AndreAI e To The Moon).
+RESTA: dopo il deploy, `BANNER_TEST = False` sul VPS (DA-FARE-ANDREA 32).
+
+## Nascondere un annuncio solo, senza scadenza (23 nov 2026, cantiere nascondi-annuncio; la richiesta di Zzap, venditore; Andrea: «lo facciamo ora», e che vada nella promozione della notte)
+
+COSA. Sulla scheda del proprio annuncio attivo «🙈 Nascondi dalla
+vetrina»: l'annuncio esce da vetrina, ricerca, negozio, link condiviso
+(404) e piazze, senza data. Resta in Profilo → «I tuoi annunci», foto
+grigia, con «👁 Rimetti in vetrina» al posto di «Modifica» e il 🗑 di
+sempre; la riga non apre la scheda (come la revisione: la scheda è quella
+di chi compra). Prima c'erano solo i pezzi a zero (resta in vetrina
+grigio, «Esaurito») e le ferie (tutto il negozio, con una data).
+Dettagli: ARCHITETTURA, «L'ANNUNCIO NASCOSTO».
+
+LO STATO È NUOVO, 'nascosto', e non una colonna: ogni filtro che guarda
+stato='attivo' (vetrina, ricerca, negozio, compra(), offerte, preferiti,
+giri di Nostr) lo lascia fuori da solo, mentre una colonna avrebbe voluto
+una riga in decine di query, e una dimenticata è un nascosto che si
+compra. Lo stato è dell'ANNUNCIO: la regola 4 di CLAUDE.md (stati
+dell'ordine) non cambia.
+
+LE GUARDIE, solo sul nascondere. Niente ordini non conclusi (la guardia
+LARGA della modifica, resi e rimborsi compresi): `_rimborsa_compratore` e
+l'annullo del venditore rimettono stato='attivo' e riaccenderebbero il
+nascosto in vetrina e in piazza. Fermare il gesto lascia intatti tutti i
+percorsi dei soldi. Niente pezzi in pagamento (`_riservati`, come la
+ricarica). Niente aste (vincolanti, a scadenza). Niente importati (Nostr,
+negozi collegati): il loro stato vive alla fonte e il sync lo riscriverebbe.
+Le fatture 'creato' scadute si annullano come nella rimozione. Rimettere
+non ha guardie: torna 'attivo' coi suoi pezzi.
+
+LE PIAZZE fanno il gesto dell'esaurito: Nostr «sold» (NIP-99 ha due stati,
+ed è la parola già decisa per la pausa dei pezzi a zero), il canale mette
+la spunta; al ritorno «active» e la spunta via. La prima pubblicazione
+ancora da firmare nasce «sold» se l'annuncio è nascosto. Le offerte vive
+le raccoglie `scadenze_offerte` col suo «non è più disponibile: la tua
+offerta decade», che qui è vero.
+
+LEVA `NASCONDI_ANNUNCIO`, accesa di serie (regola del 14 nov), nel
+pannello delle leve. Spenta, il tasto sparisce e la rotta non nasconde
+(404), ma «Rimetti in vetrina» funziona sempre. Il client lo accende solo
+con un true del server: un server di ieri non ha la rotta.
+
+STRADE SCARTATE. Togliere l'annuncio dai relay (NIP-09) e ripubblicarlo
+al ritorno: una cancellazione si porta dietro le versioni vecchie e la
+firma del venditore per chi pubblica col suo profilo; il «sold» è la
+strada già provata. Nascondere con ordini in corso tenendo il nascosto
+nei rimborsi: tre percorsi dei soldi da toccare, di notte. Una conferma
+prima di nascondere: il gesto si disfa con un tocco.
+
+TESTI NUOVI (da rivedere con Andrea): «🙈 Nascondi dalla vetrina»,
+«👁 Rimetti in vetrina», i toast «🙈 Nascosto: lo ritrovi in «I tuoi
+annunci»» e «👁 Di nuovo in vetrina»; i rifiuti «C'è un ordine in corso
+su questo annuncio: potrai nasconderlo quando è concluso», «Qualcuno lo
+sta pagando proprio ora: riprova tra qualche minuto», «Un'asta non si
+nasconde: si chiude da sola alla scadenza», «Questo annuncio arriva da
+fuori: si nasconde dove è nato», «Funzione non attiva»; la voce in
+NOVITA.md e il paragrafo in `assistente/sapere.md`.
+
+PROVATO. `collaudo_nascondi_annuncio` (server vero, 30 verdi, venv senza
+coincurve, in `ci/collaudi.txt`): fuori da vetrina, negozio e link, dentro
+«I tuoi annunci»; Nostr «sold»/«active» e canale; idempotenza; offerta
+decaduta con l'avviso; ordine spedito, pezzo in pagamento, asta, importato
+e annuncio altrui fermano il gesto senza ganci; leva spenta (404, ma il
+ritorno va); il nascosto si elimina. Controprove (codice rotto apposta,
+collaudo rosso): senza la guardia degli ordini, senza `_riservati`, senza
+'nascosto' in «I tuoi annunci», piazza sempre «sold», leva ignorata.
+`prove_nascondi_annuncio` (18): forma della rotta e delle guardie prima
+della scrittura, leva, link condiviso che resta chiuso, e in node la riga
+e il gesto del client; controprova: riga che apre la scheda e leva accesa
+di default, rosse. Sull'albero rebasato su develop (b4c3a2d3): suite
+severa 31.331 verdi e 0 rosse (nostr-tools fuori dal repo), collaudi della
+CI nel venv senza coincurve 171 verdi e 0 rossi.
+
+DA GUARDARE. Non provato dal vivo su Telegram né sui relay veri: il
+«sold» firmato dal venditore che pubblica col suo profilo (stessa coda
+dell'esaurito). Chi vuole nascondere con un ordine aperto deve aspettare
+che si chiuda.
+
+## Le foto in ordine con la loro descrizione, e le varianti dal foglio Vendi (23 nov 2026 notte, cantiere foto-varianti; Zzap in Assistenza: spostare le foto, aggiungerne dopo, una descrizione per foto, le varianti di colore; Andrea: «Rispondigli e sistemiamo anche questo», «Fai tutti i punti mandali sul develop e mandalo in produzione stanotte»)
+
+DECISO (piano approvato da Andrea, «Ok piano si manda», poi «Fai anche
+il punto 4» e «Fai tutti i punti»). Cinque cose.
+1. Le frecce ◀ ▶ sotto ogni foto e la riga «La prima foto è la
+copertina»: col dito sul telefono sono più semplici del trascinamento.
+2. In Modifica le foto attuali restano (etichetta «Le tue foto (fino a
+5)»): si aggiungono, si spostano, si tolgono con la ✕. Il patto col
+server: la lista `foto` della modifica è l'annuncio INTERO nell'ordine
+voluto; un nome che l'annuncio ha già vuol dire «resta, qui», un data: è
+una foto nuova in quel posto, quel che manca se ne va (anche dal disco,
+dopo il database, come prima; le foto della fotografia d'ordine restano
+protette). Il client di ieri manda solo data: e per lui è la
+sostituzione in blocco di sempre. Lista vuota o assente: le foto non si
+toccano (com'era). Il timestamp dei nomi nuovi salta avanti se una foto
+che resta lo porta già.
+3. «Descrizione della foto (facoltativa)», 80 caratteri, letta a foto
+aperta (`#lbDidascalia`). Colonna `annunci.didascalie`, JSON allineato a
+`foto`; `salva_foto` ha un argomento `indici` che dice quali posizioni
+sono entrate, così una foto scartata si porta via la sua descrizione. Nel
+client le descrizioni stanno in una mappa PER FOTO e non per posizione:
+spostare o togliere non le può disallineare.
+4. Le varianti semplici («Colore: rosso, blu, verde») sono le scelte
+«Qualsiasi» del 19 nov: stessa colonna `scelte`, stessa cassa, stessa
+nota all'ordine; fin qui le scriveva solo il connettore dei negozi, ora
+anche chi vende (`scelte_del_venditore`). In modifica: chiave assente =
+restano, lista vuota = tolte.
+5. Le varianti col loro prezzo e i loro pezzi (la spunta «Prezzo o pezzi
+diversi per ogni variante», solo pubblicando) sono la FAMIGLIA dei negozi
+(set 2026): un annuncio per voce, titolo «Titolo – voce», `famiglia`
+«u:<id della prima>» (i negozi usano «c<n>:», non si mescolano),
+`opzioni` [[nome, voce]]. La prima è l'annuncio che passa da pubblica
+come sempre; le altre sono sue copie (`crea_sorelle`) con prezzo e pezzi
+propri e le foto COPIATE dai file, mai condivise (una modifica di una
+sorella toglie le sue vecchie). Così cassa, pagamento, scorte ed esauriti
+restano quelli di sempre: nessuna strada dei soldi nuova. In piazza e nei
+canali parla la famiglia (`annuncio_per_nostr` lo faceva già). Nata in
+revisione, si decide tutta insieme: `decidi_revisione` porta con sé le
+sorelle «u:» ancora com'erano alla nascita (stesso creato e modificato).
+Niente varianti su aste e abbonamenti. Tutto il testo nuovo (descrizioni
+delle foto e varianti) passa dalla moderazione con la descrizione
+(`testo_da_moderare`).
+
+SCARTATE. Il trascinamento delle foto (più difficile col dito). Prezzo e
+pezzi DENTRO un annuncio solo, per voce: avrebbe toccato cassa, scorte e
+pagamenti, cioè le strade dei soldi, che si provano prima sul collaudo
+(decisione del 17 nov); la famiglia esiste già ed è provata. Le
+descrizioni nel duplicato: le foto ereditate restano il riquadro di
+sempre e partono senza descrizione (imperfezione dichiarata). Una
+famiglia che si rifà dalla modifica: ogni variante si ritocca da sola.
+
+PROVATO. `collaudo_foto_varianti.py` (49, gabbia verde): descrizioni
+allineate anche con una foto scartata, 80 caratteri, la spia vietata in
+pubblica e in modifica; modifica che riordina, aggiunge in mezzo, toglie
+(file compresi), doppioni e più di cinque in 400, il client di ieri; le
+scelte nella colonna, la cassa che le esige; la famiglia di tre (titoli,
+prezzi, pezzi, opzioni, foto non condivise, la card «da»), la variante
+ritoccata che non tocca le sorelle, i 400 delle voci; la famiglia in
+revisione decisa insieme. `prove_foto_varianti` (20): i giudici puri e i
+gesti del foglio girati in node. Controprove: tolti l'allineamento, il
+posto delle foto che restano, lo scambio della freccia e la decisione
+della famiglia, le prove vanno rosse. Ritoccate le sentinelle di
+`prove_foto_scarti` e del duplicato (la modifica conta le foto NUOVE).
+Guardato con Playwright a 390px: le schede delle foto, la tabella dei
+prezzi, la modifica, la descrizione a schermo intero.
+RESTA: guardarlo dal telefono dopo la promozione; dire a Zzap che è
+online (col sì di Andrea per il testo).
+
+## La pagina di Piano B Panama, pronta prima del negozio (23 nov 2026, notte)
+
+COSA. Entra in `racconti.py` la pagina «Piano B Panama» (la residenza a
+Panama di Piano B Group, pacchetti pagati in sats col deposito di
+garanzia), IN BOZZA e SENZA negozio: Piano B il suo account non l'ha
+ancora aperto, e Andrea la voleva in produzione spenta, da accendere il
+giorno dopo all'ok di Angelo senza un altro deploy. Due pezzi nuovi,
+tutti e due adattabili a qualsiasi pagina:
+1. `collega_dal_pannello`: la voce nasce col `negozio` vuoto, e nel
+   cassetto «Negozi consigliati» del pannello compare «🔗 Collega il
+   negozio» (solo in bozza). Il moderatore incolla il link del negozio
+   (o il codice, o il nome a scelta); il server lo risolve, scrive il
+   codice in `racconto_negozio:<slug>` e lo rimette nella voce in
+   memoria (`applica_negozi_collegati`, anche all'avvio). Così i giudici
+   di sempre (`_e_suo`, `_venditore_racconto`) leggono un posto solo.
+   Pubblicata non si ricollega: prima si rimette in bozza (una pagina
+   pubblicata non deve poter saltare sulla vetrina di un altro).
+2. `quadro`: il numero di una foto della storia che fa da foto al
+   QUADRATO del negozio in home, al posto della prima foto dell'ultimo
+   annuncio (le foto dei pacchetti hanno le scritte, a 96px illeggibili).
+   Esce da `sponsorizzati_pubblici`, il client lo costruisce solo da un
+   numero 1-9 (`/assets/racconti/<slug>-N.webp`, rotta e forma di sempre).
+
+LE DECISIONI DI ANDREA. Testi approvati (bozza in
+/mnt/project-files/piano-b/); niente frasi su tasse o patrimonio. Foto
+da Flow: copertina Casco Viejo (lo skyline ripeteva il banner: «la
+seconda foto assomiglia troppo alla prima»), «Cos'è» in elenco e non più
+riquadri («strutturato troppo uguale»), titoletto «COSA FANNO PER TE» e
+riga del quadrato «La residenza a Panama» approvati. Il quadrato: il
+balcone scartato («più di impatto»), poi lo skyline e una bandiera;
+scelta la baia dall'alto al tramonto, coi nuvoloni («La 1»).
+
+SCARTATE. Copiare pianobmaps.com dentro Barattolo (è loro, lo aggiornano
+loro, e parla di contante e tasse): basta un collegamento. Mettere il
+codice del negozio nel catalogo domani: un deploy in più per un dato
+che il moderatore ha già in mano.
+
+PROVATO. `collaudo_racconti_bozza`: il giro della pagina collegabile
+(senza negozio, 409 a pubblicare, 403/400/404 al collega, il link intero
+con ? e # la lega, sopravvive al riavvio, si pubblica, pubblicata non si
+ricollega, il negozio la mostra, lo spazio acceso porta `quadro`).
+`prove_promozioni`: il quadrato girato in node (la foto della pagina
+vince, solo da un numero 1-9). Guardato con Playwright a 390px.
+
+RESTA. Domani, a negozio aperto da Piano B: «🔗 Collega il negozio»,
+«✅ Pubblica la pagina», `/sponsor piano-b-panama 60`. Il link verso
+pianobmaps.com (oggi le foto aprono solo YouTube). La consegna
+«servizio» adattata alla pratica (appuntamento, offerta, quantità).
+
+## Le altre valute negli avvisi P2P, a scelta multipla (24 nov 2026, avvisi-p2p-valute)
+
+LA RICHIESTA. Andrea, con la foto del foglio «🔔 Avvisami dei nuovi ordini
+P2P»: «Sarebbe utile poter selezionare in VALUTA oltre a euro anche
+eventualmente qualche shitcoin». La sezione Valuta aveva quattro chip a
+scelta unica (Tutte, Solo euro, Solo franchi, Solo USDT), mentre il libro
+dal 16 nov ha anche ETH, Monero e USDe come valute (cantiere
+p2p-monete-valute, leva `P2P_COIN_ATTIVO` accesa di serie).
+
+COSA SI È FATTO. Le chip diventano Tutte, Euro, Franchi, USDT, Ethereum,
+Monero, USDe, e si accendono e si spengono una per una come i metodi
+(«Tutte» = lista vuota; i nomi non dicono più «Solo»). Ogni chip a chi
+quella valuta la vede (`valutaAvvisiVistaP2P`: USDT, franchi, monete coi
+loro cancelli); la sezione c'è se se ne vede almeno una oltre all'euro.
+Server: `VALUTE_AVVISI_NUOVI_P2P` coi sei codici, la colonna resta
+`avvisi_nuovi_valuta` con la lista fra stanghette («|EUR|XMR|»); la riga
+di ieri (un codice solo) si rilegge come lista di uno
+(`_valute_avvisi_p2p`). La rotta accetta `valute` (lista) e, dal telefono
+di ieri, `valuta` (codice solo). Le preferenze tornano con `valute`.
+
+LA VALUTA DI UN ORDINE IN MONETA. Sul filo di Mostro un ordine in ETH è
+EUR (il nodo non conosce le monete): la moneta la dicono i metodi con la
+cifra. `_valuta_avviso_p2p` la ricava col giudice del libro
+(`_coin_ordine_libro`), quindi «Euro» non lascia più passare un ordine in
+Monero. Sul Lightning un ordine in moneta ora arriva solo a chi le monete
+le vede (`p2p_coin_ammesso`, come già l'on-chain), e la riga del
+messaggio dice la cifra nella moneta («0,25 XMR») coi metodi senza cifra,
+come l'on-chain. Chi perde una valuta (beta che si stringe, leva spenta)
+la perde dalla lista; se non ne resta nessuna valgono tutte.
+
+SCARTATE. Una chip «Altcoin» cumulativa: Andrea chiede di poter scegliere
+«qualche» moneta, e la lista c'è già nel libro. Tenere la scelta unica
+con le monete in più: «euro e Monero» non si sarebbe potuto dire.
+
+PROVATO. `prove_avvisi_nuovi_ordini`: rilettura della lista e della riga
+di ieri, il giudice della valuta (filo, moneta, misto = euro), il passa
+a scelta multipla (Lightning e on-chain), il foglio in node (chip delle
+monete solo a chi le vede, accese le salvate, gesti che accendono,
+spengono, tornano a «Tutte», ignorano lo sconosciuto), e la coda vera su
+sqlite: l'ordine in Monero a chi ha «Euro + Monero» con «0,25 XMR», non a
+chi ha solo «Euro» né a chi non vede le monete. Suite intera severa.
+
+RESTA. Guardarlo dal telefono dopo la promozione.
+
+## Tappo e le recensioni nascoste: l'esame sulle novità del 24 nov (24 nov 2026, cantiere sapere-recensioni-nascoste; Andrea: «Sì, a tappo fallo verificare.»)
+
+COSA. Dopo la promozione del 24 nov (main 85cb23a4) Tappo ha avuto 15
+domande da utente sulle novità uscite, girate su una copia usa-e-getta
+della sua catena in n8n (stesso libro, stesso modello, nessun utente vero).
+14 giuste; sbagliata quella sulle recensioni nascoste: Tappo inventava
+(«nel Profilo compaiono solo le vendite concluse»), dava la strada
+«Livello e inviti» e non sapeva se le negative si nascondono. In
+`assistente/sapere.md`: il paragrafo nuovo «Nascondere le recensioni dal
+profilo pubblico» (i due interruttori, cosa sparisce, cosa resta sempre:
+stelle e numero, le negative da 1 e 2 stelle, non completati e dispute
+perse; le nascoste le vede solo il proprietario), «Livello e inviti» →
+«Livello e recensioni» (il gruppo vero del Profilo) e la strada
+dell'Assistenza nelle promozioni a pagamento (Profilo → «Aiuto» →
+«💬 Assistenza», non «Impostazioni»). Conoscenza rifatta.
+
+PERCHÉ COSÌ. I fatti vengono dal codice di develop
+(`recensioniVisibiliHTML`, `_sql_recensioni_visibili`,
+`VOTO_SEMPRE_VISIBILE = 2`) e dal commit e9c290e0, non dal post: il post
+del canale non dice ancora che le negative restano.
+
+PROVATO. `PROVE_SEVERE=1 python prove.py --dai-file=origin/develop`:
+240 passate, 0 fallite (conoscenza di Tappo e assistente del bot
+comprese). Tappo legge da main: la correzione arriva con la prossima
+promozione, e allora la domanda sulle recensioni va rifatta.
+
+## Chiedere a chi vende a cifra fissa: «Non hai sats?» quando nel libro c'è solo un ordine più grande (24 nov 2026, cantiere chiedi-al-venditore; Andrea: «il barattolo dovrebbe chiedere prima ad un venditore, poi se il venditore gli dice di no, passa ad un altro e così via»)
+
+IL PERCHÉ. Andrea: «se tipo io compro qualcosa da 50 euro ma tizio vende
+200 euro di bitcoin, non c'è match». Su Mostro un ordine a cifra fissa
+non si spezza: o si prende intero o niente. Un intervallo («da 50 a 200 €»)
+invece sì, e il resto torna nel libro. Quindi, quando per l'ordine di
+Mario non c'è un match ma ci sono venditori a cifra fissa più grande,
+Barattolo CHIEDE a loro, uno alla volta, se trasformano l'ordine in un
+intervallo.
+
+COME VA. Il telefono di Mario manda al server la fila (`viaEuroFissi`, pura:
+venditori di sats in euro, a mercato, coi metodi decisi, a cifra fissa
+PIÙ GRANDE di quel che serve, non miei; dal più conveniente, a parità il
+più recente). Il server non crede alla fila: chiede solo a un ordine che
+SA (`p2p_ordini`) in vendita, nel libro, pubblicato da un nostro iscritto
+che non è Mario, a cifra fissa più grande (`_euro_fisso_libro` sulla cifra
+del libro), senza un «No» nell'ultima ora, col venditore libero da altre
+domande (`_chiedibile_via_euro`). Il timbro prima dell'avviso
+(`_avanza_via_euro`). A Tizio arriva il bot col tasto sulla pagina del suo
+ordine; lì il riquadro con «Sì, va bene» / «No». Il «Sì» lo fa il SUO
+telefono (la chiave dell'ordine è sua, il server non firma niente):
+ritira il fisso e lo rifà uguale «da 50 a 200 €» (`allargaOrdineP2P`, con
+`pubblicaDaSoloP2P` che ora accetta i campi da cambiare). Prima il ritiro:
+due ordini insieme venderebbero due volte. Poi Mario: il foglio, se è
+aperto, guarda il libro ogni 20 secondi e appena c'è il match torna al
+foglio del prezzo col «Continua» di sempre; se l'ha chiuso, il bot lo
+avvisa col tasto all'annuncio. Le domande senza risposta passano al
+prossimo nel battito pieno dell'orologio P2P (`_giro_via_euro`).
+
+LE SCELTE DI ANDREA (24 nov): 10 minuti per venditore («dai almeno 10
+minuti»), NESSUN limite di venditori («tanto a Mario gli arriva la
+notifica»), Mario non vede la fila («il procedimento per Mario è quello
+più semplice»). Mie, dette nel piano e non contestate: un «No» mette
+QUELL'ordine in pausa un'ora; un venditore ha una domanda sola per volta;
+una ricerca viva per persona (la nuova sostituisce la vecchia). La fila
+è quella del momento in cui Mario tocca «Continua» (al più 50).
+
+STRADE SCARTATE. Prendere l'ordine fisso intero e rimandare il resto a
+Mario: i sats in più non sono suoi da tenere, e il deposito ha un tetto.
+Che il server rifaccia l'ordine di Tizio: dovrebbe avere la sua chiave
+(regola ferrea 2). Chiedere a tutti insieme: più rumore per i venditori,
+e chi accetta per secondo resterebbe con l'ordine cambiato per niente.
+
+LE SCRITTE (sei, mostrate nel thread con l'esempio dei 50 € su 200)
+approvate da Andrea il 24 nov alle 14:00: «Sì, anche per le scritte va
+bene». E il premio: l'ordine allargato è la copia di quello di Tizio, col
+suo premio («se un venditore vende 200 € al 10% di premio, anche i
+relativi 50 saranno impostati al 10% in più, giusto?» — sì).
+
+PROVATO. `prove_chiedi_al_venditore`, 19 spunte: la cifra fissa del libro,
+la fila pulita, la fila del server su un banco (saltati l'ordine di Mario,
+l'intervallo, il preso, chi compra, chi vende meno; un venditore occupato;
+la pausa di un'ora e la sua fine; fila finita), le rotte, il battito, il
+tasto, il foglio che aspetta, il riquadro e l'ordine allargato, la fila
+in node. Le tre sentinelle che contavano i try dell'orologio P2P (ora
+nove) e la firma di `pubblicaDaSoloP2P` (ora con `cambia`) aggiornate.
+NON provato dal vivo: va con la prova coi moderatori della voce
+31 di DA-FARE (il tasto è chiuso a loro come tutto «Non hai sats?»).
+
+## La home ripulita: niente «Consigliato» né card Aste, card P2P corte con l'interruttore, «In evidenza» sulle due onde (24 nov 2026, cantiere home-card-pulite)
+Andrea, con tre scatti della home in produzione (promozione del 24 nov): «La pastiglia consigliato nelle card leviamola perché tanto si capisce già che è consigliato, leviamo anche la card aste in arrivo […], le card P2P sono troppo lunghe […] rendile lunghe al massimo come le card del mercatino […] leva le scritte e lascia solo il simbolo timer e il lucchetto uno affianco all'altro […] affianco alla scritta scambi P2P metti un tasto tipo toggle […] i titoli esplora categorie e scambi P2P hanno più senso se le centri senza mettere quei puntini o no?». Piano approvato alle 10:53 Rome. Poi, con lo scatto della fila «In evidenza»: «mi danno fastidio così con la pastiglia sopra in ogni card e anche il contorno arancio […] non si potrebbe proprio mettere lo sfondo di quelle card di un altro colore […]? La barra colorata di sfondo inviterebbe a scorrere verso destra».
+
+DECISO.
+1) La pastiglia «Consigliato» (`.sc-sponsor`) non si disegna più sulle card di «Da scoprire», né su quelle degli spazi in vetrina né su quelle dei negozi che pagano la promozione; via anche la sua regola CSS. ROVESCIA la regola di agosto («la pastiglia non si toglie: è pubblicità, si dice sulla card E sulla pagina»): la parola resta sulla pagina del negozio o del progetto (`.rac-pill`).
+2) La card quadrata «Aste» esce da `SCOPRIRE` (era lì dal 16 nov, cantiere nav-nostr). Resta la tessera «Aste» in «Esplora per categorie». La forma `quadra` del template resta senza voci; «Da scoprire» torna a sparire quando non ha card vive, come prima del 16 nov.
+3) La card della fila «Scambi P2P» passa da 304 a 240 px: foto 150×139,5 (aspect-ratio sul solo `.card-p2p .ph`), i metodi su una riga coi puntini (per intero nell'etichetta ad alta voce, come prima), e la riga `.p2p-vt-regole` sparisce: ⏱ e 🔐 sono SOLE ICONE (`.p2p-vt-icona`) in `.p2p-vt-simboli`, accanto alla moneta della rete, in fondo a destra sulla riga del premio. I giudici di `bolliniVetrinaP2P` sono gli stessi; le parole stanno nell'aria-label e nel title, coi testi che c'erano già («Tempo per pagare» coi minuti, «Chi prende blocca una cauzione in Lightning»). Le card del LIBRO tengono i bollini con le scritte. Misurata con Playwright: 239,8 px a 320, 360 e 390 (la card del mercatino è 240, 260 e 275).
+4) L'interruttore accanto al titolo «Scambi P2P» (`#p2pVetrinaLeva`, riscritto intero da `filaCardP2P(html, spenta)`): è la stessa scelta di «Scambi P2P nella home» nel Profilo (timbri `p2p_home_via`/`p2p_home_su`, ogni dispositivo). Spenta, la sezione RESTA col titolo e l'interruttore spento e sparisce solo il guscio delle card (`#p2pVetrinaGuscio`); la riga «Scambi P2P nascosti · Mostra» (`#p2pVetrinaVia`) è tolta. Nessun testo nuovo: l'etichetta ad alta voce è quella che c'era, «Scambi P2P nella home». La firma della fila porta lo stato, o spegnerla con la fila già vuota non arriverebbe a schermo. Lo stile è quello dell'interruttore del pannello delle leve, in piccolo (`.leva-interruttore.piccola`, 40×24).
+5) «Esplora per categorie» e «Scambi P2P» al centro, senza puntini (`.section-label.centrato`). La testa della fila P2P è una griglia a tre colonne (vuota, titolo con interruttore, «Vedi tutti →»): a 320 px la colonna di destra si allarga per «Vedi tutti» e il titolo scivola di qualche pixel.
+6) «In evidenza»: fra tre opzioni (fascia; fascia + titolo; stellina sulla card) scelta la 2, poi una ventina di prove per lo sfondo. Il titolo «In evidenza» sta al centro (testo che c'era già, sull'aria-label della fila); dentro la fila le card sono quelle della griglia SENZA etichetta e SENZA cornice (CSS su `#evidenzaSez`), con un'ombra più profonda che le solleva come le card grandi di sopra («le card fammele in stile 3D»). Nella griglia di sotto un annuncio in evidenza resta come prima. Rovescia il «senza titolo» del 23 nov. Lo sfondo SCELTO: DUE ONDE GRANDI sotto le card, l'arancio Bitcoin davanti (alta metà fascia) e una dorata trasparente dietro (due terzi), disegnate in SVG dentro il CSS, ripetute ogni 360px, sul fondo della pagina (nessun blocco di colore: niente scalino con la sezione sopra, uguali nei due temi). SCORRONO CON LE CARD, più lente: `ondeEvidenza` (un ascoltatore passivo sulla fila, armato una volta da `renderEvidenza`, al più una scrittura per fotogramma) scrive `--onda-x` (l'arancio lo segue a metà, la dorata a tre decimi, nel verso delle card) e `--onda-h` (8% per il seno dello scorrimento: l'arancio sale mentre la dorata scende, «cambiano forma»). Con gli effetti ridotti le variabili si tolgono e le onde stanno ferme. Andrea ha provato anche le due onde che salgono insieme e ha tenuto quelle opposte.
+7) «Offerte a tempo» e «Sconti dei negozi» escono da «Da scoprire» e diventano due BANNER sopra le card del mercatino (Andrea, 13:04-13:06: «quei 2 tasti lì fungono da filtro […] mettimeli come 2 banner stretti dove ci sono prima che iniziano le card del mercatino. Ovviamente con i suoi disegni»; poi «una sopra l'altro», la prima versione). Le due voci passano da `SCOPRIRE` a `OCCASIONI`, disegnate da `renderOccasioni` in `#occasioniBanner` subito prima di `#grid` (chiamata in testa a `renderScoprire`, così ogni strada che ridisegna la fila ridisegna anche loro); stessi file, testi, giudici di vita, anello e tocco (`toccaScoperta`, che scorre fino al riquadro dei banner invece che fino a «Da scoprire»). Uno sopra l'altro a 328/80 sul telefono, accanto da 768 px (a tutta larghezza sul computer sarebbero alti 300 px). Spenti col barattolo aperto (come le card-interruttore di prima) e nella sezione lavoro. L'immagine esce di 3 px per lato: a 328/80 (rapporto 4,1, oltre il 3,58 della sveglia) l'onda della sveglia scoprirebbe ~0,3 px negli angoli. Nessun testo nuovo. Non toccato `QUADRI_MIN` (lo cambia il cantiere delle promozioni).
+
+SCARTATI. Per i banner: le pillole strette senza disegno («non mi piacciono come le hai fatte tu»), affiancati a 272/130 (la scritta copre il disegno), più bassi col disegno rimpicciolito e intero (Andrea: «mi piaceva di più la prima versione»). Una classe nuova sul titolo dei metodi: le prove della zona del contanti leggono `<div class="title">`, e la regola CSS su `.card-p2p .info .title` fa lo stesso senza toccarle. L'interruttore come bottone fisso nel markup con lo stato cambiato da classList/setAttribute: i banchi in node hanno elementi finti senza quei metodi; riscritto come innerHTML, lo stato sta tutto nel markup. La sola fascia senza titolo (opzione 1): sono annunci pagati, e senza nessuna scritta non si capisce.
+
+PROVATO. `prove_scoprire` (la fila senza «aste» in ogni giro, la sezione che torna a sparire, nessuna card quadrata nemmeno ad aste accese, la card sponsor senza pastiglia), `prove_sponsor` (la parola sulla pagina, nessuna pastiglia nel renderer né nel CSS), `prove_card_p2p_vetrina` (l'interruttore accanto al titolo, l'aria-label di prima, spenta/riaccesa/altro dispositivo con la sezione che resta e il guscio che sparisce), `prove_tempo_pagare_p2p` (le icone senza «30 min» e «Cauzione», le parole nell'etichetta), `prove_strisce_web` (il guscio con l'id), `prove_promozioni` (il titolo di «In evidenza», le due onde nel CSS e l'ombra delle card, la cornice che resta nella griglia; un banco node su `ondeEvidenza`: armata una volta, passiva, una scrittura per fotogramma, -140px e 6,73% dopo 140px, ferme con gli effetti ridotti — controprova: verso invertito, onde in fase e effetti ridotti ignorati fanno tre rossi). Per i banner: `prove_scoprire` (il catalogo delle fasce e dei file legge anche `OCCASIONI`, lo scroll del tocco va a `#occasioniBanner`), il banco di `prove_scoprire_p2p` con `OCCASIONI` e `renderOccasioni` veri (nella fila solo il P2P, le occasioni nei banner con l'aria-pressed, banner spenti col barattolo; le attese leggono quel che si vede), `prove_strisce_web`; il censimento di `requestAnimationFrame` in `prove_effetti_ridotti` conta `ondeEvidenza`. Scatti con Playwright sulla pagina vera in collaudo locale, prima e dopo, a 320 (chiaro), 360 e 390 (scuro), l'interruttore acceso e spento, la vista del computer a 1100 px; in /mnt/project-files/home-card-pulite/.
+
+DA GUARDARE. Sul telefono di Andrea, dopo la promozione: la fila P2P con un ordine Barattozon (metodi coi puntini) e uno on-chain con la cauzione (da moderatore), l'interruttore spento e riacceso, la fila «In evidenza» di giorno e di notte, e le onde che scorrono col dito (nei video del browser di prova si vedono a scatti, lì no). I due banner sopra la griglia con offerte e sconti veri: il tocco che filtra e scorre fino a loro, e il ritocco.
+
+## L'anteprima di «In cima» diventa la vetrina (24 nov 2026, cantiere in-cima-anteprima; Andrea, dopo la promozione: «quell'animazione lì non rispecchia quello che succede. Dovresti far vedere un'animazione della vetrina com'è adesso, dove ci sono tutti gli annunci, e che porti una card sopra tutte le altre»)
+
+COSA. Nel foglio «Promuovi» il disegnino della prima voce, «In cima»,
+era una lista a righe (la tua riga risaliva) con l'aeroplanino del
+canale: non somigliava alla vetrina. Ora è la vetrina in piccolo: card
+a due colonne come quelle vere (la foto, il cartellino bianco del
+prezzo, le due righe del titolo), la seconda fila tagliata dal bordo
+perché la vetrina continua. La tua card, bordo arancio e foto arancio,
+parte dalla seconda fila a destra, si solleva (più grande, con
+l'ombra) e passa SOPRA le altre fino al primo posto; le altre scalano
+di uno, nell'ordine di «Più recenti». Il riquadro di questa voce è alto
+196px (`.promo-ante.pa-alta`, la classe la mette `vocePromoHTML` alla
+sola voce «In cima»: `:has()` in questo file non entra), le altre due
+voci restano a 124.
+DECISIONI. Niente aeroplanino (Andrea: «Stop», solo la card che sale).
+Le regole di sempre: nessuna parola nel disegno, lo stato fermo è
+l'arrivo (con gli effetti ridotti resta la tua card prima).
+PROVATO. `prove_promozioni`: quattro card e la tua, niente righe né
+aeroplanino, il percorso della tua sopra le altre, lo stato d'arrivo.
+Guardato con Playwright nel foglio vero, video mandato ad Andrea.
+
+## I quadratini da due negozi, con le foto scelte da Andrea (24 nov 2026, cantiere quadrati-da-due; Andrea: «iniziamo a metterne 2, adesso ce ne sono 2, mano a mano che aggiungiamo ce ne saranno altri», scelta «2 grandi e 2 quadratini»)
+
+COSA. In produzione i negozi in «Da scoprire» sono due (AndreAI e To
+The Moon) e la regola del 23 nov (la divisione uno grande e uno
+quadrato, e la fila dei quadrati solo da 4 in su) lasciava la home
+senza quadratini fino a 8 negozi. Ora sotto gli 8 ogni negozio sta in
+TUTTE E DUE le file, la grande e i quadrati, da 2 negozi in su
+(`QUADRI_POCHI`); da 8 torna la divisione. Con un negozio solo niente
+quadrati. Le foto le ha scelte Andrea: AndreAI il ritratto della card
+«Consigliati» (`quadro: "logo"`, nuova forma accanto al numero 1-9,
+che il server fa uscire solo per una pagina col `logo` vero), To The
+Moon la foto 2 della storia, la scatola col libro (`quadro: 2` nel
+catalogo di casa: vociSponsor lo legge dal catalogo prima che dal
+server, che per le pagine di casa manda solo lo slug). La riga di
+AndreAI diventa «Bitcoin e grafici» (Andrea: «troppo lungo, sta in una
+linea»). I quadratini partono tutti dall'alto (`align-items:flex-start`):
+un bottone allungato dalla fila centrava il contenuto, e quello con la
+scritta su una riga scendeva (Andrea: «come mai sono sfalsati?»).
+SCARTATE. Riempire i quadratini con altri negozi attivi del mercatino
+(scelta sulla prima card, poi superata da Andrea: «mano a mano che
+aggiungiamo ce ne saranno altri»).
+DA SAPERE. La foto 2 di To The Moon porta la scritta «Limited Edition»
+sulla scatola; quella dell'annuncio senza scritta sta solo sul server.
+Se Andrea la manda, va in `assets/racconti/` e si cambia il numero.
+PROVATO. `prove_promozioni` 7c: la divisione in node anche con 2 e con
+1 negozio, la foto 'logo' in node, le scelte di Andrea, l'allineamento.
+Guardato con Playwright coi due negozi veri, schermate ad Andrea.
+
+## «In evidenza» regalata dal moderatore: `/promossi evidenza` (24 nov 2026, cantiere evidenza-gratis; Andrea: «dobbiamo mettere anche delle card in evidenza, in maniera gratuita… decidiamo noi chi mettere»)
+
+COSA. Una quarta forma di `/promossi`, solo admin, nel gruppo e in privato: `/promossi evidenza 288 7` mette l'annuncio 288 nella fila «In evidenza» per 7 giorni senza pagare (senza giorni sono 7, da 1 a 90). L'id si può scrivere nudo o incollare il link che Andrea ha in mano (`https://barattolo.store/annuncio/288-seedsigner-...`): lo legge `_id_annuncio`. L'aiuto di `/promossi` la elenca.
+
+DECISIONI. È LA STESSA EVIDENZA DI QUELLA PAGATA, senza la fattura: la data si somma a quella che c'è (`max(adesso, evidenza_fino) + giorni`), il primo giorno l'annuncio è anche in cima (`creato` a adesso), ed esce di nuovo nel canale Vetrina (`promo_in_cima_canale`) — due strade diverse per la stessa etichetta avrebbero voluto due spiegazioni. Occupa UNO DEGLI OTTO POSTI come le altre: a fila piena non scavalca chi ha pagato, e la risposta dice quando se ne libera uno (`posti_evidenza`). Solo annunci attivi. Si toglie col gesto di sempre, `/promossi annuncio ID`. Nessun pagamento nel libro mastro: niente da rimborsare.
+
+STRADE SCARTATE. Una leva nel config: le scelte sono per annuncio e cambiano, e un deploy per ognuna è troppo. Un comando nuovo `/evidenza` (proposto ad Andrea): stava già tutto in `/promossi`, che elenca chi è in evidenza e toglie; una forma in più non tocca i due smistatori del bot.
+
+PROVATO. `collaudo_promozioni` (il server vero coi sats di cartone): dal link, 7 giorni e oggi in cima senza nessuna riga in `pagamenti`; il post nel canale e l'avviso ai moderatori; la busta lo porta in `in_evidenza`; ridato, i giorni si sommano; senza giorni sono 7; a fila piena (2 posti) non entra e lo dice; giorni 0 e 91, chi non è admin e un annuncio venduto non cambiano niente. Controprova: senza il post e senza la guardia della fila, tre rossi. `prove_promozioni`: `_id_annuncio` sui tre link di Andrea, l'ordine guardia → data → canale.
+
+DA GUARDARE. Dopo la promozione, i due annunci scelti da Andrea (288 SeedSigner e 169 Arachidata: «metti solo i primi due») col comando dal bot.
+
+## La pagina di BitcoinLabs, e la foto che apre un bot di Telegram (24 nov 2026, cantiere bitcoinlabs; Andrea: «dobbiamo fare la stessa cosa con quest'altro collaboratore», poi «I testi sì, vanno bene. Preparami la pagina»)
+
+COSA. Entra in `racconti.py` la pagina «BitcoinLabs», il progetto di
+Carmrain (bitcoinlabs.space, gruppo t.me/bitcoinprincipianti) per
+imparare Bitcoin, sicurezza e privacy. Lo schema e' quello di Piano B
+Panama (vedi sopra, «La pagina di Piano B Panama, pronta prima del
+negozio»): in bozza, `negozio` vuoto, `collega_dal_pannello`, `quadro: 1`
+(Carmrain con la maschera), logo arancio nei Consigliati, banner in «Da
+scoprire». Quando Carmrain ha aperto il negozio col suo account: «🔗
+Collega il negozio» → «✅ Pubblica la pagina» → `/sponsor bitcoinlabs 60`.
+Nessun deploy serve.
+
+L'ACCORDO (chat Telegram del 23 nov, incollata da Andrea): Barattolo
+mette BitcoinLabs in home; Carmrain scrive un post su Barattolo nel suo
+gruppo (programmato venerdi' 27 nov alle 11:21, col link della pagina);
+il referral passa dal suo bot @ilragiondomobot, che paga il 10% di quel
+che versano gli utenti portati, a inizio mese, su un Lightning address.
+Deciso: zap@barattolo.store, il salvadanaio solo-ricevere che c'e' gia'
+(i sats del referral si mescolano agli zap: detto ad Andrea).
+
+I TESTI sono quelli che ha mandato Carmrain («Cos'e'», «Da chi e' nato il
+progetto», «Di cosa NON si occupa», l'avviso sui truffatori), approvati
+da Andrea il 24 nov. Nuovi e approvati: il riquadro «Perche' comprare i
+corsi su Barattolo» (come Piano B), la scritta della foto «Entra in
+BitcoinLabs». «I tuoi sats sono al sicuro» e non «restano al sicuro»: la
+seconda e' gia' una frase del client, e la prova «il testo non viaggia
+nel client» la prende per una fuga. Sulla card niente «Col deposito di
+garanzia» (Andrea: ce l'ha tutto), al suo posto «🎙️ Podcast e contenuti
+liberi», dalle parole di Carmrain.
+
+LA FOTO CHE APRE UN BOT. Il bottone verso il bot di Carmrain e' la foto 3
+col suo `link`, che fino a ieri apriva solo YouTube. `linkVideoRacconto`
+accetta anche `https://t.me/<nome>` con al piu' `?start=<parametro>`, e
+dentro Telegram `apriVideoRacconto` lo apre con `openTelegramLink`. Il
+nome della funzione resta quello del video: rinominarla voleva dire
+toccare tre banchi delle prove per niente. Oggi il link e' il bot nudo:
+il `?start=` del referral lo genera Andrea nel bot e si incolla quando
+c'e'.
+
+STRADE SCARTATE. Un tipo di blocco «bottone» nuovo: piu' codice, e la
+foto col link c'era gia'. Accettare qualsiasi t.me (gruppi `+invito`,
+messaggi `/c/...`): non serviva, e il giudice stretto e' la difesa.
+
+PROVATO. `prove_racconti_bozza` (286 spunte) con i casi nuovi del
+giudice in node: i due t.me giusti passano, http, `+invito`, nome corto,
+spazio, virgolette, `/../`, dominio finto e `&` no; CONTROPROVA: col
+giudice allargato a `https?` la prova diventa rossa. `collaudo_racconti_
+bozza` (222, nel venv senza coincurve): la pagina si collega, si pubblica
+e il quadrato porta la foto 1. Anteprime dal telefono sul server vero in
+/mnt/project-files/bitcoinlabs/anteprima/.
+
+DA GUARDARE. La card in «Da scoprire»: Andrea non ha ancora scelto fra la
+1 (maschera) e la 2 (comunita'); dentro c'e' la 1. Il link referral. I
+CORSI: Carmrain li vende con un suo bot, che i coupon non li fa ancora
+(«posso implementarlo in questi giorni»); su Barattolo il codice
+digitale oggi lo scrive chi vende dopo ogni vendita, e la scorta di
+codici caricata prima e' proposta ad Andrea come pezzo a parte.
+
+## La scorta di codici: chi vende incolla i codici prima, e il server consegna da solo (24 nov 2026, cantiere scorta-codici; Andrea: «c'è modo di precaricare una serie di codici coupon (che potrebbe essere a questo punto un link cliccabile) che il cliente usa quindi in autonomia?»)
+
+PERCHÉ. I corsi di BitcoinLabs si vendono con un bot di Carmrain che
+darà un coupon per corso. Col digitale di prima, a ogni vendita chi
+vende doveva entrare nell'ordine e incollare il codice a mano: per un
+negozio di corsi venduti a qualsiasi ora vuol dire compratori che
+aspettano ore. Ora chi vende incolla i codici PRIMA, dal foglio «🔑
+Codici pronti» del suo annuncio a codice online, e all'incasso il
+server ne prende uno per pezzo e consegna da solo.
+
+COME. Tabella `codici_scorta` (cifrati come ogni digitale, impronta HMAC
+per scartare i doppioni anche contro i già consegnati), le rotte GET/POST
+`/api/listings/{id}/codici` che dicono QUANTI e mai quali, il gancio in
+fondo a `_incassa_ordine` (`_scorta_dopo_incasso`), riquadri dai due
+pezzi in su come la consegna a mano. Il dettaglio in ARCHITETTURA, «LA
+SCORTA DI CODICI».
+
+LE SCELTE. (1) I pezzi dell'annuncio DIVENTANO i codici pronti: il
+client, dopo aver aggiunto, chiama la `/quantita` di sempre col numero
+del server, e per togliere mette prima i pezzi a zero e poi cancella i
+codici. Così un annuncio non vende mai più pezzi dei codici, e chi
+toglie non lascia un pagamento in volo senza codice. (2) FAIL-OPEN come
+l'abbonamento: se i codici non bastano o qualcosa si rompe, l'ordine
+resta 'locked', chi vende riceve «I codici pronti sono finiti» e
+consegna a mano come sempre. (3) Un codice uscito resta dell'ordine per
+sempre, anche col rimborso: chi l'ha visto potrebbe averlo usato. (4) Il
+link a un bot si tocca, ma solo dalla scorta e solo la forma
+`t.me/<nome>bot(?start=..)`: scelta di Andrea sulla scheda («Sì, solo
+link a bot Telegram»), perché il corso si apre con un tocco e i link a
+siti esterni, dove stanno le trappole, restano da copiare.
+
+STRADE SCARTATE. Riscrivere `ricarica_quantita` in pezzi riusabili per
+allineare i pezzi dal server: le sentinelle di prove.py ne leggono il
+corpo e contano i suoi tre avvisi di esaurito; il client che chiama la
+rotta di sempre fa lo stesso senza toccarla. Rendere cliccabile ogni
+link https scritto da chi vende (scartata da Andrea sulla scheda).
+Tenere i codici in chiaro per mostrarli a chi vende: un codice che torna
+al client è un codice che può finire in uno screenshot; il foglio dice
+solo quanti.
+
+PROVATO. `collaudo_scorta_codici` sul server vero, sette scene: le
+guardie (spedito, annuncio altrui, lista vuota, riga troppo lunga,
+doppioni nella lista e contro i caricati, tetto), un pezzo (consegnato,
+timbrato «dalla scorta», avvisi a chi compra e a chi vende col conto,
+rivelazione), tre pezzi a riquadri, la scorta che non basta (resta a
+mano, il codice rimasto resta libero, poi un pezzo prende l'ultimo), un
+annuncio senza scorta come ieri, la leva spenta, il togli. Controprove:
+senza il controllo dei doppioni e senza il gancio, rosso.
+`prove_scorta_codici`: l'ordine commit → gancio, la presa con
+`ordine_id=0` (controprova: tolta, rosso), le scritture solo su
+'locked', la lettura senza contenuto, la leva accesa, l'impronta con la
+chiave, il tasto solo dove il server dice sì (in node, negozio collegato
+compreso), l'ordine dei due gesti del foglio, i link toccabili in node
+(due sì, nove no: canale, invito, http, sottopagina, parametro in più,
+dominio finto, nome corto, caratteri scappati).
+
+DA GUARDARE. La prova dal vivo sulla VM di collaudo prima della
+produzione (le funzioni coi soldi si provano lì, regola del 17 nov): un
+annuncio a codice online con tre codici, due acquisti da un pezzo e uno
+da due. E il giorno che il bot di Carmrain dà i coupon, il primo
+caricamento vero.
+
+## I banner delle occasioni dopo sei card, il negozio di «Da scoprire» già pieno e la card che vola in cima, il barattolo incastonato nella barra Cerca (24 nov 2026, pomeriggio, cantiere banner-dopo-sei)
+Andrea, dopo il cantiere home-card-pulite: «i nuovi banner, offerte a tempo e sconti nei negozi, mettili dopo le prime 6 card»; poi «e vorrei che l'immagine in alto e l'immagine sotto combaci tra di loro, proprio come avevi fatto»; e dal telefono, in produzione: «quando clicco su una card, quella grande, la pagina ci mette un po' ad aprirsi […] non avevamo detto che appena cliccavi lì la card saltava fuori dal basso verso l'alto?», e alla prima proposta (salita subito con l'anello) «No, il negozio si deve vedere subito, non deve caricarsi». Poi: «quando ci clicco la card grande si ingrandisce, occupa tutto lo schermo e va in alto. Quando va in alto […] si apre l'appendice sotto con tutto il testo», «fluido al massimo»; sul video di prova «Bellissimo così», con due ritocchi: «non farla ingrandire tutta a pieno schermo […] rimane comunque il bordo» e «la parte in basso si apre con un leggero ritardo […] falla vedere un po' prima».
+
+DECISO. 1) `#occasioniBanner` entra in `#grid` davanti alla settima card (`posaOccasioni`, a tutta riga con `#grid > #occasioniBanner{grid-column:1/-1;padding:0}`); con meno card sta in fondo, e a griglia vuota resta solo lui (un filtro acceso che non trova niente si spegne da dove si è acceso). Chi riscrive la griglia lo riporta prima al posto di casa davanti a `#grid` (`parcheggiaOccasioni` in renderGrid e svuotaGrigliaFerma): un innerHTML lo butterebbe e getElementById non lo troverebbe più. Le pagine appese dallo scorrimento lo riposano. Il tocco che accende scorre in cima alla GRIGLIA (le card filtrate stanno sopra i banner). 2) I due disegni combaciano già: i banner sono quelli della versione scelta (328/80, 8 px fra i due), e l'immagine di sopra continua in quella di sotto; niente da cambiare, confronto mandato. 3) Il negozio da «Da scoprire» (card grandi e quadrati, via `tocca`): `apriNegozioDaScoprire` lo apre nello stesso giro del tocco e lo fa salire dal basso (`#view-negozio.active.sale-dal-basso`, keyframes `negozio-sale` 0,34 s, la classe si toglie ad `animationend` o tornando alla vista ripartirebbe; niente con gli effetti ridotti). Pieno subito perché `preparaNegoziScoprire` chiede in silenzio le pagine dei negozi della fila 1,5 s dopo il disegno, senza `vista` e senza `da` (preparare non è visitare: il termometro dello spazio resta del tocco), una volta ogni 5 minuti (`NEGOZIO_PRONTO_MS`), una corsa per negozio (`negoziInCorsa`). `apriNegozio` su un'apertura disegna il pronto e manda lo stesso la richiesta vera, che conta visita e apertura, senza aspettarla. Senza pronto (tocco prima della preparazione) la pagina sale con l'anello di `negozioInAttesa` e si riempie all'arrivo, con la guardia `qui` del dettaglio P2P. 4) Il barattolo nella barra Cerca incastonato al pixel (Andrea: «non è perfettamente incastonato, sembra che lo spazio del bordino sia diverso tra l'alto e il basso»): la barra era alta 45,75 px (la riga del font) e il barattolo da 43 centrato col `translateY(-50%)`, cioè su mezzi pixel che ogni telefono arrotonda a modo suo, e sopra il bordo di 1,5 px. Ora `#q` è alto 47 px tondi e `.q-jar` è 41×41 a `left:3px;top:3px`: 1,5 px di bordo e 1,5 px di fondo uguali sopra, sotto e a sinistra, contati dagli spigoli. 5) IL VOLO (`voloNegozio`): toccando una card grande della fila sul telefono (`mqNetflix`), col negozio pronto e senza effetti ridotti, una copia della card parte dal suo posto e si allarga fino a dove starà la testata del negozio (larga quanto la pagina meno i margini `--pad`, 272:130, angoli 14 px), mentre un velo del colore di fondo copre la home ma lascia scoperta la barra in basso. A 260 ms su 420 (`VOLO_APRI_MS`, `VOLO_MS`) sotto la copia si apre il negozio vero, già pronto; la testata `#negozioTestata` (la stessa immagine) prende il posto della copia quando arriva, e intanto il resto della pagina si apre dall'alto (clip-path, 280 ms, 12 ms fra un pezzo e l'altro). La testata vale solo per il negozio dove si è volati, anche al ritorno da un annuncio: ogni altra apertura la spegne, in cima ad `apriNegozio`, prima di ogni attesa. La card toccata la segna `toccaScoperta` (`cardToccata`), solo per le card della fila e mai per i quadrati; senza volo resta la salita dal basso del punto 3. Sul primo video del codice Andrea: «appena tocchi la card sembra che prima di allargarsi si rimpicciolisca per un attimo». Era il `.scoprire-card:active{transform:translateY(1px)}` di tutte le card, che sul telefono toglieva lo `scale(1.1)` della card al centro (e lo `scale(.82)` delle vicine): premuta, tornava a misura piena con la transizione di mezzo secondo, e il volo partiva dalla misura a metà strada. C'era già prima del volo; ora nella fila il `:active` tiene lo scale e aggiunge solo il pixel.
+
+SCARTATI. La salita con l'anello e basta (la prima proposta, bocciata: «non deve caricarsi»). Preparare i negozi al primo tocco o al passaggio del dito: arriva tardi. Una seconda copia di renderNegozio per il pronto: `apriNegozio` resta l'unica strada, cambia solo da dove prende i dati. La card a tutto schermo senza margini (il primo video: Andrea ha voluto il bordo tondo). Aprire il negozio solo a volo finito (420 ms): la parte sotto arrivava in ritardo. Il volo anche dai quadrati: troppo piccoli, partono da 96 px; restano con la salita.
+
+PROVATO. `prove_scoprire`: un banco node su `posaOccasioni`/`parcheggiaOccasioni` veri (dopo sei card, in fondo con tre, riposati dopo le pagine appese, soli a griglia vuota, di nuovo a casa) e l'ordine parcheggia → innerHTML → posa in renderGrid e svuotaGrigliaFerma; il punto d'arrivo dello scroll è `#grid`. Scatti con Playwright sul server di collaudo, scuro e chiaro: banner all'indice 6 della griglia; tocco su una card negozio con la rete rallentata di 700 ms: a 90 ms la pagina piena è a metà salita, a 200 ms è arrivata. La barra Cerca misurata a 360, 390 e 412 px (DPR 3): barra 47, barattolo 41 a 3 px; sulla colonna centrale dello scatto 6 pixel di fondo sopra e 6 sotto; `prove_tessera_testata` lo fissa. Il volo: `prove_scoprire` ne fissa le condizioni (telefono, pronto, effetti ridotti), l'apertura a corsa non finita, i margini della testata uguali all'arrivo, la pulizia (copia, velo, card) e la testata solo del volo; `prove_effetti_ridotti` lo censisce come l'unico che anima con le Web Animations. Girato col codice vero su Playwright, timer e corse guidati fotogramma per fotogramma (scuro e chiaro, 390×844): la copia atterra sulla testata (16, 10, 358×171), nessun fotogramma vuoto, a fine corsa niente copia, niente velo, card di nuovo visibile; a tempo vero lo stesso stato finale. Video `negozio-volo-nel-codice.mp4` mandato ad Andrea.
+
+DA GUARDARE. Sul telefono di Andrea: il volo e la salita dentro Telegram (fluidità su un telefono vero), e quanto pesa sul server la preparazione (una richiesta per negozio della fila ogni 5 minuti per chi sta in home).
+
+## «Esplora il lavoro» al centro (24 nov 2026, sera, cantiere titolo-lavoro; Andrea: «sistemalo»)
+Notato a fine cantiere banner-dopo-sei: in Lavoro (leva `MERCATO_LAVORO`, spenta in produzione) il titolo «Esplora il lavoro» era rimasto a sinistra con la linea puntinata, mentre «Esplora per categorie», di cui prende il posto, dal cantiere home-card-pulite sta al centro. DECISO: la stessa classe `section-label centrato`, nient'altro (nessun testo nuovo). PROVATO: `prove_promozioni` vuole i due titoli al centro (controprova: tolta la classe, rosso); scatti Playwright a 390 px, scuro e chiaro, con la leva accesa a mano: testo a 16/242 px dai bordi prima, 129/129 dopo; in /mnt/project-files/home-card-pulite/esplora-il-lavoro-prima-dopo.jpg.
+
+## Il collaudo della chat nello scambio, rosso solo sul runner (24 nov 2026, sera, cantiere chat-scambio-stabile; Andrea: curare la causa, niente ritentativi né attese più lunghe)
+La CI di main 23b0a50a è diventata rossa solo su `collaudo_chat_scambio`, sezione 16, tre NO: a chi ha pubblicato arriva «blocca i sats» e il telefono finto fotografa `(controparte sì, riquadro sì, chiave NO, la sua NO, «attesa»)`, sul server le sue buste sono `[]`, e il messaggio dopo non arriva. Sul PC verde 3 su 3, qui in cloud pure. LA PISTA DELL'ORDINE CONDIVISO NON REGGE: le sezioni 15 e 16 usano ordini diversi (150-153 e 160); `c4a70000` è il prefisso di TUTTI gli ordini del collaudo, e il journal ne stampa solo gli otto caratteri. Gli «annullato» e i «superato» del log sono la coda della 15 (ordine 153, -7003/-7004) e la presa della 16 stessa giudicata dopo l'annullo del `finally`: compiti del giro principale, fermo durante i `subprocess.run` dei telefoni, che girano tardi e non toccano la chat del 160. LA CAUSA VERA è nel telefono finto: `bloccoChatScambioP2P` rimanda a un `setTimeout(…, 0)` la domanda della controparte e, una volta arrivata, il ritiro; tra la fine della domanda (il `volo` torna `null`) e la partenza del ritiro niente era «in volo», e `quieto` — che guardava solo ritiri, domande e archivio in corso — su un runner lento poteva cadere proprio lì: foto senza chiave, `process.exit` prima che copia e saluto partissero, e a cascata il messaggio. DECISO: `quieto` conta anche i gesti «subito» della pagina (un `setTimeout` senza ritardo, avvolto nel telefono finto: finché non è scattato la pagina non è quieta). Solo il collaudo; miniapp.html e la logica «superato» del server non si toccano. SCARTATI: un ordine diverso per sezione (lo era già), un orologio finto per gli eventi (gli eventi non c'entrano), allungare `quieto` o ritentare (vietato, e coprirebbe la causa). PROVATO: controprova sul collaudo VECCHIO col ritiro ritardato apposta di 200 ms: esattamente i tre NO della CI, valore per valore (con tutti i gesti «subito» ritardati, rossa anche la domanda dell'archivio); col collaudo CURATO e TUTTI i gesti «subito» ritardati di 200 ms, verde; senza ritardi verde 3 su 3, nel venv senza coincurve e senza variabili proxy. DA GUARDARE: `collaudo_chat_mercatino` e `collaudo_chat_onchain` hanno lo stesso `quieto` senza i gesti «subito» (lì il ritiro parte dal ridisegno, coperto dai 100 ms minimi): non toccati.
+
+## La 🔔 degli USDT solo per gli ordini che l'app mostra (24 nov 2026, sera, cantiere avvisi-usdt-metodi; Andrea: «facciamo solo il filtro»)
+Alle 19:17 Andrea riceve «🔔 1 nuovo ordine nel libro P2P · 🟢 Compra BTC · da 15,00 a 120,00 USDT · USDT/USDC (Solana - Arbitrum - Polygon - Avalanche), USDC (Base - Optimism), USDT (BSC - Tron - Ethereum)», e al tocco l'app dice che l'ordine non c'è più. LETTO su main 85cb23a4: il libro del server legge solo gli eventi firmati dal NOSTRO nodo (`"authors": [mostro]`), quindi l'ordine era vero e stava sul nostro coordinator, pubblicato in USDT da un altro client Mostro coi metodi scritti a mano. Non era Alan dal collaudo (il nostro foglio scrive solo «USDT (Tron)»/«USDT (Ethereum)») né un altro coordinator. Arrivava ad Andrea perché admin (`p2p_usdt_ammesso`) con gli avvisi accesi: `_accoda_nuovi_p2p` guardava solo la valuta, mentre il libro del telefono (`valutaVistaP2P` → `reteUsdtDaMetodoP2P`) mostra un ordine in USDT solo se OGNI metodo è una nostra rete, e quello lo scartava. Il campanello suonava per un pacco che il portiere non fa entrare.
+DECISO: il server chiede la stessa cosa del telefono, `_usdt_visto_avviso_p2p` (almeno un metodo, ognuno chiave di `P2P_ONCHAIN_RETI_USDT`, spazi ai lati e maiuscole a parte, vuoti via: il calco di `tagValori(...).map(trim).filter(Boolean)` e del `toLowerCase` del telefono). Nessun testo nuovo.
+SCARTATI. Spegnere gli avvisi in USDT (si perdeva anche l'avviso giusto). Integrare USDC: non basterebbe, quei metodi sono scritti a mano, in un pezzo e con reti che non abbiamo (BSC, Polygon, Avalanche, Optimism); mostrare nell'app gli ordini coi metodi altrui sarebbe un cantiere a parte, senza i nostri aiuti per pagare (QR, controllo dell'indirizzo).
+PROVATO. `prove_avvisi_nuovi_ordini`, sul banco vero della coda (sqlite): l'ordine con «USDT (Tron)» e quello con « usdt (ethereum) » + Tron arrivano a chi vede gli USDT; quello di Andrea (i tre metodi copiati dall'avviso) e uno misto «USDT (Tron)» + «USDC (Base)» no; a chi non vede gli USDT niente. I metodi del banco stanno in UN tag `pm` come nel NIP-69 (il cartone `ev` ne fa uno per metodo e il libro legge il primo: il misto passava per quello). Il giudice puro sui casi vuoti; una sentinella lega le reti e la lettura dei metodi al telefono. Controprove: tolto il filtro, rosso (passavano tutti e quattro); giudice senza minuscole, rosso (perdeva « usdt (ethereum) »).
+DA GUARDARE. Lo stesso scarto esiste per i franchi (il telefono vuole solo `P2P_METODI_CHF`, il server guarda la valuta): non toccato, segnalato ad Andrea.
+
+## La 🔔 dei franchi solo per gli ordini che l'app mostra (24 nov 2026, sera, cantiere avvisi-chf-metodi; Andrea: «Okay, sì, procedi»)
+Il gemello di avvisi-usdt-metodi, segnalato a fine di quello: il telefono mostra un ordine in CHF solo se ogni metodo sta in `P2P_METODI_CHF` col nome esatto (`valutaVistaP2P`), il server guardava solo la valuta. Un altro client Mostro può pubblicare sul nostro nodo un ordine in franchi con «Postfinance» o «Bonifico SEPA»: la 🔔 suonava, e al tocco l'ordine «non c'era più». DECISO: `_chf_visto_avviso_p2p` in `_accoda_nuovi_p2p`, il calco del telefono (spazi ai lati e vuoti via come `ordineDaEvento`, maiuscole che contano come l'`indexOf`). Il server la lista non l'aveva: nasce `P2P_METODI_CHF_LIBRO`, copia di `P2P_METODI_CHF` nello stesso ordine, e una sentinella le tiene uguali. Nessun testo nuovo.
+SCARTATI. Leggere la lista dalla Mini App a runtime (il server non apre miniapp.html per un giudice); le maiuscole ignorate come per gli USDT (il telefono, per i franchi, non le ignora: il giudice deve dire quello che fa l'app).
+PROVATO. `prove_avvisi_nuovi_ordini`, sul banco vero della coda: «TWINT»+«Revolut» e « Wise » arrivano a chi vede i franchi; «Postfinance», «TWINT»+«Bonifico SEPA» e «twint» piccolo no; a chi non li vede niente; il giudice puro sui casi vuoti. Controprove: tolto il filtro, rosso (passavano tutti e cinque); tolto «Wise» dalla lista del server, rosse la coda e la sentinella; tolto lo strip, rosso (perdeva « Wise »).
+
+## La stessa cura alle due sorelle: chat del mercatino e chat on-chain (24 nov 2026, sera, cantiere chat-stabili-sorelle; Andrea: «Okay, sì, procedi»)
+Il «DA GUARDARE» del cantiere chat-scambio-stabile: `collaudo_chat_mercatino` e `collaudo_chat_onchain` avevano lo stesso `quieto` che non contava i `setTimeout(…, 0)` della pagina (il ritiro che `bloccoChatScambioP2P` rimanda a subito). DECISO: la stessa cura, parola per parola: il telefono finto avvolge il `setTimeout` senza ritardo e `quieto` aspetta che quei gesti siano scattati. Solo i collaudi; miniapp.html e il server non si toccano. PROVATO, con le misure vere: col ritardo forzato di 200 ms (la controprova della sorella) i due collaudi VECCHI reggevano ancora — lì il ritiro arriva anche da altre strade e il margine è più largo; a 1500 ms vanno rossi (5 NO nel mercatino, da «CHI VENDE apre l'ordine per la PRIMA volta…» in giù; 8 nell'on-chain, da «CHI COMPRA (col profilo di scambio) apre lo scambio on-chain…» in giù). Con la cura e lo stesso ritardo di 1500 ms su TUTTI i gesti «subito», verdi tutti e due; senza ritardo verdi 3 su 3, con la stessa durata di prima (29 s e 12 s), nel venv senza coincurve e senza variabili proxy.
+
+## I collaudi dei freni con l'orologio fermo (24 nov 2026, sera, cantiere freno-fermo; Andrea: curare la causa, niente ritentativi)
+La CI di main e59d8c87 è diventata rossa su `collaudo_cassetta_nip46`: «il freno per IP: sessanta al minuto, il sessantunesimo e' un 429» aspettava 429 e ha avuto 200 (CI 45467820047; sul giro prima, stesso albero, era verde). Causa: le 61 richieste girano con l'orologio vero, sul runner lento ci mettono più di un minuto, la finestra del secchio si rinnova e la sessantunesima passa. Il freno del server è giusto; il collaudo misurava la velocità della macchina. Cura: `collaudo_lnbits_muto.freno_fermo(srv)`, un blocco in cui `_secchio_passa` riceve sempre lo stesso istante; ci passano i conti a raffica di `collaudo_cassetta_nip46` (31 e 61), `collaudo_freni` (31 sfide e 61 anteprime), `collaudo_caccia_a_tappo` (61 occhiate) e, con lo stesso trucco scritto sul posto perché lì il banco è un altro, `collaudo_carrello_salvato` (120 + 1). Controprove: con l'orologio del freno che avanza di 2 s a gettone (server rotto apposta, poi rimesso) i vecchi collaudi danno rosso (nip46 2, freni 1, carrello 1; la Caccia no, la sua finestra è di un'ora) e i curati restano verdi; col secchio rotto apposta (passa sempre) i curati danno rosso tutti e quattro. Il codice dell'app non si tocca.
+
+## La luce sotto «In evidenza» e i quadratini da cinque negozi (24 nov 2026 sera, cantiere evidenza-come-prima; Andrea, dopo la promozione: «la fascia in evidenza non mi piace», poi «Anche i quadrati sotto le card grosse levale, sono troppo pochi; ora si vedranno quando le card grosse saranno almeno 5 o 6»)
+
+COSA. Due ritocchi alla home visti in produzione. 1) La fila «In evidenza» perde le DUE ONDE arancioni (cantiere home-card-pulite, «La home ripulita»): al loro posto, sotto le card, un chiarore arancio fermo, più forte al centro, che sfuma in alto e ai lati (`radial-gradient(75% 48px at 50% 100%, …)` sul bordo di sotto di `#evidenzaSez`, dentro i 30px che la fila lascia sotto le card). Via anche `ondeEvidenza` e le variabili `--onda-x`/`--onda-h`: senza onde non c'è niente da muovere. Titolo al centro, card senza pastiglia né cornice e con l'ombra profonda restano come le ha fatte il thread della home. 2) I quadratini di «Da scoprire» compaiono da 5 negozi in su (`QUADRI_POCHI` da 2 a 5); da 5 a 7 ogni negozio sta nella card grande e in un quadrato, da 8 si dividono come prima.
+
+DECISIONI. Il modello è la schermata del collaudo mandata da Andrea («Cosi»): lì la fila stava sul fondo della pagina con la sola luce sotto le card. Ho misurato i colori di quella schermata (fondo uguale sopra e sotto, chiarore che arriva a circa il 43% d'arancio al centro del bordo, il 28% a un quarto e il 10% ai lati, alto una quarantina di pixel) e l'ellisse li rifà. Il primo malinteso, da non ripetere: «mettila così come l'avevi fatta» NON voleva dire la versione con la pastiglia arancione e il bordo (la mia di ieri sera, scartata da lui sulla card), ma quella della foto allegata. Soglia dei quadratini: Andrea ha detto «5 o 6», ho scelto 5 e gliel'ho detto.
+
+PROVATO. `prove_promozioni` (la luce sul bordo di sotto, nessun SVG né variabile `--onda-` rimasti, nessun blocco di colore; il banco node di `spartisciScoprire` con 4 negozi senza quadrati e 5 con cinque quadrati e cinque grandi, la soglia 5), `prove_effetti_ridotti` (il censimento di `requestAnimationFrame` senza `ondeEvidenza`), `prove_scoprire`, `prove_scoprire_p2p`, `prove_card_p2p_vetrina`, `prove_strisce_web`. Scatti con Playwright sulla pagina vera in collaudo locale, scuro e chiaro, con foto vere nelle card (/mnt/project-files/promozioni/evidenza-luce-*.png).
+
+DA GUARDARE. Sul telefono di Andrea dopo il cherry-pick: la luce di giorno e di notte, e che sotto «Da scoprire» con due negozi i quadratini non ci siano più.
+
+## L'indirizzo degli incassi parte da solo nel P2P (24 nov 2026, sera, cantiere p2p-incasso-da-solo; Andrea: «Ok si falla»)
+Un utente ha chiesto a Tappo perché a ogni presa nel P2P gli viene chiesto dove ricevere i sats, anche con gli incassi automatici attivi su un solo indirizzo Lightning. Il motivo vero: lo chiede Mostro a ogni scambio (`add-invoice`: chi compra deve dire dove mandare i sats PRIMA che chi vende blocchi la garanzia; mostrod non ricorda niente fra uno scambio e l'altro), e nel foglio l'indirizzo del Profilo era solo una scorciatoia che SCRIVEVA nel campo (17 set 2026: «a mandare resta Invia, così l'indirizzo si può correggere per questo solo scambio»). Non era una sicurezza per rifiutare l'ordine: il foglio che scade conta come «non completato», l'«✕ Annulla» no. DECISO (Andrea, 22:31 Rome): se l'indirizzo salvato passa, lo manda il telefono, e il foglio si apre solo se qualcosa dice di no; «diventa anche più veloce», perché chi vende riceve subito la richiesta della garanzia. Si rovescia così la scelta del 17 set sull'«Invia» a mano, col perché: la domanda è la stessa a ogni scambio e la risposta pure. COME: `indirizzoDaSoloP2P` decide (leva `P2P_INCASSO_DA_SOLO`, accesa di serie e in busta come `incassoDaSolo`; mai Wallet of Satoshi né un wallet dell'elenco del server; mai un indirizzo già rifiutato su quello scambio; mai col wallet NWC collegato, che la fattura la fa già da solo; una volta sola per scambio, `daSolo` sulla riga), `incassoDaSoloP2P` fa quel che faceva «Invia» (controllo del server, tentativo segnato, `add-invoice` col solo indirizzo, ritorno a «I miei scambi») e dice «⚡ Ricevi su …» (la riga dell'esempio dato ad Andrea, approvata col suo sì); ogni «no» (il nostro controllo, il coordinatore, il messaggio mai partito, la risposta in ritardo con lo scambio fermo) riapre il toast e il foglio di sempre col perché, e i 30 minuti di chi prende sono ancora quasi tutti lì. La fattura nuova dopo un pagamento fallito resta a mano. Mostro non si tocca. STRADA SCARTATA: mettere l'indirizzo dentro il `take-sell` (`PaymentRequest`), che salterebbe anche il giro dell'`add-invoice`: il payload della presa porta già il metodo scelto (patch 0010, `Payload::Order`) e i due non stanno insieme senza toccare il nodo. PROVATO: `prove_incasso_da_solo_p2p` (20 prove: sentinelle della leva, del motore e del velo; banco node con le funzioni vere — il giudice su 13 casi, l'invio riuscito, il secondo invio negato, il controllo che avvisa o ferma, il wallet che non passa, il «no» del coordinatore, il messaggio mai partito, la risposta in ritardo nei due versi, il «già fatto», l'altra vista, l'annullo durante il controllo); controprove: dieci mutazioni del codice, tutte rosse. Il censimento di `prove_dopo_gesto_p2p` sale da 11 a 12 ritorni. NON PROVATO DAL VIVO: la verifica dell'indirizzo da parte del coordinatore resta sua (da dietro Tor): un indirizzo che lui non verifica fa ancora un giro a vuoto, ma una volta sola per scambio e poi si ricorda. DA GUARDARE: chi ha un indirizzo salvato e vuole ricevere on-chain col cambio non vede più la scelta «₿ On-chain» alla presa (si apriva col foglio); il bot dice ancora «tocca a te indicare dove ricevere i sats» a chi ha preso, anche quando il telefono lo manda da solo un attimo dopo.
+
+## La mensola di luce sotto «In evidenza», e i quadratini di nuovo da due (24 nov 2026 sera, cantiere luce-evidenza; Andrea: «No nessuno mi piace cambia stile», poi «Va bene la 4», e «i quadrati anche se sono 2 adesso facciamoli vedere»)
+
+COSA. La luce ferma della voce di prima («La luce sotto In evidenza») non è piaciuta neanche nelle quattro tonalità provate. Fra altri sette stili (alone dietro la fila, card col bordo che si illumina, mensola di luce; poi quattro mensole: vicina alle card, spessa come uno scaffale, a cornice col titolo, sottile con la luce che sale) Andrea ha scelto la mensola SOTTILE: una riga arancio (3px; provata a 1.5 su «anche la riga della mensola più fine», poi di nuovo 3: «la linea della mensola era meglio prima») che si fa oro (#FFBE5A) al centro e sfuma ai lati, 12px sotto le card, e dietro le card un chiarore arancio che sale per 90px. È disegnata sullo sfondo di `.ev-strip`, quindi resta ferma mentre la fila scorre. `#evidenzaSez` non ha più fondo suo (`padding:2px 0 0`) e la fila lascia 18px sotto le card: le sezioni ravvicinate chieste ad Andrea al thread della home, che ha alzato «Esplora per categorie» subito sotto. Poi, sugli scatti («i paragrafi vanno vicini, sono troppo distanti»), anche sopra: `#evidenzaSez` senza margine, sotto i quadratini 8px invece di 30 («stringi ancora lo spazio tra la scritta in evidenza e i quadrati sopra»); e vista la pagina intera, VIA IL TITOLO «In evidenza» («Ottimo così, diciamo che la scritta in evidenza ora si può anche togliere»): la mensola dice già che la fila è speciale, il nome resta nell'aria-label della fila (i 30 servivano quando «In evidenza» non aveva titolo). I quadratini tornano da 2 negozi (`QUADRI_POCHI` di nuovo 2): mezz'ora dopo averli voluti da 5, Andrea li ha voluti vedere subito.
+
+STRADE SCARTATE (tutte in /mnt/project-files/promozioni/): la luce sotto in quattro colori (evidenza-luce-varianti.jpg), alone, bordo luminoso e prima mensola (evidenza-stili.jpg), le altre tre mensole (evidenza-mensole.jpg). La 3 della prima tornata gli piaceva, ma ha chiesto altri stili: la scelta è venuta dalla seconda.
+
+PROVATO. `prove_promozioni` (la mensola e la luce nella regola di `.ev-strip`, nessun fondo della sezione, niente onde né SVG; la soglia dei quadratini di nuovo 2, il banco node con 2 e 4 negozi in tutte e due le file), più le sezioni toccate e i collaudi della vetrina. Scatti sulla pagina vera, scuro e chiaro, con foto vere.
+
+## I quadratini dei negozi diventano cerchi, e l'anello delle categorie più fine (24 nov 2026 sera, cantiere luce-evidenza; Andrea: le forme dei quadrati e delle icone delle categorie si somigliavano, «Tu cosa consigli?»)
+
+COSA. Fra quattro forme (cerchi con l'anello, card verticali alte con la scritta sulla foto, pillole con la foto tonda e la scritta accanto, rettangoli larghi; /mnt/project-files/promozioni/quadratini-forme.jpg) ho consigliato i cerchi e Andrea li ha presi, «ma non vorrei che quel cerchio arancio fosse troppo pesante, puoi farlo più fine? Anche il contorno delle categorie è troppo spesso». I quadratini di «Da scoprire» sono cerchi da 84px (`border-radius:50%`) con la scritta centrata sotto. L'anello: prima un bordo arancio pieno di 1.5px, poi («il bordo mi piaceva più quello di prima») quello SFUMATO della prova (oro, arancio, brace, `conic-gradient`) ma sottile, 2px e poi 1px («troppo spessi, più fini i bordi li voglio»), con un filo scuro fra anello e foto; l'anello della categoria scelta passa da 2.5 a 1.5px e poi a 1px (l'`outline` di `.cat-cella.attiva .cat-quad`, che veste anche le card sorelle).
+
+PERCHÉ IL TONDO AI NEGOZI E NON ALLE CATEGORIE. I negozi sono persone e marchi: il tondo è un profilo, una storia. Le categorie sono disegni e filtri, stanno nel quadrato e hanno già il loro anello di «scelta». Le card verticali e i rettangoli larghi spingevano giù la pagina e somigliavano alle card di sotto.
+
+PROVATO. `prove_scoprire` (il cerchio, l'anello fine, le due righe), `prove_barattolo_filtra` e `prove_seo` (l'anello delle categorie, emendate a 1.5px). Scatto della pagina intera coi due negozi veri.
+
+## Il primo schermo del telefono finisce sotto la mensola (24 nov 2026 sera, cantiere luce-evidenza; Andrea: «sul telefono vorrei che la pagina della home corrispondesse con il mio schermo: appena apro l'app lo schermo in basso non deve terminare con le icone delle categorie tagliate», poi «Sì, mi va bene» alla proposta)
+
+COSA. `adattaPrimoSchermo` (miniapp): sul telefono, a vetrina nuda e con la fila «In evidenza» accesa, le card della fila prendono una larghezza fra 130 e 220px (`--ev-larga` sulla radice, letta da `#evidenzaSez .ev-strip .card`; senza, 150 come sempre) scelta perché il fondo della sezione cada sul bordo della barra in basso (`innerHeight` meno l'altezza della `nav`). La foto della card è quadrata, quindi un pixel di larghezza è un pixel di altezza: un passo basta quasi sempre, il secondo corregge il titolo che va a capo in un modo diverso. Si misura dall'inizio della pagina (`+ scrollY`), così una chiamata a pagina scorsa dà lo stesso numero. La chiamano `renderEvidenza`, `renderQuadriScoprire` (i cerchi arrivano dopo, coi negozi, e spostano la fila) e il `resize`. Fuori da quel caso (computer, una ricerca o un reparto, fila spenta) la variabile si toglie.
+
+DECISIONI. Si adatta la fila «In evidenza» e non «Da scoprire»: la card grande ha già le sue misure per larghezza di schermo (le `@media` di `#scoprireStrip`) e il volo verso il negozio le usa. Sul telefono piccolo (667 di altezza) neanche a 130 ci sta tutto: lì il primo schermo finisce dentro le card in evidenza, e le categorie non si vedono, che è quel che Andrea non voleva vedere tagliato. La barra del collaudo in alto non c'è in produzione: il conto la misura da solo.
+
+PROVATO. Banco node su `adattaPrimoSchermo` vera in `prove_promozioni`: il fondo sulla barra (857 − 70) in due passi, uguale a pagina scorsa, fermo a 130 sul telefono piccolo e a 220 su quello alto, e la variabile tolta a vetrina non nuda, a fila spenta e sul computer; le tre chiamate e la regola CSS. Il banco dei cerchi ha lo stub. Scatti sulla pagina vera a 393×857 (il telefono di Andrea: 796 su 796), 360×780, 412×915 e 375×667 (/mnt/project-files/promozioni/primo-schermo-telefoni.jpg).
+
+DA GUARDARE. Sul telefono di Andrea dentro Telegram: l'altezza della webview è quella vera, la barra del collaudo non c'è.
+
+POI, LA SERA STESSA: IL CALCOLO VA VIA. Andrea ha chiesto le card di «Da scoprire» «leggermente più grosse, così la linea della mensola si appoggia proprio sulla linea della nav», e fra due misure ha scelto quella con le card in alto più grandi e quelle in evidenza a 175 («grande così mi piaceva»): da 375 a 411px la card grande passa da 290 a 345, mai oltre lo schermo meno 7px per lato una volta ingrandita del 10% (`--sc-larga`, scritte e quadrata in proporzione), e il conto si faceva sulla riga della mensola (12px sopra il fondo della fila) invece che sul fondo. Le locandine strette in evidenza (tre per schermo, foto alta, titolo sulla foto) bocciate: «così allungate no». Poi il DA GUARDARE di sopra si è avverato prima del telefono: tutti gli scatti avevano in cima la fascia «COLLAUDO» (61px) che in Telegram non c'è, e senza la fascia il calcolo portava le card a 220 o, alzando il tetto, a 236 («le card in evidenza sono giganti perché? Le voglio piccole»). Detto ad Andrea, la scelta è stata sua: «se ne devono vedere 2 più metà della terza», poi «va benissimo così». Ora la larghezza la fa il CSS, `calc((100vw - var(--pad) - 20px) / 2.5)` sul telefono (150 sul computer), e `adattaPrimoSchermo` non c'è più: in fondo al primo schermo spuntano le categorie, scelto sapendolo. Le card grandi restano a 345 («per il resto è ottimo»), i cerchi scendono di 8px (`#scoprireQuadri{margin-top:-4px}`, era -12: «i tondi leggermente più staccati dalle card grosse»), la riga della mensola torna a 3px («era meglio prima»). LEZIONE: uno scatto per Andrea si fa SENZA la fascia del collaudo (`#demoBanner` nascosto), o la misura che vede non è quella del telefono. PROVATO: `prove_promozioni` (la regola CSS e nessun calcolo in JS, i cerchi a -4), più le sezioni toccate, la suite intera e i collaudi della vetrina.
+
+## Niente doppioni in griglia, e i filtri delle occasioni sopra le card (24 nov 2026 notte, cantiere griglia-senza-evidenza; Andrea: «le card in evidenza sono già nella loro fascia apposita, non devono essere mostrate così nella pagina normale del mercatino [...] anche perché lì andranno poi le card "in cima"; inoltre i filtri offerte a tempo e sconti dei negozi spostali in cima alle card, perché quando li seleziono per filtrare fa casino con le card»)
+
+COSA. 1) `nellaFilaEvidenza(l)` (miniapp): a vetrina nuda la griglia salta l'annuncio che la fila «In evidenza» sta mostrando, nella prima pagina (renderGrid) e in quelle appese dallo scroll. Con una ricerca, un reparto, un filtro o un ordine la fila si spegne e l'annuncio torna in griglia con la sua etichetta «In evidenza». 2) I due banner «Offerte a tempo» e «Sconti dei negozi» restano al loro posto di casa, davanti a `#grid`: sopra le card. Tolte `posaOccasioni`, `parcheggiaOccasioni` e la regola `#grid > #occasioniBanner`.
+
+DECISIONI. La domanda di `nellaFilaEvidenza` è la stessa di `renderEvidenza` (vetrina nuda, annuncio nella busta `in_evidenza`, scadenza nel futuro), non solo l'etichetta: un annuncio non può mai sparire da tutte e due, nemmeno se la busta arriva senza la fila (server di ieri) o se la scadenza è passata a pagina aperta. Il server non cambia: `/promossi evidenza` continua a rimettere `creato` ad adesso, e a vetrina nuda la griglia lo salta comunque. Il conteggio «N oggetti» resta quello del server (l'annuncio c'è, sta solo una riga più su). I banner dopo la sesta card erano del cantiere banner-dopo-sei (24 nov pomeriggio): dentro la griglia, un filtro che rimescola le card spostava anche il banner che lo aveva acceso; sopra le card restano fermi, anche a griglia vuota (un filtro che non trova niente si spegne da dove si è acceso).
+
+PROVATO. `prove_scoprire` (i banner davanti a #grid e nessuna funzione che li sposti; `nellaFilaEvidenza` vera in node: a vetrina nuda salta solo l'annuncio della fila, non lo scaduto né quello fuori busta; con una ricerca o senza fila tornano tutti; il filtro sulla prima pagina e su quelle appese), suite intera e collaudi della vetrina. Scatti non fatti: Andrea ha chiesto di andare dritto a develop («non farmi gli scatti, procedi fino alla fine»).
+
+DA GUARDARE. Sul telefono, dopo la promozione: la prima pagina della griglia ha una o due card in meno quando gli annunci in evidenza sono fra i più recenti (lo scroll infinito chiede la pagina dopo da solo).
+
+## «Ricevi on-chain» prima della presa, e il bot che non diceva quel che temevo (24 nov 2026, notte, cantiere incasso-da-solo-ritocchi; Andrea: «Ok va bene»)
+I due «DA GUARDARE» della voce qui sopra. 1) Con l'indirizzo che parte da solo spariva la scelta «₿ On-chain» del cambio, che stava nel foglio. Adesso la si fa PRIMA della presa: nel foglio dell'ordine, sopra «Annulla/Compra», il link «₿ Ricevi on-chain» (acceso diventa «✓ Ricevi on-chain»; il testo è quello proposto e approvato). Si vede solo a chi la perderebbe: chi compra, su un ordine altrui, col cambio acceso e con l'indirizzo degli incassi che partirebbe da solo; gli altri la trovano nel foglio come prima. La scelta va sulla riga alla presa (`riceviOc`), ferma l'invio da solo, e il foglio nasce sul cambio, una volta: poi decidono i due tasti. Strada scartata: un link nel foglio dopo la presa, che non serve, perché il foglio non si apre più, e cambiare destinazione dopo l'`add-invoice` Mostro non lo lascia fare. 2) IL BOT: la voce di prima diceva che il bot scrive ancora «tocca a te indicare dove ricevere i sats» a chi ha preso. Era SBAGLIATO, letto nella funzione delle frasi e non nel giudice: a chi prende la frase della presa non parte mai (`_avvisi_libro_p2p` toglie il «preso» a chi ha preso; l'evento «preso» del coordinatore va solo all'altra parte). Un primo ritocco al server (togliere la riga a chi ha l'indirizzo salvato) era codice morto e si è tolto prima del commit. Le frasi vere col «dove ricevere i sats» restano due: la cauzione pagata da un wallet esterno («ora indica dove ricevere i sats») e, a chi ha PUBBLICATO un «Compra BTC», la garanzia bloccata da chi vende. In tutti e due i casi l'app può essere chiusa, e la frase è quella che la fa riaprire: l'indirizzo parte appena si apre. Detto ad Andrea, con una frase nuova da approvare se la vuole cambiare. PROVATO: `prove_incasso_da_solo_p2p` sale a 25 (il giudice del link su 9 casi, il link nel piede giusto, l'azzeramento, la riga alla presa, il foglio sul cambio una volta); controprove: sette mutazioni, tutte rosse. Il link non l'ho visto disegnato sul telefono.
+
+## Le foto in fila sul computer, la descrizione sulla foto della scheda e lo screenshot incollato (24 nov 2026, notte, cantiere zzap-foto-chat)
+Zzap, la sera stessa in cui gli abbiamo detto delle foto in ordine, ha scritto quattro richieste con uno screenshot del foglio Vendi sul computer; Andrea: «Risolvi da solo», e sulla scheda delle scelte ha preso «Tre subito, la quarta dopo». COSA: (1) sul computer (≥1280 px, fuori da Telegram) il campo delle foto stava in una carta da 440 px e le schede andavano due per riga, scendendo per mezzo schermo con il resto vuoto: appena c'è una foto il campo (`.field-foto`) prende tutta la riga, il riquadro «Aggiungi» a sinistra (260-380 px) e le schede in fila a destra, larghe 170 px; senza foto resta la carta di prima (`:has(#photoPreview:empty)`). La terza riga della griglia è `1fr` perché l'altezza delle schede non spinga giù la riga dell'avviso sotto il riquadro. (2) la descrizione della foto si leggeva solo a schermo intero: adesso sta anche sulla foto della scheda, in basso sopra i pallini, su una striscia scura (`.detail-didascalia`), e segue la foto in vista (la stessa `aggiorna(i)` dei pallini e delle frecce); il tocco la attraversa e apre il visore; il posto nasce solo se almeno una foto ha la descrizione. (3) Ctrl+V di un'immagine nelle due caselle dell'assistenza la mette tra gli allegati (con la ✕, parte con «Invia»: la stessa `screenshotAssistenzaScelti`), e nella chat di un ordine o di uno scambio la manda con `allegaChatScambioP2P` dopo una domanda («Mandi l'immagine incollata?», «Mandala»): quella chat manda un file appena scelto, e un incolla sbagliato non deve arrivare all'altra persona. Un ascoltatore solo sul documento (`incollaImmagine`), perché le caselle rinascono a ogni disegno; con solo testo negli appunti l'incolla resta quello di sempre. Le immagini si leggono dagli `items` (Chrome, Safari) o dai `files` (Firefox). La chat col moderatore non ha allegati, quindi nemmeno l'incolla. STRADA RIMANDATA: (4) l'inquadratura della foto (spostarla e ingrandirla nel suo riquadro): cambia la miniatura quadrata che fa il server (`miniatura_jpeg`, taglio al centro) e la copertina delle card, e merita un cantiere suo con le sue prove. PROVATO: `prove_foto_in_fila_e_incolla` (12 prove: banco node con le funzioni vere dell'incolla — solo testo, Firefox, le due caselle dell'assistenza, la domanda in chat, le caselle estranee, il gesto fermato solo con un'immagine —, le sentinelle della descrizione e del CSS); dal vivo in Chromium (1440 e 390 px): le cinque schede in fila accanto al riquadro, la descrizione che cambia con lo scorrimento, un ClipboardEvent vero che porta lo screenshot tra gli allegati pronto e un incolla di testo che non si ferma. DA GUARDARE: le schede restano alte 110 px anche sul computer (la foto si vede in orizzontale, come sul telefono).
+
+## Il volo che duplicava il banner, e il quadratino che faceva volare la card grande (24 nov 2026, sera, cantiere volo-doppio)
+Andrea, dal telefono, col video della produzione appena promossa (9288584d): «c'è un bug, guarda come si aprono le card» e «non devono esserci due immagini uguali troppo vicine come succede con To the Moon». Riprodotti in collaudo (Playwright, il negozio pronto col banner messo dalla risposta, due card sponsor) due difetti del volo del cantiere banner-dopo-sei. 1) LA STESSA IMMAGINE DUE VOLTE: To The Moon ha il banner del negozio (`bannerNegozio`, la foto della card col link e il dominio sotto), e il volo accendeva la testata sopra «← Torna» mentre sotto restava il banner: due volte la stessa foto. In collaudo il negozio di prova non aveva banner, per questo non si era visto. 2) IL QUADRATINO FACEVA VOLARE LA CARD GRANDE: il quadrato porta lo stesso id della card grande dello stesso negozio, e `toccaScoperta` segnava `cardToccata` per tutti e due: il volo partiva dalla card grande ovunque fosse nella fila, anche mezza fuori schermo (il «TO THE MOOON» tagliato a sinistra nel video).
+
+DECISO. 1) Col banner (lo stesso giudice `bannerNegozio`, sui dati pronti) la testata non si accende e la copia atterra SUL BANNER: si mira gia' al suo posto (3:1, `scartoInsegna`, 48 px sotto la cima la prima volta, poi quello misurato), a `VOLO_APRI_MS` si misura il posto vero e la copia ci scivola negli ultimi 160 ms (la prima corsa annullata, la seconda dalla posizione del momento); la copia se ne va quando la foto del banner e' decodificata, al piu' 400 ms dopo. La preparazione mette in cache anche la foto del banner. La pagina resta quella di sempre, col banner che porta al sito. Senza banner, la testata come prima. 2) Il quadratino chiama `toccaScoperta(id, true)` e non segna la card: dal quadratino la pagina sale dal basso, come deciso. In piu' una card fuori dallo schermo non vola mai.
+
+SCARTATI. Tenere la testata e nascondere il banner: si perdeva il link al sito del venditore. Far volare il quadratino: 96 px che diventano una pagina, gia' scartato.
+
+PROVATO. `prove_scoprire`: col banner niente testata e atterraggio sul banner, la copia tolta a foto pronta, il quadratino che non segna la card, la card fuori schermo (controprova: tolti `daQuadro` e il giudice del banner, due rossi); `prove_effetti_ridotti` conta quattro chiamate `.animate(` nel volo. Fotogramma per fotogramma col codice vero (timer e corse guidati), scuro e chiaro: la copia scende dolce fino al banner (16, 58, 358×119), niente testata, niente doppione; dal quadratino nessuna copia. Video `negozio-volo-sul-banner.mp4` per Andrea.
+
+3) NIENTE DOPPIONI VICINI (la terza cosa del messaggio; Andrea ha scelto sulla scheda «Niente doppioni vicini»: un negozio in card grande non va nei quadratini, e la tessera Consigliati non mostra negozi già in Da scoprire). I quadratini li toglie, sotto le 5-6 card grandi, il cantiere delle promozioni (sopra gli 8 negozi `spartisciScoprire` li divide già: mai in tutti e due). Qui la tessera: `cardConsigliati` salta i negozi che hanno una card VIVA in «Da scoprire» (`negoziInScoprire`: le pagine di casa per slug, i negozi per codice, da `vociSponsor` e `vociNegoziPromossi` senza il turno); se non ne resta nessuno la card tiene il suo 📣. `prove_consigliati`: un banco node sui due veri (nessuno sopra: tutti; To The Moon viva e un negozio pagato vivo: fuori; AndreAI spenta: resta; controprova senza il filtro: rosso).
+
+4) L'ORDINE E LE DISTANZE DELLA HOME (Andrea, nella stessa sera). Prima «rimetti le icone esplora per categorie appena sotto alle card grosse, poi sotto le card in evidenza», poi «anzi più ravvicinati i paragrafi» («esatto così» a 21 e 25 px), poi di nuovo «le icone delle categorie rimettiamole sotto alle card in evidenza»: l'ordine resta quello di prima (Da scoprire, In evidenza, categorie), e restano le distanze strette, solo sul telefono e senza toccare il CSS di «In evidenza» (del cantiere promozioni): `#scoprireSez{margin-bottom:-12px}` e `#catSez{margin-top:-10px}`. I numeri sono cambiati tre volte, con lo sfondo di «In evidenza» che intanto si rifaceva nel cantiere promozioni: con le onde -22 e -10 (a -26 il titolo finiva sopra l'onda arancione, provato e scartato), con la luce -22 e -24, e alla fine, sulla mensola senza titolo (3945e16e), -12 e -10: dalla card grande alle card in evidenza 18 px invece di 30 (con -22 erano 8 e l'ombra della card grande ci finiva sopra), dalla riga della mensola al titolo delle categorie ~20 px invece di 34 (con -24 erano 7). Senza «In evidenza» i due margini negativi si fondono e vince il più grande: dalla card grande al titolo delle categorie 22 px. Misurato a 390×844 e 360×800, confronto delle tre versioni a schermo. Il volo ricontrollato sulle card grandi ingrandite: atterra sul banner a (16, 58, 358×119) senza salti, e il tocco su un cerchio apre il negozio senza volo (Andrea: «il tondo si apre subito», lasciato così).
+
+DA GUARDARE. La tessera quando tutti i Consigliati sono anche in «Da scoprire» (resta il 📣). Il banner 3:1 taglia la scritta in alto della foto di To The Moon: e' il banner del negozio com'e' oggi.
+
+## Le card grandi a 360, il mio negozio che non vola, e la testata anche dal tondo (25 nov 2026, cantiere card-grandi-360; Andrea in produzione: «le card grosse sono troppo piccole, non so perché», poi col video: «c'è ancora il difetto quando clicco sulle card grosse [...] Under AI sì, To the Moon no [...] guarda quando clicco anche sui toggle rotondi. A questo punto forse vuoi che i banner del negozio siano obbligatori? [...] Però il banner del negozio può essere diverso dalla card grossa»)
+
+PERCHÉ ERANO PICCOLE. Dal video (720×1570, la card all'80% dello schermo) il telefono di Andrea dentro Telegram è largo 360px CSS, non 393 come negli scatti della sera prima: da 360 a 374 la card restava alla misura fissa di 264 (290 ingrandita). Ora `--sc-larga` (`min(345px, (100vw - 14px) / 1.1)`, scritte e quadrata in proporzione) vale da 360 a 767: a 360 la card fa 314 (346 ingrandita, il 96% dello schermo), da 412 in su 345 invece di 316. Tolte le misure fisse per 360 e per 412. LEZIONE (in memoria): gli scatti per Andrea a 360×785, senza la fascia del collaudo.
+
+IL DIFETTO DEL VOLO, SOLO SUL SUO NEGOZIO. Il negozio di AndreAI è di Andrea: per il proprietario `apriNegozio` aspetta la bozza (`bozzaDelVenditore`) prima di disegnare, e il volo — che conta su un disegno nello stesso giro — a 260 ms toglieva il velo su una pagina non ancora aperta: la home tornava per un attimo, poi arrivava il negozio. Agli altri utenti non succede. Al proprietario il negozio ora si apre come se non fosse pronto (`mio` in `apriNegozioDaScoprire`): la pagina sale subito, con l'anello, e si riempie quando la bozza c'è.
+
+LA TESTATA DAL TONDO. Toccando il tondo di un negozio senza banner la pagina si apriva senza immagine in cima (il volo, e quindi la testata, è solo della card grande). Il banner obbligatorio NON serve (e il banner può essere diverso dalla card): `conTestata` mette in cima l'immagine della card di «Da scoprire» quando il negozio pronto non ha un banner, per la card e per il tondo (la voce toccata la ricorda `scopertaToccata`); se il banner c'è si vede quello, e la testata resta spenta (mai la stessa foto due volte); senza il pronto non si sa, e resta spenta.
+
+PROVATO. `prove_scoprire`: il proprietario non vola; `conTestata` vera in node (senza banner la testata, col banner o senza pronto niente, il flag torna giù); le due strade del tocco passano di lì; le prove del tocco aggiornate. Suite intera e collaudi della vetrina. Scatti prima/dopo a 360×785 (/mnt/project-files/promozioni/card-grandi-prima-dopo.jpg).
+
+DA GUARDARE. Sul telefono di Andrea: il suo negozio dalla card grande (sale, niente home di mezzo) e dal tondo (l'immagine in cima).
+
+## I tondi dei negozi solo da cinque negozi in su (25 nov 2026, cantiere tondi-da-cinque; Andrea: «secondo te ste card rotonde ha senso metterle o no?», poi «ok, dai, mettili da soli 5 negozi in su»)
+
+COSA. `QUADRI_POCHI` torna a 5 (era 2 dalla sera del 24): sotto i cinque negozi in «Da scoprire» i tondi non ci sono, da 5 a 7 ogni negozio sta nella card grande e in un tondo, da 8 in su si dividono (`QUADRI_MIN` resta 4). PERCHÉ: i tondi mostrano gli stessi negozi della card grande che scorre sopra; con due negozi sono un doppione e rubano il primo schermo alle categorie (lo scatto senza tondi a 360: /mnt/project-files/promozioni/senza-tondi-360.png). Diventano utili quando i negozi sono tanti. Nel sapere di Tappo i quadrati diventano tondi, con la soglia; e i banner delle occasioni stanno «sopra gli annunci» (la frase diceva ancora «dopo i primi sei», rimasta indietro dal cantiere griglia-senza-evidenza). PROVATO: `prove_scoprire` (il banco node di spartisciScoprire con 1, 2, 4, 5, 7 e 8 negozi, la soglia), suite intera e collaudi della vetrina.
+
+## I tondi dei negozi accantonati (25 nov 2026, cantiere tondi-spenti; Andrea: «abbiamo deciso che le card rotonde vanno via, nel senso che anche se ci saranno 5 card grosse, 6, 7, 8 [...] non devono essere più mostrate. Poi non buttare via il lavoro, accantonali da qualche parte, ma per il momento le card rotonde non le devo mai più vedere»)
+
+COSA. Una leva nel codice, `TONDI_NEGOZI = false` (miniapp, accanto a `QUADRI_MIN`/`QUADRI_POCHI`): spenta, `spartisciScoprire` mette tutti i negozi nella card grande e nessuno nei tondi, a qualunque numero di negozi, e il riquadro dei tondi resta vuoto e nascosto. NIENTE È STATO TOLTO: la divisione da 8 in su, le soglie (5 negozi, 4 tondi), i cerchi con l'anello sfumato, le foto scelte da Andrea, `conTestata` dal tondo, il CSS. Si riaccendono con `true`. Mezz'ora prima la soglia era salita a 5 («mettili da soli 5 negozi in su»): resta scritta, vale se la leva si riaccende. Nel sapere di Tappo i tondi spariscono («Tutti i negozi di «Da scoprire» stanno nella card grande che scorre»). PROVATO: `prove_scoprire` (la divisione accantonata gira in node con la leva accesa, e una prova nuova con la leva vera: 2, 5 e 8 negozi tutti grandi, nessun tondo), suite intera e collaudi della vetrina.
+## La fila «Scambi P2P» in una fascia a sé, sotto «Più recenti» e «Filtro», con l'interruttore col bitcoin, e il foglio del mercatino (25 nov 2026, cantiere fascia-p2p; Andrea: «Il toggle degli scambi peer-to-peer nella home del mercatino non mi piace», «Troppo confusionario messo lì»)
+
+COSA. Tre cose, tutte di aspetto e di posto, nessuna di logica. 1) La sezione `#p2pVetrinaSez` (titolo, conteggio, interruttore, «Vedi tutti →», card che scorrono) esce da fra le categorie e gli strumenti e va SOTTO «Più recenti» e «Filtro» (dopo `#filtriBox` e, dal punto 5, dopo i banner delle occasioni; prima di `#mercMappaBox` e della griglia): «mettere quella riga proprio prima delle card del mercatino, sotto ai toggle più recenti e il toggle del filtro». 2) La sezione diventa una FASCIA A SÉ, larga quanto lo schermo: una luce arancio che scende dall'alto (`radial-gradient(70% 120px at 50% 0, …)`), un velo scuro leggero ai due bordi, un filo di luce sul bordo di sopra, e le card con l'ombra profonda delle card in evidenza («con una fascia a sé stante, come abbiamo fatto per le card in evidenza, una cosa diversa dal resto, […] che si può nascondere con un tocco»). La luce di «In evidenza» sale da sotto, questa scende dall'alto: le due fasce non si confondono. 3) L'interruttore diventa quello COL BITCOIN (`.p2p-vt-btc`): una scanalatura scura e una moneta ₿ che corre a destra e si accende d'arancio, grigia a sinistra da spenta. Spenta, la sezione prende la classe `spenta` (in `filaCardP2P`) e la testa ha 12 px sopra e sotto, così titolo e interruttore stanno in mezzo alla fascia («quando il toggle è spento, mettimi la scritta e il toggle in mezzo a quella banda lì»). Via `.leva-interruttore.piccola`, che serviva solo qui. Lo stato, i timbri, il gemello nel Profilo e l'aria-label sono quelli di prima.
+
+IL FOGLIO DEL MERCATINO, nello stesso cantiere. Vista la home intera, Andrea: «la sezione esplora per categorie […] è in mezzo a queste 2 linee molto nette, arancioni», «non si capisce che va a filtrare tutta la parte sotto, sembra una fascia a sé stante», e «ricordati che ci sono anche i filtri offerte a tempo e sconti dei negozi». 4) Dalle categorie alla sentinella dello scroll tutto sta in un contenitore nuovo, `#foglioMerc` (categorie, lavoro, strumenti, filtri, banner, fascia P2P, mappa, griglia, vuoto): un foglio un po' più chiaro della pagina (`color-mix` fra card e pagina del tema), angoli di sopra tondi da 26 px, un'ombra che lo stacca da «In evidenza», un filo arancio sul bordo e la luce arancio che scende dal bordo, come un pannello che sale: le categorie ne sono la testa. 5) I due banner delle occasioni (`#occasioniBanner`) salgono sotto «Più recenti» e «Filtro», PRIMA della fascia P2P: tutti i filtri insieme, poi gli scambi, poi le card (restano fuori dalla griglia, come deciso il 24 nov notte). Scelte: fra «foglio», «foglio + banner su» e «foglio con la luce», «il foglio 3 è bellissimo»; poi tre varianti senza lo spazio fra la mensola di «In evidenza» e il foglio (attaccato sotto la mensola, il foglio al posto della mensola, foglio dritto) e «mi piaceva di più con lo spazietto in mezzo»: resta il foglio 3 com'era (10 px sotto la sezione di sopra). Nessun testo nuovo.
+
+LE STRADE PROVATE E SCARTATE (scatti sulla pagina vera, scuro, spento e chiaro, foto vere nelle card; in /mnt/project-files/toggle-p2p/). Gli stili della fascia: A, un riquadro dentro i margini col bordo arancio che brilla; C, un nastro con una trama di ₿ sul fondo e titolo e interruttore in una pillola; D, un cassetto con una barra arancio piena e le card in un vassoio sotto (chiuso resta la barra). Scelto B, «Bellissimo il B», poi «non mi piace solo il toggle per accenderlo». Gli interruttori: un occhio (aperto/barrato), una freccia su/giù, meno/più; scelto quello col ₿. Nessuna scritta nuova: titolo, «Vedi tutti →» e l'aria-label sono quelli di prima.
+
+PROVATO. `prove_scoprire` (l'ordine della home: Da scoprire, In evidenza, categorie, strumenti, POI la fila P2P; il foglio dalle categorie alla sentinella con «In evidenza» fuori e il suo CSS; i banner fra `#filtriBox` e la fascia P2P), `prove_card_p2p_vetrina` (la sezione nasce nascosta fra `#filtriBox` e la griglia; la fascia col suo CSS; l'interruttore col ₿ nel markup, la classe `spenta`, niente `.leva-interruttore.piccola`; nel banco node la sezione spenta prende `spenta` e riaccesa la perde), `prove_promozioni`, `prove_strisce_web`, `prove_scoprire_p2p`. Controprova: la fila rimessa sopra gli strumenti, la riga della classe tolta e il vecchio interruttore rimesso fanno quattro rossi. Suite severa e collaudi della CI (anche nel venv senza coincurve): vedi il rapporto del push.
+
+DA GUARDARE. Sul computer (fuori da Telegram) visto uno scatto a 1100 px: foglio, banner affiancati e fascia stanno al loro posto; non riprovato a 768. Con un filtro acceso o una ricerca le categorie spariscono e il foglio parte dagli strumenti, con gli stessi angoli: non mostrato ad Andrea. Il primo schermo del telefono non cambia (la fila stava già sotto le categorie, fuori dal primo schermo).
+
+## Il quadro dei servizi: un battito ogni cinque minuti, il VPS guardato da fuori, e il piano «se muore X» (25 nov 2026, cantiere quadro-servizi; Andrea: «bisognerebbe avere un monitor di tutte le applicazioni che abbiamo, in che status sono, che uptime hanno e poi anche un piano di backup di disaster and recovery per ognuna di queste», poi «ok» alla proposta)
+
+L'INVENTARIO, PRIMA. C'era già molto, sparso: la sentinella dentro il server, il backup cifrato del VPS (prima di ogni deploy e alle 04:30), la ronda del nodo (ogni ora e il giro lungo), la ronda tor, il backup e la ronda del relay, l'audit del venerdì, i fogli `RIPRISTINO.md` e `RIPRISTINO-RELAY.md`. I BUCHI: nessuno guardava DA FUORI (il VPS morto si porta via la sentinella, e non avvisa nessuno); nessun quadro unico, e un controllo che tace sembrava uguale a uno morto; `RIPRISTINO.md` diceva ancora «LNbits gira su Spark» (falso dal doppio wallet); nessun piano per il nodo, per n8n e per la VM collaudo; n8n in NESSUN backup (`backup-relay.sh` prendeva solo `/opt/relay`).
+
+COSA. 1) IL SERVER: `POST /api/battito` col suo segreto (`BATTITO_SEGRETO`, calco della porta della ronda del nodo: vuoto = 404), nove servizi noti (`SERVIZI_NOTI`: Barattolo, .onion, LNbits sul VPS; LND e Mostro sul nodo; relay e n8n sul relay; collaudo e runner sulla VM). Una riga per servizio e per fetta di cinque minuti: l'uptime è fette battute su fette passate (30 giorni, o dal primo battito). `orologio_servizi` batte per «vps» da solo, avvisa nella stanza degli errori chi tace da venti minuti e chi torna (una volta per verso), pota, e ogni dodici ore legge i certificati dei tre domini (mai in collaudo). Leva `QUADRO_SERVIZI`, di serie accesa. 2) IL CASSETTO «🩺 Servizi» nel pannello admin (`boxServizi`): pallino, ultimo segnale, uptime, età del backup (rossa oltre 48 ore), certificati; il conto dice i rossi anche da chiuso. 3) LE MACCHINE: `deploy/battito/battito.sh` dal timer di cinque minuti, un file `servizi-*` per macchina (nome|controllo|cartella del backup); un controllo che fallisce non manda niente (è il silenzio che conta). Sul relay `GUARDA_VPS=1`: tre giri di fila senza `/api/salute` = avviso su Telegram (col file della ronda del relay, senza copiare il token), e il conto non avanza se Telegram non parte. 4) N8N NEL BACKUP DEL RELAY, col database copiato da python3 (`sqlite3.backup`, mai il file vivo) e il `.env` della sua chiave, che vanno insieme; l'archivio si ferma se il database manca. 5) `deploy/SE-MUORE.md`: una riga per servizio (chi se ne accorge, cosa si perde, primo gesto, foglio lungo), i fogli che mancavano (LNbits, nodo, n8n, VM collaudo), le scadenze a mano, la prova di ripristino ogni tre mesi. `RIPRISTINO.md` corretto (Spark) e coi passi di LNbits, del ponte e del battito.
+
+PERCHÉ COSÌ. Incrociato e non un servizio esterno: il VPS guarda tutti (i battiti che mancano), il relay guarda il VPS (macchine e fornitori diversi: Hetzner e LNVPS). Il relay e non il nodo come occhio sul VPS: il nodo esce solo da Tor, e la ronda tor ha già dato due falsi allarmi per circuiti lenti; per i battiti del nodo il silenzio vale dopo venti minuti, non dieci. UN segreto per tutte le macchine: rubato, fa solo sembrare vivo un servizio morto. I nomi chiusi nel server, e non liberi: la tabella non si riempie di nomi inventati. Un battito in ritardo non porta indietro l'ultimo (MAX e MIN nell'UPSERT: trovato dallo scatto, coi battiti seminati all'indietro).
+
+SCARTATE. Un servizio esterno (UptimeRobot e simili): un terzo in più, e non vede i servizi interni (LND, n8n, il runner). Il nodo come occhio sul VPS (Tor). Le scadenze dei certificati scritte a mano nel codice: Caddy li rinnova, e una data scolpita sarebbe falsa dal primo rinnovo; si leggono vivi.
+
+PROVATO. `prove_quadro_servizi` (61): i giudici su sqlite di cartone e orologio finto (doppioni della fetta, ritardatari, su/giù al minuto 19 e 21, uptime 50 e 100, finestra e potatura, età del backup, avvisi una volta per verso, porta 404/403/200, porta prima del corpo, config d'esempio, le righe dei file delle macchine contro `SERVIZI_NOTI`, `sh -n`, segreto solo da stdin, il cassetto, n8n nel backup). Controprova: tolto il segno `giu`, allargato il silenzio, porta dopo il corpo = quattro rossi. `collaudo_quadro_servizi` (14) col server vero. `battito.sh` dal vivo contro un server di cartone: segreto con virgolette e barra rovescia arrivato intero, backup di 5 ore detto 5, VPS muto al terzo giro senza Telegram = conto fermo a 2. Il pezzo n8n di `backup-relay.sh` su cartelle finte: il database estratto si apre (42). Scatti del cassetto a 360, scuro e chiaro.
+
+DA GUARDARE. Niente è installato: le macchine sono gesti di Andrea (PRODUZIONE, «IL QUADRO DEI SERVIZI E I BATTITI»; DA-FARE-ANDREA). I nomi dei container (`nodo-lnd-1`, `nodo-mostro-1`), le porte (LNbits 5001, n8n 5679, strfry 7777, collaudo 8090) e il servizio `tor@default` sono quelli dei documenti, non letti dalle macchine: il primo giro a mano lo dice. `backup-nodo.sh` non è nel repo: che l'archivio del nodo abbia `mostro.db`, `settings.toml` e la chiave di Mostro non è verificato. Il peso del database di n8n in ogni archivio del relay: da guardare prima di installare. Il bot Telegram non ha un battito suo (vive col server).

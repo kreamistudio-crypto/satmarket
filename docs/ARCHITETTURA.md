@@ -263,6 +263,21 @@
   pagamenti del nodo, `deploy/nodo/ronda-pagamenti.py`, che prima di
   bussare qui ha gia' chiesto a mostro.db e ai log di mostrod — sta in
   PRODUZIONE, «LA RONDA DEL NODO OGNI ORA».
+  IL QUADRO DEI SERVIZI (25 nov 2026, cantiere quadro-servizi): la
+  porta gemella, `POST /api/battito` ({"servizio", "backup_ore"?}), col
+  suo segreto (`BATTITO_SEGRETO`, stessa forma: vuoto = 404, a byte e a
+  tempo costante, porta prima del corpo). I giudici unici:
+  `servizi_battito` (nomi da `SERVIZI_NOTI` e nient'altro, una riga per
+  servizio e per fetta di cinque minuti in `servizi_fette`, l'ultimo in
+  `servizi_stato`), `servizi_quadro` (stato su/giu/mai, uptime =
+  fette battute su fette passate nei 30 giorni o dal primo battito,
+  eta' del backup che cresce col tempo), `servizi_da_avvisare` (il
+  silenzio oltre i venti minuti e il ritorno, una volta per verso).
+  `orologio_servizi` batte per «vps», avvisa, pota, e ogni dodici ore
+  legge i certificati di `SERVIZI_CERTIFICATI` (mai in collaudo). Il
+  cassetto «🩺 Servizi» chiede `/api/admin/servizi`. Le meta' fuori dal
+  server: `deploy/battito/` (lo script, i file dei servizi di ogni
+  macchina) e `deploy/SE-MUORE.md`.
   SE MANCA LA FATTURA: `azione: 'chiedi_fattura'` scrive il passo
   `serve_fattura/altra_cassaforte`; finché è l'ultima riga della linea
   del tempo `stadio_pagamento` dà `gesto_venditore` pur restando «in
@@ -2754,6 +2769,18 @@
   del catalogo nel client e' `SOTTOCAT`, voce per voce uguale
   all'albero (`prove_sottocategorie_vetrina`). Il pregresso: lo script
   `assegna_sottocategorie.py`, gesto di Andrea (DA-FARE, voce 23).
+  ⚠️ DAL 24 NOV 2026 (cantiere home-card-pulite) LE DUE CARD-INTERRUTTORE
+  NON STANNO PIU' QUI: «Offerte a tempo» e «Sconti dei negozi» sono i due
+  BANNER sopra la griglia (`#occasioniBanner`, catalogo `OCCASIONI`,
+  `renderOccasioni` chiamato in testa a `renderScoprire`), uno sopra
+  l'altro a 328/80 (accanto da 768px), stessi disegni, titoli, giudici di
+  vita e tocco (`toccaScoperta`, che ora scorre in cima alla griglia).
+  Stanno SOPRA le card, al loro posto davanti a #grid, e nessuno li sposta
+  (dal 24 nov notte; per qualche ora erano dentro la griglia dopo la sesta
+  card, ma filtrando si spostavano con le card: Cantieri, «Niente doppioni
+  in griglia»); spenti col barattolo e nella sezione lavoro. Quel che segue vale per loro dove
+  parla di filtri, immagini e titolo; la fila resta dei negozi e delle
+  card che navigano. Verbale: Cantieri, «La home ripulita».
   LA SEZIONE «DA SCOPRIRE» (ago 2026, decisione di Andrea): sotto la
   striscia delle categorie una fila di card RETTANGOLARI (250x115) che
   accendono i filtri dell'occasione — oggi due fisse, le offerte a
@@ -3393,6 +3420,13 @@
   temi come tutto cio' che sta sopra una foto — e sulla PAGINA la
   stessa pastiglia piu' UNA RIGA IN CHIARO. Nessuna delle due basta
   da sola.
+  ⚠️ DAL 24 NOV 2026 LA CARD NON LA DICE PIU' (cantiere
+  home-card-pulite, Andrea: «la pastiglia consigliato nelle card
+  leviamola perché tanto si capisce già che è consigliato»): la
+  pastiglia `.sc-sponsor` e la sua regola CSS sono tolte, anche dalle
+  card dei negozi che pagano la promozione. La parola resta sulla
+  PAGINA (`.rac-pill`). Le righe qui sotto sulla posizione della
+  pastiglia sono storia.
   ⚠️ LA PAROLA E' «Consigliato» E NON «Sponsor» (ago 2026, decisione
   di Andrea): e' il lessico della CATEGORIA futura — quella dove
   finiranno tutti i progetti e i negozi che segnaliamo noi — e
@@ -7870,8 +7904,27 @@
   l'archivio del dispositivo, e `miei` che la rotta da' a chi ha la
   sessione, dagli `autori` che l'orologio fotografa e che non escono mai
   interi), e il taglio a sei dopo. Chi guarda puo' spegnerla («Scambi P2P nella home», in
-  Aspetto; timbri `p2p_home_via`/`p2p_home_su`): al suo posto la riga
-  `#p2pVetrinaVia` con «Mostra», e nessuna domanda al server.
+  Aspetto; timbri `p2p_home_via`/`p2p_home_su`), e nessuna domanda al
+  server. Dal 24 nov 2026 (cantiere home-card-pulite) anche
+  dall'interruttore accanto al titolo (`#p2pVetrinaLeva`, lo riscrive
+  `filaCardP2P(html, spenta)`): spenta, la sezione RESTA col titolo e
+  l'interruttore e sparisce solo il guscio delle card
+  (`#p2pVetrinaGuscio`); la riga `#p2pVetrinaVia` «Mostra» non c'e' piu'.
+  Titolo al centro (griglia a tre colonne, «Vedi tutti» a destra). La
+  card e' alta 240 px (foto 150x139,5, metodi su una riga coi puntini,
+  ⏱ e 🔐 come sole icone accanto alla moneta della rete).
+  Dal 25 nov 2026 (cantiere fascia-p2p) la sezione sta SOTTO gli
+  strumenti («Più recenti», «Filtro», `#filtriBox` e i banner delle
+  occasioni), subito prima di `#mercMappaBox` e della griglia, in una FASCIA a tutta
+  larghezza con la luce arancio dall'alto; l'interruttore e' quello col
+  bitcoin (`.p2p-vt-btc`, moneta ₿ nel pallino), e spenta la sezione
+  prende la classe `spenta` (stesso respiro sopra e sotto la testa):
+  Nello stesso cantiere IL FOGLIO DEL MERCATINO: `#foglioMerc` avvolge
+  tutto da `#catSez` a `#gridSentinella` (categorie, strumenti, banner
+  delle occasioni, fascia P2P, mappa, griglia), un foglio piu' chiaro con
+  gli angoli tondi e il bordo acceso, e i banner `#occasioniBanner` stanno
+  fra `#filtriBox` e la fascia P2P.
+  Cantieri, «La fila Scambi P2P in una fascia a sé».
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
@@ -12450,6 +12503,57 @@
   sblocco di sempre. FUORI, dichiarato: on-chain la decisione resta
   tutto-o-niente (la nota al moderatore lo dice), e un set di annunci
   diversi resta al campo unico.
+  LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici, chiesta da
+  Andrea per i corsi di BitcoinLabs: «precaricare una serie di codici
+  coupon che il cliente usa in autonomia»). Chi vende un annuncio a
+  codice online incolla i codici PRIMA, uno per riga, dal foglio «🔑
+  Codici pronti» del suo annuncio; quando un ordine si incassa, il
+  server ne prende uno per pezzo e consegna da solo. LA TABELLA
+  `codici_scorta (annuncio_id, contenuto, impronta, ordine_id, creato,
+  usato_il)`: il contenuto CIFRATO come ogni digitale
+  (`_cifra_contenuto`), l'impronta HMAC con la chiave dei contenuti
+  (`_impronta_scorta`: lo SHA nudo di un coupon corto si rovescia a
+  forza bruta) per scartare i DOPPIONI, anche contro i già consegnati
+  — lo stesso coupon a due persone è il guaio che la scorta deve
+  rendere impossibile. `ordine_id = 0` è «libero». LE ROTTE: `GET
+  /api/listings/{id}/codici` dice QUANTI (liberi, consegnati, attiva,
+  massimo) e MAI quali — i codici non tornano più al client, nemmeno a
+  chi li ha scritti; `POST` con `{"aggiungi": testo}` (righe ≤
+  `MAX_CARATTERI_CODICE`, al più `MAX_CODICI_SCORTA` = 500 liberi) o
+  `{"togli": true}` (cancella i liberi; ammesso anche a leva spenta).
+  IL PERIMETRO (`_annuncio_con_scorta` e `scorta_per_ordine`): annuncio
+  proprio, consegna 'digitale', non «anche digitale», non abbonamento,
+  non asta, non importato da Nostr o da un negozio collegato; ordine
+  mono-annuncio. IL GANCIO sta in fondo a `_incassa_ordine`, DOPO il
+  commit e in `elif` dell'abbonamento: `_scorta_dopo_incasso` legge i
+  liberi e li prende SENZA AWAIT IN MEZZO (il patto anti-doppione di
+  compra() nel server mono-processo), con la presa che ripete
+  `ordine_id=0` e conta i presi (altrimenti rollback). Con due pezzi o
+  più e `codici_uno_alla_volta(o)` i codici vanno nei riquadri
+  (`codici_digitali`), sennò nel campo unico; l'ordine passa a
+  'shipped' solo se è ancora 'locked'. Avvisi: al compratore gli stessi
+  della consegna a mano (`_avvisa_consegna_digitale`, ora condiviso), a
+  chi vende `msg_scorta_consegnato` col conto dei rimasti. FAIL-OPEN:
+  scorta insufficiente o guasto → l'ordine resta 'locked' e chi vende
+  riceve `msg_scorta_finita` e consegna a mano come sempre. I PEZZI
+  DELL'ANNUNCIO li allinea il CLIENT chiamando la rotta `/quantita` di
+  sempre (le sentinelle leggono il corpo di `ricarica_quantita`, e i
+  suoi tre avvisi di esaurito non si duplicano): aggiungi → prima i
+  codici, poi i pezzi col numero del server; togli → prima i pezzi a
+  zero, poi i codici (al contrario, un pagamento in volo resterebbe
+  senza codice). Leva `SCORTA_CODICI`, accesa di serie. Prove:
+  `collaudo_scorta_codici` (il giro vero) e `prove_scorta_codici`.
+  IL LINK A UN BOT SI TOCCA, SOLO DALLA SCORTA (scelta di Andrea sulla
+  scheda, 24 nov: «Sì, solo link a bot Telegram»). L'ordine consegnato
+  dalla scorta ha `dalla_scorta = 1` e in `/api/orders` esce il solo
+  booleano; sul SI' `resaCodice(.., {linkBot})` passa il testo (già
+  scappato) da `linkBotToccabile`, che rende `<a>` SOLO la forma
+  `https://t.me/<nome>bot` con al più `?start=<parametro>` — il nome
+  di un bot finisce per «bot» per regola di Telegram, quindi canali,
+  gruppi e siti restano testo da copiare come in ogni altro digitale
+  (la regola dell'abbonamento, `linkCanaleToccabile`, resta com'è).
+  Il tocco passa da `apriLinkBot`, che riprova la forma e dentro
+  Telegram usa openTelegramLink.
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il
@@ -15216,6 +15320,26 @@
   (`bloccoMioEsaurito`), e il foglio dell'esaurito ha la sua frase
   («Non lo rifornirai più?»). NON fatto, e proposto ad Andrea a parte:
   il «pezzo unico» scelto alla pubblicazione che si archivia da solo.
+  L'ANNUNCIO NASCOSTO (23 nov 2026, cantiere nascondi-annuncio): lo
+  stato 'nascosto', né scaffale vuoto né archivio. Esce da ogni filtro
+  stato='attivo' da solo, e il link condiviso resta 404 come per il
+  'rimosso' (`un_annuncio` serve solo attivi ed esauriti). Lo vede solo
+  il proprietario in «I tuoi annunci» (`miei_annunci`), da dove torna.
+  La rotta è `POST /api/listings/{id}/nascondi` col corpo
+  {"nascosto": 1|0}: parte solo da 'attivo' o 'nascosto' del
+  proprietario, e scrive con lo stato di partenza nel WHERE. Nascondere
+  ha le guardie: la LARGA degli ordini (la stessa ragione dell'esaurito
+  archiviato: `_rimborsa_compratore` e l'annullo del venditore scrivono
+  stato='attivo', quindi nessun ordine vivo deve mai toccare un
+  nascosto), `_riservati`, asta, importato (`origine_annuncio`,
+  `dal_negozio_collegato`), e la leva `NASCONDI_ANNUNCIO`. Rimettere non
+  ne ha. Le piazze fanno il gesto dell'esaurito (Nostr «sold»/«active»
+  con `solo_aggiornamento`, `promo_venduto`); la coda delle firme fa
+  nascere «sold» un nascosto non ancora pubblicato. Si elimina
+  (`rimuovi_annuncio`) e il moderatore lo rimuove. Nel client:
+  «🙈 Nascondi dalla vetrina» sulla scheda (dopo lo stock, prima
+  dell'uscita rossa, mai sull'importato, solo con `nascondi_annuncio`
+  true in /api/me) e la riga grigia con «👁 Rimetti in vetrina».
   DOVE SI VEDE (decisione di Andrea): SOLO nella pagina del negozio,
   in fondo, sezione «Esauriti di recente» — chiave `esauriti` nel dict
   di `/api/negozio` (tetto `TETTO_ESAURITI` 12, `creato DESC`, una
@@ -19769,7 +19893,9 @@
   placeholder «Cerca su Barattolo…», MAI rimettere un ascoltatore
   keydown sull'Invio (doppia ricerca), e dentro il campo a sinistra
   c'è la lente decorativa `.q-lente` (emoji sbiadita con
-  grayscale+opacity, grigia in entrambi i temi); il banner web arancione ha la
+  grayscale+opacity, grigia in entrambi i temi) — dal 23 nov 2026 al
+  suo posto c'è il barattolo `.q-jar`, e la lente torna solo se il JPEG
+  non arriva (Cantieri, «Il marchio da solo»); il banner web arancione ha la
   ✕ «ho capito» (`chiudiBarraWeb`, hint `barraweb` nel solito
   `localStorage['barattolo_hint']` — chiuso una volta, mai più su
   quel dispositivo; Esci resta nel banner finché visibile e comunque
@@ -27360,6 +27486,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `scelte` sul singolo, `scelte_righe` per id nel carrello, dalla
   fabbrica `corpoConsegna`. Il perché in CANTIERI, «Le tendine
   "Qualsiasi" dei negozi collegati».
+- LE FOTO IN ORDINE, LE LORO DESCRIZIONI E LE VARIANTI DAL FOGLIO
+  VENDI (23 nov 2026, cantiere foto-varianti). La lista `foto` della
+  modifica e' l'annuncio intero in ordine: nome gia' suo = resta, data: =
+  nuova in quel posto, assente = via. Colonna additiva
+  `annunci.didascalie` (JSON allineato a `foto`, '' = nessuna; pubblica
+  in `CAMPI_VETRINA`, letta da `didascalie_lette`), scritta insieme alle
+  foto in pubblica e in modifica; `salva_foto(..., indici)` dice quali
+  posizioni sono entrate. Le varianti semplici scrivono `scelte` da
+  `scelte_del_venditore`; quelle col loro prezzo (`varianti` nel
+  payload, `varianti_da_payload`) fanno una famiglia «u:<id>» con
+  `crea_sorelle` (copie della prima, foto copiate dai file), decisa
+  insieme da `decidi_revisione`. Tutto il testo passa da
+  `testo_da_moderare`. Il perché in CANTIERI, «Le foto in ordine con la
+  loro descrizione, e le varianti dal foglio Vendi».
 - LE FAMIGLIE DI VARIANTI (30 set 2026, il negozio AGORA): l'esplosione
   resta — un annuncio per variante, col suo prezzo, la sua giacenza, i
   suoi ordini e il suo deposito di garanzia — e SOPRA ci si scrive la
@@ -30860,14 +31000,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   del mercatino e quelle degli scambi P2P (`utenti.recensioni_mercatino_
   nascoste`, `utenti.recensioni_p2p_nascoste`, rotta POST
   `/api/me/recensioni-nascoste`). Il giudice è `_recensioni_nascoste_di`
-  (al proprietario e ai moderatori niente è nascosto), il filtro
+  (al solo proprietario niente è nascosto: ai moderatori sì dal 23 nov
+  2026, con la frase «Quelle nascoste le vedi sempre solo tu.»), il filtro
   `_sql_recensioni_visibili` sta nella SELECT della rotta del negozio,
-  prima del tetto. STELLE E NUMERO RESTANO, su tutte: nascondere toglie
+  prima del tetto, e dal 23 nov 2026 lascia sempre passare le negative
+  (`VOTO_SEMPRE_VISIBILE` = 2: una e due stelle). STELLE E NUMERO RESTANO, su tutte: nascondere toglie
   il racconto, mai il voto. Con le P2P nascoste escono anche
   `scambi_completati` (0) e `risponde_in_fretta` (falso); i marchi dei
   non completati e delle dispute perse restano. Le due scelte non escono
   mai dalla risposta del negozio. Leva `RECENSIONI_NASCONDIBILI`, accesa.
   Il verbale in CANTIERI, «Le recensioni nascondibili».
+  LE CARD DEL P2P (23 nov 2026): `_p2p_nascosti_fra` dice chi ha spento
+  le P2P, e i tre costruttori dei volti — `_facce_ordini_p2p` (libro
+  Lightning e «Chi ha pubblicato»), la fotografia on-chain (`_rep`),
+  `_volti_persone` (l'altra parte) — gli tolgono `completati` e `veloce`
+  per TUTTI, moderatori compresi. CANTIERI, «"Scambi P2P" nascosto
+  anche sulle card del P2P».
 
 - LE RECENSIONI DEGLI SCAMBI (set 2026, richiesta di Andrea): a
   scambio P2P concluso le due parti si recensiscono come nel
@@ -34099,6 +34247,38 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `prove_indirizzo_non_verificato` e le sezioni 4-quater e 4-quinquies
   di `prove_p2p_motore`. La procedura (la prova dal nodo, la riga da
   aggiungere): PRODUZIONE, «I WALLET IL CUI INDIRIZZO NON PASSA».
+  E dal cantiere p2p-incasso-da-solo (24 nov 2026, perché in CANTIERI,
+  «L'indirizzo degli incassi parte da solo nel P2P»): L'INDIRIZZO DEGLI
+  INCASSI PARTE SENZA IL FOGLIO. Il motore (`applicaMessaggioP2P`), al
+  passaggio di chi compra in `attesa_mia_fattura`, chiede a
+  `indirizzoDaSoloP2P(o)` se c'è un indirizzo da mandare (leva
+  `incassoDaSolo` in busta, da `P2P_INCASSO_DA_SOLO`; `myLnAddress` con
+  la forma di un indirizzo; non `walletNonPassaP2P`; non fra gli
+  `indirizziRifiutati` di quella riga; niente wallet NWC, che la fattura
+  la fa già da solo; `daSolo` non ancora scritto sulla riga). Se sì, al
+  posto del toast e del foglio parte `incassoDaSoloP2P` (fuori dal giro,
+  `setTimeout`, e con `typeof`: il motore non chiama il server). Lì
+  dentro: `daSolo = true` sulla riga prima di partire (una volta sola
+  per scambio), il velo solo se `seguibileP2P`, `controlloFatturaP2P`,
+  `segnaTentativoP2P('fattura_inviata')`, l'`add-invoice` col solo
+  indirizzo, `ricordaFatturaP2P(id, 0)`, `dopoGestoP2P` e il toast «⚡
+  Ricevi su …» (testo di Andrea). Ogni «no» passa da `incassoAManoP2P`:
+  il toast e il foglio di sempre (il foglio solo se lo scambio chiede
+  ancora e lo si sta guardando), col fermo del controllo (e l'indirizzo
+  nel campo se c'è «Usa comunque») o col perché del coordinatore;
+  `invalid-invoice` e `wallet_non_passa` ricordano l'indirizzo come
+  rifiutato. La fattura nuova dopo un payout fallito (`fattura_nuova`)
+  resta a mano. Prove: `prove_incasso_da_solo_p2p`.
+  «RICEVI ON-CHAIN» PRIMA DELLA PRESA (stesso cantiere, secondo giro):
+  senza foglio sparirebbe la scelta «₿ On-chain» del cambio, e allora la
+  si fa nel foglio dell'ordine. `riceviOnchainOffertoP2P(riga)` decide se
+  mostrare il link (chi compra, ordine altrui, `swapP2PAcceso`, e
+  `indirizzoDaSoloP2P({lato: 'compro'})` non vuoto: solo a chi la
+  perderebbe), `riceviOnchainP2P` lo accende/spegne (`p2pDettOnchain`,
+  azzerato da `apriDettaglioP2P`), `eseguiPresaP2P` scrive `riceviOc` sulla
+  riga, `indirizzoDaSoloP2P` con `riceviOc` tace, e `apriIncassoP2P` la
+  trasforma una volta in `p2pIncassoRete[id] = 'oc'` (se il cambio c'è) e
+  la cancella.
 
 - IL «CONDIVIDI» DI UN ORDINE P2P (10 ott 2026, perché in CANTIERI, «Il
   "Condividi" di un ordine P2P»). Un ordine del libro si manda fuori con
@@ -35343,6 +35523,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.sc-quadra-eti` su velo pieno, testo funzione della leva quindi nella
   firma). Tutte e due sempre visibili, tocco `vaiAste()`: ad aste spente
   `astepresto`, accese la vetrina. Con lei «Da scoprire» non sparisce più.
+  ⚠️ LA CARD QUADRATA E' TOLTA il 24 nov 2026 (cantiere
+  home-card-pulite, Andrea: «rimane solo nelle icone sfoglia per
+  categorie»): resta la sola tessera. La forma `quadra` del template di
+  «Da scoprire» resta senza voci, e la sezione torna a sparire quando non
+  ha card vive.
   A cella vestita da
   Swap `voceNav` accende Esplora e non la quarta cella, per il ramo aste
   e per `astepresto`.
@@ -38474,7 +38659,11 @@ mai il kind 0 di nessuno: regola ferrea 2).
   (`negozi_promossi_pubblici`: `scoprire` finché corrono i giorni,
   `consigliato` dopo) e `promozioni_attive`; `evidenza_fino` viaggia con
   ogni card (`CAMPI_VETRINA`). Il moderatore: `/promossi` (elenco,
-  `negozio CODICE`, `annuncio ID`), nel gruppo e in privato. Nella pagina:
+  `negozio CODICE`, `annuncio ID`, e dal 24 nov `evidenza ID [giorni]`:
+  l'evidenza REGALATA, la stessa della pagata senza fattura — data che
+  si somma, `creato` a adesso, `promo_in_cima_canale` — dentro gli stessi
+  posti di `posti_evidenza`, 1-90 giorni, l'id anche dal link
+  (`_id_annuncio`)), nel gruppo e in privato. Nella pagina:
   `inEvidenza(l)` e la cornice `.card.ev`, la fila `#evidenzaFila`
   (`renderEvidenza`, solo vetrina nuda), le voci `vociNegoziPromossi` in
   «Da scoprire» e in `consigliatiPubblicati` (`promo: true`, banner e
@@ -38486,6 +38675,123 @@ mai il kind 0 di nessuno: regola ferrea 2).
   dopo, `armaScorriScoprire` arma pausa al tocco, osservatore e ricalcolo
   allo scroll (un fotogramma).
   Il foglio di `apriPromuovi` (23 nov sera): tre voci (`vocePromoHTML`,
-  icone `ICONA_PROMO`, anteprime `ANTEPRIMA_PROMO` aperte da `guardaPromo`,
+  icone `ICONA_PROMO`, anteprime `ANTEPRIMA_PROMO` aperte da `scegliVocePromo` (la voce scelta, una sola aperta),
   durata di In evidenza in `promoGiorni`), due letture del listino in
-  parallelo; il tasto `.btn.promo-porta`.
+  parallelo; il tasto `.btn.promo-porta` (in cima a `.detail-body`, classe `in-cima`).
+  La pagina dedicata di «Da scoprire» (23 nov): alla PRIMA entrata
+  (`promo_consigliato` ancora 0) `_incassa_promo` scrive nella stessa
+  transazione la riga dello staff `PROMO_PAGINA_ASSISTENZA` nella chat di
+  Assistenza del negozio (`autore` 0, `admin` 1), il «Fatto!» porta il tasto
+  `/?assistenza=mia` e i moderatori ricevono «Da preparare la pagina di…»
+  (argomento moderazione). Tutto solo con `ASSISTENZA_ATTIVA`. La pagina
+  resta un racconto a mano (`racconti.py`).
+  I QUADRATI DEI NEGOZI (23 nov 2026 sera): sul telefono `#scoprireQuadri`
+  sotto la fila grande, disegnati da `renderQuadriScoprire`; la divisione
+  la fa `spartisciScoprire` (dei negozi della fila, nell'ordine del
+  turno, uno si' e uno no va nei quadrati; card nostre e computer: tutte
+  grandi). Foto, categoria e riga «cosa vende» da `GET
+  /api/negozi/vetrina?codici=` (`negozi_vetrina_pubblici`: al piu'
+  `NEGOZI_VETRINA_MAX` codici passati da `_CODICE_NEGOZIO`, la prima foto
+  dell'annuncio attivo piu' recente, la categoria piu' frequente,
+  `in_breve` del racconto solo se pubblicato; mai un tg_id). La riga di
+  casa sta in `RACCONTI[slug].inBreve` (client) e
+  `RACCONTI_NEGOZI[slug]["in_breve"]` (server). L'ordine della home sul
+  ramo: `#scoprireSez` (senza titolo), `#evidenzaSez` (dal 24 nov col
+  titolo al centro, tolto di nuovo la sera; sotto le card, dalla sera del 24, una MENSOLA di luce
+  arancio ferma, disegnata sullo sfondo di `.ev-strip`, al posto delle due
+  onde di `ondeEvidenza`, tolte: Cantieri, «La home ripulita», «La luce
+  sotto In evidenza» e «La mensola di luce»; sul telefono le sue card sono larghe quanto serve per vederne due e mezza, `calc((100vw - var(--pad) - 20px) / 2.5)`, e sul computer 150: «Il primo schermo del telefono», col calcolo che c'era prima e perché è andato via),
+  `#catSez`, `#lavSez`, gli strumenti (dal 25 nov dentro `#foglioMerc`, che va da `#catSez` alla griglia), i due banner
+  `#occasioniBanner` (dal 24 nov; dal 25 sotto gli strumenti), `#p2pVetrinaSez` e la griglia. A vetrina nuda la griglia salta gli
+  annunci che la fila «In evidenza» sta mostrando (`nellaFilaEvidenza`,
+  la stessa domanda di renderEvidenza). Il tocco su un negozio della
+  fila (card o quadrato) passa da `apriNegozioDaScoprire`: la pagina sale
+  dal basso (`.sale-dal-basso`, tolta a `animationend`) GIA' PIENA, perche'
+  `preparaNegoziScoprire` chiede le pagine della fila 1,5 s dopo il disegno,
+  senza `vista`/`da` (preparare non e' visitare), valide
+  `NEGOZIO_PRONTO_MS`; `apriNegozio` su un'apertura disegna il pronto e
+  manda lo stesso la richiesta che conta, senza aspettarla. Senza pronto,
+  l'anello di `negozioInAttesa`. Dalla card GRANDE sul telefono, col
+  pronto e senza effetti ridotti, al posto della salita c'e' il VOLO
+  (`voloNegozio`, Web Animations): una copia della card si allarga fino
+  a `#negozioTestata` (margini `--pad`, 272:130, angoli 14) sopra un velo
+  `.negozio-velo`; a `VOLO_APRI_MS` (260) su `VOLO_MS` (420) il negozio
+  si apre sotto e si scopre dall'alto, e la testata prende il posto della
+  copia. La testata vale solo per il negozio del volo (`negozioTestataDi`,
+  azzerata in cima ad `apriNegozio` salvo `ridisegno` o `negozioInVolo`);
+  la card la segna `toccaScoperta` in `cardToccata` (mai dal quadratino:
+  `toccaScoperta(id, true)`). Se il negozio ha il BANNER (`bannerNegozio`
+  sui dati pronti) la testata resta spenta e la copia atterra sulla
+  `.negozio-banner` (3:1, misurata a `VOLO_APRI_MS`, scarto ricordato in
+  `scartoInsegna`), tolta a foto decodificata (al piu' 400 ms); la
+  preparazione mette gia' in cache la foto del banner. Le pillole si appiccicano solo a
+  `#catSez` passata in ALTO (`boundingClientRect.top < 0`).
+  La divisione parte da 8 negozi (`2 * QUADRI_MIN`); sotto, ogni negozio
+  sta in TUTTE E DUE le file, da `QUADRI_POCHI` negozi in su (2 il 24 nov; 5 la sera stessa, «sono troppo pochi», e di nuovo 2 mezz'ora dopo, «anche se sono 2 adesso facciamoli vedere»).
+  La foto del quadrato: `quadro` della pagina (1-9 una foto della storia,
+  o "logo", il ritratto dei Consigliati; il catalogo di casa la scrive in
+  `RACCONTI[slug].quadro`), sennò la prima foto dell'ultimo annuncio. Dietro la sezione, solo sul telefono, `.sc-sfondo` (`#scoprireSfondo`,
+  due `<i>` col `.su` che si scambiano): la foto della card al centro,
+  sfocata, messa da `sfondoScoprire` alla fine di `centroScoprire`.
+  LA FOTO DEL QUADRATO SCELTA DALLA PAGINA (23 nov 2026 notte, Piano
+  B): una voce di `racconti.py` con `quadro: N` (1-9) fa uscire `quadro`
+  da `sponsorizzati_pubblici`; `vociSponsor` ne fa
+  `/assets/racconti/<slug>-N.webp` (solo da un intero 1-9) e
+  `renderQuadriScoprire` lo mette prima della miniatura dell'annuncio.
+  IL NEGOZIO COLLEGATO DAL PANNELLO (stessa notte): una voce con
+  `collega_dal_pannello` nasce col `negozio` vuoto; il gesto
+  `{"esito": "collega", "negozio": <link o codice>}` su
+  `POST /api/admin/racconti/<slug>` (solo in bozza) scrive
+  `racconto_negozio:<slug>`, e `applica_negozi_collegati` (avvio e
+  gesto) lo rimette nella voce in memoria: i giudici leggono sempre e
+  solo `r["negozio"]`. Nel pannello «🔗 Collega il negozio», con
+  `collegabile` dall'elenco admin.
+  LA FOTO CHE APRE UN BOT DI TELEGRAM (24 nov 2026, BitcoinLabs): il
+  `link` di un blocco foto, che dal 20 nov apriva solo un video di
+  YouTube, apre anche `https://t.me/<nome>` (5-32 caratteri, lettera in
+  testa) con al piu' `?start=<lettere, cifre, _ e ->` — il link
+  referral di un bot partner. Il giudice resta `linkVideoRacconto`
+  (nome storico: lo chiamano il renderer e tre banchi delle prove), e
+  `apriVideoRacconto` dentro Telegram apre i t.me con
+  `openTelegramLink`, gli altri con `openLink`. Il catalogo lo guarda
+  `prove_racconti_bozza` con la stessa forma.
+  LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
+  `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
+  Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);
+  niente piu' `#fasciaTest`. A rodaggio spento `modaleTest` chiama
+  `modaleNotizie`: timbro `notizie` (in `VISTI_NOTI`), ogni
+  `NOTIZIE_OGNI_MS`, chiede `GET /api/me/canale-notizie`
+  (`getChatMember` su `CANALE_NOTIZIE_CHAT`, cache `NOTIZIE_CACHE_S`;
+  `iscritto` vero, falso o null) e non si ripresenta a chi e' iscritto,
+  ne' a chi non si sa se e' gia' stato visto una volta.
+- NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere profilo-mio;
+  lo studio `docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md`, GRATIS dal
+  23 nov). Il «cartellino» vive in nove colonne `mio_*` di `utenti`:
+  `mio_nome`/`mio_foto` gli APPROVATI, `mio_nome_att`/`mio_foto_att` la
+  proposta, `mio_stato` ('' | revisione | approvato | rifiutato | tolto),
+  `mio_motivo`, `mio_chiesto_il`, `mio_approvato_il` (il conto dei
+  `PROFILO_MIO_GIORNI` parte da qui) e `mio_nome_prima` (il nome che
+  torna quando lo si lascia). Approvato, si APPLICA scrivendo in `nome` e
+  `avatar` con `avatar_scelta='mia'` (`_applica_mio`): le letture del resto
+  non sanno niente del cartellino. Le porte che riscrivono lo rispettano:
+  `_upsert_da_telegram` (CASE su 'nostr','mia'), `aggiorna_profilo_social`
+  (esce subito con 'mia'), `_scrivi_avatar` e `_scrivi_nome_nostr`
+  (condizione nell'UPDATE, contro il giro partito prima
+  dell'approvazione); `_scrivi_avatar` non cancella mai `mio_foto` né
+  `mio_foto_att`. Rotte: `POST /api/me/profilo-mio` (nome e/o foto; quel
+  che manca resta com'è, la foto di adesso COPIATA da `_copia_foto_mia`),
+  `POST /api/me/avatar-scelta` con 'mia' (solo con `mio_nome`),
+  `GET/POST /api/admin/profilo-mio[/{tg_id}]` (approva | rifiuta | togli)
+  e la tastiera `pm:ok|no:{tg_id}` (`callback_profilo_mio`), cuore comune
+  `decidi_profilo_mio`. Il giudice del nome: `nome_mio_forma` (pura:
+  3-30, lettere latine, cifre, spazio e . - ' _, `NOME_MIO_VIETATE` dentro
+  il nome compattato e smascherato, `NOME_MIO_VIETATE_PAROLA` come parola
+  intera, `termine_vietato`) e `giudica_nome_mio` (i sosia di
+  `_nomi_protetti`: staff, Consigliati, chi ha venduto 10 volte; sempre
+  senza se stesso). All'approvazione con un nome diverso,
+  `_controparti_aperte` (ordini coi sats in cassaforte, scambi P2P toccati
+  nelle ultime 24 ore e non chiusi) riceve «X ora su Barattolo si chiama
+  Y». Fusione: il cartellino approvato della metà Nostr passa se di là
+  non ce n'è uno, senza imporre la scelta; la cancellazione porta via i
+  due file. Le foto hanno la forma `av_<negozio>_<millisecondi>.jpg`.
+  Leve: `PROFILO_MIO_ATTIVO` (accesa di serie), `PROFILO_MIO_GIORNI` (30).

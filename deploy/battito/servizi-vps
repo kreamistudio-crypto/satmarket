@@ -1,0 +1,5 @@
+# /etc/battito/servizi sul VPS: nome|controllo|cartella del backup
+# «vps» lo batte il server da solo; qui la sua eta' del backup.
+vps|curl -fsS -m 10 -o /dev/null http://127.0.0.1:8080/api/salute|/srv/barattolo/backup/fuori
+onion|systemctl is-active -q tor@default|
+lnbits|curl -sS -m 10 -o /dev/null http://127.0.0.1:5001/|

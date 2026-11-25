@@ -191,6 +191,7 @@ collaudo_p2p_onchain_usdt.py
 collaudo_p2p_onchain_commissione.py
 collaudo_p2p_onchain_barattozon.py
 collaudo_leve_pannello.py
+collaudo_id_utenti.py
 cartone_satsrouting.py
 collaudo_fusione_da_telegram.py
 collaudo_avvisi_nostr_arrivano.py
@@ -236,3 +237,8 @@ collaudo_sessioni_attive.py
 collaudo_abbonamento_canale.py
 collaudo_recensioni_nascoste.py
 collaudo_promozioni.py
+collaudo_profilo_mio.py
+collaudo_nascondi_annuncio.py
+collaudo_foto_varianti.py
+collaudo_scorta_codici.py
+collaudo_quadro_servizi.py

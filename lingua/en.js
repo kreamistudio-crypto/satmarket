@@ -23,7 +23,6 @@
 
   /* ---- la testata, la barra in basso, il guscio ---- */
   "Barattolo — il mercatino in sats": "Barattolo — the marketplace in sats",
-  "il mercatino in sats": "the marketplace in sats",
   "La classifica del mercatino": "The marketplace leaderboard",
   "Il tuo profilo": "Your profile",
   "🛍️ Mercato": "🛍️ Market",
@@ -31,7 +30,6 @@
   "Sezione": "Section",
   "Cerca su Barattolo…": "Search Barattolo…",
   "Mostra i prezzi in euro o in sats": "Show prices in euros or in sats",
-  "🔒 Ogni acquisto è protetto dal deposito di garanzia": "🔒 Every purchase is protected by the escrow deposit",
   "Compra e vendi": "Buy and sell",
   "Pagamenti in Lightning, col deposito di garanzia che protegge tutti. Pubblicare non costa nulla.": "Lightning payments, with an escrow deposit that protects everyone. Listing is free.",
   "Esplora": "Explore",
@@ -2246,7 +2244,6 @@
   "garanzia di questo annuncio.": "escrow deposit.",
   "Apri": "Open",
   "foto in arrivo": "photo coming",
-  "Chiudi la storia": "Close the story",
   "Leggi la storia ›": "Read the story ›",
   "{} Consigliato": "{} Recommended",
   "Anteprima: questa pagina la vedi solo tu.": "Preview: only you see this page.",

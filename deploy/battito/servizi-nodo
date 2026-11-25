@@ -1,0 +1,3 @@
+# /etc/battito/servizi sul NODO: nome|controllo|cartella del backup
+nodo|[ "$(docker inspect -f '{{.State.Running}}' nodo-lnd-1)" = true ]|/var/backups/nodo
+mostro|[ "$(docker inspect -f '{{.State.Running}}' nodo-mostro-1)" = true ]|

@@ -103,8 +103,11 @@ def avvio():
     # senza almeno una foto un annuncio non si pubblica piu', e questo
     # collaudo non parla di foto. La rotta ne riceve una finta e
     # `salva_foto` risponde col nome, senza scrivere nessun file.
-    server.salva_foto = lambda aid, foto, versione="": (
-        [f"a{aid}_0.jpg"], [])
+    # (23 nov 2026, foto-varianti) `indici` dice quale posizione e'
+    # entrata: qui entra sempre la prima, l'unica che si salva
+    server.salva_foto = lambda aid, foto, versione="", indici=None: (
+        indici.append(0) if indici is not None else None,
+        ([f"a{aid}_0.jpg"], []))[1]
 
     async def ok_ai(*a, **k):
         return None

@@ -340,6 +340,7 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     # 🔁 il coordinator e i suoi segreti
     "MOSTRO_NPUB", "P2P_PROVA_IDS", "P2P_STATISTICHE_IDS", "MOSTRO_RELAY",
     "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
+    "BATTITO_SEGRETO",
     "P2P_EVENTI_SEGRETO", "P2P_FINESTRA_SEGRETO", "SEGRETI_PROFILO_P2P",
     "P2P_GIROCONTO_SEGRETO", "LNBITS_RISERVA_ADMIN_KEY",
     "SEGRETO_PROFILO_P2P_VIVA",
@@ -1260,6 +1261,13 @@ try:
     from config import BANNER_TEST_LINK
 except ImportError:
     BANNER_TEST_LINK = ""
+# IL CANALE DELLE NOTIZIE (23 nov 2026): quello che il megafono in
+# testata apre, e dove il riquadro invita a entrare. Il bot deve esserne
+# amministratore (anche senza permessi) perche' getChatMember risponda.
+try:
+    from config import CANALE_NOTIZIE_CHAT
+except ImportError:
+    CANALE_NOTIZIE_CHAT = "@barattolostore"
 
 # Il contatore degli «utenti» in vetrina: quante persone sono gia'
 # entrate nel mercatino (fino al 26 set 2026 la riga diceva
@@ -1451,6 +1459,20 @@ try:
         CODICI_UNO_ALLA_VOLTA = True
 except ImportError:
     CODICI_UNO_ALLA_VOLTA = True
+# LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici, idea e ok
+# di Andrea, per i corsi di BitcoinLabs): chi vende un digitale incolla
+# PRIMA una lista di codici (o di link), uno per riga, e al pagamento
+# Barattolo ne consegna uno da solo: chi vende non deve fare niente.
+# Acceso di serie (regola delle leve del 14 nov); False = interruttore
+# d'emergenza: gli ordini nuovi tornano alla consegna a mano di ieri, e
+# la scorta resta li'.
+try:
+    from config import SCORTA_CODICI
+    if not isinstance(SCORTA_CODICI, bool):
+        print("[digitale] SCORTA_CODICI non e' True/False: resta acceso")
+        SCORTA_CODICI = True
+except ImportError:
+    SCORTA_CODICI = True
 # L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026, cantiere abbonamento-
 # canale, idea e ok di Andrea: il negozio AndreAI vende un mese del suo
 # canale privato «Bitcoin On»). Chi paga riceve da solo un link d'invito
@@ -3284,6 +3306,7 @@ FRENI = {
     # Lightning address, la nascita legge un PSBT
     "onchain_cambio": (40, 3600),     # preventivo, fattura e cambio di un ordine, per persona
     "leva_pannello": (20, 3600),      # una leva cambiata dal pannello, per admin
+    "id_utenti": (5, 3600),           # il file degli id Telegram degli utenti, per admin
     # (2 nov 2026) il «Conferma» del cambio automatico: ogni tocco puo'
     # far nascere uno swap dal fornitore
     "swap_auto": (10, 3600),          # il cambio automatico di un ordine, per persona
@@ -4232,7 +4255,9 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
     stesso che serve il file: la card c'e' quando c'e' la sua immagine —
     e col negozio risolto. Escono quattro chiavi: lo slug, il titolo,
     l'emoji e il CODICE del negozio, mai il tg_id con cui il catalogo
-    puo' legare la pagina (il patto dei CAMPI_RACCONTO). In bozza non
+    puo' legare la pagina (il patto dei CAMPI_RACCONTO); dal 23 nov 2026
+    anche `quadro`, il numero della foto del quadrato, se la pagina lo
+    sceglie. In bozza non
     esce niente, per nessuno: questa busta la riceve chiunque.
 
     Fail-closed anche sul guasto: un ornamento della home non deve poter
@@ -4249,9 +4274,23 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
             v = _venditore_racconto(con, r)
             if not (v and v["negozio"]):
                 continue
-            fuori.append({"slug": s, "titolo": r.get("titolo") or "",
-                          "emoji": r.get("emoji") or "",
-                          "negozio": v["negozio"]})
+            voce = {"slug": s, "titolo": r.get("titolo") or "",
+                    "emoji": r.get("emoji") or "",
+                    "negozio": v["negozio"]}
+            # LA FOTO DEL QUADRATO (23 nov 2026, Piano B): il numero di
+            # una foto della storia, `{slug}-N.webp`, che il quadrato in
+            # home mostra al posto della prima foto dell'ultimo annuncio
+            # (una foto con le scritte, a 96px, non si legge). Solo un
+            # numero da 1 a 9, la forma di FORMA_RACCONTO: senza, il
+            # quadrato resta com'era.
+            # (24 nov 2026, AndreAI) oppure "logo": il ritratto della card
+            # «Consigliati», per una pagina che il logo ce l'ha
+            q = r.get("quadro")
+            if type(q) is int and 1 <= q <= 9:
+                voce["quadro"] = q
+            elif q == "logo" and r.get("logo") is True:
+                voce["quadro"] = "logo"
+            fuori.append(voce)
     except Exception as e:
         print(f"⚠️ [sponsor] la fila non si legge: {e}")
         return []
@@ -4616,6 +4655,10 @@ def lista_racconti_admin(x_tg_init_data: str = Header(""),
             except ValueError:
                 d["pubblicato_il"] = 0
             d["venditore"] = None
+            # (23 nov 2026) il gesto «🔗 Collega il negozio»: solo le
+            # pagine nate per questo, e solo in bozza
+            d["collegabile"] = (_collegabile(r)
+                                and d["stato"] != "pubblicato")
             if r.get("negozio") or r.get("venditore_tg"):
                 v = _venditore_racconto(con, r)
                 if v and v["negozio"]:
@@ -4651,12 +4694,15 @@ async def decidi_racconto_admin(slug: str, req: Request,
         raise HTTPException(403, "Riservato ai moderatori")
     d = await leggi_json(req)
     esito = (d.get("esito") or "").strip()
-    if esito not in ("pubblica", "bozza"):
+    if esito not in ("pubblica", "bozza", "collega"):
         raise HTTPException(400, "Esito sconosciuto")
     r = RACCONTI_NEGOZI.get(slug)
     if not r:
         raise HTTPException(404, "Pagina non trovata")
     titolo = html.escape(r.get("titolo") or slug)
+    if esito == "collega":
+        return await _collega_negozio_racconto(slug, r, d.get("negozio"),
+                                               user["id"], titolo)
     if esito == "pubblica":
         if not (r.get("negozio") or r.get("venditore_tg")):
             raise HTTPException(409, "Manca il venditore: senza il suo "
@@ -4681,6 +4727,75 @@ async def decidi_racconto_admin(slug: str, req: Request,
     return {"ok": True, "stato": "bozza",
             "detto": "📝 Rimessa in bozza: la vedono solo i moderatori "
                      "e il venditore"}
+
+
+# IL NEGOZIO COLLEGATO DAL PANNELLO (23 nov 2026, Piano B: la pagina e'
+# pronta e il negozio non esiste ancora). Una voce del catalogo con
+# `collega_dal_pannello` nasce col `negozio` vuoto; il moderatore, a
+# pagina in BOZZA, incolla il link (o il codice) del negozio e il codice
+# risolto finisce in `racconto_negozio:<slug>`. Da li' lo rimette nella
+# voce in memoria `applica_negozi_collegati`, all'avvio e dopo il gesto:
+# tutti i giudici di sempre (`_e_suo`, `_venditore_racconto`) leggono il
+# `negozio` della voce, e non c'e' un secondo posto da tenere in pari.
+# PERCHE' SOLO IN BOZZA: una pagina pubblicata che cambiasse negozio
+# finirebbe in un attimo sulla vetrina di un altro. Per cambiarlo la si
+# rimette in bozza, e il gesto si ripete.
+def _collegabile(r: dict) -> bool:
+    return r.get("collega_dal_pannello") is True and not r.get("venditore_tg")
+
+
+def applica_negozi_collegati():
+    for slug, r in RACCONTI_NEGOZI.items():
+        if not _collegabile(r):
+            continue
+        cod = impostazione(f"racconto_negozio:{slug}", "")
+        r["negozio"] = cod if cod and _CODICE_NEGOZIO.fullmatch(cod) else ""
+
+
+@app.on_event("startup")
+async def collega_negozi_racconti():
+    applica_negozi_collegati()
+
+
+def _codice_da_link_negozio(testo) -> str:
+    """Il codice (o il nome a scelta) da quel che incolla il moderatore:
+    il link intero del negozio — `.../negozio/<x>`, con o senza ? o # —
+    o il solo codice. Vuoto se non ha la forma."""
+    t = str(testo or "").strip()[:300]
+    t = t.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+    if "/" in t:
+        t = t.rsplit("/", 1)[1]
+    return t if _CODICE_NEGOZIO.fullmatch(t) else ""
+
+
+async def _collega_negozio_racconto(slug: str, r: dict, testo, admin_id,
+                                    titolo: str) -> dict:
+    if not _collegabile(r):
+        raise HTTPException(409, "Questa pagina ha il venditore scritto "
+                                 "nel catalogo")
+    if racconto_stato(slug) == "pubblicato":
+        raise HTTPException(409, "Rimetti la pagina in bozza prima di "
+                                 "cambiarle il negozio")
+    cod = _codice_da_link_negozio(testo)
+    if not cod:
+        raise HTTPException(400, "Incolla il link del negozio o il suo codice")
+    con = db()
+    try:
+        v = con.execute(
+            "SELECT negozio, nome FROM utenti WHERE negozio=? OR "
+            "(negozio_slug=? COLLATE NOCASE AND negozio_slug!='') LIMIT 1",
+            (cod, cod)).fetchone()
+    finally:
+        con.close()
+    if not (v and v["negozio"]):
+        raise HTTPException(404, "Nessun negozio con questo link")
+    scrivi_impostazione(f"racconto_negozio:{slug}", v["negozio"])
+    applica_negozi_collegati()
+    await notifica_admin(f"🔗 Pagina «{titolo}» collegata al negozio "
+                         f"{html.escape(v['negozio'])} (da tg {admin_id})",
+                         argomento="riepiloghi")
+    return {"ok": True, "stato": "bozza", "negozio": v["negozio"],
+            "detto": f"🔗 Collegata al negozio di {v['nome'] or v['negozio']}"}
 
 
 def nuovo_codice_negozio(con) -> str:
@@ -7286,7 +7401,7 @@ def init_db():
         foto TEXT DEFAULT '',              -- lista JSON: nomi file o URL
         contatto_nostr TEXT DEFAULT '',    -- npub del venditore (annunci importati)
         nostr_event_id TEXT DEFAULT '',    -- evento NIP-99 firmato dalla piattaforma
-        stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso
+        stato TEXT DEFAULT 'attivo',      -- attivo | venduto | rimosso | nascosto
         -- quante volte l'annuncio e' stato visto (set 2026): PRIVATO,
         -- lo vede solo il proprietario (e gli admin) — mai un dato
         -- pubblico come i savers. Cresce da registra_vista, una volta
@@ -10106,6 +10221,29 @@ def init_db():
                     # dice ogni volta il giudice (`_nip05_chiave_hex`).
                     # Unicita' dell'applicazione, come `negozio_slug`.
                     "nip05_nome TEXT DEFAULT ''",
+                    # NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere
+                    # profilo-mio; lo studio del 6 ott, GRATIS per decisione
+                    # di Andrea del 23 nov): il «cartellino» che l'utente
+                    # appende alla bancarella, timbrato da un moderatore.
+                    # `mio_nome`/`mio_foto` sono quelli APPROVATI, le due
+                    # `_att` la proposta in attesa (il vivo resta esposto
+                    # finche' il nuovo non e' approvato, il patto del
+                    # banner). Stato: '' mai chiesto | revisione |
+                    # approvato | rifiutato | tolto. `mio_nome_prima` e' il
+                    # nome che c'era prima del cartellino: torna quando lo
+                    # si lascia e non c'e' un Telegram fresco a ridirlo.
+                    # Le letture del resto del server non si toccano:
+                    # applicato, il cartellino si scrive in `nome` e
+                    # `avatar`, e `avatar_scelta='mia'` lo tiene li'.
+                    "mio_nome TEXT DEFAULT ''",
+                    "mio_foto TEXT DEFAULT ''",
+                    "mio_nome_att TEXT DEFAULT ''",
+                    "mio_foto_att TEXT DEFAULT ''",
+                    "mio_stato TEXT DEFAULT ''",
+                    "mio_motivo TEXT DEFAULT ''",
+                    "mio_chiesto_il INTEGER DEFAULT 0",
+                    "mio_approvato_il INTEGER DEFAULT 0",
+                    "mio_nome_prima TEXT DEFAULT ''",
                     # L'INTERRUTTORE DEGLI AVVISI P2P (16 set 2026): 1 =
                     # accesi, di serie. Chi lo spegne non riceve NIENTE
                     # dello scambio, ne' la frase precisa ne' la generica
@@ -10773,6 +10911,11 @@ def init_db():
                     # compra ne sceglie una voce per tendina alla cassa
                     # e la scelta arriva al venditore nella nota.
                     "scelte TEXT DEFAULT ''",
+                    # LE DESCRIZIONI DELLE FOTO (23 nov 2026, chieste da
+                    # Zzap): JSON [testo, ...] allineato a `foto`, '' dove
+                    # la foto non ne ha. Le scrive chi vende dal foglio
+                    # Vendi e dalla modifica; si leggono a foto aperta.
+                    "didascalie TEXT DEFAULT ''",
                     # IL CONTEGGIO DELLE VISUALIZZAZIONI (set 2026):
                     # privato, lo vede solo il proprietario (e gli
                     # admin) — vedi la CREATE TABLE qui sopra per il
@@ -11980,6 +12123,31 @@ def init_db():
                 "correzioni INTEGER DEFAULT 0, "
                 "corretto_il INTEGER DEFAULT 0, "
                 "PRIMARY KEY (ordine_id, n))")
+    # LA SCORTA DI CODICI (24 nov 2026): i codici caricati PRIMA della
+    # vendita, uno per riga. Cifrati come `contenuto_digitale`; non
+    # escono mai verso nessun client, nemmeno verso chi li ha caricati
+    # (li ha gia'): le rotte dicono solo QUANTI. `ordine_id` 0 = libero;
+    # un codice uscito resta di quell'ordine per sempre, anche se si
+    # rimborsa: chi l'ha visto potrebbe averlo usato. `impronta` serve a
+    # rifiutare i doppioni senza decifrare.
+    con.execute("CREATE TABLE IF NOT EXISTS codici_scorta ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "annuncio_id INTEGER NOT NULL, "
+                "contenuto TEXT NOT NULL, "
+                "impronta TEXT NOT NULL, "
+                "ordine_id INTEGER DEFAULT 0, "
+                "creato INTEGER DEFAULT 0, "
+                "usato_il INTEGER DEFAULT 0)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_codici_scorta_annuncio "
+                "ON codici_scorta(annuncio_id, ordine_id)")
+    # sull'ordine, 1 = consegnato dalla scorta: e' il SI' che rende
+    # toccabile un link a un bot di Telegram (decisione di Andrea, 24 nov
+    # 2026: «Sì, solo link a bot Telegram»), il client non vede altro
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN "
+                    "dalla_scorta INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # L'ABBONAMENTO A UN CANALE (20 nov 2026, cantiere abbonamento-
     # canale). Sull'ordine, l'id del canale che ha pagato (0 = non e' un
     # abbonamento): lo scrive `_incassa_ordine`, e da li' l'ordine si
@@ -12405,7 +12573,10 @@ def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
     decine per sessione. In automatico ('') e per chi ha scelto
     'telegram'/'nessuna' vince sempre Telegram, com'e' sempre stato:
     e' la stessa precedenza gia' scritta per la foto in
-    aggiorna_profilo_social. `username` non ha questa preferenza —
+    aggiorna_profilo_social. Lo stesso vale per 'mia' (23 nov 2026, il
+    nome scelto su Barattolo e approvato da un moderatore): senza, la
+    richiesta dopo l'approvazione lo ricancellerebbe. `username` non ha
+    questa preferenza —
     Nostr non ne ha uno equivalente — e si aggiorna sempre.
 
     CHI RIENTRA DOPO ESSERSI CANCELLATO (1 nov 2026, cantiere
@@ -12418,7 +12589,8 @@ def _upsert_da_telegram(con, tg_id: int, nome: str, username: str):
         "INSERT INTO utenti(tg_id, nome, username, registrato, negozio) "
         "VALUES(?,?,?,?,?) "
         "ON CONFLICT(tg_id) DO UPDATE SET "
-        "nome=CASE WHEN avatar_scelta='nostr' THEN nome ELSE excluded.nome END, "
+        "nome=CASE WHEN avatar_scelta IN ('nostr','mia') THEN nome "
+        "ELSE excluded.nome END, "
         "username=excluded.username",
         (tg_id, nome, username, int(time.time()), nuovo_codice_negozio(con)))
     if nuovo:
@@ -15511,6 +15683,317 @@ async def pagamenti_noti_nodo(req: Request):
 
 
 
+# ============ IL QUADRO DEI SERVIZI (25 nov 2026, cantiere
+# quadro-servizi, Andrea: «un monitor di tutte le applicazioni che
+# abbiamo, in che status sono, che uptime hanno») ============
+# Ogni macchina, ogni cinque minuti, dice qui «questo servizio e' vivo»
+# (deploy/battito/battito.sh, dal suo timer). Il server tiene UNA riga
+# per servizio e per fetta di cinque minuti: l'uptime e' quante fette
+# hanno un battito sulle fette passate, il silenzio si vede da solo.
+# IL SERVER BATTE PER SE' (`orologio_servizi`): «vps» non aspetta
+# nessuno. Chi guarda il VPS DA FUORI e' il relay (GUARDA_VPS in
+# battito.conf): se muore il VPS muore anche questa pagina, e la
+# sentinella con lui. Il verso giusto e' incrociato: il VPS guarda tutti
+# (i battiti che tacciono), il relay guarda il VPS.
+# LA PORTA E' IL CALCO DI QUELLA DELLA RONDA DEL NODO, con UN SEGRETO
+# SUO: chi lo ruba puo' solo far sembrare vivo un servizio morto — mai
+# leggere niente, mai muovere un sat. Vuoto o segnaposto = la rotta non
+# esiste (404), e il quadro mostra il solo VPS.
+# Il perche' in CANTIERI, «Il quadro dei servizi»; le macchine in
+# PRODUZIONE, «IL QUADRO DEI SERVIZI E I BATTITI»; il piano in
+# deploy/SE-MUORE.md.
+try:
+    from config import BATTITO_SEGRETO
+except ImportError:
+    BATTITO_SEGRETO = ""
+try:
+    from config import QUADRO_SERVIZI
+except ImportError:
+    QUADRO_SERVIZI = True        # leva di serie accesa (14 nov 2026)
+
+# I SERVIZI CHE SI CONOSCONO: (chiave, nome, macchina). Un nome che non
+# sta qui e' un 400: la tabella non si riempie di nomi inventati.
+SERVIZI_NOTI = (
+    ("vps", "Barattolo", "VPS"),
+    ("onion", "Sito .onion", "VPS"),
+    ("lnbits", "LNbits (cassaforte)", "VPS"),
+    ("nodo", "LND", "Nodo"),
+    ("mostro", "Mostro (P2P)", "Nodo"),
+    ("relay", "Relay Nostr", "Relay"),
+    ("n8n", "n8n", "Relay"),
+    ("collaudo", "Collaudo", "VM collaudo"),
+    ("runner", "Runner della CI", "VM collaudo"),
+)
+SERVIZI_FETTA_S = 300            # un battito ogni cinque minuti
+SERVIZI_SILENZIO_S = 20 * 60     # quattro battiti persi = giu' (Tor e' lento)
+SERVIZI_GIORNI = 30              # la finestra dell'uptime
+SERVIZI_BACKUP_ORE_MAX = 48      # come le ronde del nodo e del relay
+SERVIZI_BACKUP_ORE_TETTO = 100_000
+# i certificati che Caddy rinnova da solo: qui si guarda che l'abbia fatto
+SERVIZI_CERTIFICATI = ("barattolo.store", "relay.barattolo.store",
+                       "collaudo.barattolo.store")
+SERVIZI_CERT_GIORNI_MIN = 14     # sotto, un avviso al giorno
+SERVIZI_CERT_OGNI_S = 12 * 3600
+_CERTIFICATI = {}                # host -> {"giorni": int|None, "quando": t}
+_CERT_AVVISATI = {}              # host -> giorno dell'ultimo avviso
+
+
+def battito_attivo() -> bool:
+    """La porta dei battiti ESISTE? Il calco di `ronda_nodo_attiva`."""
+    return bool(BATTITO_SEGRETO and not BATTITO_SEGRETO.startswith("INCOLLA"))
+
+
+def _porta_battito(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato, confronto a tempo
+    costante e a BYTE: il calco di `_porta_ronda_nodo`."""
+    if not battito_attivo():
+        raise HTTPException(404, "Non trovato")
+    atteso = ("Bearer " + BATTITO_SEGRETO).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+def _servizi_tabelle(con) -> None:
+    """Le due tabelle nascono qui, alla prima domanda: niente migrazione."""
+    con.execute("CREATE TABLE IF NOT EXISTS servizi_fette("
+                "servizio TEXT NOT NULL, fetta INTEGER NOT NULL, "
+                "PRIMARY KEY(servizio, fetta))")
+    con.execute("CREATE TABLE IF NOT EXISTS servizi_stato("
+                "servizio TEXT PRIMARY KEY, primo REAL, ultimo REAL, "
+                "backup_ore REAL, backup_quando REAL, "
+                "giu INTEGER NOT NULL DEFAULT 0)")
+
+
+def servizi_battito(con, servizio, adesso, backup_ore=None) -> None:
+    """Un battito: la fetta (una volta sola, anche se ne arrivano due) e
+    l'ultimo. Alza ValueError su un nome sconosciuto o un'eta' del
+    backup storta — mai un 400 diretto, cosi' la prova non vuole FastAPI."""
+    if servizio not in {s[0] for s in SERVIZI_NOTI}:
+        raise ValueError("Servizio sconosciuto")
+    if backup_ore is not None:
+        if isinstance(backup_ore, bool) or not isinstance(backup_ore, int) \
+                or not 0 <= backup_ore <= SERVIZI_BACKUP_ORE_TETTO:
+            raise ValueError("Età del backup storta")
+    _servizi_tabelle(con)
+    con.execute("INSERT OR IGNORE INTO servizi_fette VALUES (?, ?)",
+                (servizio, int(adesso // SERVIZI_FETTA_S)))
+    # MAX e MIN: un battito arrivato in ritardo (Tor) non porta indietro
+    # l'ultimo, ne' avanti il primo
+    con.execute("INSERT INTO servizi_stato(servizio, primo, ultimo) "
+                "VALUES (?, ?, ?) ON CONFLICT(servizio) DO UPDATE SET "
+                "ultimo = MAX(ultimo, excluded.ultimo), "
+                "primo = MIN(primo, excluded.primo)",
+                (servizio, adesso, adesso))
+    if backup_ore is not None:
+        con.execute("UPDATE servizi_stato SET backup_ore=?, backup_quando=? "
+                    "WHERE servizio=?", (backup_ore, adesso, servizio))
+    con.commit()
+
+
+def servizi_quadro(con, adesso) -> list:
+    """Una riga per servizio noto, nell'ordine di SERVIZI_NOTI: stato
+    («su», «giu», «mai» se non ha mai battuto), secondi dall'ultimo
+    battito, uptime in % sulla finestra (dal primo battito, se e' piu'
+    vicino), eta' del backup ADESSO (quella detta, piu' il tempo passato)."""
+    _servizi_tabelle(con)
+    stati = {r[0]: r for r in con.execute(
+        "SELECT servizio, primo, ultimo, backup_ore, backup_quando "
+        "FROM servizi_stato")}
+    ora_fetta = int(adesso // SERVIZI_FETTA_S)
+    fuori = []
+    for chiave, nome, dove in SERVIZI_NOTI:
+        riga = {"chiave": chiave, "nome": nome, "dove": dove,
+                "stato": "mai", "da_s": None, "uptime": None,
+                "backup_ore": None, "backup_vecchio": False}
+        s = stati.get(chiave)
+        if s and s[2] is not None:
+            primo, ultimo = s[1], s[2]
+            riga["da_s"] = max(0, int(adesso - ultimo))
+            riga["stato"] = ("su" if adesso - ultimo <= SERVIZI_SILENZIO_S
+                             else "giu")
+            inizio = int(max(primo, adesso - SERVIZI_GIORNI * 86400)
+                         // SERVIZI_FETTA_S)
+            totali = ora_fetta - inizio + 1
+            battute = con.execute(
+                "SELECT COUNT(*) FROM servizi_fette WHERE servizio=? "
+                "AND fetta BETWEEN ? AND ?",
+                (chiave, inizio, ora_fetta)).fetchone()[0]
+            riga["uptime"] = round(min(100.0, 100.0 * battute / totali), 1)
+            if s[3] is not None and s[4] is not None:
+                eta = int(s[3] + max(0.0, adesso - s[4]) / 3600)
+                riga["backup_ore"] = eta
+                riga["backup_vecchio"] = eta > SERVIZI_BACKUP_ORE_MAX
+        fuori.append(riga)
+    return fuori
+
+
+def servizi_da_avvisare(con, adesso) -> list:
+    """[(chiave, nome, «giu»|«su», minuti)]: chi ha smesso di battere e
+    chi e' tornato, UNA volta per verso (il segno `giu` sta nella riga).
+    Un servizio che non ha mai battuto non e' giu': non e' installato."""
+    _servizi_tabelle(con)
+    nomi = {s[0]: s[1] for s in SERVIZI_NOTI}
+    fuori = []
+    for chiave, ultimo, giu in con.execute(
+            "SELECT servizio, ultimo, giu FROM servizi_stato").fetchall():
+        if chiave not in nomi or ultimo is None:
+            continue
+        muto = adesso - ultimo > SERVIZI_SILENZIO_S
+        if muto and not giu:
+            fuori.append((chiave, nomi[chiave], "giu",
+                          int((adesso - ultimo) // 60)))
+            con.execute("UPDATE servizi_stato SET giu=1 WHERE servizio=?",
+                        (chiave,))
+        elif not muto and giu:
+            fuori.append((chiave, nomi[chiave], "su", 0))
+            con.execute("UPDATE servizi_stato SET giu=0 WHERE servizio=?",
+                        (chiave,))
+    con.commit()
+    return fuori
+
+
+def servizi_pota(con, adesso) -> int:
+    """Via le fette fuori dalla finestra (piu' un giorno di margine)."""
+    _servizi_tabelle(con)
+    cur = con.execute("DELETE FROM servizi_fette WHERE fetta < ?",
+                      (int((adesso - (SERVIZI_GIORNI + 1) * 86400)
+                           // SERVIZI_FETTA_S),))
+    con.commit()
+    return cur.rowcount
+
+
+def _giorni_certificato(host: str, adesso: float):
+    """Quanti giorni mancano alla scadenza del certificato di `host`,
+    letto con la stessa verifica di un browser. None = non si legge
+    (rete giu', certificato gia' scaduto o non valido): e' un allarme."""
+    try:
+        ctx = ssl.create_default_context()
+        with socket.create_connection((host, 443), timeout=10) as s:
+            with ctx.wrap_socket(s, server_hostname=host) as t:
+                fine = ssl.cert_time_to_seconds(t.getpeercert()["notAfter"])
+        return int((fine - adesso) // 86400)
+    except Exception:
+        return None
+
+
+def _servizi_testo_avviso(chiave, nome, verso, minuti) -> str:
+    if verso == "giu":
+        return (f"🩺 <b>{html.escape(nome)}</b> non dà segni di vita da "
+                f"{minuti} minuti. Il quadro: Profilo → Amministrazione → "
+                f"🩺 Servizi; cosa fare: deploy/SE-MUORE.md.")
+    return f"🩺 <b>{html.escape(nome)}</b> è tornato."
+
+
+def _servizi_giro(adesso) -> list:
+    """Il giro dell'orologio, sincrono (gira in un filo suo): il battito
+    del VPS, i silenzi, la potatura. Connessione sua, breve."""
+    con = db()
+    try:
+        servizi_battito(con, "vps", adesso)
+        avvisi = servizi_da_avvisare(con, adesso)
+        if int(adesso // SERVIZI_FETTA_S) % 288 == 0:   # una volta al giorno
+            servizi_pota(con, adesso)
+        return avvisi
+    finally:
+        con.close()
+
+
+async def orologio_servizi():
+    """Ogni cinque minuti il giro; ogni dodici ore i certificati (non in
+    collaudo: li' si resta senza rete). Un giro che cade dice il NOME
+    dell'errore e lascia partire il prossimo."""
+    ultimo_cert = 0.0
+    while True:
+        try:
+            adesso = time.time()
+            for chiave, nome, verso, minuti in await asyncio.to_thread(
+                    _servizi_giro, adesso):
+                print(f"🩺 Servizi: {chiave} {verso}", flush=True)
+                await notifica_admin(
+                    _servizi_testo_avviso(chiave, nome, verso, minuti),
+                    argomento="errori")
+            if not MODALITA_COLLAUDO and \
+                    adesso - ultimo_cert >= SERVIZI_CERT_OGNI_S:
+                ultimo_cert = adesso
+                for host in SERVIZI_CERTIFICATI:
+                    giorni = await asyncio.to_thread(
+                        _giorni_certificato, host, adesso)
+                    _CERTIFICATI[host] = {"giorni": giorni, "quando": adesso}
+                    oggi = time.strftime("%Y-%m-%d", time.gmtime(adesso))
+                    if (giorni is None or giorni < SERVIZI_CERT_GIORNI_MIN) \
+                            and _CERT_AVVISATI.get(host) != oggi:
+                        _CERT_AVVISATI[host] = oggi
+                        quanto = ("non si legge (scaduto o non valido)"
+                                  if giorni is None
+                                  else f"scade fra {giorni} giorni")
+                        print(f"🩺 Certificato {host}: {quanto}", flush=True)
+                        await notifica_admin(
+                            f"🩺 Il certificato di <b>{host}</b> {quanto}. "
+                            f"Caddy lo rinnova da solo: se non l'ha fatto, "
+                            f"guarda il suo journal.", argomento="errori")
+        except Exception as e:
+            print(f"⚠️ Servizi: giro saltato ({type(e).__name__}): il "
+                  "prossimo riparte da solo", flush=True)
+        await asyncio.sleep(SERVIZI_FETTA_S)
+
+
+@app.on_event("startup")
+async def avvia_quadro_servizi():
+    """La riga nel journal c'e' SEMPRE, accesa o spenta."""
+    if not QUADRO_SERVIZI:
+        print("🩺 Quadro dei servizi: spento (QUADRO_SERVIZI)", flush=True)
+        return
+    asyncio.create_task(orologio_servizi())
+    print("🩺 Quadro dei servizi: acceso — battiti delle altre macchine "
+          + ("APERTI" if battito_attivo() else
+             "CHIUSI (manca BATTITO_SEGRETO: si vede il solo VPS)"),
+          flush=True)
+
+
+@app.post("/api/battito")
+async def battito_servizio(req: Request):
+    """Una macchina dice «questo servizio e' vivo». La porta PRIMA del
+    corpo; il giudice e' `servizi_battito`. Nessuna riga nel journal per
+    battito: sarebbero cento all'ora a dire niente."""
+    _porta_battito(req.headers.get("authorization", ""))
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        servizi_battito(con, str(d.get("servizio") or ""), time.time(),
+                        d.get("backup_ore"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/admin/servizi")
+def servizi_admin(x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: il quadro dei servizi e i certificati."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        quadro = servizi_quadro(con, time.time())
+    finally:
+        con.close()
+    cert = [{"host": h, "giorni": (_CERTIFICATI.get(h) or {}).get("giorni"),
+             "letto": h in _CERTIFICATI} for h in SERVIZI_CERTIFICATI]
+    return {"servizi": quadro, "certificati": cert,
+            "battiti_aperti": battito_attivo(),
+            "cert_giorni_min": SERVIZI_CERT_GIORNI_MIN}
+
+
+
 # I MOTIVI DI UN PAYOUT CHE NON ARRIVA (20 set 2026, ordine #152).
 # Fino a ieri l'avviso diceva «LNbits ha risposto 520», cioe' il numero
 # di una porta sbattuta: chi lo leggeva non sapeva se guardare il nodo,
@@ -17600,6 +18083,316 @@ async def giroconto_p2p(req: Request):
           flush=True)
     await _incassa_ordine(o["id"])
     return si
+
+
+#  ============ CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026, cantiere
+#  chiedi-al-venditore; Andrea: «se il venditore gli dice di no, passa ad
+#  un altro e così via finché non riesce a trovare il match») ============
+#  Mario vuole 50 € di sats per l'oggetto di Anna, e nel libro ci sono
+#  solo ordini a cifra FISSA piu' grandi (Tizio vende 200 € esatti): su
+#  Mostro un ordine fisso non si spezza. Barattolo chiede a Tizio se gli
+#  va di vendere solo quei 50 €; col suo «Si'» il telefono di Tizio
+#  trasforma l'ordine in «da 50 a 200 €» (la chiave dell'ordine e' sua,
+#  il server non firma niente), e il foglio di Mario lo trova nel libro
+#  come un match qualsiasi. Uno alla volta, nell'ordine che ha mandato
+#  il telefono di Mario (dal piu' conveniente): 10 minuti a testa, NESSUN
+#  limite di venditori (Andrea: «tanto a Mario gli arriva la notifica»).
+#  Un «No» mette QUELL'ordine in pausa per un'ora; a un venditore arriva
+#  una domanda sola per volta. Il server non crede alla lista del
+#  telefono: chiede solo agli ordini che SA essere in vendita, ancora nel
+#  libro, pubblicati da un nostro iscritto che non e' Mario.
+VIA_EURO_CHIEDI_S = 10 * 60
+VIA_EURO_NO_PAUSA_S = 60 * 60
+VIA_EURO_CANDIDATI_MAX = 50
+VIA_EURO_VIVE = ("chiedo", "allargo")
+
+
+def _tabelle_via_euro(con) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS via_euro_richieste("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " compratore INTEGER NOT NULL,"
+        " annuncio_id INTEGER NOT NULL,"
+        # [[ordine, euro], ...] nell'ordine del telefono di Mario
+        " candidati TEXT NOT NULL,"
+        " indice INTEGER DEFAULT -1,"
+        " ordine TEXT DEFAULT '',"
+        " venditore INTEGER DEFAULT 0,"
+        " euro INTEGER DEFAULT 0,"
+        " chiesto INTEGER DEFAULT 0,"
+        # chiedo | allargo (Tizio ha detto si' e il suo telefono lavora) |
+        # accettato | nessuno | annullato
+        " stato TEXT DEFAULT 'chiedo',"
+        " creato INTEGER, aggiornato INTEGER)")
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS via_euro_no("
+        " ordine TEXT PRIMARY KEY, fino INTEGER NOT NULL)")
+
+
+def _euro_fisso_libro(testo) -> int:
+    """PURA: dalla cifra del libro come la scrive `_euro_libro` ('200,00 €')
+    gli euro interi di un ordine a cifra FISSA; 0 per un intervallo
+    ('da 20,00 a 100,00 €'), una moneta o una cifra che non si legge."""
+    m = re.fullmatch(r"\s*(\d{1,7})(?:,(\d{1,2}))?\s*€\s*", str(testo or ""))
+    if not m:
+        return 0
+    return int(m.group(1)) if not m.group(2) or int(m.group(2)) == 0 else int(m.group(1)) + 1
+
+
+def _candidati_via_euro(grezzi) -> list:
+    """PURA: la lista del telefono di Mario, pulita: `[[ordine, euro]]`,
+    forma dell'id giusta, euro interi positivi, senza doppioni, al piu'
+    VIA_EURO_CANDIDATI_MAX."""
+    fuori, visti = [], set()
+    for c in grezzi if isinstance(grezzi, list) else []:
+        if isinstance(c, dict):
+            oid, euro = c.get("id"), c.get("euro")
+        elif isinstance(c, (list, tuple)) and len(c) == 2:
+            oid, euro = c
+        else:
+            continue
+        oid = str(oid or "")
+        if (not FORMA_ORDINE_P2P.fullmatch(oid) or oid in visti
+                or isinstance(euro, bool) or not isinstance(euro, int) or euro <= 0):
+            continue
+        visti.add(oid)
+        fuori.append([oid, euro])
+        if len(fuori) >= VIA_EURO_CANDIDATI_MAX:
+            break
+    return fuori
+
+
+def _chiedibile_via_euro(con, oid: str, euro: int, compratore: int, adesso: int):
+    """La riga del libro di un ordine a cui si puo' chiedere ADESSO, o
+    None: in vendita, nel libro, pubblicato da un nostro iscritto che non
+    e' chi compra, a cifra fissa piu' grande di quella chiesta, senza un
+    «No» nell'ultima ora, e col venditore libero da altre domande."""
+    r = con.execute(
+        "SELECT ordine, tg_id, stato, lato, maker, euro FROM p2p_ordini "
+        "WHERE ordine=?", (oid,)).fetchone()
+    if (not r or (r["stato"] or "") != "pending" or (r["lato"] or "") != "sell"
+            or not int(r["maker"] or 0) or not int(r["tg_id"] or 0)
+            or int(r["tg_id"]) == int(compratore)):
+        return None
+    tot = _euro_fisso_libro(r["euro"])
+    if tot <= euro:
+        return None
+    no = con.execute("SELECT fino FROM via_euro_no WHERE ordine=?", (oid,)).fetchone()
+    if no and int(no["fino"]) > adesso:
+        return None
+    occupato = con.execute(
+        "SELECT 1 FROM via_euro_richieste WHERE venditore=? AND stato IN (?, ?) "
+        "AND chiesto>=?", (int(r["tg_id"]), *VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)).fetchone()
+    if occupato:
+        return None
+    return {"ordine": oid, "venditore": int(r["tg_id"]), "euro": euro, "tot": tot}
+
+
+def _avanza_via_euro(con, rid: int, adesso: int):
+    """Passa al prossimo venditore della fila e lo timbra (il timbro PRIMA
+    dell'avviso: un giro che muore a meta' perde un avviso, mai lo
+    raddoppia). Torna `("chiedi", riga)` col venditore da avvisare,
+    `("nessuno", compratore)` a fila finita, o None."""
+    r = con.execute("SELECT * FROM via_euro_richieste WHERE id=?", (rid,)).fetchone()
+    if not r or r["stato"] not in VIA_EURO_VIVE:
+        return None
+    try:
+        fila = json.loads(r["candidati"] or "[]")
+    except Exception:
+        fila = []
+    i = int(r["indice"] if r["indice"] is not None else -1) + 1
+    while i < len(fila):
+        oid, euro = fila[i][0], int(fila[i][1])
+        c = _chiedibile_via_euro(con, oid, euro, int(r["compratore"]), adesso)
+        if c:
+            con.execute(
+                "UPDATE via_euro_richieste SET indice=?, ordine=?, venditore=?, euro=?, "
+                "chiesto=?, stato='chiedo', aggiornato=? WHERE id=?",
+                (i, oid, c["venditore"], euro, adesso, adesso, rid))
+            con.commit()
+            return ("chiedi", dict(c, richiesta=rid))
+        i += 1
+    con.execute(
+        "UPDATE via_euro_richieste SET indice=?, ordine='', venditore=0, "
+        "stato='nessuno', aggiornato=? WHERE id=?", (i, adesso, rid))
+    con.commit()
+    return ("nessuno", int(r["compratore"]), int(r["annuncio_id"]))
+
+
+def _testo_chiedi_venditore(euro: int, tot: int) -> str:
+    return (f"🙋 Un compratore del mercatino vuole <b>{euro} €</b> dei tuoi "
+            f"<b>{tot} €</b> in vendita.\nSe ti va bene, il tuo ordine diventa "
+            f"«da {euro} a {tot} €» e il resto resta nel libro. "
+            f"Hai {VIA_EURO_CHIEDI_S // 60} minuti per rispondere.")
+
+
+async def _dopo_avanza_via_euro(esito) -> None:
+    """L'avviso che segue un passo della fila."""
+    if not esito:
+        return
+    if esito[0] == "chiedi":
+        c = esito[1]
+        link = _link_ordine_avviso_p2p({"ordine": c["ordine"]})
+        await notifica(c["venditore"], _testo_chiedi_venditore(c["euro"], c["tot"]),
+                       bottone=("Rispondi", link) if link else None)
+    elif esito[0] == "nessuno":
+        await notifica(esito[1], "Nessun venditore ha accettato: per ora l'annuncio "
+                       "si può pagare solo in sats.")
+
+
+async def _giro_via_euro(adesso: int = 0) -> int:
+    """Nel battito pieno dell'orologio P2P: le domande senza risposta da
+    10 minuti passano al venditore dopo. Torna quante ne ha mosse."""
+    adesso = adesso or int(time.time())
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        ferme = [int(r["id"]) for r in con.execute(
+            "SELECT id FROM via_euro_richieste WHERE stato IN (?, ?) AND chiesto<?",
+            (*VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)).fetchall()]
+        esiti = [_avanza_via_euro(con, rid, adesso) for rid in ferme]
+    finally:
+        con.close()
+    for e in esiti:
+        try:
+            await _dopo_avanza_via_euro(e)
+        except Exception as ex:
+            print(f"⚠️ Chiedi al venditore: avviso saltato ({ex})", flush=True)
+    return len(ferme)
+
+
+def _stato_via_euro(con, tg_id: int, adesso: int) -> dict:
+    """Per il telefono: la MIA ricerca (di Mario) e le domande A ME (di
+    Tizio), ancora dentro i loro 10 minuti."""
+    mia = con.execute(
+        "SELECT * FROM via_euro_richieste WHERE compratore=? ORDER BY id DESC LIMIT 1",
+        (tg_id,)).fetchone()
+    a_me = [{"richiesta": int(r["id"]), "ordine": r["ordine"], "euro": int(r["euro"]),
+             "stato": r["stato"], "scade": int(r["chiesto"]) + VIA_EURO_CHIEDI_S}
+            for r in con.execute(
+                "SELECT * FROM via_euro_richieste WHERE venditore=? AND stato IN (?, ?) "
+                "AND chiesto>=?", (tg_id, *VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)).fetchall()]
+    return {"mia": ({"richiesta": int(mia["id"]), "annuncio_id": int(mia["annuncio_id"]),
+                     "stato": mia["stato"], "aggiornato": int(mia["aggiornato"] or 0)}
+                    if mia else None),
+            "a_me": a_me}
+
+
+@app.get("/api/via-euro/stato")
+def stato_via_euro(x_tg_init_data: str = Header(""), barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        d = _stato_via_euro(con, int(user["id"]), int(time.time()))
+    finally:
+        con.close()
+    return JSONResponse(d, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/via-euro/chiedi")
+async def chiedi_via_euro(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Mario: `{annuncio_id, candidati: [{id, euro}]}`. Una ricerca viva
+    per persona: la nuova sostituisce la vecchia."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not via_euro_ammesso(user["id"]):
+        raise HTTPException(404, "Non trovato")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta illeggibile")
+    try:
+        annuncio = int(d.get("annuncio_id") or 0)
+    except (TypeError, ValueError):
+        annuncio = 0
+    fila = [c for c in _candidati_via_euro(d.get("candidati"))
+            if c[1] <= int(VIA_EURO_MAX_EURO or 0)]
+    if annuncio <= 0 or not fila:
+        raise HTTPException(400, "Niente da chiedere")
+    adesso = int(time.time())
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        con.execute(
+            "UPDATE via_euro_richieste SET stato='annullato', aggiornato=? "
+            "WHERE compratore=? AND stato IN (?, ?)", (adesso, user["id"], *VIA_EURO_VIVE))
+        cur = con.execute(
+            "INSERT INTO via_euro_richieste(compratore, annuncio_id, candidati, "
+            "creato, aggiornato) VALUES (?, ?, ?, ?, ?)",
+            (user["id"], annuncio, json.dumps(fila), adesso, adesso))
+        con.commit()
+        rid = int(cur.lastrowid)
+        esito = _avanza_via_euro(con, rid, adesso)
+    finally:
+        con.close()
+    if esito and esito[0] == "chiedi":
+        await _dopo_avanza_via_euro(esito)
+        return {"ok": True, "richiesta": rid, "stato": "chiedo"}
+    return {"ok": False, "richiesta": rid, "stato": "nessuno"}
+
+
+@app.post("/api/via-euro/rispondi")
+async def rispondi_via_euro(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Tizio: `{richiesta, risposta}` fra `si` (il suo telefono sta per
+    allargare l'ordine), `no`, `fatto` (l'ordine nuovo e' partito) e
+    `fallito`. Mario: `{richiesta, risposta: 'annulla'}`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+        rid = int(d.get("richiesta") or 0)
+        risposta = str(d.get("risposta") or "")
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    adesso = int(time.time())
+    esito, avvisa_mario = None, None
+    con = db()
+    try:
+        _tabelle_via_euro(con)
+        r = con.execute("SELECT * FROM via_euro_richieste WHERE id=?", (rid,)).fetchone()
+        if not r:
+            raise HTTPException(404, "Non trovato")
+        if risposta == "annulla":
+            if int(r["compratore"]) != int(user["id"]):
+                raise HTTPException(404, "Non trovato")
+            con.execute("UPDATE via_euro_richieste SET stato='annullato', aggiornato=? "
+                        "WHERE id=? AND stato IN (?, ?)", (adesso, rid, *VIA_EURO_VIVE))
+            con.commit()
+            return {"ok": True, "stato": "annullato"}
+        if int(r["venditore"] or 0) != int(user["id"]) or r["stato"] not in VIA_EURO_VIVE:
+            raise HTTPException(409, "La domanda non c'è più")
+        if risposta == "si" and r["stato"] == "chiedo":
+            # il tempo riparte: e' quello del telefono di Tizio per rifare l'ordine
+            con.execute("UPDATE via_euro_richieste SET stato='allargo', chiesto=?, "
+                        "aggiornato=? WHERE id=?", (adesso, adesso, rid))
+            con.commit()
+            return {"ok": True, "stato": "allargo"}
+        if risposta == "fatto" and r["stato"] == "allargo":
+            con.execute("UPDATE via_euro_richieste SET stato='accettato', aggiornato=? "
+                        "WHERE id=?", (adesso, rid))
+            con.commit()
+            avvisa_mario = (int(r["compratore"]), int(r["annuncio_id"]))
+        elif risposta in ("no", "fallito"):
+            if risposta == "no":
+                con.execute("INSERT OR REPLACE INTO via_euro_no(ordine, fino) VALUES (?, ?)",
+                            (r["ordine"], adesso + VIA_EURO_NO_PAUSA_S))
+                con.commit()
+            esito = _avanza_via_euro(con, rid, adesso)
+        else:
+            raise HTTPException(400, "Risposta sconosciuta")
+    finally:
+        con.close()
+    if avvisa_mario:
+        await notifica(avvisa_mario[0],
+                       "✅ Un venditore ha accettato. Torna all'annuncio e tocca "
+                       "«Non hai sats?» per continuare.",
+                       bottone=("Apri l'annuncio", link_telegram("annuncio", avvisa_mario[1])))
+        return {"ok": True, "stato": "accettato"}
+    await _dopo_avanza_via_euro(esito)
+    return {"ok": True, "stato": risposta}
 
 
 def leggi_bolt11(bolt11: str, con_hash: bool = False) -> dict | None:
@@ -20628,13 +21421,16 @@ def _startapp_da_link(url) -> str:
     # L'ASSISTENZA IN APP (5 nov 2026, passo 2): `/?assistenza=mia` →
     # `assistenza` (la propria chat), `/?assistenza=<utente>` →
     # `assistenza_<utente>` (la conversazione, per gli admin; un account
-    # solo-Nostr ha il numero negativo, e il trattino e' nella forma)
+    # solo-Nostr ha il numero negativo, e il trattino e' nella forma).
+    # FINO A 19 CIFRE (23 nov 2026, cantiere assistenza-id-nostr): l'id
+    # di un nativo Nostr arriva a -2^63, cioe' 19 cifre, e col tetto di
+    # 16 il tasto «Apri la conversazione» di Zzap portava in home.
     testa = URL_PUBBLICO + "/?assistenza="
     if u.startswith(testa):
         chi = u[len(testa):]
         if chi == "mia":
             return "assistenza"
-        if re.fullmatch(r"-?[1-9][0-9]{0,15}", chi):
+        if re.fullmatch(r"-?[1-9][0-9]{0,18}", chi):
             return "assistenza_" + chi
         return ""
     # I CORRIERI NEL PROFILO (17 nov 2026, cantiere chiedi-locker):
@@ -23092,6 +23888,19 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         if _sbl_n and (not _sbl_p or _sbl_n < _sbl_p):
             con.execute("UPDATE utenti SET banner_sbloccato_il=? "
                         "WHERE tg_id=?", (_sbl_n, id_telegram))
+        # IL NOME E LA FOTO SCELTI SU BARATTOLO (23 nov 2026) passano
+        # solo se di la' non ce n'e' gia' un cartellino approvato: come
+        # il nome NIP-05, quello di Telegram resta. Si porta il
+        # cartellino, non la scelta: si rientra su «mia» dal selettore,
+        # senza nuova revisione. Una proposta in attesa della meta'
+        # Nostr muore con la sua riga (si ripropone).
+        if n and "mio_nome" in n.keys() and n["mio_nome"]:
+            con.execute(
+                "UPDATE utenti SET mio_nome=?, mio_foto=?, "
+                "mio_approvato_il=?, mio_stato='approvato', "
+                "mio_nome_prima=nome WHERE tg_id=? AND mio_nome=''",
+                (n["mio_nome"], n["mio_foto"] or "",
+                 n["mio_approvato_il"] or 0, id_telegram))
         # IL NOME VERIFICATO SU NOSTR (17 nov 2026) passa solo se di la'
         # non ce n'e' gia' uno: quello di Telegram resta.
         if n and "nip05_nome" in n.keys() and n["nip05_nome"]:
@@ -24386,6 +25195,19 @@ async def comando_sponsor(mittente: dict, testo: str):
 
 
 
+MAX_GIORNI_EVIDENZA_GRATIS = 90
+
+
+def _id_annuncio(chi: str) -> int:
+    """L'id di un annuncio da quel che scrive il moderatore: il numero
+    nudo (`288`) o il link che ha in mano
+    (`https://barattolo.store/annuncio/288-seedsigner-...`). 0 se non
+    c'e' un numero da prendere."""
+    m = (re.search(r"/annuncio/(\d+)", chi or "")
+         or re.fullmatch(r"#?(\d+)(?:-[\w-]*)?", chi or ""))
+    return int(m.group(1)) if m else 0
+
+
 async def comando_promossi(mittente: dict, testo: str):
     """`/promossi` — le promozioni a pagamento viste dal moderatore (23
     nov 2026). Solo admin. Tre forme:
@@ -24393,6 +25215,15 @@ async def comando_promossi(mittente: dict, testo: str):
       `/promossi negozio <codice>`   toglie il negozio da Da scoprire
                                      E dai Consigliati
       `/promossi annuncio <id>`      toglie l'annuncio da In evidenza
+      `/promossi evidenza <id> [giorni]`  mette l'annuncio In evidenza
+                                     GRATIS (24 nov 2026), 7 giorni se
+                                     non si dice; l'id o il link
+    L'EVIDENZA REGALATA (24 nov 2026, Andrea: «dobbiamo mettere anche
+    delle card in evidenza, in maniera gratuita… decidiamo noi chi
+    mettere»): e' la stessa di quella pagata — la data che si somma, il
+    primo giorno in cima, il post nel nostro canale — senza la fattura.
+    Occupa uno degli PROMO_EVIDENZA_POSTI posti come le altre: a fila
+    piena non scavalca chi ha pagato, dice quando si libera un posto.
     LA PORTA DEL MODERATORE: un negozio pagato entra da solo, perche' la
     sua card e' il banner GIA' approvato (il patto della fattura); se poi
     va tolto si toglie da qui, e i sats, se e' il caso, si restituiscono
@@ -24419,6 +25250,44 @@ async def comando_promossi(mittente: dict, testo: str):
                          if fatto else
                          f"Il negozio <b>{html.escape(chi)}</b> non era "
                          "promosso.")
+        elif cosa == "evidenza" and _id_annuncio(chi):
+            aid = _id_annuncio(chi)
+            try:
+                giorni = int(pezzi[3]) if len(pezzi) > 3 else 7
+            except ValueError:
+                giorni = 0
+            a = con.execute("SELECT stato, titolo, evidenza_fino FROM annunci "
+                            "WHERE id=?", (aid,)).fetchone()
+            fatto = 0
+            if not 1 <= giorni <= MAX_GIORNI_EVIDENZA_GRATIS:
+                testo_out = (f"I giorni vanno da 1 a "
+                             f"{MAX_GIORNI_EVIDENZA_GRATIS}. Esempio: "
+                             f"<code>/promossi evidenza {aid} 7</code>")
+            elif not a or a["stato"] != "attivo":
+                testo_out = (f"L'annuncio #{aid} non c'e' o non e' in "
+                             "vendita: In evidenza ci vanno solo quelli "
+                             "attivi.")
+            else:
+                _, libero = posti_evidenza(con, adesso, aid)
+                if libero:
+                    testo_out = (f"I {PROMO_EVIDENZA_POSTI} posti di In "
+                                 "evidenza sono tutti presi: il prossimo si "
+                                 f"libera il <b>{_data_sponsor(libero)}</b>.")
+                else:
+                    fino = (max(adesso, int(a["evidenza_fino"] or 0))
+                            + giorni * 86400)
+                    con.execute("UPDATE annunci SET evidenza_fino=?, "
+                                "creato=? WHERE id=?", (fino, adesso, aid))
+                    con.commit()
+                    fatto = 1
+                    chi = f"{aid} {giorni}"
+                    testo_out = (f"✅ L'annuncio #{aid} "
+                                 f"{html.escape(a['titolo'] or '')} e' in "
+                                 f"evidenza gratis fino al "
+                                 f"<b>{_data_sponsor(fino)}</b>: oggi e' "
+                                 "anche in cima, ed esce di nuovo nel "
+                                 "canale Vetrina.")
+                    asyncio.create_task(promo_in_cima_canale(aid))
         elif cosa == "annuncio" and chi.isdigit():
             cur = con.execute("UPDATE annunci SET evidenza_fino=0 "
                               "WHERE id=? AND evidenza_fino>0", (int(chi),))
@@ -24457,7 +25326,10 @@ async def comando_promossi(mittente: dict, testo: str):
                 righe.append("nessuno")
             righe += ["", "<code>/promossi negozio CODICE</code> — toglie un "
                       "negozio", "<code>/promossi annuncio ID</code> — toglie "
-                      "un annuncio da In evidenza", "",
+                      "un annuncio da In evidenza",
+                      "<code>/promossi evidenza ID 7</code> — mette un "
+                      "annuncio In evidenza gratis per 7 giorni (l'ID o il "
+                      "link dell'annuncio)", "",
                       "Togliere non rimborsa: i sats si restituiscono a mano "
                       "dal pannello, come per il banner."]
             testo_out = "\n".join(righe)
@@ -24650,6 +25522,9 @@ async def gestisci_callback(cb: dict):
     if azione == "ban":
         # la tastiera ✅/❌ del banner del negozio (solo moderatori)
         return await callback_banner(cb, token)
+    if azione == "pm":
+        # la tastiera ✅/❌ del nome e della foto scelti (solo moderatori)
+        return await callback_profilo_mio(cb, token)
     if azione == "entra":
         # le figure dell'ingresso dal bot (ENTRA DAL BOT)
         return await callback_ingresso_bot(cb, token)
@@ -26613,7 +27488,8 @@ def _documento_busta(dataurl: str) -> tuple[bytes, str, str]:
 
 
 def salva_foto(annuncio_id: int, foto_lista: list,
-               versione: str = "") -> tuple[list, list]:
+               versione: str = "", indici: list | None = None
+               ) -> tuple[list, list]:
     """Salva le foto dell'annuncio. Dalla Mini App di solito arrivano
     gia' ridimensionate in JPEG (base64); quelle che il browser non ha
     saputo leggere (le HEIC degli iPhone) arrivano grezze e le converte
@@ -26630,7 +27506,12 @@ def salva_foto(annuncio_id: int, foto_lista: list,
     «la foto 2 non è stata accettata: troppo grande». La posizione e'
     quella della scelta, cioe' dell'anteprima che l'utente ha davanti,
     e la frase e' gia' intera qui: il client la mostra com'e', senza
-    una regola gemella da tenere in pari."""
+    una regola gemella da tenere in pari.
+
+    `indici` (23 nov 2026, cantiere foto-varianti), se c'e', riceve la
+    POSIZIONE nella lista di ogni foto entrata: serve a chi deve tenere
+    allineata alle foto un'altra lista (le descrizioni) o rimetterle in
+    mezzo a quelle che restano (la modifica)."""
     nomi, scarti = [], []
     for i, f in enumerate((foto_lista or [])[:5]):     # max 5 foto
         posto = f"la foto {i + 1} non è stata accettata: "
@@ -26699,6 +27580,8 @@ def salva_foto(annuncio_id: int, foto_lista: list,
         nome = _salva_una_foto(annuncio_id, i, raw, versione)
         if nome:
             nomi.append(nome)
+            if indici is not None:
+                indici.append(i)
         else:
             scarti.append(posto + "non riesco a leggere questa foto")
     return nomi, scarti
@@ -26826,6 +27709,262 @@ def guardia_almeno_una_foto(nuove, gia=None, messaggio: str = ""):
     if ha_foto(gia):
         return
     raise HTTPException(400, messaggio or MSG_SERVE_UNA_FOTO)
+
+
+# ---------------------------------------------------------------------
+# LE DESCRIZIONI DELLE FOTO E LE VARIANTI DI CHI VENDE (23 nov 2026,
+# cantiere foto-varianti: le ha chieste Zzap, le ha decise Andrea)
+# ---------------------------------------------------------------------
+# LA DESCRIZIONE DI UNA FOTO e' una riga corta che si legge a foto
+# aperta. Vive in `annunci.didascalie`, un JSON ALLINEATO a `foto` (la
+# posizione e' il legame): chi riordina, toglie o aggiunge foto rimanda
+# le due liste insieme, e il server le scrive insieme. '' = nessuna.
+# LE VARIANTI SEMPLICI («Colore: rosso, blu, verde») sono le scelte
+# «Qualsiasi» del 19 nov (`annunci.scelte`), che fin qui scriveva solo
+# il connettore dei negozi: stessa colonna, stessa cassa, stessa nota
+# all'ordine — qui le scrive chi vende dal foglio. Prezzo e pezzi sono
+# quelli dell'annuncio; le varianti col LORO prezzo sono un'altra
+# cosa, la famiglia (`varianti_da_payload`).
+# ENTRAMBE PASSANO DALLA MODERAZIONE: sono testo che entra in vetrina,
+# e `testo_da_moderare` le mette in coda alla descrizione.
+MAX_DIDASCALIA = 80
+MAX_SCELTE_VENDITORE = 3     # tendine per annuncio
+MAX_VOCI_SCELTA = 20         # voci per tendina
+MAX_NOME_SCELTA = 30
+MAX_VOCE_SCELTA = 40
+
+
+def didascalie_lette(grezzo) -> list:
+    """Le descrizioni dalla colonna: una lista di stringhe ('' = la foto
+    non ne ha), e la lista vuota per tutto il resto — mai un 500."""
+    try:
+        v = json.loads(grezzo or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(v, list):
+        return []
+    return [x if isinstance(x, str) else "" for x in v]
+
+
+def didascalie_da_payload(grezze, quante: int) -> list:
+    """Le descrizioni del payload, allineate alle `quante` foto
+    mandate: spazi ripuliti, '' dove non c'e' niente. Oltre il tetto e'
+    un 400 che dice quale foto — mai un taglio muto."""
+    if not isinstance(grezze, list):
+        grezze = []
+    fuori = []
+    for i in range(quante):
+        t = grezze[i] if i < len(grezze) else ""
+        t = " ".join(t.split()) if isinstance(t, str) else ""
+        if len(t) > MAX_DIDASCALIA:
+            raise HTTPException(400, f"La descrizione della foto {i + 1} "
+                                     f"è troppo lunga (massimo "
+                                     f"{MAX_DIDASCALIA} caratteri)")
+        fuori.append(t)
+    return fuori
+
+
+def didascalie_json(lista) -> str:
+    """Come si scrivono in colonna: '' se nessuna foto ne ha una."""
+    return json.dumps(list(lista), ensure_ascii=False) \
+        if any(lista) else ""
+
+
+def scelte_del_venditore(grezze):
+    """Le varianti semplici scritte da chi vende, nella forma della
+    colonna `scelte`. None = la chiave non c'era (la modifica non le
+    tocca), '' = nessuna. Voci ripulite e senza doppioni; una tendina
+    senza nome e senza voci e' una riga lasciata vuota, e si salta."""
+    if grezze is None:
+        return None
+    if not isinstance(grezze, list):
+        raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                 "riprova")
+    fuori = []
+    for o in grezze:
+        if not (isinstance(o, list) and len(o) == 2
+                and isinstance(o[1], list)):
+            raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                     "riprova")
+        nome = " ".join(str(o[0] or "").split())
+        voci = []
+        for v in o[1]:
+            v = " ".join(str(v or "").split())
+            if v and v not in voci:
+                voci.append(v)
+        if not nome and not voci:
+            continue
+        if not nome or not voci:
+            raise HTTPException(400, "Ogni variante vuole un nome e almeno "
+                                     "una voce (per esempio «Colore: "
+                                     "rosso, blu»)")
+        if (len(nome) > MAX_NOME_SCELTA
+                or any(len(v) > MAX_VOCE_SCELTA for v in voci)
+                or len(voci) > MAX_VOCI_SCELTA):
+            raise HTTPException(400, f"«{nome[:MAX_NOME_SCELTA]}»: nome fino "
+                                     f"a {MAX_NOME_SCELTA} caratteri, voci "
+                                     f"fino a {MAX_VOCE_SCELTA}, al massimo "
+                                     f"{MAX_VOCI_SCELTA} voci")
+        if any(nome.lower() == f[0].lower() for f in fuori):
+            raise HTTPException(400, f"«{nome}» c'è due volte: usa nomi "
+                                     f"diversi")
+        fuori.append([nome, voci])
+    if len(fuori) > MAX_SCELTE_VENDITORE:
+        raise HTTPException(400, f"Al massimo {MAX_SCELTE_VENDITORE} "
+                                 f"varianti per annuncio")
+    return json.dumps(fuori, ensure_ascii=False) if fuori else ""
+
+
+# LE VARIANTI COL LORO PREZZO E I LORO PEZZI (23 nov 2026, stesso
+# cantiere). Sono la FAMIGLIA dei negozi collegati (set 2026), fatta dal
+# foglio Vendi: ogni voce e' un annuncio vero, col suo prezzo e le sue
+# scorte, e la vetrina le mostra come UNA card coi bottoncini nella
+# scheda. Cosi' cassa, pagamento, scorte, esauriti e ordini restano
+# quelli di sempre, byte per byte: nessuna strada dei soldi nuova. La
+# chiave e' «u:<id del primo>» (u come utente: i negozi usano «c<n>:»,
+# non si mescolano mai). Nascono SOLO in pubblica; poi ogni variante si
+# ritocca dalla sua «Modifica», come un annuncio qualunque.
+MAX_VARIANTI_PREZZO = 10
+
+
+def titolo_variante(titolo: str, voce: str) -> str:
+    """Il titolo di una variante: quello dell'annuncio e la voce, cosi'
+    nell'ordine e nella notifica chi vende sa QUALE ha venduto."""
+    return f"{titolo} – {voce}"
+
+
+async def varianti_da_payload(d: dict, valuta: str, prezzo_sats: int,
+                              prezzo_eur: float, quantita: int,
+                              senza_scorte: bool) -> tuple[str, list]:
+    """(nome, voci) delle varianti col loro prezzo, o ("", []) se il
+    payload non ne porta. Ogni voce e' {voce, prezzo_sats, prezzo_eur,
+    quantita}: prezzo e pezzi lasciati vuoti valgono quelli
+    dell'annuncio. Il prezzo passa dal giudice di sempre
+    (`prezzo_da_payload`, nella valuta dell'annuncio), i pezzi da
+    `quantita_da_payload`; dove le scorte non esistono (servizi) i pezzi
+    restano quelli dell'annuncio."""
+    v = d.get("varianti")
+    if not v:
+        return "", []
+    if not isinstance(v, dict) or not isinstance(v.get("voci"), list):
+        raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                 "riprova")
+    nome = " ".join(str(v.get("nome") or "").split())
+    voci, viste = [], set()
+    for x in v["voci"]:
+        if not isinstance(x, dict):
+            raise HTTPException(400, "Le varianti non sono scritte bene: "
+                                     "riprova")
+        voce = " ".join(str(x.get("voce") or "").split())
+        if not voce:
+            continue
+        if voce.lower() in viste:
+            raise HTTPException(400, f"«{voce}» c'è due volte: usa voci "
+                                     f"diverse")
+        viste.add(voce.lower())
+        if len(voce) > MAX_VOCE_SCELTA:
+            raise HTTPException(400, f"«{voce[:MAX_VOCE_SCELTA]}…»: una "
+                                     f"voce sta in {MAX_VOCE_SCELTA} "
+                                     f"caratteri")
+        ps, pe = prezzo_sats, prezzo_eur
+        if x.get("prezzo") not in (None, ""):
+            chiave = "prezzo_eur" if valuta == "eur" else "prezzo_sats"
+            _, ps, pe = await prezzo_da_payload(
+                {"titolo": d.get("titolo"), "valuta": valuta,
+                 chiave: x["prezzo"]})
+        q = quantita
+        if not senza_scorte and x.get("quantita") not in (None, ""):
+            q = quantita_da_payload({"quantita": x["quantita"]})
+        voci.append({"voce": voce, "prezzo_sats": ps, "prezzo_eur": pe,
+                     "quantita": q})
+    if not voci:
+        return "", []
+    if not nome:
+        raise HTTPException(400, "Scrivi il nome delle varianti (per "
+                                 "esempio «Colore»)")
+    if len(nome) > MAX_NOME_SCELTA:
+        raise HTTPException(400, f"Il nome delle varianti sta in "
+                                 f"{MAX_NOME_SCELTA} caratteri")
+    if len(voci) < 2:
+        raise HTTPException(400, "Per le varianti servono almeno due voci")
+    if len(voci) > MAX_VARIANTI_PREZZO:
+        raise HTTPException(400, f"Al massimo {MAX_VARIANTI_PREZZO} "
+                                 f"varianti per annuncio")
+    return nome, voci
+
+
+# Le colonne che una sorella NON eredita dalla prima: sono la sua storia
+# (eventi, post, visite, indice della ricerca), e lei non ne ha ancora.
+_SORELLA_DA_ZERO = {"nostr_event_id": "", "post_canale_id": 0,
+                    "nostr_impronta": "", "visualizzazioni": 0,
+                    "ricerca_v": 0}
+
+
+def crea_sorelle(capo_id: int, nome: str, voci: list,
+                 famiglia_titolo: str) -> list:
+    """La famiglia nasce dalla prima variante, gia' scritta e con le
+    sue foto: le altre sono sue COPIE (stessi campi, stessa consegna,
+    stesso stato — anche 'revisione') con voce, prezzo e pezzi propri,
+    e le foto copiate dai file (mai condivise: una modifica di una
+    sorella toglie le sue vecchie, e non deve togliere quelle delle
+    altre). Ritorna gli id delle sorelle nuove."""
+    chiave = f"u:{capo_id}"
+    con = db()
+    capo = dict(con.execute("SELECT * FROM annunci WHERE id=?",
+                            (capo_id,)).fetchone())
+    con.execute("UPDATE annunci SET famiglia=?, famiglia_titolo=?, "
+                "opzioni=? WHERE id=?",
+                (chiave, famiglia_titolo,
+                 json.dumps([[nome, voci[0]["voce"]]], ensure_ascii=False),
+                 capo_id))
+    ids = []
+    for v in voci[1:]:
+        riga = {k: x for k, x in capo.items() if k != "id"}
+        riga.update({k: x for k, x in _SORELLA_DA_ZERO.items()
+                     if k in riga})
+        riga.update(titolo=titolo_variante(famiglia_titolo, v["voce"]),
+                    prezzo_sats=v["prezzo_sats"],
+                    prezzo_eur=v["prezzo_eur"],
+                    quantita=v["quantita"], quantita_max=v["quantita"],
+                    famiglia=chiave, famiglia_titolo=famiglia_titolo,
+                    opzioni=json.dumps([[nome, v["voce"]]],
+                                       ensure_ascii=False),
+                    foto="", didascalie="")
+        colonne = list(riga)
+        con.execute(f"INSERT INTO annunci({','.join(colonne)}) "
+                    f"VALUES({','.join('?' * len(colonne))})",
+                    [riga[c] for c in colonne])
+        ids.append(con.execute("SELECT last_insert_rowid() AS i")
+                   .fetchone()["i"])
+    con.commit()
+    con.close()
+    try:
+        nomi_capo = json.loads(capo["foto"] or "[]")
+    except Exception:
+        nomi_capo = []
+    for sid in ids:
+        nomi, _ = copia_foto(sid, nomi_capo)
+        # le descrizioni viaggiano solo se le foto sono entrate tutte:
+        # con una in meno non si saprebbe piu' quale va con quale
+        did = (capo.get("didascalie") or "") \
+            if len(nomi) == len(nomi_capo) else ""
+        if nomi:
+            con = db()
+            con.execute("UPDATE annunci SET foto=?, didascalie=? "
+                        "WHERE id=?", (json.dumps(nomi), did, sid))
+            con.commit()
+            con.close()
+    return ids
+
+
+def testo_da_moderare(descrizione: str, didascalie=(), scelte="") -> str:
+    """La descrizione con in coda le descrizioni delle foto e le
+    varianti: tutto il testo che entra in vetrina passa dagli stessi
+    strati (filtro parole e AI), niente porta laterale."""
+    pezzi = [descrizione or ""] + [t for t in (didascalie or []) if t]
+    for nome, voci in scelte_lette(scelte or ""):
+        pezzi.append(f"{nome}: {', '.join(voci)}")
+    return "\n".join(p for p in pezzi if p)
 
 
 def _miniatura_da_rifare(percorso_min, percorso_pieno) -> bool:
@@ -30134,6 +31273,8 @@ CAMPI_VETRINA = (
     # LE SCELTE «QUALSIASI» (19 nov 2026): le tendine della scheda,
     # pubbliche come le opzioni (le dice il negozio a tutti)
     "a.scelte, "
+    # LE DESCRIZIONI DELLE FOTO (23 nov 2026): pubbliche come le foto
+    "a.didascalie, "
     # il massimo mai dichiarato NON esce da qui: lo legge
     # arricchisci_righe_vetrina per decidere il flag `ultimo`, e poi lo
     # butta via — grezzo racconterebbe «ne ha venduti N», che e' un dato
@@ -30373,6 +31514,8 @@ def arricchisci_righe_vetrina(righe):
             r["opzioni"] = _opzioni_lista(r["opzioni"])
         if "scelte" in r:
             r["scelte"] = scelte_lette(r["scelte"])
+        if "didascalie" in r:
+            r["didascalie"] = didascalie_lette(r["didascalie"])
     fam = sorted({r["famiglia"] for r in righe if r.get("famiglia")})
     if fam:
         con = db()
@@ -31728,11 +32871,38 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     guardia_almeno_una_foto(
         d.get("foto"),
         foto_da_copiare(user["id"], d.get("copia_foto_da")))
+    # LE DESCRIZIONI DELLE FOTO E LE VARIANTI (23 nov 2026, cantiere
+    # foto-varianti): lette e giudicate qui, PRIMA della moderazione che
+    # le legge insieme alla descrizione. Le varianti non valgono sulle
+    # aste: il vincitore non passa dalla cassa che le fa scegliere.
+    foto_chieste = d.get("foto") if isinstance(d.get("foto"), list) else []
+    didascalie_nuove = didascalie_da_payload(d.get("didascalie"),
+                                             len(foto_chieste))
+    scelte_nuove = "" if asta_secondi else (
+        scelte_del_venditore(d.get("scelte")) or "")
+    # le varianti col loro prezzo: la prima e' QUESTO annuncio (titolo,
+    # prezzo e pezzi suoi), le altre nascono dopo, sue copie. Non sulle
+    # aste ne' sugli abbonamenti: un pezzo unico e un mese non hanno
+    # varianti. Qui, coi loro await, prima dello scudo anti-doppione.
+    nome_var, varianti = ("", []) if (asta_secondi or abbonamento) else \
+        await varianti_da_payload(d, valuta, prezzo_sats, prezzo_eur,
+                                  quantita, consegna == "servizio")
+    famiglia_titolo = ""
+    if varianti:
+        famiglia_titolo = d["titolo"]
+        d["titolo"] = titolo_variante(famiglia_titolo, varianti[0]["voce"])
+        prezzo_sats = varianti[0]["prezzo_sats"]
+        prezzo_eur = varianti[0]["prezzo_eur"]
+        quantita = varianti[0]["quantita"]
+    testo_mod = testo_da_moderare(
+        d.get("descrizione", ""), didascalie_nuove, scelte_nuove
+        or (json.dumps([[nome_var, [v["voce"] for v in varianti]]])
+            if varianti else ""))
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
-    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    categoria = controlla_vietato(d["titolo"], testo_mod)
     if categoria:
-        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        parola = parola_vietata(d["titolo"], testo_mod)
         registra_moderazione("parole", "vietato",
                              motivo_parole(categoria, parola),
                              d["titolo"], venditore_id=user["id"])
@@ -31748,7 +32918,7 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # --- Strato 2: parere dell'AI. Il vietato netto blocca come
     # sempre; il DUBBIO non blocca piu' (lug 2026): l'annuncio nasce
     # in stato 'revisione' e decide un moderatore umano. ---
-    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    verdetto = await moderazione_ai(d["titolo"], testo_mod)
     if verdetto and verdetto[0] == "vietato":
         registra_moderazione("ai", "vietato", verdetto[1],
                              d["titolo"], venditore_id=user["id"])
@@ -31875,13 +33045,18 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     if abbonamento:
         con.execute("UPDATE annunci SET abbonamento=1 WHERE id=?",
                     (annuncio_id,))
+    # le varianti semplici (23 nov 2026): stesso UPDATE a parte
+    if scelte_nuove:
+        con.execute("UPDATE annunci SET scelte=? WHERE id=?",
+                    (scelte_nuove, annuncio_id))
     con.commit()
     con.close()
     # Le foto in un thread: convertire una HEIC da 15MB costa secondi
     # di CPU e non deve congelare il server (che e' mono-processo).
     # Il commit e' gia' fatto: niente lock del database nel frattempo.
+    entrate = []   # le posizioni delle foto entrate, per le descrizioni
     nomi, scarti_foto = await asyncio.to_thread(salva_foto, annuncio_id,
-                                                d.get("foto"))
+                                                d.get("foto"), "", entrate)
     # IL DUPLICATO EREDITA LE FOTO (ago 2026): chi ricalca un proprio
     # annuncio non le ricarica — si copiano i file di quello di
     # partenza. Solo se non ne ha scelte di NUOVE: sceglierne una
@@ -31927,15 +33102,26 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
               f"{len(nomi)} foto salvate, {len(scarti_foto)} scartate — "
               + "; ".join(scarti_foto), flush=True)
     if nomi:
+        # le descrizioni seguono le foto ENTRATE: una scartata si porta
+        # via la sua, e le altre restano accanto alla foto giusta (nel
+        # duplicato le foto copiate non ne hanno: `entrate` e' vuota)
+        didascalie = [didascalie_nuove[i] for i in entrate
+                      if i < len(didascalie_nuove)]
         con = db()
-        con.execute("UPDATE annunci SET foto=? WHERE id=?",
-                    (json.dumps(nomi), annuncio_id))
+        con.execute("UPDATE annunci SET foto=?, didascalie=? WHERE id=?",
+                    (json.dumps(nomi), didascalie_json(didascalie),
+                     annuncio_id))
         con.commit()
         con.close()
     # Quante ne sono entrate davvero: la risposta lo DICE, e il client
     # avvisa. Un annuncio che nasce con meno foto di quelle scelte non
     # e' una cosa da scoprire da soli aprendo la scheda.
     conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
+    # le sorelle (23 nov 2026): copie della prima, foto comprese; in
+    # piazza e nei canali parla la famiglia, cioe' la prima
+    if varianti:
+        await asyncio.to_thread(crea_sorelle, annuncio_id, nome_var,
+                                varianti, famiglia_titolo)
     if in_revisione:
         # La terza via: l'annuncio esiste ma non e' online — niente
         # Nostr, niente promo, niente avvisi di ricerca, niente
@@ -32086,8 +33272,10 @@ def miei_annunci(limit: int = 0, cursore: str = "",
     # E dal cantiere stock anche i venduti/esauriti: la ricarica parte
     # da qui, e la riga «Venduto» col bottone «Rimetti in vendita» e'
     # il relist onesto anche per chi vendeva un pezzo solo.
+    # ...e i NASCOSTI (23 nov 2026): qui e' l'unico posto dove chi
+    # vende li ritrova, ed e' da qui che li rimette in vetrina.
     dove = ("a.venditore_id=? AND a.stato IN "
-            "('attivo','revisione','venduto')")
+            "('attivo','revisione','venduto','nascosto')")
     con = db()
     if limit:
         righe, prossimo = pagina_annunci(
@@ -33325,15 +34513,18 @@ def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
 # COSA RESTA: le stelle e il numero di recensioni, che contano anche
 # quelle nascoste — altrimenti chi riceve un voto brutto lo nasconde e
 # la media sale. Nascondere toglie il RACCONTO, mai il voto.
-# CHI LE VEDE LO STESSO: il proprietario (il suo cassetto «Recensioni
-# ricevute» legge questa stessa rotta) e i moderatori, che da qui
-# hanno il bottone «rimuovi».
+# CHI LE VEDE LO STESSO: SOLO il proprietario (il suo cassetto
+# «Recensioni ricevute» legge questa stessa rotta). Fino al 23 nov 2026
+# anche i moderatori, per il bottone «rimuovi»; poi Andrea, scegliendo
+# la frase «Quelle nascoste le vedi sempre solo tu.»: via anche ai
+# moderatori (cantiere scambi-p2p-nascosti-scheda). Da qui una nascosta
+# non si rimuove piu': si torna a vederla se il proprietario la riaccende.
 # Scartata «togliere la provenienza a tutti» (la prima proposta):
 # Andrea vuole lasciare la scelta a chi e' recensito.
 def _recensioni_nascoste_di(riga, chi_guarda: int = 0) -> tuple:
     """PURA: `(mercatino, p2p)` — quali recensioni di questo profilo
-    NON si mostrano a `chi_guarda`. A leva spenta, al proprietario e ai
-    moderatori niente e' nascosto. `riga` e' la riga di `utenti` (con
+    NON si mostrano a `chi_guarda`. A leva spenta e al proprietario
+    niente e' nascosto (ai moderatori si', dal 23 nov 2026). `riga` e' la riga di `utenti` (con
     `tg_id` e le due colonne; una colonna assente vale 0)."""
     if not RECENSIONI_NASCONDIBILI:
         return (False, False)
@@ -33342,7 +34533,7 @@ def _recensioni_nascoste_di(riga, chi_guarda: int = 0) -> tuple:
         suo = int(riga["tg_id"] or 0)
     except (TypeError, ValueError, KeyError, IndexError):
         io, suo = 0, 0
-    if io and (io == suo or e_admin(io)):
+    if io and io == suo:
         return (False, False)
 
     def _col(nome):
@@ -33359,14 +34550,26 @@ def _sql_recensioni_visibili(mercatino: bool, p2p: bool) -> str:
     che toglie le recensioni nascoste. Le P2P sono quelle con `scambio`
     pieno — lo stesso ramo che le chiama «scambio» nel CASE del ruolo —,
     tutte le altre sono del mercatino. Niente da nascondere, stringa
-    vuota; tutte e due, nessuna riga."""
+    vuota; tutte e due, solo le negative.
+    LE NEGATIVE NON SI NASCONDONO MAI (23 nov 2026, Andrea: «le
+    recensioni negative, quelle da 1 o 2 stelle, devono restare sempre
+    visibili»): nascondere serve a non dire «uso il P2P», non a togliere
+    di mezzo chi si e' trovato male. Una da 1 o 2 stelle esce anche se
+    il suo tipo e' spento — e se e' di uno scambio, dice lo scambio:
+    e' il prezzo scelto da Andrea. Il numero sta in `VOTO_SEMPRE_VISIBILE`."""
+    neg = f"f.voto<={int(VOTO_SEMPRE_VISIBILE)}"
     if mercatino and p2p:
-        return " AND 0"
+        return f" AND {neg}"
     if p2p:
-        return " AND COALESCE(f.scambio,'')=''"
+        return f" AND (COALESCE(f.scambio,'')='' OR {neg})"
     if mercatino:
-        return " AND f.scambio<>''"
+        return f" AND (f.scambio<>'' OR {neg})"
     return ""
+
+
+# Fin dove una recensione e' «negativa» e quindi non si nasconde mai (23
+# nov 2026, vedi `_sql_recensioni_visibili`): 2 = una e due stelle.
+VOTO_SEMPRE_VISIBILE = 2
 
 
 @app.get("/api/negozio/{chi}")
@@ -33968,8 +35171,12 @@ async def rimuovi_annuncio(annuncio_id: int, x_tg_init_data: str = Header(""),
     # 'rimosso' di sempre, cioe' un ARCHIVIO e non una cancellazione:
     # la riga resta, e ordini, recensioni e dispute ci si appoggiano
     # come prima.
+    # ...e il NASCOSTO (23 nov 2026): chi lo ha tolto dalla vetrina puo'
+    # anche decidere che non torna. Gli ordini vivi su un nascosto non
+    # ci sono (li ferma il gesto stesso), quindi basta la guardia stretta.
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
-                    "AND stato IN ('attivo','revisione','venduto')",
+                    "AND stato IN ('attivo','revisione','venduto',"
+                    "'nascosto')",
                     (annuncio_id, user["id"])).fetchone()
     if not a:
         con.close()
@@ -34229,6 +35436,128 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
             "esaurito": esaurito_ora}
 
 
+# NASCONDERE UN ANNUNCIO SOLO (23 nov 2026, cantiere nascondi-annuncio;
+# lo ha chiesto un venditore). Prima c'erano due strade e nessuna era
+# questa: i pezzi a zero (l'annuncio resta in vetrina, grigio,
+# «Esaurito») e le ferie (fermano TUTTO il negozio, e con una data).
+# Il nascosto esce dalla vetrina senza scadenza e ci torna quando chi
+# vende vuole. LO STATO E' NUOVO, 'nascosto', e non una colonna: ogni
+# filtro di sempre — vetrina, ricerca, negozio, compra(), offerte,
+# preferiti, piazza Nostr — guarda stato='attivo', e cosi' lo lascia
+# fuori da solo, senza una riga in ognuno di quei posti. Il link
+# condiviso risponde 404 come per il 'rimosso': per chi guarda da fuori
+# non c'e'. Lo vede solo il proprietario, in «I tuoi annunci».
+# LA LEVA NASCE ACCESA (regola di Andrea del 14 nov): spenta, il tasto
+# «Nascondi» sparisce e la rotta rifiuta di nascondere — ma RIMETTERE
+# IN VETRINA funziona sempre, o un annuncio resterebbe chiuso fuori.
+try:
+    from config import NASCONDI_ANNUNCIO
+    if not isinstance(NASCONDI_ANNUNCIO, bool):
+        print("[nascondi] NASCONDI_ANNUNCIO non e' True/False: "
+              "il tasto «Nascondi» resta acceso")
+    NASCONDI_ANNUNCIO = NASCONDI_ANNUNCIO is not False
+except ImportError:
+    NASCONDI_ANNUNCIO = True
+
+
+@app.post("/api/listings/{annuncio_id}/nascondi")
+async def nascondi_annuncio(annuncio_id: int, req: Request,
+                            x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Nasconde (body {"nascosto": 1}, il default) o rimette in vetrina
+    ({"nascosto": 0}) un annuncio del proprietario.
+
+    SI NASCONDE SOLO L'ATTIVO NATO QUI, e ogni esclusione ha il suo
+    perche':
+    - l'esaurito ('venduto') e' gia' fuori dagli acquisti, e ha il suo
+      «Elimina»;
+    - l'asta e' vincolante e a scadenza: nasconderla a gara aperta
+      toglierebbe la gara a chi ha versato;
+    - l'importato (Nostr, negozio collegato) ha lo stato che vive alla
+      fonte: il giro di sync lo riscriverebbe, o non lo troverebbe piu'
+      fra gli attivi e lo rifarebbe accanto.
+    GLI ORDINI IN CORSO FERMANO IL GESTO, con la guardia LARGA della
+    modifica (ogni ordine non concluso, resi e rimborsi compresi): il
+    rimborso (`_rimborsa_compratore`) e l'annullo del venditore rimettono
+    i pezzi con stato='attivo', e su un nascosto lo riaccenderebbero in
+    vetrina — e in piazza — rovesciando la scelta di chi vende. Cosi'
+    nessun ordine vivo tocca mai un nascosto, e nessun percorso dei
+    soldi va cambiato. Niente pezzi in pagamento, per la stessa ragione
+    della ricarica: una fattura gia' in volo atterrerebbe su un annuncio
+    che non c'e'.
+    LE PIAZZE fanno il gesto dell'esaurito, parola per parola: su Nostr
+    NIP-99 ha due stati, active e sold, e «non si compra» e' sold (la
+    decisione di Andrea per la pausa dei pezzi a zero); il post del
+    canale prende la spunta. Al ritorno, il viaggio inverso. Le offerte
+    vive le raccoglie `scadenze_offerte` entro dieci minuti col suo
+    «non è più disponibile: la tua offerta decade», che qui e' vero.
+    E' IDEMPOTENTE: nascondere un nascosto (o rimettere un attivo) non
+    rifa' partire niente."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    nascondi = bool(d.get("nascosto", 1))
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('attivo','nascosto')",
+                    (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    gia = (a["stato"] == "nascosto") == nascondi
+    if gia:
+        con.close()
+        return {"ok": True, "nascosto": nascondi, "cambiato": False}
+    if nascondi:
+        if not NASCONDI_ANNUNCIO:
+            con.close()
+            raise HTTPException(404, "Funzione non attiva")
+        if a["asta_base_sats"] > 0:
+            con.close()
+            raise HTTPException(400, "Un'asta non si nasconde: si chiude "
+                                     "da sola alla scadenza")
+        if origine_annuncio(a) or dal_negozio_collegato(a):
+            con.close()
+            raise HTTPException(400, "Questo annuncio arriva da fuori: "
+                                     "si nasconde dove è nato")
+        if _ordini_vivi_annuncio(
+                con, annuncio_id,
+                ("released", "refunded", "annullato", "creato"),
+                esclusi=True):
+            con.close()
+            raise HTTPException(400, "C'è un ordine in corso su questo "
+                                     "annuncio: potrai nasconderlo quando "
+                                     "è concluso")
+        if _riservati(con, annuncio_id):
+            con.close()
+            raise HTTPException(400, "Qualcuno lo sta pagando proprio ora: "
+                                     "riprova tra qualche minuto")
+    # La scrittura guarda lo stato di PARTENZA anche nel WHERE: due tocchi
+    # incrociati non fanno due passaggi (il secondo trova 0 righe).
+    cur = con.execute("UPDATE annunci SET stato=? WHERE id=? AND stato=?",
+                      ("nascosto" if nascondi else "attivo", annuncio_id,
+                       a["stato"]))
+    if cur.rowcount == 0:
+        con.close()
+        raise HTTPException(409, "L'annuncio è cambiato proprio adesso: "
+                                 "ricarica la pagina e riprova")
+    if nascondi:
+        # Le fatture mai pagate (e scadute: _riservati qui sopra dice che
+        # di fresche non ce n'e') si chiudono come nella rimozione: una
+        # fattura viva non deve poter pagare un annuncio nascosto.
+        con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                    "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                    "(SELECT ordine_id FROM ordine_righe WHERE "
+                    "annuncio_id=?))",
+                    (int(time.time()), annuncio_id, annuncio_id))
+    con.commit()
+    con.close()
+    asyncio.create_task(annuncio_su_nostr(
+        annuncio_id, "sold" if nascondi else "active",
+        solo_aggiornamento=True))
+    asyncio.create_task(promo_venduto(annuncio_id, venduto=nascondi))
+    return {"ok": True, "nascosto": nascondi, "cambiato": True}
+
+
 
 def _togli_foto_mai_entrate(nomi: list):
     """(14 nov 2026, audit) Le foto nuove di una modifica che non si e'
@@ -34382,11 +35711,40 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # a voler dire «restano quelle».
     guardia_almeno_una_foto(d.get("foto"), a["foto"],
                             MSG_SERVE_UNA_FOTO_MODIFICA)
+    # LE FOTO CHE RESTANO, LE NUOVE E LE DESCRIZIONI (23 nov 2026,
+    # cantiere foto-varianti). La lista `foto` adesso e' l'annuncio
+    # INTERO nell'ordine voluto: un nome che l'annuncio ha gia' vuol
+    # dire «questa resta, qui», un data: e' una foto nuova da salvare in
+    # quel posto. Quel che manca dalla lista se ne va. Un client di
+    # prima manda solo foto nuove, e per lui non cambia niente: e' la
+    # sostituzione in blocco di sempre.
+    try:
+        foto_prima = json.loads(a["foto"]) if a["foto"] else []
+    except Exception:
+        foto_prima = []
+    foto_chieste = d.get("foto") if isinstance(d.get("foto"), list) else []
+    restano = [f for f in foto_chieste
+               if isinstance(f, str) and f in foto_prima]
+    if len(set(restano)) != len(restano):
+        raise HTTPException(400, "La stessa foto c'è due volte: togline "
+                                 "una e riprova")
+    if len(foto_chieste) > 5:
+        raise HTTPException(400, "Al massimo 5 foto per annuncio")
+    didascalie_nuove = didascalie_da_payload(d.get("didascalie"),
+                                             len(foto_chieste))
+    # le varianti semplici: chiave assente = restano quelle che ci sono
+    # (None); sulle aste non valgono, come in pubblica
+    scelte_nuove = scelte_del_venditore(d.get("scelte"))
+    if scelte_nuove and a["asta_base_sats"]:
+        scelte_nuove = ""
+    testo_mod = testo_da_moderare(
+        d.get("descrizione", ""), didascalie_nuove,
+        a["scelte"] if scelte_nuove is None else scelte_nuove)
 
     # --- Stessa moderazione di una pubblicazione nuova ---
-    categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
+    categoria = controlla_vietato(d["titolo"], testo_mod)
     if categoria:
-        parola = parola_vietata(d["titolo"], d.get("descrizione", ""))
+        parola = parola_vietata(d["titolo"], testo_mod)
         registra_moderazione("parole", "vietato",
                              motivo_parole(categoria, parola), d["titolo"],
                              annuncio_id, user["id"])
@@ -34398,7 +35756,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             argomento="moderazione")
         raise HTTPException(400, messaggio_rifiuto(divieto=categoria,
                                                    parola=parola))
-    verdetto = await moderazione_ai(d["titolo"], d.get("descrizione", ""))
+    verdetto = await moderazione_ai(d["titolo"], testo_mod)
     if verdetto and verdetto[0] == "vietato":
         registra_moderazione("ai", "vietato", verdetto[1], d["titolo"],
                              annuncio_id, user["id"])
@@ -34427,14 +35785,23 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # se ne ha scelte, e «toglile tutte» dal form non si puo' chiedere
     # (prima una lista vuota svuotava l'annuncio e ne cancellava i file).
     nomi_nuovi, scarti_foto = [], []
-    if isinstance(d.get("foto"), list) and d["foto"]:
+    foto_finali = None   # None = le foto e le loro descrizioni non si toccano
+    da_salvare = [(i, x) for i, x in enumerate(foto_chieste)
+                  if not (isinstance(x, str) and x in foto_prima)]
+    if da_salvare:
         # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
         # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
         # E in un thread, come in pubblica(): la conversione HEIC non
-        # deve congelare il server.
+        # deve congelare il server. Il timestamp salta avanti se una
+        # foto che RESTA lo porta gia' (due modifiche nello stesso
+        # secondo): un nome nuovo non deve mai coprire uno che resta.
+        ts = int(time.time())
+        while any(n.endswith(f"_{ts}.jpg") for n in restano):
+            ts += 1
+        entrate = []
         nomi_nuovi, scarti_foto = await asyncio.to_thread(
-            salva_foto, annuncio_id, d["foto"],
-            versione=f"_{int(time.time())}")
+            salva_foto, annuncio_id, [x for _, x in da_salvare],
+            f"_{ts}", entrate)
         if scarti_foto:
             print(f"📷 Modifica dell'annuncio #{annuncio_id}: "
                   f"{len(nomi_nuovi)} foto salvate, {len(scarti_foto)} "
@@ -34444,6 +35811,19 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                 400, "Modifica non salvata — " + "; ".join(scarti_foto)
                      + ". L'annuncio è com'era, foto comprese: cambia le "
                        "foto nuove e riprova.")
+        # ogni foto nuova entrata torna al posto in cui era nella lista
+        nuova_al_posto = {da_salvare[k][0]: n
+                          for k, n in zip(entrate, nomi_nuovi)}
+    else:
+        nuova_al_posto = {}
+    if foto_chieste:
+        foto_finali, didascalie_finali = [], []
+        for i, x in enumerate(foto_chieste):
+            nome = x if (isinstance(x, str) and x in foto_prima) \
+                else nuova_al_posto.get(i)
+            if nome:
+                foto_finali.append(nome)
+                didascalie_finali.append(didascalie_nuove[i])
 
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
@@ -34528,6 +35908,10 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     # (20 nov 2026) l'abbonamento: deciso qui sopra, si scrive sempre
     con.execute("UPDATE annunci SET abbonamento=? WHERE id=?",
                 (abbonamento, annuncio_id))
+    # (23 nov 2026) le varianti semplici: None = chiave assente, restano
+    if scelte_nuove is not None:
+        con.execute("UPDATE annunci SET scelte=? WHERE id=?",
+                    (scelte_nuove, annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -34576,17 +35960,18 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"riproponi sul listino nuovo."
             f"\n{link_telegram('annuncio', annuncio_id)}")
     conto_foto = {}
-    if nomi_nuovi:
-        nomi = nomi_nuovi
+    if foto_finali:
+        nomi = foto_finali
         # come in pubblica(): quante ne sono entrate lo dice la risposta
-        conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
-        try:
-            vecchie = json.loads(a["foto"]) if a["foto"] else []
-        except Exception:
-            vecchie = []
+        # (le NUOVE: e' su quelle che il client fa il conto)
+        if da_salvare:
+            conto_foto = {"foto_salvate": len(nomi_nuovi),
+                          "foto_scarti": scarti_foto}
+        vecchie = foto_prima
         con = db()
-        con.execute("UPDATE annunci SET foto=? WHERE id=?",
-                    (json.dumps(nomi), annuncio_id))
+        con.execute("UPDATE annunci SET foto=?, didascalie=? WHERE id=?",
+                    (json.dumps(nomi), didascalie_json(didascalie_finali),
+                     annuncio_id))
         con.commit()
         # LE FOTO DELLA FOTOGRAFIA RESTANO (18 nov 2026): se una
         # fotografia in archivio (un anno) le nomina, sono lo storico.
@@ -35001,8 +36386,10 @@ async def rimuovi_annuncio_admin(annuncio_id: int,
     con = db()
     # anche 'revisione': il moderatore puo' rimuovere pure cio' che
     # e' ancora in attesa (equivale a un rifiuto)
+    # (e il nascosto, 23 nov 2026: fuori dalla vetrina non vuol dire
+    # fuori dalla moderazione)
     a = con.execute("SELECT * FROM annunci WHERE id=? AND "
-                    "stato IN ('attivo','revisione')",
+                    "stato IN ('attivo','revisione','nascosto')",
                     (annuncio_id,)).fetchone()
     if not a:
         con.close()
@@ -35172,6 +36559,17 @@ async def decidi_revisione(annuncio_id: int, esito: str, admin_id: int):
         "UPDATE annunci SET stato=? WHERE id=? AND stato='revisione'",
         (nuovo, annuncio_id))
     deciso = cur.rowcount == 1
+    # LE VARIANTI NATE INSIEME SI DECIDONO INSIEME (23 nov 2026, cantiere
+    # foto-varianti): la famiglia fatta dal foglio Vendi e' un annuncio
+    # solo per chi l'ha scritto, e il moderatore ne ha guardato uno. Solo
+    # le sorelle ancora com'erano alla nascita (stesso `creato` e stesso
+    # `modificato`): una ritoccata dopo ha la sua revisione, e si decide
+    # da sola.
+    if deciso and (a["famiglia"] or "").startswith("u:"):
+        con.execute("UPDATE annunci SET stato=? WHERE famiglia=? AND id<>? "
+                    "AND stato='revisione' AND creato=? AND modificato=?",
+                    (nuovo, a["famiglia"], annuncio_id, a["creato"],
+                     a["modificato"]))
     if (deciso and esito == "pubblica" and a["asta_base_sats"] > 0
             and a["asta_scadenza"] > 0):
         # L'asta nata (o tornata) in revisione non paga la coda: il
@@ -38751,6 +40149,16 @@ def _leve_stato():
                          "il motivo per cui la legge non la chiede",
                   spento="la tabella torna facoltativa: si può pubblicare "
                          "un alimento senza"),
+            # NASCONDERE UN ANNUNCIO SOLO (23 nov 2026): acceso di serie,
+            # la leva e' l'interruttore d'emergenza
+            _leva("Nascondi un annuncio dalla vetrina",
+                  "NASCONDI_ANNUNCIO", NASCONDI_ANNUNCIO,
+                  acceso="sulla scheda del proprio annuncio c'è «🙈 "
+                         "Nascondi dalla vetrina»: l'annuncio esce dalla "
+                         "vetrina senza scadenza e torna con «👁 Rimetti "
+                         "in vetrina» da «I tuoi annunci»",
+                  spento="il tasto «Nascondi» non c'è; i nascosti restano "
+                         "tali e si possono sempre rimettere in vetrina"),
             # LA FOTOGRAFIA DELL'ANNUNCIO (18 nov 2026): accesa di
             # serie, la leva e' l'interruttore d'emergenza
             _leva("Fotografia dell'annuncio all'acquisto",
@@ -39156,6 +40564,15 @@ def _leve_stato():
                          "apertura, on-chain dal server); mai Barattozon",
                   spento="nessun paragrafo «Ripubblica» nel foglio, e gli "
                          "ordini scaduti non si rifanno più"),
+            # L'INCASSO DA SOLO (24 nov 2026): acceso di serie
+            _leva("Indirizzo degli incassi mandato da solo nel P2P",
+                  "P2P_INCASSO_DA_SOLO", P2P_INCASSO_DA_SOLO,
+                  acceso="chi compra sats con un indirizzo Lightning salvato "
+                         "che passa non vede il foglio «Dove ricevere i "
+                         "sats»: il telefono lo controlla e lo manda da "
+                         "solo; il foglio si apre se qualcosa dice di no",
+                  spento="come ieri: il foglio si apre sempre, e l'indirizzo "
+                         "degli incassi è un bottone che scrive nel campo"),
             # IL TEMPO PER PAGARE (18 nov 2026): acceso di serie
             _leva("Tempo per pagare nel P2P (da 15 minuti a 24 ore)",
                   "P2P_TEMPO_PER_PAGARE", P2P_TEMPO_PER_PAGARE,
@@ -39557,6 +40974,23 @@ def _leve_stato():
         # `_swap_quota_leve`.
         {"gruppo": "🔄 Indirizzo della quota SATS Routing",
          "voci": _swap_quota_leve()},
+        # IL QUADRO DEI SERVIZI (25 nov 2026): esce il FATTO che la porta
+        # dei battiti e' aperta, mai il segreto.
+        {"gruppo": "🩺 Quadro dei servizi", "voci": [
+            _leva("Quadro dei servizi", "QUADRO_SERVIZI",
+                  bool(QUADRO_SERVIZI),
+                  acceso="ogni cinque minuti il VPS batte per sé, guarda "
+                         "chi ha smesso di battere e avvisa nella stanza "
+                         "degli errori",
+                  spento="niente battito del VPS, niente avvisi dei "
+                         "silenzi né dei certificati"),
+            _leva("Quadro dei servizi — porta dei battiti",
+                  "BATTITO_SEGRETO", battito_attivo(),
+                  acceso="le altre macchine dicono qui, ogni cinque "
+                         "minuti, quali servizi sono vivi",
+                  spento="le altre macchine non possono battere: il "
+                         "quadro mostra il solo VPS"),
+        ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
                   bool(AVVISI_ISCRITTI),
@@ -39628,6 +41062,19 @@ def _leve_stato():
                          "restano salvati"),
             _leva("...gratis dal livello", "NIP05_UTENTI_LIVELLO",
                   NIP05_UTENTI_LIVELLO or "(storto: porta chiusa)"),
+        ]},
+        {"gruppo": "✏️ Nome e foto scelti su Barattolo", "voci": [
+            # NOME E FOTO SCELTI (23 nov 2026, cantiere profilo-mio):
+            # gratis, accesa di serie, nessun segreto
+            _leva("Nome e foto scelti dall'utente", "PROFILO_MIO_ATTIVO",
+                  bool(PROFILO_MIO_ATTIVO),
+                  acceso="nel Profilo si propongono nome e foto; li "
+                         "approva un moderatore, poi valgono su tutto "
+                         "Barattolo",
+                  spento="niente proposte e niente quarta scelta; chi ha "
+                         "gia' un nome approvato lo tiene"),
+            _leva("...un cambio ogni (giorni)", "PROFILO_MIO_GIORNI",
+                  PROFILO_MIO_GIORNI),
         ]},
         {"gruppo": "🔥 Serie dei giorni", "voci": [
             # LA SERIE DEI GIORNI (17 nov 2026, cantiere serie-giorni):
@@ -40733,6 +42180,53 @@ async def leve_backup_telegram(x_tg_init_data: str = Header(""),
     if not ok:
         raise HTTPException(502, "Telegram non ha preso il file: usa «Copia il testo»")
     return {"ok": True, "leve": len(b["leve"])}
+
+
+# GLI ID TELEGRAM DEGLI UTENTI, IN UN FILE (23 nov 2026, chiesto da
+# Andrea). Serve a incrociarli, SUL SUO PC, coi membri dei gruppi
+# Telegram in cui sta lui (lo userbot «gruppi in comune», fuori dal
+# repo): quanti di un gruppo sono gia' su Barattolo. Escono SOLO i
+# numeri, uno per riga: niente nomi, username, npub — per il conto
+# bastano gli id, e un file che gira con meno dentro fa meno danno se
+# finisce dove non deve. Gli utenti solo-Nostr (tg_id negativo) non ci
+# sono: su Telegram non esistono. Il file va nella chat di CHI LO
+# CHIEDE, come il backup delle leve, e mai in una risposta della rotta:
+# la Mini App non scarica file, e una lista intera nel JSON finirebbe
+# in qualche cache. Ogni richiesta lascia una riga nel journal.
+@app.post("/api/admin/id-utenti/telegram")
+async def id_utenti_telegram(x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: gli id Telegram degli utenti, un .txt dal bot."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    _frena("id_utenti", user["id"])
+    con = db()
+    try:
+        ids = [r["tg_id"] for r in con.execute(
+            "SELECT tg_id FROM utenti WHERE tg_id>0 ORDER BY tg_id")]
+    finally:
+        con.close()
+    print(f"📇 Id Telegram degli utenti chiesti dall'admin {user['id']}: "
+          f"{len(ids)} righe", flush=True)
+    if MODALITA_COLLAUDO:
+        return {"ok": False, "collaudo": True, "utenti": len(ids)}
+    nome = time.strftime("barattolo-id-utenti-%Y-%m-%d.txt")
+    testo = "\n".join(str(i) for i in ids) + "\n"
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
+                             data={"chat_id": str(user["id"]),
+                                   "caption": f"📇 {len(ids)} id Telegram degli utenti "
+                                              "di Barattolo, uno per riga. Sono dati "
+                                              "degli iscritti: tienili sul tuo PC."},
+                             files={"document": (nome, testo.encode("utf-8"), "text/plain")})
+        ok = r.status_code == 200 and r.json().get("ok")
+    except Exception:
+        ok = False
+    if not ok:
+        raise HTTPException(502, "Telegram non ha preso il file: riprova tra poco")
+    return {"ok": True, "utenti": len(ids)}
 
 
 @app.post("/api/admin/leve-ripristina")
@@ -50822,6 +52316,10 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         # il link (o il rinnovo), dopo tutto il resto: fail-open, e un
         # guasto lo riprende la ronda
         await _abbonamento_dopo_incasso(ordine_id, canale_abbo)
+    elif not e_set and scorta_per_ordine(o):
+        # LA SCORTA DI CODICI (24 nov 2026): il codice pronto, dopo tutto
+        # il resto e fail-open; senza scorta non succede niente
+        await _scorta_dopo_incasso(ordine_id)
     return {"stato": "locked"}
 
 
@@ -52838,6 +54336,30 @@ def _impronta(testo: str) -> str:
     return hashlib.sha256(testo.encode("utf-8")).hexdigest()[:16]
 
 
+async def _avvisa_consegna_digitale(compratore_id: int, n: int,
+                                    riquadri: bool):
+    """L'avviso a chi compra che il contenuto c'e': lo stesso dalla
+    consegna a mano e dalla scorta (24 nov 2026), cosi' chi compra non
+    vede differenze. `riquadri`: i codici si aprono uno alla volta."""
+    if riquadri:
+        await notifica(compratore_id,
+                       f"💾 <b>Il venditore ha consegnato i {n} codici</b> "
+                       f"del tuo acquisto digitale! Si aprono <b>uno alla "
+                       f"volta</b>: apri il primo nella Mini App, provalo e "
+                       f"tocca «Funziona» per vedere il successivo. Ogni "
+                       f"codice ha {ORE_CONFERMA_DIGITALE} ore per una "
+                       f"disputa se non va. ⚠️ Un codice aperto non torna "
+                       f"indietro.")
+        return
+    await notifica(compratore_id,
+                   f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
+                   f"tuo acquisto digitale! Rivelalo nella Mini App e "
+                   f"provalo subito: dalla rivelazione hai "
+                   f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
+                   f"se qualcosa non va, poi l'acquisto è definitivo. "
+                   f"⚠️ Un codice, una volta rivelato, non torna indietro.")
+
+
 async def _consegna_codici(con, o, d: dict) -> dict:
     """La consegna (e la correzione) di un ordine a riquadri: il ramo
     di `consegna_digitale` quando `codici_uno_alla_volta` dice si'.
@@ -52933,14 +54455,7 @@ async def _consegna_codici(con, o, d: dict) -> dict:
         print(f"💾 Ordine #{ordine_id}: {n} codici consegnati uno per "
               f"riquadro (impronte "
               f"{', '.join(_impronta(c) for c in finali)})")
-        await notifica(o["compratore_id"],
-                       f"💾 <b>Il venditore ha consegnato i {n} codici</b> "
-                       f"del tuo acquisto digitale! Si aprono <b>uno alla "
-                       f"volta</b>: apri il primo nella Mini App, provalo e "
-                       f"tocca «Funziona» per vedere il successivo. Ogni "
-                       f"codice ha {ORE_CONFERMA_DIGITALE} ore per una "
-                       f"disputa se non va. ⚠️ Un codice aperto non torna "
-                       f"indietro.")
+        await _avvisa_consegna_digitale(o["compratore_id"], n, True)
         return {"ok": True, "stato": "shipped", "codici_n": n,
                 "correzioni": 0, "documento": False}
     cambiati = [k for k in range(1, n + 1) if finali[k - 1] != vecchi.get(k, "")]
@@ -53718,6 +55233,263 @@ async def ronda_abbonamenti():
         con.close()
 
 
+# LA SCORTA DI CODICI (24 nov 2026, cantiere scorta-codici; Andrea:
+# «c'e' modo di precaricare una serie di codici coupon che il cliente usa
+# in autonomia?», per i corsi di BitcoinLabs). Chi vende un DIGITALE
+# incolla prima i codici, uno per riga; al pagamento `_incassa_ordine`
+# chiama `_scorta_dopo_incasso`, che ne prende uno libero e consegna da
+# solo, con le stesse colonne e gli stessi avvisi della consegna a mano.
+# Tutto il resto non cambia: il deposito, la rivelazione che fa da
+# ricevuta, «Funziona» sui riquadri, la disputa, le 24 ore.
+# I PEZZI DELL'ANNUNCIO li scrive la rotta di sempre (`/quantita`), che
+# il client chiama col numero dei codici liberi dopo averli salvati:
+# un secondo scrittore dello stock avrebbe voluto le sue sentinelle.
+# Se i pezzi superano i codici (o due pagamenti arrivano insieme
+# sull'ultimo), l'ordine senza codice resta 'locked' e chi vende lo
+# consegna a mano come ieri: e' avvisato.
+# I TESTI DELLA SCORTA (24 nov 2026): approvati da Andrea prima del push
+MSG_SCORTA_SOLO_DIGITALE = ("I codici pronti valgono solo per gli annunci "
+                            "a codice online")
+MSG_SCORTA_SPENTA = "I codici pronti sono spenti in questo momento"
+MSG_SCORTA_VUOTA = "Incolla almeno un codice, uno per riga"
+
+
+def msg_scorta_consegnato(n: int, restano: int) -> str:
+    cosa = "Un codice" if n == 1 else f"{n} codici"
+    return (f"🔑 <b>Venduto!</b> {cosa} dei tuoi codici pronti "
+            f"{'è partito' if n == 1 else 'sono partiti'} da solo. "
+            + ("Non ne restano più: l'annuncio è esaurito." if not restano
+               else f"Ne restano {restano}."))
+
+
+def msg_scorta_finita(ordine_id: int) -> str:
+    return (f"🔑 <b>I codici pronti sono finiti</b> e l'ordine "
+            f"#{int(ordine_id)} è pagato: consegnalo tu dall'ordine, come "
+            f"sempre.")
+
+
+MAX_CODICI_SCORTA = 500
+
+
+def _impronta_scorta(testo: str) -> str:
+    """L'impronta di un codice per i doppioni: con la chiave dei
+    contenuti, non lo SHA nudo — un coupon corto si indovinerebbe."""
+    chiave = _SALE_CONTENUTI + (CHIAVE_CONTENUTI_DIGITALI or "").encode()
+    return hmac.new(chiave, testo.encode("utf-8"),
+                    hashlib.sha256).hexdigest()[:32]
+
+
+def codici_liberi(con, annuncio_id: int) -> int:
+    return con.execute("SELECT COUNT(*) AS n FROM codici_scorta WHERE "
+                       "annuncio_id=? AND ordine_id=0",
+                       (int(annuncio_id),)).fetchone()["n"]
+
+
+def _annuncio_con_scorta(con, annuncio_id: int, venditore_id: int):
+    """L'annuncio di chi vende, se la scorta ci sta: solo il codice
+    online puro (non «anche digitale», che puo' partire per posta), non
+    un abbonamento (il link lo fa il bot), non un'asta, non una riga
+    importata (lo stock vive dove vive la merce)."""
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato IN ('attivo','venduto','nascosto')",
+                    (annuncio_id, venditore_id)).fetchone()
+    if not a:
+        raise HTTPException(400, "Operazione non permessa")
+    if (a["consegna"] != "digitale" or int(_campo(a, "anche_digitale", 0) or 0)
+            or e_abbonamento(a) or int(a["asta_base_sats"] or 0) > 0
+            or origine_annuncio(a)):
+        raise HTTPException(400, MSG_SCORTA_SOLO_DIGITALE)
+    return a
+
+
+@app.get("/api/listings/{annuncio_id}/codici")
+async def scorta_codici(annuncio_id: int, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """Quanti codici ci sono: i liberi e quelli gia' consegnati. Mai i
+    codici: chi li ha caricati li ha gia'."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        _annuncio_con_scorta(con, annuncio_id, user["id"])
+        usati = con.execute("SELECT COUNT(*) AS n FROM codici_scorta WHERE "
+                            "annuncio_id=? AND ordine_id<>0",
+                            (annuncio_id,)).fetchone()["n"]
+        return {"attiva": SCORTA_CODICI,
+                "liberi": codici_liberi(con, annuncio_id),
+                "consegnati": usati, "massimo": MAX_CODICI_SCORTA}
+    finally:
+        con.close()
+
+
+@app.post("/api/listings/{annuncio_id}/codici")
+async def scrivi_scorta_codici(annuncio_id: int, req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """`{"aggiungi": "<un codice per riga>"}` o `{"togli": true}` (via i
+    codici non ancora consegnati). Toglierli si puo' sempre, anche a
+    leva spenta: e' il modo di riprenderli."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        _annuncio_con_scorta(con, annuncio_id, user["id"])
+        if d.get("togli") is True:
+            via = con.execute("DELETE FROM codici_scorta WHERE annuncio_id=? "
+                              "AND ordine_id=0", (annuncio_id,)).rowcount
+            con.commit()
+            print(f"🔑 Annuncio #{annuncio_id}: tolti {via} codici dalla "
+                  f"scorta")
+            return {"ok": True, "tolti": via, "liberi": 0}
+        if not SCORTA_CODICI:
+            raise HTTPException(400, MSG_SCORTA_SPENTA)
+        testo = d.get("aggiungi")
+        if not isinstance(testo, str):
+            raise HTTPException(400, MSG_SCORTA_VUOTA)
+        righe = [r.strip() for r in testo.splitlines() if r.strip()]
+        if not righe:
+            raise HTTPException(400, MSG_SCORTA_VUOTA)
+        for k, r in enumerate(righe, 1):
+            if len(r) > MAX_CARATTERI_CODICE:
+                raise HTTPException(400, f"Il codice della riga {k} è "
+                                         f"troppo lungo (massimo "
+                                         f"{MAX_CARATTERI_CODICE} caratteri)")
+        # I DOPPIONI non entrano, ne' quelli della lista ne' quelli gia'
+        # caricati (anche consegnati): lo stesso coupon a due persone e'
+        # il guaio che la scorta deve rendere impossibile
+        visti = {x["impronta"] for x in con.execute(
+            "SELECT impronta FROM codici_scorta WHERE annuncio_id=?",
+            (annuncio_id,))}
+        nuovi = []
+        for r in righe:
+            imp = _impronta_scorta(r)
+            if imp in visti:
+                continue
+            visti.add(imp)
+            nuovi.append((r, imp))
+        liberi = codici_liberi(con, annuncio_id)
+        if liberi + len(nuovi) > MAX_CODICI_SCORTA:
+            raise HTTPException(400, f"Al massimo {MAX_CODICI_SCORTA} codici "
+                                     f"pronti per annuncio: ne hai già "
+                                     f"{liberi}")
+        adesso = int(time.time())
+        con.executemany(
+            "INSERT INTO codici_scorta(annuncio_id, contenuto, impronta, "
+            "creato) VALUES(?,?,?,?)",
+            [(annuncio_id, _cifra_contenuto(r), imp, adesso)
+             for r, imp in nuovi])
+        con.commit()
+        print(f"🔑 Annuncio #{annuncio_id}: {len(nuovi)} codici nella scorta "
+              f"({len(righe) - len(nuovi)} doppioni scartati)")
+        return {"ok": True, "aggiunti": len(nuovi),
+                "doppioni": len(righe) - len(nuovi),
+                "liberi": liberi + len(nuovi)}
+    finally:
+        con.close()
+
+
+def scorta_per_ordine(o) -> bool:
+    """PURA: quest'ordine puo' consegnarsi dalla scorta? Un mono (un set
+    ha righe di annunci diversi) a codice online, non ancora consegnato,
+    a leva accesa."""
+    return bool(SCORTA_CODICI
+                and (_campo(o, "consegna_scelta") or "") == "digitale"
+                and int(_campo(o, "annuncio_id", 0) or 0) > 0
+                and not (_campo(o, "contenuto_digitale") or "")
+                and not int(_campo(o, "abbonamento_canale", 0) or 0))
+
+
+async def _scorta_dopo_incasso(ordine_id: int):
+    """I sats sono nel deposito: se l'annuncio ha codici pronti, se ne
+    prende uno per pezzo e si consegna. Fail-open come l'abbonamento: un
+    guasto lascia l'ordine 'locked', e chi vende consegna a mano.
+    NIENTE AWAIT fra la lettura dei liberi e la loro presa: nel server
+    mono-processo e' il patto anti-doppione di compra(); in piu' la presa
+    ripete `ordine_id=0`, e si conta che li abbia presi tutti."""
+    con = db()
+    try:
+        o = con.execute("SELECT * FROM ordini WHERE id=?",
+                        (ordine_id,)).fetchone()
+        if not o or o["stato"] != "locked" or not scorta_per_ordine(o):
+            return
+        n = int(o["quantita"] or 1)
+        liberi = con.execute(
+            "SELECT id, contenuto FROM codici_scorta WHERE annuncio_id=? "
+            "AND ordine_id=0 ORDER BY id LIMIT ?",
+            (o["annuncio_id"], n)).fetchall()
+        if not liberi:
+            # nessuna scorta (l'annuncio non la usa): niente da dire
+            if con.execute("SELECT 1 FROM codici_scorta WHERE annuncio_id=? "
+                           "LIMIT 1", (o["annuncio_id"],)).fetchone():
+                await _avvisa_scorta_finita(o)
+            return
+        if len(liberi) < n:
+            await _avvisa_scorta_finita(o)
+            return
+        adesso = int(time.time())
+        presi = 0
+        for c in liberi:
+            presi += con.execute(
+                "UPDATE codici_scorta SET ordine_id=?, usato_il=? "
+                "WHERE id=? AND ordine_id=0",
+                (ordine_id, adesso, c["id"])).rowcount
+        if presi != n:
+            con.rollback()
+            return
+        cifrati = [c["contenuto"] for c in liberi]
+        if n >= 2 and codici_uno_alla_volta(o):
+            cur = con.execute(
+                "UPDATE ordini SET stato='shipped', "
+                "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                "contenuto_digitale=?, contenuto_file='', "
+                "contenuto_file_tipo='', contenuto_file_nome='', "
+                "codici_n=?, codici_aperti=0, codici_confermati=0, "
+                "codice_aperto_il=0, dalla_scorta=1, aggiornato=? "
+                "WHERE id=? AND stato='locked'",
+                (adesso, _cifra_contenuto(""), n, adesso, ordine_id))
+            if cur.rowcount == 1:
+                con.execute("DELETE FROM codici_digitali WHERE ordine_id=?",
+                            (ordine_id,))
+                con.executemany(
+                    "INSERT INTO codici_digitali(ordine_id, n, contenuto) "
+                    "VALUES(?,?,?)",
+                    [(ordine_id, k, cif) for k, cif in enumerate(cifrati, 1)])
+        else:
+            # il campo unico: un codice, o (a leva dei riquadri spenta)
+            # tutti, uno per riga
+            testo = "\n".join(_decifra_contenuto(cif) for cif in cifrati)
+            cur = con.execute(
+                "UPDATE ordini SET stato='shipped', "
+                "corriere='Consegna digitale', tracking='', spedito_il=?, "
+                "contenuto_digitale=?, contenuto_file='', "
+                "contenuto_file_tipo='', contenuto_file_nome='', "
+                "dalla_scorta=1, aggiornato=? WHERE id=? AND stato='locked'",
+                (adesso, cifrati[0] if n == 1 else _cifra_contenuto(testo),
+                 adesso, ordine_id))
+        if cur.rowcount != 1:
+            con.rollback()
+            return
+        con.commit()
+        restano = codici_liberi(con, o["annuncio_id"])
+        print(f"🔑 Ordine #{ordine_id}: {n} "
+              f"{'codice consegnato' if n == 1 else 'codici consegnati'} "
+              f"dalla scorta (ne restano {restano})")
+        await _avvisa_consegna_digitale(o["compratore_id"], n,
+                                        n >= 2 and codici_uno_alla_volta(o))
+        await notifica(o["venditore_id"], msg_scorta_consegnato(n, restano))
+    except Exception as e:
+        print(f"⚠️ Ordine #{ordine_id}: scorta dopo l'incasso interrotta: "
+              f"{e}")
+    finally:
+        con.close()
+
+
+async def _avvisa_scorta_finita(o):
+    """A chi vende: i codici pronti non bastano, quest'ordine va
+    consegnato a mano come ieri."""
+    print(f"🔑 Ordine #{o['id']}: la scorta non basta, consegna a mano")
+    await notifica(o["venditore_id"], msg_scorta_finita(o["id"]))
+
+
 @app.post("/api/orders/{ordine_id}/consegna-digitale")
 async def consegna_digitale(ordine_id: int, req: Request,
                             x_tg_init_data: str = Header(""),
@@ -53915,13 +55687,7 @@ async def consegna_digitale(ordine_id: int, req: Request,
                        "del tuo acquisto digitale: apri l'ordine e rivela "
                        "quello nuovo.")
     else:
-        await notifica(o["compratore_id"],
-                       f"💾 <b>Il venditore ha consegnato il contenuto</b> del "
-                       f"tuo acquisto digitale! Rivelalo nella Mini App e "
-                       f"provalo subito: dalla rivelazione hai "
-                       f"{ORE_CONFERMA_DIGITALE} ore per aprire una disputa "
-                       f"se qualcosa non va, poi l'acquisto è definitivo. "
-                       f"⚠️ Un codice, una volta rivelato, non torna indietro.")
+        await _avvisa_consegna_digitale(o["compratore_id"], 1, False)
     return {"ok": True, "stato": "shipped",
             "correzioni": o["contenuto_correzioni"] + (1 if correzione else 0),
             "documento": bool(file_nome)}
@@ -54789,13 +56555,29 @@ def _scrivi_avatar(tg_id: int, nome_nuovo: str):
     avatar_aggiornato si segna comunque: niente ritentativi a raffica
     per chi una foto non ce l'ha proprio."""
     con = db()
-    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
-                    (tg_id,)).fetchone()
+    r = con.execute("SELECT avatar, mio_foto, mio_foto_att FROM utenti "
+                    "WHERE tg_id=?", (tg_id,)).fetchone()
     vecchio = r["avatar"] if r else ""
-    con.execute("UPDATE utenti SET avatar=?, avatar_aggiornato=? "
-                "WHERE tg_id=?", (nome_nuovo, int(time.time()), tg_id))
+    # IL CARTELLINO NON SI SCAVALCA (23 nov 2026, profilo-mio): un giro
+    # del social partito PRIMA dell'approvazione puo' finire DOPO, e
+    # scriverebbe la foto di Telegram sopra quella appena approvata. La
+    # condizione sta nell'UPDATE, cioe' nel momento in cui si scrive, e
+    # non in una lettura di prima che puo' essere gia' vecchia.
+    scritte = con.execute(
+        "UPDATE utenti SET avatar=?, avatar_aggiornato=? "
+        "WHERE tg_id=? AND avatar_scelta!='mia'",
+        (nome_nuovo, int(time.time()), tg_id)).rowcount
     con.commit()
     con.close()
+    if not scritte:
+        # la foto appena scaricata non e' di nessuno: via subito
+        if nome_nuovo and nome_nuovo != vecchio:
+            _togli_banner_file(nome_nuovo)
+        return
+    # ...e i file del cartellino restano: la foto approvata (e quella in
+    # attesa) torna quando si rientra su «mia», senza nuova revisione
+    if r and vecchio in (r["mio_foto"], r["mio_foto_att"]):
+        vecchio = ""
     if vecchio and vecchio != nome_nuovo:
         # Col francobollo vecchio se ne va anche la _min che gli avatar
         # non avrebbero mai dovuto avere (ago 2026): finche' la passata
@@ -55004,8 +56786,10 @@ def _scrivi_nome_nostr(tg_id: int, nome: str):
     if not nome:
         return
     con = db()
-    con.execute("UPDATE utenti SET nome=? WHERE tg_id=? AND nome!=?",
-                (nome, tg_id, nome))
+    # (23 nov 2026) mai sopra il nome scelto su Barattolo: vedi
+    # `_scrivi_avatar`, stessa corsa e stessa cura
+    con.execute("UPDATE utenti SET nome=? WHERE tg_id=? AND nome!=? "
+                "AND avatar_scelta!='mia'", (nome, tg_id, nome))
     con.commit()
     con.close()
 
@@ -55046,6 +56830,17 @@ async def aggiorna_profilo_social(tg_id: int):
         if not u or not u["negozio"]:
             return
         scelta = u["avatar_scelta"]
+        if scelta == "mia":
+            # NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026): qui non c'e'
+            # niente da prendere dal social — ne' il nome, nemmeno per un
+            # nativo Nostr, ne' la faccia. Si timbra il giro, o si
+            # rifarebbe a ogni apertura.
+            con = db()
+            con.execute("UPDATE utenti SET avatar_aggiornato=? "
+                        "WHERE tg_id=?", (int(time.time()), tg_id))
+            con.commit()
+            con.close()
+            return
         npub = u["npub_accesso"] or \
             (u["npub"] if u["npub_verificata"] else "")
         # Un solo giro sui relay per il nome e per la faccia. None = i
@@ -55369,6 +57164,11 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
     profilo["onchain_incasso"] = (_onchain_incasso_mio(user["id"])
                                   if profilo["onchain"] else "")
+    # ...e il suo inizio e la sua fine (23 nov 2026, cantiere
+    # indirizzo-visibile): prima il Profilo diceva solo «un tuo
+    # indirizzo», e chi l'aveva salvato non lo ritrovava
+    profilo["onchain_incasso_vista"] = (_onchain_incasso_mio_vista(user["id"])
+                                        if profilo["onchain_incasso"] else "")
     # (28 ott 2026) come ricevo quando vendo on-chain: la busta del cambio
     # in Lightning (il cancello per me, il modo scelto, il minimo)
     profilo["onchain_ln"] = (onchain_ln_busta(user["id"])
@@ -55449,6 +57249,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # L'etichetta degli alimenti (17 nov 2026): la leva VIVA, perche' il
     # form non disegni una sezione che il server non scriverebbe.
     profilo["etichetta_alimenti"] = ETICHETTA_ALIMENTI
+    # Il «🙈 Nascondi» sulla scheda del proprio annuncio (23 nov 2026):
+    # la leva VIVA, perche' il tasto nasca solo quando la rotta nasconde.
+    profilo["nascondi_annuncio"] = NASCONDI_ANNUNCIO
     # ...e la tabella obbligatoria (18 nov 2026), perche' il form dica
     # «obbligatoria» solo quando il server la esige davvero
     profilo["etichetta_obbligatoria"] = ETICHETTA_OBBLIGATORIA
@@ -55847,6 +57650,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # a leva accesa; null = il client non disegna niente
     profilo["nip05"] = nip05_stato(u) if (NIP05_UTENTI_ATTIVO and u) \
         else None
+    # NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026): le colonne `mio_*`
+    # escono gia' con la riga; qui la leva e da quando si puo' cambiare
+    profilo["profilo_mio"] = {
+        "attivo": PROFILO_MIO_ATTIVO, "giorni": PROFILO_MIO_GIORNI,
+        "prossimo": mio_prossimo_cambio(u["mio_approvato_il"] or 0)
+        if u else 0}
     # LE RACCOLTE IN SATS (17 nov 2026): la voce nel Profilo e la tessera
     # in vetrina solo a leva accesa; la tessera solo se ce n'e' almeno una
     # viva (una porta su un elenco vuoto e' un bottone che porta a un muro)
@@ -56694,8 +58503,13 @@ def assistenza_elenco_admin(x_tg_init_data: str = Header(""),
             (ASSISTENZA_ELENCO_MAX,)).fetchall()
     finally:
         con.close()
+    # L'UTENTE COME TESTO (23 nov 2026, cantiere assistenza-id-nostr):
+    # l'id di un nativo Nostr va oltre il 2^53 di JavaScript, e come
+    # numero JSON arrivava arrotondato — l'app chiedeva un utente che non
+    # esiste («Utente non trovato», il caso di Zzap). Come testo resta
+    # esatto, come gia' fa `idConto` per il portachiavi.
     return {"conversazioni": [{
-        "utente": r["utente"], "nome": r["nome"] or "",
+        "utente": str(r["utente"]), "nome": r["nome"] or "",
         "username": r["username"] or "", "negozio": r["negozio"] or "",
         "staff_utente": e_staff(r["utente"]), "messaggi": r["n"],
         "ultimo": r["testo"][:140] or "📎 Screenshot", "quando": r["quando"],
@@ -56722,7 +58536,7 @@ def assistenza_conversazione_admin(utente: int,
         righe = _righe_assistenza(con, utente, True)
     finally:
         con.close()
-    return {"utente": u["tg_id"], "nome": u["nome"] or "",
+    return {"utente": str(u["tg_id"]), "nome": u["nome"] or "",
             "username": u["username"] or "", "negozio": u["negozio"] or "",
             "messaggi": righe, "max": ASSISTENZA_TESTO_MAX}
 
@@ -58233,7 +60047,9 @@ async def scegli_font_scala(req: Request,
 # le slide: parte da solo una volta, e la volta vale su ogni dispositivo.
 # `banner_p2p` (26 set 2026) e' la prima animazione del banner personale
 # delle commissioni: da li' il banner e' personale a ogni ingresso.
-VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
+# `notizie` (23 nov 2026) e' il riquadro che invita nel canale delle
+# notizie: una volta sola per persona, su ogni dispositivo.
+VISTI_NOTI = ("tour", "tour_p2p", "cartello", "notizie", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
               "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5", "giro_p2p",
               "banner_p2p",
@@ -60092,6 +61908,559 @@ async def decidi_banner_admin(tg_id: int, req: Request,
     return {"ok": True, "detto": testo}
 
 
+# --- NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026, cantiere profilo-mio) ---
+# La richiesta di un utente entrato con Nostr, e la decisione di Andrea
+# («implementiamo ora la possibilita' di customizzare la foto, e di
+# mettere il nome umano sul mercatino, mantenendo l'uso del profilo
+# Nostr»). Il disegno e' quello dello studio del 6 ott
+# (docs/STUDIO-PROFILO-PERSONALIZZATO-2026-10-06.md) con UNA differenza
+# decisa il 23 nov: e' GRATIS — niente fattura, niente porta da
+# comprare, niente rimborsi. Restano il moderatore PRIMA della
+# pubblicazione (la moderazione AI e' ferma, e una foto la guarda
+# solo un occhio), un cambio approvato ogni PROFILO_MIO_GIORNI, le
+# regole del nome (niente emoji, niente parole dello staff, niente
+# sosia) e l'avviso a chi ha un ordine aperto con lui.
+# LA METAFORA: Barattolo fotocopia il documento che sta altrove
+# (Telegram, il kind-0); con questo l'utente appende alla bancarella
+# un CARTELLINO scritto da lui e timbrato da un moderatore. Il kind-0,
+# la npub, il login Nostr e Mostro non si toccano: il cartellino vale
+# solo dentro Barattolo.
+# COME SI APPLICA: approvato, si scrive in `utenti.nome` e
+# `utenti.avatar` con `avatar_scelta='mia'` — le ~70 letture del
+# server e la decina del client non sanno niente del cartellino, e le
+# due porte che riscrivono (`_upsert_da_telegram`, il giro del social)
+# rispettano 'mia' come gia' rispettavano 'nostr'.
+# LA LEVA: PROFILO_MIO_ATTIVO, accesa di serie (la regola delle leve
+# nuove). Spenta: niente proposte e niente quarta scelta; chi ha gia'
+# il cartellino lo tiene, e puo' sempre tornare a Telegram o Nostr.
+try:
+    from config import PROFILO_MIO_ATTIVO
+except ImportError:
+    PROFILO_MIO_ATTIVO = True
+PROFILO_MIO_ATTIVO = bool(PROFILO_MIO_ATTIVO)
+try:
+    from config import PROFILO_MIO_GIORNI
+except ImportError:
+    PROFILO_MIO_GIORNI = 30
+try:
+    PROFILO_MIO_GIORNI = max(0, int(PROFILO_MIO_GIORNI))
+except (TypeError, ValueError):
+    PROFILO_MIO_GIORNI = 30
+# i SOSIA PROTETTI (decisione 7 del 6 ott): lo staff, i Consigliati e
+# chi ha venduto almeno questo numero di volte
+PROFILO_MIO_SOSIA_VENDITE = 10
+NOME_MIO_MIN, NOME_MIO_MAX = 3, 30
+MSG_MIO_SPENTO = "Il nome e la foto a scelta non sono attivi al momento"
+MSG_MIO_NON_APPROVATO = ("Prima scegli il tuo nome e la tua foto: li "
+                         "guarda un moderatore")
+# LA FORMA DEL NOME: lettere latine (con le accentate), cifre, spazio
+# e . - ' _ — NIENTE EMOJI (decisione 6) ne' altri alfabeti, che e'
+# anche quel che chiude i sosia di un carattere (la «а» cirillica,
+# identica alla «a» latina). L'intervallo À-ÿ salta × e ÷.
+_NOME_MIO_FORMA = re.compile(r"[A-Za-z0-9À-ÖØ-ö"
+                             r"ø-ÿ .'_-]+")
+# il camuffamento piu' comune: «4dm1n», «$taff», «m0deratore»
+_NOME_MIO_LEET = str.maketrans("01345789@$", "oieastgbas")
+# PAROLE DELLO STAFF, cercate DENTRO il nome compattato (senza spazi
+# ne' segni): un nome non descrive un oggetto, dichiara chi sei — e
+# «Barattolo» qui vale anche se e' un vaso di vetro.
+NOME_MIO_VIETATE = ("barattolo", "barattozon", "admin", "amministrator",
+                    "moderator", "moderatric", "staff", "supporto",
+                    "support", "assistenza", "helpdesk", "ufficiale",
+                    "official", "mostro", "tappo")
+# ...e le CORTE, solo come parola intera: «mod» dentro «Modena» no
+NOME_MIO_VIETATE_PAROLA = ("mod", "team")
+
+
+def _nome_mio_parole(nome: str) -> list:
+    """Il nome in parole normalizzate e smascherate: minuscole, senza
+    accenti, i numeri-lettera rimessi a lettera, i segni a spazio."""
+    t = unicodedata.normalize("NFKD", (nome or "").lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    t = t.translate(_NOME_MIO_LEET)
+    return re.findall(r"[a-z0-9]+", t)
+
+
+def nome_mio_compatto(nome: str) -> str:
+    """La forma su cui si confrontano i sosia e si cercano le parole:
+    «Bottega  del-Riuso» e «bottegadelriuso» sono lo stesso nome."""
+    return "".join(_nome_mio_parole(nome))
+
+
+def nome_mio_forma(nome) -> tuple[str, str]:
+    """(nome pulito, '') o ('', motivo). Solo la FORMA e le parole
+    vietate: pura, si tortura in CI. I sosia li guarda
+    `giudica_nome_mio`, che ha bisogno del database."""
+    nome = " ".join(str(nome or "").split())
+    if len(nome) < NOME_MIO_MIN or len(nome) > NOME_MIO_MAX:
+        return "", (f"Il nome deve avere da {NOME_MIO_MIN} a "
+                    f"{NOME_MIO_MAX} caratteri")
+    if not _NOME_MIO_FORMA.fullmatch(nome):
+        return "", ("Nel nome solo lettere, numeri, spazi e . - ' _ "
+                    "(niente emoji)")
+    compatto = nome_mio_compatto(nome)
+    # la lettera si cerca PRIMA di smascherare i numeri: «123 456»
+    # smascherato diventerebbe «iea asg»
+    if not re.search(r"[a-z]", normalizza(nome)):
+        return "", "Il nome deve contenere almeno una lettera"
+    parole = _nome_mio_parole(nome)
+    if any(v in compatto for v in NOME_MIO_VIETATE) or \
+            any(v in parole for v in NOME_MIO_VIETATE_PAROLA):
+        return "", ("Questo nome non si può usare: ricorda lo staff di "
+                    "Barattolo")
+    if termine_vietato(nome, ""):
+        return "", "Questo nome non si può usare"
+    return nome, ""
+
+
+def _nomi_protetti(con, tg_id: int) -> set:
+    """I nomi (compattati) che nessun altro puo' prendere: lo staff, i
+    negozi Consigliati (quelli del catalogo e quelli promossi) e chi ha
+    venduto almeno PROFILO_MIO_SOSIA_VENDITE volte. Sempre senza se
+    stesso: chi ha gia' quel nome resta libero di tenerlo."""
+    ids = set(_ids_staff())
+    try:
+        codici = [c["negozio"] for c in consigliati_pubblici(con)]
+    except Exception:
+        codici = []
+    for cod in codici:
+        r = con.execute("SELECT tg_id FROM utenti WHERE negozio=?",
+                        (cod,)).fetchone()
+        if r:
+            ids.add(r["tg_id"])
+    ids.update(r[0] for r in con.execute(
+        "SELECT tg_id FROM utenti WHERE promo_consigliato=1"))
+    ids.update(r[0] for r in con.execute(
+        "SELECT venditore_id FROM ordini WHERE stato='released' AND prova=0 "
+        "GROUP BY venditore_id HAVING COUNT(*)>=?",
+        (PROFILO_MIO_SOSIA_VENDITE,)))
+    ids.discard(tg_id)
+    if not ids:
+        return set()
+    fuori = set()
+    lista = list(ids)
+    for i in range(0, len(lista), 500):
+        pezzo = lista[i:i + 500]
+        for r in con.execute(
+                "SELECT nome, mio_nome FROM utenti WHERE tg_id IN "
+                f"({','.join('?' * len(pezzo))})", pezzo):
+            for n in (r["nome"], r["mio_nome"]):
+                c = nome_mio_compatto(n or "")
+                if c:
+                    fuori.add(c)
+    return fuori
+
+
+def giudica_nome_mio(con, tg_id: int, nome) -> tuple[str, str]:
+    """La forma, le parole e i sosia: (nome, '') o ('', motivo). La
+    macchina ferma i casi netti PRIMA del moderatore; il resto lo
+    giudica lui."""
+    nome, motivo = nome_mio_forma(nome)
+    if not nome:
+        return "", motivo
+    if nome_mio_compatto(nome) in _nomi_protetti(con, tg_id):
+        return "", ("Questo nome è troppo simile a quello di un altro "
+                    "venditore")
+    return nome, ""
+
+
+def mio_prossimo_cambio(approvato_il: int) -> int:
+    """Da quando si puo' proporre il prossimo cambio (0 = adesso). Il
+    conto parte dall'APPROVAZIONE: un rifiuto o una proposta sostituita
+    non consumano il mese."""
+    if not approvato_il or not PROFILO_MIO_GIORNI:
+        return 0
+    return int(approvato_il) + PROFILO_MIO_GIORNI * 86400
+
+
+def _salva_foto_mia(negozio: str, raw: bytes) -> str:
+    """Il francobollo del cartellino: come `_salva_avatar` (quadrato da
+    AVATAR_LATO, la ricompressione toglie EXIF e GPS), col nome in
+    MILLISECONDI — un giro del social nello stesso secondo non deve
+    poter scrivere sopra la foto in attesa. La forma resta `av_..._N.jpg`,
+    quella che la rotta `/foto/` gia' conosce."""
+    if not ImmaginePillow or not raw or not negozio:
+        return ""
+    try:
+        img = _decodifica_frenata(raw, (AVATAR_LATO, AVATAR_LATO))
+        if img is None:
+            return ""
+        img = ImageOps.fit(img, (AVATAR_LATO, AVATAR_LATO),
+                           ImmaginePillow.Resampling.LANCZOS)
+        nome = f"av_{negozio}_{time.time_ns() // 1_000_000}.jpg"
+        img.save(os.path.join(FOTO_DIR, nome), "JPEG",
+                 quality=AVATAR_QUALITA)
+        return nome
+    except Exception:
+        return ""
+
+
+def _copia_foto_mia(negozio: str, attuale: str) -> str:
+    """La foto di adesso, COPIATA come foto del cartellino, per chi
+    propone solo il nome: «l'altro resta com'e'». Una copia e non lo
+    stesso file, perche' quello del social se ne va al prossimo giro."""
+    if not attuale or not negozio or not NOME_FOTO.match(attuale):
+        return ""
+    sorgente = os.path.join(FOTO_DIR, attuale)
+    if not os.path.exists(sorgente):
+        return ""
+    nome = f"av_{negozio}_{time.time_ns() // 1_000_000}.jpg"
+    try:
+        with open(sorgente, "rb") as f:
+            dati = f.read()
+        with open(os.path.join(FOTO_DIR, nome), "wb") as f:
+            f.write(dati)
+    except OSError:
+        return ""
+    return nome
+
+
+def _applica_mio(con, tg_id: int, u) -> str:
+    """Mette il cartellino approvato al posto del nome e della foto
+    del social, DENTRO la transazione di chi chiama. Ritorna il file
+    da togliere DOPO il commit (la foto del social, che non serve
+    piu'), o ''. Il nome di prima si tiene da parte, solo se arriva
+    davvero da fuori: rientrare su 'mia' da 'mia' non lo sovrascrive."""
+    prima = u["mio_nome_prima"] or ""
+    if u["avatar_scelta"] != "mia":
+        prima = u["nome"] or prima
+    con.execute("UPDATE utenti SET nome=?, avatar=?, avatar_scelta='mia', "
+                "mio_nome_prima=? WHERE tg_id=?",
+                (u["mio_nome"], u["mio_foto"] or "", prima, tg_id))
+    vecchio = u["avatar"] or ""
+    if vecchio in ("", u["mio_foto"] or "", u["mio_foto_att"] or ""):
+        return ""
+    return vecchio
+
+
+def _lascia_mio(con, tg_id: int, u, scelta: str, fresco: str = ""):
+    """Si lascia il cartellino: torna il nome di prima (quello fresco
+    di Telegram se c'e', sennò quello tenuto da parte) e — tranne che
+    per 'nessuna', dove la foto non si vede comunque — la colonna della
+    foto si svuota, e la riempie il giro del social. I file del
+    cartellino restano: rientrare non chiede una nuova revisione."""
+    nome = fresco or u["mio_nome_prima"] or u["nome"] or ""
+    if scelta == "nessuna":
+        con.execute("UPDATE utenti SET nome=? WHERE tg_id=?", (nome, tg_id))
+    else:
+        con.execute("UPDATE utenti SET nome=?, avatar='', "
+                    "avatar_aggiornato=0 WHERE tg_id=?", (nome, tg_id))
+
+
+@app.post("/api/me/profilo-mio")
+async def proponi_profilo_mio(req: Request,
+                              x_tg_init_data: str = Header(""),
+                              barattolo_sessione: str = Cookie("")):
+    """La proposta: un nome, una foto, o tutt'e due. Nasce SEMPRE in
+    revisione, e fino all'approvazione resta esposto quel che c'era
+    (il patto del banner: niente «faccio approvare il pulito e lo
+    cambio il giorno dopo»). Proporre di nuovo mentre una revisione e'
+    in corso SOSTITUISCE quella in attesa: e' una correzione.
+    Quel che non si cambia resta com'e': senza nome vale quello di
+    adesso, senza foto quella di adesso (copiata)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not PROFILO_MIO_ATTIVO:
+        raise HTTPException(400, MSG_MIO_SPENTO)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        u = con.execute(
+            "SELECT nome, negozio, avatar, avatar_scelta, mio_nome, "
+            "mio_foto, mio_foto_att, mio_approvato_il FROM utenti "
+            "WHERE tg_id=?", (user["id"],)).fetchone()
+        if not u or not u["negozio"]:
+            raise HTTPException(400, "Il tuo profilo non è ancora pronto")
+        dal = mio_prossimo_cambio(u["mio_approvato_il"] or 0)
+        if dal > time.time():
+            raise HTTPException(400, "Il prossimo cambio si può fare dal "
+                                + time.strftime("%d/%m/%Y",
+                                                time.localtime(dal)))
+        scritto = " ".join(str(d.get("nome") or "").split())
+        foto_dato = d.get("foto") or ""
+        if not scritto and not foto_dato:
+            raise HTTPException(400, "Scrivi il nome o scegli la foto")
+        if scritto:
+            nome, motivo = giudica_nome_mio(con, user["id"], scritto)
+            if not nome:
+                raise HTTPException(400, motivo)
+        else:
+            nome = u["mio_nome"] or u["nome"] or ""
+        raw = None
+        if foto_dato:
+            raw, motivo = _byte_banner(foto_dato)
+            if raw is None:
+                raise HTTPException(400, motivo)
+    finally:
+        con.close()
+    if raw is not None:
+        foto = await asyncio.to_thread(_salva_foto_mia, u["negozio"], raw)
+        if not foto:
+            raise HTTPException(400, "Non riesco a leggere questa foto")
+    elif u["mio_foto"]:
+        foto = u["mio_foto"]
+    else:
+        foto = await asyncio.to_thread(_copia_foto_mia, u["negozio"],
+                                       u["avatar"] or "")
+    con = db()
+    vecchia = con.execute("SELECT mio_foto_att, mio_foto, avatar FROM utenti "
+                          "WHERE tg_id=?", (user["id"],)).fetchone()
+    con.execute("UPDATE utenti SET mio_nome_att=?, mio_foto_att=?, "
+                "mio_stato='revisione', mio_motivo='', mio_chiesto_il=? "
+                "WHERE tg_id=?", (nome, foto, int(time.time()), user["id"]))
+    con.commit()
+    con.close()
+    # la foto della proposta PRECEDENTE se ne va dopo il commit, mai
+    # prima — salvo che sia ancora in uso (il vivo, o la faccia di adesso)
+    va = (vecchia["mio_foto_att"] or "") if vecchia else ""
+    if va and va != foto and va not in (vecchia["mio_foto"],
+                                        vecchia["avatar"]):
+        _togli_banner_file(va)
+    asyncio.create_task(avvisa_profilo_mio(user["id"]))
+    return {"ok": True, "stato": "revisione", "nome": nome, "foto": foto,
+            "attesa_ore": REVISIONE_ATTESA_ORE}
+
+
+async def avvisa_profilo_mio(tg_id: int):
+    """La notifica coi bottoni ✅/❌ ai moderatori, gemella di
+    `avvisa_banner`: il moderatore deve VEDERE la foto, e accanto il
+    nome proposto e quello di adesso. callback_data `pm:ok:{tg_id}` /
+    `pm:no:{tg_id}`: autorizza `e_admin` sul mittente del tocco."""
+    con = db()
+    u = con.execute("SELECT tg_id, nome, negozio, mio_nome_att, "
+                    "mio_foto_att, mio_stato FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    if not u or u["mio_stato"] != "revisione":
+        return
+    testo = (f"✏️ <b>Nome e foto da approvare</b>\n"
+             f"Nome proposto: <b>{html.escape(u['mio_nome_att'] or '')}</b>\n"
+             f"Adesso si chiama: {html.escape(u['nome'] or '')} "
+             f"({URL_PUBBLICO}/negozio/{u['negozio']})")
+    tastiera = {"inline_keyboard": [[
+        {"text": "✅ Pubblica", "callback_data": f"pm:ok:{tg_id}"},
+        {"text": "❌ Rifiuta", "callback_data": f"pm:no:{tg_id}"},
+    ]]}
+    foto = (f"{URL_PUBBLICO}/foto/{u['mio_foto_att']}"
+            if u["mio_foto_att"] else "")
+    if await _al_gruppo_admin(testo, "moderazione", tastiera=tastiera,
+                              foto=foto):
+        return
+    destinatari = set(ADMIN_IDS)
+    if MODALITA_COLLAUDO:
+        destinatari.add(999)
+    for admin in destinatari:
+        if foto:
+            await bot_api("sendPhoto", {
+                "chat_id": admin, "parse_mode": "HTML", "caption": testo,
+                "photo": foto, "reply_markup": tastiera})
+        else:
+            await bot_api("sendMessage", {
+                "chat_id": admin, "parse_mode": "HTML", "text": testo,
+                "reply_markup": tastiera})
+
+
+def _controparti_aperte(con, tg_id: int) -> set:
+    """Chi ha con lui un ordine del mercatino coi sats in cassaforte, o
+    uno scambio P2P toccato nell'ultimo giorno e non ancora chiuso (gli
+    importi arrivano solo alla chiusura: `p2p_scambi`). Sono quelli a
+    cui un nome nuovo, a ordine aperto, va detto (decisione 9)."""
+    fuori = set()
+    segni = ",".join("?" * len(STATI_SATS_IN_CASSAFORTE))
+    for r in con.execute(
+            "SELECT venditore_id, compratore_id FROM ordini WHERE "
+            f"(venditore_id=? OR compratore_id=?) AND stato IN ({segni})",
+            (tg_id, tg_id, *STATI_SATS_IN_CASSAFORTE)):
+        fuori.update((r[0], r[1]))
+    for r in con.execute(
+            "SELECT compratore, venditore FROM p2p_scambi WHERE "
+            "(compratore=? OR venditore=?) AND aggiornato>? "
+            "AND COALESCE(sats_compratore,0)=0",
+            (tg_id, tg_id, int(time.time()) - 86400)):
+        fuori.update((r[0], r[1]))
+    fuori.discard(tg_id)
+    fuori.discard(0)
+    fuori.discard(None)
+    return fuori
+
+
+async def decidi_profilo_mio(tg_id: int, esito: str, admin_id: int,
+                             motivo: str = "") -> tuple[bool, str]:
+    """Il cuore condiviso della decisione (tastiera E pannello admin).
+    · `approva` — il cartellino diventa quello vivo e si APPLICA
+      subito (avatar_scelta='mia'): chi aspetta la risposta vuole
+      vedersi col nome nuovo, non andarlo a scegliere;
+    · `rifiuta` — la proposta se ne va, il vivo (se c'e') resta: si
+      boccia la MODIFICA, non quel che era gia' approvato. Non consuma
+      il mese;
+    · `togli` — un cartellino gia' approvato che non va piu' bene: via
+      nome e foto scelti, si torna all'automatico.
+    L'UPDATE e' sempre CONDIZIONATO sullo stato letto: il secondo
+    moderatore che tocca trova il fatto compiuto."""
+    con = db()
+    u = con.execute("SELECT * FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    if not u:
+        con.close()
+        return False, "Utente non trovato"
+    stato, adesso = u["mio_stato"] or "", int(time.time())
+    via = set()
+    nome_prima, nome_dopo = u["nome"] or "", ""
+    if esito == "approva":
+        if stato != "revisione" or not u["mio_nome_att"]:
+            con.close()
+            return False, "Questa proposta non è in attesa di una decisione"
+        n = con.execute(
+            "UPDATE utenti SET mio_nome=mio_nome_att, mio_foto=mio_foto_att, "
+            "mio_nome_att='', mio_foto_att='', mio_stato='approvato', "
+            "mio_motivo='', mio_approvato_il=? "
+            "WHERE tg_id=? AND mio_stato='revisione'",
+            (adesso, tg_id)).rowcount
+        if n:
+            nuovo = con.execute(
+                "SELECT nome, avatar, avatar_scelta, mio_nome, mio_foto, "
+                "mio_foto_att, mio_nome_prima FROM utenti WHERE tg_id=?",
+                (tg_id,)).fetchone()
+            f_via = _applica_mio(con, tg_id, nuovo)
+            via.update(x for x in (f_via, u["mio_foto"] or "")
+                       if x and x != (nuovo["mio_foto"] or ""))
+            nome_dopo = nuovo["mio_nome"]
+        avviso = ("✏️ <b>Il tuo nome e la tua foto sono online su "
+                  "Barattolo.</b> Li vedi nel tuo Profilo.")
+        detto = "✅ Nome e foto pubblicati"
+    elif esito == "rifiuta":
+        if stato != "revisione":
+            con.close()
+            return False, "Questa proposta non è in attesa di una decisione"
+        n = con.execute(
+            "UPDATE utenti SET mio_nome_att='', mio_foto_att='', "
+            "mio_stato='rifiutato', mio_motivo=? "
+            "WHERE tg_id=? AND mio_stato='revisione'",
+            (motivo, tg_id)).rowcount
+        att = u["mio_foto_att"] or ""
+        if att and att not in (u["mio_foto"], u["avatar"]):
+            via.add(att)
+        avviso = ("✏️ <b>Il nome e la foto che hai proposto non sono stati "
+                  "approvati.</b>"
+                  + (f" Motivo: {html.escape(motivo)}." if motivo else "")
+                  + " Puoi riprovare subito dal Profilo, su Barattolo.")
+        detto = "❌ Proposta rifiutata"
+    elif esito == "togli":
+        if not u["mio_nome"]:
+            con.close()
+            return False, "Questo utente non ha un nome scelto"
+        n = con.execute(
+            "UPDATE utenti SET mio_nome='', mio_foto='', mio_stato='tolto', "
+            "mio_motivo=?, mio_approvato_il=0 "
+            "WHERE tg_id=? AND mio_nome!=''", (motivo, tg_id)).rowcount
+        if n and u["avatar_scelta"] == "mia":
+            _lascia_mio(con, tg_id, u, "")
+            con.execute("UPDATE utenti SET avatar_scelta='' WHERE tg_id=?",
+                        (tg_id,))
+        if u["mio_foto"] and u["mio_foto"] != (u["mio_foto_att"] or ""):
+            via.add(u["mio_foto"])
+        avviso = ("✏️ <b>Il nome e la foto che avevi scelto su Barattolo "
+                  "sono stati tolti</b> da un moderatore."
+                  + (f" Motivo: {html.escape(motivo)}." if motivo else "")
+                  + " Adesso vale di nuovo il tuo profilo.")
+        detto = "🚫 Nome e foto tolti"
+    else:
+        con.close()
+        return False, "Esito sconosciuto"
+    if not n:
+        con.close()
+        return False, "Ci ha già pensato un altro moderatore"
+    controparti = set()
+    if nome_dopo and nome_mio_compatto(nome_dopo) != \
+            nome_mio_compatto(nome_prima):
+        controparti = _controparti_aperte(con, tg_id)
+    con.commit()
+    con.close()
+    for f in via:
+        _togli_banner_file(f)
+    registra_moderazione("profilo", esito, motivo,
+                         nome_dopo or u["mio_nome_att"] or u["mio_nome"] or "",
+                         0, tg_id, admin_id)
+    try:
+        await notifica(tg_id, avviso)
+    except Exception as e:
+        print(f"⚠️ Avviso nome e foto saltato (tg {tg_id}): {e}")
+    if esito == "togli":
+        asyncio.create_task(aggiorna_profilo_social(tg_id))
+    for altro in controparti:
+        try:
+            await notifica(altro, (
+                f"✏️ <b>{html.escape(nome_prima)}</b> ora su Barattolo si "
+                f"chiama <b>{html.escape(nome_dopo)}</b>. È la stessa "
+                "persona del tuo ordine in corso."))
+        except Exception as e:
+            print(f"⚠️ Avviso del nome nuovo saltato (tg {altro}): {e}")
+    return True, detto
+
+
+async def callback_profilo_mio(cb: dict, dati: str):
+    """Il tocco su ✅/❌ della tastiera del cartellino. Solo i
+    moderatori; il tg_id puo' essere NEGATIVO (i nativi Nostr)."""
+    if not e_admin((cb.get("from") or {}).get("id") or 0):
+        return
+    esito, _, sid = dati.partition(":")
+    if esito not in ("ok", "no") or not sid.lstrip("-").isdigit():
+        return
+    ok, testo = await decidi_profilo_mio(
+        int(sid), "approva" if esito == "ok" else "rifiuta",
+        cb["from"]["id"])
+    msg = cb.get("message") or {}
+    chat = (msg.get("chat") or {}).get("id")
+    if chat:
+        if msg.get("photo"):
+            await bot_api("editMessageCaption", {
+                "chat_id": chat, "message_id": msg.get("message_id"),
+                "caption": testo, "parse_mode": "HTML"})
+        else:
+            await bot_api("editMessageText", {
+                "chat_id": chat, "message_id": msg.get("message_id"),
+                "text": testo, "parse_mode": "HTML"})
+
+
+@app.get("/api/admin/profilo-mio")
+def lista_profilo_mio(x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le proposte in ATTESA (dalla piu' vecchia) e sotto i
+    cartellini gia' approvati, perche' quello da togliere abbia un
+    bottone da qualche parte."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    righe = con.execute(
+        "SELECT tg_id, nome, negozio, mio_stato, mio_motivo, mio_nome, "
+        "mio_foto, mio_nome_att, mio_foto_att, mio_chiesto_il, "
+        "mio_approvato_il FROM utenti "
+        "WHERE mio_stato='revisione' OR mio_nome!='' "
+        "ORDER BY CASE mio_stato WHEN 'revisione' THEN 0 ELSE 1 END, "
+        "         mio_chiesto_il ASC LIMIT 50").fetchall()
+    con.close()
+    return [dict(r) for r in righe]
+
+
+@app.post("/api/admin/profilo-mio/{tg_id}")
+async def decidi_profilo_mio_admin(tg_id: int, req: Request,
+                                   x_tg_init_data: str = Header(""),
+                                   barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: la seconda porta della decisione, gemella di quella
+    del banner. Il 403 sta PRIMA di leggere il body."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    esito = (d.get("esito") or "").strip()
+    if esito not in ("approva", "rifiuta", "togli"):
+        raise HTTPException(400, "Esito sconosciuto")
+    ok, testo = await decidi_profilo_mio(tg_id, esito, user["id"],
+                                         (d.get("motivo") or "").strip()[:200])
+    if not ok:
+        raise HTTPException(409, testo)
+    return {"ok": True, "detto": testo}
+
+
 # --- IL LINK DEL NEGOZIO A SCELTA, la fattura (set 2026) -------------
 # SUBITO DOPO IL BANNER nella scala delle personalizzazioni (decisione
 # di Andrea): stesso livello che apriva la porta del banner prima che
@@ -60470,6 +62839,74 @@ def negozi_promossi_pubblici(con, adesso: int | None = None) -> list:
     return fuori
 
 
+# I QUADRATI DEI NEGOZI IN HOME (23 nov 2026, sotto la card grande di
+# «Da scoprire», sul telefono): per ogni negozio della fila la PRIMA foto
+# del suo annuncio attivo piu' recente, la categoria dove ne ha di piu', e
+# la riga «cosa vende» che scriviamo noi nel catalogo della pagina
+# (`in_breve`, solo a pagina PUBBLICATA: la bozza non esce mai, il patto
+# di `racconto_pubblico`). Il client manda i CODICI (pubblici), al piu'
+# NEGOZI_VETRINA_MAX e passati dalla forma; dei negozi che non ci sono non
+# si dice niente. Nessun tg_id esce. Fail-closed: un guasto da' un
+# dizionario vuoto, e i quadrati restano col logo.
+NEGOZI_VETRINA_MAX = 16
+_CODICE_NEGOZIO = re.compile(r"[A-Za-z0-9_-]{2,40}")
+
+
+def negozi_vetrina_pubblici(con, codici: list) -> dict:
+    fuori = {}
+    for cod in codici[:NEGOZI_VETRINA_MAX]:
+        u = con.execute("SELECT tg_id FROM utenti WHERE negozio=? LIMIT 1",
+                        (cod,)).fetchone()
+        if not u:
+            continue
+        foto = ""
+        for r in con.execute("SELECT foto FROM annunci WHERE venditore_id=? "
+                             "AND stato='attivo' AND foto<>'' "
+                             "ORDER BY creato DESC, id DESC LIMIT 5",
+                             (u["tg_id"],)):
+            try:
+                nomi = json.loads(r["foto"] or "[]")
+            except (ValueError, TypeError):
+                continue
+            if isinstance(nomi, list) and nomi and isinstance(nomi[0], str) and nomi[0]:
+                foto = nomi[0]
+                break
+        c = con.execute("SELECT categoria, COUNT(*) AS n FROM annunci "
+                        "WHERE venditore_id=? AND stato='attivo' "
+                        "AND COALESCE(categoria,'')<>'' GROUP BY categoria "
+                        "ORDER BY n DESC, categoria LIMIT 1",
+                        (u["tg_id"],)).fetchone()
+        breve = ""
+        for slug, rr in RACCONTI_NEGOZI.items():
+            if (rr.get("in_breve") and _e_suo(rr, cod, u["tg_id"])
+                    and racconto_stato(slug) == "pubblicato"):
+                breve = str(rr["in_breve"])
+                break
+        fuori[cod] = {"foto": foto, "categoria": (c["categoria"] if c else "") or "",
+                      "in_breve": breve}
+    return fuori
+
+
+@app.get("/api/negozi/vetrina")
+def negozi_vetrina(codici: str = ""):
+    """I quadrati dei negozi della home: vedi `negozi_vetrina_pubblici`."""
+    lista = []
+    for c in (codici or "").split(","):
+        c = c.strip()
+        if _CODICE_NEGOZIO.fullmatch(c) and c not in lista:
+            lista.append(c)
+    if not lista:
+        return {"negozi": {}}
+    con = db()
+    try:
+        return {"negozi": negozi_vetrina_pubblici(con, lista)}
+    except Exception as e:
+        print(f"⚠️ [promozioni] i quadrati dei negozi non si leggono: {e}")
+        return {"negozi": {}}
+    finally:
+        con.close()
+
+
 def in_evidenza_pubblici(con, campi: str, adesso: int | None = None) -> list:
     """LA FILA «⭐ In evidenza» della home, per la busta di prima pagina:
     gli annunci attivi con la promozione viva, di negozi aperti. Al piu'
@@ -60656,6 +63093,21 @@ async def compra_promo(req: Request,
             "scadenza_invoice": INVOICE_EXPIRY}
 
 
+# LA PAGINA DEDICATA DEL NEGOZIO IN «Da scoprire» (23 nov 2026, Andrea:
+# «la pagina fa parte di quello che vendiamo»; i tre testi sono suoi).
+# Alla prima entrata il negozio trova questo messaggio dello staff nella
+# sua chat di Assistenza, il bot glielo indica col tasto, e ai moderatori
+# arriva «Da preparare la pagina di…»: la pagina (un racconto, come quelle
+# dei Consigliati) si scrive a mano coi materiali che manda li'. Con
+# l'Assistenza spenta niente dei tre: non ci sarebbe dove rispondere.
+# `autore` 0: lo scrive Barattolo, non un admin col suo nome.
+PROMO_PAGINA_ASSISTENZA = (
+    "Ciao! Per preparare la pagina del tuo negozio mandaci qui da 3 a 6 "
+    "foto (prodotti, laboratorio, persone), il logo e un testo su chi siete "
+    "e cosa fate. La prepariamo noi e te la facciamo vedere prima di "
+    "pubblicarla.")
+
+
 def _promo_dal_riferimento(p) -> tuple:
     """(annuncio_id, giorni) dal `riferimento` di un pagamento promo:
     «aid» per In cima, «aid:giorni» per In evidenza, «giorni» per il
@@ -60700,6 +63152,7 @@ async def _incassa_promo(pagamento_id: int) -> dict:
     motivo = p["motivo"]
     aid, giorni = _promo_dal_riferimento(p)
     applicata, fino = False, 0
+    pagina_da_fare, negozio_nome = False, ""
     if motivo in ("promo_cima", "promo_evidenza") and aid:
         a = con.execute("SELECT venditore_id, evidenza_fino FROM annunci "
                         "WHERE id=?", (aid,)).fetchone()
@@ -60713,10 +63166,20 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                 con.execute("UPDATE annunci SET creato=? WHERE id=?",
                             (adesso, aid))
     elif motivo == "promo_scoprire" and giorni > 0:
-        u = con.execute("SELECT promo_scoprire_fino FROM utenti "
-                        "WHERE tg_id=?", (p["tg_id"],)).fetchone()
+        u = con.execute("SELECT promo_scoprire_fino, promo_consigliato, nome "
+                        "FROM utenti WHERE tg_id=?", (p["tg_id"],)).fetchone()
         if u:
             applicata = True
+            # LA PAGINA DEDICATA si chiede solo alla PRIMA entrata: chi
+            # rinnova, o e' gia' fra i Consigliati, la pagina ce l'ha (o
+            # l'ha gia' avviata). Il segno e' `promo_consigliato`, che dopo
+            # la prima volta resta acceso per sempre.
+            pagina_da_fare = ASSISTENZA_ATTIVA and not u["promo_consigliato"]
+            negozio_nome = u["nome"] or ""
+            if pagina_da_fare:
+                con.execute("INSERT INTO assistenza(utente, autore, admin, "
+                            "testo, quando, immagini) VALUES(?,0,1,?,?,'')",
+                            (p["tg_id"], PROMO_PAGINA_ASSISTENZA, adesso))
             fino = max(adesso, int(u["promo_scoprire_fino"] or 0)) + giorni * 86400
             con.execute("UPDATE utenti SET promo_scoprire_fino=?, "
                         "promo_consigliato=1 WHERE tg_id=?",
@@ -60748,6 +63211,12 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                 f"🚀 <b>Promozione pagata:</b> {nome}, "
                 f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
                 f"(pagamento #{pagamento_id}).", argomento="riepiloghi")
+        if pagina_da_fare:
+            await notifica_admin(
+                "🏪 Da preparare la pagina di "
+                f"<b>{html.escape(negozio_nome or '#' + str(p['tg_id']))}</b>: "
+                "gli abbiamo chiesto foto e testo in Assistenza.",
+                argomento="moderazione")
     except Exception as e:
         print(f"⚠️ Polso della promozione non partito: {e}")
     try:
@@ -60755,7 +63224,13 @@ async def _incassa_promo(pagamento_id: int) -> dict:
             await notifica(p["tg_id"],
                            "🏪 <b>Fatto!</b> Il tuo negozio è in «Da scoprire» "
                            f"fino al {_data_sponsor(fino)}, e poi resta fra "
-                           "i Consigliati.")
+                           "i Consigliati."
+                           + ("\n\nPer la pagina dedicata del tuo negozio "
+                              "mandaci le foto e un testo che lo racconti: "
+                              "tocca qui." if pagina_da_fare else ""),
+                           ("💬 Apri l'assistenza",
+                            f"{URL_PUBBLICO}/?assistenza=mia")
+                           if pagina_da_fare else None)
         elif applicata and motivo == "promo_evidenza":
             await notifica(p["tg_id"],
                            "⭐ <b>Fatto!</b> Il tuo annuncio è in evidenza "
@@ -60952,17 +63427,26 @@ async def scegli_avvisi_nuovi_p2p(req: Request, x_tg_init_data: str = Header("")
         r = con.execute("SELECT avvisi_nuovi_rete FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
         rete = str(r[0] or "") if r else ""
-    # LA VALUTA (2 nov 2026): '' = tutte, 'EUR', 'USDT'. Un telefono di
-    # ieri non la manda, e allora resta quella scritta
-    if "valuta" in d:
-        valuta = str(d.get("valuta") or "").strip().upper()
-        if valuta not in ("",) + VALUTE_AVVISI_NUOVI_P2P:
+    # LE VALUTE (24 nov 2026, avvisi-p2p-valute): una lista dal catalogo,
+    # [] = tutte. Il telefono di ieri mandava `valuta`, un codice solo ('' =
+    # tutte): vale come lista di uno. Chi non manda niente tiene la scritta;
+    # un codice che il catalogo non ha e' un 400, non un filtro muto
+    if "valute" in d or "valuta" in d:
+        grezze = d.get("valute") if "valute" in d else (
+            [d.get("valuta")] if d.get("valuta") else [])
+        if grezze is None:
+            grezze = []
+        if not isinstance(grezze, list) or \
+                any(str(v or "").strip().upper() not in VALUTE_AVVISI_NUOVI_P2P for v in grezze):
             con.close()
-            raise HTTPException(400, "Valuta sconosciuta: tutte, euro, USDT o franchi")
+            raise HTTPException(400, "Valuta sconosciuta")
+        scelte = [str(v).strip().upper() for v in grezze]
+        valute = [v for v in VALUTE_AVVISI_NUOVI_P2P if v in scelte]
     else:
         r = con.execute("SELECT avvisi_nuovi_valuta FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
-        valuta = str(r[0] or "") if r else ""
+        valute = _valute_avvisi_p2p(r[0] if r else "")
+    valuta = ("|" + "|".join(valute) + "|") if valute else ""
     # I METODI (18 nov 2026, cantiere vetrina-pulita): una lista dal catalogo,
     # [] = tutti. Un telefono di ieri non la manda, e allora resta quella
     # scritta; un nome che il catalogo non ha e' un 400, non un filtro muto
@@ -61251,8 +63735,10 @@ async def firme_nostr_da_fare(x_tg_init_data: str = Header(""),
         # 'pubblica' rilegge lo stato di ADESSO: fra l'accodamento
         # e la firma l'annuncio puo' essere stato venduto, e
         # nascere «attivo» sarebbe una bugia in piazza.
+        # (il nascosto, 23 nov 2026, nasce «sold» come l'esaurito: in
+        # piazza non si compra, e NIP-99 un terzo stato non ce l'ha)
         stato = a["azione"] if a["azione"] in ("sold", "active") else (
-            "sold" if a["stato"] == "venduto" else "active")
+            "sold" if a["stato"] in ("venduto", "nascosto") else "active")
         # Si riusa evento_annuncio per non avere DUE posti che
         # costruiscono i tag NIP-99 di un annuncio (divergerebbero
         # al primo campo nuovo, ed e' anche cio' che la sentinella
@@ -61669,17 +64155,22 @@ async def scegli_avatar(req: Request,
     chi ha entrambe le sorgenti, 'nessuna' = iniziale ovunque per il
     pubblico (reversibile: il file resta in dispensa e il CASE nelle
     SELECT lo tiene in casa). Si accetta solo una sorgente che esiste
-    davvero — il pattern di canale-notifiche."""
+    davvero — il pattern di canale-notifiche.
+    LA QUARTA SCELTA, 'mia' (23 nov 2026, cantiere profilo-mio): nome e
+    foto scelti su Barattolo, gia' approvati da un moderatore. Si entra
+    solo con un cartellino approvato in mano, e rientrarci non chiede
+    una nuova revisione; uscirne e' sempre libero e immediato."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     scelta = (d.get("scelta") or "").strip().lower()
-    if scelta not in ("", "telegram", "nostr", "nessuna"):
+    if scelta not in ("", "telegram", "nostr", "nessuna", "mia"):
         raise HTTPException(400, "Scelta sconosciuta: telegram, nostr, "
-                                 "nessuna o vuoto (automatico)")
+                                 "nessuna, mia o vuoto (automatico)")
     con = db()
     u = con.execute(
-        "SELECT npub, npub_verificata, npub_accesso FROM utenti "
-        "WHERE tg_id=?", (user["id"],)).fetchone()
+        "SELECT npub, npub_verificata, npub_accesso, avatar_scelta, nome, "
+        "avatar, mio_nome, mio_foto, mio_foto_att, mio_nome_prima "
+        "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
     if not u:
         con.close()
         raise HTTPException(404, "Profilo non trovato")
@@ -61695,10 +64186,26 @@ async def scegli_avatar(req: Request,
         raise HTTPException(400,
             "Prima verifica la tua npub (o entra con Nostr): la foto si "
             "prende solo da una chiave di cui hai dimostrato il possesso")
-    con.execute("UPDATE utenti SET avatar_scelta=? WHERE tg_id=?",
-                (scelta, user["id"]))
+    if scelta == "mia" and not (PROFILO_MIO_ATTIVO and u["mio_nome"]):
+        con.close()
+        raise HTTPException(400, MSG_MIO_NON_APPROVATO)
+    file_via = ""
+    if scelta == "mia":
+        file_via = _applica_mio(con, user["id"], u)
+    else:
+        if u["avatar_scelta"] == "mia":
+            # il nome FRESCO di Telegram c'e' solo dalla Mini App (la
+            # firma di initData lo porta); dal sito vale quello di prima
+            fresco = ""
+            if x_tg_init_data and user["id"] > 0:
+                fresco = (user.get("first_name") or "").strip()
+            _lascia_mio(con, user["id"], u, scelta, fresco)
+        con.execute("UPDATE utenti SET avatar_scelta=? WHERE tg_id=?",
+                    (scelta, user["id"]))
     con.commit()
     con.close()
+    if file_via:
+        _togli_banner_file(file_via)
     # LA SORGENTE E' CAMBIATA, E QUI SI ASPETTA (ago 2026, decisione
     # di Andrea): era un `create_task` — la risposta non aspettava — e
     # andava bene finche' la propria faccia si vedeva comunque. Da
@@ -61712,8 +64219,9 @@ async def scegli_avatar(req: Request,
     # social (due chiamate a Telegram, quattro relay per Nostr). Vale
     # per un gesto raro, e a dirlo c'e' il velo del cassetto.
     # Con 'nessuna' non si aspetta NIENTE: li' non c'e' niente da
-    # scaricare, e spegnere resta istantaneo.
-    if scelta != "nessuna":
+    # scaricare, e spegnere resta istantaneo. Con 'mia' nemmeno: nome e
+    # foto sono gia' qui, approvati.
+    if scelta not in ("nessuna", "mia"):
         await aggiorna_profilo_social(user["id"])
     # Il nome del francobollo torna col si': e' quello che permette al
     # client di rimettere la faccia SUBITO, senza ricaricare. Si
@@ -63941,6 +66449,23 @@ try:
         P2P_RIPUBBLICA = True
 except ImportError:
     P2P_RIPUBBLICA = True
+# L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO (24 nov 2026, cantiere
+# p2p-incasso-da-solo, ok di Andrea alle 22:31): chi compra sats nel P2P e
+# ha salvato nel Profilo un indirizzo Lightning che passa, alla domanda
+# del coordinatore «dove mando i sats?» non tocca niente: il telefono
+# controlla l'indirizzo e lo manda lui; il foglio si apre solo se il
+# controllo o il coordinatore dicono di no. Il server qui non fa niente:
+# la leva viaggia in busta (`incassoDaSolo`) e la legge il telefono.
+# ACCESA DI SERIE (regola del 14 nov). Interruttore d'emergenza:
+# `P2P_INCASSO_DA_SOLO = False` nel config, e il foglio torna a mano.
+try:
+    from config import P2P_INCASSO_DA_SOLO
+    if not isinstance(P2P_INCASSO_DA_SOLO, bool):
+        print("[p2p] P2P_INCASSO_DA_SOLO non e' True/False: l'incasso da "
+              "solo resta ACCESO come di serie")
+        P2P_INCASSO_DA_SOLO = True
+except ImportError:
+    P2P_INCASSO_DA_SOLO = True
 # IL TEMPO PER PAGARE, SCELTO DA CHI PUBBLICA (18 nov 2026, cantiere
 # tempo-pagamento; Andrea, da JJ che scambia tanto: «se uno ha fretta dice
 # io metto l'ordine però nel momento in cui lo prendi hai un'ora di tempo
@@ -64374,6 +66899,11 @@ def _p2p_leve() -> dict:
             # la ripubblica (16 nov 2026): il paragrafo nel foglio che
             # pubblica e il battito che rifa' gli ordini scaduti
             "ripubblica": bool(P2P_RIPUBBLICA),
+            # l'incasso da solo (24 nov 2026): l'indirizzo degli incassi
+            # parte senza il foglio, se passa
+            # (`globals().get`: i banchi che fanno girare `_p2p_leve` da
+            # sola non conoscono la leva, e di serie e' accesa)
+            "incassoDaSolo": bool(globals().get("P2P_INCASSO_DA_SOLO", True)),
             # il tempo per pagare (18 nov 2026): la scelta nel foglio che
             # pubblica, la riga prima della presa e il timer nello scambio;
             # la pagina la offre solo se ANCHE il nodo la annuncia (38385)
@@ -67773,6 +70303,34 @@ def _completati_p2p(con, ids) -> dict:
     return {int(r[0]): int(r[1]) for r in righe if int(r[1] or 0) > 0}
 
 
+def _p2p_nascosti_fra(con, ids) -> set:
+    """CHI HA SPENTO LE RECENSIONI P2P fra queste persone: l'insieme dei
+    tg_id (23 nov 2026, cantiere scambi-p2p-nascosti-scheda; Andrea: «se
+    uno decide di nascondere dal profilo pubblico le recensioni degli
+    scambi peer-to-peer, deve sparire anche da lì [...] gli scambi non
+    completati non devono sparire, ma quelli conclusi sì»). A chi sta
+    qui dentro le CARD del P2P — il volto sulla card del libro,
+    Lightning e on-chain, e la card dell'altra parte (`_volti_persone`)
+    — non mostrano «✅ N scambi P2P» né «⚡ Risponde in fretta», come
+    gia' il profilo pubblico. «Non completati» e «dispute perse»
+    restano: proteggono chi ci scambia (10 ott 2026).
+    SULLE CARD VALE PER TUTTI, anche per il proprietario e i moderatori:
+    la loro eccezione sta nella lista delle recensioni, dove il
+    moderatore ha il bottone «rimuovi»; sul numero di una card non c'e'
+    niente da moderare, e vederlo da moderatore ha gia' fatto credere a
+    un bug (23 nov). A leva spenta, o senza la colonna, insieme vuoto."""
+    ids = sorted({int(i) for i in ids or [] if i})
+    if not ids or not RECENSIONI_NASCONDIBILI:
+        return set()
+    segni = ",".join("?" * len(ids))
+    try:
+        return {int(r[0]) for r in con.execute(
+            f"SELECT tg_id FROM utenti WHERE recensioni_p2p_nascoste=1 "
+            f"AND tg_id IN ({segni})", ids)}
+    except sqlite3.OperationalError:
+        return set()
+
+
 def _euro_sospesi_p2p(con, tg_id, adesso: int) -> int:
     """IN QUANTI SCAMBI chi vende aspetta gli euro di questa persona da
     piu' di P2P_EURO_SOSPESI_DOPO_S (10 ott 2026, «I MALUS DOPO LA
@@ -68854,6 +71412,10 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     # ...e il badge «⚡ risponde in fretta» (12 ott 2026): la chiave c'e'
     # SOLO per chi ce l'ha, come lo staff
     veloci = _veloci_p2p(con, [r["autore"] for r in righe], adesso)
+    # ...tranne chi ha spento le recensioni P2P (23 nov 2026)
+    zitti = _p2p_nascosti_fra(con, [r["autore"] for r in righe])
+    fatti = {t: n for t, n in fatti.items() if t not in zitti}
+    veloci = veloci - zitti
     fuori = {}
     for r in righe:
         voti = int(r["n_feedback"] or 0)
@@ -69006,6 +71568,10 @@ def _volti_persone(con, ids, adesso) -> dict:
     fatti = _completati_p2p(con, ids)
     # ...e il badge «⚡ risponde in fretta» (12 ott 2026)
     veloci = _veloci_p2p(con, ids, adesso)
+    # ...tranne chi ha spento le recensioni P2P (23 nov 2026)
+    zitti = _p2p_nascosti_fra(con, ids)
+    fatti = {t: n for t, n in fatti.items() if t not in zitti}
+    veloci = veloci - zitti
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -77923,7 +80489,20 @@ NOMI_TIPI_AVVISI_NUOVI_P2P = {"vendita": "vendita BTC", "acquisto": "acquisto BT
 # X% meglio» col segno girato — il giudice resta `conv >= soglia`
 SOGLIE_AVVISI_NUOVI_P2P = ("-10", "-5", "-2", "0", "2", "5")   # le sei chip, gemelle di P2P_AVVISI_SOGLIE nel client
 RETI_AVVISI_NUOVI_P2P = ("onchain", "ln")   # '' = tutte; gemelle di P2P_AVVISI_RETI nel client
-VALUTE_AVVISI_NUOVI_P2P = ("EUR", "USDT", "CHF")   # '' = tutte; gemelle di P2P_AVVISI_VALUTE nel client
+VALUTE_AVVISI_NUOVI_P2P = ("EUR", "CHF", "USDT", "ETH", "XMR", "USDE")   # [] = tutte; gemelle di P2P_AVVISI_VALUTE nel client
+# LE ALTRE VALUTE DEGLI AVVISI, A SCELTA MULTIPLA (24 nov 2026, cantiere
+# avvisi-p2p-valute, Andrea: «poter selezionare in VALUTA oltre a euro anche
+# eventualmente qualche shitcoin»). Fino ad allora una scelta sola fra euro,
+# franchi e USDT; adesso ci sono anche le tre monete del P2P (ETH, Monero,
+# USDe: `P2P_COIN_METODI`, i codici della pagina in maiuscolo) e le valute
+# si accendono e si spengono una per una, come i metodi: «euro e Monero» si
+# puo' dire. Nessuna scelta = tutte. La colonna resta `avvisi_nuovi_valuta`:
+# la forma nuova e' la lista fra le stanghette («|EUR|XMR|»), quella di
+# ieri un codice solo («EUR») e si rilegge come lista di uno.
+# Un ordine in moneta viaggia sul filo come EUR (il nodo non conosce ETH):
+# la sua valuta per gli avvisi la dicono i metodi (`_valuta_avviso_p2p`),
+# quindi «solo euro» non lascia piu' passare un ordine in Monero, e un
+# ordine in moneta arriva solo a chi le monete le vede (`p2p_coin_ammesso`).
 # IL METODO DI PAGAMENTO DEGLI AVVISI (18 nov 2026, cantiere vetrina-pulita;
 # un utente: «Si possono filtrare le notifiche del bot per buy e per sell
 # oltre che per tipo di pagamento?», Andrea: «Sì, aprila»). Nessuno scelto =
@@ -77969,6 +80548,26 @@ def _avvisi_da_ieri(tipi, metodi):
                   else [m for m in METODI_AVVISI_NUOVI_P2P if m != METODO_BZ_AVVISI_P2P])
 
 
+def _valute_avvisi_p2p(testo) -> list:
+    """PURA: le valute scritte nella colonna → la lista nell'ordine del
+    catalogo, [] = tutte. Legge la forma nuova («|EUR|XMR|») e quella di
+    ieri (un codice solo, «EUR» o «usdt»); un codice che il catalogo non
+    ha si perde."""
+    t = str(testo or "").strip().upper()
+    scelte = t.strip("|").split("|") if t else []
+    return [v for v in VALUTE_AVVISI_NUOVI_P2P if v in scelte]
+
+
+def _valuta_avviso_p2p(fiat, metodi) -> str:
+    """PURA: la valuta di un ordine per gli avvisi — quella del filo
+    ('EUR', 'CHF', 'USDT'), salvo un ordine IN MONETA, che sul filo e' EUR
+    e la cui moneta la dicono i metodi (`_coin_ordine_libro`): 'ETH',
+    'XMR', 'USDE'. Il `globals()` e' quello delle sorelle, per i banchi."""
+    giudice = globals().get("_coin_ordine_libro")
+    c = giudice(metodi) if giudice else None
+    return str(c[0]).upper() if c else str(fiat or "EUR").upper()
+
+
 def _pref_avvisi_nuovi_p2p(riga) -> dict:
     """PURA: le tre colonne di `utenti` come le legge il client —
     {attivo, tipi, soglia}. Una riga assente, o di ieri senza le colonne,
@@ -77976,7 +80575,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     non un default del database."""
     if not riga:
         return {"attivo": False, "tipi": list(TIPI_AVVISI_NUOVI_P2P), "soglia": "", "rete": "",
-                "valuta": "", "metodi": []}
+                "valute": [], "metodi": []}
     try:
         attivo = bool(int(_campo_riga(riga, "avvisi_nuovi_p2p", 0) or 0))
     except (TypeError, ValueError):
@@ -77992,9 +80591,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     rete = str(_campo_riga(riga, "avvisi_nuovi_rete", "") or "").strip()
     if rete not in RETI_AVVISI_NUOVI_P2P:
         rete = ""
-    valuta = str(_campo_riga(riga, "avvisi_nuovi_valuta", "") or "").strip().upper()
-    if valuta not in VALUTE_AVVISI_NUOVI_P2P:
-        valuta = ""
+    valute = _valute_avvisi_p2p(_campo_riga(riga, "avvisi_nuovi_valuta", ""))
     # i metodi (18 nov 2026): nell'ordine del catalogo, [] = tutti; un nome
     # che il catalogo non ha piu' si perde, e se non ne resta nessuno vale tutti
     metodi_txt = str(_campo_riga(riga, "avvisi_nuovi_metodi", "") or "")
@@ -78002,7 +80599,7 @@ def _pref_avvisi_nuovi_p2p(riga) -> dict:
     # una riga di prima del 19 nov 2026 si traduce (`_avvisi_da_ieri`)
     if not nuova:
         tipi, metodi = _avvisi_da_ieri(tipi, metodi)
-    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valuta": valuta,
+    return {"attivo": attivo, "tipi": tipi, "soglia": soglia, "rete": rete, "valute": valute,
             "metodi": metodi}
 
 
@@ -78083,7 +80680,8 @@ def _passa_avviso_nuovo_p2p(pref: dict, tipo: str, conv, rete: str = "ln",
         return False
     if pref.get("rete") and pref.get("rete") != rete:
         return False
-    if pref.get("valuta") and pref.get("valuta") != valuta:
+    # LE VALUTE (24 nov 2026): una lista, [] = tutte
+    if pref.get("valute") and str(valuta or "").upper() not in pref.get("valute"):
         return False
     # IL METODO (18 nov 2026, cantiere vetrina-pulita): con dei metodi scelti
     # passa l'ordine che ne accetta almeno uno — i nomi come li DICE il libro
@@ -78265,22 +80863,23 @@ def _pref_rete_vista_p2p(riga) -> dict:
     pref = _pref_avvisi_nuovi_p2p(riga)
     if pref["rete"] and not p2p_onchain_ammesso(int(riga["tg_id"])):
         pref["rete"] = ""
-    # ...e la VALUTA (2 nov 2026) conta solo se gli USDT lei li vede: chi
-    # aveva scelto «solo USDT» e li ha persi torna a sentire l'euro
-    # (14 nov 2026, cantiere p2p-chf) ...e «solo franchi» conta solo se i
-    # franchi lei li vede; «solo euro» resta finche' vede almeno un'altra
-    # valuta, sennò e' gia' tutto quel che vede
-    valuta = pref["valuta"]
-    if valuta:
+    # ...e le VALUTE (2 nov 2026) contano solo se lei le vede: chi aveva
+    # scelto «solo USDT» e li ha persi torna a sentire tutto (14 nov 2026,
+    # cantiere p2p-chf: i franchi; 24 nov 2026, avvisi-p2p-valute: le
+    # monete). Si toglie ogni valuta che non vede; se non ne resta nessuna,
+    # valgono tutte
+    if pref["valute"]:
         tg = int(riga["tg_id"])
-        if valuta == "USDT":
-            vista = p2p_usdt_ammesso(tg)
-        elif valuta == "CHF":
-            vista = p2p_chf_ammesso(tg)
-        else:
-            vista = p2p_usdt_ammesso(tg) or p2p_chf_ammesso(tg)
-        if not vista:
-            pref["valuta"] = ""
+        coin = globals().get("p2p_coin_ammesso")
+        def _vista(v):
+            if v == "USDT":
+                return p2p_usdt_ammesso(tg)
+            if v == "CHF":
+                return p2p_chf_ammesso(tg)
+            if v in ("ETH", "XMR", "USDE"):
+                return bool(coin and coin(tg))
+            return True
+        pref["valute"] = [v for v in pref["valute"] if _vista(v)]
     return pref
 
 
@@ -78340,7 +80939,8 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
             if (chf and not p2p_chf_ammesso(tg)) or (coin and not p2p_coin_ammesso(tg)):
                 continue
             if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "onchain",
-                                           p2p_onchain_valuta(o), _metodi_libro(metodi),
+                                           (str(coin["moneta"]).upper() if coin
+                                            else p2p_onchain_valuta(o)), _metodi_libro(metodi),
                                            str(o["lato"] or "")):
                 continue
             if not _avvisi_p2p_accesi(con, tg):
@@ -78375,6 +80975,50 @@ def _onchain_vivi_avvisi_p2p() -> set:
         return set()
 
 
+def _usdt_visto_avviso_p2p(metodi) -> bool:
+    """PURA: un ordine in USDT che il libro dell'app MOSTRA? Il calco di
+    `valutaVistaP2P` del telefono: almeno un metodo, e OGNUNO e' una
+    nostra rete, «USDT (Tron)» o «USDT (Ethereum)» (le chiavi di
+    `P2P_ONCHAIN_RETI_USDT`, la grafia di `P2P_RETI_USDT`), spazi ai lati
+    e maiuscole a parte come la' (`reteUsdtDaMetodoP2P`).
+    PERCHE' (24 nov 2026, cantiere avvisi-usdt-metodi). Andrea riceve
+    «🔔 1 nuovo ordine nel libro P2P · 🟢 Compra BTC · da 15,00 a 120,00
+    USDT · USDT/USDC (Solana - Arbitrum - Polygon - Avalanche), USDC
+    (Base - Optimism), USDT (BSC - Tron - Ethereum)» e al tocco l'app
+    dice che l'ordine non c'e' piu'. L'ordine era vero, sul nostro nodo,
+    pubblicato in USDT da un altro client Mostro coi metodi scritti a
+    mano: il server guardava solo la valuta, l'app anche i metodi, e
+    l'ordine coi metodi altrui non lo mostra (non avrebbe ne' la rete
+    ne' il controllo dell'indirizzo). Ora il server chiede la stessa
+    cosa."""
+    nostre = {str(k).lower() for k in P2P_ONCHAIN_RETI_USDT}
+    m = [str(x).strip() for x in (metodi if isinstance(metodi, list) else [])]
+    m = [x for x in m if x]
+    return len(m) > 0 and all(x.lower() in nostre for x in m)
+
+
+# I METODI DEI FRANCHI COME LI SCRIVE IL TELEFONO (`P2P_METODI_CHF` della
+# Mini App, la stessa lista nello stesso ordine: una sentinella di
+# prove.py le tiene uguali). Servono solo al giudice qui sotto.
+P2P_METODI_CHF_LIBRO = ("TWINT", "Bonifico CH", "Revolut", "Wise", "Contanti",
+                        "Contante per posta")
+
+
+def _chf_visto_avviso_p2p(metodi) -> bool:
+    """PURA: un ordine in franchi che il libro dell'app MOSTRA? Il calco di
+    `valutaVistaP2P` del telefono per i CHF: almeno un metodo, e OGNUNO
+    sta in `P2P_METODI_CHF` col nome esatto (spazi ai lati via, vuoti via,
+    come `ordineDaEvento`; le maiuscole contano, come la' l'`indexOf`).
+    PERCHE' (24 nov 2026, cantiere avvisi-chf-metodi, dopo il gemello
+    `_usdt_visto_avviso_p2p`): un altro client Mostro puo' pubblicare sul
+    nostro nodo un ordine in CHF con «Postfinance» o «Bonifico SEPA»; il
+    telefono lo nasconde (non avrebbe il suo form ne' il suo controllo),
+    e la 🔔 del server, che guardava solo la valuta, suonava lo stesso."""
+    m = [str(x).strip() for x in (metodi if isinstance(metodi, list) else [])]
+    m = [x for x in m if x]
+    return len(m) > 0 and all(x in P2P_METODI_CHF_LIBRO for x in m)
+
+
 def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
     """Per ogni ordine nuovo, le persone che lo vogliono: in CODA, una
     riga per (persona, ordine). Qui stanno le regole 1 e 3 — le
@@ -78397,6 +81041,21 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         fiat = o.get("fiat") or "EUR"
         if fiat not in ("EUR", "USDT", "CHF"):
             continue
+        # ...e in USDT solo con le NOSTRE reti (24 nov 2026, cantiere
+        # avvisi-usdt-metodi): il giudice e' quello del libro dell'app
+        # (`_usdt_visto_avviso_p2p`), o la 🔔 suona per un ordine che al
+        # tocco «non c'e' piu'»
+        if fiat == "USDT" and not _usdt_visto_avviso_p2p(o["metodi"]):
+            continue
+        # ...e in franchi solo coi NOSTRI metodi (24 nov 2026, cantiere
+        # avvisi-chf-metodi): lo stesso scarto, lo stesso rimedio
+        if fiat == "CHF" and not _chf_visto_avviso_p2p(o["metodi"]):
+            continue
+        # ...e un ordine IN MONETA (24 nov 2026, avvisi-p2p-valute): sul
+        # filo e' EUR, la moneta la dicono i metodi; arriva solo a chi le
+        # monete le vede, e il messaggio dice la cifra nella moneta
+        valuta = _valuta_avviso_p2p(fiat, o["metodi"])
+        moneta = _coin_ordine_libro(o["metodi"]) if valuta != fiat else None
         tipo = _tipo_nuovo_p2p(o["lato"], o["metodi"])
         if not tipo:
             continue
@@ -78415,11 +81074,14 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
         if fiat == "CHF" and euro_txt.endswith(" €"):
             euro_txt = euro_txt[:-2] + " CHF"
         metodi_txt = ", ".join(_metodi_libro(o["metodi"]))
+        if moneta:
+            euro_txt = f"{moneta[1]} {moneta[0]}"
+            metodi_txt = ", ".join(_metodi_libro(moneta[2]))
         for p in persone:
             tg = int(p["tg_id"])
             if autore and tg == autore:
                 continue                      # mai per i suoi
-            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", fiat,
+            if not _passa_avviso_nuovo_p2p(_pref_rete_vista_p2p(p), tipo, conv, "ln", valuta,
                                            _metodi_libro(o["metodi"]), str(o["lato"] or "")):
                 continue
             if not _p2p_per(tg)["attivo"] or not _avvisi_p2p_accesi(con, tg):
@@ -78427,6 +81089,8 @@ def _accoda_nuovi_p2p(con, nuovi: list, cambio: float, adesso: int) -> int:
             if fiat == "USDT" and not p2p_usdt_ammesso(tg):
                 continue
             if fiat == "CHF" and not p2p_chf_ammesso(tg):
+                continue
+            if moneta and not p2p_coin_ammesso(tg):
                 continue
             cur = con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi_nuovi(tg_id, ordine, tipo, conv, "
@@ -78645,6 +81309,14 @@ async def orologio_p2p():
                 await asyncio.wait_for(_giro_paracadute_p2p(), P2P_PASSATA_MAX_S)
             except Exception as e:
                 print(f"⚠️ Paracadute P2P: battito saltato "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
+            # CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026): le domande
+            # senza risposta da 10 minuti passano al venditore dopo
+            try:
+                await asyncio.wait_for(_giro_via_euro(), P2P_PASSATA_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Chiedi al venditore: battito saltato "
                       f"({type(e).__name__}: {e})", flush=True)
             _P2P_BATTITO["vivo"] = time.time()
         # LA FOTOGRAFIA DEL LIBRO (26 set 2026): nella passata intera, col
@@ -98691,6 +101363,10 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
         # (chi vende non lo puo' riscrivere: MSG_ABBONAMENTO_DA_SOLO).
         # Esce il booleano, mai l'id del canale.
         r["abbonamento"] = bool(int(r.pop("abbonamento_canale", 0) or 0))
+        # LA SCORTA DI CODICI (24 nov 2026): consegnato da solo dai codici
+        # pronti. Sul SI' il client rende toccabili i soli link a un bot
+        # di Telegram (`linkBotToccabile`), decisione di Andrea.
+        r["dalla_scorta"] = bool(int(r.get("dalla_scorta", 0) or 0))
         # I PUNTI PROPOSTI escono come LISTA e non come stringa JSON:
         # in colonna sono JSON perche' SQLite non ha un tipo lista, ma
         # quella e' una scelta dello schema e il client non deve
@@ -112499,24 +115175,44 @@ async def _onchain_xpub_rileggi_tutte():
                   f"({type(e).__name__})", flush=True)
 
 
-def _onchain_incasso_mio(tg_id: int) -> str:
-    """'indirizzo' | 'xpub' se chi vende ha una destinazione viva (firmata
-    dal seme di adesso), sennò ''. Muto sui guasti: e' una voce del
-    profilo, non un giudizio — quello lo da' la cassa."""
+def _onchain_destinazione_mia(tg_id: int):
+    """La riga viva di «Dove ricevi» (firmata dal seme di adesso), o None.
+    Muta sui guasti: serve alle voci del profilo, non alla cassa."""
     if not EMBIT:
-        return ""
+        return None
     try:
         con = _onchain_db()
         try:
             r = con.execute("SELECT xpub FROM onchain_xpub WHERE tg_id=?",
                             (int(tg_id),)).fetchone()
-            dest = (_onchain_destinazione_viva(con, tg_id, r["xpub"])
+            return (_onchain_destinazione_viva(con, tg_id, r["xpub"])
                     if r else None)
         finally:
             con.close()
     except Exception:
-        return ""
+        return None
+
+
+def _onchain_incasso_mio(tg_id: int) -> str:
+    """'indirizzo' | 'xpub' se chi vende ha una destinazione viva (firmata
+    dal seme di adesso), sennò ''. Muto sui guasti: e' una voce del
+    profilo, non un giudizio — quello lo da' la cassa."""
+    dest = _onchain_destinazione_mia(tg_id)
     return dest["tipo"] if dest else ""
+
+
+def onchain_accorcia(valore: str) -> str:
+    """L'INIZIO E LA FINE di dove ricevi (23 nov 2026, Andrea: «magari
+    mostralo, solo l'inizio e la fine»): otto caratteri, «…», sei. Il
+    gemello in pagina e' `accorciaIncassoOnchain`, con la stessa regola."""
+    v = str(valore or "")
+    return v if len(v) <= 16 else v[:8] + "…" + v[-6:]
+
+
+def _onchain_incasso_mio_vista(tg_id: int) -> str:
+    """Dove ricevo, accorciato per il Profilo: solo per me, in /api/me."""
+    dest = _onchain_destinazione_mia(tg_id)
+    return onchain_accorcia(dest["valore"]) if dest else ""
 
 
 ONCHAIN_MSG_SENZA_DESTINAZIONE = (
@@ -116722,6 +119418,10 @@ def _p2p_onchain_rifai_foto() -> None:
                 perse = _marchi_dispute_p2p(con, makers, adesso)
                 fatti = _completati_p2p(con, makers)
                 veloci = _veloci_p2p(con, makers, adesso)
+                # ...tranne chi ha spento le recensioni P2P (23 nov 2026)
+                zitti = _p2p_nascosti_fra(con, makers)
+                fatti = {t: n for t, n in fatti.items() if t not in zitti}
+                veloci = veloci - zitti
                 for m in makers:
                     u = con.execute(
                         "SELECT rating, n_feedback, (CASE WHEN avatar_scelta='nessuna' "
@@ -120570,9 +123270,18 @@ def _p2p_onchain_mancato(o, stato) -> tuple:
 # nome nuovo — come la ripubblica. Riaprire il vecchio era la strada
 # scartata: l'indirizzo 2-di-3 contiene la chiave di chi ha preso e non si
 # riusa con un'altra persona, e ogni tabella legata allo scambio avrebbe
-# dovuto imparare un «secondo giro». Col PayCode di un Barattozon non
-# rinasce niente: alla presa l'importo diventa quello del codice di chi
-# prende, e l'ordine di prima non c'e' piu' da copiare.
+# dovuto imparare un «secondo giro». Nella FASCIA di Barattozon («Compra
+# BTC») non rinasce niente: alla presa l'importo diventa quello del codice
+# di chi prende, e l'ordine di prima non c'e' piu' da copiare.
+# IL PAYCODE DI CHI VENDE (23 nov 2026, cantiere barattozon-rinasce; un
+# utente annullato due volte in un minuto ripubblicava a mano, e Andrea,
+# dalla card: «Sì», poi «Sì, 8 ore»). Barattozon in «Vendi BTC» rinasce
+# SOLO se chi l'ha preso annulla prima del deposito: il PayCode esce a chi
+# paga solo a deposito confermato, quindi non l'ha mai visto e si puo'
+# rimettere nel libro. Dopo il deposito no (l'ha visto). E solo se il
+# PayCode vive ancora piu' delle 8 ore del margine
+# (`P2P_ONCHAIN_TAB_MARGINE_S`, lo stesso limite con cui il libro lo
+# toglie): l'ordine nuovo ha lo stesso PayCode e la stessa scadenza.
 P2P_ONCHAIN_RINASCE_PERCHE = {
     "annullato": "Chi l'aveva preso ha annullato prima del deposito",
     "deposito": "Chi l'aveva preso non ha depositato in tempo",
@@ -120595,13 +123304,17 @@ def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
     taker = int(_p2p_onchain_campo(o, "taker_id", 0) or 0)
     if not taker or not int(_p2p_onchain_campo(o, "maker_id", 0) or 0):
         return ""
-    if (str(_p2p_onchain_campo(o, "paycode", "") or "")
-            or int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0)):
+    if int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0):
+        return ""
+    paycode = bool(str(_p2p_onchain_campo(o, "paycode", "") or ""))
+    if paycode and str(_p2p_onchain_campo(o, "lato", "") or "") != "sell":
         return ""
     prima = str(_p2p_onchain_campo(o, "stato", "") or "")
     if stato_nuovo == "annullato" and prima == "preso":
         if chi_chiude and int(chi_chiude) == taker:
             return "annullato"
+        if paycode:
+            return ""
         dep_taker = int(_p2p_onchain_campo(o, "depositante_id", 0) or 0) == taker
         entro = int(_p2p_onchain_campo(o, "deposito_entro", 0) or 0)
         if not chi_chiude and dep_taker:
@@ -120611,7 +123324,7 @@ def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
             return "deposito"
         return ""
     if (stato_nuovo == "rimborsato" and int(mancato_a or 0) == taker
-            and mancato_perche in P2P_ONCHAIN_RINASCE_PERCHE):
+            and mancato_perche in P2P_ONCHAIN_RINASCE_PERCHE and not paycode):
         return mancato_perche
     return ""
 
@@ -120622,9 +123335,11 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     (lato, prezzo o premio, cifra, metodi, filtro, paracadute ripartito
     dal cambio di adesso, ripubblica, zona, tempo per pagare, cauzione) e
     la vita nel libro di nuovo intera. Il recapito torna solo se l'aveva
-    scritto chi pubblica (ordine di vendita). Torna l'id nuovo, o 0 se
-    l'ordine era gia' rinato o chi l'aveva pubblicato non ha piu' la sua
-    chiave on-chain. Committa."""
+    scritto chi pubblica (ordine di vendita). Col PayCode di chi vende
+    (Barattozon in «Vendi BTC») lo stesso PayCode e la stessa scadenza, e
+    nel libro fino a 8 ore prima di quella. Torna l'id nuovo, o 0 se
+    l'ordine era gia' rinato, se chi l'aveva pubblicato non ha piu' la sua
+    chiave on-chain, o se al PayCode non restano piu' di 8 ore. Committa."""
     vecchio = int(o["id"])
     if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE rinato_da=?",
                    (vecchio,)).fetchone():
@@ -120635,6 +123350,17 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     if not con.execute("SELECT 1 FROM onchain_xpub WHERE tg_id=?",
                        (maker,)).fetchone():
         return 0
+    # il PayCode di chi vende rinasce con lui, se vive ancora oltre il
+    # margine: sennò l'ordine nuovo uscirebbe dal libro appena nato
+    paycode = str(_p2p_onchain_campo(o, "paycode", "") or "")
+    tab_scade = 0
+    if paycode:
+        try:
+            tab_scade = int((json.loads(paycode) or {}).get("scade") or 0)
+        except Exception:
+            tab_scade = 0
+        if not tab_scade or tab_scade - P2P_ONCHAIN_TAB_MARGINE_S <= int(adesso):
+            return 0
     mercato = _p2p_onchain_mercato(o)
     lato = str(o["lato"])
     recapito = str(o["recapito"] or "") if lato == "sell" else ""
@@ -120652,14 +123378,14 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (ordine, lato, maker, 0 if mercato else int(o["prezzo_sats"]),
          int(o["euro_cent"]), o["metodi"], recapito,
-         p2p_onchain_scade_libro(adesso, 0), adesso, adesso,
+         p2p_onchain_scade_libro(adesso, tab_scade), adesso, adesso,
          "mercato" if mercato else "fisso",
          int(_p2p_onchain_campo(o, "premio", 0) or 0) if mercato else 0,
          int(_p2p_onchain_campo(o, "filtro", 0) or 0),
          para if para_da else 0, para_da, para_letto,
          int(_p2p_onchain_campo(o, "rip_minimo", 0) or 0),
          int(_p2p_onchain_campo(o, "rip_massimo", 0) or 0),
-         str(_p2p_onchain_campo(o, "fiat", "") or ""), "",
+         str(_p2p_onchain_campo(o, "fiat", "") or ""), paycode,
          str(_p2p_onchain_campo(o, "zona", "") or ""),
          int(_p2p_onchain_campo(o, "para_su", -1)),
          int(_p2p_onchain_campo(o, "para_giu", -1)), 0,
@@ -123752,6 +126478,44 @@ async def prova_stradina(req: Request, x_tg_init_data: str = Header(""),
         return {"ok": True, "finte": sorted(stradina_finte(con, user["id"]))}
     finally:
         con.close()
+
+
+# IL RIQUADRO DELLE NOTIZIE SA CHI E' GIA' ENTRATO (23 nov 2026, Andrea:
+# «quando uno entra nel canale non viene piu' visualizzato», e la scelta
+# «ogni 3 giorni»): il client chiede qui prima di riproporlo, e qui si
+# chiede a Telegram se CHI BUSSA e' nel canale. Tre risposte: True (dentro:
+# il riquadro non torna piu'), False (fuori), None (non si sa: bot non
+# amministratore, account senza Telegram, Telegram muto — il client allora
+# lo mostra una volta sola). Una risposta per persona ogni 6 ore in
+# memoria: il riquadro si apre al piu' ogni 3 giorni, ma una domanda a
+# Telegram a ogni apertura non serve a nessuno.
+_NOTIZIE_ISCRITTI: dict = {}
+NOTIZIE_CACHE_S = 6 * 3600
+
+
+@app.get("/api/me/canale-notizie")
+async def mio_canale_notizie(x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    tg = int(user["id"])
+    adesso = time.time()
+    c = _NOTIZIE_ISCRITTI.get(tg)
+    if c and adesso - c[0] < NOTIZIE_CACHE_S:
+        return {"iscritto": c[1]}
+    esito = None
+    try:
+        r = await bot_api("getChatMember", {"chat_id": CANALE_NOTIZIE_CHAT,
+                                            "user_id": tg})
+        res = (r or {}).get("result")
+        if r and r.get("ok") and isinstance(res, dict) and res.get("status"):
+            esito = res["status"] in ("member", "administrator", "creator",
+                                      "restricted")
+    except Exception as e:
+        print(f"⚠️ [notizie] il canale non risponde: {e}")
+    if len(_NOTIZIE_ISCRITTI) > 20000:
+        _NOTIZIE_ISCRITTI.clear()
+    _NOTIZIE_ISCRITTI[tg] = (adesso, esito)
+    return {"iscritto": esito}
 
 
 @app.get("/api/me/stradina")
@@ -130593,7 +133357,8 @@ def esegui_cancellazione(tg_id: int) -> dict:
     except Exception as e:
         print(f"⚠️ Cancellazione account: chat non pulita ({e})", flush=True)
     file_foto += [x for x in (u["avatar"], u["banner_foto"],
-                              u["banner_foto_att"])
+                              u["banner_foto_att"], u["mio_foto"],
+                              u["mio_foto_att"])
                   if x and "/" not in str(x) and NOME_FOTO.match(str(x))]
     print(f"🗑 Account cancellato: {len(ids_annunci)} annunci ritirati, "
           f"il resto ora porta il fantasma {fantasma}", flush=True)

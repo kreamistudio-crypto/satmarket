@@ -159,6 +159,7 @@ collaudo_p2p_onchain_usdt
 collaudo_p2p_onchain_commissione
 collaudo_p2p_onchain_barattozon
 collaudo_leve_pannello
+collaudo_id_utenti
 collaudo_certificati_relay
 collaudo_filtro_avorio
 collaudo_assistente_bot
@@ -221,3 +222,8 @@ collaudo_sessioni_attive
 collaudo_abbonamento_canale
 collaudo_recensioni_nascoste
 collaudo_promozioni
+collaudo_profilo_mio
+collaudo_nascondi_annuncio
+collaudo_foto_varianti
+collaudo_scorta_codici
+collaudo_quadro_servizi

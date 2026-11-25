@@ -1115,8 +1115,8 @@ riavviare: niente link né espulsioni, e gli abbonati già dentro restano.
 
 ## 31. «Non hai sats?»: la prova vera del giroconto in produzione, coi moderatori (23 nov 2026, cantiere giroconto-interno)
 
-**Stato.** IN ATTESA DEL SÌ DI ANDREA sulla scelta (thread «Non hai sats?»):
-il collaudo ha i pagamenti FINTI (LNbits FakeWallet), il deposito non sta
+**Stato.** SCELTA DI ANDREA (23 nov, 21:01): «Produzione, solo tu e Alan».
+Va fatta DOPO la promozione che porta il cantiere su main. Il collaudo ha i pagamenti FINTI (LNbits FakeWallet), il deposito non sta
 sul nodo e Mostro non lo può saldare, quindi la prova vera si fa in
 produzione col tasto visibile ai soli moderatori (`VIA_EURO_SOLO_ADMIN`,
 di serie True: arriva con la promozione, nessuna riga da scrivere).
@@ -1163,7 +1163,7 @@ Deve dire `403` (la porta c'è, il segreto no). `404` = manca un pezzo
 **4) La `-bar13` sul nodo.** La procedura è quella della `-bar12`
 (PRODUZIONE, «LA `-bar12`»), con la sola `0016-*.patch`:
 sorgente pulito sul branch `barattolo/v0.20.2`, albero `deb731c3`;
-`git am` della `0016-*.patch` → l'albero deve cominciare con `654388cb`
+`git am` della `0016-*.patch` → l'albero deve cominciare con `7408b7fa`
 (lo stesso del cloud); i test nello stadio `builder` col filtro di sempre
 più `barattolo_giroconto` (4 test nuovi, 0 rossi); nel binario la parola
 `BARATTOLO_GIROCONTO_URL`. Il compose `.bar13`: l'immagine
@@ -1183,6 +1183,12 @@ Nel log del nodo NON deve esserci «giroconto … not set».
   «Continua», poi segue il foglio fino a «Ho pagato» (manda davvero gli
   euro ad Alan).
 - Alan riceve gli euro e rilascia.
+- (24 nov, cantiere chiedi-al-venditore) Una seconda volta con Alan che
+  vende a CIFRA FISSA più grande (per esempio 30 € esatti per un oggetto
+  da 5 €): a «Continua» il foglio dice che sta cercando; ad Alan arriva il
+  bot «Un compratore del mercatino vuole…»; «Sì, va bene» dalla pagina del
+  suo ordine lo trasforma in «da 5 a 30 €», e il foglio dell'altro account
+  torna al prezzo col «Continua» di sempre.
 
 Deve succedere: l'ordine passa a pagato (locked) da solo; la riserva scende
 di quanto il deposito; nel log del nodo
@@ -1199,3 +1205,46 @@ Quel che si vede va nel verbale (CANTIERI, «Il giroconto interno»).
 /srv/barattolo/config.py` e riavvio (porta 404, il tasto sparisce). Nodo:
 `cp -p docker-compose.yml.prima-bar13 docker-compose.yml && docker compose
 up -d mostro`. I sats rimasti nella riserva restano lì.
+
+## 32. Spegnere il riquadro «fase di test» in produzione (23 nov 2026, cantiere scoprire-quadrati; Andrea: «levamelo quello lì anche, spegnilo dalla lista, il riquadro fase di test»)
+
+**Perché.** La fascia in home se ne va col codice (alla prossima
+promozione). Il riquadro che compare una volta al giorno all'apertura
+invece lo accende la riga `BANNER_TEST` del config del VPS: si spegne lì,
+senza codice. Si può fare anche subito, prima della promozione.
+
+**Sola lettura:**
+```
+grep -n "^BANNER_TEST" /srv/barattolo/config.py
+```
+Se non esce `BANNER_TEST = True`, non c'è niente da fare.
+
+**Scrive** (dopo il sì di Andrea, già dato il 23 nov):
+```
+cp -a /srv/barattolo/config.py /root/config-prima-banner-test-$(date +%F).py
+```
+```
+sudo sed -i 's/^BANNER_TEST = True/BANNER_TEST = False/' /srv/barattolo/config.py && grep -n "^BANNER_TEST " /srv/barattolo/config.py
+```
+```
+sudo python3 -c "import ast; ast.parse(open('/srv/barattolo/config.py').read()); print('ok')"
+```
+```
+sudo systemctl restart barattolo && sleep 5 && curl -s -o /dev/null -w 'salute %{http_code}\n' http://127.0.0.1:8080/api/salute
+```
+Atteso `BANNER_TEST = False`, `ok` e `salute 200`. Riaprendo l'app il
+riquadro non compare più.
+
+## 33. Il quadro dei servizi: i battiti sulle quattro macchine e n8n nel backup del relay (25 nov 2026, cantiere quadro-servizi; Andrea: «un monitor di tutte le applicazioni che abbiamo [...] e un piano di backup di disaster and recovery»)
+
+**Perché.** Il cassetto «🩺 Servizi» del pannello admin vede il solo VPS
+finché le altre macchine non battono; e il VPS morto lo può dire solo il
+relay, da fuori. n8n non era in nessun backup. DOPO la promozione su main.
+
+**I comandi**, uno alla volta e in quest'ordine, stanno in PRODUZIONE,
+«IL QUADRO DEI SERVIZI E I BATTITI»: il segreto negli appunti dal PC, la
+riga sul VPS (con la copia prima) e il riavvio, poi su ogni macchina il
+file del segreto, i file dal repo, il primo giro a mano (`battito: vivi
+…; fermi nessuno`) e il timer. Per ultimo il backup del relay con n8n,
+dopo aver guardato quanto pesa `/opt/n8n-barattolo/dati`.
+Il piano «se muore X» è `deploy/SE-MUORE.md`.

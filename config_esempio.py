@@ -468,6 +468,11 @@ ETICHETTA_ALIMENTI = True
 # pubblica solo con la tabella intera o col motivo per cui la legge non
 # la chiede. Nasce ACCESA; False la rende di nuovo facoltativa.
 ETICHETTA_OBBLIGATORIA = True
+# Nascondere un annuncio solo (23 nov 2026): sulla scheda del proprio
+# annuncio «🙈 Nascondi dalla vetrina», senza scadenza; si rimette da «I
+# tuoi annunci». Nasce ACCESA: la riga serve per SPEGNERLA, e solo False
+# spegne (i nascosti si possono rimettere in vetrina anche a leva spenta).
+NASCONDI_ANNUNCIO = True
 
 # --- La fotografia dell'annuncio all'acquisto (18 nov 2026) -----------
 # Al pagamento l'ordine salva l'annuncio com'era (testo, condizione,
@@ -524,6 +529,12 @@ DIGITALE_MIN_VENDITE = 0     # es. 1: per pubblicare annunci digitali
 # compra. Acceso di serie; False = interruttore d'emergenza: gli ordini
 # nuovi tornano al campo unico (quelli gia' a riquadri restano cosi').
 CODICI_UNO_ALLA_VOLTA = True
+# LA SCORTA DI CODICI (24 nov 2026): chi vende un digitale incolla prima
+# una lista di codici o link, uno per riga, e al pagamento Barattolo ne
+# consegna uno da solo. I pezzi dell'annuncio sono i codici rimasti.
+# Acceso di serie; False = interruttore d'emergenza: si torna alla
+# consegna a mano.
+SCORTA_CODICI = True
 # L'ABBONAMENTO A UN CANALE TELEGRAM (20 nov 2026): un annuncio digitale
 # a prezzo fisso diventa un mese d'ingresso a un canale privato. Chi paga
 # riceve un link valido solo per lui; i sats arrivano a chi vende quando
@@ -1275,6 +1286,13 @@ P2P_PARACADUTE = False
 # Spenta per ogni ordine finche' non si scrivono i due prezzi; mai su
 # Barattozon ne' sugli ordini in moneta. Solo False spegne.
 P2P_RIPUBBLICA = True
+# L'INDIRIZZO DEGLI INCASSI PARTE DA SOLO NEL P2P (24 nov 2026): ACCESO di
+# serie. Chi compra sats e ha salvato un indirizzo Lightning negli incassi
+# (che non sia di un wallet che col P2P non passa) non vede il foglio
+# «Dove ricevere i sats»: il telefono controlla l'indirizzo e lo manda da
+# solo al coordinatore. Il foglio si apre solo se il controllo o il
+# coordinatore dicono di no. Solo False spegne.
+P2P_INCASSO_DA_SOLO = True
 # IL TEMPO PER PAGARE (18 nov 2026): ACCESO di serie. Chi vende sceglie
 # entro quanto chi prende manda gli euro (un orologio da 15 minuti a 24
 # ore; sotto le 24 solo coi metodi veloci), e allo scadere senza «Ho
@@ -1471,6 +1489,17 @@ VIA_EURO_MAX_EURO = 100
 # Vuoto o segnaposto = la rotta NON ESISTE (404), e la ronda allarma
 # dopo tre ore di pagamenti che non ha potuto verificare.
 RONDA_NODO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# IL QUADRO DEI SERVIZI (25 nov 2026): il segreto con cui le altre
+# macchine (nodo, relay, VM collaudo, e lo script del VPS stesso) dicono
+# a /api/battito che i loro servizi sono vivi. Lo stesso valore va in
+# /etc/battito/battito.conf su ogni macchina (`BATTITO_SEGRETO`). UN
+# SEGRETO SUO: chi lo ruba puo' solo far sembrare vivo un servizio morto.
+# Si genera con `openssl rand -hex 32`. Vuoto o segnaposto = la rotta NON
+# ESISTE (404), e il quadro mostra il solo VPS.
+BATTITO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# Il quadro dei servizi: ogni cinque minuti il VPS batte per se', avvisa
+# chi ha smesso di battere e controlla i certificati. False lo spegne.
+QUADRO_SERVIZI = True
 # LA RIGA A OGNI PASSATA DELL'OROLOGIO P2P (17 set 2026): una al minuto
 # nel journal, anche quando non trova niente — e' quella che distingue
 # «gira a vuoto» da «non gira», che un giorno e' costata un'ora.
@@ -1738,6 +1767,14 @@ NIP05_UTENTI_ATTIVO = True
 # ...gratis da questo livello (l'id del gradino: nuovo, avviato, pratico,
 # esperto, maestro). Storto o sconosciuto: porta chiusa per tutti.
 NIP05_UTENTI_LIVELLO = "avviato"
+# NOME E FOTO SCELTI SU BARATTOLO (23 nov 2026): nel Profilo l'utente propone
+# un nome e una foto suoi, GRATIS; un moderatore li approva prima che si
+# vedano, e poi valgono ovunque dentro Barattolo (il profilo Telegram o Nostr
+# non cambia). Accesa di serie; a False niente proposte nuove, chi ha gia'
+# un nome approvato lo tiene.
+PROFILO_MIO_ATTIVO = True
+# ...un cambio approvato ogni tanti giorni (0 = nessun limite)
+PROFILO_MIO_GIORNI = 30
 
 # --- I relay Nostr ----------------------------------------------------
 # Dove Barattolo scrive e legge su Nostr. Erano cinque elenchi scritti
@@ -2238,6 +2275,10 @@ Per ora esplora liberamente e contribuisci allo sviluppo: un feedback, un'opinio
 👉 Entra nel canale: dentro trovi il post fissato 📋 dove lasciare i tuoi feedback."""
 # Dove porta il bottone "Entra nel canale". Vuoto = niente bottone.
 BANNER_TEST_LINK = ""
+# Il canale delle notizie: a rodaggio spento, il riquadro che invita a
+# entrarci (ogni 3 giorni) chiede al bot se la persona e' gia' iscritta.
+# Il bot deve essere amministratore del canale.
+CANALE_NOTIZIE_CHAT = "@barattolostore"
 
 # --- Contatore degli utenti (in vetrina, sotto gli oggetti) ----------
 # "54 utenti": quante persone sono già entrate nel mercatino (tutti gli

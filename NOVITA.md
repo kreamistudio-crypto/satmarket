@@ -940,3 +940,51 @@ frase: Adesso puoi far vedere di più quello che vendi, pagando in sats. Dalla s
 dove: Scheda dell'annuncio → «Promuovi»; Profilo → cassetto del banner del negozio → «Promuovi»; home: la fila «In evidenza» sotto «Da scoprire».
 leva: PROMOZIONI_ATTIVE (accesa di serie)
 pubblico: sì
+
+## 2026-11-23 · barattozon-rinasce
+frase: Anche gli ordini Barattozon on-chain in «Vendi BTC» tornano nel libro da soli se chi li prende annulla prima del deposito, con lo stesso PayCode, finché al PayCode mancano più di 8 ore.
+dove: P2P → un tuo ordine Barattozon on-chain preso e annullato da chi l'ha preso → avviso «🔁 Il tuo ordine è tornato nel libro».
+leva: P2P_ONCHAIN_BARATTOZON (accesa di serie)
+pubblico: no
+
+## 2026-11-23 · profilo-mio
+frase: Adesso puoi mettere su Barattolo un nome e una foto tuoi, gratis. Li guarda un moderatore, poi si vedono ovunque nel mercatino e nel P2P. Il tuo profilo Telegram o Nostr non cambia.
+dove: Profilo → «🆔 Nostr e identità» → «✏️ Nome e foto su Barattolo» → «✏️ Scegli nome e foto»; approvati, la scelta «✏️ Mia» in «📷 La tua foto».
+leva: PROFILO_MIO_ATTIVO (accesa di serie)
+pubblico: sì
+
+## 2026-11-23 · nascondi-annuncio
+frase: Adesso puoi nascondere un annuncio solo, senza mettere in ferie tutto il negozio e senza una data di rientro. Nella sua scheda tocca «🙈 Nascondi dalla vetrina»: nessuno lo vede più. Lo ritrovi in «I tuoi annunci», da dove con «👁 Rimetti in vetrina» torna quando vuoi.
+dove: Scheda del tuo annuncio → «🙈 Nascondi dalla vetrina»; Profilo → «I tuoi annunci» → «👁 Rimetti in vetrina».
+leva: NASCONDI_ANNUNCIO (accesa di serie)
+pubblico: sì
+
+## 2026-11-24 · foto-varianti
+frase: Le foto del tuo annuncio adesso si mettono in ordine con le frecce ◀ ▶ (la prima è la copertina), e ognuna può avere una breve descrizione che si legge a schermo intero. In «Modifica» le foto restano: ne aggiungi altre e togli quella che non vuoi. E ci sono le varianti: «Colore: rosso, blu, verde», anche con un prezzo e dei pezzi diversi per ognuna.
+dove: Vendi → le foto (frecce ◀ ▶ e «Descrizione della foto (facoltativa)»), «🎨 Varianti (facoltative)» sotto la quantità, «Prezzo o pezzi diversi per ogni variante»; I tuoi annunci → Modifica → «Le tue foto (fino a 5)».
+leva: nessuna
+pubblico: sì
+
+## 2026-11-24 · avvisi-p2p-valute
+frase: Negli avvisi dei nuovi ordini P2P adesso le valute si scelgono una per una, e puoi accenderne più di una insieme: per esempio «Euro» e «USDT». Ci sono anche Ethereum, Monero e USDe: un ordine in Monero ti arriva solo se hai acceso «Monero» (o lasciato «Tutte»).
+dove: Libro P2P → la campanella 🔔 → «Valuta»; Profilo → «🔔 Avvisi» → «Valuta».
+leva: P2P_COIN_ATTIVO (le monete; accesa di serie)
+pubblico: sì
+
+## 2026-11-24 · home-card-pulite
+frase: La home è più pulita. Le card degli scambi P2P sono più corte, col tempo per pagare e la cauzione come due icone, e accanto a «Scambi P2P» c'è un interruttore per nasconderle. Gli annunci in evidenza stanno sopra due onde arancio che scorrono mentre sfogli le card. Le offerte a tempo e gli sconti sono due banner dopo i primi sei annunci, e i negozi di «Da scoprire» si aprono subito.
+dove: Esplora → «Scambi P2P» (l'interruttore accanto al titolo); la fila «In evidenza» sotto «Da scoprire»; i due banner fra gli annunci.
+leva: nessuna
+pubblico: no
+
+## 2026-11-24 · p2p-incasso-da-solo
+frase: Nel P2P, quando compri sats e hai salvato un indirizzo Lightning negli incassi, non devi più dire ogni volta dove riceverli: l'app lo manda da sola appena prendi l'ordine, e lo scambio parte subito. Se l'indirizzo non passa, si apre il foglio di sempre.
+dove: P2P → prendi un ordine di chi vende sats → «⚡ Ricevi su …»; per riceverli on-chain, «₿ Ricevi on-chain» nel foglio dell'ordine prima di «Compra»; Profilo → «⚡ Attiva incassi automatici» per salvare l'indirizzo.
+leva: P2P_INCASSO_DA_SOLO (accesa di serie)
+pubblico: no
+
+## 2026-11-24 · foto-in-fila-incolla
+frase: Sul computer le foto del tuo annuncio stanno in fila, una accanto all'altra, e non scendono più per mezzo schermo. La descrizione di una foto adesso si legge anche sulla foto nella scheda dell'annuncio, non solo a schermo intero. E puoi incollare uno screenshot con Ctrl+V nell'assistenza e nella chat di un ordine, senza salvarlo prima.
+dove: Vendi → le foto (sul computer); la scheda di un annuncio → la foto; Assistenza e chat dell'ordine → Ctrl+V nella casella.
+leva: nessuna
+pubblico: sì

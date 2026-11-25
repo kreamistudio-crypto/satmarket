@@ -1,0 +1,11 @@
+# Il battito dei servizi di questa macchina (25 nov 2026, cantiere
+# quadro-servizi). Lo lancia battito.timer ogni cinque minuti.
+[Unit]
+Description=Barattolo — battito dei servizi verso il quadro
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/battito.sh
+TimeoutStartSec=4min

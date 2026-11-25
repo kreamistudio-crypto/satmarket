@@ -140,7 +140,8 @@ def main():
           c.post("/api/admin/assistenza/222", json={"testo": "sono lo staff"},
                  headers=COMPRA).status_code)
     el = c.get("/api/admin/assistenza", headers=ADMIN).json()["conversazioni"]
-    prova("due conversazioni, una per utente, l'ultima mossa prima", [222, 111],
+    prova("due conversazioni, una per utente, l'ultima mossa prima (l'id come testo)",
+          ["222", "111"],
           [x["utente"] for x in el])
     prova("...tutte e due da rispondere", [True, True], [x["da_rispondere"] for x in el])
     prova("...coi nomi", ["Venditore", "Compratore"], [x["nome"] for x in el])
@@ -158,7 +159,7 @@ def main():
           avvisi[-1][2][1])
     el = c.get("/api/admin/assistenza", headers=ADMIN).json()["conversazioni"]
     prova("la conversazione del compratore torna in cima, non piu' da rispondere",
-          (111, False), (el[0]["utente"], el[0]["da_rispondere"]))
+          ("111", False), (el[0]["utente"], el[0]["da_rispondere"]))
     gia = len([a for a in avvisi if a[0] == 999])
     c.post("/api/assistenza", json={"testo": "Grazie!"}, headers=COMPRA)
     aspetta_sottofondo()
@@ -202,11 +203,66 @@ def main():
     S._SECCHI.clear()
 
     gli_screenshot(c, S, avvisi, aspetta_sottofondo)
+    il_nativo_nostr(c, S, avvisi, aspetta_sottofondo)
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
     print("=" * 58)
     return 1 if banco.FALLITE else 0
+
+
+# Il numero di Zzap, il caso vero del 23 nov 2026: un nativo Nostr ha l'id
+# fino a -2^63, 19 cifre, oltre il 2^53 di JavaScript (come numero JSON
+# diventerebbe -5945373116987485696, un utente che non esiste).
+NATIVO = -5945373116987485543
+NATIVO_JSON_ARROTONDATO = -5945373116987485696
+
+
+def il_nativo_nostr(c, S, avvisi, aspetta_sottofondo):
+    """IL NATIVO NOSTR (23 nov 2026, cantiere assistenza-id-nostr):
+    l'elenco e la conversazione danno l'id ESATTO come testo, la
+    risposta dello staff arriva, e il tasto dell'avviso porta dentro la
+    conversazione anche dentro Telegram (fino a 19 cifre)."""
+    print("\n[il nativo Nostr, 19 cifre: il caso di Zzap]")
+    con = S.db()
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato) "
+                "VALUES(?,?,?,1)", (NATIVO, "Zzap", "negzzap"))
+    con.execute("INSERT INTO assistenza(utente, autore, admin, testo, quando, "
+                "immagini) VALUES(?,?,0,?,?,'')",
+                (NATIVO, NATIVO, "Quale il canale preferenziale?",
+                 int(S.time.time())))
+    con.commit()
+    con.close()
+    el = c.get("/api/admin/assistenza", headers=ADMIN).json()["conversazioni"]
+    prova("l'elenco lo da' come TESTO, cifra per cifra", str(NATIVO),
+          el[0]["utente"])
+    prova("...e il testo non passa per un numero (la causa del guasto)",
+          True, isinstance(el[0]["utente"], str))
+    r = c.get(f"/api/admin/assistenza/{el[0]['utente']}", headers=ADMIN)
+    prova("la conversazione si apre con l'id dell'elenco", (200, "Zzap", str(NATIVO)),
+          (r.status_code, r.json().get("nome"), r.json().get("utente")))
+    prova("...mentre l'id arrotondato non esiste (cosi' si vedeva il guasto)",
+          404, c.get(f"/api/admin/assistenza/{NATIVO_JSON_ARROTONDATO}",
+                     headers=ADMIN).status_code)
+    prima = len([a for a in avvisi if a[0] == NATIVO])
+    r = c.post(f"/api/admin/assistenza/{el[0]['utente']}",
+               json={"testo": "Scrivi pure qui"}, headers=ADMIN)
+    prova("lo staff gli risponde", (200, "Scrivi pure qui"),
+          (r.status_code, r.json()["messaggi"][-1]["testo"]))
+    prova("...e il nativo riceve l'avviso", prima + 1,
+          len([a for a in avvisi if a[0] == NATIVO]))
+    vecchio = S.TELEGRAM_MINIAPP_LINK
+    S.TELEGRAM_MINIAPP_LINK = "https://t.me/ilbarattolobot"
+    prova("il tasto dell'avviso porta dentro la conversazione, 19 cifre",
+          f"https://t.me/ilbarattolobot?startapp=assistenza_{NATIVO}",
+          S._link_dentro_telegram(f"{S.URL_PUBBLICO}/?assistenza={NATIVO}"))
+    prova("...anche col numero piu' lungo possibile, -2^63",
+          f"https://t.me/ilbarattolobot?startapp=assistenza_{-2**63}",
+          S._link_dentro_telegram(f"{S.URL_PUBBLICO}/?assistenza={-2**63}"))
+    prova("...ma venti cifre restano il link del sito",
+          f"{S.URL_PUBBLICO}/?assistenza=-12345678901234567890",
+          S._link_dentro_telegram(f"{S.URL_PUBBLICO}/?assistenza=-12345678901234567890"))
+    S.TELEGRAM_MINIAPP_LINK = vecchio
 
 
 def _png(colore=(200, 40, 40)) -> bytes:
@@ -312,7 +368,7 @@ def gli_screenshot(c, S, avvisi, aspetta_sottofondo):
           (len(nuove), len(nuove) == 2 and "1/2" in nuove[0][3] and "2/2" in nuove[1][3]))
     el = c.get("/api/admin/assistenza", headers=ADMIN).json()["conversazioni"]
     prova("nell'elenco l'ultimo messaggio vuoto dice lo screenshot", "📎 Screenshot",
-          [x for x in el if x["utente"] == 111][0]["ultimo"])
+          [x for x in el if x["utente"] == "111"][0]["ultimo"])
 
     file_prima = sorted(os.listdir(cartella))
     prova("quattro screenshot sono un 400", 400,
