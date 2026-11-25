@@ -27519,8 +27519,17 @@ const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
    doppione che ruba il primo schermo alle categorie: «ok, dai, mettili da
    soli 5 negozi in su»). Compaiono da soli quando i negozi arrivano a 5. */
 const QUADRI_MIN = 4, QUADRI_POCHI = 5;
+/* I TONDI ACCANTONATI (25 nov 2026, Andrea: «abbiamo deciso che le card
+   rotonde vanno via [...] anche se ci saranno 5 card grosse, 6, 7, 8 [...]
+   non buttare via il lavoro, accantonali da qualche parte, ma per il
+   momento le card rotonde non le devo mai più vedere»): spenti qui, a
+   qualunque numero di negozi, e tutti i negozi tornano nella card grande.
+   Il lavoro resta intero — la divisione, le soglie, i cerchi con l'anello,
+   le foto scelte, la testata dal tondo — e si riaccende con true (le
+   prove girano la divisione anche da spenta). */
+const TONDI_NEGOZI = false;
 function spartisciScoprire(tutte){
-  if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
+  if (!TONDI_NEGOZI || !mqNetflix.matches) return {grandi: tutte, quadri: []};
   const negozi = tutte.filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));
   if (negozi.length < 2 * QUADRI_MIN)
     return {grandi: tutte, quadri: negozi.length >= QUADRI_POCHI ? negozi : []};
