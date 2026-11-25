@@ -38676,7 +38676,7 @@ mai il kind 0 di nessuno: regola ferrea 2).
   si somma, `creato` a adesso, `promo_in_cima_canale` — dentro gli stessi
   posti di `posti_evidenza`, 1-90 giorni, l'id anche dal link
   (`_id_annuncio`)), nel gruppo e in privato. Nella pagina:
-  `inEvidenza(l)` e la cornice `.card.ev`, la fila `#evidenzaFila`
+  `inEvidenza(l)` (la cornice `.card.ev` e l'etichetta sono andate via il 25 nov 2026), la fila `#evidenzaFila`
   (`renderEvidenza`, solo vetrina nuda), le voci `vociNegoziPromossi` in
   «Da scoprire» e in `consigliatiPubblicati` (`promo: true`, banner e
   logo da `/foto/`), `aTurno` (il turno per apertura, `turnoPromo`), il

@@ -222725,12 +222725,13 @@ def prove_promozioni():
 
     # ---- 7. L'APP -----------------------------------------------------
     # L'ETICHETTA SE NE VA ANCHE DA RICERCHE E CATEGORIE (25 nov 2026,
-    # Andrea: «creava solo confusione»): resta la cornice, i badge di
-    # stato tornano nel loro angolo
-    prova("la card promossa non porta piu' l'etichetta, e la classe mai da "
-          "esaurita", (True, 0, 0),
-          ("const ev = !esa && inEvidenza(l);" in mini,
-           mini.count("card-evidenza"), mini.count("){top:32px}")))
+    # Andrea: «creava solo confusione»), i badge di stato tornano nel loro
+    # angolo; e poi la cornice («ok», lo stesso giorno): la card promossa
+    # fuori dalla mensola e' una card come le altre
+    prova("la card promossa non porta piu' ne' l'etichetta ne' la cornice",
+          (0, 0, 0, 0),
+          (mini.count("card-evidenza"), mini.count("){top:32px}"),
+           mini.count(".card.ev"), mini.count("${ev?' ev':''}")))
     # «anzi più ravvicinati i paragrafi» (Andrea, 24 nov 2026 sera): sul
     # telefono «In evidenza» sale verso la card grande e le categorie
     # verso «In evidenza», senza toccare il CSS di «In evidenza»
@@ -223352,13 +223353,11 @@ INSERT INTO annunci VALUES
           (mini.count("#scoprireQuadri{margin-top:-4px}"),
            mini.count("#scoprireQuadri{margin-top:-12px}")))
     prova("...le card della fila sollevate dall'ombra, senza etichetta e "
-          "senza cornice (nella griglia restano)",
-          (True, True, True, True),
+          "senza cornice (dal 25 nov nemmeno nella griglia)",
+          (True, True, True),
           ("#evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}" in _css,
-           # l'etichetta non c'e' piu' da nessuna parte (25 nov 2026)
            "card-evidenza" not in mini,
-           "#evidenzaSez .card.ev{outline:none}" in _css,
-           ".card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}" in _css))
+           ".card.ev" not in mini))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",
           True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
 

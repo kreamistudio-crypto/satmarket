@@ -96045,3 +96045,11 @@ SCARTATO. Mostrare nel foglio anche il prezzo dello scalino dopo o i posti liber
 PROVATO. `prove_promozioni` (la tabella posto per posto delle tre scale, i 15 giorni, le coppie storte, la scala dal pannello, i presi girati su un database finto, l'ordine guardie → scalino → ripresa → fattura, i testi, le anteprime, l'icona, niente più `card-evidenza`); `prove_scoprire` (l'aria-label «Mensola»); suite intera e i collaudi `collaudo_promozioni` (lo scalino che sale con due posti presi, chi allunga che paga lo scalino degli altri, In cima e Da scoprire allo scalino dopo, il «Fatto!» del bot), `collaudo_vetrina_pulita`, `collaudo_coda_vetrina`, `collaudo_sottocategorie_vetrina`, `collaudo_sponsor`, `collaudo_leve_pannello`. Scatti a 360×785 senza fascia del collaudo e un video delle tre anteprime in /mnt/project-files/promozioni/ (mensola-foglio-1.png, mensola-foglio-2.png, mensola-animazioni.mp4).
 
 DA GUARDARE. Il config del VPS prima della promozione (DA-FARE-ANDREA 34). Il conto di «In cima» guarda solo le promozioni pagate, non i regali di `/promossi evidenza`, che pure portano in cima: voluto, il regalo non deve alzare il prezzo a chi paga.
+
+## Via anche la cornice arancio delle card promosse (25 nov 2026, cantiere cornice-via; Andrea: «Ok.» alla domanda «fuori dalla mensola la card promossa ha ancora la cornice arancio: se vuoi tolgo anche quella»)
+
+COSA. Dopo l'etichetta «In evidenza» (cantiere mensola-a-step, lo stesso giorno) se ne va anche la cornice arancio `.card.ev` che la card promossa aveva in ricerche e categorie: fuori dalla mensola una card promossa è una card come le altre. Con la cornice è sparita la classe `ev` sulla card (nessun CSS la usava più) e la regola che la spegneva dentro la mensola. `inEvidenza(l)` resta: la usa `nellaFilaEvidenza` per non ripetere in griglia chi è sulla mensola.
+
+PERCHÉ. «Ok.» di Andrea è stato letto come il sì alla domanda appena fatta; la cornice senza l'etichetta era un segno che non spiegava niente, come l'etichetta che «creava solo confusione».
+
+PROVATO. `prove_promozioni` (niente etichetta, niente `.card.ev`, niente classe), `prove_scoprire` (la fila senza cornice), suite intera e i collaudi della vetrina.

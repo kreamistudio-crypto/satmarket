@@ -1549,7 +1549,6 @@
   @media (max-width:767px){
     #evidenzaSez .ev-strip{--ev-larga:calc((100vw - var(--pad) - 20px) / 2.5)}
   }
-  #evidenzaSez .card.ev{outline:none}
   /* IL FOGLIO DEL MERCATINO (25 nov 2026, cantiere fascia-p2p). Dalle
      categorie in giu' il mercatino sta su un foglio un po' piu' chiaro
      della pagina, con gli angoli di sopra tondi, un'ombra che lo stacca
@@ -2043,14 +2042,12 @@
      reduced-motion) e, dal lug 2026, nemmeno il countdown: in
      griglia basta la percentuale, il tempo che resta lo dice la
      scheda. */
-  /* «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento): la cornice
-     arancio ₿ della card promossa, fuori dalla mensola. La cornice sta
-     PRIMA delle sorelle: una card in lampo o in asta tiene la sua
-     (stessa forza, vince l'ultima). L'ETICHETTA «In evidenza» se n'e'
-     andata il 25 nov 2026 anche da ricerche e categorie (Andrea: «creava
-     solo confusione»; dalla mensola era gia' sparita il 24): i badge di
-     stato tornano nel loro angolo. */
-  .card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}
+  /* «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento): la card
+     promossa aveva l'etichetta e la cornice arancio ₿. Il 25 nov 2026 se
+     ne sono andate tutte e due anche da ricerche e categorie (Andrea:
+     l'etichetta «creava solo confusione», poi «ok» a togliere anche la
+     cornice; dalla mensola erano gia' sparite il 24): fuori dalla
+     mensola la card promossa e' una card come le altre. */
   .card-lampo{position:absolute;top:8px;left:8px;z-index:2;
     background:var(--lampo);color:#fff;border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
@@ -29302,11 +29299,9 @@ const cardHTML = l => {
   const rif = bottoneRifornisci(l);
   const jar = rif ? ''
     : bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
-  /* «IN EVIDENZA» (23 nov 2026): la classe `ev` di una promozione
-     PAGATA, che fuori dalla mensola da' la cornice arancio (vedi il CSS).
-     L'etichetta «In evidenza» non c'e' piu' dal 25 nov 2026. Mai
-     sull'esaurito, che non si compra e non si promuove. */
-  const ev = !esa && inEvidenza(l);
+  /* «IN EVIDENZA» (23 nov 2026): la card promossa aveva la classe `ev`,
+     con l'etichetta e la cornice arancio; dal 25 nov 2026 niente dei due
+     (vedi il CSS), e la classe se n'e' andata con loro. */
   /* LA CARD E' UN COLLEGAMENTO VERO (ago 2026): l'<a> avvolge foto e
      testo, i due BOTTONI restano fuori — contenuto interattivo dentro
      un <a> e' HTML non valido — mentre il badge di stato ${flash}, che
@@ -29316,7 +29311,7 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${ev?' ev':''}${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
