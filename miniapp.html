@@ -85947,7 +85947,12 @@ function viaEuroPasso(o){
   if (!o || P2P_FINALI.indexOf(o.stato) >= 0 || o.stato === 'rilasciato') return 'fine';
   if (o.stato === 'euro_inviati') return 'controllo';
   /* (25 nov 2026) con l'annullo chiesto da una parte lo scambio e' ancora
-     attivo: si resta sul pagamento, col tasto per accettare */
+     attivo: si resta sul pagamento, col tasto per accettare. Ma se la
+     richiesta e' arrivata a euro gia' segnati (`primaAnnullo`, lo stesso
+     giudice di `azioniDisponibili`) il gesto e' fatto: si resta sul
+     controllo, e non si torna a «Manda» */
+  if ((o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto')
+      && o.primaAnnullo === 'euro_inviati') return 'controllo';
   if (o.stato === 'attivo' || o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto')
     return recapitoEuroArrivatoP2P(o) ? 'paga' : 'attesa';
   if (['prendo', 'attesa_mia_fattura', 'attesa_hold_venditore'].indexOf(o.stato) >= 0) return 'attesa';

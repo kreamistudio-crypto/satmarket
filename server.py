@@ -79060,6 +79060,15 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
             # che inciampa non ferma il battito (la lezione dei solleciti)
             try:
                 perche = _promemoria_recensione_p2p_fermo(con, r)
+                # (25 nov 2026, via-euro-annullo) chi ha pagato in euro un
+                # oggetto del mercatino lo scambio non lo vede, e la sua
+                # pagina — dove sta la recensione — non gliela si apre: il
+                # promemoria non gli parte (la recensione dell'oggetto ha
+                # la strada sua, quella del mercatino)
+                _ve = globals().get("_ordine_via_euro")
+                if not perche and _ve and _ve(con, r["ordine"], r["tg_id"]):
+                    perche = ("ha pagato in euro un acquisto del mercatino: lo "
+                              "scambio non lo vede")
                 if not perche:
                     promemoria = _testo_promemoria_recensione_p2p(
                         _nome_altro_p2p(con, r["ordine"], r["tg_id"], adesso))
