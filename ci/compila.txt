@@ -242,3 +242,4 @@ collaudo_nascondi_annuncio.py
 collaudo_foto_varianti.py
 collaudo_scorta_codici.py
 collaudo_quadro_servizi.py
+collaudo_richieste.py

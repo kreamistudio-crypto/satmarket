@@ -94,6 +94,17 @@ TAPPO_LINK = "https://t.me/TappoBarattoloBot"
 # --- Anthropic (ricerca AI in linguaggio naturale) -------------------
 ANTHROPIC_API_KEY = "INCOLLA_QUI_LA_API_KEY"
 MODELLO_RICERCA = "claude-haiku-4-5"
+# La moderazione AI degli annunci (lo strato 2, dopo il filtro parole):
+# SPENTA di serie dal 25 nov 2026 (scelta di Andrea). True la riaccende.
+MODERAZIONE_AI = False
+
+# --- «Cerco»: le richieste di chi cerca (25 nov 2026) ----------------
+# Chi non trova una cosa la scrive; Haiku sceglie fra chi vende cose
+# simili i 5 venditori adatti e il bot li avvisa. Aperta a tutti;
+# RICHIESTE_SOLO_MODERATORI = True la richiude ai moderatori.
+RICHIESTE = True
+RICHIESTE_SOLO_MODERATORI = False
+RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
 
 # --- L'assistente del bot (28 ott 2026, cantiere bot-assistente) -----
 # Chi scrive una domanda al bot riceve la risposta di Claude, che si

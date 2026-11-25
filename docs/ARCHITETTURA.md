@@ -38840,3 +38840,41 @@ mai il kind 0 di nessuno: regola ferrea 2).
   non ce n'è uno, senza imporre la scelta; la cancellazione porta via i
   due file. Le foto hanno la forma `av_<negozio>_<millisecondi>.jpg`.
   Leve: `PROFILO_MIO_ATTIVO` (accesa di serie), `PROFILO_MIO_GIORNI` (30).
+- «CERCO», LE RICHIESTE DI CHI CERCA (25 nov 2026, cantiere richieste):
+  chi non trova una cosa la scrive (`testo` 4-140, categoria, budget in
+  sats facoltativo) e la richiesta VA da chi può avercela invece di
+  restare in bacheca. Tabelle: `richieste` (stato aperta | chiusa |
+  scaduta, `scade` a 14 giorni, `avvisati`, `avviso_id` = il gemello in
+  `avvisi_ricerca`), `richieste_avvisati` (chi ha già avuto l'avviso:
+  mai due volte), `richieste_offerte` (gli annunci collegati),
+  `richieste_muti` (chi non vuole avvisi). Il giro: `_candidati_richiesta`
+  (prefiltro nel database, max `RICHIESTE_PREFILTRO` = 20: punteggio 2
+  per la stessa categoria più le parole della richiesta che aprono una
+  parola del titolo dei suoi annunci attivi; fuori chi chiede, i muti,
+  chi è in ferie, chi è già stato avvisato e chi ha già avuto
+  `RICHIESTE_TETTO_GIORNO` = 3 avvisi nelle ultime 24 ore), poi
+  `_scegli_venditori` (Haiku, `RICHIESTE_MODELLO`, sceglie i
+  `RICHIESTE_VENDITORI` = 5; senza chiave, con un errore o con una
+  risposta storta prende i primi 5 del prefiltro: FAIL-OPEN, l'avviso
+  parte comunque) e `_avvisa_venditori_richiesta` (`notifica` con il
+  bottone «Offri» → `link_telegram("cerco", id)` → `/?cerco=<id>`). Il
+  gemello in `avvisi_ricerca` (se ci sono parole e c'è posto fra i 5
+  avvisi dell'utente) fa il resto: un annuncio NUOVO che combacia avvisa
+  chi cerca col giro di sempre; chiusa o scaduta la richiesta, il gemello
+  se ne va con lei (`_chiudi_richieste_scadute`, pigra, a ogni lettura).
+  L'OFFERTA È UN ANNUNCIO NORMALE: la pubblicazione porta `richiesta_id`,
+  `collega_offerta_richiesta` scrive la riga e avvisa chi cerca (solo
+  annuncio attivo; in revisione la riga si scrive, l'avviso no). Si
+  compra col deposito di garanzia: niente stati nuovi. Rotte:
+  `GET/POST /api/richieste`, `POST /api/richieste/{id}/chiudi`,
+  `POST /api/me/richieste-muto`; la porta la dice `/api/me` (`richieste`,
+  da `richieste_per`). Filtri: `termine_vietato` e, se accesa,
+  `moderazione_ai`. Leve: `RICHIESTE` (accesa di serie),
+  `RICHIESTE_SOLO_MODERATORI` (False: aperta a tutti da subito per
+  scelta di Andrea; True la richiude a chi passa `e_admin`), `RICHIESTE_MODELLO`. Nello stesso cantiere
+  `MODERAZIONE_AI` (SPENTA di serie, scelta di Andrea): spenta,
+  `moderazione_ai` e `moderazione_ai_lotto` escono subito. Il client: il
+  riquadro «Cerco» sotto «Offerte» e «Sconti» (`CERCO_RIQUADRO`, la sua
+  etichetta esce dal banner solo se «Sconti» c'è), la vista `cerco`, il
+  bottone nella ricerca vuota (`chiediloATutti`), la nota in Vendi
+  (`offertaRichiesta`).
