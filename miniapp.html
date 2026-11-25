@@ -1552,6 +1552,21 @@
   #evidenzaSez .card.ev .card-evidenza{display:none}
   #evidenzaSez .card.ev{outline:none}
   #evidenzaSez .card.ev :is(.card-lampo,.card-sconto,.card-asta,.card-ferie,.card-ultimo){top:8px}
+  /* IL FOGLIO DEL MERCATINO (25 nov 2026, cantiere fascia-p2p). Dalle
+     categorie in giu' il mercatino sta su un foglio un po' piu' chiaro
+     della pagina, con gli angoli di sopra tondi, un'ombra che lo stacca
+     da «In evidenza», un filo arancio sul bordo e la luce arancio che
+     scende dal bordo: Andrea voleva che le categorie si capisse che
+     filtrano «tutta la parte sotto» (prima sembravano «una fascia a sé
+     stante»). Fra tre prove «il foglio 3 è bellissimo»; poi, provate le
+     varianti senza lo spazio sotto la mensola di «In evidenza» (attaccato,
+     al posto della mensola, dritto), «mi piaceva di più con lo spazietto
+     in mezzo»: resta questo. Uguale nei due temi (il foglio mescola la
+     card e la pagina del tema). */
+  #foglioMerc{margin-top:10px;padding-top:4px;border-radius:26px 26px 0 0;
+    background:radial-gradient(80% 140px at 50% 0,rgba(247,147,26,.20),rgba(247,147,26,0) 100%),
+      color-mix(in srgb,var(--card) 45%,var(--bg));
+    box-shadow:0 -10px 24px rgba(0,0,0,.30),inset 0 1px 0 rgba(247,147,26,.35)}
   /* I QUADRATI DEI NEGOZI sotto la card grande (23 nov 2026, vedi
      renderQuadriScoprire): fermi, in una fila che si scorre col dito,
      solo sul telefono. Nessun bordo che segue la card grande (Andrea,
@@ -2716,11 +2731,43 @@
   .p2p-vt-tutti{grid-column:3;justify-self:end;white-space:nowrap;
     background:none;border:0;padding:4px 0;cursor:pointer;
     font:800 13px Nunito,sans-serif;color:var(--sats-text)}
-  /* l'interruttore della fila: quello del pannello delle leve, in piccolo
-     (sta accanto a un titolo da 11 px); il dito ha comunque 40x24 */
-  .leva-interruttore.piccola{width:40px;height:24px}
-  .leva-interruttore.piccola span{top:3px;left:3px;width:18px;height:18px}
-  .leva-interruttore.piccola.su span{transform:translateX(16px)}
+  /* LA FASCIA A SE' (25 nov 2026, cantiere fascia-p2p; Andrea: «Troppo
+     confusionario messo lì», «con una fascia a sé stante, come abbiamo
+     fatto per le card in evidenza, una cosa diversa dal resto», e fra
+     quattro prove «Bellissimo il B»). La fila sta sotto «Più recenti» e
+     «Filtro», subito prima delle card del mercatino, larga quanto lo
+     schermo: una luce arancio che SCENDE DALL'ALTO (quella di «In
+     evidenza» sale da sotto, cosi' le due fasce non si confondono), un
+     filo di luce sul bordo di sopra e un'ombra leggera ai due bordi. Le
+     card hanno l'ombra profonda delle card in evidenza. Spenta, restano
+     titolo e interruttore dentro la stessa luce. Uguale nei due temi. */
+  #p2pVetrinaSez{margin:14px 0 10px;
+    background:radial-gradient(70% 120px at 50% 0,rgba(247,147,26,.30),rgba(247,147,26,0) 100%),
+      linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.18));
+    box-shadow:inset 0 1px 0 rgba(247,147,26,.25)}
+  #p2pVetrinaSez .p2p-vt-testa{padding-top:14px}
+  #p2pVetrinaSez .p2p-vt-fila{padding-top:12px;padding-bottom:22px}
+  #p2pVetrinaSez .p2p-vt-fila .card{box-shadow:0 12px 20px rgba(0,0,0,.42),0 3px 6px rgba(0,0,0,.25)}
+  /* spenta: lo stesso respiro sopra e sotto, titolo e interruttore in
+     mezzo alla fascia (Andrea: «mettimi la scritta e il toggle in mezzo a
+     quella banda lì quando è spenta») */
+  #p2pVetrinaSez.spenta .p2p-vt-testa{padding-top:12px;padding-bottom:12px}
+  /* L'INTERRUTTORE COL BITCOIN (25 nov 2026, cantiere fascia-p2p): una
+     scanalatura scura e una moneta ₿ che corre a destra e si accende
+     d'arancio; spenta e' grigia a sinistra. Il dito ha 56x30. */
+  .p2p-vt-btc{position:relative;flex:0 0 auto;width:56px;height:30px;border-radius:999px;
+    border:0;padding:0;cursor:pointer;background:color-mix(in srgb,var(--bg) 60%,#000);
+    box-shadow:inset 0 2px 5px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06);
+    transition:background .2s,box-shadow .2s}
+  .p2p-vt-btc span{position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;
+    display:grid;place-items:center;font:900 15px Nunito,sans-serif;color:#fff;
+    background:linear-gradient(180deg,#9B948A,#6F6A63);box-shadow:0 2px 4px rgba(0,0,0,.45);
+    transition:transform .2s,background .2s,box-shadow .2s}
+  .p2p-vt-btc.su{background:linear-gradient(90deg,rgba(247,147,26,.55),rgba(247,147,26,.25));
+    box-shadow:inset 0 2px 5px rgba(0,0,0,.35),0 0 14px rgba(247,147,26,.35)}
+  .p2p-vt-btc.su span{transform:translateX(26px);background:linear-gradient(180deg,#FFB24A,#F7931A);
+    box-shadow:0 2px 6px rgba(0,0,0,.4),0 0 10px rgba(247,147,26,.7)}
+  @media (prefers-reduced-motion:reduce){.p2p-vt-btc,.p2p-vt-btc span{transition:none}}
   /* «Esplora per categorie» e «Scambi P2P» al centro, senza puntini
      (24 nov 2026, cantiere home-card-pulite): sopra una fila che scorre
      di lato il titolo fa da intestazione */
@@ -15112,6 +15159,15 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('evidenzaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
+    <!-- IL FOGLIO DEL MERCATINO (25 nov 2026, cantiere fascia-p2p;
+         Andrea: «sembra non si capisce che va a filtrare tutta la parte
+         sotto, sembra una fascia a sé stante», e fra tre prove «il foglio
+         3 è bellissimo»): dalle categorie in giu' tutto il mercatino
+         (categorie, strumenti, banner delle occasioni, fascia P2P, card)
+         sta su un foglio un po' piu' chiaro con gli angoli tondi e il
+         bordo acceso d'arancio, come un pannello che sale: le categorie
+         ne sono la testa. Vedi IL FOGLIO DEL MERCATINO nel CSS. -->
+    <div id="foglioMerc">
     <!-- LE CATEGORIE SOTTO «In evidenza» (23 nov 2026, Andrea: «le card
          da scoprire proprio prima delle icone di esplora per categorie,
          e le categorie prima degli scambi P2P e degli oggetti»): in cima
@@ -15165,36 +15221,6 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('lavStrip',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
           onclick="scorriFila('lavStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
-    <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
-         Nasce spenta: la accende renderVetrinaP2P solo con la leva del
-         server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
-    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): fino al 24 nov 2026 una
-         riga sua, «Scambi P2P nascosti · Mostra»; adesso e' l'interruttore
-         accanto al titolo (cantiere home-card-pulite, Andrea: «affianco
-         alla scritta scambi P2P metti un tasto tipo toggle per nascondere
-         quelle card velocemente»): spento, restano titolo e interruttore -->
-    <div id="p2pVetrinaSez" style="display:none">
-      <div class="p2p-vt-testa">
-        <div class="p2p-vt-titolo">
-          <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
-          <span id="p2pVetrinaLeva" class="p2p-vt-leva"></span>
-        </div>
-        <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
-      </div>
-      <!-- LE FRECCE ANCHE QUI (6 ott 2026, ritocco di Andrea): dal PC la
-           fila mostra quattro card e le altre restano di lato, e col
-           mouse non c'era modo di arrivarci. Lo stesso guscio, le stesse
-           frecce e la stessa rotellina delle due strisce di sopra (vedi
-           LE FRECCE DELLE DUE STRISCE): nascono spente, sul telefono non
-           esistono, e le accende il solo blocco del web. -->
-      <div class="strip-wrap" id="p2pVetrinaGuscio">
-        <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
-        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
-          onclick="scorriFila('p2pVetrinaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
-          onclick="scorriFila('p2pVetrinaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
@@ -15318,14 +15344,52 @@ document.getElementById('cartello')?.remove();</script>
         <button class="btn ghost" onclick="azzeraFiltri()">Azzera</button>
       </div>
     </div>
-    <div id="mercMappaBox"></div>
     <!-- I DUE BANNER DELLE OCCASIONI (24 nov 2026, cantiere
          home-card-pulite): «Offerte a tempo» e «Sconti dei negozi»
          escono da «Da scoprire», uno sopra l'altro — sono filtri della
          griglia, e stanno SOPRA le card (24 nov notte, Andrea: dentro la
          griglia, filtrando, «fa casino con le card»). Li disegna
-         renderOccasioni; senza occasioni vive il riquadro e' spento. -->
+         renderOccasioni; senza occasioni vive il riquadro e' spento.
+         Dal 25 nov 2026 (cantiere fascia-p2p) stanno sotto «Più recenti»
+         e «Filtro», con gli altri filtri, e PRIMA della fascia P2P: tutti
+         i filtri insieme, poi gli scambi, poi le card. -->
     <div class="occ-banner" id="occasioniBanner" style="display:none"></div>
+    <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
+         Nasce spenta: la accende renderVetrinaP2P solo con la leva del
+         server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
+    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): fino al 24 nov 2026 una
+         riga sua, «Scambi P2P nascosti · Mostra»; adesso e' l'interruttore
+         accanto al titolo (cantiere home-card-pulite, Andrea: «affianco
+         alla scritta scambi P2P metti un tasto tipo toggle per nascondere
+         quelle card velocemente»): spento, restano titolo e interruttore -->
+    <!-- SOTTO GLI STRUMENTI (25 nov 2026, cantiere fascia-p2p, Andrea:
+         «mettere quella riga proprio prima delle card del mercatino,
+         sotto ai toggle più recenti e il toggle del filtro»): fino a quel
+         giorno stava fra le categorie e gli strumenti. Adesso e' una
+         fascia a se' (vedi LA FASCIA A SE' nel CSS). -->
+    <div id="p2pVetrinaSez" style="display:none">
+      <div class="p2p-vt-testa">
+        <div class="p2p-vt-titolo">
+          <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
+          <span id="p2pVetrinaLeva" class="p2p-vt-leva"></span>
+        </div>
+        <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
+      </div>
+      <!-- LE FRECCE ANCHE QUI (6 ott 2026, ritocco di Andrea): dal PC la
+           fila mostra quattro card e le altre restano di lato, e col
+           mouse non c'era modo di arrivarci. Lo stesso guscio, le stesse
+           frecce e la stessa rotellina delle due strisce di sopra (vedi
+           LE FRECCE DELLE DUE STRISCE): nascono spente, sul telefono non
+           esistono, e le accende il solo blocco del web. -->
+      <div class="strip-wrap" id="p2pVetrinaGuscio">
+        <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('p2pVetrinaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('p2pVetrinaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+    <div id="mercMappaBox"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
       <img class="empty-mascotte" src="/assets/mascotte.jpeg" alt="" onerror="this.remove()">
@@ -15349,6 +15413,7 @@ document.getElementById('cartello')?.remove();</script>
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
          schermo si carica la pagina di annunci successiva -->
     <div id="gridSentinella" style="height:1px"></div>
+    </div>
   </div>
 
   <!-- La vista SFOGLIA non esiste piu' (ago 2026, decisione di
@@ -116648,11 +116713,18 @@ function filaCardP2P(html, spenta){
   sez.style.display = (html.length || spenta) ? '' : 'none';
   const guscio = el('p2pVetrinaGuscio');
   if (guscio) guscio.style.display = spenta ? 'none' : '';
-  /* l'interruttore si riscrive intero: lo stato sta tutto nel markup */
+  /* spenta, la fascia resta col solo titolo: `spenta` le da' lo stesso
+     respiro sopra e sotto, cosi' titolo e interruttore stanno in mezzo
+     (25 nov 2026, cantiere fascia-p2p) */
+  sez.classList[spenta ? 'add' : 'remove']('spenta');
+  /* l'interruttore si riscrive intero: lo stato sta tutto nel markup.
+     Dal 25 nov 2026 e' quello COL BITCOIN (`p2p-vt-btc`, Andrea fra
+     quattro prove: «va bene l'interruttore col Bitcoin»): il pallino e'
+     una moneta ₿ arancio che si illumina, grigia da spenta */
   const leva = el('p2pVetrinaLeva');
-  if (leva) leva.innerHTML = `<button type="button" class="leva-interruttore piccola${spenta ? '' : ' su'}"
+  if (leva) leva.innerHTML = `<button type="button" class="p2p-vt-btc${spenta ? '' : ' su'}"
     role="switch" aria-checked="${spenta ? 'false' : 'true'}" aria-label="Scambi P2P nella home"
-    onclick="setFilaP2P(${spenta ? 'true' : 'false'})"><span></span></button>`;
+    onclick="setFilaP2P(${spenta ? 'true' : 'false'})"><span aria-hidden="true">₿</span></button>`;
   fila.innerHTML = html.join('');
   /* le frecce seguono il contenuto, come nelle due strisce: sei card
      o due cambiano quanto c'e' da scorrere, e la riga riporta all'inizio */
