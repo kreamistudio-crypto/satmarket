@@ -1235,20 +1235,6 @@ sudo systemctl restart barattolo && sleep 5 && curl -s -o /dev/null -w 'salute %
 Atteso `BANNER_TEST = False`, `ok` e `salute 200`. Riaprendo l'app il
 riquadro non compare più.
 
-## 33. Il quadro dei servizi: i battiti sulle quattro macchine e n8n nel backup del relay (25 nov 2026, cantiere quadro-servizi; Andrea: «un monitor di tutte le applicazioni che abbiamo [...] e un piano di backup di disaster and recovery»)
-
-**Perché.** Il cassetto «🩺 Servizi» del pannello admin vede il solo VPS
-finché le altre macchine non battono; e il VPS morto lo può dire solo il
-relay, da fuori. n8n non era in nessun backup. DOPO la promozione su main.
-
-**I comandi**, uno alla volta e in quest'ordine, stanno in PRODUZIONE,
-«IL QUADRO DEI SERVIZI E I BATTITI»: il segreto negli appunti dal PC, la
-riga sul VPS (con la copia prima) e il riavvio, poi su ogni macchina il
-file del segreto, i file dal repo, il primo giro a mano (`battito: vivi
-…; fermi nessuno`) e il timer. Per ultimo il backup del relay con n8n,
-dopo aver guardato quanto pesa `/opt/n8n-barattolo/dati`.
-Il piano «se muore X» è `deploy/SE-MUORE.md`.
-
 ## 34. I prezzi a scalini delle promozioni: guardare il config del VPS (25 nov 2026, cantiere mensola-a-step)
 
 **Perché.** Con la prossima promozione i prezzi delle tre promozioni

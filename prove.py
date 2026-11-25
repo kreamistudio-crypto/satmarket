@@ -133533,6 +133533,26 @@ def prove_quadro_servizi():
     prova("il cassetto 🩺 Servizi c'e' e il pannello lo chiede", True,
           "function boxServizi()" in mini and "${boxServizi()}" in mini
           and "`${API_BASE}/admin/servizi`" in mini)
+    # lo stesso cassetto nella pagina /admin (25 nov 2026 sera): dalla
+    # stessa rotta, con le stesse parole approvate, e i nomi escapati
+    adm = open(os.path.join(QUI, "admin.html"), encoding="utf-8").read()
+    srv = adm[adm.index("function sezioneServizi()"):]
+    srv = srv[:srv.index("\n}\n")]
+    prova("il cassetto 🩺 Servizi c'e' anche in /admin, dalla stessa rotta",
+          True, "fetch('/api/admin/servizi'" in adm
+          and "caricaServizi();" in adm
+          and '<div id="sezServizi">${sezioneServizi()}</div>' in adm)
+    prova("in /admin le parole del cassetto sono quelle approvate", True,
+          all(t in srv for t in (
+              "Ogni macchina manda un segnale ogni cinque minuti. Se uno "
+              "smette, arriva un avviso nella stanza degli errori.",
+              "Non ha mai dato segni di vita: il battito non è installato.",
+              "uptime 30 giorni", "Ultimo backup", "🔐 Certificati",
+              "non ancora controllato", "non si legge (scaduto o non valido)",
+              "da guardare", "tutto ok")))
+    prova("in /admin nome, macchina e dominio passano da esc()", True,
+          "esc(v.nome)" in srv and "esc(v.dove)" in srv
+          and "esc(c.host)" in srv)
     relay = open(os.path.join(QUI, "deploy", "relay", "backup-relay.sh"),
                  encoding="utf-8").read()
     prova("il backup del relay prende n8n, e si ferma senza il suo "
