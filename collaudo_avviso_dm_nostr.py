@@ -261,12 +261,22 @@ def main():
     loop = asyncio.new_event_loop()
     threading.Thread(target=loop.run_forever, daemon=True).start()
     orologio = asyncio.run_coroutine_threadsafe(S.orologio_avviso_dm(), loop)
+    # SI ASPETTA ANCHE IL GIRO DELLA GUARDIA SUL RELAY VERO (25 nov 2026,
+    # CI rossa di 69a98bab): `_dm_guardia` fa partire i fili di A e B e
+    # SOLO DOPO arriva al relay vero e lo segna «simulato». Sul runner
+    # lento i due fili erano gia' «connesso» mentre la guardia non aveva
+    # ancora toccato il terzo: lo stato letto era None, non un errore
+    # dell'app. Il giro si aspetta fino a che lo stato del vero e' scritto
+    # (qualunque esso sia), poi si guarda COSA dice: se l'app smettesse di
+    # segnarlo «simulato» resterebbe rosso.
     prova("i due relay di casa sono in ascolto, quello pubblico vero e' "
           "«simulato»: nessuno gli ha bussato, e il suo filo non e' "
           "nemmeno nato",
           (True, "simulato", None, None),
           (aspetta(lambda: all(S._DM_ASCOLTO.get(r, {}).get("stato")
-                               == "connesso" for r in (RELAY_A, RELAY_B))),
+                               == "connesso" for r in (RELAY_A, RELAY_B))
+                   and S._DM_ASCOLTO.get(RELAY_VERO, {}).get("stato")
+                   not in (None, "parte")),
            S._DM_ASCOLTO.get(RELAY_VERO, {}).get("stato"),
            WsCartone.aperte.get(RELAY_VERO),
            S._DM_ASCOLTO.get(RELAY_VERO, {}).get("filo")))

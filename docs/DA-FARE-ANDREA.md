@@ -1248,3 +1248,26 @@ file del segreto, i file dal repo, il primo giro a mano (`battito: vivi
 …; fermi nessuno`) e il timer. Per ultimo il backup del relay con n8n,
 dopo aver guardato quanto pesa `/opt/n8n-barattolo/dati`.
 Il piano «se muore X» è `deploy/SE-MUORE.md`.
+
+## 34. I prezzi a scalini delle promozioni: guardare il config del VPS (25 nov 2026, cantiere mensola-a-step)
+
+**Perché.** Con la prossima promozione i prezzi delle tre promozioni
+vanno a scalini (più posti presi, più costa) e «In evidenza» si chiama
+«Mensola». Le leve vecchie dei prezzi fissi (`PROMO_IN_CIMA_SATS`,
+`PROMO_EVIDENZA_SATS`, `PROMO_SCOPRIRE_SATS`) non le legge più nessuno:
+se sono scritte nel config del VPS restano lì innocue, ma ingannano chi
+le legge. Le scale nuove valgono di serie dal codice.
+
+**Sola lettura** (prima della promozione):
+```
+grep -n "^PROMO_" /srv/barattolo/config.py
+```
+Se non esce niente, o escono solo `PROMO_IN_CIMA_ORE`,
+`PROMO_EVIDENZA_POSTI`, `PROMO_SCOPRIRE_GIORNI` e `PROMO_GIORNI_VENDITORE`,
+non c'è niente da fare. Se escono le tre righe `..._SATS`, si possono
+togliere a mano (copia del config prima) quando vuoi: non cambiano
+niente.
+
+**Dopo la promozione** si vede nel pannello «⚙️ Stato delle leve»,
+gruppo delle promozioni: le tre scale coi loro scalini.
+

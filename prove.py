@@ -37372,8 +37372,9 @@ def _censimento(acceso, dopo=None):
               "raccolta_min_garantita_euro", "raccolta_vendite_min",
               "raccolta_zap_max_sats", "_raccolte_leve",
               # le promozioni a pagamento (23 nov 2026): la riga dei
-              # prezzi di In evidenza CHIAMA `listino_evidenza()`
-              "listino_evidenza",
+              # prezzi di In evidenza CHIAMA `listino_evidenza()`, e dal
+              # 25 nov le scale `scalini_promo()` e `prezzo_a_scalini()`
+              "scalini_promo", "prezzo_a_scalini", "listino_evidenza",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -44537,6 +44538,30 @@ def prove_seo():
     ds = pezzo_js(testo_mini, "async function doSearch(){", "\n}\n")
     prova("cercare spegne il reparto", True,
           "if (q && activeCat !== 'Tutto') spegniReparto();" in ds)
+    # L'INVIO PORTA AI RISULTATI (25 nov 2026, cantiere scatti-home,
+    # Andrea: «in automatico l'app dovrebbe scorrere verso il basso e
+    # mostrarmi ciò che ha trovato»): la bandierina dello scaffale, armata
+    # SOLO con una query (dopo il ritorno del campo vuoto), in demo DOPO
+    # il disegno e coi dati vivi PRIMA della domanda — la consuma il primo
+    # renderGrid coi risultati
+    _i_vuoto = ds.find("if (!q) {")
+    _f_vuoto = ds.find("\n  }\n", _i_vuoto)
+    _i_demo = ds.find("if (DEMO) {\n    /* In demo non c'è nessun server")
+    _f_demo = ds.find("\n  }\n", _i_demo)
+    prova("l'invio con una query porta ai risultati: in demo dopo il disegno, "
+          "coi dati vivi prima della domanda, a campo vuoto no",
+          [True, True, True],
+          [0 < _f_vuoto < _i_demo
+           and "armaScrollReparto" not in ds[:_f_vuoto],
+           "renderGrid();\n    armaScrollReparto(true);\n    return;"
+           in ds[_i_demo:_f_demo],
+           0 < _f_demo < ds.find("armaScrollReparto(true);", _f_demo)
+           < ds.find("loadListings()", _f_demo)])
+    # L'INVIO CHIUDE LA TASTIERA (25 nov 2026, cantiere tastiera-ricerca):
+    # il campo perde il fuoco a ogni invio, prima di ogni ramo
+    prova("l'invio chiude la tastiera, a ogni invio e prima di ogni ramo", True,
+          0 < ds.find("el('q').blur();") < ds.find("if (q && activeCat")
+          and ds.find("el('q').blur();") < ds.find("if (!q) {"))
     sr = pezzo_js(testo_mini, "function spegniReparto(){", "\n}\n")
     # NIENTE setCat qui dentro: ricaricherebbe la prima pagina intera
     # in GARA con la fetch dei risultati — vincerebbe chi arriva
@@ -44670,6 +44695,13 @@ def prove_seo():
         "@media (min-width:768px) and (max-width:899px)")
     prova("nella fascia stretta il lockup cede", True,
           ".nav-logo .lockup{display:none}" in testo_mini[_if:_if + 120])
+    # LA TOPBAR STRETTA SI STRINGE LEI (25 nov 2026, cantiere logo-bordo):
+    # fra 768 e 1023 le pillole perdono aria e un punto di corpo, o il
+    # marchio esce dal bordo sinistro (misurato: 102 px a 768, 40 a 900)
+    _is = testo_mini.index("@media (min-width:768px) and (max-width:1023px){\n    nav{gap:2px}")
+    prova("fino a 1023 le pillole della topbar si stringono", (True, True),
+          ("nav button{padding:9px 9px;font-size:13px}" in testo_mini[_is:_is + 200],
+           _is > testo_mini.index("    nav button{\n      flex:0 0 auto;flex-direction:row")))
 
     # --- 16ter) IL REPARTO SI CONDIVIDE (ago 2026) -----------------
     # Le 27 pagine /categoria/{slug} esistevano dal cantiere «farsi
@@ -52391,8 +52423,29 @@ def prove_scoprire():
           (2, True, True, True),
           (mini.count("tocca: () => apriNegozioDaScoprire("),
            _ds.find("if (negozioPronto(chi))") < _ds.find("negozioInAttesa(chi);"),
-           "@keyframes negozio-sale{from{transform:translateY(100%)}" in mini,
-           "e.currentTarget.classList.remove('sale-dal-basso')" in mini))
+           "@keyframes negozio-sale{from{transform:translateY(100vh)}" in mini,
+           "if (view !== 'negozio') el('view-negozio')?.classList.remove('sale-dal-basso');" in mini))
+    # LA SALITA NON SCATTA (25 nov 2026, Andrea: «guarda come scatta»,
+    # video dal telefono): la corsa parte dal fondo dello SCHERMO (con
+    # `100%` saltava quando la pagina si allungava all'arrivo dei dati),
+    # il secondo go('negozio') di renderNegozio non spegne e riaccende la
+    # vista che sta salendo, e la classe non si toglie a corsa finita (il
+    # `fadein` ripartiva: la pagina lampeggiava) ma uscendo dal negozio
+    _go = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("la salita del negozio non riparte e non lampeggia",
+          (0, True, True, 0, 0),
+          (mini.count("translateY(100%)}to{transform:none}}"),
+           "const restaSalita = vistaNuova.classList.contains('active')\n"
+           "    && vistaNuova.classList.contains('sale-dal-basso');" in _go,
+           _go.index("if (!restaSalita) {")
+           < _go.index("document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));"),
+           mini.count("salitaNegozioFinita"),
+           mini.count('onanimationend="salita')))
+    # IL LAMPO NERO in «Da scoprire» (stesso giorno, dalla mini app): lo
+    # strato della card resta montato, niente ridipinta a fine transizione
+    prova("le card di Da scoprire tengono il loro strato (niente lampo nero)",
+          True, "transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease;\n"
+          "      will-change:transform,opacity}" in mini)
     # IL VOLO DELLA CARD (24 nov 2026, Andrea: «si ingrandisce un po', ma
     # rimane comunque il bordo» e «la parte in basso [...] falla vedere un
     # po' prima»): solo dal telefono, solo col negozio pronto, mai con gli
@@ -67548,7 +67601,7 @@ def prove_card_p2p_vetrina():
           ['<span id="p2pVetrinaLeva"' in _testa,
            _testa.index('Scambi P2P <span class="conta"') < _testa.index('id="p2pVetrinaLeva"'),
            'p2pVetrinaVia' in mini])
-    _fc = pezzo_js(mini, "function filaCardP2P(html, spenta){", "\n}\n")
+    _fc = pezzo_js(mini, "function filaCardP2P(html, spenta, attesa){", "\n}\n")
     prova("...e dice il suo stato a chi legge ad alta voce, col nome che c'era gia'", True,
           'role="switch" aria-checked="${spenta ? \'false\' : \'true\'}" aria-label="Scambi P2P nella home"' in _fc)
     # COL BITCOIN (25 nov 2026, cantiere fascia-p2p, Andrea: «va bene
@@ -67558,7 +67611,7 @@ def prove_card_p2p_vetrina():
           [True, True, True, True, False],
           ['class="p2p-vt-btc${spenta ? \'\' : \' su\'}"' in _fc,
            '<span aria-hidden="true">₿</span></button>' in _fc,
-           "sez.classList[spenta ? 'add' : 'remove']('spenta');" in _fc,
+           "sez.classList[chiusa ? 'add' : 'remove']('spenta');" in _fc,
            "#p2pVetrinaSez.spenta .p2p-vt-testa{padding-top:12px;padding-bottom:12px}" in mini,
            ".leva-interruttore.piccola" in mini])
     prova("l'interruttore vive in «Aspetto», sotto gli effetti ridotti", True,
@@ -68000,6 +68053,36 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   myTgId = null; renderVetrinaP2P();
   out.anonimoLeva = el('filaP2PRiga').innerHTML.includes('questo dispositivo');
   myTgId = 111;
+  /* IL PRIMO TOCCO (25 nov 2026, cantiere scatti-home, dal video di
+     Andrea): l'app aperta con la fascia SPENTA non ha mai chiesto la
+     fotografia, e al primo tocco la fascia senza card spariva tutta per
+     il tempo della domanda. In attesa resta com'era — in mezzo, senza
+     guscio — con l'interruttore gia' acceso; le card arrivano col giro */
+  HINT = {p2p_home_su: 1000, p2p_home_via: 2000};
+  TIMERS.length = 0; p2pVetrinaTimer = null; FETCH.length = 0;
+  p2pVetrinaFoto = null; p2pVetrinaFirma = null;
+  renderVetrinaP2P();
+  const fascia = () => ({sez: el('p2pVetrinaSez').style.display,
+    guscio: el('p2pVetrinaGuscio').style.display,
+    acceso: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'), card: conta()});
+  out.primoSpenta = fascia();
+  setFilaP2P(true);
+  out.primoTocco = fascia();
+  await giro();
+  out.primoArrivo = Object.assign(fascia(), {chiesto: FETCH.length});
+  /* ...e se la fotografia torna VUOTA la regola resta quella di sempre:
+     senza card la fascia se ne va */
+  HINT = {p2p_home_su: 1000, p2p_home_via: 2000};
+  TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaFoto = null; p2pVetrinaFirma = null;
+  renderVetrinaP2P();
+  const fotoPiena = FOTO;
+  FOTO = {eventi: [], quando: ADESSO};
+  setFilaP2P(true);
+  out.primoVuotoAttesa = el('p2pVetrinaSez').style.display;
+  await giro();
+  out.primoVuoto = el('p2pVetrinaSez').style.display;
+  FOTO = fotoPiena; HINT = {};
   out.relay = LOG.filter(x => x.startsWith('RELAY')).concat(ALLOG.filter(x => x.startsWith('RELAY')));
   out.frecce = [FRECCE.length, [...new Set(FRECCE)]];
   process.stdout.write(JSON.stringify(out));
@@ -68211,6 +68294,17 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     prova("...chi la fila non la vedrebbe non vede ne' l'interruttore ne' la sezione", ["", "none"],
           o["nonLaVede"])
     prova("...e per chi non e' entrato la scelta vale su questo dispositivo", True, o["anonimoLeva"])
+    # IL PRIMO TOCCO (25 nov 2026, cantiere scatti-home): la fascia non
+    # sparisce mentre le card arrivano, e arrivano in un colpo solo
+    prova("IL PRIMO TOCCO a fascia spenta e fotografia mai chiesta: la fascia resta "
+          "com'era, con l'interruttore gia' acceso, e le card arrivano col giro",
+          [{"sez": "", "guscio": "none", "acceso": False, "inMezzo": True, "card": 0},
+           {"sez": "", "guscio": "none", "acceso": True, "inMezzo": True, "card": 0},
+           {"sez": "", "guscio": "", "acceso": True, "inMezzo": False, "card": 1,
+            "chiesto": 1}],
+          [o["primoSpenta"], o["primoTocco"], o["primoArrivo"]])
+    prova("...e se la fotografia torna vuota la fascia se ne va, come sempre",
+          ["", "none"], [o["primoVuotoAttesa"], o["primoVuoto"]])
     prova("L'ANONIMO chiede la fotografia senza initData", [1, False], o["anonimo"])
     prova("LEVA SPENTA SUL SERVER (fotografia vuota): la fila sparisce",
           {"display": "none", "card": 0}, o["serverSpento"])
@@ -144477,7 +144571,8 @@ function nuovaImg(attr){
     dataset: {src: (attr.match(/data-src="([^"]*)"/) || [])[1] || ''},
     arrivata: !!src, attr};
   im.classList = {contains: c => im._cls.has(c),
-    toggle: (c, si) => { if (si) im._cls.add(c); else im._cls.delete(c); }};
+    toggle: (c, si) => { if (si) im._cls.add(c); else im._cls.delete(c); },
+    remove: (...cs) => cs.forEach(c => im._cls.delete(c))};
   im.getAttribute = n => n === 'src' ? (im._src || null) : null;
   Object.defineProperty(im, 'src', {get: () => im._src,
     set: v => { im._src = v; richieste.push(v); }});
@@ -144811,6 +144906,38 @@ caso('lo scorrimento', () => {
   giro();
   dice('...e il giro ricomincia: il primo rientra dall alto',
        ['attivo+entra', '-', 'esce'], classi());
+});
+
+/* LA CORSA FINITA SE NE VA (25 nov 2026, cantiere scatti-home, dal video
+   di Andrea): la home esce di scena con display:none a ogni card aperta,
+   e al ritorno il browser rigioca ogni animazione rimasta attaccata —
+   l ultima corsa si rivedeva intera. Gli ascoltatori sono quelli SCRITTI
+   SULL IMMAGINE dalla card, eseguiti come li eseguirebbe il browser
+   (this = l immagine): finita o interrotta, la corsa toglie le sue
+   classi, e il passaggio dopo corre come sempre. */
+const ascolta = (im, ev) => {
+  const m = im.attr.match(new RegExp('\\s' + ev + '="([^"]*)"'));
+  if (m) (function(codice){ eval(codice); }).call(im, m[1]);
+  return !!m;
+};
+caso('la corsa finita se ne va', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  rifai(); giro(); arrivano(); giro();
+  dice('una corsa: il primo esce e il secondo entra',
+       ['esce', 'attivo+entra', '-'], classi());
+  const im = immaginiCard();
+  dice('ogni logo ascolta la fine e l interruzione della sua corsa',
+       [true, true, true, true], [ascolta(im[0], 'onanimationend'),
+       ascolta(im[1], 'onanimationend'), ascolta(im[2], 'onanimationend'),
+       ascolta(im[2], 'onanimationcancel')]);
+  dice('...e finita la corsa le classi se ne vanno: al ritorno niente da rigiocare',
+       ['-', 'attivo', '-'], classi());
+  arrivano(); giro();
+  dice('il passaggio dopo corre come sempre', ['-', 'esce', 'attivo+entra'],
+       classi());
+  ascolta(im[1], 'onanimationcancel'); ascolta(im[2], 'onanimationcancel');
+  dice('...e una corsa interrotta a meta (la card che si apre) non resta attaccata',
+       ['-', '-', 'attivo'], classi());
 });
 
 /* SI MUOVE SOLO SE SI VEDE (set 2026, ritocco di Andrea): con meno di
@@ -214795,15 +214922,15 @@ def prove_non_hai_sats():
     pdp = _fn_js(mini, "function pannelloDaPagare(o){")
     pvo = _fn_js(mini, "function viaEuroPassoOrdine(p){")
     prova("l'ordine pagato in euro: niente fattura Lightning ma i passi dello "
-          "scambio nella pagina (attesa, dove pagare + «Ho pagato», il "
+          "scambio nella pagina (attesa, dove pagare + «Ho inviato gli euro», il "
           "controllo, la verifica), e niente annullo dell'ordine a meta'", True,
           "viaEuroScambioDellOrdine(o.id)" in pdp
           and "const v = viaEuroPassoOrdine(ve);" in pdp
           and "Sto preparando il pagamento…" in pvo
-          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho pagato</button>" in pvo
+          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho inviato gli euro</button>" in pvo
           and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
           and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
-          and "if (!v || v.orma !== box.dataset.orma) box.outerHTML = pannelloDaPagare(o);" in mini)
+          and "if (!v || v.orma !== ormaBox) box.outerHTML = pannelloDaPagare(o);" in mini)
     prog0 = (_fn_js(mini, "function viaEuroScambioDellOrdine(id){") + r"""
 const P2P_FINALI = ['annullato'];
 const tab = {
@@ -214840,7 +214967,7 @@ r.base = viaEuroScelta([O('a')], 40000, per, 0.02, {});
 r.premio = viaEuroScelta([O('a', {premium: 5}), O('b', {premium: 1})], 40000, per, 0.02, {});
 r.metodi = viaEuroScelta([O('a', {metodi: ['Wise', 'Contanti']}), O('b', {metodi: ['Satispay', 'SEPA', 'Revolut'], premium: 5})], 40000, per, 0.02, {});
 r.veloci = viaEuroScelta([O('a', {metodi: ['PayPal', 'Contanti']}), O('b', {metodi: ['Revolut'], premium: 5})], 40000, per, 0.02, {});
-r.nonHo = viaEuroScelta([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['PayPal', 'Revolut'], premium: 5})], 40000, per, 0.02, {}, ['Revolut']);
+r.nonHo = viaEuroScelta([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Satispay', 'Revolut'], premium: 5})], 40000, per, 0.02, {}, ['Revolut']);
 r.nonHoTutti = viaEuroScelta([O('a', {metodi: ['Revolut']})], 40000, per, 0.02, {}, ['Revolut']);
 r.fuori = viaEuroScelta([O('a', {euro: 50, euroMax: 100}), O('b', {euroMax: 30})], 40000, per, 0.02, {});
 r.unico = viaEuroScelta([O('a', {euro: 41, euroMax: 0}), O('b', {euro: 45, euroMax: 0})], 40000, per, 0.02, {});
@@ -214865,13 +214992,14 @@ console.log(JSON.stringify(r));
     prova("un ordine a intervallo: la cifra in euro INTERI, col margine",
           ["a", 41, ["SEPA Instant"]], [r["base"]["id"], r["base"]["euro"], r["base"]["metodi"]])
     prova("...fra due, il premio piu' basso (la cifra piu' bassa)", "b", r["premio"]["id"])
-    prova("...solo i metodi VELOCI (SEPA Instant, Satispay, Revolut, PayPal), e si "
+    prova("...solo i metodi VELOCI (SEPA Instant, Satispay, Revolut), e si "
           "mostrano solo quelli: niente lenti ne' contanti",
           ["b", ["Satispay", "Revolut"]], [r["metodi"]["id"], r["metodi"]["metodi"]])
-    prova("...anche PayPal e Revolut contano (25 nov 2026, «Tutti i veloci»)",
-          ["a", ["PayPal"]], [r["veloci"]["id"], r["veloci"]["metodi"]])
+    prova("...Revolut conta (25 nov 2026, «Tutti i veloci»), PayPal no "
+          "(«leva PayPal»: si contesta dopo, coi sats gia' partiti)",
+          ["b", ["Revolut"]], [r["veloci"]["id"], r["veloci"]["metodi"]])
     prova("...«Non ho Revolut»: quel metodo sparisce, si passa all'offerta dopo",
-          ["b", ["PayPal"], None],
+          ["b", ["Satispay"], None],
           [r["nonHo"]["id"], r["nonHo"]["metodi"], r["nonHoTutti"]])
     prova("...la cifra deve stare nell'intervallo", None, r["fuori"])
     prova("...un importo unico va bene solo se copre ed e' entro un euro", ["a", 41],
@@ -214884,10 +215012,10 @@ console.log(JSON.stringify(r));
     # --- i passi dopo «Continua» (secondo giro) ------------------------------
     rp = _fn_js(mini, "function renderViaEuroPasso(){")
     prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
-          "…», «Ho pagato», «… sta controllando il pagamento», «Puoi chiudere "
+          "…», «Ho inviato gli euro», «… sta controllando il pagamento», «Puoi chiudere "
           "l'app, ti avvisiamo noi.»", True,
           "Sto preparando il pagamento…" in rp and "'Manda ' + String(o.euro) + ' € a ' + nome" in rp
-          and ">Ho pagato</button>" in rp and "' sta controllando il pagamento'" in rp
+          and ">Ho inviato gli euro</button>" in rp and "' sta controllando il pagamento'" in rp
           and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
     prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
           "«Ho pagato» e' il suo gesto", True,
@@ -215067,7 +215195,7 @@ const r = {};
 r.base = viaEuroFissi([O('a'), O('b', {premium: 5}), O('c', {euroMax: 300, euro: 10}),
   O('d', {euro: 42}), O('e', {metodi: ['Wise']}), O('f', {lato: 'buy'}), O('g'),
   O('h', {sats: 50000})], 40000, per, 0.02, {g: {}});
-r.nonHo = viaEuroFissi([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Revolut', 'PayPal'], premium: 5})],
+r.nonHo = viaEuroFissi([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Revolut', 'Satispay'], premium: 5})],
   40000, per, 0.02, {}, ['Revolut']).map(c => c.id);
 r.pari = viaEuroFissi([O('a', {creato: 5}), O('b', {creato: 9})], 40000, per, 0.02, {}).map(c => c.id);
 r.storti = [viaEuroFissi([O('a')], 0, per, 0.02, {}).length, viaEuroFissi(null, 1, per, 0.02, {}).length];
@@ -222582,13 +222710,29 @@ def prove_promozioni():
     esempio = open("config_esempio.py", encoding="utf-8").read()
 
     # ---- 1. LE LEVE, coi prezzi decisi da Andrea il 23 nov ----------
-    for riga in ("PROMOZIONI_ATTIVE = True", "PROMO_IN_CIMA_SATS = 5_000",
+    # (i prezzi fissi del 23 nov sono diventati SCALINI il 25 nov: i
+    # numeri proposti quel giorno e approvati da Andrea)
+    for riga in ("PROMOZIONI_ATTIVE = True",
+                 "PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))",
                  "PROMO_IN_CIMA_ORE = 24",
-                 "PROMO_EVIDENZA_SATS = {7: 15_000, 15: 25_000}",
-                 "PROMO_EVIDENZA_POSTI = 8", "PROMO_SCOPRIRE_SATS = 50_000",
+                 "PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}",
+                 "PROMO_EVIDENZA_POSTI = 8",
                  "PROMO_SCOPRIRE_GIORNI = 30"):
         prova(f"la leva c'e' col suo valore: {riga}", True, riga in src)
         prova(f"...e nel config d'esempio", True, riga in esempio)
+    for riga in ("PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),\n"
+                 "                          (5, 25_000), (6, 35_000), (7, 50_000))",
+                 "PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),\n"
+                 "                          (3, 50_000), (4, 70_000), (5, 100_000))"):
+        prova(f"la scala c'e' nel config d'esempio: {riga.split(' =')[0]}",
+              True, riga in esempio)
+        prova("...e nel server, con gli stessi numeri", True,
+              riga.replace("\n                          ",
+                           "\n                              ") in src)
+    prova("i prezzi fissi di prima non li legge piu' nessuno", (0, 0, 0),
+          tuple(codice(src).count(f"import {n}") for n in (
+              "PROMO_IN_CIMA_SATS", "PROMO_EVIDENZA_SATS",
+              "PROMO_SCOPRIRE_SATS")))
     for col in ('"promo_scoprire_fino INTEGER DEFAULT 0"',
                 '"promo_consigliato INTEGER DEFAULT 0"',
                 '"evidenza_fino INTEGER DEFAULT 0"'):
@@ -222617,20 +222761,57 @@ def prove_promozioni():
            for m in ("promo_cima", "promo_evidenza", "promo_scoprire")])
 
     # ---- 3. I PEZZI PURI, girati --------------------------------------
-    amb = {"PROMO_EVIDENZA_SATS": {7: 15_000, 15: 25_000, "x": 3, 0: 9,
-                                   400: 1, 30: 0},
-           "PROMO_IN_CIMA_SATS": 5_000, "PROMO_SCOPRIRE_SATS": 50_000,
+    amb = {"PROMO_EVIDENZA_SCALINI": ((0, 5_000), (2, 10_000), (4, 15_000),
+                                      (5, 25_000), (6, 35_000), (7, 50_000)),
+           "PROMO_EVIDENZA_DURATE": {7: 1, 15: 1.7, "x": 3, 0: 9, 400: 1,
+                                     30: 0},
+           "PROMO_IN_CIMA_SCALINI": ((0, 2_000), (3, 5_000), (6, 8_000),
+                                     (10, 12_000)),
+           "PROMO_SCOPRIRE_SCALINI": ((0, 20_000), (1, 30_000), (2, 40_000),
+                                      (3, 50_000), (4, 70_000), (5, 100_000)),
            "PROMO_SCOPRIRE_GIORNI": 30, "PROMO_IN_CIMA_ORE": 24}
-    for nome in ("listino_evidenza", "_voce_promo", "_promo_dal_riferimento",
-                 "in_cima_da"):
+    for nome in ("scalini_promo", "prezzo_a_scalini", "listino_evidenza",
+                 "_voce_promo", "_promo_dal_riferimento", "in_cima_da"):
         exec(pezzo(nome), amb)
-    prova("il listino salta le voci storte e resta ordinato",
-          [(7, 15_000), (15, 25_000)], amb["listino_evidenza"]())
+    prova("il listino salta le durate storte e resta ordinato, a fila vuota "
+          "dal primo scalino", [(7, 5_000), (15, 8_500)],
+          amb["listino_evidenza"]())
+    # I PREZZI A SCALINI (25 nov 2026, Andrea: «se ci sono già 5 card, la
+    # sesta costerà tanto»): la tabella approvata, posto per posto
+    prova("Mensola, 7 giorni: lo scalino per 0..9 posti gia' presi",
+          [5_000, 5_000, 10_000, 10_000, 15_000, 25_000, 35_000, 50_000,
+           50_000, 50_000],
+          [dict(amb["listino_evidenza"](n))[7] for n in range(10)])
+    prova("...e i 15 giorni 1,7 volte tanto", [8_500, 17_000, 85_000],
+          [dict(amb["listino_evidenza"](n))[15] for n in (0, 2, 7)])
+    prova("In cima: lo scalino per gli annunci saliti nelle ultime 24 ore",
+          [2_000, 2_000, 5_000, 5_000, 8_000, 8_000, 12_000, 12_000],
+          [amb["_voce_promo"]("cima", n)[1] for n in (0, 2, 3, 5, 6, 9, 10, 40)])
+    prova("Da scoprire: lo scalino per i negozi gia' dentro",
+          [20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 100_000],
+          [amb["_voce_promo"]("scoprire", n)[1] for n in (0, 1, 2, 3, 4, 5, 12)])
+    sc = amb["scalini_promo"]
+    prova("la scala salta le coppie storte, a zero e negative, e si "
+          "rimette in ordine; una leva che non e' una scala da' []",
+          ([(0, 7), (2, 9)], [], [], []),
+          (sc([(2, 9), ("x", 1), (0, 7), (1, 0), (-1, 5), (3,)]), sc(7),
+           sc(None), sc(())))
+    prova("...e una scala che parte da piu' in alto e' spenta sotto la "
+          "prima soglia", (0, 9), (amb["prezzo_a_scalini"]([(2, 9)], 1),
+                                   amb["prezzo_a_scalini"]([(2, 9)], 2)))
+    prova("...la scala che torna dal pannello (liste e chiavi di testo) "
+          "vale lo stesso", 8_500,
+          (amb.update(PROMO_EVIDENZA_DURATE={"15": 1.7}),
+           dict(amb["listino_evidenza"](0)).get(15))[1])
+    amb["PROMO_EVIDENZA_DURATE"] = {7: 1, 15: 1.7}
     prova("le voci che si comprano, e quelle che no",
-          [("promo_cima", 5_000, 0), ("promo_evidenza", 25_000, 15),
-           ("promo_scoprire", 50_000, 30), None, None, None],
+          [("promo_cima", 2_000, 0), ("promo_evidenza", 8_500, 15),
+           ("promo_scoprire", 20_000, 30), None, None, None],
           [amb["_voce_promo"](t) for t in
            ("cima", "evidenza:15", "scoprire", "evidenza:3", "boh", None)])
+    amb["PROMO_IN_CIMA_SCALINI"] = ()
+    prova("una scala vuota spegne quella sola", (None, True),
+          (amb["_voce_promo"]("cima"), amb["_voce_promo"]("scoprire") is not None))
     rif = amb["_promo_dal_riferimento"]
     prova("il riferimento si rilegge: annuncio, annuncio:giorni, giorni",
           [(12, 0), (12, 7), (0, 30), (0, 0)],
@@ -222726,9 +222907,14 @@ def prove_promozioni():
           < c.index("promo_in_cima_canale(aid)"))
 
     # ---- 7. L'APP -----------------------------------------------------
-    prova("la card in evidenza porta l'etichetta, e mai da esaurita", True,
-          "const ev = !esa && inEvidenza(l);" in mini
-          and '<div class="card-evidenza">In evidenza</div>' in mini)
+    # L'ETICHETTA SE NE VA ANCHE DA RICERCHE E CATEGORIE (25 nov 2026,
+    # Andrea: «creava solo confusione»), i badge di stato tornano nel loro
+    # angolo; e poi la cornice («ok», lo stesso giorno): la card promossa
+    # fuori dalla mensola e' una card come le altre
+    prova("la card promossa non porta piu' ne' l'etichetta ne' la cornice",
+          (0, 0, 0, 0),
+          (mini.count("card-evidenza"), mini.count("){top:32px}"),
+           mini.count(".card.ev"), mini.count("${ev?' ev':''}")))
     # «anzi più ravvicinati i paragrafi» (Andrea, 24 nov 2026 sera): sul
     # telefono «In evidenza» sale verso la card grande e le categorie
     # verso «In evidenza», senza toccare il CSS di «In evidenza»
@@ -222853,7 +223039,7 @@ const conta = (h, x) => h.split(x).length - 1;
 console.log(JSON.stringify([conta(ev, 'class="promo-durata"'),
   conta(ev, 'aria-pressed="true"'), ev.includes('onclick="scegliGiorniPromo(this, 15)"'),
   conta(ev, 'promo-guarda'), ev.includes('class="promo-ante">'),
-  ev.includes('pa-eti'), ev.includes('<svg'), ev.includes('onchange="scegliVocePromo(this)"'),
+  ev.includes('pa-mensola') && !ev.includes('pa-eti'), ev.includes('<svg'), ev.includes('onchange="scegliVocePromo(this)"'),
   sp.includes(' disabled'), sp.includes('class="promo-ante" hidden>'), sp.includes('pa-s2'),
   sp.includes('serve il banner')]));""")
     if r is None:
@@ -222916,10 +223102,114 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
     prova("«Da scoprire» vende la card E la pagina dedicata, con la frase di "
           "Andrea, nel foglio, nel suo cassetto e nella conferma; «dopo l'ok "
           "del moderatore» non c'e' piu'", (True, 4, 0),
-          ("const SCOPRIRE_COSA = 'La card del tuo negozio in home e una pagina "
-           "dedicata, '\n  + 'preparata da noi con le tue foto e il tuo testo.';" in mini,
+          ("const SCOPRIRE_COSA = 'La card grande del tuo negozio in cima alla home e una '\n"
+           "  + 'pagina dedicata, preparata da noi con le tue foto e il tuo testo.';" in mini,
            mini.count("SCOPRIRE_COSA"),
            mini.count("dopo l\\'ok del moderatore")))
+    _srv_promo_pre = pezzo("_incassa_promo")
+    # ---- 7b-bis. «MENSOLA» E I PREZZI A SCALINI (25 nov 2026, Andrea:
+    # «più che In evidenza la chiamerei mensola»; «la sesta card costerà
+    # tanto»). I testi sono quelli proposti e approvati quel giorno.
+    prova("la voce si chiama «Mensola», coi testi nuovi; niente etichetta "
+          "e niente «primo giorno in cima»", (True, True, True, True, 0, 0),
+          ("titolo: 'Mensola', durate," in ap,
+           "'Sulla mensola in home, fra le prime cose che si vedono.'" in ap,
+           "`È sulla mensola fino al ${dataPromo(e.fino)}: i giorni si aggiungono.`" in ap,
+           "`La mensola è piena: il prossimo posto si libera il ${dataPromo(e.libero_da)}`" in ap,
+           _senza_commenti_js(ap).count("etichetta."),
+           _senza_commenti_js(ap).count("anche in cima")))
+    prova("...la riga dei prezzi a scalini sotto le voci, nel foglio e nella "
+          "conferma del negozio", (True, 3),
+          ("const PROMO_SCALINI = 'Il prezzo sale man mano che i posti si riempiono.';" in mini,
+           mini.count("PROMO_SCALINI")))
+    prova("...il «Fatto!» dice la mensola, nell'app e nel bot, senza «anche "
+          "in cima»", (True, True, 0),
+          ("`⭐ Fatto! Il tuo annuncio è sulla mensola fino al ${dataPromo(d.fino || 0)}.`" in mini,
+           "\"⭐ <b>Fatto!</b> Il tuo annuncio è sulla mensola \"" in _srv_promo_pre,
+           mini.count("e oggi è anche in cima") + _srv_promo_pre.count("in cima.\")")))
+    _ant = pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};")
+    prova("...l'anteprima della Mensola: la linea di luce sotto le card, la "
+          "tua che entra per prima; Da scoprire: la grande, la tua da destra",
+          (True, True, True, True),
+          ("'<div class=\"pa-mensola\"></div><div class=\"pa-card pa-tuo pa-c1\"></div>'" in _ant,
+           ".pa-mensola{position:absolute;left:0;right:0;top:106px;" in mini,
+           "@keyframes pa-s2{0%,20%{left:90%}55%,100%{left:4%}}" in mini,
+           # lo stato fermo e' l'ARRIVO (effetti ridotti): la tua al primo posto
+           ".pa-s2{left:4%;" in mini))
+    prova("...e l'icona e' la mensolina con due card, non piu' la stella",
+          (False, True),
+          ("M12 7.3l1.4 2.9" in mini,
+           '<rect class="ip-p" x="2.5" y="17.5" width="19" height="2.2" rx="1.1"/>' in mini))
+    c = codice(pezzo("compra_promo"))
+    prova("compra: lo scalino si legge coi posti di adesso, dopo le guardie "
+          "e PRIMA della ripresa (che confronta i sats)", True,
+          c.index("posti_evidenza(con, adesso, aid)")
+          < c.index("presi = _presi_promo(con, motivo, adesso, aid, user[\"id\"])")
+          < c.index("voce = _voce_promo(d.get(\"tipo\"), presi)")
+          < c.index("vive = con.execute(")
+          < c.index("await crea_invoice_escrow("))
+    prova("...la mensola piena si dice con le parole nuove", True,
+          '"La mensola è piena: il prossimo "' in c)
+    li = codice(pezzo("listino_promo"))
+    prova("il listino mostra lo scalino di adesso, per tutte e tre", (True, True, True),
+          ("prezzo_a_scalini(PROMO_IN_CIMA_SCALINI," in li,
+           # il prezzo dai posti PAGATI, non da tutti i posti (25 nov)
+           "presi_ev = _presi_promo(con, \"promo_evidenza\", adesso, a[\"id\"])" in li
+           and "for g, s in listino_evidenza(presi_ev)]" in li,
+           "prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi_sc)" in li))
+    # i presi, girati su un database finto. SOLO I PAGATI (25 nov 2026,
+    # Andrea: «quelli che abbiamo messo in maniera gratuita [...] non devi
+    # considerarli, adesso è come se ci fossero 0»): un regalo occupa un
+    # posto ma non alza il prezzo
+    A, G = 10_000_000, 86400
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript(f"""
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT, motivo TEXT,
+        riferimento TEXT, stato TEXT, pagato_il INT);
+      INSERT INTO pagamenti(tg_id,motivo,riferimento,stato,pagato_il) VALUES
+        (7,'promo_cima','1','pagato',{A-1000}),(7,'promo_cima','1','pagato',{A-500}),
+        (7,'promo_cima','2','pagato',{A-2000}),(7,'promo_cima','3','creato',{A-900}),
+        (7,'promo_cima','4','pagato',{A-5000}),
+        (7,'promo_evidenza','1:7','pagato',{A-2*G}),
+        (7,'promo_evidenza','3:7','pagato',{A-G}),
+        (7,'promo_evidenza','4:7','pagato',{A-20*G}),
+        (7,'promo_evidenza','5:7','rimborsato',{A-G}),
+        (7,'promo_evidenza','6:7','pagato',{A-10*G}),
+        (7,'promo_evidenza','6:7','pagato',{A-8*G}),
+        (1,'promo_scoprire','30','pagato',{A-10*G}),
+        (3,'promo_scoprire','30','pagato',{A-90*G}),
+        (4,'promo_scoprire','30','rimborsato',{A-G});
+      CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
+        evidenza_fino INT DEFAULT 0);
+      INSERT INTO annunci VALUES(1,'attivo',{A+5*G}),(2,'attivo',{A+3*G}),
+        (3,'venduto',{A+6*G}),(4,'attivo',{A+10*G}),(5,'attivo',{A+6*G}),
+        (6,'attivo',{A+4*G});
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, promo_scoprire_fino INT);
+      INSERT INTO utenti VALUES(1,{A+20*G}),(2,{A+20*G}),(3,0),(4,{A+29*G});
+    """)
+    amb = {"PROMO_IN_CIMA_ORE": 1, "PROMO_EVIDENZA_POSTI": 8}
+    for nome in ("posti_evidenza", "_promo_dal_riferimento", "_pagati_vivi",
+                 "_presi_promo"):
+        exec(pezzo(nome), amb)
+    pp = amb["_presi_promo"]
+    prova("i presi: In cima conta gli annunci pagati nell'ultima ora (uno "
+          "salito due volte vale uno); la Mensola solo gli annunci attivi coi "
+          "giorni PAGATI in corso (i giorni si sommano), senza chi allunga; "
+          "Da scoprire solo i negozi coi giorni pagati, senza chi rinnova",
+          [2, 2, 1, 1, 0, 0],
+          [pp(con, "promo_cima", A), pp(con, "promo_evidenza", A),
+           pp(con, "promo_evidenza", A, 6), pp(con, "promo_scoprire", A, tg_id=9),
+           pp(con, "promo_scoprire", A, tg_id=1), pp(con, "boh", A)])
+    prova("...mentre i POSTI della mensola contano anche i regali (lo spazio "
+          "c'e' o non c'e')", (5, 0), amb["posti_evidenza"](con, A))
+    # LA CONTROPROVA, com'e' oggi in produzione: tutto messo gratis
+    con.execute("DELETE FROM pagamenti")
+    prova("...e senza pagamenti (tutto regalato, com'e' oggi) zero ovunque, "
+          "con la mensola e Da scoprire piene di regali", [0, 0, 0],
+          [pp(con, "promo_cima", A), pp(con, "promo_evidenza", A),
+           pp(con, "promo_scoprire", A)])
+    con.close()
     _srv_promo = pezzo("_incassa_promo")
     prova("la pagina dedicata si chiede in Assistenza solo alla PRIMA entrata, "
           "nella stessa transazione, e solo con l'Assistenza accesa",
@@ -223221,11 +223511,12 @@ INSERT INTO annunci VALUES
     # centro, sulla fascia; le card della fila senza etichetta e cornice
     # (24 nov 2026 sera, Andrea, vista la mensola di luce: «la scritta in
     # evidenza ora si può anche togliere») il titolo se ne va di nuovo
+    # (25 nov 2026: la fila si chiama «Mensola», scelto da Andrea)
     prova("«In evidenza» senza titolo (lo dice la mensola), e il nome resta "
-          "sulla fila per chi legge ad alta voce",
+          "sulla fila per chi legge ad alta voce: «Mensola»",
           (False, True),
           ('section-label' in _evs,
-           'id="evidenzaFila" role="region" aria-label="In evidenza"' in _evs))
+           'id="evidenzaFila" role="region" aria-label="Mensola"' in _evs))
     # «Esplora il lavoro» prende il posto di «Esplora per categorie» in
     # Lavoro, e ne prende anche il titolo al centro (24 nov 2026, Andrea:
     # «sistemalo», era rimasto a sinistra con la linea puntinata)
@@ -223271,12 +223562,11 @@ INSERT INTO annunci VALUES
           (mini.count("#scoprireQuadri{margin-top:-4px}"),
            mini.count("#scoprireQuadri{margin-top:-12px}")))
     prova("...le card della fila sollevate dall'ombra, senza etichetta e "
-          "senza cornice (nella griglia restano)",
-          (True, True, True, True),
+          "senza cornice (dal 25 nov nemmeno nella griglia)",
+          (True, True, True),
           ("#evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}" in _css,
-           "#evidenzaSez .card.ev .card-evidenza{display:none}" in _css,
-           "#evidenzaSez .card.ev{outline:none}" in _css,
-           ".card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}" in _css))
+           "card-evidenza" not in mini,
+           ".card.ev" not in mini))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",
           True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
 

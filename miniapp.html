@@ -1549,9 +1549,6 @@
   @media (max-width:767px){
     #evidenzaSez .ev-strip{--ev-larga:calc((100vw - var(--pad) - 20px) / 2.5)}
   }
-  #evidenzaSez .card.ev .card-evidenza{display:none}
-  #evidenzaSez .card.ev{outline:none}
-  #evidenzaSez .card.ev :is(.card-lampo,.card-sconto,.card-asta,.card-ferie,.card-ultimo){top:8px}
   /* IL FOGLIO DEL MERCATINO (25 nov 2026, cantiere fascia-p2p). Dalle
      categorie in giu' il mercatino sta su un foglio un po' piu' chiaro
      della pagina, con gli angoli di sopra tondi, un'ombra che lo stacca
@@ -1697,31 +1694,31 @@
   @keyframes pa-va{0%,30%{top:8px;left:21%}58%,100%{top:8px;left:52%}}
   @keyframes pa-vb{0%,30%{top:8px;left:52%}58%,100%{top:134px;left:21%}}
   @keyframes pa-vc{0%,30%{top:134px;left:21%}58%,100%{top:134px;left:52%}}
-  .pa-card{top:22px;width:70px;height:88px}
+  /* «Mensola»: le card piccole sulla linea di luce, come in home */
+  .pa-card{top:16px;width:70px;height:88px}
   .pa-card::after{content:"";position:absolute;left:6px;right:6px;bottom:8px;height:5px;
     border-radius:3px;background:var(--line);box-shadow:0 -9px 0 0 var(--line)}
   .pa-c1{left:12px;animation:pa-c1 4s ease-in-out infinite}
   .pa-c2{left:90px;animation:pa-c2 4s ease-in-out infinite}
   .pa-c3{left:168px;animation:pa-c3 4s ease-in-out infinite}
   .pa-c4{left:246px}
-  @keyframes pa-c1{0%,20%{top:130px;opacity:0}50%,100%{top:22px;opacity:1}}
+  @keyframes pa-c1{0%,20%{top:130px;opacity:0}50%,100%{top:16px;opacity:1}}
   @keyframes pa-c2{0%,20%{left:12px}50%,100%{left:90px}}
   @keyframes pa-c3{0%,20%{left:90px}50%,100%{left:168px}}
-  .pa-eti{position:absolute;left:4px;top:4px;padding:2px 5px;border-radius:5px;
-    background:var(--sats-deep);color:#fff;font-size:8.5px;font-weight:800;
-    letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;
-    animation:pa-eti 4s ease-out infinite}
-  @keyframes pa-eti{0%,52%{opacity:0;transform:scale(.6)}65%,100%{opacity:1;transform:none}}
-  .pa-sc{top:30px;width:96px;height:62px;background:var(--line);opacity:.6}
-  .pa-s1{left:-60px}
-  .pa-s3{left:224px}
-  .pa-s2{left:76px;top:20px;width:124px;height:82px;opacity:1;border:0;
-    background:linear-gradient(135deg,#F7931A,#B45309);
+  .pa-mensola{position:absolute;left:0;right:0;top:106px;height:18px;
+    background:linear-gradient(90deg,rgba(247,147,26,0),rgba(247,147,26,.95) 15%,#FFBE5A 50%,rgba(247,147,26,.95) 85%,rgba(247,147,26,0)) 0 0/100% 3px no-repeat,
+      linear-gradient(180deg,rgba(247,147,26,.32),rgba(247,147,26,0)) 0 3px/100% 15px no-repeat}
+  /* «Da scoprire»: la card grande e il pezzo della prossima, come in home */
+  .pa-sc{top:12px;width:82%;height:100px;background:var(--line)}
+  .pa-s1{left:-84%;animation:pa-s1 4s ease-in-out infinite}
+  .pa-s3{left:90%;animation:pa-s3 4s ease-in-out infinite}
+  .pa-s2{left:4%;border:0;background:linear-gradient(135deg,#F7931A,#B45309);
     box-shadow:0 6px 16px rgba(0,0,0,.35);animation:pa-s2 4s ease-in-out infinite}
-  .pa-s2::after{content:"";position:absolute;left:8px;bottom:8px;width:22px;height:22px;
+  .pa-s2::after{content:"";position:absolute;left:10px;bottom:10px;width:24px;height:24px;
     border-radius:50%;background:#FFF7EC;border:2px solid #fff}
-  @keyframes pa-s2{0%,20%{left:224px;top:30px;width:96px;height:62px;opacity:.6}
-    55%,100%{left:76px;top:20px;width:124px;height:82px;opacity:1}}
+  @keyframes pa-s1{0%,20%{left:4%}55%,100%{left:-84%}}
+  @keyframes pa-s2{0%,20%{left:90%}55%,100%{left:4%}}
+  @keyframes pa-s3{0%,20%{left:176%}55%,100%{left:90%}}
   /* IL TASTO «Promuovi» (23 nov 2026 sera, Andrea: «colorato in un certo
      modo, simile al tasto della classifica degli streak»): la stessa carta
      lucida della porta della Classifica Streak (il riflesso chiaro
@@ -1776,7 +1773,13 @@
     height:calc(100% + 6px)}
   /* sul computer (e sul tablet) uno ACCANTO all'altro: uno sotto l'altro
      a tutta larghezza sarebbero due cartelloni da 300px d'altezza */
-  @media (min-width:768px){#occasioniBanner{grid-template-columns:1fr 1fr}}
+  /* PIU' PICCOLI SUL COMPUTER (25 nov 2026, cantiere home-pc, Andrea: «i
+     filtri offerte a tempo e sconti dei negozi nel browser del PC mettili
+     più piccoli»): a meta' riga erano 684x167 a 1440. Ognuno al piu' 420
+     di largo (102 d'alto, sempre 328/80: il disegno cala col riquadro),
+     la coppia al centro; sul tablet stretto si restringono da soli. */
+  @media (min-width:768px){#occasioniBanner{grid-template-columns:repeat(2,minmax(0,420px));
+    justify-content:center}}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -1906,7 +1909,16 @@
       scroll-snap-type:x mandatory}
     #scoprireStrip .scoprire-card{scroll-snap-align:center;margin:0 -10px;
       transform:scale(.82);opacity:.55;
-      transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease}
+      transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease;
+      will-change:transform,opacity}
+    /* IL LAMPO NERO (25 nov 2026, Andrea dalla mini app: «quando scorro
+       tra le varie card ogni tanto c'è un flash nero»): nel video la card
+       al centro sparisce per UN fotogramma circa mezzo secondo dopo lo
+       scorrimento, cioe' quando finisce la sua transizione di misura. E'
+       il momento in cui il telefono smonta lo strato della card e la
+       ridipinge; con `will-change` lo strato resta montato e non c'e'
+       niente da ridipingere. Ipotesi dal video, da riguardare sul
+       telefono vero: in un browser del computer il lampo non si vede. */
     #scoprireStrip .scoprire-card:active{transform:scale(.82) translateY(1px)}
     #scoprireStrip .scoprire-card.sc-centro{transform:scale(1.1);opacity:1;
       z-index:3;box-shadow:0 6px 12px rgba(0,0,0,.45)}
@@ -2045,19 +2057,12 @@
      reduced-motion) e, dal lug 2026, nemmeno il countdown: in
      griglia basta la percentuale, il tempo che resta lo dice la
      scheda. */
-  /* «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento): l'etichetta
-     della promozione, nell'angolo dei badge di stato — che con lei
-     scendono di una riga, perche' un posto pagato si dice sempre — e
-     la cornice arancio ₿. La cornice sta PRIMA delle sorelle: una card
-     in lampo o in asta tiene la sua (stessa forza, vince l'ultima). */
-  .card-evidenza{position:absolute;top:8px;left:8px;z-index:3;
-    background:var(--sats-deep);color:#1b1206;border-radius:999px;
-    padding:4px 8px;font-size:10px;font-weight:800;line-height:1;
-    letter-spacing:.06em;text-transform:uppercase;
-    box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  .card.ev :is(.card-lampo, .card-sconto, .card-asta, .card-ferie,
-    .card-ultimo){top:32px}
-  .card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}
+  /* «IN EVIDENZA» (23 nov 2026, le promozioni a pagamento): la card
+     promossa aveva l'etichetta e la cornice arancio ₿. Il 25 nov 2026 se
+     ne sono andate tutte e due anche da ricerche e categorie (Andrea:
+     l'etichetta «creava solo confusione», poi «ok» a togliere anche la
+     cornice; dalla mensola erano gia' sparite il 24): fuori dalla
+     mensola la card promossa e' una card come le altre. */
   .card-lampo{position:absolute;top:8px;left:8px;z-index:2;
     background:var(--lampo);color:#fff;border-radius:999px;
     padding:3px 9px;font-size:11.5px;font-weight:800;
@@ -8332,7 +8337,11 @@
      apriNegozioDaScoprire); la regola universale degli effetti ridotti la
      spegne come ogni altra corsa */
   #view-negozio.active.sale-dal-basso{animation:negozio-sale .34s cubic-bezier(.2,.8,.2,1)}
-  @keyframes negozio-sale{from{transform:translateY(100%)}to{transform:none}}
+  /* (25 nov 2026, «guarda come scatta») dal fondo dello SCHERMO, non dal
+     fondo della pagina: con `100%` la partenza era l'altezza della vista,
+     e quando i dati arrivavano a salita in corso la pagina si allungava e
+     la corsa saltava di colpo piu' in basso */
+  @keyframes negozio-sale{from{transform:translateY(100vh)}to{transform:none}}
   /* IL VOLO DELLA CARD (24 nov 2026, voloNegozio): la card toccata si
      allarga fino alla testata del negozio, coi margini e gli angoli tondi
      («si ingrandisce un po', ma rimane comunque il bordo»), sopra un velo
@@ -13932,16 +13941,13 @@
        podio in mezzo l'adiacenza non combacia piu' */
     nav .tema-btn ~ .avatar-btn{margin-left:10px}
 
-    /* la hero: titolo grande e mascotte fluttuante, solo qui */
-    .hero{display:flex;align-items:center;gap:40px;padding:28px var(--pad) 0}
-    .hero-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:38px;line-height:1.1}
-    .hero-title span{color:var(--sats)}
-    .hero-sub{font-size:16px;color:var(--ink-soft);font-weight:600;margin-top:8px;max-width:520px}
-    /* Il barattolo scontornato fluttua libero: niente tessera,
-       l'ombra e' un drop-shadow che segue la sagoma */
-    .hero img{width:220px;height:220px;margin-left:auto;flex:0 0 auto;
-      transform:rotate(-6deg);filter:drop-shadow(0 14px 22px rgba(60,45,10,.25));
-      animation:floaty 4s ease-in-out infinite}
+    /* (Qui c'era LA HERO da desktop, «Compra e vendi in sats.» col
+       barattolo che fluttuava: tolta il 25 nov 2026, cantiere home-pc,
+       Andrea: «sistema l'interfaccia PC perché non è al passo con quella
+       della versione mobile». Sul telefono non c'e' mai stata, e dal 23
+       nov Barattolo non e' piu' solo il mercatino in sats: la home da PC
+       parte dalle card grandi come quella del telefono. Il markup resta,
+       spento dalla regola di casa `.hero{display:none}`.) */
     nav button{
       flex:0 0 auto;flex-direction:row;gap:7px;font-size:14px;
       padding:9px 16px;border-radius:999px;
@@ -14109,6 +14115,30 @@
      Aria-label e title restano sul .nav-logo: il nome non si perde. */
   @media (min-width:768px) and (max-width:899px){
     .nav-logo .lockup{display:none}
+  }
+  /* IL MARCHIO DA SOLO ANCHE DA PC (25 nov 2026, cantiere home-pc,
+     Andrea: «anche il logo non è quello»): come in testata sul telefono
+     dal 23 nov, solo «₿arattolo» — via la tessera del barattolo, che sta
+     gia' dentro la barra Cerca, e via il fulmine. Da 900 in su, dove il
+     lockup c'e': nella fascia stretta qui sopra resta la tessera, che e'
+     l'unico segno che li' ci sta. Da solo a 22 si perdeva nella topbar:
+     30, come il marchio del telefono sta fra 26 e 34. */
+  @media (min-width:900px){
+    .nav-logo .brand-jar,.nav-logo .bolt{display:none}
+    .nav-logo .lockup{font-size:30px}
+  }
+  /* LA TOPBAR STRETTA SI STRINGE LEI (25 nov 2026, cantiere logo-bordo):
+     con cinque voci (le celle a strati sono larghe quanto la scritta piu'
+     lunga) fra 768 e ~1020 px le voci non ci stavano, e a uscire dal bordo
+     sinistro era il marchio: misurato nel collaudo, di 102 px a 768 e di
+     40 a 900. Qui le pillole perdono un po' d'aria e un punto di corpo,
+     cosi' il marchio resta dentro con almeno 8 px; da 1024 in su tutto
+     com'era. */
+  @media (min-width:768px) and (max-width:1023px){
+    nav{gap:2px}
+    nav button{padding:9px 9px;font-size:13px}
+    nav button.sell{margin-left:4px}
+    nav .tema-btn,nav .notizie-testa,nav .avatar-btn.on{margin-left:6px}
   }
 
   /* ====== LE DUE STRISCE, PIU' GRANDI SUL WEB (ago 2026) ======
@@ -14436,6 +14466,13 @@
     html.fuori-telegram .p2p-vt-fila{gap:var(--gap-griglia)}
     html.fuori-telegram .p2p-vt-fila .card{
       flex:0 0 calc((100% - (var(--colonne) - 1) * var(--gap-griglia)) / var(--colonne))}
+    /* LA MENSOLA COME LE CARD DEL MERCATINO (25 nov 2026, cantiere
+       home-pc): da PC le card di «Mensola» erano 150, piu' piccole di
+       quelle della griglia sotto (263 a 1440), mentre sul telefono sono
+       piu' grandi. Qui prendono la colonna della griglia, stesso conto
+       e stesso spazio della fila P2P qui sopra. */
+    html.fuori-telegram #evidenzaSez .ev-strip{gap:var(--gap-griglia);
+      --ev-larga:calc((100% - (var(--colonne) - 1) * var(--gap-griglia)) / var(--colonne))}
     /* le pagine che avevano una colonna fissa si allargano: il loro
        contenuto si dispone piu' sotto, soglia per soglia */
     html.fuori-telegram #view-dettaglio,
@@ -15152,7 +15189,7 @@ document.getElementById('cartello')?.remove();</script>
            mensola dice gia' che la fila e' speciale; il nome resta per chi
            legge ad alta voce (aria-label della fila) -->
       <div class="strip-wrap">
-        <div class="ev-strip" id="evidenzaFila" role="region" aria-label="In evidenza"></div>
+        <div class="ev-strip" id="evidenzaFila" role="region" aria-label="Mensola"></div>
         <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
           onclick="scorriFila('evidenzaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
         <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
@@ -15443,7 +15480,7 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ VISTA: NEGOZIO DEL VENDITORE ============ -->
-  <div class="view" id="view-negozio" onanimationend="salitaNegozioFinita(event)">
+  <div class="view" id="view-negozio">
     <!-- LA TESTATA DEL VOLO (24 nov 2026): la card di «Da scoprire» che e'
          volata fin qui; c'e' solo arrivando col volo (voloNegozio) -->
     <div class="negozio-testata" id="negozioTestata" hidden></div>
@@ -24505,8 +24542,25 @@ function go(view){
   /* il bottone di «Pubblica annuncio» si misura PRIMA che la vista se ne
      vada: e' da li' che il ritorno lo riporta nel + (lasciaMorfoVendi) */
   const daVendi = view !== 'vendi' ? misuraRitornoVendi() : null;
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  el('view-'+view).classList.add('active');
+  /* LA SALITA DEL NEGOZIO NON RIPARTE (25 nov 2026, Andrea dal telefono:
+     «guarda come scatta», sul suo negozio in «Da scoprire»). Due colpi:
+     1) il disegno del negozio richiama go('negozio') quando i dati
+     arrivano (renderNegozio), a salita gia' partita: togliere e rimettere
+     `active` con una lettura del layout in mezzo spegne e riaccende la
+     vista, e la corsa ricominciava dal fondo dello schermo; ora, se la
+     vista e' gia' quella attiva e sta salendo (o e' salita), resta com'e'.
+     2) a corsa finita la classe `sale-dal-basso` si toglieva, e
+     l'animazione tornava il `fadein` di ogni vista: la pagina spariva e
+     riappariva in un lampo. Ora la classe resta finche' si sta sul
+     negozio e se ne va QUI, uscendo: tornando alla vista non riparte. */
+  const vistaNuova = el('view-'+view);
+  const restaSalita = vistaNuova.classList.contains('active')
+    && vistaNuova.classList.contains('sale-dal-basso');
+  if (view !== 'negozio') el('view-negozio')?.classList.remove('sale-dal-basso');
+  if (!restaSalita) {
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    vistaNuova.classList.add('active');
+  }
   /* la musica della stradina suona solo sul tabellone (17 nov 2026) */
   if (view !== 'stradina' && typeof musicaStradinaFerma === 'function') musicaStradinaFerma();
   if ((view === 'stradina') !== temaStradina && typeof applicaTema === 'function') {
@@ -27970,6 +28024,8 @@ function cardConsigliati(voci){
            class="cons-logo${v.pieno ? ' cons-pieno' : ''}${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${esc(logoConsigliato(v))}"
            style="--giu:${giuLogoConsigliato(v.giu)}%"
            alt="" loading="lazy" decoding="async" fetchpriority="low"
+           onanimationend="fineCorsaConsigliato(this)"
+           onanimationcancel="fineCorsaConsigliato(this)"
            onerror="this.remove()">`).join('')}<span class="cat-emoji"
            aria-hidden="true">📣</span></span></span>
       <span class="cat-eti">Consigliati</span>
@@ -27992,12 +28048,20 @@ function cardConsigliati(voci){
    all'avvio. Da li' ognuno si chiede quando entra il precedente, e il
    ritmo torna quello chiesto. Un logo che non e' ancora arrivato non
    entra a meta': si aspetta il giro dopo.
-   LE CLASSI DI UNA CORSA RESTANO FINO ALLA CORSA DOPO, e non serve
-   toglierle prima: finita l'animazione, le regole di sempre dicono gia'
-   lo stato giusto (vedi il CSS), e al passaggio dopo ogni logo cambia
-   classe — chi e' entrato esce, chi e' uscito resta fermo o entra —
-   quindi l'animazione riparte sempre, senza fotogrammi d'attesa ne'
-   ascoltatori.
+   LE CLASSI DI UNA CORSA SE NE VANNO QUANDO LA CORSA FINISCE (25 nov
+   2026, cantiere scatti-home, dal video di Andrea: «guarda cosa succede
+   alla sezione esplora per categorie quando torno indietro da una card»).
+   Fino a quel giorno restavano fino alla corsa dopo, perche' finita
+   l'animazione le regole di sempre dicono gia' lo stato giusto (vedi il
+   CSS). Ma la home esce di scena con `display:none` a ogni card aperta,
+   e al ritorno il browser fa RIPARTIRE DA CAPO ogni animazione che trova
+   attaccata: l'ultima corsa si rivedeva intera, il logo vecchio che
+   esce e il nuovo che ricade dall'alto, come uno scatto della fila.
+   Adesso `animationend` le toglie (fineCorsaConsigliato), e anche
+   `animationcancel`: una corsa interrotta a meta' dalla card che si apre
+   non si rigioca al ritorno, e il logo resta fermo al suo posto. Al
+   passaggio dopo le classi tornano, e l'animazione parte come sempre. */
+/* ...e il resto del giro:
    EFFETTI RIDOTTI: niente corsa e niente giro, resta il PRIMO. Il
    giudice e' `effettiRidotti()`, chiesto a OGNI giro: la scelta si cambia
    da «🌗 Aspetto» senza ridisegnare la fila, e al giro dopo la card torna
@@ -28073,6 +28137,9 @@ function giraConsigliati(){
    corsa, `entra` a lui ed `esce` a chi c'era. Senza (gli effetti ridotti
    che riportano al primo) nessuna corsa: il cambio e' secco, e le classi
    di una corsa vecchia se ne vanno con lui. */
+function fineCorsaConsigliato(im){
+  im.classList.remove('entra', 'esce');
+}
 function accendiLogoConsigliato(loghi, k, prima = -1){
   loghi.forEach((x, j) => {
     x.classList.toggle('attivo', j === k);
@@ -29309,13 +29376,9 @@ const cardHTML = l => {
   const rif = bottoneRifornisci(l);
   const jar = rif ? ''
     : bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
-  /* «IN EVIDENZA» (23 nov 2026): l'etichetta di una promozione PAGATA,
-     e un posto pagato si dice SEMPRE — per questo non entra nella fila
-     delle precedenze qui sopra, dove perderebbe contro una lampo: sta
-     nello stesso angolo e il badge di stato scende sotto di lei (la
-     classe `ev` sulla card, vedi il CSS). Mai sull'esaurito, che non
-     si compra e non si promuove. */
-  const ev = !esa && inEvidenza(l);
+  /* «IN EVIDENZA» (23 nov 2026): la card promossa aveva la classe `ev`,
+     con l'etichetta e la cornice arancio; dal 25 nov 2026 niente dei due
+     (vedi il CSS), e la classe se n'e' andata con loro. */
   /* LA CARD E' UN COLLEGAMENTO VERO (ago 2026): l'<a> avvolge foto e
      testo, i due BOTTONI restano fuori — contenuto interattivo dentro
      un <a> e' HTML non valido — mentre il badge di stato ${flash}, che
@@ -29325,14 +29388,14 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${ev?' ev':''}${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
           ? `<img src="${esc((l.thumbs&&l.thumbs[0])||l.photos[0])}" data-full="${esc(l.photos[0])}" loading="lazy" decoding="async" onerror="this.onerror=null;if(this.dataset.full)this.src=this.dataset.full" alt="">`
           : l.emoji}</div>
         <div class="tag-price${esa?' esaurito':ferie?' ferie':asta?' asta':''}">${(lampo||sconto||(acc&&piuBasso(g.v,l)))?`<div class="price-was"><s>${prezzoParte(l).big}</s></div>`:''}<div class="price">${famigliaCard(l) && l.famigliaVaria ? '<span class="price-da">da </span>' : ''}${p.big}</div><div class="price-sub">${p.small}</div></div>
-        ${ev ? '<div class="card-evidenza">In evidenza</div>' : ''}${flash}
+        ${flash}
       </div>
       <div class="info">
         <div class="title">${esc(famigliaCard(l) && l.famigliaTitolo ? l.famigliaTitolo : l.title)}</div>
@@ -29370,6 +29433,13 @@ function spegniReparto(){
 async function doSearch(){
   haptic();
   const q = el('q').value.trim();
+  /* L'INVIO CHIUDE LA TASTIERA (25 nov 2026, cantiere tastiera-ricerca,
+     Andrea: «dopo l'invio la tastiera chiudila in automatico»): sul
+     telefono restava aperta e copriva meta' dei risultati appena
+     raggiunti. Il campo perde il fuoco e la tastiera se ne va; la parola
+     cercata resta scritta. Ogni invio, anche a campo vuoto: e' il gesto
+     di «ho finito di scrivere». */
+  el('q').blur();
   /* LA RICERCA GUARDA TUTTI GLI ARTICOLI (ago 2026, decisione di
      Andrea): premere invio da dentro un reparto lo spegne — l'AI non
      ha mai filtrato per categoria, ma DEMO e vetrina anonima si', e
@@ -29386,12 +29456,23 @@ async function doSearch(){
     loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
     return;
   }
+  /* L'INVIO PORTA AI RISULTATI (25 nov 2026, cantiere scatti-home,
+     Andrea: «quando io digito qualcosa nella barra di ricerca e schiaccio
+     invio, in automatico l'app dovrebbe scorrere verso il basso e
+     mostrarmi ciò che ha trovato»): fino a quel giorno la pagina restava
+     ferma in cima, e i risultati andavano cercati scorrendo a mano. Lo
+     stesso arrivo dello scaffale — «N risultati» sotto l'header, coi
+     prodotti in vista — e la stessa bandierina, consumata dal primo
+     renderGrid coi risultati (armaScrollReparto). Solo con una query: a
+     campo vuoto l'invio ricomincia la vista e non porta da nessuna parte. */
   if (DEMO) {
     /* In demo non c'è nessun server che cerchi: filtro sui dati
        finti, che è quel che renderGrid sa già fare */
     renderGrid();
+    armaScrollReparto(true);
     return;
   }
+  armaScrollReparto(true);
   /* UNA STRADA SOLA per tutti (ago 2026), autenticati e anonimi: la
      ricerca vive dentro la VETRINA — `/api/listings?q=` — quindi è
      paginata come il resto e si compone con categoria, prezzo,
@@ -29865,8 +29946,9 @@ function negozioInAttesa(chi){
    istante con l'anello (`negozioInAttesa`), sale dal basso, e si riempie
    quando i dati arrivano; se nel frattempo si e' tornati indietro, il
    negozio non salta addosso (`qui`). La salita e' del CSS
-   (`.sale-dal-basso`), si toglie a corsa finita — o tornando alla vista
-   ripartirebbe — e con gli effetti ridotti non c'e'. Vale per le card
+   (`.sale-dal-basso`), resta finche' si sta sul negozio e si toglie
+   uscendo (in go(), dal 25 nov 2026: tolta a corsa finita faceva
+   ripartire il `fadein` della vista) — e con gli effetti ridotti non c'e'. Vale per le card
    grandi e per i quadrati dei negozi (tutti passano da `tocca`). */
 function apriNegozioDaScoprire(chi, aperto, da){
   if (!chi) return apriNegozio(chi);
@@ -30081,9 +30163,6 @@ function voloNegozio(card, chi, aperto, da){
     }, VOLO_MS - VOLO_APRI_MS);
   }, VOLO_APRI_MS);
   return true;
-}
-function salitaNegozioFinita(e){
-  if (e.animationName === 'negozio-sale') e.currentTarget.classList.remove('sale-dal-basso');
 }
 
 /* LA PAGINA DEL NEGOZIO RIDISEGNATA, non aperta: stessa strada di
@@ -39977,9 +40056,10 @@ function avviaOrologioOrdine(o){
     }
     /* pagato in euro: si ridisegna solo quando lo scambio cambia passo */
     const ve = typeof viaEuroScambioDellOrdine === 'function' ? viaEuroScambioDellOrdine(o.id) : null;
-    if (ve || box.dataset.orma) {
+    const ormaBox = (box.dataset && box.dataset.orma) || '';
+    if (ve || ormaBox) {
       const v = ve ? viaEuroPassoOrdine(ve) : null;
-      if (!v || v.orma !== box.dataset.orma) box.outerHTML = pannelloDaPagare(o);
+      if (!v || v.orma !== ormaBox) box.outerHTML = pannelloDaPagare(o);
       return;
     }
     const riga = el('ordFatturaScade');
@@ -54271,9 +54351,14 @@ let promoServeBanner = false; // il negozio non ha ancora il banner approvato
    parte di quello che vendiamo, quindi bisogna scriverlo»): la card E la
    pagina dedicata, quella dei Consigliati, scritta da noi coi materiali
    del negozio. La frase e' sua; prima diceva «dopo l'ok del moderatore»,
-   ma l'ok e' quello del banner, che viene prima. */
-const SCOPRIRE_COSA = 'La card del tuo negozio in home e una pagina dedicata, '
-  + 'preparata da noi con le tue foto e il tuo testo.';
+   ma l'ok e' quello del banner, che viene prima. Dal 25 nov «la card
+   grande... in cima alla home»: e' la card che scorre in testa. */
+const SCOPRIRE_COSA = 'La card grande del tuo negozio in cima alla home e una '
+  + 'pagina dedicata, preparata da noi con le tue foto e il tuo testo.';
+/* I PREZZI A SCALINI (25 nov 2026, Andrea: «se in evidenza ci sono già 5
+   card, la sesta costerà tanto»): il prezzo lo fa il server coi posti
+   presi, e il foglio lo dice in una riga sotto le voci (frase approvata) */
+const PROMO_SCALINI = 'Il prezzo sale man mano che i posti si riempiono.';
 const scoprireSempre = giorni =>
   `Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`;
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
@@ -54285,7 +54370,7 @@ const oraPromo = ts => new Date(ts * 1000).toLocaleString('it-IT',
    `color` di chi le ospita. Il razzo e' quello del tasto «Promuovi». */
 const ICONA_PROMO = {
   cima: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M12 13.5V3.5M7.5 8 12 3.5 16.5 8"/><rect class="ip-p" x="4" y="16" width="16" height="3" rx="1.5"/><rect class="ip-p" x="4" y="20.5" width="16" height="2" rx="1" opacity=".5"/></svg>',
-  evidenza: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="ip-l" x="3.5" y="4" width="17" height="16" rx="3.5"/><path class="ip-p" d="M12 7.3l1.4 2.9 3.2.46-2.3 2.25.54 3.17L12 14.6l-2.84 1.48.54-3.17-2.3-2.25 3.2-.46z"/></svg>',
+  evidenza: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="ip-l" x="4.5" y="5" width="6.5" height="10.5" rx="1.6"/><rect class="ip-l" x="13" y="5" width="6.5" height="10.5" rx="1.6"/><rect class="ip-p" x="2.5" y="17.5" width="19" height="2.2" rx="1.1"/></svg>',
   scoprire: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M4 9.5 5.4 4.5h13.2L20 9.5"/><path class="ip-l" d="M4 9.5c0 1.4 1 2.4 2.2 2.4s2.3-1 2.3-2.4c0 1.4 1 2.4 2.3 2.4h.4c1.3 0 2.3-1 2.3-2.4 0 1.4 1.1 2.4 2.3 2.4S20 10.9 20 9.5"/><path class="ip-l" d="M5.5 12.3V20h13v-7.7M10 20v-4.3h4V20"/></svg>',
   porta: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ip-l" d="M13.5 15.5 8.5 10.5C10 6 13.5 3.5 20.5 3.5c0 7-2.5 10.5-7 12z"/><circle class="ip-l" cx="15" cy="9" r="1.6"/><path class="ip-l" d="M8.5 10.5H5l2.5-3.2h3.4M13.5 15.5V19l3.2-2.5v-3.4M6.6 15.4c-1.5.6-2.3 2.3-2.4 4.4 2.1-.1 3.8-.9 4.4-2.4"/></svg>'
 };
@@ -54297,13 +54382,17 @@ const ICONA_PROMO = {
    e il tuo annuncio (bordo arancio) sale dalla seconda fila al primo posto
    mentre gli altri scalano di uno, come in «Più recenti». Prima era
    una lista a righe con l'aeroplanino del canale: non somigliava alla
-   vetrina. «In evidenza»: entra per primo nella fila e
-   si accende l'etichetta. «Da scoprire»: la tua card arriva al centro e
-   diventa la grande, come nella fila vera. */
+   vetrina. «Mensola» (25 nov 2026, rifatta con la home): le card piccole
+   appoggiate sulla linea arancio luminosa, la tua entra per prima e le
+   altre scivolano a destra; niente etichetta, che in home non c'e' piu'.
+   «Da scoprire» (stesso giorno): la card grande quasi a tutta larghezza
+   col pezzo della prossima a destra, come in home; la tua arriva da
+   destra e prende il primo posto. Prima c'era la fila con la card al
+   centro, quella dei tondi. */
 const ANTEPRIMA_PROMO = {
   cima: '<div class="pa-v pa-va"><i></i></div><div class="pa-v pa-vb"><i></i></div>'
       + '<div class="pa-v pa-vc"><i></i></div><div class="pa-v pa-tuo pa-vt"><i></i></div>',
-  evidenza: '<div class="pa-card pa-tuo pa-c1"><span class="pa-eti">In evidenza</span></div>'
+  evidenza: '<div class="pa-mensola"></div><div class="pa-card pa-tuo pa-c1"></div>'
       + '<div class="pa-card pa-c2"></div><div class="pa-card pa-c3"></div><div class="pa-card pa-c4"></div>',
   scoprire: '<div class="pa-sc pa-s1"></div><div class="pa-sc pa-s3"></div><div class="pa-sc pa-s2"></div>'
 };
@@ -54379,11 +54468,16 @@ async function apriPromuovi(aid){
   const durate = (Array.isArray(e.durate) ? e.durate : []).filter(x => x.giorni > 0 && x.sats > 0);
   if (durate.length) {
     if (!durate.some(x => x.giorni === promoGiorni)) promoGiorni = durate[0].giorni;
-    voci.push({tipo: 'evidenza', titolo: 'In evidenza', durate,
-      testo: e.fino ? `È in evidenza fino al ${dataPromo(e.fino)}: i giorni si aggiungono.`
-                    : 'Nella fila In evidenza della home, con l\'etichetta. Il primo giorno anche in cima.',
+    /* «MENSOLA» (25 nov 2026, Andrea: «più che In evidenza la chiamerei
+       mensola... sembra proprio una mensola quella che si vede nella
+       home»): l'etichetta sulle card non c'e' piu', e il «primo giorno
+       anche in cima» nemmeno — in home la griglia non ripete chi sta
+       sulla mensola. I testi sono quelli approvati da Andrea. */
+    voci.push({tipo: 'evidenza', titolo: 'Mensola', durate,
+      testo: e.fino ? `È sulla mensola fino al ${dataPromo(e.fino)}: i giorni si aggiungono.`
+                    : 'Sulla mensola in home, fra le prime cose che si vedono.',
       no: (!!e.libero_da && !e.fino)
-        ? `I posti sono tutti presi: il prossimo si libera il ${dataPromo(e.libero_da)}` : ''});
+        ? `La mensola è piena: il prossimo posto si libera il ${dataPromo(e.libero_da)}` : ''});
   }
   /* SENZA BANNER LA VOCE SI SCEGLIE LO STESSO (23 nov 2026, Andrea:
      «se non ha il banner glielo farei fare in questo momento»): prima
@@ -54411,7 +54505,7 @@ async function apriPromuovi(aid){
     titolo: 'Promuovi',
     testata: `<div class="promo-scelte">${voci.map(v =>
       vocePromoHTML(v, libera && v.tipo === libera.tipo)).join('')}</div>`,
-    corpo: 'Si paga una volta, in sats. Non è un abbonamento.',
+    corpo: PROMO_SCALINI + '\nSi paga una volta, in sats. Non è un abbonamento.',
     etichetta: etichettaPromo(!!(libera && libera.serve)), soldi: true,
     poi: () => {
       if (!promoScelta) { toast('Per ora non c\'è una promozione libera', 5000); return; }
@@ -54473,7 +54567,7 @@ async function verificaPromo(pid){
         renderBanner();
         toast(`🏪 Fatto! Il tuo negozio è in «Da scoprire» fino al ${dataPromo(d.fino || 0)}, e poi resta fra i Consigliati.`, 7000);
       } else if (tipo === 'evidenza') {
-        toast(`⭐ Fatto! Il tuo annuncio è in evidenza fino al ${dataPromo(d.fino || 0)}, e oggi è anche in cima.`, 7000);
+        toast(`⭐ Fatto! Il tuo annuncio è sulla mensola fino al ${dataPromo(d.fino || 0)}.`, 7000);
       } else {
         toast('⬆️ Fatto! Il tuo annuncio è tornato in cima.', 6000);
       }
@@ -54504,7 +54598,7 @@ async function chiediPromoScoprire(){
     corpo: SCOPRIRE_COSA + ' '
          + scoprireSempre(sc.giorni)
          + (sc.fino ? `\n\nÈ già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
-         + '\n\nSi paga una volta, in sats. Non è un abbonamento.',
+         + '\n\n' + PROMO_SCALINI + '\nSi paga una volta, in sats. Non è un abbonamento.',
     etichetta: 'Paga', soldi: true,
     poi: () => pagaPromo('scoprire', 0)});
 }
@@ -85190,11 +85284,13 @@ let myViaEuro = false;      // il cancello, da /api/me
 let myViaEuroMax = 0;       // il tetto in euro, da /api/me (100)
 let viaEuroSats = 0;        // il totale dell'ordine dell'ultima porta accesa
 let viaEuroLibroTentato = 0;
-/* i metodi di chi compra senza sats: tutti i VELOCI in euro (25 nov 2026,
+/* i metodi di chi compra senza sats: i VELOCI in euro (25 nov 2026,
    Andrea: «Tutti i veloci»; erano solo SEPA Instant e Satispay). I lenti
    no: il deposito dell'oggetto dura 4 ore e un bonifico di giorni lo
-   farebbe scadere; i contanti a distanza non si danno. */
-const VIA_EURO_METODI = ['SEPA Instant', 'Satispay', 'Revolut', 'PayPal'];
+   farebbe scadere; i contanti a distanza non si danno. PAYPAL NO (25 nov
+   sera, Andrea: «leva PayPal»): chi paga puo' contestare settimane dopo
+   e farsi ridare i soldi, coi sats gia' partiti. */
+const VIA_EURO_METODI = ['SEPA Instant', 'Satispay', 'Revolut'];
 /* i metodi che chi compra ha detto di NON avere («Non ho Revolut»): solo
    in memoria, finche' l'app resta aperta */
 let viaEuroNonHo = [];
@@ -85289,7 +85385,7 @@ function payViaEuroVista(sats){
 /* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
    euro interi), e sotto in piccolo da cosa e' fatto. Il metodo si
    sceglie solo se l'offerta ne ha piu' d'uno fra quelli decisi. */
-const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut', 'PayPal': 'PayPal'};
+const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut'};
 let viaEuroScelto = null;   // {id, euro, metodo} dell'offerta mostrata
 let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in memoria
 async function apriViaEuro(dove){
@@ -85509,7 +85605,7 @@ function renderViaEuroPasso(){
     if (tit) tit.textContent = 'Manda ' + String(o.euro) + ' € a ' + nome;
     box.innerHTML = recapitoCompratoreP2P(o)
       + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')
-      + '<button type="button" class="btn primary" onclick="viaEuroHoPagato()">Ho pagato</button>';
+      + '<button type="button" class="btn primary" onclick="viaEuroHoPagato()">Ho inviato gli euro</button>';
     return;
   }
   if (tit) tit.textContent = nome + ' sta controllando il pagamento';
@@ -85559,7 +85655,7 @@ function viaEuroPassoOrdine(p){
     return {orma, html: '<h4>' + esc('Manda ' + String(p.euro) + ' € a ' + nome) + '</h4>'
       + recapitoCompratoreP2P(p)
       + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(p) : '')
-      + '<button type="button" class="btn primary" onclick="viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()">Ho pagato</button>'};
+      + '<button type="button" class="btn primary" onclick="viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()">Ho inviato gli euro</button>'};
   if (passo === 'controllo')
     return {orma, html: '<h4>' + esc(nome + ' sta controllando il pagamento') + '</h4>'
       + '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>'};
@@ -116574,6 +116670,7 @@ let p2pVetrinaTimer = null;         // il prossimo giro, se c'e'
 let p2pVetrinaInVolo = false;
 let p2pVetrinaFresca = false;       // la prossima domanda salta la cache (ritorno in Esplora)
 let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
+let p2pFilaInArrivo = false;        // interruttore appena acceso, card in arrivo (scatti-home)
 let p2pVetrinaMiei = new Set();     // gli ordini della fotografia pubblicati da me, per il server
 
 /* La vetrina e' quella nuda? */
@@ -116855,16 +116952,26 @@ function cardVetrinaOnchainP2P(o){
 /* `spenta` (24 nov 2026, cantiere home-card-pulite): chi guarda l'ha
    spenta con l'interruttore accanto al titolo. La sezione resta, col solo
    titolo e l'interruttore spento; le card e le frecce no. */
-function filaCardP2P(html, spenta){
+/* `attesa` (25 nov 2026, cantiere scatti-home, dal video di Andrea: «la
+   prima volta che schiaccio il toggle scambi peer-to-peer... scatta»):
+   l'interruttore e' appena stato acceso e le card sono in arrivo dal
+   server. Chi apre l'app con la fascia spenta non le ha mai chieste, e
+   senza card la fascia spariva tutta per il tempo della domanda: le card
+   del mercatino salivano al suo posto e poi venivano rispinte giu'. In
+   attesa la fascia resta com'era da spenta — stessa altezza, titolo e
+   interruttore in mezzo — ma con l'interruttore gia' acceso; le card
+   arrivano in un colpo solo, come dal secondo tocco in poi. */
+function filaCardP2P(html, spenta, attesa){
   const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
   if (!sez || !fila) return;
-  sez.style.display = (html.length || spenta) ? '' : 'none';
+  const chiusa = spenta || (attesa && !html.length);
+  sez.style.display = (html.length || chiusa) ? '' : 'none';
   const guscio = el('p2pVetrinaGuscio');
-  if (guscio) guscio.style.display = spenta ? 'none' : '';
+  if (guscio) guscio.style.display = chiusa ? 'none' : '';
   /* spenta, la fascia resta col solo titolo: `spenta` le da' lo stesso
      respiro sopra e sotto, cosi' titolo e interruttore stanno in mezzo
      (25 nov 2026, cantiere fascia-p2p) */
-  sez.classList[spenta ? 'add' : 'remove']('spenta');
+  sez.classList[chiusa ? 'add' : 'remove']('spenta');
   /* l'interruttore si riscrive intero: lo stato sta tutto nel markup.
      Dal 25 nov 2026 e' quello COL BITCOIN (`p2p-vt-btc`, Andrea fra
      quattro prove: «va bene l'interruttore col Bitcoin»): il pallino e'
@@ -116909,10 +117016,14 @@ function renderVetrinaP2P(){
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
      ogni pagina di annunci che arriva */
-  const firma = (via ? 'spenta|' : '') + html.join('');
+  /* LE CARD IN ARRIVO DOPO L'INTERRUTTORE (25 nov 2026, cantiere
+     scatti-home): vedi `attesa` in filaCardP2P. Vale solo finche' la
+     domanda partita dal tocco non torna (giroFotoVetrinaP2P la spegne) */
+  const attesa = vede && !html.length && p2pFilaInArrivo;
+  const firma = (via ? 'spenta|' : '') + (attesa ? 'attesa|' : '') + html.join('');
   if (firma === p2pVetrinaFirma) return;
   p2pVetrinaFirma = firma;
-  filaCardP2P(html, via);
+  filaCardP2P(html, via, attesa);
 }
 /* LA FOTOGRAFIA PER LA FILA: una GET leggera, che il server serve dalla
    memoria (cache privata di 30 s: un rientro in Esplora subito dopo non
@@ -116999,6 +117110,7 @@ function giroFotoVetrinaP2P(){
   p2pVetrinaChiesta = Date.now();
   chiediFotoVetrinaP2P().catch(() => false).then(() => {
     p2pVetrinaInVolo = false;
+    p2pFilaInArrivo = false;
     renderVetrinaP2P();          // ridisegna se e' cambiato, e riarma il giro
   });
 }
@@ -117058,6 +117170,9 @@ function setFilaP2P(mostra){
   else timbraVisto('p2p_home_via', quando);
   if (!mostra && p2pVetrinaTimer) { clearTimeout(p2pVetrinaTimer); p2pVetrinaTimer = null; }
   if (mostra) armaFotoVetrinaP2P(true);
+  /* in arrivo solo se una domanda e' davvero partita (o in volo): senza,
+     la fascia non aspetterebbe niente */
+  p2pFilaInArrivo = !!(mostra && (p2pVetrinaTimer || p2pVetrinaInVolo));
   renderVetrinaP2P();
 }
 function renderLevaFilaP2P(){

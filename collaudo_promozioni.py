@@ -242,10 +242,11 @@ def main():
     come(1)
     li = asyncio.run(server.listino_promo(vecchio, "", ""))
     prova("le promozioni sono accese di serie", True, li["attive"])
-    prova("In cima costa la leva, e si puo' subito (vecchio di 5 giorni)",
-          (5000, 0), (li["cima"]["sats"], li["cima"]["da"]))
-    prova("In evidenza: le due durate coi loro prezzi",
-          [{"giorni": 7, "sats": 15000}, {"giorni": 15, "sats": 25000}],
+    # I PREZZI A SCALINI (25 nov 2026): a file vuote, il primo scalino
+    prova("In cima costa il primo scalino, e si puo' subito (vecchio di 5 "
+          "giorni)", (2000, 0), (li["cima"]["sats"], li["cima"]["da"]))
+    prova("Mensola: le due durate col primo scalino (15 giorni 1,7 volte)",
+          [{"giorni": 7, "sats": 5000}, {"giorni": 15, "sats": 8500}],
           li["evidenza"]["durate"])
     prova("...coi posti dalla leva, liberi", (2, 0, 0),
           (li["evidenza"]["posti"], li["evidenza"]["occupati"],
@@ -258,8 +259,8 @@ def main():
     prova("il listino di un annuncio altrui non si legge",
           "Annuncio non trovato", esito)
     ln = asyncio.run(server.listino_promo(0, "", ""))
-    prova("senza annuncio: la voce del negozio, 50.000 per 30 giorni",
-          (50000, 30, False), (ln["scoprire"]["sats"],
+    prova("senza annuncio: la voce del negozio, 20.000 per 30 giorni",
+          (20000, 30, False), (ln["scoprire"]["sats"],
                                ln["scoprire"]["giorni"],
                                ln["scoprire"]["banner"]))
 
@@ -293,7 +294,7 @@ def main():
     print("\n[In cima: fattura, ripresa, poll, incasso]")
     r, no = compra({"tipo": "cima", "annuncio_id": vecchio})
     pid = r["pagamento_id"]
-    prova("la fattura chiede 5.000 sats", 5000,
+    prova("la fattura chiede 2.000 sats", 2000,
           FATTURE[r["payment_hash"]]["sats"])
     prova("...e nel registro LNbits si riconosce", True,
           "promozione" in FATTURE[r["payment_hash"]]["memo"])
@@ -324,16 +325,24 @@ def main():
     r3, no = compra({"tipo": "cima", "annuncio_id": vecchio})
     prova("subito dopo, In cima non si ricompra (una volta ogni 24 ore)",
           True, bool(no) and "già fra i primi" in no[1])
+    # LO SCALINO DI In cima: con un annuncio gia' salito pagando, chi
+    # arriva dopo paga lo scalino suo (qui una scala corta, per vederlo)
+    _scala = server.PROMO_IN_CIMA_SCALINI
+    server.PROMO_IN_CIMA_SCALINI = ((0, 2000), (1, 5000))
+    come(2)
+    prova("...e chi arriva dopo uno salito pagando paga lo scalino dopo",
+          5000, asyncio.run(server.listino_promo(di_altro, "", ""))["cima"]["sats"])
+    server.PROMO_IN_CIMA_SCALINI = _scala
 
     # ---------------------------------------------------------------
     print("\n[In evidenza: la fila e i posti]")
     come(2)
     r, no = compra({"tipo": "evidenza:7", "annuncio_id": di_altro})
-    prova("7 giorni chiedono 15.000 sats", 15000,
+    prova("7 giorni a fila vuota chiedono 5.000 sats", 5000,
           FATTURE[r["payment_hash"]]["sats"])
     # CHI CAMBIA IDEA: 15 giorni invece di 7 chiude la fattura vecchia
     rb, _ = compra({"tipo": "evidenza:15", "annuncio_id": di_altro})
-    prova("chi cambia durata ha una fattura nuova da 25.000", 25000,
+    prova("chi cambia durata ha una fattura nuova da 8.500", 8500,
           FATTURE[rb["payment_hash"]]["sats"])
     prova("...e la vecchia diventa una lapide", "annullato",
           uno("SELECT stato FROM pagamenti WHERE id=?",
@@ -348,10 +357,12 @@ def main():
           uno("SELECT creato FROM annunci WHERE id=?",
               (di_altro,))["creato"] >= adesso)
     b = busta()
-    prova("la busta della home porta la fila In evidenza", [di_altro],
+    prova("la busta della home porta la Mensola", [di_altro],
           [a["id"] for a in b.get("in_evidenza", [])])
     prova("...e la card sa fino a quando", fino,
           b["in_evidenza"][0].get("evidenza_fino"))
+    prova("...e il «Fatto!» del bot dice la mensola", True,
+          any(tg == 2 and "sulla mensola" in t for tg, t in AVVISI))
     come(1)
     r, _ = compra({"tipo": "evidenza:7", "annuncio_id": vecchio})
     paga(r["payment_hash"])
@@ -365,11 +376,15 @@ def main():
     li4 = asyncio.run(server.listino_promo(terzo, "", ""))
     prova("il listino dice i posti pieni e la data", (2, True),
           (li4["evidenza"]["occupati"], li4["evidenza"]["libero_da"] > 0))
+    prova("...e con due posti presi il prezzo e' salito di uno scalino",
+          [10000, 17000], [x["sats"] for x in li4["evidenza"]["durate"]])
     # CHI ALLUNGA LA SUA non conta come un posto in piu'
     come(2)
     r, no = compra({"tipo": "evidenza:7", "annuncio_id": di_altro})
     prova("chi e' gia' in fila puo' allungare anche a posti pieni", "",
           no)
+    prova("...e paga lo scalino degli ALTRI: il suo posto non conta due "
+          "volte", 5000, FATTURE[r["payment_hash"]]["sats"])
     paga(r["payment_hash"])
     verifica(r["pagamento_id"])
     fino2 = uno("SELECT evidenza_fino FROM annunci WHERE id=?",
@@ -385,8 +400,22 @@ def main():
     # LA PAGINA DEDICATA (23 nov 2026) si chiede in Assistenza: accesa qui
     server.ASSISTENZA_ATTIVA = True
     AVVISI.clear(); BOTTONI.clear(); ADMIN.clear()
+    # LO SCALINO DEL NEGOZIO: un altro negozio gia' dentro alza il prezzo,
+    # ma SOLO SE HA PAGATO (25 nov 2026, Andrea: i negozi messi gratis
+    # «non devi considerarli»)
+    scrivi("UPDATE utenti SET promo_scoprire_fino=? WHERE tg_id=2",
+           (adesso + 9999,))
+    prova("un negozio messo in Da scoprire gratis non alza il prezzo",
+          20000, asyncio.run(server.listino_promo(0, "", ""))["scoprire"]["sats"])
+    scrivi("INSERT INTO pagamenti(tg_id,motivo,riferimento,importo_sats,"
+           "stato,creato,aggiornato,pagato_il) VALUES(2,'promo_scoprire','30',"
+           "20000,'pagato',?,?,?)", (adesso - 60, adesso - 60, adesso - 60))
+    prova("...uno che ha pagato si': il prezzo sale a 30.000",
+          30000, asyncio.run(server.listino_promo(0, "", ""))["scoprire"]["sats"])
+    scrivi("DELETE FROM pagamenti WHERE tg_id=2 AND motivo='promo_scoprire'")
+    scrivi("UPDATE utenti SET promo_scoprire_fino=0 WHERE tg_id=2")
     r, no = compra({"tipo": "scoprire"})
-    prova("col banner approvato la fattura chiede 50.000", 50000,
+    prova("col banner approvato la fattura chiede 20.000", 20000,
           FATTURE[r["payment_hash"]]["sats"])
     # PAGA E CHIUDE L'APP: l'orologio lo riacciuffa
     scrivi("UPDATE pagamenti SET creato=creato-99999 WHERE id=?",
@@ -478,7 +507,7 @@ def main():
     scrivi("UPDATE utenti SET ln_address='chi@wallet.it' WHERE tg_id IN (1,3)")
     esito = asyncio.run(server._rimborsa_sblocco(pid_ev, 999))
     prova("il rimborso di In evidenza riesce", True, esito["ok"])
-    prova("...paga ESATTAMENTE quel che ha incassato", 15000, USCITE[-1][1])
+    prova("...paga ESATTAMENTE quel che ha incassato", 5000, USCITE[-1][1])
     prova("...e l'annuncio esce dalla fila", 0,
           uno("SELECT evidenza_fino FROM annunci WHERE id=?",
               (vecchio,))["evidenza_fino"])
@@ -522,6 +551,17 @@ def main():
     POST.clear(); ADMIN.clear()
     pagamenti = uno("SELECT COUNT(*) FROM pagamenti")[0]
 
+    def _conti():
+        """(posti occupati, posti PAGATI per lo scalino) della mensola"""
+        c = server.db()
+        try:
+            t = int(time.time())
+            return (server.posti_evidenza(c, t)[0],
+                    server._presi_promo(c, "promo_evidenza", t))
+        finally:
+            c.close()
+    conti_prima = _conti()
+
     async def _regala(chi, testo):
         await server.comando_promossi({"id": chi}, testo)
         await asyncio.sleep(0.05)      # il post del canale e' un task
@@ -537,6 +577,11 @@ def main():
                           for x in ADMIN)))
     prova("...e la busta lo porta nella fila", True,
           regalo in [x["id"] for x in busta().get("in_evidenza", [])])
+    # IL REGALO NON ALZA IL PREZZO (25 nov 2026, Andrea: «anche le
+    # mensole le abbiamo messe gratuite [...] come se fosse 0»): prende un
+    # posto, ma lo scalino conta solo i pagati
+    prova("...prende un posto, ma lo scalino del prezzo non si muove",
+          (conti_prima[0] + 1, conti_prima[1]), _conti())
     asyncio.run(_regala(999, f"/promossi evidenza {regalo} 3"))
     prova("ridato a chi ce l'ha, i giorni si sommano", True,
           abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",
