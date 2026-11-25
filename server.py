@@ -340,6 +340,7 @@ LEVE_MAI_DAL_PANNELLO = frozenset({
     # 🔁 il coordinator e i suoi segreti
     "MOSTRO_NPUB", "P2P_PROVA_IDS", "P2P_STATISTICHE_IDS", "MOSTRO_RELAY",
     "TELEGRAM_MINIAPP_LINK", "P2P_SCONTO_SEGRETO", "RONDA_NODO_SEGRETO",
+    "BATTITO_SEGRETO",
     "P2P_EVENTI_SEGRETO", "P2P_FINESTRA_SEGRETO", "SEGRETI_PROFILO_P2P",
     "P2P_GIROCONTO_SEGRETO", "LNBITS_RISERVA_ADMIN_KEY",
     "SEGRETO_PROFILO_P2P_VIVA",
@@ -15679,6 +15680,317 @@ async def pagamenti_noti_nodo(req: Request):
           f"{sum(noti.values())} sono payout nostri", flush=True)
     return JSONResponse({"ok": True, "noti": noti},
                         headers={"Cache-Control": "no-store"})
+
+
+
+# ============ IL QUADRO DEI SERVIZI (25 nov 2026, cantiere
+# quadro-servizi, Andrea: «un monitor di tutte le applicazioni che
+# abbiamo, in che status sono, che uptime hanno») ============
+# Ogni macchina, ogni cinque minuti, dice qui «questo servizio e' vivo»
+# (deploy/battito/battito.sh, dal suo timer). Il server tiene UNA riga
+# per servizio e per fetta di cinque minuti: l'uptime e' quante fette
+# hanno un battito sulle fette passate, il silenzio si vede da solo.
+# IL SERVER BATTE PER SE' (`orologio_servizi`): «vps» non aspetta
+# nessuno. Chi guarda il VPS DA FUORI e' il relay (GUARDA_VPS in
+# battito.conf): se muore il VPS muore anche questa pagina, e la
+# sentinella con lui. Il verso giusto e' incrociato: il VPS guarda tutti
+# (i battiti che tacciono), il relay guarda il VPS.
+# LA PORTA E' IL CALCO DI QUELLA DELLA RONDA DEL NODO, con UN SEGRETO
+# SUO: chi lo ruba puo' solo far sembrare vivo un servizio morto — mai
+# leggere niente, mai muovere un sat. Vuoto o segnaposto = la rotta non
+# esiste (404), e il quadro mostra il solo VPS.
+# Il perche' in CANTIERI, «Il quadro dei servizi»; le macchine in
+# PRODUZIONE, «IL QUADRO DEI SERVIZI E I BATTITI»; il piano in
+# deploy/SE-MUORE.md.
+try:
+    from config import BATTITO_SEGRETO
+except ImportError:
+    BATTITO_SEGRETO = ""
+try:
+    from config import QUADRO_SERVIZI
+except ImportError:
+    QUADRO_SERVIZI = True        # leva di serie accesa (14 nov 2026)
+
+# I SERVIZI CHE SI CONOSCONO: (chiave, nome, macchina). Un nome che non
+# sta qui e' un 400: la tabella non si riempie di nomi inventati.
+SERVIZI_NOTI = (
+    ("vps", "Barattolo", "VPS"),
+    ("onion", "Sito .onion", "VPS"),
+    ("lnbits", "LNbits (cassaforte)", "VPS"),
+    ("nodo", "LND", "Nodo"),
+    ("mostro", "Mostro (P2P)", "Nodo"),
+    ("relay", "Relay Nostr", "Relay"),
+    ("n8n", "n8n", "Relay"),
+    ("collaudo", "Collaudo", "VM collaudo"),
+    ("runner", "Runner della CI", "VM collaudo"),
+)
+SERVIZI_FETTA_S = 300            # un battito ogni cinque minuti
+SERVIZI_SILENZIO_S = 20 * 60     # quattro battiti persi = giu' (Tor e' lento)
+SERVIZI_GIORNI = 30              # la finestra dell'uptime
+SERVIZI_BACKUP_ORE_MAX = 48      # come le ronde del nodo e del relay
+SERVIZI_BACKUP_ORE_TETTO = 100_000
+# i certificati che Caddy rinnova da solo: qui si guarda che l'abbia fatto
+SERVIZI_CERTIFICATI = ("barattolo.store", "relay.barattolo.store",
+                       "collaudo.barattolo.store")
+SERVIZI_CERT_GIORNI_MIN = 14     # sotto, un avviso al giorno
+SERVIZI_CERT_OGNI_S = 12 * 3600
+_CERTIFICATI = {}                # host -> {"giorni": int|None, "quando": t}
+_CERT_AVVISATI = {}              # host -> giorno dell'ultimo avviso
+
+
+def battito_attivo() -> bool:
+    """La porta dei battiti ESISTE? Il calco di `ronda_nodo_attiva`."""
+    return bool(BATTITO_SEGRETO and not BATTITO_SEGRETO.startswith("INCOLLA"))
+
+
+def _porta_battito(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato, confronto a tempo
+    costante e a BYTE: il calco di `_porta_ronda_nodo`."""
+    if not battito_attivo():
+        raise HTTPException(404, "Non trovato")
+    atteso = ("Bearer " + BATTITO_SEGRETO).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+def _servizi_tabelle(con) -> None:
+    """Le due tabelle nascono qui, alla prima domanda: niente migrazione."""
+    con.execute("CREATE TABLE IF NOT EXISTS servizi_fette("
+                "servizio TEXT NOT NULL, fetta INTEGER NOT NULL, "
+                "PRIMARY KEY(servizio, fetta))")
+    con.execute("CREATE TABLE IF NOT EXISTS servizi_stato("
+                "servizio TEXT PRIMARY KEY, primo REAL, ultimo REAL, "
+                "backup_ore REAL, backup_quando REAL, "
+                "giu INTEGER NOT NULL DEFAULT 0)")
+
+
+def servizi_battito(con, servizio, adesso, backup_ore=None) -> None:
+    """Un battito: la fetta (una volta sola, anche se ne arrivano due) e
+    l'ultimo. Alza ValueError su un nome sconosciuto o un'eta' del
+    backup storta — mai un 400 diretto, cosi' la prova non vuole FastAPI."""
+    if servizio not in {s[0] for s in SERVIZI_NOTI}:
+        raise ValueError("Servizio sconosciuto")
+    if backup_ore is not None:
+        if isinstance(backup_ore, bool) or not isinstance(backup_ore, int) \
+                or not 0 <= backup_ore <= SERVIZI_BACKUP_ORE_TETTO:
+            raise ValueError("Età del backup storta")
+    _servizi_tabelle(con)
+    con.execute("INSERT OR IGNORE INTO servizi_fette VALUES (?, ?)",
+                (servizio, int(adesso // SERVIZI_FETTA_S)))
+    # MAX e MIN: un battito arrivato in ritardo (Tor) non porta indietro
+    # l'ultimo, ne' avanti il primo
+    con.execute("INSERT INTO servizi_stato(servizio, primo, ultimo) "
+                "VALUES (?, ?, ?) ON CONFLICT(servizio) DO UPDATE SET "
+                "ultimo = MAX(ultimo, excluded.ultimo), "
+                "primo = MIN(primo, excluded.primo)",
+                (servizio, adesso, adesso))
+    if backup_ore is not None:
+        con.execute("UPDATE servizi_stato SET backup_ore=?, backup_quando=? "
+                    "WHERE servizio=?", (backup_ore, adesso, servizio))
+    con.commit()
+
+
+def servizi_quadro(con, adesso) -> list:
+    """Una riga per servizio noto, nell'ordine di SERVIZI_NOTI: stato
+    («su», «giu», «mai» se non ha mai battuto), secondi dall'ultimo
+    battito, uptime in % sulla finestra (dal primo battito, se e' piu'
+    vicino), eta' del backup ADESSO (quella detta, piu' il tempo passato)."""
+    _servizi_tabelle(con)
+    stati = {r[0]: r for r in con.execute(
+        "SELECT servizio, primo, ultimo, backup_ore, backup_quando "
+        "FROM servizi_stato")}
+    ora_fetta = int(adesso // SERVIZI_FETTA_S)
+    fuori = []
+    for chiave, nome, dove in SERVIZI_NOTI:
+        riga = {"chiave": chiave, "nome": nome, "dove": dove,
+                "stato": "mai", "da_s": None, "uptime": None,
+                "backup_ore": None, "backup_vecchio": False}
+        s = stati.get(chiave)
+        if s and s[2] is not None:
+            primo, ultimo = s[1], s[2]
+            riga["da_s"] = max(0, int(adesso - ultimo))
+            riga["stato"] = ("su" if adesso - ultimo <= SERVIZI_SILENZIO_S
+                             else "giu")
+            inizio = int(max(primo, adesso - SERVIZI_GIORNI * 86400)
+                         // SERVIZI_FETTA_S)
+            totali = ora_fetta - inizio + 1
+            battute = con.execute(
+                "SELECT COUNT(*) FROM servizi_fette WHERE servizio=? "
+                "AND fetta BETWEEN ? AND ?",
+                (chiave, inizio, ora_fetta)).fetchone()[0]
+            riga["uptime"] = round(min(100.0, 100.0 * battute / totali), 1)
+            if s[3] is not None and s[4] is not None:
+                eta = int(s[3] + max(0.0, adesso - s[4]) / 3600)
+                riga["backup_ore"] = eta
+                riga["backup_vecchio"] = eta > SERVIZI_BACKUP_ORE_MAX
+        fuori.append(riga)
+    return fuori
+
+
+def servizi_da_avvisare(con, adesso) -> list:
+    """[(chiave, nome, «giu»|«su», minuti)]: chi ha smesso di battere e
+    chi e' tornato, UNA volta per verso (il segno `giu` sta nella riga).
+    Un servizio che non ha mai battuto non e' giu': non e' installato."""
+    _servizi_tabelle(con)
+    nomi = {s[0]: s[1] for s in SERVIZI_NOTI}
+    fuori = []
+    for chiave, ultimo, giu in con.execute(
+            "SELECT servizio, ultimo, giu FROM servizi_stato").fetchall():
+        if chiave not in nomi or ultimo is None:
+            continue
+        muto = adesso - ultimo > SERVIZI_SILENZIO_S
+        if muto and not giu:
+            fuori.append((chiave, nomi[chiave], "giu",
+                          int((adesso - ultimo) // 60)))
+            con.execute("UPDATE servizi_stato SET giu=1 WHERE servizio=?",
+                        (chiave,))
+        elif not muto and giu:
+            fuori.append((chiave, nomi[chiave], "su", 0))
+            con.execute("UPDATE servizi_stato SET giu=0 WHERE servizio=?",
+                        (chiave,))
+    con.commit()
+    return fuori
+
+
+def servizi_pota(con, adesso) -> int:
+    """Via le fette fuori dalla finestra (piu' un giorno di margine)."""
+    _servizi_tabelle(con)
+    cur = con.execute("DELETE FROM servizi_fette WHERE fetta < ?",
+                      (int((adesso - (SERVIZI_GIORNI + 1) * 86400)
+                           // SERVIZI_FETTA_S),))
+    con.commit()
+    return cur.rowcount
+
+
+def _giorni_certificato(host: str, adesso: float):
+    """Quanti giorni mancano alla scadenza del certificato di `host`,
+    letto con la stessa verifica di un browser. None = non si legge
+    (rete giu', certificato gia' scaduto o non valido): e' un allarme."""
+    try:
+        ctx = ssl.create_default_context()
+        with socket.create_connection((host, 443), timeout=10) as s:
+            with ctx.wrap_socket(s, server_hostname=host) as t:
+                fine = ssl.cert_time_to_seconds(t.getpeercert()["notAfter"])
+        return int((fine - adesso) // 86400)
+    except Exception:
+        return None
+
+
+def _servizi_testo_avviso(chiave, nome, verso, minuti) -> str:
+    if verso == "giu":
+        return (f"🩺 <b>{html.escape(nome)}</b> non dà segni di vita da "
+                f"{minuti} minuti. Il quadro: Profilo → Amministrazione → "
+                f"🩺 Servizi; cosa fare: deploy/SE-MUORE.md.")
+    return f"🩺 <b>{html.escape(nome)}</b> è tornato."
+
+
+def _servizi_giro(adesso) -> list:
+    """Il giro dell'orologio, sincrono (gira in un filo suo): il battito
+    del VPS, i silenzi, la potatura. Connessione sua, breve."""
+    con = db()
+    try:
+        servizi_battito(con, "vps", adesso)
+        avvisi = servizi_da_avvisare(con, adesso)
+        if int(adesso // SERVIZI_FETTA_S) % 288 == 0:   # una volta al giorno
+            servizi_pota(con, adesso)
+        return avvisi
+    finally:
+        con.close()
+
+
+async def orologio_servizi():
+    """Ogni cinque minuti il giro; ogni dodici ore i certificati (non in
+    collaudo: li' si resta senza rete). Un giro che cade dice il NOME
+    dell'errore e lascia partire il prossimo."""
+    ultimo_cert = 0.0
+    while True:
+        try:
+            adesso = time.time()
+            for chiave, nome, verso, minuti in await asyncio.to_thread(
+                    _servizi_giro, adesso):
+                print(f"🩺 Servizi: {chiave} {verso}", flush=True)
+                await notifica_admin(
+                    _servizi_testo_avviso(chiave, nome, verso, minuti),
+                    argomento="errori")
+            if not MODALITA_COLLAUDO and \
+                    adesso - ultimo_cert >= SERVIZI_CERT_OGNI_S:
+                ultimo_cert = adesso
+                for host in SERVIZI_CERTIFICATI:
+                    giorni = await asyncio.to_thread(
+                        _giorni_certificato, host, adesso)
+                    _CERTIFICATI[host] = {"giorni": giorni, "quando": adesso}
+                    oggi = time.strftime("%Y-%m-%d", time.gmtime(adesso))
+                    if (giorni is None or giorni < SERVIZI_CERT_GIORNI_MIN) \
+                            and _CERT_AVVISATI.get(host) != oggi:
+                        _CERT_AVVISATI[host] = oggi
+                        quanto = ("non si legge (scaduto o non valido)"
+                                  if giorni is None
+                                  else f"scade fra {giorni} giorni")
+                        print(f"🩺 Certificato {host}: {quanto}", flush=True)
+                        await notifica_admin(
+                            f"🩺 Il certificato di <b>{host}</b> {quanto}. "
+                            f"Caddy lo rinnova da solo: se non l'ha fatto, "
+                            f"guarda il suo journal.", argomento="errori")
+        except Exception as e:
+            print(f"⚠️ Servizi: giro saltato ({type(e).__name__}): il "
+                  "prossimo riparte da solo", flush=True)
+        await asyncio.sleep(SERVIZI_FETTA_S)
+
+
+@app.on_event("startup")
+async def avvia_quadro_servizi():
+    """La riga nel journal c'e' SEMPRE, accesa o spenta."""
+    if not QUADRO_SERVIZI:
+        print("🩺 Quadro dei servizi: spento (QUADRO_SERVIZI)", flush=True)
+        return
+    asyncio.create_task(orologio_servizi())
+    print("🩺 Quadro dei servizi: acceso — battiti delle altre macchine "
+          + ("APERTI" if battito_attivo() else
+             "CHIUSI (manca BATTITO_SEGRETO: si vede il solo VPS)"),
+          flush=True)
+
+
+@app.post("/api/battito")
+async def battito_servizio(req: Request):
+    """Una macchina dice «questo servizio e' vivo». La porta PRIMA del
+    corpo; il giudice e' `servizi_battito`. Nessuna riga nel journal per
+    battito: sarebbero cento all'ora a dire niente."""
+    _porta_battito(req.headers.get("authorization", ""))
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    if not isinstance(d, dict):
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        servizi_battito(con, str(d.get("servizio") or ""), time.time(),
+                        d.get("backup_ore"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/admin/servizi")
+def servizi_admin(x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: il quadro dei servizi e i certificati."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    try:
+        quadro = servizi_quadro(con, time.time())
+    finally:
+        con.close()
+    cert = [{"host": h, "giorni": (_CERTIFICATI.get(h) or {}).get("giorni"),
+             "letto": h in _CERTIFICATI} for h in SERVIZI_CERTIFICATI]
+    return {"servizi": quadro, "certificati": cert,
+            "battiti_aperti": battito_attivo(),
+            "cert_giorni_min": SERVIZI_CERT_GIORNI_MIN}
 
 
 
@@ -40662,6 +40974,23 @@ def _leve_stato():
         # `_swap_quota_leve`.
         {"gruppo": "🔄 Indirizzo della quota SATS Routing",
          "voci": _swap_quota_leve()},
+        # IL QUADRO DEI SERVIZI (25 nov 2026): esce il FATTO che la porta
+        # dei battiti e' aperta, mai il segreto.
+        {"gruppo": "🩺 Quadro dei servizi", "voci": [
+            _leva("Quadro dei servizi", "QUADRO_SERVIZI",
+                  bool(QUADRO_SERVIZI),
+                  acceso="ogni cinque minuti il VPS batte per sé, guarda "
+                         "chi ha smesso di battere e avvisa nella stanza "
+                         "degli errori",
+                  spento="niente battito del VPS, niente avvisi dei "
+                         "silenzi né dei certificati"),
+            _leva("Quadro dei servizi — porta dei battiti",
+                  "BATTITO_SEGRETO", battito_attivo(),
+                  acceso="le altre macchine dicono qui, ogni cinque "
+                         "minuti, quali servizi sono vivi",
+                  spento="le altre macchine non possono battere: il "
+                         "quadro mostra il solo VPS"),
+        ]},
         {"gruppo": "🔔 Avvisi ai moderatori", "voci": [
             _leva("Campanello dei nuovi iscritti", "AVVISI_ISCRITTI",
                   bool(AVVISI_ISCRITTI),

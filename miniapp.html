@@ -61880,6 +61880,15 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rk.ok) admChiaveOc = await rk.json();
     } catch(e) {}
+    /* il quadro dei servizi (25 nov 2026): si chiede SEMPRE, come le
+       leve — un servizio giu' lo si vuole vedere proprio nel giro in cui
+       non lo si stava cercando */
+    admServizi = null;
+    try {
+      const rsv = await fetch(`${API_BASE}/admin/servizi`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rsv.ok) admServizi = await rsv.json();
+    } catch(e) {}
     /* le parole dello swap automatico (2 nov 2026): solo dove lo swap
        c'e' per questo admin */
     admSwapParole = null;
@@ -62039,6 +62048,7 @@ async function loadAdminStats(){
         <div class="sub" style="margin-top:6px">Ripassa le foto già pubblicate e toglie i metadati rimasti (GPS compreso) — sicuro anche a server acceso, prima un'anteprima poi si conferma.</div>
         <button class="btn ghost" style="margin-top:8px" onclick="pulisciFotoRetroattivo()">🧹 Controlla le foto</button>
       </div>
+      ${boxServizi()}
       ${boxLeve(leve)}
       ${boxChiaveBarattolo()}
       ${boxParoleSwap()}
@@ -63109,6 +63119,51 @@ function registroModerazione(mod){
    2 firme»), e qui si vede com'è fatta e se il backup la contiene. Le
    dodici parole NON arrivano mai qui: vederle sarebbe tenerle. Nasce con
    un gesto, una volta sola. */
+/* ---- 🩺 IL QUADRO DEI SERVIZI (25 nov 2026, cantiere quadro-servizi) ----
+   Ogni macchina batte ogni cinque minuti; qui per ogni servizio lo
+   stato, l'ultimo battito, l'uptime dei 30 giorni e l'eta' del backup,
+   e sotto i certificati. SI GUARDA E BASTA: cosa fare quando uno e'
+   rosso sta in deploy/SE-MUORE.md. Il conto del cassetto dice i rossi
+   anche da chiuso, come gli allarmi delle leve. */
+let admServizi = null;
+function fraQuanto(s){
+  if (s === null || s === undefined) return '—';
+  if (s < 90) return 'adesso';
+  if (s < 3600) return `${Math.round(s / 60)} min fa`;
+  if (s < 172800) return `${Math.round(s / 3600)} ore fa`;
+  return `${Math.round(s / 86400)} giorni fa`;
+}
+function boxServizi(){
+  const q = admServizi;
+  if (!q || !Array.isArray(q.servizi)) return '';
+  const giu = q.servizi.filter(v => v.stato === 'giu' || v.backup_vecchio);
+  const certMali = (q.certificati || []).filter(c => c.letto
+    && (c.giorni === null || c.giorni < (q.cert_giorni_min || 14)));
+  const rossi = giu.length + certMali.length;
+  const pallino = v => v.stato === 'su' ? '🟢' : v.stato === 'giu' ? '🔴' : '⚪';
+  const righe = q.servizi.map(v => `
+    <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)">
+      <div style="font-size:16px;line-height:20px">${pallino(v)}</div>
+      <div style="flex:1;min-width:0">
+        <div><b>${esc(v.nome)}</b> <span class="hint">· ${esc(v.dove)}</span></div>
+        <div class="hint">${v.stato === 'mai'
+          ? 'Non ha mai dato segni di vita: il battito non è installato.'
+          : `Ultimo segnale ${fraQuanto(v.da_s)} · uptime 30 giorni <b>${String(v.uptime).replace('.', ',')}%</b>`}</div>
+        ${v.backup_ore === null ? '' : `<div class="hint"${v.backup_vecchio ? ' style="color:var(--danger)"' : ''}>${v.backup_vecchio ? '⚠️ ' : ''}Ultimo backup ${fraQuanto(v.backup_ore * 3600)}</div>`}
+      </div>
+    </div>`).join('');
+  const cert = (q.certificati || []).map(c => `
+    <div class="hint">${!c.letto ? '⚪' : (c.giorni === null || c.giorni < (q.cert_giorni_min || 14)) ? '🔴' : '🟢'}
+      ${esc(c.host)}: ${!c.letto ? 'non ancora controllato'
+        : c.giorni === null ? 'non si legge (scaduto o non valido)'
+        : `scade fra ${c.giorni} giorni`}</div>`).join('');
+  return cassettoAdm('accAdmServizi', '🩺', 'Servizi',
+    rossi ? `⚠️ ${rossi} da guardare` : 'tutto ok', `
+    <div class="sub">Ogni macchina manda un segnale ogni cinque minuti. Se uno smette, arriva un avviso nella stanza degli errori.${q.battiti_aperti ? '' : ' <b>I segnali delle altre macchine sono chiusi</b> (manca BATTITO_SEGRETO nel config): si vede solo il VPS.'}</div>
+    ${righe}
+    <div class="section-label" style="margin-top:12px">🔐 Certificati</div>
+    ${cert}`);
+}
 let admChiaveOc = null;
 function dataOraBreve(t){
   return t ? new Date(t * 1000).toLocaleString('it-IT', {day: 'numeric', month: 'short',

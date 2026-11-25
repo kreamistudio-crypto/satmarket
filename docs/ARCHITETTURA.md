@@ -263,6 +263,21 @@
   pagamenti del nodo, `deploy/nodo/ronda-pagamenti.py`, che prima di
   bussare qui ha gia' chiesto a mostro.db e ai log di mostrod — sta in
   PRODUZIONE, «LA RONDA DEL NODO OGNI ORA».
+  IL QUADRO DEI SERVIZI (25 nov 2026, cantiere quadro-servizi): la
+  porta gemella, `POST /api/battito` ({"servizio", "backup_ore"?}), col
+  suo segreto (`BATTITO_SEGRETO`, stessa forma: vuoto = 404, a byte e a
+  tempo costante, porta prima del corpo). I giudici unici:
+  `servizi_battito` (nomi da `SERVIZI_NOTI` e nient'altro, una riga per
+  servizio e per fetta di cinque minuti in `servizi_fette`, l'ultimo in
+  `servizi_stato`), `servizi_quadro` (stato su/giu/mai, uptime =
+  fette battute su fette passate nei 30 giorni o dal primo battito,
+  eta' del backup che cresce col tempo), `servizi_da_avvisare` (il
+  silenzio oltre i venti minuti e il ritorno, una volta per verso).
+  `orologio_servizi` batte per «vps», avvisa, pota, e ogni dodici ore
+  legge i certificati di `SERVIZI_CERTIFICATI` (mai in collaudo). Il
+  cassetto «🩺 Servizi» chiede `/api/admin/servizi`. Le meta' fuori dal
+  server: `deploy/battito/` (lo script, i file dei servizi di ogni
+  macchina) e `deploy/SE-MUORE.md`.
   SE MANCA LA FATTURA: `azione: 'chiedi_fattura'` scrive il passo
   `serve_fattura/altra_cassaforte`; finché è l'ultima riga della linea
   del tempo `stadio_pagamento` dà `gesto_venditore` pur restando «in

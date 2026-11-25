@@ -1489,6 +1489,17 @@ VIA_EURO_MAX_EURO = 100
 # Vuoto o segnaposto = la rotta NON ESISTE (404), e la ronda allarma
 # dopo tre ore di pagamenti che non ha potuto verificare.
 RONDA_NODO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# IL QUADRO DEI SERVIZI (25 nov 2026): il segreto con cui le altre
+# macchine (nodo, relay, VM collaudo, e lo script del VPS stesso) dicono
+# a /api/battito che i loro servizi sono vivi. Lo stesso valore va in
+# /etc/battito/battito.conf su ogni macchina (`BATTITO_SEGRETO`). UN
+# SEGRETO SUO: chi lo ruba puo' solo far sembrare vivo un servizio morto.
+# Si genera con `openssl rand -hex 32`. Vuoto o segnaposto = la rotta NON
+# ESISTE (404), e il quadro mostra il solo VPS.
+BATTITO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# Il quadro dei servizi: ogni cinque minuti il VPS batte per se', avvisa
+# chi ha smesso di battere e controlla i certificati. False lo spegne.
+QUADRO_SERVIZI = True
 # LA RIGA A OGNI PASSATA DELL'OROLOGIO P2P (17 set 2026): una al minuto
 # nel journal, anche quando non trova niente — e' quella che distingue
 # «gira a vuoto» da «non gira», che un giorno e' costata un'ora.

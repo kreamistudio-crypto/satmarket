@@ -226,3 +226,4 @@ collaudo_profilo_mio
 collaudo_nascondi_annuncio
 collaudo_foto_varianti
 collaudo_scorta_codici
+collaudo_quadro_servizi

@@ -1,0 +1,11 @@
+; Ogni cinque minuti, a ogni minuto multiplo di cinque. Persistent non
+; serve: un battito perso non si recupera, e' il silenzio che conta.
+[Unit]
+Description=Barattolo — battito ogni cinque minuti
+
+[Timer]
+OnCalendar=*:0/5
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

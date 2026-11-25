@@ -177,6 +177,13 @@ Nell'archivio, e in nessun altro posto, restano i **tre segreti** e il
    vengono dal repo. `telegram.conf`, che le serve per parlare, quello
    sì (sta in `/opt/relay/`, e il tar prende tutta la cartella).
 
+   **n8n e il battito (25 nov 2026).** Su questa macchina vive anche
+   `n8n-barattolo`: dal 25 nov è nello stesso archivio (`n8n-barattolo/`,
+   col database e il `.env` della sua chiave), e torna in `/opt` con un
+   `docker compose up -d` (`SE-MUORE.md`, «n8n»). Poi il battito
+   (`deploy/battito/`, con `GUARDA_VPS=1`): è da qui che si guarda il
+   VPS da fuori.
+
 ## Il database degli eventi non c'è nell'archivio, ed è voluto
 
 **Si salva ciò che non si ricostruisce.** Gli eventi Nostr vivono su

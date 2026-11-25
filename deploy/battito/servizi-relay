@@ -1,0 +1,3 @@
+# /etc/battito/servizi sul RELAY: nome|controllo|cartella del backup
+relay|curl -sS -m 10 -o /dev/null -H 'Accept: application/nostr+json' http://127.0.0.1:7777/|/var/backups/relay
+n8n|curl -sS -m 10 -o /dev/null http://127.0.0.1:5679/healthz|
