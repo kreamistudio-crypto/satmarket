@@ -215440,7 +215440,10 @@ const P = s => viaEuroPasso(s);
 console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia_fattura'}),
   P({stato: 'attesa_hold_venditore'}), P({stato: 'attivo'}), P({stato: 'attivo', campiLoro: {euro: {testo: 'IBAN'}}}),
   P({stato: 'euro_inviati'}), P({stato: 'rilasciato'}), P({stato: 'concluso'}), P({stato: 'annullato'}),
-  P({stato: 'in_disputa'}), P({stato: 'pagamento_ritentato'})]));
+  P({stato: 'in_disputa'}), P({stato: 'pagamento_ritentato'}),
+  P({stato: 'annullo_proposto', campiLoro: {euro: {testo: 'IBAN'}}}),
+  P({stato: 'annullo_proposto', primaAnnullo: 'euro_inviati', campiLoro: {euro: {testo: 'IBAN'}}}),
+  P({stato: 'annullo_chiesto', primaAnnullo: 'euro_inviati'})]));
 """)
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
         f.write(prog2)
@@ -215450,9 +215453,10 @@ console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia
     finally:
         os.unlink(nome2)
     prova("il passo del foglio: attesa fino al recapito, poi paga, poi controllo; "
-          "fine e pagina per il resto",
+          "fine e pagina per il resto; con l'annullo chiesto si resta su «paga», "
+          "ma a euro gia' segnati sul controllo (non si torna a «Manda»)",
           ["fine", "attesa", "attesa", "attesa", "attesa", "paga", "controllo",
-           "fine", "fine", "fine", "pagina", "pagina"],
+           "fine", "fine", "fine", "pagina", "pagina", "paga", "controllo", "controllo"],
           _js.loads(out2.stdout) if out2.returncode == 0 else out2.stderr[-300:])
 
     # --- GLI ORDINI CHE SAM NON PUO' PRENDERE (25 nov 2026) ------------------
@@ -215600,6 +215604,17 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
            (B, "la frase di sempre", amb["P2P_BOTTONE_SCAMBIO"])],
           sorted((t, x, btn.get(i, ("", ""))[0] if t == B else btn.get(i))
                  for i, (t, x, _f) in enumerate(fuori_ve)))
+    # ...e il promemoria della recensione dello scambio a lui non parte (25
+    # nov 2026, scelta lasciata a noi da Andrea): lo scambio non lo vede
+    amb["_promemoria_recensione_p2p_fermo"] = lambda c, r: ""
+    exec(_senza_prosa(pezzo("_testo_promemoria_recensione_p2p")), amb)
+    for tg in (A, B):
+        con.execute("INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                    "quando, scade, fonte) VALUES(?,'recensione',0,?,'',?,?,'recensione')",
+                    (ORDV, tg, ORA, ORA + 2000))
+    fuori_rec, _ = amb["_scarica_attese_p2p"](con, ORA + 2001, {})
+    prova("il promemoria della recensione dello scambio: a chi paga in euro "
+          "no, a chi vende si'", [B], [t for t, _x, _f in fuori_rec])
     con.close()
     # ...e i fili: il legame nasce col deposito, e il bot lo usa per le frasi
     # e per il bottone, sugli eventi e sul recapito
