@@ -39939,8 +39939,10 @@ function pannelloDaPagare(o){
      «Non hai sats?», qui niente fattura Lightning ma la strada di quello
      scambio, col suo tasto di sempre */
   const ve = typeof viaEuroScambioDellOrdine === 'function' ? viaEuroScambioDellOrdine(o.id) : null;
-  if (ve) return `<div class="payout pag-evidenza" id="ordDaPagare">
-      <button class="btn orange" onclick="viaEuroSegui('${esc(ve.id)}')">Riprendi il pagamento</button></div>`;
+  if (ve) {
+    const v = viaEuroPassoOrdine(ve);
+    return `<div class="payout pag-evidenza" id="ordDaPagare" data-orma="${esc(v.orma)}">${v.html}</div>`;
+  }
   const resta = scadenzaFatturaOrdine(o) - Date.now() / 1000;
   const corpo = (o.fattura && resta > 0)
     ? `<h4>⚡ Manca il tuo pagamento</h4>
@@ -39972,6 +39974,13 @@ function avviaOrologioOrdine(o){
     if (!box || currentOrder !== o
         || !el('view-ordine').classList.contains('active')) {
       clearInterval(orologioOrdine); orologioOrdine = null; return;
+    }
+    /* pagato in euro: si ridisegna solo quando lo scambio cambia passo */
+    const ve = typeof viaEuroScambioDellOrdine === 'function' ? viaEuroScambioDellOrdine(o.id) : null;
+    if (ve || box.dataset.orma) {
+      const v = ve ? viaEuroPassoOrdine(ve) : null;
+      if (!v || v.orma !== box.dataset.orma) box.outerHTML = pannelloDaPagare(o);
+      return;
     }
     const riga = el('ordFatturaScade');
     const resta = scadenzaFatturaOrdine(o) - Date.now() / 1000;
@@ -85519,9 +85528,31 @@ function viaEuroScambioDellOrdine(id){
     const p = tutti[k];
     if (!p || !p.viaEuro || p.lato !== 'compro' || Number(p.viaEuro.ordine) !== n) continue;
     const passo = viaEuroPasso(p);
-    if (passo === 'attesa' || passo === 'paga' || passo === 'controllo') return p;
+    if (passo === 'attesa' || passo === 'paga' || passo === 'controllo'
+        || p.stato === 'concluso' || p.stato === 'rilasciato') return p;
   }
   return null;
+}
+/* I PASSI DELLO SCAMBIO DENTRO LA PAGINA DELL'ORDINE (25 nov 2026, Andrea:
+   «dovrebbe mostrarmi l'attesa della controparte che blocca i satoshi e
+   poi dove dover pagare in euro e il bottone»): le stesse scritte del
+   foglio, una cosa per volta. A scambio finito i sats sono nel deposito:
+   resta la verifica di sempre. {orma, html} */
+function viaEuroPassoOrdine(p){
+  const passo = viaEuroPasso(p);
+  const orma = passo + ':' + p.stato + ':' + (recapitoEuroArrivatoP2P(p) ? 1 : 0);
+  const nome = nomeControparteP2P(p, 'chi vende i sats');
+  if (passo === 'attesa')
+    return {orma, html: '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>'};
+  if (passo === 'paga')
+    return {orma, html: '<h4>' + esc('Manda ' + String(p.euro) + ' € a ' + nome) + '</h4>'
+      + recapitoCompratoreP2P(p)
+      + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(p) : '')
+      + '<button type="button" class="btn primary" onclick="viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()">Ho pagato</button>'};
+  if (passo === 'controllo')
+    return {orma, html: '<h4>' + esc(nome + ' sta controllando il pagamento') + '</h4>'
+      + '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>'};
+  return {orma, html: '<button class="btn ghost" onclick="verificaDaOrdine(this)">🔄 Ho pagato — verifica</button>'};
 }
 function viaEuroRiprendiP2P(o){
   if (!o || !o.viaEuro || o.lato !== 'compro') return '';

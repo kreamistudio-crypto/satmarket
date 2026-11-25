@@ -214793,21 +214793,28 @@ def prove_non_hai_sats():
 
     # --- la pagina dell'ordine del mercatino (25 nov 2026) -------------------
     pdp = _fn_js(mini, "function pannelloDaPagare(o){")
-    prova("l'ordine pagato in euro: niente fattura Lightning ma «Riprendi il "
-          "pagamento» verso lo scambio, e niente annullo dell'ordine a meta'", True,
+    pvo = _fn_js(mini, "function viaEuroPassoOrdine(p){")
+    prova("l'ordine pagato in euro: niente fattura Lightning ma i passi dello "
+          "scambio nella pagina (attesa, dove pagare + «Ho pagato», il "
+          "controllo, la verifica), e niente annullo dell'ordine a meta'", True,
           "viaEuroScambioDellOrdine(o.id)" in pdp
-          and "onclick=\"viaEuroSegui('${esc(ve.id)}')\">Riprendi il pagamento</button>" in pdp
-          and "viaEuroScambioDellOrdine(o.id) ? ''" in mini)
+          and "const v = viaEuroPassoOrdine(ve);" in pdp
+          and "Sto preparando il pagamento…" in pvo
+          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho pagato</button>" in pvo
+          and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
+          and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
+          and "if (!v || v.orma !== box.dataset.orma) box.outerHTML = pannelloDaPagare(o);" in mini)
     prog0 = (_fn_js(mini, "function viaEuroScambioDellOrdine(id){") + r"""
 const P2P_FINALI = ['annullato'];
 const tab = {
   x: {id: 'x', lato: 'compro', viaEuro: {ordine: 7}, stato: 'attivo'},
   y: {id: 'y', lato: 'compro', viaEuro: {ordine: 8}, stato: 'annullato'},
+  v: {id: 'v', lato: 'compro', viaEuro: {ordine: 11}, stato: 'concluso'},
   z: {id: 'z', lato: 'vendo', viaEuro: {ordine: 9}, stato: 'attivo'},
   w: {id: 'w', lato: 'compro', stato: 'attivo'}};
 function ordiniP2P(){ return tab; }
 function viaEuroPasso(o){ return o.stato === 'attivo' ? 'paga' : 'fine'; }
-console.log(JSON.stringify([7, 8, 9, 10, 0].map(n => (viaEuroScambioDellOrdine(n) || {}).id || null)));
+console.log(JSON.stringify([7, 8, 9, 10, 0, 11].map(n => (viaEuroScambioDellOrdine(n) || {}).id || null)));
 """)
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
         f.write(prog0)
@@ -214816,8 +214823,8 @@ console.log(JSON.stringify([7, 8, 9, 10, 0].map(n => (viaEuroScambioDellOrdine(n
         out0 = _sp.run(["node", nome0], capture_output=True, text=True, encoding="utf-8", timeout=60)
     finally:
         os.unlink(nome0)
-    prova("...lo scambio giusto: mio, in corsa, di QUELL'ordine",
-          '["x",null,null,null,null]', (out0.stdout or out0.stderr).strip()[-300:])
+    prova("...lo scambio giusto: mio, in corsa (o finito bene), di QUELL'ordine",
+          '["x",null,null,null,null,"v"]', (out0.stdout or out0.stderr).strip()[-300:])
 
     # --- la scelta, in node ------------------------------------------------
     prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
