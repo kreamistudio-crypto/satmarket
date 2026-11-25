@@ -96284,3 +96284,15 @@ LE STRADE SCARTATE. (1) La card «Nel tuo barattolo» in foto, cinque stadi col 
 PROVATO. Scatti della pagina vera (il `miniapp.html` del ramo, servito in locale) a 390 px nei due temi: la card dell'Esplora, la testata P2P su Compra e su Vendi, e la striscia delle categorie intera. Suite severa e collaudi: vedi il verbale del commit.
 
 RESTA DA GUARDARE. Sul telefono di Andrea dopo la promozione: la striscia delle categorie, la card «Scambio P2P» e la testata P2P (il tocco che fa ballare il logo e scambia le frecce), nei due temi.
+
+## «Non hai sats?»: i ritocchi dopo la prova (25 nov 2026, cantiere via-euro-ritocchi; Andrea: «correggimi anche i punti che hai notato strada facendo»)
+
+GLI ORDINI CHE NON SI POSSONO PRENDERE. L'ordine di Alan voleva 5 scambi P2P completati, Sam non ne aveva e il tasto girava a vuoto. `viaEuroOrdiniPrendibili` toglie dal libro, per l'offerta e per la ricerca a cifra fissa, gli ordini col filtro «almeno N scambi» se il server non ha detto che li posso prendere, e quelli su cui il server ha già detto di no.
+
+I DUE PASSI (scelta di Andrea sul riquadro: «Dopo, con i due passi»). Chi paga in euro è un principiante: nella schermata dell'ordine e nel foglio «1. Manda N € a … con i dati qui sotto», il recapito, il tempo, «2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l'acquisto salta e rischi di perdere gli euro che hai mandato.» SCARTATO: toccare il tasto prima di pagare (se poi non paga, i sats di chi vende restano bloccati fino a un moderatore, e il tempo per pagare non lo protegge più). LA PAROLA: «il pagamento si annulla» faceva pensare a un rimborso (Andrea: «sembra che il pagamento gli ritorna indietro, in realtà lo perde»); la stessa frase del rischio ora sta anche nel messaggio «Manda N € a …» e nell'ultimo promemoria (`VIA_EURO_RISCHIO`).
+
+IL BOT, IL RESTO. Testi approvati da Andrea: i promemoria degli euro (a metà tempo, negli ultimi dieci minuti, senza tempo uno solo), «… chiede di annullare il pagamento» con il tasto nuovo «Annulla il pagamento» nell'ordine (solo dopo la richiesta; manda il `cancel` di sempre senza la conferma della pagina dello scambio, che parla di «scambio»), «Il pagamento del tuo acquisto si è fermato…». E «📦 Apri l'ordine» sotto OGNI avviso e attesa a chi paga in euro, dispute comprese.
+
+PROVATO. `prove_non_hai_sats`: i filtri del libro in node, i testi esatti, i passi, il promemoria e il bottone dal vero banco delle attese; suite severa e collaudi.
+
+DA GUARDARE. Se chi vende chiede di annullare DOPO «Ho inviato gli euro», la schermata torna al passo «Manda» (lo stato dello scambio non ricorda il «pagato»). Il promemoria della recensione dopo la chiusura parla ancora dello scambio a chi paga in euro.
