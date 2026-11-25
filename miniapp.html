@@ -1097,6 +1097,23 @@
     overflow:hidden;
   }
   .card .ph img{width:100%;height:100%;object-fit:cover}
+  /* «SPONSORIZZATO» (25 nov 2026, Andrea: la card spinta in alto
+     «deve essere scontornata e messa in evidenza, magari con una
+     scritta sopra»; «in cima» come parola no). Stile scelto da lui fra
+     tre anteprime: cornice arancione con un alone e l'etichetta a
+     cavallo del bordo alto. Dura PROMO_IN_CIMA_ORE dal pagamento
+     (`sponsor_fino`), anche dopo che la card e' scesa.
+     LA CARD QUI E' overflow:visible, se no l'etichetta verrebbe tagliata
+     a meta': gli angoli della foto li arrotonda allora la foto stessa.
+     La riga della griglia ha 12px di respiro, e l'etichetta ne sporge 11. */
+  .card.sponsor{overflow:visible;
+    box-shadow:0 0 0 2px var(--orange),0 8px 22px rgba(255,138,0,.45)}
+  .card.sponsor .ph{border-radius:18px 18px 0 0}
+  .card-sponsor{position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+    z-index:5;white-space:nowrap;pointer-events:none;
+    padding:4px 10px;border-radius:999px;background:var(--orange);color:#fff;
+    font-size:11px;font-weight:800;line-height:1;
+    text-shadow:0 1px 1px rgba(74,36,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.3)}
   /* Il cartellino resta di carta CHIARA anche col tema scuro (valori
      fissi, non token): e' un'etichetta vera attaccata sulla foto, e il
      prezzo deve staccare al primo sguardo — i cartellini non
@@ -1690,7 +1707,20 @@
   @keyframes pa-vt{0%,22%{top:134px;left:52%;transform:none;box-shadow:none}
     40%{transform:scale(1.12);box-shadow:0 10px 22px rgba(0,0,0,.45)}
     62%{top:8px;left:21%;transform:scale(1.12);box-shadow:0 10px 22px rgba(0,0,0,.45)}
-    76%,100%{top:8px;left:21%;transform:none;box-shadow:none}}
+    76%,100%{top:8px;left:21%;transform:none;
+      box-shadow:0 0 0 1.5px var(--orange),0 4px 12px rgba(255,138,0,.5)}}
+  /* «SPONSORIZZATO» (25 nov 2026): arrivata in testa, la tua card si
+     accende come quella vera — la cornice arancione con l'alone e
+     l'etichetta a cavallo del bordo. Fermo = arrivo: accese. La card
+     qui non taglia (overflow visibile), se no l'etichetta sparirebbe. */
+  .pa-v.pa-vt{overflow:visible;box-shadow:0 0 0 1.5px var(--orange),0 4px 12px rgba(255,138,0,.5)}
+  .pa-v.pa-vt::before{z-index:0}
+  .pa-sp{position:absolute;top:-6px;left:50%;transform:translateX(-50%);z-index:3;
+    white-space:nowrap;padding:2px 5px;border-radius:999px;background:var(--orange);
+    color:#fff;font-size:7px;font-weight:800;line-height:1;font-style:normal;
+    animation:pa-sp 4s ease-in-out infinite}
+  @keyframes pa-sp{0%,62%{opacity:0;transform:translateX(-50%) scale(.6)}
+    74%,100%{opacity:1;transform:translateX(-50%) scale(1)}}
   @keyframes pa-va{0%,30%{top:8px;left:21%}58%,100%{top:8px;left:52%}}
   @keyframes pa-vb{0%,30%{top:8px;left:52%}58%,100%{top:134px;left:21%}}
   @keyframes pa-vc{0%,30%{top:134px;left:21%}58%,100%{top:134px;left:52%}}
@@ -21479,6 +21509,9 @@ function mapListing(a){
     /* la promozione «In evidenza» (23 nov 2026): fino a quando (unix),
        0 = nessuna. Viva la giudica il client come la lampo (inEvidenza) */
     evidenzaFino:a.evidenza_fino||0,
+    /* «Sponsorizzato» (25 nov 2026): fino a quando la card porta
+       l'etichetta (unix), 0 = mai. Viva la giudica cardHTML */
+    sponsorFino:a.sponsor_fino||0,
     /* l'asta (ago 2026): base>0 = quest'annuncio e' un'asta; viva =
        scadenza nel futuro (giudica il client come per la lampo);
        top e conteggio sono pubblici, gli offerenti mai */
@@ -29327,6 +29360,11 @@ const cardHTML = l => {
      bottone della colonna e il barattolino sta sulla foto — li'
      convivono senza pestarsi. */
   const rif = bottoneRifornisci(l);
+  /* «Sponsorizzato» (25 nov 2026): la data la scrive il server solo
+     dopo «In cima» PAGATO; qui si confronta con l'orologio, come la
+     lampo. Non e' un badge della foto — sta sul bordo della card — e
+     quindi convive con tutti gli altri. */
+  const sponsor = (+l.sponsorFino || 0) * 1000 > Date.now();
   const jar = rif ? ''
     : bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
   /* «IN EVIDENZA» (23 nov 2026): la card promossa aveva la classe `ev`,
@@ -29341,7 +29379,8 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}${sponsor?' sponsor':''}" data-vid="${l.id}">
+      ${sponsor ? `<div class="card-sponsor">${PROMO_ETICHETTA}</div>` : ''}
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
@@ -54287,13 +54326,18 @@ let promoServeBanner = false; // il negozio non ha ancora il banner approvato
    pagina dedicata, quella dei Consigliati, scritta da noi coi materiali
    del negozio. La frase e' sua; prima diceva «dopo l'ok del moderatore»,
    ma l'ok e' quello del banner, che viene prima. Dal 25 nov «la card
-   grande... in cima alla home»: e' la card che scorre in testa. */
-const SCOPRIRE_COSA = 'La card grande del tuo negozio in cima alla home e una '
+   grande... in cima alla home»: e' la card che scorre in testa; la sera
+   «in alto nella home», perche' «in cima» ad Andrea non piace. */
+const SCOPRIRE_COSA = 'La card grande del tuo negozio in alto nella home e una '
   + 'pagina dedicata, preparata da noi con le tue foto e il tuo testo.';
 /* I PREZZI A SCALINI (25 nov 2026, Andrea: «se in evidenza ci sono già 5
    card, la sesta costerà tanto»): il prezzo lo fa il server coi posti
    presi, e il foglio lo dice in una riga sotto le voci (frase approvata) */
 const PROMO_SCALINI = 'Il prezzo sale man mano che i posti si riempiono.';
+/* LA PAROLA DELLA CARD SPINTA IN ALTO (25 nov 2026, fino ad allora «In
+   cima»): un posto solo, la leggono l'etichetta sulla card, la voce del
+   foglio e la sua anteprima. Scelta da Andrea. */
+const PROMO_ETICHETTA = 'Sponsorizzato';
 const scoprireSempre = giorni =>
   `Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`;
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
@@ -54326,7 +54370,7 @@ const ICONA_PROMO = {
    centro, quella dei tondi. */
 const ANTEPRIMA_PROMO = {
   cima: '<div class="pa-v pa-va"><i></i></div><div class="pa-v pa-vb"><i></i></div>'
-      + '<div class="pa-v pa-vc"><i></i></div><div class="pa-v pa-tuo pa-vt"><i></i></div>',
+      + '<div class="pa-v pa-vc"><i></i></div><div class="pa-v pa-tuo pa-vt"><i></i><b class="pa-sp">' + PROMO_ETICHETTA + '</b></div>',
   evidenza: '<div class="pa-mensola"></div><div class="pa-card pa-tuo pa-c1"></div>'
       + '<div class="pa-card pa-c2"></div><div class="pa-card pa-c3"></div><div class="pa-card pa-c4"></div>',
   scoprire: '<div class="pa-sc pa-s1"></div><div class="pa-sc pa-s3"></div><div class="pa-sc pa-s2"></div>'
@@ -54396,8 +54440,8 @@ async function apriPromuovi(aid){
   const voci = [];
   const c = d.cima || {};
   if (c.sats > 0)
-    voci.push({tipo: 'cima', titolo: `In cima, ${fmt(c.sats)} sats`,
-      testo: 'Torna primo tra i più recenti e riesce nel canale Barattolo Vetrina.',
+    voci.push({tipo: 'cima', titolo: `${PROMO_ETICHETTA}, ${fmt(c.sats)} sats`,
+      testo: 'La tua card torna prima tra i più recenti, ben in vista per 24 ore, e riesce nel canale Barattolo Vetrina.',
       no: c.da ? `È già fra i primi: di nuovo dal ${oraPromo(c.da)}` : ''});
   const e = d.evidenza || {};
   const durate = (Array.isArray(e.durate) ? e.durate : []).filter(x => x.giorni > 0 && x.sats > 0);
@@ -54427,12 +54471,16 @@ async function apriPromuovi(aid){
   promoServeBanner = sc.sats > 0 && !sc.banner && cassettoBanner;
   if (sc.sats > 0)
     voci.push({tipo: 'scoprire',
-      titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
-      testo: (sc.fino ? `È già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
+      titolo: `Il negozio nella home, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
+      testo: (sc.fino ? `È già nella home fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
                       : SCOPRIRE_COSA)
            + ` ${scoprireSempre(sc.giorni)}`,
       serve: promoServeBanner ? 'Prima serve il banner del negozio approvato: la card è fatta con quello' : '',
-      no: (sc.banner || cassettoBanner) ? '' : 'Prima serve il banner del negozio approvato: la card è fatta con quello'});
+      /* i 10 posti (25 nov 2026, Andrea: «metti un limite di 10»): chi
+         e' gia' dentro allunga sempre, il suo posto ce l'ha */
+      no: (!!sc.libero_da && !sc.fino)
+        ? `I negozi nella home sono al completo: il prossimo posto si libera il ${dataPromo(sc.libero_da)}`
+        : (sc.banner || cassettoBanner) ? '' : 'Prima serve il banner del negozio approvato: la card è fatta con quello'});
   if (!voci.length) { toast('Le promozioni non sono attive al momento', 5000); return; }
   const libera = voci.find(v => !v.no);
   promoScelta = libera ? libera.tipo : '';
@@ -54500,11 +54548,11 @@ async function verificaPromo(pid){
       if (tipo === 'scoprire') {
         if (d.fino) myPromoScoprireFino = d.fino;
         renderBanner();
-        toast(`🏪 Fatto! Il tuo negozio è in «Da scoprire» fino al ${dataPromo(d.fino || 0)}, e poi resta fra i Consigliati.`, 7000);
+        toast(`🏪 Fatto! Il tuo negozio è nella home fino al ${dataPromo(d.fino || 0)}, e poi resta fra i Consigliati.`, 7000);
       } else if (tipo === 'evidenza') {
         toast(`⭐ Fatto! Il tuo annuncio è sulla mensola fino al ${dataPromo(d.fino || 0)}.`, 7000);
       } else {
-        toast('⬆️ Fatto! Il tuo annuncio è tornato in cima.', 6000);
+        toast('⬆️ Fatto! Il tuo annuncio è sponsorizzato per 24 ore.', 6000);
       }
       /* la vetrina si rilegge: l'annuncio e' salito, la fila e' cambiata */
       if (typeof loadListings === 'function') loadListings().catch(() => {});
@@ -54528,11 +54576,12 @@ async function chiediPromoScoprire(){
   const sc = d.scoprire || {};
   if (!d.attive || !(sc.sats > 0)) { toast('Le promozioni non sono attive al momento', 5000); return; }
   if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
+  if (sc.libero_da && !sc.fino) { toast(`I negozi nella home sono al completo: il prossimo posto si libera il ${dataPromo(sc.libero_da)}`, 7000); return; }
   chiediConferma({
-    titolo: `Il negozio in Da scoprire, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
+    titolo: `Il negozio nella home, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
     corpo: SCOPRIRE_COSA + ' '
          + scoprireSempre(sc.giorni)
-         + (sc.fino ? `\n\nÈ già in «Da scoprire» fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
+         + (sc.fino ? `\n\nÈ già nella home fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.` : '')
          + '\n\n' + PROMO_SCALINI + '\nSi paga una volta, in sats. Non è un abbonamento.',
     etichetta: 'Paga', soldi: true,
     poi: () => pagaPromo('scoprire', 0)});
