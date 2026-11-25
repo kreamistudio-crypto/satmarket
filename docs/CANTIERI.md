@@ -96083,3 +96083,20 @@ COSA. Nel conto dei posti presi per lo scalino del prezzo (`_presi_promo`) entra
 PERCHÉ COSÌ. Nessuna colonna nuova: il pagamento c'è già nel libro dei `pagamenti`, e un regalo per costruzione non ce l'ha. Il caso storto è un regalo venuto PRIMA di un pagamento sullo stesso annuncio: la catena qui finisce un po' prima della data vera, e chi compra in quei giorni paga al più uno scalino in meno, mai uno in più. Un pagamento rimborsato non è più `pagato` e non conta.
 
 PROVATO. `prove_promozioni`: i presi su un database finto con pagati, regalati, venduti, scaduti, rimborsati e due pagamenti che si sommano; i posti che contano anche i regali; LA CONTROPROVA com'è oggi in produzione (mensola e Da scoprire pieni di regali, nessun pagamento): zero ovunque. `collaudo_promozioni`: un negozio messo gratis lascia il prezzo a 20.000, uno che ha pagato lo porta a 30.000; il regalo `/promossi evidenza` prende un posto ma lo scalino non si muove. Suite intera e collaudi della vetrina.
+
+## Il collaudo dei DM Nostr aspetta anche il relay vero (25 nov 2026, cantiere promozione del pomeriggio; CI di 69a98bab rossa)
+
+La CI di 69a98bab (promozione con la correzione dei prezzi) è caduta su
+UNA riga di `collaudo_avviso_dm_nostr`: «quello pubblico vero è
+«simulato»» ha letto None. Sul PC il collaudo era verde sullo stesso
+albero. Non è l'app: `_dm_guardia` scorre i relay in ordine, fa partire
+i fili di A e B e SOLO DOPO arriva al relay vero e lo segna «simulato».
+Il collaudo aspettava che A e B fossero «connesso» e poi leggeva subito
+il terzo: sul runner lento i due fili si collegavano prima che la guardia
+avesse toccato il terzo. Cura nel solo collaudo: l'attesa comprende anche
+lo stato del relay vero (scritto, qualunque sia), poi si controlla che sia
+«simulato». Niente attese allungate, niente ritentativi. Controprove sul
+PC: con un ritardo di mezzo secondo messo apposta nella guardia prima del
+relay vero il collaudo VECCHIO è rosso («parte» invece di «simulato») e il
+NUOVO verde; con l'app rotta apposta (stato «rotto-apposta» al posto di
+«simulato») il nuovo è rosso. Codice dell'app non toccato.
