@@ -96214,3 +96214,29 @@ collaudi della vetrina; schermate dell'app vera a 360px in tema chiaro
 e scuro. DA GUARDARE sul telefono: la card in vetrina e' piu' alta
 della vicina (il bollino aggiunge una riga), e la tinta in tema scuro.
 
+
+## I battiti installati sulle quattro macchine (25 nov 2026 sera, seguito di quadro-servizi; il coordinatore, a promozione verde: «dai ad Andrea i comandi uno alla volta, partendo dal VPS»)
+
+Fatto dalle 18:15 alle 18:35 (Rome), coi comandi scritti qui e lanciati
+da Andrea dal PC: VPS, nodo (col Tor), relay (con l'occhio sul VPS e il
+backup nuovo che prende n8n, 65 MB cifrati) e VM di collaudo. Primo giro
+a mano 200 su tutti e nove i servizi, poi i timer. La voce 33 di
+DA-FARE-ANDREA si cancella; il «com'è andata» sta in PRODUZIONE, in coda
+a «IL QUADRO DEI SERVIZI E I BATTITI». LE TRE LEZIONI: il segreto negli
+appunti non regge (chi incolla in chat un risultato li sovrascrive): si
+fa sulla macchina e viaggia in una pipe ssh, mai a schermo; nelle
+virgolette doppie di PowerShell il `$` è suo; il `>` di PowerShell 5.1
+scrive UTF-16 e rovina i caratteri non ASCII, quindi `cmd /c` e
+l'impronta `sha256sum` contro il repo per ogni file portato a mano.
+
+LO STESSO CASSETTO IN `/admin` (stessa sera; Andrea, visto tutto verde:
+«questo cassetto possiamo metterlo anche nella pagina barattolo.store
+admin?»). Il cruscotto chiede `/api/admin/servizi` DOPO i suoi numeri
+(`caricaServizi`) e mette «🩺 Servizi» chiuso subito sotto «Va tutto
+bene?», col conto dei rossi sul titolo. Parole uguali a quelle approvate
+per la Mini App, niente rotta nuova; una rotta che non risponde lascia
+la pagina com'era. La riga è a due piani (nome e macchina sopra, numeri
+sotto): con le colonne della «Va tutto bene?» a 360 px i nomi lunghi si
+spezzavano. Provato: tre prove in `prove_quadro_servizi` (la rotta, le
+parole, l'`esc`; la controprova sull'`esc` le fa rosse) e gli scatti a
+390 px chiaro e scuro col quadro finto.

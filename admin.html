@@ -236,6 +236,7 @@ async function carica(){
   el('sub').textContent = 'Aggiornato alle ' + new Date(D.generato * 1000)
     .toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
   disegna();
+  caricaServizi();
   caricaGrafico();
   if (D.p2p_statistiche) caricaP2P();
   if (D.p2p_statistiche) caricaSettimanaP2P();
@@ -388,6 +389,7 @@ function disegna(){
   el('corpo').innerHTML = `
   ${sezioneDaFare()}
   ${sezioneSalute(L)}
+  <div id="sezServizi">${sezioneServizi()}</div>
   ${sezioneSettimana()}
   ${sezioneGrafico()}
 
@@ -584,6 +586,57 @@ function sezioneSalute(L){
   righe.push(!S.cambio_valido ? voceSalute('Cambio', 'urgente', 'fermo')
     : voceSalute('Cambio', S.cambio_eta_s > 900 ? 'guarda' : 'bene', 'aggiornato ' + fa(S.cambio_eta_s || 0)));
   return `<div class="sez">Va tutto bene?</div><div class="salute">${righe.join('')}</div>`;
+}
+
+/* 🩺 IL QUADRO DEI SERVIZI (25 nov 2026, seguito di quadro-servizi;
+   Andrea: «questo cassetto possiamo metterlo anche nella pagina
+   barattolo.store admin?»). Lo stesso cassetto del pannello della Mini
+   App, dalla stessa rotta e con le stesse parole approvate: qui sotto
+   «Va tutto bene?», chiuso, col conto dei rossi sul titolo. Arriva dopo
+   i numeri, e una rotta che non risponde lascia la pagina com'era. */
+let SRV = null;
+async function caricaServizi(){
+  try {
+    const r = await fetch('/api/admin/servizi', {credentials:'same-origin',
+      headers:{'X-Tg-Init-Data': intestazione()}});
+    if (!r.ok) return;
+    SRV = await r.json();
+  } catch(e) { return; }
+  const box = el('sezServizi');
+  if (!box) return;
+  const aperto = !!document.querySelector('#altroServizi[open]');
+  box.innerHTML = sezioneServizi();
+  if (aperto && el('altroServizi')) el('altroServizi').open = true;
+}
+function sezioneServizi(){
+  const q = SRV;
+  if (!q || !Array.isArray(q.servizi)) return '';
+  const minimo = q.cert_giorni_min || 14;
+  const certMale = c => c.letto && (c.giorni === null || c.giorni < minimo);
+  const rossi = q.servizi.filter(v => v.stato === 'giu' || v.backup_vecchio).length
+    + (q.certificati || []).filter(certMale).length;
+  /* una riga a due piani: nome e macchina sopra, i numeri sotto (le
+     colonne della «Va tutto bene?» spezzavano i nomi lunghi a 360px) */
+  const riga = (st, nome, sotto) => `<div class="riga${STILE[st] || ''}" style="align-items:flex-start">
+    <i class="pallino" style="margin-top:5px"></i><div style="flex:1;min-width:0">${nome}${sotto}</div></div>`;
+  const piano = (t, rosso) => `<div class="nota" style="margin-top:2px${rosso ? ';color:var(--urgente)' : ''}">${t}</div>`;
+  const righe = q.servizi.map(v => riga(
+    v.stato === 'giu' || v.backup_vecchio ? 'urgente' : v.stato === 'su' ? 'bene' : 'guarda',
+    `<b>${esc(v.nome)}</b> <small style="font-weight:700;color:var(--muted)">· ${esc(v.dove)}</small>`,
+    (v.stato === 'mai' ? piano('Non ha mai dato segni di vita: il battito non è installato.')
+      : piano(`Ultimo segnale ${fa(v.da_s || 0)} · uptime 30 giorni ${esc(String(v.uptime).replace('.', ','))}%`))
+    + (v.backup_ore === null || v.backup_ore === undefined ? ''
+      : piano(`${v.backup_vecchio ? '⚠️ ' : ''}Ultimo backup ${fa(v.backup_ore * 3600)}`, v.backup_vecchio)))).join('');
+  const cert = (q.certificati || []).map(c => voceSalute(esc(c.host),
+    !c.letto ? 'guarda' : certMale(c) ? 'urgente' : 'bene',
+    !c.letto ? 'non ancora controllato' : c.giorni === null ? 'non si legge (scaduto o non valido)'
+      : `scade fra ${c.giorni} giorni`)).join('');
+  return `<details class="grp" id="altroServizi"><summary>🩺 Servizi <span style="font-size:14px;font-weight:700;color:${rossi ? 'var(--urgente)' : 'var(--soft)'}">${rossi ? `⚠️ ${rossi} da guardare` : 'tutto ok'}</span></summary><div class="grp-b">
+    <div class="nota" style="margin-top:0">Ogni macchina manda un segnale ogni cinque minuti. Se uno smette, arriva un avviso nella stanza degli errori.${q.battiti_aperti ? '' : ' <b>I segnali delle altre macchine sono chiusi</b> (manca BATTITO_SEGRETO nel config): si vede solo il VPS.'}</div>
+    <div class="salute" style="margin-top:10px">${righe}</div>
+    <div class="nota" style="margin-top:14px">🔐 Certificati</div>
+    <div class="salute" style="margin-top:6px">${cert}</div>
+  </div></details>`;
 }
 
 /* QUESTA SETTIMANA: gli ultimi sette giorni, dai dati che la pagina ha
