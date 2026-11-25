@@ -214922,12 +214922,12 @@ def prove_non_hai_sats():
     pdp = _fn_js(mini, "function pannelloDaPagare(o){")
     pvo = _fn_js(mini, "function viaEuroPassoOrdine(p){")
     prova("l'ordine pagato in euro: niente fattura Lightning ma i passi dello "
-          "scambio nella pagina (attesa, dove pagare + «Ho pagato», il "
+          "scambio nella pagina (attesa, dove pagare + «Ho inviato gli euro», il "
           "controllo, la verifica), e niente annullo dell'ordine a meta'", True,
           "viaEuroScambioDellOrdine(o.id)" in pdp
           and "const v = viaEuroPassoOrdine(ve);" in pdp
           and "Sto preparando il pagamento…" in pvo
-          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho pagato</button>" in pvo
+          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho inviato gli euro</button>" in pvo
           and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
           and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
           and "if (!v || v.orma !== ormaBox) box.outerHTML = pannelloDaPagare(o);" in mini)
@@ -214967,7 +214967,7 @@ r.base = viaEuroScelta([O('a')], 40000, per, 0.02, {});
 r.premio = viaEuroScelta([O('a', {premium: 5}), O('b', {premium: 1})], 40000, per, 0.02, {});
 r.metodi = viaEuroScelta([O('a', {metodi: ['Wise', 'Contanti']}), O('b', {metodi: ['Satispay', 'SEPA', 'Revolut'], premium: 5})], 40000, per, 0.02, {});
 r.veloci = viaEuroScelta([O('a', {metodi: ['PayPal', 'Contanti']}), O('b', {metodi: ['Revolut'], premium: 5})], 40000, per, 0.02, {});
-r.nonHo = viaEuroScelta([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['PayPal', 'Revolut'], premium: 5})], 40000, per, 0.02, {}, ['Revolut']);
+r.nonHo = viaEuroScelta([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Satispay', 'Revolut'], premium: 5})], 40000, per, 0.02, {}, ['Revolut']);
 r.nonHoTutti = viaEuroScelta([O('a', {metodi: ['Revolut']})], 40000, per, 0.02, {}, ['Revolut']);
 r.fuori = viaEuroScelta([O('a', {euro: 50, euroMax: 100}), O('b', {euroMax: 30})], 40000, per, 0.02, {});
 r.unico = viaEuroScelta([O('a', {euro: 41, euroMax: 0}), O('b', {euro: 45, euroMax: 0})], 40000, per, 0.02, {});
@@ -214992,13 +214992,14 @@ console.log(JSON.stringify(r));
     prova("un ordine a intervallo: la cifra in euro INTERI, col margine",
           ["a", 41, ["SEPA Instant"]], [r["base"]["id"], r["base"]["euro"], r["base"]["metodi"]])
     prova("...fra due, il premio piu' basso (la cifra piu' bassa)", "b", r["premio"]["id"])
-    prova("...solo i metodi VELOCI (SEPA Instant, Satispay, Revolut, PayPal), e si "
+    prova("...solo i metodi VELOCI (SEPA Instant, Satispay, Revolut), e si "
           "mostrano solo quelli: niente lenti ne' contanti",
           ["b", ["Satispay", "Revolut"]], [r["metodi"]["id"], r["metodi"]["metodi"]])
-    prova("...anche PayPal e Revolut contano (25 nov 2026, «Tutti i veloci»)",
-          ["a", ["PayPal"]], [r["veloci"]["id"], r["veloci"]["metodi"]])
+    prova("...Revolut conta (25 nov 2026, «Tutti i veloci»), PayPal no "
+          "(«leva PayPal»: si contesta dopo, coi sats gia' partiti)",
+          ["b", ["Revolut"]], [r["veloci"]["id"], r["veloci"]["metodi"]])
     prova("...«Non ho Revolut»: quel metodo sparisce, si passa all'offerta dopo",
-          ["b", ["PayPal"], None],
+          ["b", ["Satispay"], None],
           [r["nonHo"]["id"], r["nonHo"]["metodi"], r["nonHoTutti"]])
     prova("...la cifra deve stare nell'intervallo", None, r["fuori"])
     prova("...un importo unico va bene solo se copre ed e' entro un euro", ["a", 41],
@@ -215011,10 +215012,10 @@ console.log(JSON.stringify(r));
     # --- i passi dopo «Continua» (secondo giro) ------------------------------
     rp = _fn_js(mini, "function renderViaEuroPasso(){")
     prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
-          "…», «Ho pagato», «… sta controllando il pagamento», «Puoi chiudere "
+          "…», «Ho inviato gli euro», «… sta controllando il pagamento», «Puoi chiudere "
           "l'app, ti avvisiamo noi.»", True,
           "Sto preparando il pagamento…" in rp and "'Manda ' + String(o.euro) + ' € a ' + nome" in rp
-          and ">Ho pagato</button>" in rp and "' sta controllando il pagamento'" in rp
+          and ">Ho inviato gli euro</button>" in rp and "' sta controllando il pagamento'" in rp
           and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
     prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
           "«Ho pagato» e' il suo gesto", True,
@@ -215194,7 +215195,7 @@ const r = {};
 r.base = viaEuroFissi([O('a'), O('b', {premium: 5}), O('c', {euroMax: 300, euro: 10}),
   O('d', {euro: 42}), O('e', {metodi: ['Wise']}), O('f', {lato: 'buy'}), O('g'),
   O('h', {sats: 50000})], 40000, per, 0.02, {g: {}});
-r.nonHo = viaEuroFissi([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Revolut', 'PayPal'], premium: 5})],
+r.nonHo = viaEuroFissi([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Revolut', 'Satispay'], premium: 5})],
   40000, per, 0.02, {}, ['Revolut']).map(c => c.id);
 r.pari = viaEuroFissi([O('a', {creato: 5}), O('b', {creato: 9})], 40000, per, 0.02, {}).map(c => c.id);
 r.storti = [viaEuroFissi([O('a')], 0, per, 0.02, {}).length, viaEuroFissi(null, 1, per, 0.02, {}).length];
