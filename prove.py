@@ -31816,12 +31816,13 @@ def prove_pagina_acquisto():
     #    client (searchbar, carrello, i due dell'offerta, il dettaglio,
     #    LA CASSA — che e' l'unica a passare da una fabbrica invece che
     #    dal markup — l'ordine, il pannello, e dall'ago 2026 il foglio
-    #    dell'offerta sul CARRELLO). Chi ne aggiunge una lo sente da
+    #    dell'offerta sul CARRELLO; DIECI dal 26 nov 2026 col budget
+    #    di «Cerco»). Chi ne aggiunge una lo sente da
     #    qui, invece di scoprirlo da un toggle che non si accende: e'
     #    aggiornaCurToggle a doverli conoscere tutti — ed e' anche il
     #    motivo per cui quel foglio non ha inventato nessun comando
     #    suo, ha aggiunto una superficie a quello che c'era gia'.
-    prova("...e le superfici del toggle sono nove", 9,
+    prova("...e le superfici del toggle sono dieci", 10,
           mini3.count('class="cur-seg'))
     prova("...tutte pescate per data-cur, mai per id", True,
           "'.cur-seg button[data-cur]'" in mini3)
@@ -205993,6 +205994,12 @@ def prove_richieste():
           ["deposito di garanzia" in avv,
            '"Offri", link_telegram("cerco", richiesta_id)' in avv,
            "_fmt_sats(rich['budget_sats'])" in avv])
+    # (26 nov 2026) il budget anche in euro, e la durata a scelta
+    prova("l'avviso dice il budget in euro quando e' in euro", True,
+          '_fmt_eur(rich["budget_eur"])' in avv or "_fmt_eur(rich['budget_eur'])" in avv)
+    prova("le durate sono tre, di serie la prima (30 giorni)", [True, True],
+          ["RICHIESTE_DURATE = (30, 60, 90)" in srv,
+           "RICHIESTE_GIORNI = RICHIESTE_DURATE[0]" in srv])
     _blocco = srv[srv.index("_RICHIESTE_PAROLE_VUOTE = frozenset("):
                   srv.index('@app.post("/api/me/avvisi-mercatino")')]
     _testi = codice(_blocco).lower() if "codice" in globals() else _blocco.lower()
@@ -206026,6 +206033,8 @@ def prove_richieste():
           "const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
           ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n"
           "const icoCategoria = c => '[' + c + ']';\n"
+          "const fmtEur = e => e.toFixed(2).replace('.', ',');\n"
+          + pezzo_js(mini, "function cercoLeggiBudget(") + "\n"
           + mini[i:f] +
           "\nconst ora = Math.floor(Date.now()/1000), f = {};\n"
           "f.molti = cercoScade(ora + 5*86400 + 60); f.uno = cercoScade(ora + 86400 + 60);\n"
@@ -206035,6 +206044,12 @@ def prove_richieste():
           "f.mia = cardRichiesta({id: 5, testo: 'buono', categoria: 'Libri',"
           " budget_sats: 0, scade: ora + 3*86400, mia: true, offerte: 2,"
           " annunci: [{id: 9, titolo: '<b>Buono</b>', prezzo_sats: 1000}]});\n"
+          "f.euro = cardRichiesta({id: 6, testo: 'bici', categoria: 'Libri',"
+          " budget_sats: 0, budget_eur: 50, scade: ora + 3*86400, mia: false});\n"
+          "f.leggi = [cercoLeggiBudget('50,5','eur'), cercoLeggiBudget('50.5','eur'),"
+          " cercoLeggiBudget('1.500','eur'), cercoLeggiBudget('1.500,25','eur'),"
+          " cercoLeggiBudget('zero','eur'), cercoLeggiBudget('55.000','sats'),"
+          " cercoLeggiBudget('','sats')];\n"
           "console.log(JSON.stringify(f));\n")
     r = _node_banco(js)
     if r is None:
@@ -206052,12 +206067,26 @@ def prove_richieste():
               [True, False, True, False, True],
               ["openDetail(9)" in _m, "<b>Buono</b>" in _m, "chiudiRichiesta(5)" in _m,
                "offriPerRichiesta" in _m, "2 offerte" in _m])
+        prova("la card col budget in euro", [True, False],
+              ["fino a <b class=\"mono\">50,00</b> €" in r.get("euro", ""),
+               "sats" in r.get("euro", "")])
+        prova("il budget letto: la virgola, il punto, le migliaia, i sats",
+              [50.5, 50.5, 1500, 1500.25, 0, 55000, 0], r.get("leggi"))
     # l'etichetta del megafono esce SOLO sopra «Sconti»: da sola andrebbe
     # sopra l'ordinamento e i filtri
     prova("l'etichetta che esce nasce nascosta e si accende solo dopo «Sconti»",
           [True, True],
           [bool(_re.search(r"\.occ-cerco \.cerco-eti\{[^}]*display:none", mini)),
            '#occasioniBanner [data-id="sconto"] ~ .occ-cerco .cerco-eti{display:block}' in mini])
+    # (26 nov 2026) l'omino accanto al titolo, l'interruttore stile
+    # Barattolo al posto della casella, il toggle € / ₿ nel budget
+    _rc = pezzo_js(mini, "function renderCerco(){")
+    prova("Cerco: l'omino nel titolo, l'interruttore, il toggle del budget",
+          [True, True, False, True],
+          ['src="/assets/scoprire/cerco-omino.webp"' in mini,
+           'role="switch"' in _rc and "mutoRichieste(" in _rc,
+           'type="checkbox"' in _rc,
+           "cercoBudgetSegue();" in mini[mini.index("function setValuta(v){"):][:6000]])
     # (25 nov 2026 sera) i due riquadri restano anche senza occasioni
     prova("Offerte e Sconti sempre in vista, fuori dal barattolo", True,
           "const vive = vistaBarattolo ? [] : OCCASIONI;" in mini)
@@ -206066,7 +206095,7 @@ def prove_richieste():
           ["const cerco = !vistaBarattolo && cercoAttivo();" in mini,
            "function cercoAttivo(){ return cercoLeva && !DEMO && !VETRINA; }" in mini])
     for _f in ("occ-offerte.webp", "occ-sconti.webp", "cerco.webp",
-               "cerco-etichetta.webp"):
+               "cerco-etichetta.webp", "cerco-omino.webp"):
         prova("il disegno %s c'e' e la rotta lo serve" % _f, (True, True),
               (os.path.exists(os.path.join("assets", "scoprire", _f)),
                '"%s"' % _f in srv[srv.index("FILE_SCOPRIRE = ("):][:900]))

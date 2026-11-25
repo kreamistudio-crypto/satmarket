@@ -38864,10 +38864,13 @@ mai il kind 0 di nessuno: regola ferrea 2).
   due file. Le foto hanno la forma `av_<negozio>_<millisecondi>.jpg`.
   Leve: `PROFILO_MIO_ATTIVO` (accesa di serie), `PROFILO_MIO_GIORNI` (30).
 - «CERCO», LE RICHIESTE DI CHI CERCA (25 nov 2026, cantiere richieste):
-  chi non trova una cosa la scrive (`testo` 4-140, categoria, budget in
-  sats facoltativo) e la richiesta VA da chi può avercela invece di
+  chi non trova una cosa la scrive (`testo` 4-140, categoria, budget
+  facoltativo in UNA valuta: `budget_sats` oppure `budget_eur`, col
+  toggle € / ₿ dal 26 nov) e la richiesta VA da chi può avercela invece di
   restare in bacheca. Tabelle: `richieste` (stato aperta | chiusa |
-  scaduta, `scade` a 14 giorni, `avvisati`, `avviso_id` = il gemello in
+  scaduta, `scade` ai giorni scelti fra `RICHIESTE_DURATE` = 30/60/90:
+  di serie il primo, fuori elenco si torna al primo, il GET li manda come
+  `durate`; `avvisati`, `avviso_id` = il gemello in
   `avvisi_ricerca`), `richieste_avvisati` (chi ha già avuto l'avviso:
   mai due volte), `richieste_offerte` (gli annunci collegati),
   `richieste_muti` (chi non vuole avvisi). Il giro: `_candidati_richiesta`

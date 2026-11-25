@@ -7819,6 +7819,7 @@ def init_db():
         testo TEXT NOT NULL,
         categoria TEXT DEFAULT '',
         budget_sats INTEGER DEFAULT 0,  -- 0 = nessun tetto
+        budget_eur REAL DEFAULT 0,      -- o in euro (allora sats a 0)
         stato TEXT DEFAULT 'aperta',    -- aperta | chiusa
         creato INTEGER, scade INTEGER,
         avvisati INTEGER DEFAULT 0,     -- quanti venditori avvisati
@@ -10567,6 +10568,13 @@ def init_db():
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # il budget di «Cerco» anche in euro (26 nov 2026, cantiere
+    # cerco-ritocchi, Andrea: «Nel budget massimo devo poter selezionare
+    # anche in euro»): la tabella e' nata il 25 col solo budget in sats
+    try:
+        con.execute("ALTER TABLE richieste ADD COLUMN budget_eur REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # il dollaro dell'andamento (14 nov 2026, cantiere prezzo-btc-p2p): la
     # tabella e' nata il 13 col solo euro, sul collaudo
     try:
@@ -64916,7 +64924,7 @@ async def elimina_avviso_ricerca(avviso_id: int,
 # l'AI per intercettare chi puo' soddisfarla». Le parti, e ognuna ha il
 # suo perche':
 #  · LA RICHIESTA: un testo, la categoria, un budget massimo in sats
-#    (facoltativo). Aperta RICHIESTE_GIORNI giorni, al piu'
+#    (facoltativo). Aperta 30, 60 o 90 giorni (RICHIESTE_DURATE), al piu'
 #    RICHIESTE_MAX_APERTE aperte per persona: una bacheca che si riempie
 #    di richieste dimenticate e' una bacheca che nessuno legge.
 #  · IL FILTRO PAROLE e' quello degli annunci (`termine_vietato`), gratis
@@ -64958,7 +64966,11 @@ try:
 except ImportError:
     RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
 RICHIESTE_MAX_APERTE = 3
-RICHIESTE_GIORNI = 14
+# QUANTO RESTA APERTA LO SCEGLIE CHI CERCA (26 nov 2026, Andrea: «dai la
+# possibilità di decidere quanto tempo lasciarlo attivo, 14 giorni è troppo
+# poco»): una delle durate, di serie la prima
+RICHIESTE_DURATE = (30, 60, 90)
+RICHIESTE_GIORNI = RICHIESTE_DURATE[0]
 RICHIESTE_VENDITORI = 5
 RICHIESTE_PREFILTRO = 20
 RICHIESTE_TETTO_GIORNO = 3
@@ -64996,7 +65008,9 @@ def _parole_richiesta(testo: str) -> list:
 
 def _richiesta_pubblica(r, mio_id: int, offerte: int) -> dict:
     return {"id": r["id"], "testo": r["testo"], "categoria": r["categoria"],
-            "budget_sats": r["budget_sats"] or 0, "scade": r["scade"],
+            "budget_sats": r["budget_sats"] or 0,
+            "budget_eur": (r["budget_eur"] if "budget_eur" in r.keys() else 0) or 0,
+            "scade": r["scade"],
             "creato": r["creato"], "stato": r["stato"],
             "mia": r["tg_id"] == mio_id, "offerte": offerte}
 
@@ -65124,8 +65138,12 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
                     (len(scelti), richiesta_id))
         con.commit()
         con.close()
-        budget = (f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
-                  if rich["budget_sats"] else "")
+        if rich.get("budget_eur"):
+            budget = f"\nBudget: fino a {_fmt_eur(rich['budget_eur'])} €"
+        elif rich["budget_sats"]:
+            budget = f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
+        else:
+            budget = ""
         testo = (f"🙋 Qualcuno cerca: <b>{html.escape(rich['testo'])}</b>"
                  f"{budget}\nSe ce l'hai, fagli un'offerta: la paga col "
                  f"deposito di garanzia, come ogni annuncio.")
@@ -65174,7 +65192,8 @@ async def lista_richieste(x_tg_init_data: str = Header(""),
                             (user["id"],)).fetchone())
     con.close()
     return {"richieste": voci, "muto": muto,
-            "max_aperte": RICHIESTE_MAX_APERTE, "giorni": RICHIESTE_GIORNI}
+            "max_aperte": RICHIESTE_MAX_APERTE, "giorni": RICHIESTE_GIORNI,
+            "durate": list(RICHIESTE_DURATE)}
 
 
 @app.post("/api/richieste")
@@ -65190,12 +65209,25 @@ async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
     categoria = d.get("categoria") or ""
     if categoria not in CATEGORIE:
         raise HTTPException(400, "Scegli la categoria")
+    # il budget in UNA valuta: in euro (col toggle € del client) o in sats
+    budget, budget_eur = 0, 0.0
     try:
-        budget = int(d.get("budget_sats") or 0)
-    except (TypeError, ValueError):
+        if d.get("budget_valuta") == "eur":
+            budget_eur = round(float(d.get("budget_eur") or 0), 2)
+        else:
+            budget = int(d.get("budget_sats") or 0)
+    except (TypeError, ValueError, OverflowError):
         raise HTTPException(400, "Budget non valido")
-    if budget < 0 or budget > 2_100_000_000_000_000:
+    if (budget < 0 or budget > 2_100_000_000_000_000
+            or not 0 <= budget_eur <= 10_000_000):
         raise HTTPException(400, "Budget non valido")
+    # la durata scelta, fra quelle ammesse (fuori elenco: la prima)
+    try:
+        giorni = int(d.get("giorni") or 0)
+    except (TypeError, ValueError, OverflowError):
+        giorni = 0
+    if giorni not in RICHIESTE_DURATE:
+        giorni = RICHIESTE_GIORNI
     # strato 1, lo stesso degli annunci
     trovato = termine_vietato(testo, "")
     if trovato:
@@ -65230,14 +65262,15 @@ async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
         cur = con.execute(
             "INSERT INTO avvisi_ricerca(tg_id, categorie, comune, lat, lon, "
             "raggio_km, prezzo_max_sats, prezzo_max_eur, parole, attivo, "
-            "creato) VALUES(?,?,'',0,0,0,?,0,?,1,?)",
-            (user["id"], f"|{categoria}|", budget, " ".join(parole), adesso))
+            "creato) VALUES(?,?,'',0,0,0,?,?,?,1,?)",
+            (user["id"], f"|{categoria}|", budget, budget_eur, " ".join(parole),
+             adesso))
         avviso_id = cur.lastrowid
     cur = con.execute(
-        "INSERT INTO richieste(tg_id, testo, categoria, budget_sats, stato, "
-        "creato, scade, avviso_id) VALUES(?,?,?,?,'aperta',?,?,?)",
-        (user["id"], testo, categoria, budget, adesso,
-         adesso + RICHIESTE_GIORNI * 86400, avviso_id))
+        "INSERT INTO richieste(tg_id, testo, categoria, budget_sats, budget_eur, "
+        "stato, creato, scade, avviso_id) VALUES(?,?,?,?,?,'aperta',?,?,?)",
+        (user["id"], testo, categoria, budget, budget_eur, adesso,
+         adesso + giorni * 86400, avviso_id))
     rid = cur.lastrowid
     con.commit()
     con.close()
@@ -127853,7 +127886,9 @@ FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp",
                  # solo col nastro di luce che li lega, «Cerco» col
                  # megafono, e la sua etichetta che esce dal riquadro
                  "occ-offerte.webp", "occ-sconti.webp", "cerco.webp",
-                 "cerco-etichetta.webp")
+                 "cerco-etichetta.webp",
+                 # l'omino che alza la mano accanto al titolo di Cerco
+                 "cerco-omino.webp")
 
 
 # Le anteprime dei reparti (ago 2026): l'og:image di

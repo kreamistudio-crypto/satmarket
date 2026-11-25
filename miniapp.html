@@ -1880,8 +1880,27 @@
     width:100%;margin-top:8px;padding:9px 12px;border-radius:10px;
     border:1px solid var(--line);background:none;color:inherit;
     font:inherit;text-align:left;cursor:pointer}
-  .cerco-muto{display:flex;gap:8px;align-items:center;margin:22px 0 8px;
-    color:var(--muted);font-size:14px}
+  /* «🔕» IN STILE BARATTOLO (26 nov 2026, Andrea: «mettimi il tasto non
+     avvisarmi delle notifiche più bello in stile barattolo»): una card
+     con l'interruttore della fascia P2P, senza il ₿ nel pallino («non
+     mettermi il simbolo di btc lì») */
+  .cerco-muto{display:flex;gap:12px;align-items:center;justify-content:space-between;
+    margin:22px 0 8px;padding:12px 14px;border-radius:14px;
+    background:var(--card);border:1px solid var(--line);
+    font-size:14px;font-weight:700;color:var(--ink)}
+  .cerco-muto .p2p-vt-btc{flex:none}
+  /* l'omino che alza la mano accanto al titolo (Andrea, 25 nov 2026:
+     «fai l'icona personalizzata dell'omino che alza la mano»), disegnato
+     con Flow e scontornato («non è scontornato»): piccolo, senza l'ombra
+     e il dondolo delle figure grandi delle schede */
+  #view-cerco .sicu-hero img.cerco-omino{width:62px;height:62px;
+    filter:none;animation:none;vertical-align:-17px;margin-right:4px}
+  /* e la pagina un filo più su («spostala leggermente più in alto») */
+  #view-cerco .sicu-hero{padding-top:0;margin-top:-8px}
+  #view-cerco .sicu-hero h2{margin-top:0}
+  /* il budget col toggle € / ₿ dentro il campo, come l'offerta */
+  .cerco-budget-campo{display:flex;gap:10px;align-items:center}
+  .cerco-budget-campo input{flex:1;min-width:0}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -17049,14 +17068,22 @@ document.getElementById('cartello')?.remove();</script>
     <button class="back" onclick="navIndietro()">← Torna</button>
     <div class="sicu">
       <div class="sicu-hero">
-        <h2>🙋 Cerco</h2>
+        <h2><img class="cerco-omino" src="/assets/scoprire/cerco-omino.webp" alt="" width="62" height="62">Cerco</h2>
         <p class="occhiello">Scrivi cosa cerchi: avvisiamo i venditori che possono avercelo</p>
       </div>
       <div class="cerco-modulo">
         <div class="field"><input id="cercoTesto" maxlength="140" autocomplete="off" placeholder="Es. un buono Amazon da 50 €"></div>
         <div class="field"><select id="cercoCat" hidden><option value=""></option></select>
           <button type="button" class="campo-scelta" id="cercoCatBtn" onclick="cercoPrepara();apriPicker('cercoCat')" aria-haspopup="dialog"><span class="cs-val"><span class="cs-vuoto">Scegli la categoria</span></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
-        <div class="field"><input id="cercoBudget" inputmode="numeric" autocomplete="off" placeholder="Budget massimo in sats (facoltativo)"></div>
+        <!-- il budget nella valuta che si sta guardando, col toggle di
+             sempre (26 nov 2026, Andrea): il toggle converte la cifra -->
+        <div class="field cerco-budget-campo"><input id="cercoBudget" inputmode="decimal" autocomplete="off" placeholder="Budget massimo (facoltativo)">
+          <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+            <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+            <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+          </div></div>
+        <div class="hint" style="margin:4px 0 6px">Quanto dura</div>
+        <div class="consegna-scelta" id="cercoGiorni" style="margin:0 0 12px"></div>
         <button class="btn orange" id="cercoInvia" onclick="inviaRichiesta()">📣 Chiedilo a tutti</button>
       </div>
       <div id="cercoCorpo"></div>
@@ -32079,6 +32106,8 @@ function setValuta(v){
      un'altra offerta. A non derivare ci pensa l'ancora: la cifra
      resta quella scritta, e il toggle la RILEGGE convertita. */
   if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
+  /* e il budget di «Cerco», con la stessa ragione: la cifra si converte */
+  if (el('view-cerco')?.classList.contains('active')) cercoBudgetSegue();
   /* e il gemello del carrello, con la stessa ragione: li' il toggle
      cambia la valuta del CAMPO, e a non far derivare la cifra ci
      pensa la sua ancora */
@@ -44555,6 +44584,9 @@ function apriCerco(testo){
   if (!cercoAttivo()) return;
   go('cerco');
   cercoPrepara();
+  cercoBudgetValuta = valutaVista;    // il campo parla la valuta di adesso
+  aggiornaCurToggle();
+  disegnaGiorniCerco();
   if (typeof testo === 'string' && el('cercoTesto')) {
     el('cercoTesto').value = testo.slice(0, 140);
     if (activeCat && activeCat !== 'Tutto' && el('cercoCat')) {
@@ -44565,6 +44597,46 @@ function apriCerco(testo){
   caricaCerco();
 }
 function chiediloATutti(){ apriCerco(el('q').value.trim()); }
+
+/* IL BUDGET IN EURO O IN SATS (26 nov 2026, Andrea: «Nel budget massimo
+   devo poter selezionare anche in euro, metti il solito toggle»): il campo
+   parla `valutaVista`, e il toggle CONVERTE la cifra scritta, come nel
+   foglio dell'offerta — o 50 euro diventerebbero 50 sats. */
+let cercoBudgetValuta = 'sats';
+/* PURA: la cifra scritta, nella sua valuta (euro con la virgola) */
+function cercoLeggiBudget(testo, valuta){
+  const t = String(testo || '').trim();
+  if (valuta === 'eur') {
+    // la virgola e' il decimale; senza virgola il punto lo e' anche lui,
+    // tranne quando fa le migliaia («1.500»)
+    let x = t.replace(/\s/g, '');
+    if (x.indexOf(',') >= 0 || /^\d{1,3}(\.\d{3})+$/.test(x)) x = x.replace(/\./g, '').replace(',', '.');
+    const n = Number(x);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+  return Math.max(0, Math.floor(Number(t.replace(/\D/g, '')) || 0));
+}
+function cercoBudgetSegue(){
+  const c = el('cercoBudget');
+  if (!c || cercoBudgetValuta === valutaVista) { cercoBudgetValuta = valutaVista; return; }
+  const n = cercoLeggiBudget(c.value, cercoBudgetValuta);
+  if (n) c.value = valutaVista === 'eur'
+    ? String(Math.round(n * eurPerSat * 100) / 100).replace('.', ',')
+    : String(Math.round(n / eurPerSat));
+  cercoBudgetValuta = valutaVista;
+}
+/* QUANTO DURA (26 nov 2026, Andrea: «dai la possibilità di decidere quanto
+   tempo lasciarlo attivo, 14 giorni è troppo poco»): le durate le manda il
+   server (`durate`), di serie la prima */
+let cercoGiorni = 30;
+function disegnaGiorniCerco(){
+  const box = el('cercoGiorni');
+  if (!box) return;
+  const durate = (cercoDati && cercoDati.durate) || [30, 60, 90];
+  if (durate.indexOf(cercoGiorni) < 0) cercoGiorni = durate[0];
+  box.innerHTML = durate.map(g =>
+    `<button type="button" class="consegna-pill${cercoGiorni === g ? ' attiva' : ''}" onclick="cercoGiorni=${Number(g)};disegnaGiorniCerco()">${Number(g)} giorni</button>`).join('');
+}
 /* le voci del modulo sono quelle di Vendi: si copiano la prima volta */
 function cercoPrepara(){
   const sel = el('cercoCat');
@@ -44592,7 +44664,9 @@ function cercoScade(sec){
   return g === 1 ? 'ancora 1 giorno' : 'scade oggi';
 }
 function cardRichiesta(r){
-  const budget = r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
+  const budget = r.budget_eur
+    ? `<div class="cerco-budget">fino a <b class="mono">${fmtEur(Number(r.budget_eur))}</b> €</div>`
+    : r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
   const conto = r.offerte ? ` · 📬 ${r.offerte} ${r.offerte === 1 ? 'offerta' : 'offerte'}` : '';
   let piede;
   if (r.mia) {
@@ -44621,25 +44695,31 @@ function renderCerco(){
     <div class="section-label" style="padding:22px 0 0">Cercano</div>
     ${altre.length ? `<div class="cerco-lista">${altre.map(cardRichiesta).join('')}</div>`
       : '<div class="hint" style="margin-top:8px">Nessuna richiesta aperta, per ora.</div>'}
-    <label class="cerco-muto"><input type="checkbox" ${d.muto ? 'checked' : ''}
-      onchange="mutoRichieste(this.checked)"> 🔕 Non avvisarmi delle richieste</label>`;
+    <div class="cerco-muto"><span>🔕 Non avvisarmi delle richieste</span>
+      <button type="button" class="p2p-vt-btc${d.muto ? ' su' : ''}" role="switch"
+        aria-checked="${d.muto ? 'true' : 'false'}" aria-label="Non avvisarmi delle richieste"
+        onclick="mutoRichieste(${d.muto ? 'false' : 'true'})"><span aria-hidden="true"></span></button></div>`;
+  disegnaGiorniCerco();
 }
 
 async function inviaRichiesta(){
   haptic();
   const testo = (el('cercoTesto').value || '').trim();
   const categoria = el('cercoCat').value || '';
-  const budget = Math.max(0, Math.floor(Number(String(el('cercoBudget').value || '0').replace(/\D/g, '')) || 0));
+  const inEuro = cercoBudgetValuta === 'eur';
+  const budget = cercoLeggiBudget(el('cercoBudget').value, cercoBudgetValuta);
   if (testo.length < 4) { toast('Scrivi cosa cerchi'); return; }
   if (!categoria) { toast('Scegli la categoria'); return; }
   const ripristina = bottoneInAttesa(el('cercoInvia'), 'Invio…');
   try {
     const r = await fetch(`${API_BASE}/richieste`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({testo, categoria, budget_sats: budget})});
+      body: JSON.stringify({testo, categoria, giorni: cercoGiorni,
+        ...(inEuro ? {budget_valuta: 'eur', budget_eur: budget} : {budget_sats: budget})})});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { const e = j.detail || 'Non ci sono riuscito, riprova'; toast(e, tempoLettura(e)); return; }
     el('cercoTesto').value = ''; el('cercoBudget').value = '';
+    cercoGiorni = 0;   // la prossima riparte dalla durata di serie
     toast('📣 Richiesta inviata: avvisiamo i venditori adatti', 5000);
     caricaCerco();
   } finally { ripristina(); }
@@ -44658,6 +44738,7 @@ async function mutoRichieste(muto){
     body: JSON.stringify({muto: !!muto})});
   if (!r.ok) { toast('Non ci sono riuscito, riprova'); return; }
   if (cercoDati) cercoDati.muto = !!muto;
+  renderCerco();
 }
 
 /* «OFFRI»: Vendi con la richiesta in mano. La categoria e' quella della

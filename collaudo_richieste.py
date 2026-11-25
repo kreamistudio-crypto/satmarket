@@ -144,8 +144,8 @@ def main():
     prova("la richiesta nasce", True, bool(r.get("ok")) and rid > 0)
     riga = righe("SELECT stato, budget_sats, scade - creato, avviso_id FROM richieste "
                  "WHERE id=?", rid)[0]
-    prova("...aperta, col budget, per 14 giorni", ("aperta", 55000, 14 * 86400),
-          riga[:3])
+    prova("...aperta, col budget, per 30 giorni (la durata di serie)",
+          ("aperta", 55000, 30 * 86400), riga[:3])
     prova("...e col suo avviso di ricerca gemello: le parole vere, la categoria, "
           "il budget", [("buono amazon", f"|{CAT}|", 55000)],
           righe("SELECT parole, categorie, prezzo_max_sats FROM avvisi_ricerca "
@@ -181,8 +181,28 @@ def main():
                   "GROUP BY tg_id", ora - 86400)
     prova("nessun venditore riceve piu' di 3 avvisi in 24 ore", True,
           all(n <= 3 for _, n in conti))
-    crea(CERCA, {"testo": "un buono carburante", "categoria": CAT})
-    crea(CERCA, {"testo": "un voucher Ryanair", "categoria": CAT})
+    prova("budget in euro storto", 400,
+          _errore(lambda: crea(CERCA, {"testo": "un buono", "categoria": CAT,
+                                       "budget_valuta": "eur", "budget_eur": -5}))[0])
+    # (26 nov 2026) il budget in euro e la durata a scelta
+    r2 = crea(CERCA, {"testo": "un buono carburante", "categoria": CAT,
+                      "budget_valuta": "eur", "budget_eur": "50.499", "giorni": 60})
+    r3 = crea(CERCA, {"testo": "un voucher Ryanair", "categoria": CAT, "giorni": 7})
+    prova("in euro: i sats a zero, gli euro coi centesimi, 60 giorni come scelto",
+          [(0, 50.5, 60 * 86400)],
+          righe("SELECT budget_sats, budget_eur, scade - creato FROM richieste WHERE id=?",
+                r2.get("id")))
+    prova("...e il gemello cerca col tetto in euro", [(0, 50.5)],
+          righe("SELECT prezzo_max_sats, prezzo_max_eur FROM avvisi_ricerca WHERE id="
+                "(SELECT avviso_id FROM richieste WHERE id=?)", r2.get("id")))
+    prova("una durata fuori elenco torna a 30 giorni", [(30 * 86400,)],
+          righe("SELECT scade - creato FROM richieste WHERE id=?", r3.get("id")))
+    prova("la bacheca dice le durate e il budget in euro", ([30, 60, 90], 50.5),
+          (lista(CERCA).get("durate"),
+           next((v["budget_eur"] for v in lista(CERCA)["richieste"]
+                 if v["id"] == r2.get("id")), None)))
+    prova("l'avviso in euro: la virgola e il simbolo", "Budget: fino a 50,50 €",
+          S._fmt_eur(50.5) and f"Budget: fino a {S._fmt_eur(50.5)} €")
     prova("la quarta richiesta aperta no", 400,
           _errore(lambda: crea(CERCA, {"testo": "un buono Zalando", "categoria": CAT}))[0])
 
