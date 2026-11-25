@@ -96142,3 +96142,75 @@ LA CURA. Fra 768 e 1023 le pillole perdono un po' d'aria (padding 9 invece di 16
 SCARTATO. Allargare la fascia della tessera fino a 940: lì il marchio intero ci sta, toglierlo sarebbe stato perderlo proprio dove c'è posto. Nascondere le scritte delle voci: cambia la topbar più di quanto serva.
 
 PROVATO. `prove_seo` ha la sentinella della fascia (con la controprova: rimesso il padding a 16, è rossa); suite severa e collaudi; scatto in /mnt/project-files/home-pc/6-topbar-stretta-dopo.png.
+
+## La card «In vetrina», i prezzi rifatti e i dieci negozi nella home (25 nov 2026 sera, cantiere sponsorizzato)
+
+Andrea, dal collaudo dei prezzi a scalini: la card spinta «In cima» deve
+«essere scontornata e messa in evidenza, magari con una scritta sopra»,
+ma senza dire «in evidenza» né «in cima» («in cima mi dà fastidio»); e
+la stessa sera ha rifatto le tre scale. DECISO, in quest'ordine:
+- PREZZI (tabelle mandate e corrette da lui nel thread): card in alto
+  2.000 fino al terzo, poi 5.000/8.000/11.000/14.000/17.000 e 20.000
+  dal nono (tetto 20.000, «aumenta in maniera più massiva» dal quinto);
+  Mensola da 7.000 a 40.000 sugli 8 posti (7/9/12/15/19/24/31/40 mila:
+  prima aveva detto 30.000 di tetto e +10.000 dal quarto al sesto, poi
+  «parte da 7.000 e arriva a 40.000, abbiamo detto»; i passi sono miei
+  e si ritoccano dalla leva); il negozio nella home 20/30/40/45 mila e
+  50.000 dal quinto al decimo, MASSIMO 10 negozi («dal 10º in poi non è
+  più possibile»). I 10 posti contano TUTTI i negozi dentro, regali
+  compresi: e' spazio, non prezzo (la stessa regola di
+  `posti_evidenza`); il prezzo resta sui soli pagati.
+- LO STILE: tre anteprime a 360px (fascia «🚀 Promosso», razzo
+  sull'angolo, etichetta a cavallo del bordo), poi con foto vere
+  ritagliate dai suoi screenshot. Scelta la terza, con la parola
+  «Sponsorizzato»; poi «non si può usare un altro titolo», «cosa di
+  inerente a barattolo», e la sua: «chiamarlo sul tappo, che riprende
+  tappo, e metterci il disegno di tappo». Tappo piccolo nell'etichetta
+  era «poco evidente»: disegnato con Google Flow (progetto Barattolo,
+  Nano Banana 2.1, dal Tappo ufficiale, su magenta pieno per
+  scontornarlo), in piedi nell'angolo in basso a destra della foto con
+  un alone arancio — l'unico angolo libero (barattolino in alto,
+  cartellino a sinistra). Scartato Tappo seduto sul bordo alto: sulla
+  prima riga finiva sopra «8 utenti», e a destra sul barattolino.
+  Visto il render nell'app vera: «non mi piace», «togli tappo chiamala
+  in un altro modo», «chiamale promosso». Sei anteprime nuove con
+  «Promosso» (etichetta sul bordo, nastro diagonale, fascia sopra la
+  foto, cornice doppia con pillola, sfumatura in cima alla foto, card
+  tinta con la scritta sul titolo): scelta la 1, poi «ho cambiato idea,
+  usa la 6» e «metti la scritta in vetrina». Finale: la card tinta
+  d'arancio chiaro (background-image, cosi' il colore della card resta
+  il suo in chiaro e in scuro) con cornice e alone, e il bollino «IN
+  VETRINA» sopra il titolo, dentro la card: niente piu' overflow
+  visibile ne' etichetta a cavallo del bordo. Tappo, il suo file e la
+  sua rotta sono usciti dal codice prima del commit.
+  LA TRAPPOLA DI PASSAGGIO: il commento su `sponsor` messo fra `const
+  rif` e `const jar` in cardHTML spingeva `const jar` oltre i 160
+  caratteri che la sentinella del rifornimento guarda: commento e riga
+  spostati sopra `const rif`.
+- DURA 24 ORE dal pagamento (`sponsor_fino`), anche dopo che la card e'
+  scesa: in alto la card non ha durata (scende con gli annunci nuovi),
+  l'etichetta si'. Il rimborso la toglie, la data no.
+- I NOMI: «In cima» -> «In vetrina» (voce, toast, bot, anteprima: la
+  parola sta in `PROMO_ETICHETTA`); «Il negozio in Da scoprire» -> «Il
+  negozio nella home» (la sezione non c'e' piu'); nella frase della
+  card grande «in cima alla home» -> «in alto nella home». Testi
+  mandati ad Andrea prima del codice.
+- L'ANIMAZIONE della voce: la card che sale in testa si accende con la
+  tinta, la cornice e il bollino sopra le righe del titolo; testo
+  della voce «...colorata e con la scritta «In vetrina» per 24 ore...»
+  mostrato ad Andrea. Mensola e negozio come prima.
+LA TRAPPOLA TROVATA: `var(--orange)` in miniapp.html NON e' definita
+(la cita un commento, nessun :root la dichiara): la cornice e
+l'etichetta uscivano trasparenti nell'app vera, mentre l'anteprima
+finta (arancio scritto a mano) era giusta. L'arancio qui e' #FF8A00 in
+chiaro, e una prova lo tiene. Le altre righe che usano var(--orange)
+(P2P) non le ho toccate: vanno guardate a parte.
+PROVATO: `prove_promozioni` (scale, posti_scoprire su un db finto, la
+guardia prima della fattura, l'etichetta in card/CSS/anteprima, nessun
+avanzo di Tappo, nessun «In cima»/«Da scoprire» nel foglio),
+`collaudo_promozioni` (etichetta 24 ore dopo l'incasso e nella busta,
+409 a posti pieni col listino che lo dice, prezzi nuovi), suite intera e
+collaudi della vetrina; schermate dell'app vera a 360px in tema chiaro
+e scuro. DA GUARDARE sul telefono: la card in vetrina e' piu' alta
+della vicina (il bollino aggiunge una riga), e la tinta in tema scuro.
+

@@ -38665,8 +38665,20 @@ mai il kind 0 di nessuno: regola ferrea 2).
   si rilegge dopo le guardie e prima della ripresa, che confrontando i
   sats rifà la fattura se la fila è cambiata. «In evidenza» per
   l'utente si chiama «Mensola» dal 25 nov; motivi, colonne e id interni
-  restano `evidenza`. Incasso `_incassa_promo` (In cima:
-  `creato` = adesso e `promo_in_cima_canale`; In evidenza:
+  restano `evidenza`. Dalla sera del 25 nov anche «In cima» per l'utente
+  si chiama «In vetrina» (la parola sta in UN posto, `PROMO_ETICHETTA`
+  nell'app) e «Da scoprire» si chiama «Il negozio nella home»; id,
+  motivi e colonne restano `cima` e `scoprire`. LA CARD IN VETRINA SI
+  VEDE: `annunci.sponsor_fino` (additiva, la scrive solo l'incasso, il
+  rimborso la azzera, gate in lettura) viaggia in `CAMPI_VETRINA`, e
+  per `PROMO_IN_CIMA_ORE` `cardHTML` accende la cornice arancio,
+  la tinta arancio chiaro (background-image sopra il colore della card)
+  e il bollino «In vetrina» sopra il titolo. I POSTI DEL NEGOZIO NELLA HOME:
+  `PROMO_SCOPRIRE_POSTI` (10; 0 = senza limite) contati da
+  `posti_scoprire` come `posti_evidenza`, regali compresi e senza chi
+  rinnova; a posti pieni `compra_promo` risponde 409 con la data, prima
+  dello scalino e della fattura. Incasso `_incassa_promo` (In cima:
+  `creato` = adesso, `sponsor_fino` e `promo_in_cima_canale`; In evidenza:
   `annunci.evidenza_fino`, che si somma, e il primo giorno in cima;
   negozio: `utenti.promo_scoprire_fino` e `promo_consigliato` = 1),
   rimborso `_disfa_promo`. Escono nella busta di prima pagina:

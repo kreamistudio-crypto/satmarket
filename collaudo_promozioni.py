@@ -246,7 +246,7 @@ def main():
     prova("In cima costa il primo scalino, e si puo' subito (vecchio di 5 "
           "giorni)", (2000, 0), (li["cima"]["sats"], li["cima"]["da"]))
     prova("Mensola: le due durate col primo scalino (15 giorni 1,7 volte)",
-          [{"giorni": 7, "sats": 5000}, {"giorni": 15, "sats": 8500}],
+          [{"giorni": 7, "sats": 7000}, {"giorni": 15, "sats": 11900}],
           li["evidenza"]["durate"])
     prova("...coi posti dalla leva, liberi", (2, 0, 0),
           (li["evidenza"]["posti"], li["evidenza"]["occupati"],
@@ -320,7 +320,15 @@ def main():
           uno("SELECT post_canale_id FROM annunci WHERE id=?",
               (vecchio,))["post_canale_id"])
     prova("chi ha pagato riceve il «Fatto!»", True,
-          any(tg == 1 and "tornato in cima" in t for tg, t in AVVISI))
+          any(tg == 1 and "per 24 ore" in t for tg, t in AVVISI))
+    # L'ETICHETTA DELLA CARD (25 nov 2026): 24 ore dal pagamento, e la
+    # vetrina la porta a chiunque
+    sf = uno("SELECT sponsor_fino FROM annunci WHERE id=?",
+             (vecchio,))["sponsor_fino"]
+    prova("...e la card porta l'etichetta per 24 ore", True,
+          abs(sf - (adesso + 24 * 3600)) < 120)
+    prova("...che la vetrina manda con la card", sf,
+          b["annunci"][0].get("sponsor_fino"))
     come(1)
     r3, no = compra({"tipo": "cima", "annuncio_id": vecchio})
     prova("subito dopo, In cima non si ricompra (una volta ogni 24 ore)",
@@ -338,11 +346,11 @@ def main():
     print("\n[In evidenza: la fila e i posti]")
     come(2)
     r, no = compra({"tipo": "evidenza:7", "annuncio_id": di_altro})
-    prova("7 giorni a fila vuota chiedono 5.000 sats", 5000,
+    prova("7 giorni a fila vuota chiedono 7.000 sats", 7000,
           FATTURE[r["payment_hash"]]["sats"])
     # CHI CAMBIA IDEA: 15 giorni invece di 7 chiude la fattura vecchia
     rb, _ = compra({"tipo": "evidenza:15", "annuncio_id": di_altro})
-    prova("chi cambia durata ha una fattura nuova da 8.500", 8500,
+    prova("chi cambia durata ha una fattura nuova da 11.900", 11900,
           FATTURE[rb["payment_hash"]]["sats"])
     prova("...e la vecchia diventa una lapide", "annullato",
           uno("SELECT stato FROM pagamenti WHERE id=?",
@@ -377,14 +385,14 @@ def main():
     prova("il listino dice i posti pieni e la data", (2, True),
           (li4["evidenza"]["occupati"], li4["evidenza"]["libero_da"] > 0))
     prova("...e con due posti presi il prezzo e' salito di uno scalino",
-          [10000, 17000], [x["sats"] for x in li4["evidenza"]["durate"]])
+          [12000, 20400], [x["sats"] for x in li4["evidenza"]["durate"]])
     # CHI ALLUNGA LA SUA non conta come un posto in piu'
     come(2)
     r, no = compra({"tipo": "evidenza:7", "annuncio_id": di_altro})
     prova("chi e' gia' in fila puo' allungare anche a posti pieni", "",
           no)
     prova("...e paga lo scalino degli ALTRI: il suo posto non conta due "
-          "volte", 5000, FATTURE[r["payment_hash"]]["sats"])
+          "volte", 9000, FATTURE[r["payment_hash"]]["sats"])
     paga(r["payment_hash"])
     verifica(r["pagamento_id"])
     fino2 = uno("SELECT evidenza_fino FROM annunci WHERE id=?",
@@ -412,6 +420,19 @@ def main():
            "20000,'pagato',?,?,?)", (adesso - 60, adesso - 60, adesso - 60))
     prova("...uno che ha pagato si': il prezzo sale a 30.000",
           30000, asyncio.run(server.listino_promo(0, "", ""))["scoprire"]["sats"])
+    # I POSTI DEL NEGOZIO NELLA HOME (25 nov 2026, Andrea: «metti un
+    # limite di 10»): qui uno solo, per vederlo. Contano tutti i negozi
+    # dentro, e la fattura non nasce
+    _posti = server.PROMO_SCOPRIRE_POSTI
+    server.PROMO_SCOPRIRE_POSTI = 1
+    r, no = compra({"tipo": "scoprire"})
+    prova("a posti pieni il negozio non conia fattura, e sa quando si "
+          "libera un posto", (409, True),
+          (no[0] if no else None, "si libera il" in (no[1] if no else "")))
+    ls = asyncio.run(server.listino_promo(0, "", ""))["scoprire"]
+    prova("...e il listino lo dice al foglio", (1, 1, True),
+          (ls["posti"], ls["occupati"], ls["libero_da"] > 0))
+    server.PROMO_SCOPRIRE_POSTI = _posti
     scrivi("DELETE FROM pagamenti WHERE tg_id=2 AND motivo='promo_scoprire'")
     scrivi("UPDATE utenti SET promo_scoprire_fino=0 WHERE tg_id=2")
     r, no = compra({"tipo": "scoprire"})
@@ -507,7 +528,7 @@ def main():
     scrivi("UPDATE utenti SET ln_address='chi@wallet.it' WHERE tg_id IN (1,3)")
     esito = asyncio.run(server._rimborsa_sblocco(pid_ev, 999))
     prova("il rimborso di In evidenza riesce", True, esito["ok"])
-    prova("...paga ESATTAMENTE quel che ha incassato", 5000, USCITE[-1][1])
+    prova("...paga ESATTAMENTE quel che ha incassato", 9000, USCITE[-1][1])
     prova("...e l'annuncio esce dalla fila", 0,
           uno("SELECT evidenza_fino FROM annunci WHERE id=?",
               (vecchio,))["evidenza_fino"])

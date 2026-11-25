@@ -1906,20 +1906,30 @@ except ImportError:
 # raggiunta: con 0 presi il primo, e oltre l'ultimo resta l'ultimo. Il
 # conto dei presi si fa alla FATTURA (`_presi_promo`), come i posti.
 # Una scala vuota = quella promozione e' spenta (le altre restano). I
-# numeri sono quelli proposti il 25 nov e approvati da Andrea («ok»).
+# numeri sono quelli proposti il 25 nov e approvati da Andrea («ok»),
+# rifatti la sera stessa (Andrea: la mensola «un po' troppo cara», da
+# 7.000 a 40.000; la card in alto al massimo 20.000; il negozio nella
+# home da 20.000 a 50.000, massimo 10).
 # Prima erano prezzi fissi (`PROMO_IN_CIMA_SATS` 5.000, `PROMO_EVIDENZA_
 # SATS` {7: 15.000, 15: 25.000}, `PROMO_SCOPRIRE_SATS` 50.000): quelle
 # righe, se restano nel config del VPS, non le legge piu' nessuno.
-# «⬆️ In cima»: l'annuncio torna primo fra i «Più recenti», come appena
-# pubblicato, e riesce nel nostro canale. Una volta, niente durata. I
+# «⬆️ In vetrina» (fino al 25 nov 2026 «In cima»: Andrea, «in cima mi dà
+# fastidio»; scartati «Sponsorizzato», «Sul tappo», «Promosso» e Tappo
+# disegnato nella card, la parola e lo stile sono suoi): l'annuncio torna primo fra i «Più recenti», come
+# appena pubblicato, e riesce nel nostro canale. In alto non ha durata
+# (scende con gli annunci nuovi), ma per PROMO_IN_CIMA_ORE ore la card
+# e' tinta d'arancio, con la cornice e la scritta «In vetrina»
+# (`sponsor_fino`). I
 # presi sono gli annunci saliti in cima PAGANDO nelle ultime
 # PROMO_IN_CIMA_ORE ore.
 try:
     from config import PROMO_IN_CIMA_SCALINI
 except ImportError:
-    PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))
+    PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (4, 8_000), (5, 11_000),
+                             (6, 14_000), (7, 17_000), (8, 20_000))
 # ...al massimo una volta ogni tante ore per annuncio: il conto parte da
-# quando l'annuncio e' salito in cima l'ultima volta (o e' nato).
+# quando l'annuncio e' salito in cima l'ultima volta (o e' nato). Sono
+# anche le ore della scritta «In vetrina».
 try:
     from config import PROMO_IN_CIMA_ORE
 except ImportError:
@@ -1932,8 +1942,9 @@ except ImportError:
 try:
     from config import PROMO_EVIDENZA_SCALINI
 except ImportError:
-    PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),
-                              (5, 25_000), (6, 35_000), (7, 50_000))
+    PROMO_EVIDENZA_SCALINI = ((0, 7_000), (1, 9_000), (2, 12_000),
+                              (3, 15_000), (4, 19_000), (5, 24_000),
+                              (6, 31_000), (7, 40_000))
 try:
     from config import PROMO_EVIDENZA_DURATE
 except ImportError:
@@ -1945,21 +1956,30 @@ try:
     from config import PROMO_EVIDENZA_POSTI
 except ImportError:
     PROMO_EVIDENZA_POSTI = 8
-# «🏪 Il negozio in Da scoprire»: la scala e per quanti giorni. Dopo
-# la scadenza la card esce da «Da scoprire» ma il negozio RESTA fra i
+# «🏪 Il negozio nella home» (fino al 25 nov 2026 «Da scoprire», che
+# come sezione non c'e' piu'): la scala e per quanti giorni. Dopo la
+# scadenza la card esce dalla home ma il negozio RESTA fra i
 # Consigliati, finche' un moderatore non lo toglie (decisione di Andrea:
-# «possono essere anche infiniti lì»). Nessun limite di posti: la fila
-# gira a ogni apertura e scorre da sola; i presi sono i negozi che ci
-# sono gia'. Una scala vuota = spenta.
+# «possono essere anche infiniti lì»). I presi sono i negozi PAGATI che
+# ci sono gia'. Una scala vuota = spenta.
 try:
     from config import PROMO_SCOPRIRE_SCALINI
 except ImportError:
     PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),
-                              (3, 50_000), (4, 70_000), (5, 100_000))
+                              (3, 45_000), (4, 50_000))
 try:
     from config import PROMO_SCOPRIRE_GIORNI
 except ImportError:
     PROMO_SCOPRIRE_GIORNI = 30
+# I posti dei negozi nella home (25 nov 2026, Andrea: «dal 10º in poi
+# non è più possibile, metti un limite di 10»). Qui contano TUTTI i
+# negozi dentro, regali compresi: e' un limite di spazio, non di
+# prezzo. Chi allunga il suo non prende un posto nuovo. 0 = nessun
+# limite.
+try:
+    from config import PROMO_SCOPRIRE_POSTI
+except ImportError:
+    PROMO_SCOPRIRE_POSTI = 10
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -10763,6 +10783,11 @@ def init_db():
                     # come la lampo: alla scadenza la card esce dalla fila
                     # da sola. La scrive solo `_incassa_promo`.
                     "evidenza_fino INTEGER DEFAULT 0",
+                    # «In vetrina» (25 nov 2026): fino a quando la card
+                    # porta l'etichetta e la cornice, dopo «In cima»
+                    # pagato. Gate in LETTURA come `evidenza_fino`; la
+                    # scrive solo `_incassa_promo`, la azzera il rimborso.
+                    "sponsor_fino INTEGER DEFAULT 0",
                     # quantita (lug 2026): i pezzi disponibili ADESSO,
                     # non lo storico. Default 1 = ogni annuncio di ieri
                     # resta un pezzo solo. INVARIANTE: stato='venduto'
@@ -31310,6 +31335,9 @@ CAMPI_VETRINA = (
     # scadenza e basta: il client confronta con l'orologio, come fa
     # con `lampo_scadenza`
     "a.evidenza_fino, "
+    # «In vetrina» (25 nov 2026): pubblico per natura come la
+    # Mensola — l'etichetta e' proprio quel che si paga per far vedere
+    "a.sponsor_fino, "
     # l'asta e' pubblica per natura (regola del cantiere: importo in
     # testa e numero di puntate si vedono, gli offerenti no): base e
     # scadenza qui, top e conteggio li aggiunge arricchisci_righe_vetrina
@@ -39870,14 +39898,14 @@ def _leve_stato():
                   bool(PROMOZIONI_ATTIVE),
                   spento="la cassa delle promozioni e' chiusa: nessuno "
                          "ne compra di nuove, quelle gia' pagate restano",
-                  acceso="i venditori possono pagare In cima, In "
-                         "evidenza e il negozio in Da scoprire"),
-            _leva("Promozione In cima: prezzi (gia' presi: sats)",
+                  acceso="i venditori possono pagare In vetrina, "
+                         "Mensola e il negozio nella home"),
+            _leva("Promozione In vetrina: prezzi (gia' presi: sats)",
                   "PROMO_IN_CIMA_SCALINI",
                   _elenco(f"{n}+ {s}" for n, s in
                           scalini_promo(PROMO_IN_CIMA_SCALINI)),
-                  spento="In cima non si vende"),
-            _leva("Promozione In cima: ore fra due volte",
+                  spento="In vetrina non si vende"),
+            _leva("Promozione In vetrina: ore (etichetta e fra due volte)",
                   "PROMO_IN_CIMA_ORE", int(PROMO_IN_CIMA_ORE or 0)),
             _leva("Promozione Mensola: prezzi 1a durata (gia' presi: sats)",
                   "PROMO_EVIDENZA_SCALINI",
@@ -39890,13 +39918,15 @@ def _leve_stato():
                   spento="la Mensola non si vende"),
             _leva("Promozione Mensola: posti", "PROMO_EVIDENZA_POSTI",
                   int(PROMO_EVIDENZA_POSTI or 0)),
-            _leva("Negozio in Da scoprire: prezzi (gia' dentro: sats)",
+            _leva("Negozio nella home: prezzi (gia' dentro: sats)",
                   "PROMO_SCOPRIRE_SCALINI",
                   _elenco(f"{n}+ {s}" for n, s in
                           scalini_promo(PROMO_SCOPRIRE_SCALINI)),
-                  spento="la card del negozio in Da scoprire non si vende"),
-            _leva("Negozio in Da scoprire: giorni", "PROMO_SCOPRIRE_GIORNI",
+                  spento="la card del negozio nella home non si vende"),
+            _leva("Negozio nella home: giorni", "PROMO_SCOPRIRE_GIORNI",
                   int(PROMO_SCOPRIRE_GIORNI or 0)),
+            _leva("Negozio nella home: posti (0 = senza limite)",
+                  "PROMO_SCOPRIRE_POSTI", int(PROMO_SCOPRIRE_POSTI or 0)),
             _leva("Link toccabili in descrizione",
                   "LINK_DESCRIZIONE_AMMESSI",
                   _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
@@ -62831,6 +62861,21 @@ def posti_evidenza(con, adesso: int, escluso: int = 0) -> tuple:
     return len(righe), (righe[len(righe) - posti] if righe else 0)
 
 
+def posti_scoprire(con, adesso: int, escluso: int = 0) -> tuple:
+    """I posti dei negozi nella home, come `posti_evidenza`:
+    (occupati, prossimo_libero), regali compresi — e' lo spazio, non il
+    prezzo. `escluso` e' il tg_id di chi rinnova: il suo posto ce l'ha.
+    PROMO_SCOPRIRE_POSTI a 0 = nessun limite."""
+    posti = max(0, int(PROMO_SCOPRIRE_POSTI or 0))
+    righe = [r["promo_scoprire_fino"] for r in con.execute(
+        "SELECT promo_scoprire_fino FROM utenti WHERE promo_scoprire_fino>? "
+        "AND tg_id<>? ORDER BY promo_scoprire_fino",
+        (adesso, int(escluso or 0)))]
+    if not posti or len(righe) < posti:
+        return len(righe), 0
+    return len(righe), righe[len(righe) - posti]
+
+
 def in_cima_da(creato: int) -> int:
     """Da quando l'annuncio puo' tornare in cima: PROMO_IN_CIMA_ORE dopo
     l'ultima volta che c'e' salito — o dopo che e' nato, che per la
@@ -63107,7 +63152,10 @@ async def listino_promo(annuncio: int = 0,
             fino = int((u["promo_scoprire_fino"] if u else 0) or 0)
             presi_sc = _presi_promo(con, "promo_scoprire", adesso,
                                     tg_id=user["id"])
+            occ_sc, libero_sc = posti_scoprire(con, adesso, user["id"])
             fuori["scoprire"] = {
+                "posti": max(0, int(PROMO_SCOPRIRE_POSTI or 0)),
+                "occupati": occ_sc, "libero_da": libero_sc,
                 "sats": prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi_sc),
                 "giorni": int(PROMO_SCOPRIRE_GIORNI or 0),
                 "banner": _banner_vivo(u),
@@ -63169,7 +63217,7 @@ async def compra_promo(req: Request,
                                          + _data_sponsor(prossimo))
         riferimento = str(aid) + (f":{giorni}" if giorni else "")
         memo = (f"Barattolo promozione #{user['id']}: "
-                + ("in cima" if motivo == "promo_cima"
+                + ("in vetrina" if motivo == "promo_cima"
                    else f"in evidenza {giorni} giorni")
                 + f", annuncio {aid}")
     else:
@@ -63183,9 +63231,15 @@ async def compra_promo(req: Request,
             con.close()
             raise HTTPException(400, "Prima serve il banner del negozio "
                                      "approvato: la card è fatta con quello")
+        _occ, prossimo = posti_scoprire(con, adesso, user["id"])
+        if prossimo:
+            con.close()
+            raise HTTPException(409, "I negozi nella home sono al "
+                                     "completo: il prossimo posto si "
+                                     "libera il " + _data_sponsor(prossimo))
         riferimento = str(giorni)
-        memo = (f"Barattolo promozione #{user['id']}: negozio in "
-                f"Da scoprire {giorni} giorni")
+        memo = (f"Barattolo promozione #{user['id']}: negozio nella "
+                f"home {giorni} giorni")
     # LO SCALINO DEL PREZZO si legge QUI, coi posti di adesso (25 nov
     # 2026): la ripresa qui sotto confronta anche i sats, quindi se nel
     # frattempo la fila si e' riempita la fattura vecchia si chiude e ne
@@ -63306,8 +63360,11 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                 con.execute("UPDATE annunci SET evidenza_fino=?, creato=? "
                             "WHERE id=?", (fino, adesso, aid))
             else:
-                con.execute("UPDATE annunci SET creato=? WHERE id=?",
-                            (adesso, aid))
+                # «In vetrina»: la scritta dura PROMO_IN_CIMA_ORE da
+                # adesso, anche quando la card e' gia' scesa
+                fino = adesso + max(0, int(PROMO_IN_CIMA_ORE or 0)) * 3600
+                con.execute("UPDATE annunci SET creato=?, sponsor_fino=? "
+                            "WHERE id=?", (adesso, fino, aid))
     elif motivo == "promo_scoprire" and giorni > 0:
         u = con.execute("SELECT promo_scoprire_fino, promo_consigliato, nome "
                         "FROM utenti WHERE tg_id=?", (p["tg_id"],)).fetchone()
@@ -63365,7 +63422,7 @@ async def _incassa_promo(pagamento_id: int) -> dict:
     try:
         if applicata and motivo == "promo_scoprire":
             await notifica(p["tg_id"],
-                           "🏪 <b>Fatto!</b> Il tuo negozio è in «Da scoprire» "
+                           "🏪 <b>Fatto!</b> Il tuo negozio è nella home "
                            f"fino al {_data_sponsor(fino)}, e poi resta fra "
                            "i Consigliati."
                            + ("\n\nPer la pagina dedicata del tuo negozio "
@@ -63380,8 +63437,8 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                            f"fino al {_data_sponsor(fino)}.")
         elif applicata:
             await notifica(p["tg_id"],
-                           "⬆️ <b>Fatto!</b> Il tuo annuncio è tornato in "
-                           "cima.")
+                           "⬆️ <b>Fatto!</b> Il tuo annuncio è in vetrina "
+                           "per 24 ore.")
     except Exception as e:
         print(f"⚠️ Avviso della promozione non partito: {e}")
     return {"stato": "pagato", "applicata": applicata, "fino": fino}
@@ -63452,6 +63509,10 @@ def _disfa_promo(con, p) -> str:
     Consigliati — il rimborso disfa tutto in un gesto, la regola di
     `_rimborsa_sblocco`."""
     aid, _g = _promo_dal_riferimento(p)
+    if p["motivo"] == "promo_cima" and aid:
+        # la data non torna indietro, la scritta «In vetrina» si'
+        con.execute("UPDATE annunci SET sponsor_fino=0 WHERE id=? "
+                    "AND venditore_id=?", (aid, p["tg_id"]))
     if p["motivo"] == "promo_evidenza" and aid:
         con.execute("UPDATE annunci SET evidenza_fino=0 WHERE id=? "
                     "AND venditore_id=?", (aid, p["tg_id"]))
@@ -126817,6 +126878,7 @@ def asset_tappo():
     tasto-avatar del Profilo, reso tondo dal CSS della pagina."""
     return FileResponse("assets/tappo.jpeg", media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
+
 
 
 @app.get("/assets/caccia-tappo.webp")
