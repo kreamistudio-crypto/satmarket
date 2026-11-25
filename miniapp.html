@@ -85173,7 +85173,14 @@ let myViaEuro = false;      // il cancello, da /api/me
 let myViaEuroMax = 0;       // il tetto in euro, da /api/me (100)
 let viaEuroSats = 0;        // il totale dell'ordine dell'ultima porta accesa
 let viaEuroLibroTentato = 0;
-const VIA_EURO_METODI = ['SEPA Instant', 'Satispay'];
+/* i metodi di chi compra senza sats: tutti i VELOCI in euro (25 nov 2026,
+   Andrea: «Tutti i veloci»; erano solo SEPA Instant e Satispay). I lenti
+   no: il deposito dell'oggetto dura 4 ore e un bonifico di giorni lo
+   farebbe scadere; i contanti a distanza non si danno. */
+const VIA_EURO_METODI = ['SEPA Instant', 'Satispay', 'Revolut', 'PayPal'];
+/* i metodi che chi compra ha detto di NON avere («Non ho Revolut»): solo
+   in memoria, finche' l'app resta aperta */
+let viaEuroNonHo = [];
 /* il margine sul cambio: il prezzo di Mostro puo' scostarsi un poco dal
    nostro, e con un sat in meno il deposito non si salda (il server ne
    ammette in piu' fino al 3% o a un euro e mezzo, l'euro intero compreso) */
@@ -85191,7 +85198,8 @@ function viaEuroPerMe(){
    euro / perSat × (1 − premio)), all'indietro, con meta' commissione a
    chi compra (`nettoLatoP2P`). A parita' di cifra, il piu' recente: e'
    piu' probabile che sia al telefono. null = niente da proporre. */
-function viaEuroScelta(ordini, sats, perSat, fee, miei){
+function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo){
+  const no = Array.isArray(nonHo) ? nonHo : [];
   if (!(sats > 0) || !(perSat > 0) || !(fee >= 0) || fee >= 2 || !Array.isArray(ordini)) return null;
   const lordo = Math.ceil(sats / (1 - fee / 2)) + 1;
   let meglio = null;
@@ -85200,7 +85208,7 @@ function viaEuroScelta(ordini, sats, perSat, fee, miei){
     if (o.stato && o.stato !== 'pending') continue;
     if (o.sats > 0 || o.coin) continue;
     if (miei && miei[o.id]) continue;
-    const metodi = (o.metodi || []).filter(m => VIA_EURO_METODI.indexOf(m) >= 0);
+    const metodi = (o.metodi || []).filter(m => VIA_EURO_METODI.indexOf(m) >= 0 && no.indexOf(m) < 0);
     if (!metodi.length) continue;
     const quota = 1 - (Number(o.premium) || 0) / 100;
     if (!(quota > 0)) continue;
@@ -85223,7 +85231,7 @@ function viaEuroOfferta(sats){
   const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
   const fee = commissioneVivaP2P();
   if (fee === null) return null;
-  const o = viaEuroScelta(p2pLibro.ordini, sats, perSat, fee, ordiniP2P());
+  const o = viaEuroScelta(p2pLibro.ordini, sats, perSat, fee, ordiniP2P(), viaEuroNonHo);
   if (!o || !(myViaEuroMax > 0) || o.euro > myViaEuroMax) return null;
   return o;
 }
@@ -85264,7 +85272,7 @@ function payViaEuroVista(sats){
 /* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
    euro interi), e sotto in piccolo da cosa e' fatto. Il metodo si
    sceglie solo se l'offerta ne ha piu' d'uno fra quelli decisi. */
-const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay'};
+const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut', 'PayPal': 'PayPal'};
 let viaEuroScelto = null;   // {id, euro, metodo} dell'offerta mostrata
 let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in memoria
 async function apriViaEuro(dove){
@@ -85320,7 +85328,27 @@ function renderViaEuro(){
     + '<div class="via-euro-sotto">prezzo ' + centesimiTestoP2P(prezzo) + ' € + '
     + centesimiTestoP2P(cambio) + ' € di cambio</div>'
     + metodi
-    + '<button type="button" class="btn primary" onclick="viaEuroContinua()">Continua</button>';
+    + '<button type="button" class="btn primary" onclick="viaEuroContinua()">Continua</button>'
+    + '<button type="button" class="btn ghost" onclick="viaEuroNonHoMetodo()">Non ho '
+    + esc(VIA_EURO_NOMI[viaEuroScelto.metodo] || viaEuroScelto.metodo) + '</button>';
+}
+/* «NON HO REVOLUT» (25 nov 2026, Andrea): quel metodo si toglie e si
+   propone l'offerta dopo, fra i metodi che restano. Senza piu' match
+   si riparte dalla porta: chi vende a cifra fissa, o il tasto si spegne. */
+function viaEuroNonHoMetodo(){
+  if (!viaEuroScelto) return;
+  haptic();
+  const m = viaEuroScelto.metodo;
+  if (m && viaEuroNonHo.indexOf(m) < 0) viaEuroNonHo.push(m);
+  const o = viaEuroOfferta(viaEuroSats);
+  if (o) {
+    viaEuroScelto = {id: o.id, euro: o.euro, metodo: o.metodi[0]};
+    renderViaEuro();
+    return;
+  }
+  viaEuroScelto = null;
+  chiudiFoglioP2P('viaEuroSheet');
+  apriViaEuro('cassa');
 }
 function viaEuroMetodo(m){
   if (!viaEuroScelto) return;
@@ -85492,7 +85520,8 @@ function viaEuroRiprendiP2P(o){
    del loro ordine, dal piu' conveniente (meno euro per Mario; a parita' il
    piu' recente). Stesse regole di `viaEuroScelta`, ma l'importo unico e'
    PIU' GRANDE di quel che serve. [{id, euro, tot}] */
-function viaEuroFissi(ordini, sats, perSat, fee, miei){
+function viaEuroFissi(ordini, sats, perSat, fee, miei, nonHo){
+  const no = Array.isArray(nonHo) ? nonHo : [];
   if (!(sats > 0) || !(perSat > 0) || !(fee >= 0) || fee >= 2 || !Array.isArray(ordini)) return [];
   const lordo = Math.ceil(sats / (1 - fee / 2)) + 1;
   const fuori = [];
@@ -85501,7 +85530,7 @@ function viaEuroFissi(ordini, sats, perSat, fee, miei){
     if (o.stato && o.stato !== 'pending') continue;
     if (o.sats > 0 || o.coin) continue;
     if (miei && miei[o.id]) continue;
-    if (!(o.metodi || []).some(m => VIA_EURO_METODI.indexOf(m) >= 0)) continue;
+    if (!(o.metodi || []).some(m => VIA_EURO_METODI.indexOf(m) >= 0 && no.indexOf(m) < 0)) continue;
     const quota = 1 - (Number(o.premium) || 0) / 100;
     if (!(quota > 0)) continue;
     const euro = Math.ceil(lordo * perSat * (1 + VIA_EURO_MARGINE) / quota);
@@ -85516,7 +85545,7 @@ function viaEuroFissiOra(sats){
   const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
   const fee = commissioneVivaP2P();
   if (fee === null) return [];
-  return viaEuroFissi(p2pLibro.ordini, sats, perSat, fee, ordiniP2P()).filter(c => c.euro <= myViaEuroMax);
+  return viaEuroFissi(p2pLibro.ordini, sats, perSat, fee, ordiniP2P(), viaEuroNonHo).filter(c => c.euro <= myViaEuroMax);
 }
 /* la ricerca di Mario, come la dice il server: {richiesta, annuncio_id, stato} */
 let viaEuroCerca = null;

@@ -214794,7 +214794,7 @@ def prove_non_hai_sats():
     # --- la scelta, in node ------------------------------------------------
     prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
             + _riga_js(mini, "const VIA_EURO_MARGINE = ")
-            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei){")
+            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo){")
             + r"""
 const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
   euro: 10, euroMax: 100, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
@@ -214803,7 +214803,10 @@ const r = {};
 // 40.000 sats, fee 2% (1% a chi compra): lordo 40.405, x0,001 x1,005 = 40,61 -> 41 €
 r.base = viaEuroScelta([O('a')], 40000, per, 0.02, {});
 r.premio = viaEuroScelta([O('a', {premium: 5}), O('b', {premium: 1})], 40000, per, 0.02, {});
-r.metodi = viaEuroScelta([O('a', {metodi: ['PayPal', 'Contanti']}), O('b', {metodi: ['Satispay', 'Revolut'], premium: 5})], 40000, per, 0.02, {});
+r.metodi = viaEuroScelta([O('a', {metodi: ['Wise', 'Contanti']}), O('b', {metodi: ['Satispay', 'SEPA', 'Revolut'], premium: 5})], 40000, per, 0.02, {});
+r.veloci = viaEuroScelta([O('a', {metodi: ['PayPal', 'Contanti']}), O('b', {metodi: ['Revolut'], premium: 5})], 40000, per, 0.02, {});
+r.nonHo = viaEuroScelta([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['PayPal', 'Revolut'], premium: 5})], 40000, per, 0.02, {}, ['Revolut']);
+r.nonHoTutti = viaEuroScelta([O('a', {metodi: ['Revolut']})], 40000, per, 0.02, {}, ['Revolut']);
 r.fuori = viaEuroScelta([O('a', {euro: 50, euroMax: 100}), O('b', {euroMax: 30})], 40000, per, 0.02, {});
 r.unico = viaEuroScelta([O('a', {euro: 41, euroMax: 0}), O('b', {euro: 45, euroMax: 0})], 40000, per, 0.02, {});
 r.scartati = viaEuroScelta([O('a', {lato: 'buy'}), O('b', {fiat: 'USD'}), O('c', {sats: 40000}),
@@ -214827,8 +214830,14 @@ console.log(JSON.stringify(r));
     prova("un ordine a intervallo: la cifra in euro INTERI, col margine",
           ["a", 41, ["SEPA Instant"]], [r["base"]["id"], r["base"]["euro"], r["base"]["metodi"]])
     prova("...fra due, il premio piu' basso (la cifra piu' bassa)", "b", r["premio"]["id"])
-    prova("...solo i metodi decisi (SEPA Instant, Satispay), e si mostrano solo quelli",
-          ["b", ["Satispay"]], [r["metodi"]["id"], r["metodi"]["metodi"]])
+    prova("...solo i metodi VELOCI (SEPA Instant, Satispay, Revolut, PayPal), e si "
+          "mostrano solo quelli: niente lenti ne' contanti",
+          ["b", ["Satispay", "Revolut"]], [r["metodi"]["id"], r["metodi"]["metodi"]])
+    prova("...anche PayPal e Revolut contano (25 nov 2026, «Tutti i veloci»)",
+          ["a", ["PayPal"]], [r["veloci"]["id"], r["veloci"]["metodi"]])
+    prova("...«Non ho Revolut»: quel metodo sparisce, si passa all'offerta dopo",
+          ["b", ["PayPal"], None],
+          [r["nonHo"]["id"], r["nonHo"]["metodi"], r["nonHoTutti"]])
     prova("...la cifra deve stare nell'intervallo", None, r["fuori"])
     prova("...un importo unico va bene solo se copre ed e' entro un euro", ["a", 41],
           [r["unico"]["id"], r["unico"]["euro"]])
@@ -215005,15 +215014,17 @@ def prove_chiedi_al_venditore():
 
     prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
             + _riga_js(mini, "const VIA_EURO_MARGINE = ")
-            + _fn_js(mini, "function viaEuroFissi(ordini, sats, perSat, fee, miei){")
+            + _fn_js(mini, "function viaEuroFissi(ordini, sats, perSat, fee, miei, nonHo){")
             + r"""
 const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
   euro: 200, euroMax: 0, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
 const per = 0.001;
 const r = {};
 r.base = viaEuroFissi([O('a'), O('b', {premium: 5}), O('c', {euroMax: 300, euro: 10}),
-  O('d', {euro: 42}), O('e', {metodi: ['PayPal']}), O('f', {lato: 'buy'}), O('g'),
+  O('d', {euro: 42}), O('e', {metodi: ['Wise']}), O('f', {lato: 'buy'}), O('g'),
   O('h', {sats: 50000})], 40000, per, 0.02, {g: {}});
+r.nonHo = viaEuroFissi([O('a', {metodi: ['Revolut']}), O('b', {metodi: ['Revolut', 'PayPal'], premium: 5})],
+  40000, per, 0.02, {}, ['Revolut']).map(c => c.id);
 r.pari = viaEuroFissi([O('a', {creato: 5}), O('b', {creato: 9})], 40000, per, 0.02, {}).map(c => c.id);
 r.storti = [viaEuroFissi([O('a')], 0, per, 0.02, {}).length, viaEuroFissi(null, 1, per, 0.02, {}).length];
 console.log(JSON.stringify(r));
@@ -215034,6 +215045,7 @@ console.log(JSON.stringify(r));
           [["a", 41, 200], ["b", 43, 200]],
           [[c["id"], c["euro"], c["tot"]] for c in r["base"]])
     prova("...a parita' il piu' recente", ["b", "a"], r["pari"])
+    prova("...senza i metodi che chi compra non ha", ["b"], r["nonHo"])
     prova("...e senza sats o libro: fila vuota", [0, 0], r["storti"])
 
 
