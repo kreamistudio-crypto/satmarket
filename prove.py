@@ -215082,6 +215082,34 @@ console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia
            "fine", "fine", "fine", "pagina", "pagina"],
           _js.loads(out2.stdout) if out2.returncode == 0 else out2.stderr[-300:])
 
+    # --- GLI ORDINI CHE SAM NON PUO' PRENDERE (25 nov 2026) ------------------
+    # Dalla prova con Alan: il suo ordine voleva 5 scambi P2P completati, Sam
+    # non ne aveva, e il tasto girava a vuoto.
+    prog3 = (_fn_js(mini, "function viaEuroOrdiniPrendibili(){") + r"""
+let p2pLibro = {ordini: [{id: 'libero'}, {id: 'filtro'}, {id: 'filtro-ok'}, {id: 'veto'}]};
+const FILTRI = {'filtro': 5, 'filtro-ok': 3};
+const filtroOrdineP2P = o => FILTRI[o.id] || 0;
+const p2pPrendibili = {'filtro-ok': {ok: true}, 'veto': {ok: false, motivo: 'pausa'}};
+const a = viaEuroOrdiniPrendibili().map(o => o.id);
+p2pLibro = null;
+console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog3)
+        nome3 = f.name
+    try:
+        out3 = _sp.run(["node", nome3], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome3)
+    prova("fuori gli ordini col filtro «almeno N scambi» (se il server non ha "
+          "detto che li posso prendere) e quelli col no del server; senza libro "
+          "niente", [["libero", "filtro-ok"], []],
+          _js.loads(out3.stdout) if out3.returncode == 0 else out3.stderr[-300:])
+    prova("...ed e' quel libro che leggono l'offerta e la ricerca a cifra fissa",
+          True, "viaEuroScelta(viaEuroOrdiniPrendibili()," in _fn_js(mini, "function viaEuroOfferta(sats){")
+          and "viaEuroFissi(viaEuroOrdiniPrendibili()," in _fn_js(mini, "function viaEuroFissiOra(sats){")
+          and "p2pLibro.ordini, sats" not in mini)
+
     # --- GLI AVVISI DEL BOT A CHI PAGA IN EURO (25 nov 2026) -----------------
     # Andrea: chi paga in euro «non deve neanche sapere che cos'e' la scheda
     # peer-to-peer». Le quattro frasi le ha approvate lui il 25 nov sera.
