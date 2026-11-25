@@ -96240,3 +96240,13 @@ sotto): con le colonne della «Va tutto bene?» a 360 px i nomi lunghi si
 spezzavano. Provato: tre prove in `prove_quadro_servizi` (la rotta, le
 parole, l'`esc`; la controprova sull'`esc` le fa rosse) e gli scatti a
 390 px chiaro e scuro col quadro finto.
+
+## Via la moneta Lightning/on-chain dalle card del mercatino (25 nov 2026, cantiere card-senza-rete; Andrea: «nelle card in tutte le card della home di barattolo, leviamo pure il toggle nella card, quello in basso a destra, che indica se un ordine è, lighting o on chain. Non serve saperlo in quel momento [...] pasticcia troppo la card. Lasciamo solamente l'icona del furgoncino o delle mani se c'è uno scambio a mano [...] Sto parlando della home del mercatino, non del peer to peer.»)
+
+COSA. `iconeCard` non scrive più la moneta di come preferisce ricevere chi vende (la ₿ del Cambio per on-chain, il fulmine per Lightning, dal 2 nov 2026, swap-auto): in fondo alla card restano 🚚 (con «gratis» quando vale), 🤝, 💾 e 📅. Via anche le tre regole CSS `.card .meta .ico .card-incasso`, rimaste senza nessuno da vestire. La card è una sola (`cardHTML`), quindi la moneta sparisce da tutte le card del mercatino: home, Mensola, ricerca, reparti, negozi.
+
+COSA RESTA. Nella scheda dell'annuncio la pillola `pill-incasso` («Preferisce ricevere on-chain/in Lightning», con la moneta): lì chi compra sceglie come pagare, ed è lì che la domanda serve. Il campo `incasso` di `mapListing` e il `venditore_incasso` del server non cambiano. Le card del P2P (`cardVetrinaP2P`, con `reteVetrinaP2P`) non sono toccate: ad Andrea la rete in quelle card serve.
+
+PROVATO. `prove_swap_auto_schermate` gira la funzione VERA in node: on-chain, Lightning e senza scelta danno tutti zero icone (prima: la moneta); la pillola della scheda c'è ancora. LA CONTROPROVA: con la miniapp di develop la prova è rossa. Suite severa (31.686) e collaudi della CI (174) verdi nel venv senza coincurve. ARCHITETTURA aggiornata (LA MONETA SULLA CARD).
+
+RESTA DA GUARDARE. Sul telefono di Andrea dopo la promozione: card senza la moneta, icone di consegna al loro posto.

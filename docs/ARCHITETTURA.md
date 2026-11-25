@@ -37572,8 +37572,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   per loro, `_swap_auto_da_guardare`) e avvisa col txid. LA MONETA SULLA
   CARD: `venditore_incasso` ('onchain' | 'ln' | '') da
   `_segna_incasso_venditori` in `arricchisci_righe_vetrina`, la moneta ₿
-  del Cambio o il fulmine (`P2P_OC_MONETA`/`P2P_LN_MONETA`) in
-  `iconeCard` e nel dettaglio, mai il ⛓️. LE LEVE: `SWAP_AUTO_ATTIVO`
+  del Cambio o il fulmine (`P2P_OC_MONETA`/`P2P_LN_MONETA`) nel
+  dettaglio (`pill-incasso`), mai il ⛓️; dalla card del mercatino
+  (`iconeCard`) TOLTA il 25 nov 2026 (cantiere card-senza-rete: «troppe
+  icone», Andrea). LE LEVE: `SWAP_AUTO_ATTIVO`
   (spenta), `SWAP_AUTO_SOLO_ADMIN` (accesa), `SWAP_AUTO_FEE_PERCENTO` (0;
   sopra 0 oggi non parte niente). APP: il blocco «LO SWAP AUTOMATICO»
   accanto a `selettoreIncassoSwap` (`renderSwapAutoProfilo` in
