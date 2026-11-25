@@ -27513,8 +27513,12 @@ const CODICE_NEGOZIO = /^[A-Za-z0-9_-]{2,40}$/;
    levale, sono troppo pochi; ora si vedranno quando le card grosse
    saranno almeno 5 o 6»): la soglia sale da 2 a 5 negozi. E TORNA A 2
    mezz'ora dopo (Andrea: «i quadrati anche se sono 2 adesso facciamoli
-   vedere»). */
-const QUADRI_MIN = 4, QUADRI_POCHI = 2;
+   vedere»). E DI NUOVO 5, PER SEMPRE (25 nov 2026, Andrea: «secondo te
+   ste card rotonde ha senso metterle o no?»; i tondi mostrano gli stessi
+   negozi della card grande che scorre sopra, e con due negozi sono un
+   doppione che ruba il primo schermo alle categorie: «ok, dai, mettili da
+   soli 5 negozi in su»). Compaiono da soli quando i negozi arrivano a 5. */
+const QUADRI_MIN = 4, QUADRI_POCHI = 5;
 function spartisciScoprire(tutte){
   if (!mqNetflix.matches) return {grandi: tutte, quadri: []};
   const negozi = tutte.filter(v => v.negozio && CODICE_NEGOZIO.test(String(v.negozio)));

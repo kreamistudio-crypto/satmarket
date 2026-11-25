@@ -222812,18 +222812,19 @@ console.log(JSON.stringify([ids(t.grandi), ids(t.quadri), ids(giro.grandi),
         # (24 nov 2026, Andrea: «2 grandi e 2 quadratini») sotto gli 8
         # negozi ognuno sta in tutte e due le file; (24 nov sera, Andrea:
         # «sono troppo pochi… almeno 5 o 6») da 5, e mezz'ora dopo di
-        # nuovo da 2 («anche se sono 2 adesso facciamoli vedere»)
+        # nuovo da 2 («anche se sono 2 adesso facciamoli vedere»); il 25
+        # nov di nuovo da 5 («mettili da soli 5 negozi in su»)
         prova("in node: da 8 negozi uno grande e uno quadrato, mai in tutti "
-              "e due, e il turno dopo si scambiano; da 2 a 7 negozi ognuno "
-              "e' grande E quadrato; con uno solo niente quadrati; sul "
+              "e due, e il turno dopo si scambiano; da 5 a 7 negozi ognuno "
+              "e' grande E quadrato; con 1, 2 o 4 niente quadrati; sul "
               "computer tutti grandi",
               [["A", "C", "E", "G", "p2p", "aste"], ["B", "D", "F", "H"],
                ["B", "D", "F", "H", "p2p", "aste"], ["C", "E", "G", "A"],
                8, ["A", "B", "C", "D", "E", "F", "G"], 10, [],
-               ["A", "B", "p2p"], ["A", "B"], ["A", "p2p"], [], ["A", "B", "C", "D"],
+               ["A", "B", "p2p"], [], ["A", "p2p"], [], [],
                ["A", "B", "C", "D", "E", "p2p"], ["A", "B", "C", "D", "E"]], r)
-    prova("...e le soglie sono 4 quadrati divisi e 2 negozi, le parole di Andrea",
-          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 2;" in mini)
+    prova("...e le soglie sono 4 quadrati divisi e 5 negozi, le parole di Andrea",
+          True, "const QUADRI_MIN = 4, QUADRI_POCHI = 5;" in mini)
     _rs = pezzo_js(mini, "function renderScoprire(){", "\n}\n")
     prova("...e la fila grande disegna solo i suoi, i quadrati gli altri", True,
           "const {grandi: vive, quadri} = spartisciScoprire(tutte);\n"
