@@ -85574,7 +85574,9 @@ async function viaEuroDeposito(id){
     const r = await fetch(`${API_BASE}/orders`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify(Object.assign({}, ve.corpo, {metodo: 'giroconto', sats_giroconto: sats}))});
+      /* p2p_ordine (25 nov 2026): lo scambio che salda l'ordine, perche' il
+         bot parli a chi compra dell'ORDINE e non dello scambio */
+      body: JSON.stringify(Object.assign({}, ve.corpo, {metodo: 'giroconto', sats_giroconto: sats, p2p_ordine: id}))});
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.invoice) throw new Error(d.detail || 'errore');
     await chiamataOrdineP2P(ordiniP2P()[id] || o, 'add-invoice', {payment_request: [null, d.invoice, null]});

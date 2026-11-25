@@ -96250,3 +96250,17 @@ COSA RESTA. Nella scheda dell'annuncio la pillola `pill-incasso` («Preferisce r
 PROVATO. `prove_swap_auto_schermate` gira la funzione VERA in node: on-chain, Lightning e senza scelta danno tutti zero icone (prima: la moneta); la pillola della scheda c'è ancora. LA CONTROPROVA: con la miniapp di develop la prova è rossa. Suite severa (31.686) e collaudi della CI (174) verdi nel venv senza coincurve. ARCHITETTURA aggiornata (LA MONETA SULLA CARD).
 
 RESTA DA GUARDARE. Sul telefono di Andrea dopo la promozione: card senza la moneta, icone di consegna al loro posto.
+
+## «Non hai sats?»: via PayPal, «Ho inviato gli euro» e il bot che parla dell'ordine (25 nov 2026, cantiere via-euro-avvisi; seguito della prova dal vivo con Alan e Sam)
+
+PAYPAL VIA. Andrea, la sera del 25: «Chi paga in PayPal può annullare il pagamento dopo aver ricevuto i sats» → «Ok, sì, allora leva PayPal». In `VIA_EURO_METODI` restano SEPA Instant, Satispay e Revolut; un ordine che accetta solo PayPal non viene proposto, e «Non ho …» non lo offre mai.
+
+IL TASTO. «Ho pagato» diventa «Ho inviato gli euro», nel foglio e nella pagina dell'ordine: è il gesto, detto con le parole che Andrea voleva fossero chiare a Sam.
+
+IL BOT. Chi paga in euro sentiva gli avvisi di chi fa uno scambio P2P («ha bloccato i sats in garanzia», «Apri Barattolo → P2P → I miei scambi», «⚡ Apri lo scambio»). Ora il deposito porta al server lo scambio che lo salda (`p2p_ordine` nel POST /orders del giroconto, anche sulla fattura lunga ripresentata), il server lo lega all'ordine (`via_euro_scambi`, chiave scambio + chi compra) e a lui, e solo a lui, vanno le quattro frasi approvate da Andrea il 25 nov sera (`_testo_via_euro`): la garanzia bloccata («… ha preparato i sats per il tuo acquisto»), il recapito («Manda N € a …», col tempo per pagare se c'è), la chiusura («… ha ricevuto gli euro: il tuo acquisto è pagato»), ogni annullo o ritorno nel libro («Il pagamento in euro è stato annullato…»). Sotto, «📦 Apri l'ordine» all'ordine del mercatino. Chi vende sente quelle di sempre.
+
+PERCHÉ IL LEGAME DAL CLIENT. Solo il telefono sa quale scambio sta saldando quale ordine prima che Mostro chieda il giroconto (che arriva al rilascio, troppo tardi per le prime frasi). Un body scritto a mano può legare al più gli avvisi di chi l'ha scritto: si legge solo per chi riceve.
+
+RESTANO QUELLE DI SEMPRE. Le dispute e il moderatore, «chiede di annullare», gli aggiornamenti del recapito, i promemoria del tempo per pagare, il pagamento caduto: testi nuovi solo con l'ok di Andrea.
+
+PROVATO. `prove_non_hai_sats`: le frasi esatte, «a/ad», il bottone, il legame, e dal vero banco degli eventi la garanzia e la chiusura a chi paga in euro (a chi vende la frase di sempre); suite severa e collaudi. Dal vivo: da rifare con Alan e Sam quando è in produzione.
