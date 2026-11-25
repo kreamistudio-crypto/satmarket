@@ -400,11 +400,19 @@ def main():
     # LA PAGINA DEDICATA (23 nov 2026) si chiede in Assistenza: accesa qui
     server.ASSISTENZA_ATTIVA = True
     AVVISI.clear(); BOTTONI.clear(); ADMIN.clear()
-    # LO SCALINO DEL NEGOZIO: un altro negozio gia' dentro alza il prezzo
+    # LO SCALINO DEL NEGOZIO: un altro negozio gia' dentro alza il prezzo,
+    # ma SOLO SE HA PAGATO (25 nov 2026, Andrea: i negozi messi gratis
+    # «non devi considerarli»)
     scrivi("UPDATE utenti SET promo_scoprire_fino=? WHERE tg_id=2",
            (adesso + 9999,))
-    prova("con un negozio gia' in Da scoprire il prezzo sale a 30.000",
+    prova("un negozio messo in Da scoprire gratis non alza il prezzo",
+          20000, asyncio.run(server.listino_promo(0, "", ""))["scoprire"]["sats"])
+    scrivi("INSERT INTO pagamenti(tg_id,motivo,riferimento,importo_sats,"
+           "stato,creato,aggiornato,pagato_il) VALUES(2,'promo_scoprire','30',"
+           "20000,'pagato',?,?,?)", (adesso - 60, adesso - 60, adesso - 60))
+    prova("...uno che ha pagato si': il prezzo sale a 30.000",
           30000, asyncio.run(server.listino_promo(0, "", ""))["scoprire"]["sats"])
+    scrivi("DELETE FROM pagamenti WHERE tg_id=2 AND motivo='promo_scoprire'")
     scrivi("UPDATE utenti SET promo_scoprire_fino=0 WHERE tg_id=2")
     r, no = compra({"tipo": "scoprire"})
     prova("col banner approvato la fattura chiede 20.000", 20000,
@@ -543,6 +551,17 @@ def main():
     POST.clear(); ADMIN.clear()
     pagamenti = uno("SELECT COUNT(*) FROM pagamenti")[0]
 
+    def _conti():
+        """(posti occupati, posti PAGATI per lo scalino) della mensola"""
+        c = server.db()
+        try:
+            t = int(time.time())
+            return (server.posti_evidenza(c, t)[0],
+                    server._presi_promo(c, "promo_evidenza", t))
+        finally:
+            c.close()
+    conti_prima = _conti()
+
     async def _regala(chi, testo):
         await server.comando_promossi({"id": chi}, testo)
         await asyncio.sleep(0.05)      # il post del canale e' un task
@@ -558,6 +577,11 @@ def main():
                           for x in ADMIN)))
     prova("...e la busta lo porta nella fila", True,
           regalo in [x["id"] for x in busta().get("in_evidenza", [])])
+    # IL REGALO NON ALZA IL PREZZO (25 nov 2026, Andrea: «anche le
+    # mensole le abbiamo messe gratuite [...] come se fosse 0»): prende un
+    # posto, ma lo scalino conta solo i pagati
+    prova("...prende un posto, ma lo scalino del prezzo non si muove",
+          (conti_prima[0] + 1, conti_prima[1]), _conti())
     asyncio.run(_regala(999, f"/promossi evidenza {regalo} 3"))
     prova("ridato a chi ce l'ha, i giorni si sommano", True,
           abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",

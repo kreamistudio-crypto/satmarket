@@ -62862,16 +62862,47 @@ def _voce_promo(tipo: str, presi: int = 0):
     return None
 
 
+def _pagati_vivi(con, motivo: str, adesso: int) -> set:
+    """Chi ha giorni PAGATI ancora in corso, per lo scalino del prezzo:
+    gli annunci (Mensola) o i venditori (Da scoprire) che hanno un
+    pagamento incassato la cui durata non e' finita. I giorni si sommano
+    come all'incasso (`_incassa_promo`): ogni pagamento parte dalla fine
+    di quello prima, se correva ancora, sennò da quando e' stato pagato.
+    I REGALI NON CONTANO (25 nov 2026, Andrea: «I prezzi non devono
+    comprendere [...] quelli che abbiamo messo in maniera gratuita»): i
+    giorni dati da un moderatore (`/promossi`) o messi a mano non hanno
+    un pagamento, e qui non entrano. Se un regalo e' venuto PRIMA di un
+    pagamento, la catena qui finisce un po' prima della data vera: chi
+    compra paga al piu' uno scalino in meno, mai uno in piu'. Un
+    pagamento rimborsato non e' piu' 'pagato', e non conta."""
+    fine = {}
+    for r in con.execute(
+            "SELECT tg_id, motivo, riferimento, pagato_il FROM pagamenti "
+            "WHERE motivo=? AND stato='pagato' AND pagato_il>? "
+            "ORDER BY pagato_il, id", (motivo, adesso - 400 * 86400)):
+        aid, giorni = _promo_dal_riferimento(r)
+        chi = aid if motivo == "promo_evidenza" else r["tg_id"]
+        if not chi or giorni <= 0:
+            continue
+        fine[chi] = max(fine.get(chi, 0), int(r["pagato_il"] or 0)) + giorni * 86400
+    return {chi for chi, f in fine.items() if f > adesso}
+
+
 def _presi_promo(con, motivo: str, adesso: int, aid: int = 0,
                  tg_id: int = 0) -> int:
-    """Quanti posti sono gia' presi, per lo scalino del prezzo:
+    """Quanti posti sono gia' presi, per lo scalino del prezzo — SOLO
+    quelli PAGATI (`_pagati_vivi`: i regali dei moderatori occupano un
+    posto ma non alzano il prezzo, 25 nov 2026):
     - In cima: gli annunci saliti in cima PAGANDO nelle ultime
       PROMO_IN_CIMA_ORE ore (sono quelli che stanno lassu');
-    - Mensola: i posti occupati, senza l'annuncio che allunga (il suo
-      posto ce l'ha: `posti_evidenza`);
-    - Da scoprire: i negozi con la card viva, senza chi rinnova.
+    - Mensola: gli annunci attivi sulla mensola coi giorni pagati ancora
+      in corso, senza l'annuncio che allunga;
+    - Da scoprire: i negozi con la card viva e i giorni pagati in corso,
+      senza chi rinnova.
     Chi allunga paga quindi lo scalino di chi arriva ultimo dopo gli
-    altri — mai il suo posto contato due volte."""
+    altri — mai il suo posto contato due volte. I POSTI della Mensola
+    (il tetto di PROMO_EVIDENZA_POSTI) li conta invece `posti_evidenza`,
+    regali compresi: quello e' lo spazio che c'e', non il prezzo."""
     if motivo == "promo_cima":
         ore = max(0, int(PROMO_IN_CIMA_ORE or 0))
         return con.execute(
@@ -62879,11 +62910,15 @@ def _presi_promo(con, motivo: str, adesso: int, aid: int = 0,
             "WHERE motivo='promo_cima' AND stato='pagato' AND pagato_il>?",
             (adesso - ore * 3600,)).fetchone()[0] or 0
     if motivo == "promo_evidenza":
-        return posti_evidenza(con, adesso, aid)[0]
+        pagati = _pagati_vivi(con, motivo, adesso)
+        return sum(1 for r in con.execute(
+            "SELECT id FROM annunci WHERE stato='attivo' AND evidenza_fino>? "
+            "AND id<>?", (adesso, int(aid or 0))) if r["id"] in pagati)
     if motivo == "promo_scoprire":
-        return con.execute(
-            "SELECT COUNT(*) FROM utenti WHERE promo_scoprire_fino>? "
-            "AND tg_id<>?", (adesso, int(tg_id or 0))).fetchone()[0] or 0
+        pagati = _pagati_vivi(con, motivo, adesso)
+        return sum(1 for r in con.execute(
+            "SELECT tg_id FROM utenti WHERE promo_scoprire_fino>? "
+            "AND tg_id<>?", (adesso, int(tg_id or 0))) if r["tg_id"] in pagati)
     return 0
 
 
@@ -63055,9 +63090,11 @@ async def listino_promo(annuncio: int = 0,
                                                       presi_cima),
                              "da": da if da > adesso else 0}
             occ, prossimo = posti_evidenza(con, adesso, a["id"])
+            # il prezzo guarda solo i posti PAGATI, i posti tutti (25 nov)
+            presi_ev = _presi_promo(con, "promo_evidenza", adesso, a["id"])
             fuori["evidenza"] = {
                 "durate": [{"giorni": g, "sats": s}
-                           for g, s in listino_evidenza(occ)],
+                           for g, s in listino_evidenza(presi_ev)],
                 "posti": max(0, int(PROMO_EVIDENZA_POSTI or 0)),
                 "occupati": occ, "libero_da": prossimo,
                 "fino": (a["evidenza_fino"]

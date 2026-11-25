@@ -38655,9 +38655,12 @@ mai il kind 0 di nessuno: regola ferrea 2).
   la durata piu' corta moltiplicata da `PROMO_EVIDENZA_DURATE`,
   `PROMO_SCOPRIRE_SCALINI`), coppie (gia' presi, sats) pulite da
   `scalini_promo` e lette da `prezzo_a_scalini`; i presi li conta
-  `_presi_promo` (In cima: annunci distinti pagati nelle ultime
-  `PROMO_IN_CIMA_ORE`; Mensola: `posti_evidenza` senza chi allunga;
-  Da scoprire: negozi con la card viva senza chi rinnova). `_voce_promo(tipo,
+  `_presi_promo`, SOLO PAGATI (In cima: annunci distinti pagati nelle
+  ultime `PROMO_IN_CIMA_ORE`; Mensola e Da scoprire: chi e' sulla mensola
+  o ha la card viva E ha giorni pagati in corso, `_pagati_vivi`, la
+  catena dei pagamenti 'pagato' sommati come all'incasso; senza chi
+  allunga o rinnova). I regali di `/promossi` occupano i posti
+  (`posti_evidenza`) ma non alzano il prezzo. `_voce_promo(tipo,
   presi)` resta l'unico che legge i prezzi; in `compra_promo` lo scalino
   si rilegge dopo le guardie e prima della ripresa, che confrontando i
   sats rifà la fattura se la fila è cambiata. «In evidenza» per

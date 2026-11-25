@@ -223047,36 +223047,62 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
     li = codice(pezzo("listino_promo"))
     prova("il listino mostra lo scalino di adesso, per tutte e tre", (True, True, True),
           ("prezzo_a_scalini(PROMO_IN_CIMA_SCALINI," in li,
-           "for g, s in listino_evidenza(occ)]" in li,
+           # il prezzo dai posti PAGATI, non da tutti i posti (25 nov)
+           "presi_ev = _presi_promo(con, \"promo_evidenza\", adesso, a[\"id\"])" in li
+           and "for g, s in listino_evidenza(presi_ev)]" in li,
            "prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi_sc)" in li))
-    # i presi, girati su un database finto
+    # i presi, girati su un database finto. SOLO I PAGATI (25 nov 2026,
+    # Andrea: «quelli che abbiamo messo in maniera gratuita [...] non devi
+    # considerarli, adesso è come se ci fossero 0»): un regalo occupa un
+    # posto ma non alza il prezzo
+    A, G = 10_000_000, 86400
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
-    con.executescript("""
-      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, motivo TEXT,
+    con.executescript(f"""
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT, motivo TEXT,
         riferimento TEXT, stato TEXT, pagato_il INT);
-      INSERT INTO pagamenti(motivo,riferimento,stato,pagato_il) VALUES
-        ('promo_cima','1','pagato',9000),('promo_cima','1','pagato',9500),
-        ('promo_cima','2','pagato',8000),('promo_cima','3','creato',9000),
-        ('promo_cima','4','pagato',100),('promo_evidenza','5:7','pagato',9000);
+      INSERT INTO pagamenti(tg_id,motivo,riferimento,stato,pagato_il) VALUES
+        (7,'promo_cima','1','pagato',{A-1000}),(7,'promo_cima','1','pagato',{A-500}),
+        (7,'promo_cima','2','pagato',{A-2000}),(7,'promo_cima','3','creato',{A-900}),
+        (7,'promo_cima','4','pagato',{A-5000}),
+        (7,'promo_evidenza','1:7','pagato',{A-2*G}),
+        (7,'promo_evidenza','3:7','pagato',{A-G}),
+        (7,'promo_evidenza','4:7','pagato',{A-20*G}),
+        (7,'promo_evidenza','5:7','rimborsato',{A-G}),
+        (7,'promo_evidenza','6:7','pagato',{A-10*G}),
+        (7,'promo_evidenza','6:7','pagato',{A-8*G}),
+        (1,'promo_scoprire','30','pagato',{A-10*G}),
+        (3,'promo_scoprire','30','pagato',{A-90*G}),
+        (4,'promo_scoprire','30','rimborsato',{A-G});
       CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
         evidenza_fino INT DEFAULT 0);
-      INSERT INTO annunci VALUES(1,'attivo',20000),(2,'attivo',30000),
-        (3,'venduto',20000);
+      INSERT INTO annunci VALUES(1,'attivo',{A+5*G}),(2,'attivo',{A+3*G}),
+        (3,'venduto',{A+6*G}),(4,'attivo',{A+10*G}),(5,'attivo',{A+6*G}),
+        (6,'attivo',{A+4*G});
       CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, promo_scoprire_fino INT);
-      INSERT INTO utenti VALUES(1,20000),(2,20000),(3,500),(4,0);
+      INSERT INTO utenti VALUES(1,{A+20*G}),(2,{A+20*G}),(3,0),(4,{A+29*G});
     """)
     amb = {"PROMO_IN_CIMA_ORE": 1, "PROMO_EVIDENZA_POSTI": 8}
-    exec(pezzo("posti_evidenza"), amb)
-    exec(pezzo("_presi_promo"), amb)
+    for nome in ("posti_evidenza", "_promo_dal_riferimento", "_pagati_vivi",
+                 "_presi_promo"):
+        exec(pezzo(nome), amb)
     pp = amb["_presi_promo"]
     prova("i presi: In cima conta gli annunci pagati nell'ultima ora (uno "
-          "salito due volte vale uno), la Mensola i posti senza chi allunga, "
-          "Da scoprire i negozi vivi senza chi rinnova",
-          [2, 2, 1, 2, 1, 0],
-          [pp(con, "promo_cima", 10000), pp(con, "promo_evidenza", 10000),
-           pp(con, "promo_evidenza", 10000, 1), pp(con, "promo_scoprire", 10000, tg_id=4),
-           pp(con, "promo_scoprire", 10000, tg_id=1), pp(con, "boh", 10000)])
+          "salito due volte vale uno); la Mensola solo gli annunci attivi coi "
+          "giorni PAGATI in corso (i giorni si sommano), senza chi allunga; "
+          "Da scoprire solo i negozi coi giorni pagati, senza chi rinnova",
+          [2, 2, 1, 1, 0, 0],
+          [pp(con, "promo_cima", A), pp(con, "promo_evidenza", A),
+           pp(con, "promo_evidenza", A, 6), pp(con, "promo_scoprire", A, tg_id=9),
+           pp(con, "promo_scoprire", A, tg_id=1), pp(con, "boh", A)])
+    prova("...mentre i POSTI della mensola contano anche i regali (lo spazio "
+          "c'e' o non c'e')", (5, 0), amb["posti_evidenza"](con, A))
+    # LA CONTROPROVA, com'e' oggi in produzione: tutto messo gratis
+    con.execute("DELETE FROM pagamenti")
+    prova("...e senza pagamenti (tutto regalato, com'e' oggi) zero ovunque, "
+          "con la mensola e Da scoprire piene di regali", [0, 0, 0],
+          [pp(con, "promo_cima", A), pp(con, "promo_evidenza", A),
+           pp(con, "promo_scoprire", A)])
     con.close()
     _srv_promo = pezzo("_incassa_promo")
     prova("la pagina dedicata si chiede in Assistenza solo alla PRIMA entrata, "
