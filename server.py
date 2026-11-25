@@ -25353,6 +25353,9 @@ async def comando_promossi(mittente: dict, testo: str):
       `/promossi evidenza <id> [giorni]`  mette l'annuncio In evidenza
                                      GRATIS (24 nov 2026), 7 giorni se
                                      non si dice; l'id o il link
+      `/promossi premio <id>`        il premio di uno zap generoso (25
+                                     nov 2026): 7 giorni come sopra, e
+                                     a chi vende arriva il grazie
     L'EVIDENZA REGALATA (24 nov 2026, Andrea: «dobbiamo mettere anche
     delle card in evidenza, in maniera gratuita… decidiamo noi chi
     mettere»): e' la stessa di quella pagata — la data che si somma, il
@@ -25371,6 +25374,7 @@ async def comando_promossi(mittente: dict, testo: str):
     cosa = pezzi[1].strip().lower() if len(pezzi) > 1 else ""
     chi = pezzi[2].strip() if len(pezzi) > 2 else ""
     adesso = int(time.time())
+    premiato = None
     con = db()
     try:
         if cosa == "negozio" and chi:
@@ -25385,14 +25389,17 @@ async def comando_promossi(mittente: dict, testo: str):
                          if fatto else
                          f"Il negozio <b>{html.escape(chi)}</b> non era "
                          "promosso.")
-        elif cosa == "evidenza" and _id_annuncio(chi):
+        elif cosa in ("evidenza", "premio") and _id_annuncio(chi):
             aid = _id_annuncio(chi)
             try:
                 giorni = int(pezzi[3]) if len(pezzi) > 3 else 7
             except ValueError:
                 giorni = 0
-            a = con.execute("SELECT stato, titolo, evidenza_fino FROM annunci "
-                            "WHERE id=?", (aid,)).fetchone()
+            if cosa == "premio":
+                giorni = 7          # il premio dello zap e' di 7, sempre
+            a = con.execute("SELECT stato, titolo, evidenza_fino, "
+                            "venditore_id FROM annunci WHERE id=?",
+                            (aid,)).fetchone()
             fatto = 0
             if not 1 <= giorni <= MAX_GIORNI_EVIDENZA_GRATIS:
                 testo_out = (f"I giorni vanno da 1 a "
@@ -25423,6 +25430,9 @@ async def comando_promossi(mittente: dict, testo: str):
                                  "anche in cima, ed esce di nuovo nel "
                                  "canale Vetrina.")
                     asyncio.create_task(promo_in_cima_canale(aid))
+                    if cosa == "premio":
+                        premiato = (int(a["venditore_id"] or 0),
+                                    a["titolo"] or "")
         elif cosa == "annuncio" and chi.isdigit():
             cur = con.execute("UPDATE annunci SET evidenza_fino=0 "
                               "WHERE id=? AND evidenza_fino>0", (int(chi),))
@@ -25464,7 +25474,10 @@ async def comando_promossi(mittente: dict, testo: str):
                       "un annuncio da In evidenza",
                       "<code>/promossi evidenza ID 7</code> — mette un "
                       "annuncio In evidenza gratis per 7 giorni (l'ID o il "
-                      "link dell'annuncio)", "",
+                      "link dell'annuncio)",
+                      "<code>/promossi premio ID</code> — il premio di uno "
+                      "zap generoso: 7 giorni In evidenza e il grazie a chi "
+                      "vende", "",
                       "Togliere non rimborsa: i sats si restituiscono a mano "
                       "dal pannello, come per il banner."]
             testo_out = "\n".join(righe)
@@ -25473,6 +25486,8 @@ async def comando_promossi(mittente: dict, testo: str):
     if fatto:
         await notifica_admin(f"🚀 /promossi {cosa} {chi} (da tg {chat})",
                              argomento="riepiloghi")
+    if premiato and premiato[0]:
+        await notifica(premiato[0], zap_testo_premio(premiato[1]))
     return await bot_api("sendMessage", {"chat_id": chat, "text": testo_out,
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
@@ -129126,7 +129141,14 @@ def _zap_prepara_tabella(con):
         pagato_il INTEGER DEFAULT 0,
         ricevuta TEXT DEFAULT '',
         ricevuta_relay INTEGER DEFAULT 0,
-        ricevuta_tentativi INTEGER DEFAULT 0)""")
+        ricevuta_tentativi INTEGER DEFAULT 0,
+        tg_id INTEGER DEFAULT 0)""")
+    # CHI HA ZAPPATO DALL'APP (25 nov 2026, cantiere grazie-zap): il
+    # foglio della mancia chiede la fattura con l'identita' di chi e'
+    # dentro, cosi' il grazie sa a chi andare. Le tabelle nate prima
+    # la colonna non ce l'hanno: si aggiunge una volta.
+    if "tg_id" not in {r[1] for r in con.execute("PRAGMA table_info(zap)")}:
+        con.execute("ALTER TABLE zap ADD COLUMN tg_id INTEGER DEFAULT 0")
 
 
 def _zap_db():
@@ -129281,6 +129303,125 @@ async def _zap_incassa(riga: dict, esito: dict, adesso: int):
     if riga["tipo"] == "zap":
         await _zap_pubblica(dict(riga, stato="pagato", pagato_il=adesso),
                             esito.get("preimage", ""))
+    await _zap_grazie(riga)
+
+
+# ---------- IL GRAZIE A CHI CI FA UNO ZAP (25 nov 2026) ----------
+# (cantiere «grazie-zap», Andrea: «il messaggio di ringraziamento deve
+# essere mandato a tutti, anche chi ci manda 100 sats, o 1 sat», e il
+# premio — 7 giorni in vetrina — «solo a chi fa lo zap generoso», da
+# 21.000 sats in su.)
+#
+# IL GRAZIE PARTE A CHI SAPPIAMO CHI E', e a nessun altro:
+#   · lo zap Nostr porta la chiave di chi paga, FIRMATA (il giudice
+#     della richiesta la verifica): se quella chiave e' l'accesso di un
+#     utente, o il suo badge VERIFICATO, il grazie va a lui con
+#     `notifica` (il canale che preferisce); sennò e' un DM Nostr
+#     diretto alla chiave. Una richiesta `anon` (NIP-57) e' firmata da
+#     una chiave usa-e-getta: li' non legge nessuno, e non si scrive.
+#   · lo zap dal foglio della mancia porta l'utente (`tg_id`), che il
+#     callback ha letto dall'identita' di chi e' dentro l'app.
+#   · un pagamento da un wallet qualunque, senza Nostr, e' anonimo.
+#
+# IL PREMIO NON PARTE DA SOLO: sopra la soglia i moderatori ricevono
+# l'avviso col comando pronto (`/promossi premio ID`), e il gesto resta
+# di Andrea. Solo per chi e' un utente: a una chiave che non e' di
+# nessuno non c'e' un annuncio da mettere in vetrina. Mai il badge non
+# verificato: chiunque potrebbe scriversi la npub di chi ha pagato.
+ZAP_GENEROSO_SATS = 21_000
+
+
+def zap_testo_grazie(sats: int) -> str:
+    """PURA: il grazie, uguale per tutti (testo approvato da Andrea il
+    25 nov 2026)."""
+    return (f"Grazie per lo zap da {_fmt_sats(sats)} sats a Barattolo! ⚡ "
+            "Ci aiuta a tenere il mercatino libero e tutto in sats.")
+
+
+def zap_testo_premio(titolo: str) -> str:
+    """PURA: il premio, a chi l'ha avuto (testo approvato da Andrea il
+    25 nov 2026)."""
+    return (f"Per dirti grazie, il tuo annuncio «{html.escape(titolo or '')}» "
+            "resta in vetrina per 7 giorni, gratis. 🧡")
+
+
+def zap_chi_e(riga: dict, con) -> int:
+    """Il tg_id dell'utente che ha pagato, 0 se non lo sappiamo. Dal
+    foglio della mancia c'e' gia' in colonna; per uno zap Nostr si
+    cerca la chiave fra gli accessi e i badge VERIFICATI."""
+    if int(riga.get("tg_id") or 0):
+        return int(riga["tg_id"])
+    if riga.get("tipo") != "zap" or not RE_HEX_64.fullmatch(
+            str(riga.get("mittente") or "")):
+        return 0
+    npub = hex_to_npub(riga["mittente"])
+    r = con.execute("SELECT tg_id FROM utenti WHERE npub_accesso=? OR "
+                    "(npub=? AND npub_verificata=1) LIMIT 1",
+                    (npub, npub)).fetchone()
+    return int(r[0]) if r else 0
+
+
+def zap_anonimo(riga: dict) -> bool:
+    """La richiesta di zap porta il tag `anon` (NIP-57): la chiave e'
+    usa-e-getta, e un DM li' non lo legge nessuno."""
+    try:
+        ev = json.loads(riga.get("richiesta") or "{}")
+        return any(t and t[0] == "anon" for t in ev.get("tags") or [])
+    except (ValueError, TypeError, AttributeError):
+        return True
+
+
+def zap_avviso_generoso(sats: int, tg_id: int, nome: str,
+                        annunci: list) -> str:
+    """PURA: l'avviso ai moderatori per uno zap generoso, col comando
+    del premio pronto per ogni annuncio in vendita (i piu' recenti)."""
+    righe = [f"⚡ Zap generoso: {_fmt_sats(sats)} sats da "
+             f"{html.escape(nome or '')} (tg {tg_id}). Il grazie gli e' gia' "
+             "arrivato."]
+    if annunci:
+        righe.append("Per premiarlo con 7 giorni in vetrina:")
+        righe += [f"<code>/promossi premio {a['id']}</code> "
+                  f"{html.escape(a['titolo'] or '')}" for a in annunci]
+    else:
+        righe.append("Non ha annunci in vendita: per ora niente da mettere "
+                     "in vetrina.")
+    return "\n".join(righe)
+
+
+async def _zap_grazie(riga: dict):
+    """Il grazie per UNA riga appena incassata (la chiama `_zap_incassa`
+    dopo il cancello: parte una volta sola), e sopra la soglia l'avviso
+    del premio. Fail-open: un intoppo e' una riga nel journal, mai un
+    giro dell'orologio fermato."""
+    try:
+        con = _zap_db()
+        try:
+            tg_id = zap_chi_e(riga, con)
+            u = con.execute("SELECT nome FROM utenti WHERE tg_id=?",
+                            (tg_id,)).fetchone() if tg_id else None
+            annunci = [dict(a) for a in con.execute(
+                "SELECT id, titolo FROM annunci WHERE venditore_id=? AND "
+                "stato='attivo' ORDER BY id DESC LIMIT 3", (tg_id,))] \
+                if tg_id else []
+        finally:
+            con.close()
+        testo = zap_testo_grazie(riga["sats"])
+        if tg_id:
+            await notifica(tg_id, testo)
+        elif riga.get("tipo") == "zap" and riga.get("mittente") \
+                and not zap_anonimo(riga):
+            await manda_dm_nostr(riga["mittente"], testo)
+        else:
+            return
+        print(f"🧡 zap: grazie mandato ({'utente' if tg_id else 'DM Nostr'})",
+              flush=True)
+        if tg_id and riga["sats"] >= ZAP_GENEROSO_SATS:
+            await notifica_admin(zap_avviso_generoso(
+                riga["sats"], tg_id, u["nome"] if u else "", annunci),
+                argomento="riepiloghi")
+    except Exception as e:
+        print(f"⚠️ zap: grazie non partito ({type(e).__name__}: "
+              f"{str(e)[:120]})", flush=True)
 
 
 async def giro_zap() -> int:
@@ -129431,7 +129572,8 @@ def zap_lnurlp(nome: str):
 
 @app.get("/api/lnurl/zap")
 async def zap_fattura(request: Request, amount: str = "", nostr: str = "",
-                      comment: str = ""):
+                      comment: str = "", x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
     """IL CALLBACK: conia la fattura sul salvadanaio. `amount` e' in
     millisatoshi e deve fare sat INTERI (LNbits conia a sat, e il wallet
     controlla che la fattura dica l'importo chiesto: arrotondare
@@ -129472,6 +129614,16 @@ async def zap_fattura(request: Request, amount: str = "", nostr: str = "",
         con.close()
     if in_attesa >= ZAP_MAX_ATTESA:
         return _zap_errore(MSG_FRENO, 429)
+    # CHI PAGA DALL'APP (25 nov 2026, il grazie): il foglio della mancia
+    # manda l'identita' di chi e' dentro. Facoltativa e muta: un wallet
+    # di fuori non la manda, e un'identita' che non regge vale anonima.
+    chi_paga = 0
+    if not ev and (x_tg_init_data or barattolo_sessione):
+        try:
+            chi_paga = int(verifica_utente(x_tg_init_data,
+                                           barattolo_sessione)["id"])
+        except Exception:
+            chi_paga = 0
     try:
         inv = await zap_conia(sats, nostr if ev else zap_metadata())
     except Exception as e:
@@ -129482,14 +129634,14 @@ async def zap_fattura(request: Request, amount: str = "", nostr: str = "",
     try:
         con.execute(
             "INSERT OR IGNORE INTO zap(payment_hash,bolt11,sats,tipo,mittente,"
-            "commento,richiesta,relay,stato,creato,scade) "
-            "VALUES(?,?,?,?,?,?,?,?,'attesa',?,?)",
+            "commento,richiesta,relay,stato,creato,scade,tg_id) "
+            "VALUES(?,?,?,?,?,?,?,?,'attesa',?,?,?)",
             (inv["payment_hash"], inv["bolt11"], sats,
              "zap" if ev else "semplice", ev["pubkey"] if ev else "",
              (ev["content"] if ev else comment)[:ZAP_COMMENTO],
              nostr if ev else "",
              json.dumps(zap_relay_richiesti(ev) if ev else []),
-             int(adesso), int(adesso) + ZAP_SCADENZA_S))
+             int(adesso), int(adesso) + ZAP_SCADENZA_S, chi_paga))
         con.commit()
     finally:
         con.close()

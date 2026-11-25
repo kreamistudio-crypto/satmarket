@@ -125394,6 +125394,123 @@ def prove_indirizzo_lightning():
           and "/.well-known/lnurlp/zap" in prod)
 
 
+def prove_grazie_zap():
+    """IL GRAZIE A CHI CI FA UNO ZAP (25 nov 2026, cantiere grazie-zap).
+    Andrea: il grazie «a tutti, anche chi ci manda 1 sat», il premio
+    (7 giorni in vetrina) solo da 21.000 sats in su, e il gesto del
+    premio resta del moderatore. Qui i pezzi PURI e le sentinelle; la
+    storia col server vero sta in `collaudo_indirizzo_lightning`."""
+    import html as _html
+    import sqlite3
+    amb = _banco_zap({"html": _html})
+    exec(pezzo("_fmt_sats"), amb)
+    for f in ("zap_testo_grazie", "zap_testo_premio", "zap_chi_e",
+              "zap_anonimo", "zap_avviso_generoso"):
+        exec(pezzo(f), amb)
+    i = _SORGENTE.index("ZAP_GENEROSO_SATS = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    prova("la soglia del premio e' 21.000 sats (Andrea, 25 nov)", 21_000,
+          amb["ZAP_GENEROSO_SATS"])
+    prova("il grazie, il testo approvato, con le migliaia all'italiana",
+          "Grazie per lo zap da 21.000 sats a Barattolo! ⚡ Ci aiuta a "
+          "tenere il mercatino libero e tutto in sats.",
+          amb["zap_testo_grazie"](21000))
+    prova("...uguale per 1 sat", True,
+          amb["zap_testo_grazie"](1).startswith("Grazie per lo zap da 1 sats"))
+    prova("il premio, il testo approvato, col titolo scappato",
+          "Per dirti grazie, il tuo annuncio «Bici &lt;rossa&gt;» resta in "
+          "vetrina per 7 giorni, gratis. 🧡", amb["zap_testo_premio"]("Bici <rossa>"))
+
+    # --- chi e': l'utente dall'app, la chiave Nostr, mai il badge dichiarato
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE utenti(tg_id INTEGER, nome TEXT, npub TEXT, "
+                "npub_verificata INTEGER, npub_accesso TEXT)")
+    k_acc, k_ver, k_dich, k_nessuno = "a1" * 32, "b2" * 32, "c3" * 32, "d4" * 32
+    n = amb["hex_to_npub"]
+    con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)", [
+        (-7, "Nativo", "", 0, n(k_acc)), (55, "Verificato", n(k_ver), 1, ""),
+        (66, "Furbo", n(k_dich), 0, "")])
+    chi = amb["zap_chi_e"]
+    prova("chi e': dall'app il tg_id in colonna; la chiave d'accesso; il "
+          "badge VERIFICATO; mai quello solo dichiarato; nessuno; il "
+          "semplice senza utente",
+          [42, -7, 55, 0, 0, 0],
+          [chi({"tg_id": 42, "tipo": "semplice"}, con),
+           chi({"tipo": "zap", "mittente": k_acc}, con),
+           chi({"tipo": "zap", "mittente": k_ver}, con),
+           chi({"tipo": "zap", "mittente": k_dich}, con),
+           chi({"tipo": "zap", "mittente": k_nessuno}, con),
+           chi({"tipo": "semplice", "mittente": ""}, con)])
+    con.close()
+    an = amb["zap_anonimo"]
+    prova("anon (NIP-57) si riconosce; senza tag no; una richiesta che non "
+          "si legge vale anonima", [True, False, True],
+          [an({"richiesta": json.dumps({"tags": [["p", "x"], ["anon"]]})}),
+           an({"richiesta": json.dumps({"tags": [["p", "x"]]})}),
+           an({"richiesta": "{rotta"})])
+    avv = amb["zap_avviso_generoso"](25000, 55, "Lu<ca>",
+                                     [{"id": 288, "titolo": "Bici"},
+                                      {"id": 169, "titolo": "Crema & co"}])
+    prova("l'avviso ai moderatori: i sats, chi, e un comando pronto per "
+          "annuncio, tutto scappato", True,
+          "25.000 sats da Lu&lt;ca&gt; (tg 55)" in avv
+          and "<code>/promossi premio 288</code> Bici" in avv
+          and "<code>/promossi premio 169</code> Crema &amp; co" in avv)
+    prova("...e senza annunci lo dice, senza comandi", (True, False),
+          ("Non ha annunci in vendita" in (v := amb["zap_avviso_generoso"](
+              21000, 55, "Luca", [])), "/promossi" in v))
+
+    # --- le sentinelle sul testo -------------------------------------
+    inc = codice(pezzo("_zap_incassa"))
+    prova("il grazie parte DOPO il cancello e dopo la ricevuta: una volta "
+          "sola, e i client contano lo zap prima", True,
+          inc.index("if not mia:") < inc.index("_zap_pubblica(")
+          < inc.index("await _zap_grazie(riga)"))
+    g = codice(pezzo("_zap_grazie"))
+    prova("il grazie: all'utente con notifica, sennò DM alla chiave (non "
+          "anon), sennò niente", True,
+          g.index("await notifica(tg_id, testo)")
+          < g.index("not zap_anonimo(riga)")
+          < g.index("await manda_dm_nostr(riga[\"mittente\"], testo)")
+          < g.index("return"))
+    prova("...il premio solo da utente e sopra la soglia, ai moderatori", True,
+          "if tg_id and riga[\"sats\"] >= ZAP_GENEROSO_SATS:" in g
+          and "await notifica_admin(zap_avviso_generoso(" in g)
+    prova("...e un intoppo non ferma l'orologio", True,
+          "except Exception as e:" in g)
+    cb = codice(pezzo("zap_fattura"))
+    prova("il callback legge chi paga SOLO senza Nostr e dopo i limiti, "
+          "senza mai alzare", True,
+          cb.index("in_attesa >= ZAP_MAX_ATTESA")
+          < cb.index("if not ev and (x_tg_init_data or barattolo_sessione):")
+          < cb.index("await zap_conia(")
+          and "except Exception:\n            chi_paga = 0" in cb
+          and "int(adesso) + ZAP_SCADENZA_S, chi_paga))" in cb)
+    tab = codice(pezzo("_zap_prepara_tabella"))
+    prova("la colonna tg_id nasce con la tabella e si aggiunge alle vecchie",
+          True, "tg_id INTEGER DEFAULT 0)" in tab
+          and "ALTER TABLE zap ADD COLUMN tg_id INTEGER DEFAULT 0" in tab)
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE zap(id INTEGER PRIMARY KEY, payment_hash TEXT)")
+    amb["_zap_prepara_tabella"](con)
+    amb["_zap_prepara_tabella"](con)
+    prova("...una tabella di ieri la prende, due volte senza alzare", True,
+          "tg_id" in {r[1] for r in con.execute("PRAGMA table_info(zap)")})
+    con.close()
+    pr = codice(pezzo("comando_promossi"))
+    prova("/promossi premio: 7 giorni sempre, la strada dell'evidenza, e il "
+          "grazie a chi vende solo a premio dato", True,
+          'cosa in ("evidenza", "premio")' in pr
+          and 'if cosa == "premio":\n                giorni = 7' in pr
+          and pr.index("asyncio.create_task(promo_in_cima_canale(aid))")
+          < pr.index("premiato = (int(a[\"venditore_id\"] or 0),")
+          and "await notifica(premiato[0], zap_testo_premio(premiato[1]))" in pr)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("l'app chiede la fattura dello zap dicendo chi e'", True,
+          "encodeURIComponent('Zap insieme a una mancia'),\n"
+          "      {headers:{'X-Tg-Init-Data':authHdr()}});" in mini)
+
+
 def _banco_swap(extra=None):
     """L'ambiente dell'indirizzo della quota: quello degli zap (swap@
     ne usa la lettura della fattura e le costanti) piu' i pezzi VERI
@@ -188297,8 +188414,10 @@ def prove_canale_admin():
           # di un admin (tolta o rimborsata) nei riepiloghi
           # (25 nov 2026, quadro-servizi) il servizio che tace o torna, e
           # il certificato vicino alla scadenza: negli errori
+          # (25 nov 2026, grazie-zap) lo zap generoso col comando del
+          # premio pronto: nei riepiloghi, come la quota di swap@
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 41,
-           "liquidita": 5, "moderazione": 28, "riepiloghi": 30}, per_stanza)
+           "liquidita": 5, "moderazione": 28, "riepiloghi": 31}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -188336,7 +188455,7 @@ def prove_canale_admin():
                                               "avvisa_profilo_mio",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "118 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "128 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -188367,7 +188486,8 @@ def prove_canale_admin():
           "/promossi di un admin e la pagina dedicata da preparare; e il "
           "nome e la foto scelti da approvare; e la pagina collegata a un "
           "negozio dal pannello; dal 25 nov il servizio del quadro che tace "
-          "o torna, e il certificato vicino alla scadenza)", 127,
+          "o torna, e il certificato vicino alla scadenza; e lo zap "
+          "generoso col comando del premio)", 128,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -224092,7 +224212,7 @@ CATEGORIE = {
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
     carrello_salvato bollino_staff anello_ovunque avvisi_mercatino
-    x_risonanza indirizzo_lightning foto_obbligatorie foto_varianti foto_in_fila_e_incolla vibrazione
+    x_risonanza indirizzo_lightning grazie_zap foto_obbligatorie foto_varianti foto_in_fila_e_incolla vibrazione
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
@@ -225478,7 +225598,7 @@ def main():
               prove_recensioni_ricevute,
               prove_recensioni_nascondibili,
               prove_x_risonanza,
-              prove_indirizzo_lightning,
+              prove_indirizzo_lightning, prove_grazie_zap,
               prove_indirizzo_swap,
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,
