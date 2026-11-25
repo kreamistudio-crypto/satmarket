@@ -44405,11 +44405,13 @@ async function mandaMancia(btn){
   finally { ripristina(); }
 }
 /* la fattura dello zap a Barattolo, dal callback dell'indirizzo di casa
-   (lo stesso che usa un wallet qualunque per zap@): '' se non arriva */
+   (lo stesso che usa un wallet qualunque per zap@): '' se non arriva.
+   Porta chi siamo (25 nov 2026, il grazie): il server sa a chi dirlo */
 async function fatturaZapBarattolo(sats){
   try {
     const r = await fetch(`${API_BASE}/lnurl/zap?amount=${sats * 1000}&comment=`
-      + encodeURIComponent('Zap insieme a una mancia'));
+      + encodeURIComponent('Zap insieme a una mancia'),
+      {headers:{'X-Tg-Init-Data':authHdr()}});
     const d = await r.json().catch(()=>({}));
     return (r.ok && d.pr) ? String(d.pr) : '';
   } catch(e) { return ''; }

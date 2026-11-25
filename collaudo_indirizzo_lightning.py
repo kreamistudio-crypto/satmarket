@@ -640,6 +640,103 @@ def main():
           '151.38.10.7:5555 - "GET /api/annunci?q=bici HTTP/1.1" 200',
           riga_accesso("/api/annunci?q=bici"))
 
+    # ---- 12) il grazie a chi zappa (25 nov 2026) -------------------------
+    print("\n[il grazie a chi zappa, e l'avviso del premio]")
+    SRV._SECCHI.clear()
+    scrivi("DELETE FROM zap")
+    sk_utente = bytes.fromhex("0f" * 31 + "23")     # un utente col badge verificato
+    sk_furbo = bytes.fromhex("11" * 31 + "29")      # chi ha solo DICHIARATO la npub
+    pub_utente = schnorr_puro.pubblica(sk_utente).hex()
+    pub_furbo = schnorr_puro.pubblica(sk_furbo).hex()
+    scrivi("INSERT INTO utenti(tg_id, nome, npub, npub_verificata) "
+           "VALUES(?,?,?,1)", 55, "Lucia", SRV.hex_to_npub(pub_utente))
+    scrivi("INSERT INTO utenti(tg_id, nome, npub, npub_verificata) "
+           "VALUES(?,?,?,0)", 66, "Furbo", SRV.hex_to_npub(pub_utente))
+    scrivi("INSERT INTO utenti(tg_id, nome, npub, npub_verificata) "
+           "VALUES(?,?,?,0)", 67, "Furbo2", SRV.hex_to_npub(pub_furbo))
+    scrivi("INSERT INTO annunci(venditore_id, titolo, stato) "
+           "VALUES(55, 'Bici rossa', 'attivo')")
+    id_bici = SRV.db().execute("SELECT MAX(id) FROM annunci").fetchone()[0]
+    dm = []
+
+    async def dm_finto(dest_hex, testo):
+        dm.append((dest_hex, testo))
+        return True
+    vero_dm, SRV.manda_dm_nostr = SRV.manda_dm_nostr, dm_finto
+    grazie = "Grazie per lo zap da {} sats a Barattolo! ⚡ Ci aiuta a " \
+             "tenere il mercatino libero e tutto in sats."
+
+    def zappa(sats, **kw):
+        d = chiedi(amount=str(sats * 1000), nostr=richiesta_zap(sats * 1000, **kw))
+        paga(SRV.zap_leggi_bolt11(d.json()["pr"])["payment_hash"])
+        banco.DETTO.clear(); banco.AVVISI.clear(); dm.clear()
+        return giro()
+
+    try:
+        n, carta = zappa(1)
+        prova("1 sat da una chiave che non e' di nessuno: il grazie in DM "
+              "alla chiave, niente bot, niente moderatori",
+              (1, [(PUB_ZAPPA, grazie.format(1))], [], []),
+              (n, dm, banco.DETTO, banco.AVVISI))
+        prova("...e il journal lo dice senza dire chi", True,
+              "🧡 zap: grazie mandato (DM Nostr)" in carta)
+        zappa(25000, sk=sk_furbo)
+        prova("25.000 sats da una npub solo DICHIARATA: DM alla chiave, non "
+              "all'utente che se l'e' scritta, e nessun premio",
+              ([pub_furbo], [], []),
+              ([x[0] for x in dm], banco.DETTO, banco.AVVISI))
+        zappa(100, sk=sk_utente)
+        prova("100 sats dal badge verificato: il grazie a lui con notifica "
+              "(il suo canale), niente DM doppio, niente premio sotto soglia",
+              ([(55, grazie.format(100))], [], []),
+              (banco.DETTO, dm, banco.AVVISI))
+        zappa(21000, sk=sk_utente)
+        avviso = banco.AVVISI[0] if banco.AVVISI else ""
+        prova("21.000 sats: il grazie, e ai moderatori il comando del premio",
+              (1, True, True),
+              (len(banco.DETTO), "21.000 sats da Lucia (tg 55)" in avviso,
+               f"<code>/promossi premio {id_bici}</code> Bici rossa" in avviso))
+        prova("...ma il premio non parte da solo", 0,
+              SRV.db().execute("SELECT evidenza_fino FROM annunci WHERE id=?",
+                               (id_bici,)).fetchone()[0] or 0)
+        zappa(30000, sk=SK_ALTRO, tags=[["amount", "30000000"],
+                                        ["p", PUB_BARATTOLO], ["anon"]])
+        prova("uno zap «anon»: nessun DM alla chiave usa-e-getta, nessun "
+              "avviso", ([], [], []), (dm, banco.DETTO, banco.AVVISI))
+
+        # dal foglio della mancia: l'identita' di chi e' dentro l'app
+        vero_verifica = SRV.verifica_utente
+        banco.come(77)
+        try:
+            with contextlib.redirect_stdout(journal):
+                r = c.get(CALLBACK, params={"amount": "500000"},
+                          headers={"X-Tg-Init-Data": "collaudo:77:Mario"})
+        finally:
+            SRV.verifica_utente = vero_verifica
+        h_app = SRV.zap_leggi_bolt11(r.json()["pr"])["payment_hash"]
+        prova("dall'app la riga sa chi paga", (200, 77),
+              (r.status_code, righe(f"payment_hash='{h_app}'")[0]["tg_id"]))
+        paga(h_app)
+        banco.DETTO.clear(); banco.AVVISI.clear(); dm.clear()
+        giro()
+        prova("...e il grazie gli arriva dal bot; 500 sats, niente premio",
+              ([(77, grazie.format(500))], [], []),
+              (banco.DETTO, dm, banco.AVVISI))
+        with contextlib.redirect_stdout(journal):
+            r = c.get(CALLBACK, params={"amount": "2000"},
+                      headers={"X-Tg-Init-Data": "firma=falsa"})
+        h_x = SRV.zap_leggi_bolt11(r.json()["pr"])["payment_hash"]
+        prova("un'identita' che non regge: la fattura esce lo stesso, anonima",
+              (200, 0), (r.status_code,
+                         righe(f"payment_hash='{h_x}'")[0]["tg_id"]))
+        paga(h_x)
+        banco.DETTO.clear(); dm.clear()
+        giro()
+        prova("...e un pagamento anonimo non ringrazia nessuno", ([], []),
+              (banco.DETTO, dm))
+    finally:
+        SRV.manda_dm_nostr = vero_dm
+
     SRV.ZAP_ATTIVO = False
     prova("spenta di nuovo la leva: 404, e la card resta (ci sono righe)",
           (404, False), (c.get(VIA).status_code,

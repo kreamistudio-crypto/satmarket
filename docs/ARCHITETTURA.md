@@ -34487,6 +34487,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `collaudo_indirizzo_lightning` (il server vero per HTTP con un LNbits
   di cartone, in CI nella gabbia). La procedura: PRODUZIONE,
   «L'INDIRIZZO LIGHTNING DI CASA».
+  IL GRAZIE A CHI ZAPPA (25 nov 2026, perché in CANTIERI, «Il grazie a
+  chi ci fa uno zap»): `_zap_incassa`, dopo il cancello e dopo la
+  ricevuta, chiama `_zap_grazie`. Chi è lo dice `zap_chi_e`: la colonna
+  `tg_id` (la scrive il callback quando la richiesta porta l'identità
+  di chi è nell'app, `X-Tg-Init-Data` o il cookie, e solo senza Nostr;
+  un'identità che non regge vale 0 e la fattura esce lo stesso), oppure
+  la chiave dello zap Nostr fra `npub_accesso` e i badge VERIFICATI. A
+  un utente il grazie va con `notifica` (il suo canale); a una chiave
+  che non è di nessuno con `manda_dm_nostr`, tranne una richiesta
+  `anon`; un pagamento semplice anonimo non ringrazia nessuno. Da
+  `ZAP_GENEROSO_SATS` (21.000) in su, e solo per un utente, ai
+  moderatori (stanza riepiloghi) va `zap_avviso_generoso` col comando
+  `/promossi premio ID` per i suoi tre annunci attivi più recenti: il
+  premio non parte da solo. `/promossi premio` è `/promossi evidenza`
+  a 7 giorni fissi, e a premio dato manda a chi vende `zap_testo_premio`.
+  Fail-open: un intoppo è «⚠️ zap: grazie non partito» nel journal.
 - LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore; il
   perché in CANTIERI, «La mancia al venditore»). Un blocco suo in
   server.py, subito DOPO quello degli zap (ne usa `zap_leggi_bolt11`
