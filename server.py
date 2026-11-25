@@ -1906,20 +1906,30 @@ except ImportError:
 # raggiunta: con 0 presi il primo, e oltre l'ultimo resta l'ultimo. Il
 # conto dei presi si fa alla FATTURA (`_presi_promo`), come i posti.
 # Una scala vuota = quella promozione e' spenta (le altre restano). I
-# numeri sono quelli proposti il 25 nov e approvati da Andrea («ok»).
+# numeri sono quelli proposti il 25 nov e approvati da Andrea («ok»),
+# rifatti la sera stessa (Andrea: la mensola «un po' troppo cara», da
+# 7.000 a 40.000; la card in alto al massimo 20.000; il negozio nella
+# home da 20.000 a 50.000, massimo 10).
 # Prima erano prezzi fissi (`PROMO_IN_CIMA_SATS` 5.000, `PROMO_EVIDENZA_
 # SATS` {7: 15.000, 15: 25.000}, `PROMO_SCOPRIRE_SATS` 50.000): quelle
 # righe, se restano nel config del VPS, non le legge piu' nessuno.
-# «⬆️ In cima»: l'annuncio torna primo fra i «Più recenti», come appena
-# pubblicato, e riesce nel nostro canale. Una volta, niente durata. I
+# «⬆️ In vetrina» (fino al 25 nov 2026 «In cima»: Andrea, «in cima mi dà
+# fastidio»; scartati «Sponsorizzato», «Sul tappo», «Promosso» e Tappo
+# disegnato nella card, la parola e lo stile sono suoi): l'annuncio torna primo fra i «Più recenti», come
+# appena pubblicato, e riesce nel nostro canale. In alto non ha durata
+# (scende con gli annunci nuovi), ma per PROMO_IN_CIMA_ORE ore la card
+# e' tinta d'arancio, con la cornice e la scritta «In vetrina»
+# (`sponsor_fino`). I
 # presi sono gli annunci saliti in cima PAGANDO nelle ultime
 # PROMO_IN_CIMA_ORE ore.
 try:
     from config import PROMO_IN_CIMA_SCALINI
 except ImportError:
-    PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))
+    PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (4, 8_000), (5, 11_000),
+                             (6, 14_000), (7, 17_000), (8, 20_000))
 # ...al massimo una volta ogni tante ore per annuncio: il conto parte da
-# quando l'annuncio e' salito in cima l'ultima volta (o e' nato).
+# quando l'annuncio e' salito in cima l'ultima volta (o e' nato). Sono
+# anche le ore della scritta «In vetrina».
 try:
     from config import PROMO_IN_CIMA_ORE
 except ImportError:
@@ -1932,8 +1942,9 @@ except ImportError:
 try:
     from config import PROMO_EVIDENZA_SCALINI
 except ImportError:
-    PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),
-                              (5, 25_000), (6, 35_000), (7, 50_000))
+    PROMO_EVIDENZA_SCALINI = ((0, 7_000), (1, 9_000), (2, 12_000),
+                              (3, 15_000), (4, 19_000), (5, 24_000),
+                              (6, 31_000), (7, 40_000))
 try:
     from config import PROMO_EVIDENZA_DURATE
 except ImportError:
@@ -1945,21 +1956,30 @@ try:
     from config import PROMO_EVIDENZA_POSTI
 except ImportError:
     PROMO_EVIDENZA_POSTI = 8
-# «🏪 Il negozio in Da scoprire»: la scala e per quanti giorni. Dopo
-# la scadenza la card esce da «Da scoprire» ma il negozio RESTA fra i
+# «🏪 Il negozio nella home» (fino al 25 nov 2026 «Da scoprire», che
+# come sezione non c'e' piu'): la scala e per quanti giorni. Dopo la
+# scadenza la card esce dalla home ma il negozio RESTA fra i
 # Consigliati, finche' un moderatore non lo toglie (decisione di Andrea:
-# «possono essere anche infiniti lì»). Nessun limite di posti: la fila
-# gira a ogni apertura e scorre da sola; i presi sono i negozi che ci
-# sono gia'. Una scala vuota = spenta.
+# «possono essere anche infiniti lì»). I presi sono i negozi PAGATI che
+# ci sono gia'. Una scala vuota = spenta.
 try:
     from config import PROMO_SCOPRIRE_SCALINI
 except ImportError:
     PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),
-                              (3, 50_000), (4, 70_000), (5, 100_000))
+                              (3, 45_000), (4, 50_000))
 try:
     from config import PROMO_SCOPRIRE_GIORNI
 except ImportError:
     PROMO_SCOPRIRE_GIORNI = 30
+# I posti dei negozi nella home (25 nov 2026, Andrea: «dal 10º in poi
+# non è più possibile, metti un limite di 10»). Qui contano TUTTI i
+# negozi dentro, regali compresi: e' un limite di spazio, non di
+# prezzo. Chi allunga il suo non prende un posto nuovo. 0 = nessun
+# limite.
+try:
+    from config import PROMO_SCOPRIRE_POSTI
+except ImportError:
+    PROMO_SCOPRIRE_POSTI = 10
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -10763,6 +10783,11 @@ def init_db():
                     # come la lampo: alla scadenza la card esce dalla fila
                     # da sola. La scrive solo `_incassa_promo`.
                     "evidenza_fino INTEGER DEFAULT 0",
+                    # «In vetrina» (25 nov 2026): fino a quando la card
+                    # porta l'etichetta e la cornice, dopo «In cima»
+                    # pagato. Gate in LETTURA come `evidenza_fino`; la
+                    # scrive solo `_incassa_promo`, la azzera il rimborso.
+                    "sponsor_fino INTEGER DEFAULT 0",
                     # quantita (lug 2026): i pezzi disponibili ADESSO,
                     # non lo storico. Default 1 = ogni annuncio di ieri
                     # resta un pezzo solo. INVARIANTE: stato='venduto'
@@ -17915,6 +17940,95 @@ def _tabella_giroconti(con) -> None:
         " payout_verso TEXT DEFAULT '', payout_tentativi INTEGER DEFAULT 0,"
         " payout_ultimo INTEGER DEFAULT 0, payout_verificato INTEGER DEFAULT 0,"
         " payout_errore TEXT DEFAULT '')")
+
+
+# ══ GLI AVVISI DI «NON HAI SATS?» (25 nov 2026, cantiere via-euro-avvisi) ══
+# Andrea: chi paga in euro «non deve neanche sapere che cos'e' la scheda
+# peer-to-peer». Il bot gli parlava come a chi fa uno scambio P2P («blocca
+# la garanzia», «Apri lo scambio»): qui lo scambio si lega all'ordine del
+# mercatino che salda, e a chi compra le quattro frasi approvate da Andrea
+# il 25 nov sera, col bottone «📦 Apri l'ordine». Le dispute e il resto
+# restano quelli di sempre.
+# IL LEGAME LO PORTA IL CLIENT, nel POST /orders del giroconto
+# (`p2p_ordine`): e' l'unico che sa quale scambio sta saldando. La chiave
+# e' (scambio, chi compra), e si legge solo per chi riceve l'avviso: un
+# body scritto a mano puo' cambiare al piu' gli avvisi di chi l'ha scritto.
+def _tabella_via_euro(con) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS via_euro_scambi("
+        " ordine_p2p TEXT NOT NULL, compratore INTEGER NOT NULL,"
+        " ordine INTEGER NOT NULL, creato INTEGER,"
+        " PRIMARY KEY(ordine_p2p, compratore))")
+
+
+def _lega_via_euro(con, ordine_p2p, compratore: int, ordine_id: int) -> bool:
+    """Scrive il legame scambio → ordine del mercatino. Non committa: sta
+    nella transazione di chi chiama. Un id storto non lega niente."""
+    if not (isinstance(ordine_p2p, str) and FORMA_ORDINE_P2P.fullmatch(ordine_p2p)
+            and compratore and ordine_id):
+        return False
+    _tabella_via_euro(con)
+    con.execute("INSERT OR REPLACE INTO via_euro_scambi(ordine_p2p, compratore, "
+                "ordine, creato) VALUES(?,?,?,?)",
+                (ordine_p2p, int(compratore), int(ordine_id), int(time.time())))
+    return True
+
+
+def _ordine_via_euro(con, ordine_p2p, tg_id) -> int:
+    """L'ordine del mercatino che QUESTA persona salda con quello scambio,
+    o 0. Un database senza la tabella vale 0: l'avviso resta quello di
+    sempre."""
+    try:
+        r = con.execute("SELECT ordine FROM via_euro_scambi WHERE ordine_p2p=? "
+                        "AND compratore=?", (str(ordine_p2p or ""),
+                                             int(tg_id or 0))).fetchone()
+    except sqlite3.OperationalError:
+        return 0
+    return int(r[0]) if r else 0
+
+
+def _via_euro_cambia(momento: str, dettaglio: str) -> bool:
+    """PURA: su questo momento chi paga in euro sente la frase sua? La
+    garanzia bloccata a scambio attivo, il recapito, la chiusura, ogni
+    annullo e ritorno nel libro tranne quello di un moderatore."""
+    if momento == "garanzia_pagata":
+        return dettaglio == "active"
+    if momento in ("recapito", "concluso", "tornato"):
+        return True
+    if momento == "annullato":
+        return dettaglio != "admin"
+    return False
+
+
+def _testo_via_euro(momento: str, dettaglio: str, nome: str = "",
+                    cifra: str = "", detto: bool = False, minuti: int = 0) -> str:
+    """PURA: la frase a chi paga in euro (testi approvati da Andrea il 25
+    nov 2026), o '' = resta quella di sempre. `nome` e' di chi vende, gia'
+    scappato; `cifra` gli euro come li dice il libro; `detto` = il recapito
+    e' gia' arrivato; `minuti` il tempo per pagare (0 = la riga non c'e')."""
+    if not _via_euro_cambia(momento, dettaglio):
+        return ""
+    chi = nome or "Chi vende"
+    a_chi = (("ad " if nome[:1].lower() in "aeiou" else "a ") + nome) if nome \
+        else "a chi vende"
+    quanto = cifra or "gli euro"
+    if momento == "garanzia_pagata" and not detto:
+        return (f"🔒 <b>{chi} ha preparato i sats per il tuo acquisto.</b> Tra "
+                f"poco ti dice dove mandare {quanto}.")
+    if momento in ("garanzia_pagata", "recapito"):
+        return (f"💶 <b>Manda {quanto} {a_chi}:</b> i dati sono nell'ordine. "
+                "Poi tocca «Ho inviato gli euro»."
+                + (f"\n\n⏱ Hai {_durata_detta_p2p(int(minuti) * 60)}, poi il "
+                   "pagamento si annulla." if minuti else ""))
+    if momento == "concluso":
+        return f"✅ <b>{chi} ha ricevuto gli euro:</b> il tuo acquisto è pagato."
+    return ("❌ <b>Il pagamento in euro è stato annullato:</b> l'acquisto non è "
+            "pagato. Se avevi già mandato gli euro, scrivici da Assistenza.")
+
+
+def _bottone_via_euro(ordine_id: int) -> tuple:
+    """PURA: «📦 Apri l'ordine» sotto gli avvisi di chi paga in euro."""
+    return (BOTTONE_ORDINE_VENDUTO, f"{URL_PUBBLICO}/?ordine={int(ordine_id)}")
 
 
 def _domanda_giroconto(d) -> dict:
@@ -31310,6 +31424,9 @@ CAMPI_VETRINA = (
     # scadenza e basta: il client confronta con l'orologio, come fa
     # con `lampo_scadenza`
     "a.evidenza_fino, "
+    # «In vetrina» (25 nov 2026): pubblico per natura come la
+    # Mensola — l'etichetta e' proprio quel che si paga per far vedere
+    "a.sponsor_fino, "
     # l'asta e' pubblica per natura (regola del cantiere: importo in
     # testa e numero di puntate si vedono, gli offerenti no): base e
     # scadenza qui, top e conteggio li aggiunge arricchisci_righe_vetrina
@@ -39870,14 +39987,14 @@ def _leve_stato():
                   bool(PROMOZIONI_ATTIVE),
                   spento="la cassa delle promozioni e' chiusa: nessuno "
                          "ne compra di nuove, quelle gia' pagate restano",
-                  acceso="i venditori possono pagare In cima, In "
-                         "evidenza e il negozio in Da scoprire"),
-            _leva("Promozione In cima: prezzi (gia' presi: sats)",
+                  acceso="i venditori possono pagare In vetrina, "
+                         "Mensola e il negozio nella home"),
+            _leva("Promozione In vetrina: prezzi (gia' presi: sats)",
                   "PROMO_IN_CIMA_SCALINI",
                   _elenco(f"{n}+ {s}" for n, s in
                           scalini_promo(PROMO_IN_CIMA_SCALINI)),
-                  spento="In cima non si vende"),
-            _leva("Promozione In cima: ore fra due volte",
+                  spento="In vetrina non si vende"),
+            _leva("Promozione In vetrina: ore (etichetta e fra due volte)",
                   "PROMO_IN_CIMA_ORE", int(PROMO_IN_CIMA_ORE or 0)),
             _leva("Promozione Mensola: prezzi 1a durata (gia' presi: sats)",
                   "PROMO_EVIDENZA_SCALINI",
@@ -39890,13 +40007,15 @@ def _leve_stato():
                   spento="la Mensola non si vende"),
             _leva("Promozione Mensola: posti", "PROMO_EVIDENZA_POSTI",
                   int(PROMO_EVIDENZA_POSTI or 0)),
-            _leva("Negozio in Da scoprire: prezzi (gia' dentro: sats)",
+            _leva("Negozio nella home: prezzi (gia' dentro: sats)",
                   "PROMO_SCOPRIRE_SCALINI",
                   _elenco(f"{n}+ {s}" for n, s in
                           scalini_promo(PROMO_SCOPRIRE_SCALINI)),
-                  spento="la card del negozio in Da scoprire non si vende"),
-            _leva("Negozio in Da scoprire: giorni", "PROMO_SCOPRIRE_GIORNI",
+                  spento="la card del negozio nella home non si vende"),
+            _leva("Negozio nella home: giorni", "PROMO_SCOPRIRE_GIORNI",
                   int(PROMO_SCOPRIRE_GIORNI or 0)),
+            _leva("Negozio nella home: posti (0 = senza limite)",
+                  "PROMO_SCOPRIRE_POSTI", int(PROMO_SCOPRIRE_POSTI or 0)),
             _leva("Link toccabili in descrizione",
                   "LINK_DESCRIZIONE_AMMESSI",
                   _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
@@ -50772,6 +50891,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     (mail, mio["email_corriere_il"]
                      or (int(time.time()) if mail else 0), mio["id"]))
                 con.commit()
+            # LA FATTURA LUNGA RIPRESENTATA A UNO SCAMBIO NUOVO (il primo
+            # annullato, Mario riprova): il legame segue lo scambio di adesso
+            if giroconto and _lega_via_euro(con, d.get("p2p_ordine"),
+                                            user["id"], mio["id"]):
+                con.commit()
             con.close()
             # La divisione a ritroso RIAGGIUNGE lo sconto (ago 2026, il
             # mono sconta): prezzo_sats nasce gia' scontato, quindi
@@ -51320,6 +51444,9 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         con.execute("UPDATE ordini SET fattura_scade=? WHERE id=?",
                     (int(time.time()) + GIROCONTO_FATTURA_SECONDI,
                      ordine_id))
+        # ...e lo scambio che la salda, per gli avvisi a chi paga in euro
+        # (25 nov 2026, vedi «GLI AVVISI DI «NON HAI SATS?»»)
+        _lega_via_euro(con, d.get("p2p_ordine"), user["id"], ordine_id)
     if off:
         # Il legame ordine-offerta nella STESSA transazione: nessuna
         # finestra in cui l'uno esiste senza l'altro.
@@ -62831,6 +62958,21 @@ def posti_evidenza(con, adesso: int, escluso: int = 0) -> tuple:
     return len(righe), (righe[len(righe) - posti] if righe else 0)
 
 
+def posti_scoprire(con, adesso: int, escluso: int = 0) -> tuple:
+    """I posti dei negozi nella home, come `posti_evidenza`:
+    (occupati, prossimo_libero), regali compresi — e' lo spazio, non il
+    prezzo. `escluso` e' il tg_id di chi rinnova: il suo posto ce l'ha.
+    PROMO_SCOPRIRE_POSTI a 0 = nessun limite."""
+    posti = max(0, int(PROMO_SCOPRIRE_POSTI or 0))
+    righe = [r["promo_scoprire_fino"] for r in con.execute(
+        "SELECT promo_scoprire_fino FROM utenti WHERE promo_scoprire_fino>? "
+        "AND tg_id<>? ORDER BY promo_scoprire_fino",
+        (adesso, int(escluso or 0)))]
+    if not posti or len(righe) < posti:
+        return len(righe), 0
+    return len(righe), righe[len(righe) - posti]
+
+
 def in_cima_da(creato: int) -> int:
     """Da quando l'annuncio puo' tornare in cima: PROMO_IN_CIMA_ORE dopo
     l'ultima volta che c'e' salito — o dopo che e' nato, che per la
@@ -63107,7 +63249,10 @@ async def listino_promo(annuncio: int = 0,
             fino = int((u["promo_scoprire_fino"] if u else 0) or 0)
             presi_sc = _presi_promo(con, "promo_scoprire", adesso,
                                     tg_id=user["id"])
+            occ_sc, libero_sc = posti_scoprire(con, adesso, user["id"])
             fuori["scoprire"] = {
+                "posti": max(0, int(PROMO_SCOPRIRE_POSTI or 0)),
+                "occupati": occ_sc, "libero_da": libero_sc,
                 "sats": prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi_sc),
                 "giorni": int(PROMO_SCOPRIRE_GIORNI or 0),
                 "banner": _banner_vivo(u),
@@ -63169,7 +63314,7 @@ async def compra_promo(req: Request,
                                          + _data_sponsor(prossimo))
         riferimento = str(aid) + (f":{giorni}" if giorni else "")
         memo = (f"Barattolo promozione #{user['id']}: "
-                + ("in cima" if motivo == "promo_cima"
+                + ("in vetrina" if motivo == "promo_cima"
                    else f"in evidenza {giorni} giorni")
                 + f", annuncio {aid}")
     else:
@@ -63183,9 +63328,15 @@ async def compra_promo(req: Request,
             con.close()
             raise HTTPException(400, "Prima serve il banner del negozio "
                                      "approvato: la card è fatta con quello")
+        _occ, prossimo = posti_scoprire(con, adesso, user["id"])
+        if prossimo:
+            con.close()
+            raise HTTPException(409, "I negozi nella home sono al "
+                                     "completo: il prossimo posto si "
+                                     "libera il " + _data_sponsor(prossimo))
         riferimento = str(giorni)
-        memo = (f"Barattolo promozione #{user['id']}: negozio in "
-                f"Da scoprire {giorni} giorni")
+        memo = (f"Barattolo promozione #{user['id']}: negozio nella "
+                f"home {giorni} giorni")
     # LO SCALINO DEL PREZZO si legge QUI, coi posti di adesso (25 nov
     # 2026): la ripresa qui sotto confronta anche i sats, quindi se nel
     # frattempo la fila si e' riempita la fattura vecchia si chiude e ne
@@ -63306,8 +63457,11 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                 con.execute("UPDATE annunci SET evidenza_fino=?, creato=? "
                             "WHERE id=?", (fino, adesso, aid))
             else:
-                con.execute("UPDATE annunci SET creato=? WHERE id=?",
-                            (adesso, aid))
+                # «In vetrina»: la scritta dura PROMO_IN_CIMA_ORE da
+                # adesso, anche quando la card e' gia' scesa
+                fino = adesso + max(0, int(PROMO_IN_CIMA_ORE or 0)) * 3600
+                con.execute("UPDATE annunci SET creato=?, sponsor_fino=? "
+                            "WHERE id=?", (adesso, fino, aid))
     elif motivo == "promo_scoprire" and giorni > 0:
         u = con.execute("SELECT promo_scoprire_fino, promo_consigliato, nome "
                         "FROM utenti WHERE tg_id=?", (p["tg_id"],)).fetchone()
@@ -63365,7 +63519,7 @@ async def _incassa_promo(pagamento_id: int) -> dict:
     try:
         if applicata and motivo == "promo_scoprire":
             await notifica(p["tg_id"],
-                           "🏪 <b>Fatto!</b> Il tuo negozio è in «Da scoprire» "
+                           "🏪 <b>Fatto!</b> Il tuo negozio è nella home "
                            f"fino al {_data_sponsor(fino)}, e poi resta fra "
                            "i Consigliati."
                            + ("\n\nPer la pagina dedicata del tuo negozio "
@@ -63380,8 +63534,8 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                            f"fino al {_data_sponsor(fino)}.")
         elif applicata:
             await notifica(p["tg_id"],
-                           "⬆️ <b>Fatto!</b> Il tuo annuncio è tornato in "
-                           "cima.")
+                           "⬆️ <b>Fatto!</b> Il tuo annuncio è in vetrina "
+                           "per 24 ore.")
     except Exception as e:
         print(f"⚠️ Avviso della promozione non partito: {e}")
     return {"stato": "pagato", "applicata": applicata, "fino": fino}
@@ -63452,6 +63606,10 @@ def _disfa_promo(con, p) -> str:
     Consigliati — il rimborso disfa tutto in un gesto, la regola di
     `_rimborsa_sblocco`."""
     aid, _g = _promo_dal_riferimento(p)
+    if p["motivo"] == "promo_cima" and aid:
+        # la data non torna indietro, la scritta «In vetrina» si'
+        con.execute("UPDATE annunci SET sponsor_fino=0 WHERE id=? "
+                    "AND venditore_id=?", (aid, p["tg_id"]))
     if p["motivo"] == "promo_evidenza" and aid:
         con.execute("UPDATE annunci SET evidenza_fino=0 WHERE id=? "
                     "AND venditore_id=?", (aid, p["tg_id"]))
@@ -73363,6 +73521,27 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
             ripetuto=(d or {}).get("ripetuto") is True,
             contanti=forma if isinstance(forma, bool) else None,
             versione=_versione_recapito_p2p((d or {}).get("versione")))
+        # «NON HAI SATS?» (25 nov 2026, via-euro-avvisi): a chi paga in
+        # euro un oggetto del mercatino il primo recapito ha la frase sua
+        # (gli aggiornamenti restano quelli di sempre), e sotto ogni
+        # recapito «📦 Apri l'ordine». Un guasto lascia la frase di sempre
+        n_ve = 0
+        try:
+            if a_chi:
+                n_ve = _ordine_via_euro(con, (d or {}).get("ordine"), a_chi)
+            if n_ve and testo.startswith("💶 "):
+                _o_ve = (d or {}).get("ordine")
+                _r_ve = con.execute("SELECT euro FROM p2p_ordini WHERE ordine=?",
+                                    (_o_ve,)).fetchone()
+                _e_ve = html.escape(str((_r_ve["euro"] if _r_ve else "") or ""))
+                testo = _testo_via_euro(
+                    "recapito", "",
+                    nome=_nome_altro_p2p(con, _o_ve, a_chi, int(time.time())),
+                    cifra=_e_ve if _e_ve and not _e_ve.startswith("da ") else "",
+                    minuti=_minuti_pagare_scelta_p2p(_minuti_pagare_ordine_p2p(con, _o_ve)))
+        except Exception as e:
+            print(f"⚠️ Recapito P2P: la frase di «Non hai sats?» non si fa "
+                  f"({type(e).__name__}: {e}): resta quella di sempre", flush=True)
         # in USDT con le sue parole (2 nov 2026, usdt-due-reti)
         if a_chi and p2p_usdt_ordine(con, (d or {}).get("ordine")):
             testo = p2p_usdt_frase(testo)
@@ -73391,7 +73570,9 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
         # a te»: sotto, il bottone che lo porta a QUELLO scambio. Solo
         # con un id nella forma di sempre; sennò l'avviso parte nudo
         o_avviso = (d or {}).get("ordine")
-        if isinstance(o_avviso, str) and FORMA_ORDINE_P2P.fullmatch(o_avviso):
+        if n_ve:
+            esito = await notifica(a_chi, testo, _bottone_via_euro(n_ve))
+        elif isinstance(o_avviso, str) and FORMA_ORDINE_P2P.fullmatch(o_avviso):
             esito = await notifica(a_chi, testo, _bottone_scambio_p2p(o_avviso))
         else:
             esito = await notifica(a_chi, testo)
@@ -84209,17 +84390,38 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             print(f"· Evento P2P: {corto} «{momento}» a {chi} e' gia' stato "
                   "detto: non si ripete", flush=True)
             continue
+        nome_altro = _nome_altro_p2p(con, ordine, chi, adesso)
         testo = _testo_evento_p2p(
             momento, ev["dettaglio"], ruolo, dati,
-            nome=_nome_altro_p2p(con, ordine, chi, adesso),
+            nome=nome_altro,
             maker=e_maker,
             recensibile=(momento == "concluso" and recensibile(chi)),
             mio_gesto=(ruolo == {"buyer": "compra",
                                  "seller": "vende"}.get(ev["attore"], "")))
-        if testo:
+        # «NON HAI SATS?» (25 nov 2026, via-euro-avvisi): chi paga in euro
+        # un oggetto del mercatino sente le frasi sue, senza P2P. Da
+        # `globals()`: i banchi che ritagliano questa funzione non le
+        # portano. Un guasto lascia la frase di sempre, mai l'avviso in meno
+        via_euro = ""
+        try:
+            _ve = globals().get("_ordine_via_euro")
+            if testo and ruolo == "compra" and _ve and _ve(con, ordine, chi):
+                _euro = str(dati.get("euro") or "")
+                via_euro = _testo_via_euro(
+                    momento, ev["dettaglio"], nome=nome_altro,
+                    cifra=_euro if _euro and not _euro.startswith("da ") else "",
+                    detto=bool(dati.get("recapito_detto")),
+                    minuti=_minuti_pagare_scelta_p2p(int(dati.get("minuti_pagare") or 0)))
+        except Exception as e:
+            print(f"⚠️ Evento P2P: {corto} la frase di «Non hai sats?» non si "
+                  f"fa ({type(e).__name__}: {e}): resta quella di sempre", flush=True)
+        if via_euro:
+            testo = via_euro
+        elif testo:
             # ...e a chi aveva bloccato la cauzione, alla chiusura, la
             # riga che gli dice che torna (1 ott 2026)
             testo += _coda_cauzione_p2p(momento, ev["dettaglio"], ruolo, dati)
+        if testo:
             fuori.append((chi, testo))
             # A CHI COMPRA LA GARANZIA HA DETTO ANCHE IL RECAPITO (19 set
             # 2026): vale come il suo primo avviso del recapito, o il
@@ -85297,6 +85499,18 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
             # un guasto lascia i bottoni com'erano: mai l'avviso in meno
             try:
                 bottoni = _bottoni_evento_p2p(ev["ordine"], avvisi, bottoni)
+            except Exception:
+                pass
+            # ...ma a chi paga in euro un oggetto del mercatino (25 nov
+            # 2026, via-euro-avvisi), sotto le sue frasi, «📦 Apri l'ordine»:
+            # lo scambio non lo deve vedere. Un guasto lascia i bottoni
+            try:
+                _ve = globals().get("_ordine_via_euro")
+                if _ve and _via_euro_cambia(fatto["momento"], ev.get("dettaglio") or ""):
+                    for tg, _ in avvisi:
+                        n_ve = _ve(con, ev["ordine"], tg)
+                        if n_ve:
+                            bottoni[tg] = _bottone_via_euro(n_ve)
             except Exception:
                 pass
             # ...e la riga del PARACADUTE (13 ott 2026), sotto l'avviso
@@ -126817,6 +127031,7 @@ def asset_tappo():
     tasto-avatar del Profilo, reso tondo dal CSS della pagina."""
     return FileResponse("assets/tappo.jpeg", media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
+
 
 
 @app.get("/assets/caccia-tappo.webp")

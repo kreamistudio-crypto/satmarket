@@ -96142,3 +96142,125 @@ LA CURA. Fra 768 e 1023 le pillole perdono un po' d'aria (padding 9 invece di 16
 SCARTATO. Allargare la fascia della tessera fino a 940: lì il marchio intero ci sta, toglierlo sarebbe stato perderlo proprio dove c'è posto. Nascondere le scritte delle voci: cambia la topbar più di quanto serva.
 
 PROVATO. `prove_seo` ha la sentinella della fascia (con la controprova: rimesso il padding a 16, è rossa); suite severa e collaudi; scatto in /mnt/project-files/home-pc/6-topbar-stretta-dopo.png.
+
+## La card «In vetrina», i prezzi rifatti e i dieci negozi nella home (25 nov 2026 sera, cantiere sponsorizzato)
+
+Andrea, dal collaudo dei prezzi a scalini: la card spinta «In cima» deve
+«essere scontornata e messa in evidenza, magari con una scritta sopra»,
+ma senza dire «in evidenza» né «in cima» («in cima mi dà fastidio»); e
+la stessa sera ha rifatto le tre scale. DECISO, in quest'ordine:
+- PREZZI (tabelle mandate e corrette da lui nel thread): card in alto
+  2.000 fino al terzo, poi 5.000/8.000/11.000/14.000/17.000 e 20.000
+  dal nono (tetto 20.000, «aumenta in maniera più massiva» dal quinto);
+  Mensola da 7.000 a 40.000 sugli 8 posti (7/9/12/15/19/24/31/40 mila:
+  prima aveva detto 30.000 di tetto e +10.000 dal quarto al sesto, poi
+  «parte da 7.000 e arriva a 40.000, abbiamo detto»; i passi sono miei
+  e si ritoccano dalla leva); il negozio nella home 20/30/40/45 mila e
+  50.000 dal quinto al decimo, MASSIMO 10 negozi («dal 10º in poi non è
+  più possibile»). I 10 posti contano TUTTI i negozi dentro, regali
+  compresi: e' spazio, non prezzo (la stessa regola di
+  `posti_evidenza`); il prezzo resta sui soli pagati.
+- LO STILE: tre anteprime a 360px (fascia «🚀 Promosso», razzo
+  sull'angolo, etichetta a cavallo del bordo), poi con foto vere
+  ritagliate dai suoi screenshot. Scelta la terza, con la parola
+  «Sponsorizzato»; poi «non si può usare un altro titolo», «cosa di
+  inerente a barattolo», e la sua: «chiamarlo sul tappo, che riprende
+  tappo, e metterci il disegno di tappo». Tappo piccolo nell'etichetta
+  era «poco evidente»: disegnato con Google Flow (progetto Barattolo,
+  Nano Banana 2.1, dal Tappo ufficiale, su magenta pieno per
+  scontornarlo), in piedi nell'angolo in basso a destra della foto con
+  un alone arancio — l'unico angolo libero (barattolino in alto,
+  cartellino a sinistra). Scartato Tappo seduto sul bordo alto: sulla
+  prima riga finiva sopra «8 utenti», e a destra sul barattolino.
+  Visto il render nell'app vera: «non mi piace», «togli tappo chiamala
+  in un altro modo», «chiamale promosso». Sei anteprime nuove con
+  «Promosso» (etichetta sul bordo, nastro diagonale, fascia sopra la
+  foto, cornice doppia con pillola, sfumatura in cima alla foto, card
+  tinta con la scritta sul titolo): scelta la 1, poi «ho cambiato idea,
+  usa la 6» e «metti la scritta in vetrina». Finale: la card tinta
+  d'arancio chiaro (background-image, cosi' il colore della card resta
+  il suo in chiaro e in scuro) con cornice e alone, e il bollino «IN
+  VETRINA» sopra il titolo, dentro la card: niente piu' overflow
+  visibile ne' etichetta a cavallo del bordo. Tappo, il suo file e la
+  sua rotta sono usciti dal codice prima del commit.
+  LA TRAPPOLA DI PASSAGGIO: il commento su `sponsor` messo fra `const
+  rif` e `const jar` in cardHTML spingeva `const jar` oltre i 160
+  caratteri che la sentinella del rifornimento guarda: commento e riga
+  spostati sopra `const rif`.
+- DURA 24 ORE dal pagamento (`sponsor_fino`), anche dopo che la card e'
+  scesa: in alto la card non ha durata (scende con gli annunci nuovi),
+  l'etichetta si'. Il rimborso la toglie, la data no.
+- I NOMI: «In cima» -> «In vetrina» (voce, toast, bot, anteprima: la
+  parola sta in `PROMO_ETICHETTA`); «Il negozio in Da scoprire» -> «Il
+  negozio nella home» (la sezione non c'e' piu'); nella frase della
+  card grande «in cima alla home» -> «in alto nella home». Testi
+  mandati ad Andrea prima del codice.
+- L'ANIMAZIONE della voce: la card che sale in testa si accende con la
+  tinta, la cornice e il bollino sopra le righe del titolo; testo
+  della voce «...colorata e con la scritta «In vetrina» per 24 ore...»
+  mostrato ad Andrea. Mensola e negozio come prima.
+LA TRAPPOLA TROVATA: `var(--orange)` in miniapp.html NON e' definita
+(la cita un commento, nessun :root la dichiara): la cornice e
+l'etichetta uscivano trasparenti nell'app vera, mentre l'anteprima
+finta (arancio scritto a mano) era giusta. L'arancio qui e' #FF8A00 in
+chiaro, e una prova lo tiene. Le altre righe che usano var(--orange)
+(P2P) non le ho toccate: vanno guardate a parte.
+PROVATO: `prove_promozioni` (scale, posti_scoprire su un db finto, la
+guardia prima della fattura, l'etichetta in card/CSS/anteprima, nessun
+avanzo di Tappo, nessun «In cima»/«Da scoprire» nel foglio),
+`collaudo_promozioni` (etichetta 24 ore dopo l'incasso e nella busta,
+409 a posti pieni col listino che lo dice, prezzi nuovi), suite intera e
+collaudi della vetrina; schermate dell'app vera a 360px in tema chiaro
+e scuro. DA GUARDARE sul telefono: la card in vetrina e' piu' alta
+della vicina (il bollino aggiunge una riga), e la tinta in tema scuro.
+
+
+## I battiti installati sulle quattro macchine (25 nov 2026 sera, seguito di quadro-servizi; il coordinatore, a promozione verde: «dai ad Andrea i comandi uno alla volta, partendo dal VPS»)
+
+Fatto dalle 18:15 alle 18:35 (Rome), coi comandi scritti qui e lanciati
+da Andrea dal PC: VPS, nodo (col Tor), relay (con l'occhio sul VPS e il
+backup nuovo che prende n8n, 65 MB cifrati) e VM di collaudo. Primo giro
+a mano 200 su tutti e nove i servizi, poi i timer. La voce 33 di
+DA-FARE-ANDREA si cancella; il «com'è andata» sta in PRODUZIONE, in coda
+a «IL QUADRO DEI SERVIZI E I BATTITI». LE TRE LEZIONI: il segreto negli
+appunti non regge (chi incolla in chat un risultato li sovrascrive): si
+fa sulla macchina e viaggia in una pipe ssh, mai a schermo; nelle
+virgolette doppie di PowerShell il `$` è suo; il `>` di PowerShell 5.1
+scrive UTF-16 e rovina i caratteri non ASCII, quindi `cmd /c` e
+l'impronta `sha256sum` contro il repo per ogni file portato a mano.
+
+LO STESSO CASSETTO IN `/admin` (stessa sera; Andrea, visto tutto verde:
+«questo cassetto possiamo metterlo anche nella pagina barattolo.store
+admin?»). Il cruscotto chiede `/api/admin/servizi` DOPO i suoi numeri
+(`caricaServizi`) e mette «🩺 Servizi» chiuso subito sotto «Va tutto
+bene?», col conto dei rossi sul titolo. Parole uguali a quelle approvate
+per la Mini App, niente rotta nuova; una rotta che non risponde lascia
+la pagina com'era. La riga è a due piani (nome e macchina sopra, numeri
+sotto): con le colonne della «Va tutto bene?» a 360 px i nomi lunghi si
+spezzavano. Provato: tre prove in `prove_quadro_servizi` (la rotta, le
+parole, l'`esc`; la controprova sull'`esc` le fa rosse) e gli scatti a
+390 px chiaro e scuro col quadro finto.
+
+## Via la moneta Lightning/on-chain dalle card del mercatino (25 nov 2026, cantiere card-senza-rete; Andrea: «nelle card in tutte le card della home di barattolo, leviamo pure il toggle nella card, quello in basso a destra, che indica se un ordine è, lighting o on chain. Non serve saperlo in quel momento [...] pasticcia troppo la card. Lasciamo solamente l'icona del furgoncino o delle mani se c'è uno scambio a mano [...] Sto parlando della home del mercatino, non del peer to peer.»)
+
+COSA. `iconeCard` non scrive più la moneta di come preferisce ricevere chi vende (la ₿ del Cambio per on-chain, il fulmine per Lightning, dal 2 nov 2026, swap-auto): in fondo alla card restano 🚚 (con «gratis» quando vale), 🤝, 💾 e 📅. Via anche le tre regole CSS `.card .meta .ico .card-incasso`, rimaste senza nessuno da vestire. La card è una sola (`cardHTML`), quindi la moneta sparisce da tutte le card del mercatino: home, Mensola, ricerca, reparti, negozi.
+
+COSA RESTA. Nella scheda dell'annuncio la pillola `pill-incasso` («Preferisce ricevere on-chain/in Lightning», con la moneta): lì chi compra sceglie come pagare, ed è lì che la domanda serve. Il campo `incasso` di `mapListing` e il `venditore_incasso` del server non cambiano. Le card del P2P (`cardVetrinaP2P`, con `reteVetrinaP2P`) non sono toccate: ad Andrea la rete in quelle card serve.
+
+PROVATO. `prove_swap_auto_schermate` gira la funzione VERA in node: on-chain, Lightning e senza scelta danno tutti zero icone (prima: la moneta); la pillola della scheda c'è ancora. LA CONTROPROVA: con la miniapp di develop la prova è rossa. Suite severa (31.686) e collaudi della CI (174) verdi nel venv senza coincurve. ARCHITETTURA aggiornata (LA MONETA SULLA CARD).
+
+RESTA DA GUARDARE. Sul telefono di Andrea dopo la promozione: card senza la moneta, icone di consegna al loro posto.
+
+## «Non hai sats?»: via PayPal, «Ho inviato gli euro» e il bot che parla dell'ordine (25 nov 2026, cantiere via-euro-avvisi; seguito della prova dal vivo con Alan e Sam)
+
+PAYPAL VIA. Andrea, la sera del 25: «Chi paga in PayPal può annullare il pagamento dopo aver ricevuto i sats» → «Ok, sì, allora leva PayPal». In `VIA_EURO_METODI` restano SEPA Instant, Satispay e Revolut; un ordine che accetta solo PayPal non viene proposto, e «Non ho …» non lo offre mai.
+
+IL TASTO. «Ho pagato» diventa «Ho inviato gli euro», nel foglio e nella pagina dell'ordine: è il gesto, detto con le parole che Andrea voleva fossero chiare a Sam.
+
+IL BOT. Chi paga in euro sentiva gli avvisi di chi fa uno scambio P2P («ha bloccato i sats in garanzia», «Apri Barattolo → P2P → I miei scambi», «⚡ Apri lo scambio»). Ora il deposito porta al server lo scambio che lo salda (`p2p_ordine` nel POST /orders del giroconto, anche sulla fattura lunga ripresentata), il server lo lega all'ordine (`via_euro_scambi`, chiave scambio + chi compra) e a lui, e solo a lui, vanno le quattro frasi approvate da Andrea il 25 nov sera (`_testo_via_euro`): la garanzia bloccata («… ha preparato i sats per il tuo acquisto»), il recapito («Manda N € a …», col tempo per pagare se c'è), la chiusura («… ha ricevuto gli euro: il tuo acquisto è pagato»), ogni annullo o ritorno nel libro («Il pagamento in euro è stato annullato…»). Sotto, «📦 Apri l'ordine» all'ordine del mercatino. Chi vende sente quelle di sempre.
+
+PERCHÉ IL LEGAME DAL CLIENT. Solo il telefono sa quale scambio sta saldando quale ordine prima che Mostro chieda il giroconto (che arriva al rilascio, troppo tardi per le prime frasi). Un body scritto a mano può legare al più gli avvisi di chi l'ha scritto: si legge solo per chi riceve.
+
+RESTANO QUELLE DI SEMPRE. Le dispute e il moderatore, «chiede di annullare», gli aggiornamenti del recapito, i promemoria del tempo per pagare, il pagamento caduto: testi nuovi solo con l'ok di Andrea.
+
+PROVATO. `prove_non_hai_sats`: le frasi esatte, «a/ad», il bottone, il legame, e dal vero banco degli eventi la garanzia e la chiusura a chi paga in euro (a chi vende la frase di sempre); suite severa e collaudi. Dal vivo: da rifare con Alan e Sam quando è in produzione.

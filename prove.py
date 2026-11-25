@@ -133533,6 +133533,26 @@ def prove_quadro_servizi():
     prova("il cassetto 🩺 Servizi c'e' e il pannello lo chiede", True,
           "function boxServizi()" in mini and "${boxServizi()}" in mini
           and "`${API_BASE}/admin/servizi`" in mini)
+    # lo stesso cassetto nella pagina /admin (25 nov 2026 sera): dalla
+    # stessa rotta, con le stesse parole approvate, e i nomi escapati
+    adm = open(os.path.join(QUI, "admin.html"), encoding="utf-8").read()
+    srv = adm[adm.index("function sezioneServizi()"):]
+    srv = srv[:srv.index("\n}\n")]
+    prova("il cassetto 🩺 Servizi c'e' anche in /admin, dalla stessa rotta",
+          True, "fetch('/api/admin/servizi'" in adm
+          and "caricaServizi();" in adm
+          and '<div id="sezServizi">${sezioneServizi()}</div>' in adm)
+    prova("in /admin le parole del cassetto sono quelle approvate", True,
+          all(t in srv for t in (
+              "Ogni macchina manda un segnale ogni cinque minuti. Se uno "
+              "smette, arriva un avviso nella stanza degli errori.",
+              "Non ha mai dato segni di vita: il battito non è installato.",
+              "uptime 30 giorni", "Ultimo backup", "🔐 Certificati",
+              "non ancora controllato", "non si legge (scaduto o non valido)",
+              "da guardare", "tutto ok")))
+    prova("in /admin nome, macchina e dominio passano da esc()", True,
+          "esc(v.nome)" in srv and "esc(v.dove)" in srv
+          and "esc(c.host)" in srv)
     relay = open(os.path.join(QUI, "deploy", "relay", "backup-relay.sh"),
                  encoding="utf-8").read()
     prova("il backup del relay prende n8n, e si ferma senza il suo "
@@ -207840,11 +207860,15 @@ def prove_swap_auto_schermate():
     if r is None:
         salta("lo swap automatico, le schermate", "node non c'e'")
         return
-    prova("card on-chain: la moneta ₿ del Cambio, col suo titolo",
-          (True, True), ("cambio-moneta btc" in r["oc"], "Preferisce ricevere on-chain" in r["oc"]))
-    prova("card Lightning: il fulmine", (True, False),
-          ("cambio-moneta ln" in r["ln"], "cambio-moneta btc" in r["ln"]))
-    prova("card senza il campo: niente moneta", False, "card-incasso" in r["niente"])
+    # (25 nov 2026, cantiere card-senza-rete, Andrea: «l'icona lighting o
+    # on chain direi di levarlo, se no ci sono troppe icone») la moneta
+    # di come riceve chi vende non sta piu' sulla card del mercatino: ne'
+    # la ₿ del Cambio ne' il fulmine, qualunque sia la scelta. Resta nella
+    # scheda (`pill-incasso`, qui sotto)
+    prova("(25 nov) card del mercatino: niente moneta, ne' on-chain ne' Lightning ne' senza scelta",
+          ["", "", ""], [r["oc"], r["ln"], r["niente"]])
+    prova("...e la scheda la dice ancora, con la moneta del Cambio", True,
+          "+ (l.incasso ? `<span class=\"pill pill-incasso\">${l.incasso === 'onchain'" in mini)
     prova("Profilo a leva spenta: vuoto", "", r["spento"])
     prova("Profilo: On-chain acceso, «Conferma» e il minimo in parole",
           (True, True, True),
@@ -214909,7 +214933,7 @@ def prove_non_hai_sats():
     dep = _fn_js(mini, "async function viaEuroDeposito(id){")
     prova("la fattura al coordinatore e' il deposito: metodo giroconto con i "
           "sats che ha chiesto lui", True,
-          "{metodo: 'giroconto', sats_giroconto: sats}" in dep
+          "{metodo: 'giroconto', sats_giroconto: sats, p2p_ordine: id}" in dep
           and "'add-invoice', {payment_request: [null, d.invoice, null]}" in dep
           and "Number(o.satsMiei)" in dep)
     prova("...e lo scambio nato dalla cassa non apre il foglio «dove ricevere»",
@@ -215057,6 +215081,94 @@ console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia
           ["fine", "attesa", "attesa", "attesa", "attesa", "paga", "controllo",
            "fine", "fine", "fine", "pagina", "pagina"],
           _js.loads(out2.stdout) if out2.returncode == 0 else out2.stderr[-300:])
+
+    # --- GLI AVVISI DEL BOT A CHI PAGA IN EURO (25 nov 2026) -----------------
+    # Andrea: chi paga in euro «non deve neanche sapere che cos'e' la scheda
+    # peer-to-peer». Le quattro frasi le ha approvate lui il 25 nov sera.
+    con, amb = _banco_eventi_p2p()
+    for f in ("_tabella_via_euro", "_lega_via_euro", "_ordine_via_euro",
+              "_via_euro_cambia", "_testo_via_euro", "_bottone_via_euro"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb["BOTTONE_ORDINE_VENDUTO"] = "📦 Apri l'ordine"
+    amb["URL_PUBBLICO"] = "https://barattolo.store"
+    tv = amb["_testo_via_euro"]
+    prova("le quattro frasi approvate, coi nomi e la cifra", [
+        "🔒 <b>Alan ha preparato i sats per il tuo acquisto.</b> Tra poco ti "
+        "dice dove mandare 5 €.",
+        "💶 <b>Manda 5 € ad Alan:</b> i dati sono nell'ordine. Poi tocca «Ho "
+        "inviato gli euro».\n\n⏱ Hai 30 minuti, poi il pagamento si annulla.",
+        "✅ <b>Alan ha ricevuto gli euro:</b> il tuo acquisto è pagato.",
+        "❌ <b>Il pagamento in euro è stato annullato:</b> l'acquisto non è "
+        "pagato. Se avevi già mandato gli euro, scrivici da Assistenza."],
+          [tv("garanzia_pagata", "active", "Alan", "5 €"),
+           tv("recapito", "", "Alan", "5 €", minuti=30),
+           tv("concluso", "", "Alan", "5 €"),
+           tv("annullato", "payment-window", "Alan", "5 €")])
+    prova("...il recapito gia' arrivato con la garanzia: subito «Manda»; «a» "
+          "davanti a una consonante; senza tempo la riga del tempo non c'e'",
+          "💶 <b>Manda 5 € a Luca:</b> i dati sono nell'ordine. Poi tocca «Ho "
+          "inviato gli euro».",
+          tv("garanzia_pagata", "active", "Luca", "5 €", detto=True))
+    prova("...ogni annullo e ritorno nel libro ha la stessa frase; le dispute, "
+          "il moderatore e la garanzia non ancora attiva restano quelle di sempre",
+          ([True] * 4, [""] * 5),
+          ([tv(m, d).startswith("❌") for m, d in (
+              ("annullato", ""), ("annullato", "cooperative"),
+              ("tornato", "payment-window-republished"), ("tornato", "taker-timeout"))],
+           [tv(m, d) for m, d in (("annullato", "admin"), ("rilasciato", "admin"),
+                                  ("disputa", ""), ("garanzia_pagata", "invoice-next"),
+                                  ("annullo_chiesto", ""))]))
+    prova("il bottone porta all'ORDINE del mercatino",
+          ("📦 Apri l'ordine", "https://barattolo.store/?ordine=77"),
+          amb["_bottone_via_euro"](77))
+    ORDV = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99"
+    A, B = 111, 222        # A paga in euro, B vende i sats
+    for chi, pub in ((A, "a" * 64), (B, "b" * 64)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
+                    (pub, chi))
+    con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+                "sats, euro, preso_da) VALUES(?,?,0,'in-progress','sell',1,9000,"
+                "'5,00 €',?)", (ORDV, B, A))
+    amb["_NOMI"][A] = "Alan"
+    prova("il legame: un id storto non lega niente, e si legge solo per chi "
+          "compra", (False, True, 77, 0, 0),
+          (amb["_lega_via_euro"](con, "x y", A, 77),
+           amb["_lega_via_euro"](con, ORDV, A, 77),
+           amb["_ordine_via_euro"](con, ORDV, A), amb["_ordine_via_euro"](con, ORDV, B),
+           amb["_ordine_via_euro"](con, "altro-scambio", A)))
+    ORA = 1_790_000_000
+
+    def ev_ve(azione, attore, quando, dettaglio=""):
+        d = {"order": ORDV, "action": azione, "ts": quando, "actor": attore,
+             "buyer": "a" * 64, "seller": "b" * 64}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = amb["_evento_p2p_pulito"](d, quando)
+        return dict(amb["_avvisi_evento_p2p"](
+            con, e, amb["_registra_evento_p2p"](con, e, quando), quando))
+    ev_ve("taken", "buyer", ORA, "invoice-next")
+    detti = ev_ve("hold-invoice-paid", "seller", ORA + 60, "active")
+    prova("dal vero banco: la garanzia bloccata, a chi paga in euro la frase sua "
+          "(e a chi vende quella di sempre)", (True, True),
+          (detti.get(A, "").startswith("🔒 <b>Alan ha preparato i sats per il tuo "
+                                      "acquisto.</b> Tra poco ti dice dove mandare 5,00 €."),
+           "Garanzia bloccata" in detti.get(B, "")))
+    prova("...e la chiusura: «il tuo acquisto è pagato», niente invito a "
+          "recensire lo scambio", "✅ <b>Alan ha ricevuto gli euro:</b> il tuo "
+          "acquisto è pagato.",
+          ev_ve("success", "mostro", ORA + 900).get(A, ""))
+    con.close()
+    # ...e i fili: il legame nasce col deposito, e il bot lo usa per le frasi
+    # e per il bottone, sugli eventi e sul recapito
+    prova("i fili: il deposito porta lo scambio, il server lo lega (anche alla "
+          "fattura ripresentata), le frasi e il bottone lo leggono", True,
+          srv.count('_lega_via_euro(con, d.get("p2p_ordine"), user["id"], ordine_id)') == 1
+          and 'if giroconto and _lega_via_euro(con, d.get("p2p_ordine"),' in srv
+          and 'via_euro = _testo_via_euro(' in pezzo("_avvisi_evento_p2p")
+          and "bottoni[tg] = _bottone_via_euro(n_ve)" in pezzo("_manda_evento_p2p")
+          and "esito = await notifica(a_chi, testo, _bottone_via_euro(n_ve))" in srv
+          and 'if n_ve and testo.startswith("💶 "):' in srv)
 
 
 def prove_chiedi_al_venditore():
@@ -222711,24 +222823,28 @@ def prove_promozioni():
 
     # ---- 1. LE LEVE, coi prezzi decisi da Andrea il 23 nov ----------
     # (i prezzi fissi del 23 nov sono diventati SCALINI il 25 nov: i
-    # numeri proposti quel giorno e approvati da Andrea)
+    # numeri proposti quel giorno e approvati da Andrea, rifatti da lui
+    # la sera stessa)
     for riga in ("PROMOZIONI_ATTIVE = True",
-                 "PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))",
                  "PROMO_IN_CIMA_ORE = 24",
+                 "PROMO_SCOPRIRE_POSTI = 10",
                  "PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}",
                  "PROMO_EVIDENZA_POSTI = 8",
                  "PROMO_SCOPRIRE_GIORNI = 30"):
         prova(f"la leva c'e' col suo valore: {riga}", True, riga in src)
         prova(f"...e nel config d'esempio", True, riga in esempio)
-    for riga in ("PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),\n"
-                 "                          (5, 25_000), (6, 35_000), (7, 50_000))",
+    for riga in ("PROMO_EVIDENZA_SCALINI = ((0, 7_000), (1, 9_000), (2, 12_000),\n"
+                 "                          (3, 15_000), (4, 19_000), (5, 24_000),\n"
+                 "                          (6, 31_000), (7, 40_000))",
                  "PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),\n"
-                 "                          (3, 50_000), (4, 70_000), (5, 100_000))"):
+                 "                          (3, 45_000), (4, 50_000))",
+                 "PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (4, 8_000), (5, 11_000),\n"
+                 "                         (6, 14_000), (7, 17_000), (8, 20_000))"):
         prova(f"la scala c'e' nel config d'esempio: {riga.split(' =')[0]}",
               True, riga in esempio)
+        _rientro = " " * len(riga.split("(")[0] + "(")
         prova("...e nel server, con gli stessi numeri", True,
-              riga.replace("\n                          ",
-                           "\n                              ") in src)
+              riga.replace("\n" + _rientro, "\n    " + _rientro) in src)
     prova("i prezzi fissi di prima non li legge piu' nessuno", (0, 0, 0),
           tuple(codice(src).count(f"import {n}") for n in (
               "PROMO_IN_CIMA_SATS", "PROMO_EVIDENZA_SATS",
@@ -222761,35 +222877,41 @@ def prove_promozioni():
            for m in ("promo_cima", "promo_evidenza", "promo_scoprire")])
 
     # ---- 3. I PEZZI PURI, girati --------------------------------------
-    amb = {"PROMO_EVIDENZA_SCALINI": ((0, 5_000), (2, 10_000), (4, 15_000),
-                                      (5, 25_000), (6, 35_000), (7, 50_000)),
+    amb = {"PROMO_EVIDENZA_SCALINI": ((0, 7_000), (1, 9_000), (2, 12_000),
+                                      (3, 15_000), (4, 19_000), (5, 24_000),
+                                      (6, 31_000), (7, 40_000)),
            "PROMO_EVIDENZA_DURATE": {7: 1, 15: 1.7, "x": 3, 0: 9, 400: 1,
                                      30: 0},
-           "PROMO_IN_CIMA_SCALINI": ((0, 2_000), (3, 5_000), (6, 8_000),
-                                     (10, 12_000)),
+           "PROMO_IN_CIMA_SCALINI": ((0, 2_000), (3, 5_000), (4, 8_000),
+                                     (5, 11_000), (6, 14_000), (7, 17_000),
+                                     (8, 20_000)),
            "PROMO_SCOPRIRE_SCALINI": ((0, 20_000), (1, 30_000), (2, 40_000),
-                                      (3, 50_000), (4, 70_000), (5, 100_000)),
+                                      (3, 45_000), (4, 50_000)),
            "PROMO_SCOPRIRE_GIORNI": 30, "PROMO_IN_CIMA_ORE": 24}
     for nome in ("scalini_promo", "prezzo_a_scalini", "listino_evidenza",
                  "_voce_promo", "_promo_dal_riferimento", "in_cima_da"):
         exec(pezzo(nome), amb)
     prova("il listino salta le durate storte e resta ordinato, a fila vuota "
-          "dal primo scalino", [(7, 5_000), (15, 8_500)],
+          "dal primo scalino", [(7, 7_000), (15, 11_900)],
           amb["listino_evidenza"]())
     # I PREZZI A SCALINI (25 nov 2026, Andrea: «se ci sono già 5 card, la
-    # sesta costerà tanto»): la tabella approvata, posto per posto
+    # sesta costerà tanto»): la tabella approvata, posto per posto — quella
+    # rifatta la sera (Mensola da 7.000 a 40.000, in alto al massimo
+    # 20.000, il negozio nella home da 20.000 a 50.000)
     prova("Mensola, 7 giorni: lo scalino per 0..9 posti gia' presi",
-          [5_000, 5_000, 10_000, 10_000, 15_000, 25_000, 35_000, 50_000,
-           50_000, 50_000],
+          [7_000, 9_000, 12_000, 15_000, 19_000, 24_000, 31_000, 40_000,
+           40_000, 40_000],
           [dict(amb["listino_evidenza"](n))[7] for n in range(10)])
-    prova("...e i 15 giorni 1,7 volte tanto", [8_500, 17_000, 85_000],
+    prova("...e i 15 giorni 1,7 volte tanto", [11_900, 20_400, 68_000],
           [dict(amb["listino_evidenza"](n))[15] for n in (0, 2, 7)])
-    prova("In cima: lo scalino per gli annunci saliti nelle ultime 24 ore",
-          [2_000, 2_000, 5_000, 5_000, 8_000, 8_000, 12_000, 12_000],
-          [amb["_voce_promo"]("cima", n)[1] for n in (0, 2, 3, 5, 6, 9, 10, 40)])
-    prova("Da scoprire: lo scalino per i negozi gia' dentro",
-          [20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 100_000],
-          [amb["_voce_promo"]("scoprire", n)[1] for n in (0, 1, 2, 3, 4, 5, 12)])
+    prova("La card in alto: lo scalino per gli annunci saliti nelle ultime "
+          "24 ore, fino al tetto di 20.000",
+          [2_000, 2_000, 5_000, 8_000, 11_000, 14_000, 17_000, 20_000, 20_000],
+          [amb["_voce_promo"]("cima", n)[1] for n in (0, 2, 3, 4, 5, 6, 7, 8, 40)])
+    prova("Il negozio nella home: lo scalino per i negozi gia' dentro, "
+          "fermo a 50.000 dal quinto",
+          [20_000, 30_000, 40_000, 45_000, 50_000, 50_000, 50_000],
+          [amb["_voce_promo"]("scoprire", n)[1] for n in (0, 1, 2, 3, 4, 5, 9)])
     sc = amb["scalini_promo"]
     prova("la scala salta le coppie storte, a zero e negative, e si "
           "rimette in ordine; una leva che non e' una scala da' []",
@@ -222800,12 +222922,12 @@ def prove_promozioni():
           "prima soglia", (0, 9), (amb["prezzo_a_scalini"]([(2, 9)], 1),
                                    amb["prezzo_a_scalini"]([(2, 9)], 2)))
     prova("...la scala che torna dal pannello (liste e chiavi di testo) "
-          "vale lo stesso", 8_500,
+          "vale lo stesso", 11_900,
           (amb.update(PROMO_EVIDENZA_DURATE={"15": 1.7}),
            dict(amb["listino_evidenza"](0)).get(15))[1])
     amb["PROMO_EVIDENZA_DURATE"] = {7: 1, 15: 1.7}
     prova("le voci che si comprano, e quelle che no",
-          [("promo_cima", 2_000, 0), ("promo_evidenza", 8_500, 15),
+          [("promo_cima", 2_000, 0), ("promo_evidenza", 11_900, 15),
            ("promo_scoprire", 20_000, 30), None, None, None],
           [amb["_voce_promo"](t) for t in
            ("cima", "evidenza:15", "scoprire", "evidenza:3", "boh", None)])
@@ -223024,7 +223146,8 @@ console.log(JSON.stringify([a, b, c]));""")
     prova("...la carta lucida e' la ricetta della porta Streak", True,
           ".btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,"
           "rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%)," in mini)
-    _v = (pezzo_js(mini, "const ICONA_PROMO = {", "\n};") + "\n};\n"
+    _v = (re.search(r"^const PROMO_ETICHETTA = .*$", mini, re.M).group(0) + "\n"
+          + pezzo_js(mini, "const ICONA_PROMO = {", "\n};") + "\n};\n"
           + pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};") + "\n};\n"
           + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n") + "\n}\n")
     r = _node_banco("""
@@ -223072,7 +223195,7 @@ console.log(JSON.stringify([conta(ev, 'class="promo-durata"'),
           "spenta (se il cassetto del banner c'e'), la riga che lo dice e il "
           "tasto che porta al banner", (True, True, True, True, True, True),
           ("serve: promoServeBanner ? 'Prima serve il banner" in ap,
-           "no: (sc.banner || cassettoBanner) ? ''" in ap
+           ": (sc.banner || cassettoBanner) ? ''" in ap
            and "&& !sc.banner && cassettoBanner;" in ap,
            "if (promoScelta === 'scoprire' && promoServeBanner) return "
            "apriCassettoProfilo('accBanner');" in ap,
@@ -223102,7 +223225,7 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
     prova("«Da scoprire» vende la card E la pagina dedicata, con la frase di "
           "Andrea, nel foglio, nel suo cassetto e nella conferma; «dopo l'ok "
           "del moderatore» non c'e' piu'", (True, 4, 0),
-          ("const SCOPRIRE_COSA = 'La card grande del tuo negozio in cima alla home e una '\n"
+          ("const SCOPRIRE_COSA = 'La card grande del tuo negozio in alto nella home e una '\n"
            "  + 'pagina dedicata, preparata da noi con le tue foto e il tuo testo.';" in mini,
            mini.count("SCOPRIRE_COSA"),
            mini.count("dopo l\\'ok del moderatore")))
@@ -223569,6 +223692,99 @@ INSERT INTO annunci VALUES
            ".card.ev" not in mini))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",
           True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
+
+    # ---- 7d. LA CARD SPINTA IN ALTO SI VEDE, E IL NEGOZIO NELLA HOME HA
+    # DIECI POSTI (25 nov 2026 sera, Andrea: la card «deve essere
+    # scontornata e messa in evidenza, magari con una scritta sopra», e
+    # «dal 10º in poi non è più possibile, metti un limite di 10»)
+    prova("l'etichetta della card in alto: la colonna additiva e la "
+          "vetrina che la porta", (True, True),
+          ('"sponsor_fino INTEGER DEFAULT 0",' in src,
+           "a.sponsor_fino, " in src[src.index("CAMPI_VETRINA = ("):
+                                     src.index("\n)\n", src.index("CAMPI_VETRINA = ("))]))
+    _inc = pezzo("_incassa_promo")
+    prova("...la scrive l'incasso della card in alto, per PROMO_IN_CIMA_ORE "
+          "da adesso (insieme alla data che la fa salire)", (True, True),
+          ("fino = adesso + max(0, int(PROMO_IN_CIMA_ORE or 0)) * 3600" in _inc,
+           'UPDATE annunci SET creato=?, sponsor_fino=? "\n'
+           '                            "WHERE id=?", (adesso, fino, aid))' in _inc))
+    prova("...e il rimborso la toglie (la data no)", True,
+          "UPDATE annunci SET sponsor_fino=0 WHERE id=? " in pezzo("_disfa_promo"))
+    _amb = {"PROMO_SCOPRIRE_POSTI": 3}
+    exec(pezzo("posti_scoprire"), _amb)
+    _c = _sq.connect(":memory:")
+    _c.row_factory = _sq.Row
+    _c.executescript("""
+CREATE TABLE utenti(tg_id INTEGER, promo_scoprire_fino INTEGER);
+INSERT INTO utenti VALUES(1, 500),(2, 300),(3, 0),(4, 50),(5, 900);""")
+    _ps = _amb["posti_scoprire"]
+    _r1 = (_ps(_c, 100), _ps(_c, 100, 2), _ps(_c, 400))
+    _amb["PROMO_SCOPRIRE_POSTI"] = 0
+    _r2 = _ps(_c, 100)
+    _c.close()
+    prova("i posti del negozio nella home: pieni = il prossimo che si "
+          "libera; chi rinnova non aspetta se stesso; una card scaduta non "
+          "conta; 0 = senza limite",
+          ((3, 300), (2, 0), (2, 0), (3, 0)), _r1 + (_r2,))
+    _cp = pezzo("compra_promo")
+    prova("...la fattura del negozio guarda i posti PRIMA dello scalino e "
+          "della fattura, e dice quando si libera", (True, True),
+          (_cp.index("posti_scoprire(con, adesso, user[\"id\"])")
+           < _cp.index("presi = _presi_promo(") < _cp.index("crea_invoice_escrow("),
+           '"I negozi nella home sono al "' in _cp))
+    prova("...e il listino li manda al foglio", True,
+          '"occupati": occ_sc, "libero_da": libero_sc,' in pezzo("listino_promo"))
+    prova("la leva dei posti e' sul pannello", True,
+          '"PROMO_SCOPRIRE_POSTI", int(PROMO_SCOPRIRE_POSTI or 0)),' in src)
+    _ch = pezzo_js(mini, "const cardHTML = l => {", "\n    </div>`; };")
+    prova("la card: l'etichetta e la cornice finche' la data corre, con la "
+          "parola scelta in un posto solo", (True, True, True, True),
+          ("const sponsor = (+l.sponsorFino || 0) * 1000 > Date.now();" in _ch,
+           "${sponsor?' sponsor':''}" in _ch,
+           "<div class=\"info\">\n        ${sponsor ? `<div class=\"card-sponsor\">${PROMO_ETICHETTA}</div>` : ''}\n        <div class=\"title\">" in _ch,
+           "    sponsorFino:a.sponsor_fino||0,\n" in mini))
+    prova("...la card tinta d'arancio sopra il SUO colore (background-image), "
+          "il bollino sopra il titolo", (True, True, 0),
+          ("  .card.sponsor{\n    background-image:linear-gradient(" in _css,
+           "  .card-sponsor{display:inline-block;" in _css,
+           _css[_css.index("  .card.sponsor{"):_css.index("}", _css.index("  .card.sponsor{"))].count("overflow")))
+    _ant = pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};")
+    prova("l'anteprima della card in alto: arrivata in testa si accende con "
+          "la tinta, il bollino e la cornice", (True, True, True, True),
+          ("<span class=\"pa-sp\">' + PROMO_ETICHETTA + '</span>" in _ant,
+           "@keyframes pa-sp{0%,62%{opacity:0;" in _css,
+           "76%,100%{top:8px;left:21%;transform:none;\n"
+           "      box-shadow:0 0 0 1.5px #FF8A00" in _css,
+           "  .pa-v.pa-vt{background-image:linear-gradient(" in _css))
+    prova("...l'arancio delle card promosse e' scritto in chiaro: "
+          "var(--orange) qui non esiste", 0,
+          sum(_css[_css.index(k):_css.index("}", _css.index(k))].count("var(--orange)")
+              for k in ("  .card.sponsor{", "  .card-sponsor{", "  .pa-v.pa-vt{", "  .pa-sp{")))
+    # «IN VETRINA» (25 nov 2026, Andrea: «togli tappo», poi «usa la 6» fra
+    # sei anteprime, «e metti la scritta in vetrina»)
+    prova("la parola e' «In vetrina», e la dicono anche il toast e il bot",
+          (True, True, True),
+          ("const PROMO_ETICHETTA = 'In vetrina';" in mini,
+           "toast('⬆️ Fatto! Il tuo annuncio è in vetrina per 24 ore.', 6000);" in mini,
+           '"⬆️ <b>Fatto!</b> Il tuo annuncio è in vetrina "\n'
+           '                           "per 24 ore.")' in _inc))
+    prova("...e Tappo disegnato non c'e' piu': ne' file, ne' rotta, ne' "
+          "immagine nella card o nell'anteprima", (False, 0, 0, 0),
+          (os.path.exists(os.path.join("assets", "tappo-saluta.webp")),
+           src.count("tappo-saluta"), mini.count("tappo-saluta"),
+           mini.count("card-tappo") + mini.count("pa-tappo")))
+    _apv = _senza_commenti_js(ap)
+    prova("il foglio: la voce in alto col suo nome nuovo, il negozio «nella "
+          "home», e «In cima» e «Da scoprire» non si leggono piu'",
+          (True, True, True, 0, 0),
+          ("titolo: `${PROMO_ETICHETTA}, ${fmt(c.sats)} sats`" in _apv,
+           "titolo: `Il negozio nella home, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`" in _apv,
+           "I negozi nella home sono al completo: il prossimo posto si libera il" in _apv,
+           _apv.count("In cima"), _apv.count("Da scoprire")))
+    _cs = _senza_commenti_js(pezzo_js(mini, "async function chiediPromoScoprire(){", "\n}\n"))
+    prova("...anche dal cassetto del negozio", (True, 0, True),
+          ("titolo: `Il negozio nella home," in _cs, _cs.count("Da scoprire"),
+           "sc.libero_da && !sc.fino" in _cs))
 
     # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
     prova("collaudo_promozioni e' fra i collaudi della CI", True,

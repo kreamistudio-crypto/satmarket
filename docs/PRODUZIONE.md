@@ -1680,6 +1680,27 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   il file dal repo come al passo 4, `sudo install -m 755 /tmp/backup-relay.sh /usr/local/sbin/`
   e un giro a mano, `sudo /usr/local/sbin/backup-relay.sh`: nell'elenco
   devono comparire `n8n-barattolo/.env` e il suo `.sqlite`.
+  INSTALLATO IL 25 NOV 2026 (18:15-18:35 Rome) su tutte e quattro le
+  macchine, primo giro a mano 200 ovunque (VPS: vps/onion/lnbits; NODO
+  col `TOR_SOCKS`: nodo/mostro; RELAY con `GUARDA_VPS=1`: relay/n8n e
+  «VPS ok»; COLLAUDO: collaudo/runner), timer accesi. Il backup del relay
+  con n8n pesa 65 MB cifrato; la copia vecchia sta in
+  `/root/backup-relay.sh.prima-n8n`. COM'È ANDATA DAVVERO, per la prossima
+  volta: (a) il segreto NEGLI APPUNTI non regge, perché per incollare in
+  chat il risultato di un comando Andrea copia, e gli appunti si
+  sovrascrivono. Il segreto si è fatto SUL VPS (`openssl rand -hex 32`
+  dentro il `printf` del passo 2, mai a schermo) e alle altre macchine
+  l'ha portato una pipe dal PC, senza fermarsi in nessun posto:
+  `ssh root@46.62.162.103 "cat /etc/battito/battito.conf" | ssh -i $env:USERPROFILE\.ssh\lnvps debian@<macchina>.lnvps.cloud "sudo install -d -m 700 /etc/battito /var/lib/battito && tr -d '\r' | sed 's/^MACCHINA=.*/MACCHINA=NODO/' | sudo tee /etc/battito/battito.conf >/dev/null && sudo chmod 600 /etc/battito/battito.conf"`.
+  (b) Dentro una stringa fra virgolette doppie di PowerShell il `$` si
+  mangia le variabili: la riga del Telegram sul relay è passata fra
+  apici singoli (`'...'`, con gli apici interni raddoppiati) e senza
+  virgolette doppie (`TG_TOKEN=$BOT_TOKEN`); per i CR si usa
+  `sed 's/\r//'` senza `$`. (c) `backup-relay.sh` era uscito dal `>` di
+  PowerShell (non da `cmd /c`): UTF-16 e i due `—` dei commenti rovinati
+  in cp850. Rimesso con `iconv -f UTF-16 -t UTF-8` più un `sed` sui byte,
+  e verificato con `sha256sum` contro il repo: per ogni file portato a
+  mano, l'impronta.
 - IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion): dal `.onion`
   il login reggeva SOLO con Tor Browser, che tratta l'onion come contesto
   sicuro; Chrome, Brave e Vanadium con Orbot scartano un cookie «Secure»
