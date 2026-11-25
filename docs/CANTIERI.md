@@ -96132,3 +96132,13 @@ PERCHÉ COSÌ. Andrea guarda la home dal telefono e l'ha approvata; da PC era ri
 NON TOCCATO. La fascia P2P e i loghi dei Consigliati (un altro thread, «Fermare gli scatti in home»), le voci della topbar, le categorie, Da scoprire. Nessun testo nuovo.
 
 DA GUARDARE. Nel collaudo locale, con la voce «Aste» in topbar, fra 900 e ~940 px il marchio esce ancora dal bordo sinistro (di 40 px; prima di 89): c'era già, ed è la stessa fascia stretta del cantiere di agosto.
+
+## La topbar stretta si stringe lei, e il marchio resta dentro (25 nov 2026, cantiere logo-bordo; seguito di home-pc: «sistema anche il logo che esce dal bordo tra 900 e 940 px»)
+
+IL DIFETTO, MISURATO. Con le cinque voci della topbar (le celle a strati sono larghe quanto la loro scritta più lunga) da 768 a ~1020 px le voci non ci stavano, e con `justify-content:flex-end` a uscire dal bordo sinistro era il marchio: nel collaudo locale, a passi di 4 px, 102 px a 768, 2 a 868, poi di nuovo 40 a 900 (dove torna la scritta) fino a 0 a 940. C'era già prima di home-pc (allora 89 px a 900); la fascia 768-899 di agosto (la scritta cede, resta la tessera) non bastava più con la quinta voce.
+
+LA CURA. Fra 768 e 1023 le pillole perdono un po' d'aria (padding 9 invece di 16, spazi 2 invece di 6, tondi di destra a 6 invece di 10) e un punto di corpo (13 invece di 14). Misurato di nuovo da 768 a 1100: il marchio sta a 16 px dal bordo a ogni larghezza, nessuno scorrimento nella barra. Da 1024 in su tutto com'era; la fascia della tessera (768-899) resta.
+
+SCARTATO. Allargare la fascia della tessera fino a 940: lì il marchio intero ci sta, toglierlo sarebbe stato perderlo proprio dove c'è posto. Nascondere le scritte delle voci: cambia la topbar più di quanto serva.
+
+PROVATO. `prove_seo` ha la sentinella della fascia (con la controprova: rimesso il padding a 16, è rossa); suite severa e collaudi; scatto in /mnt/project-files/home-pc/6-topbar-stretta-dopo.png.

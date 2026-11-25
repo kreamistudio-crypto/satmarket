@@ -44695,6 +44695,13 @@ def prove_seo():
         "@media (min-width:768px) and (max-width:899px)")
     prova("nella fascia stretta il lockup cede", True,
           ".nav-logo .lockup{display:none}" in testo_mini[_if:_if + 120])
+    # LA TOPBAR STRETTA SI STRINGE LEI (25 nov 2026, cantiere logo-bordo):
+    # fra 768 e 1023 le pillole perdono aria e un punto di corpo, o il
+    # marchio esce dal bordo sinistro (misurato: 102 px a 768, 40 a 900)
+    _is = testo_mini.index("@media (min-width:768px) and (max-width:1023px){\n    nav{gap:2px}")
+    prova("fino a 1023 le pillole della topbar si stringono", (True, True),
+          ("nav button{padding:9px 9px;font-size:13px}" in testo_mini[_is:_is + 200],
+           _is > testo_mini.index("    nav button{\n      flex:0 0 auto;flex-direction:row")))
 
     # --- 16ter) IL REPARTO SI CONDIVIDE (ago 2026) -----------------
     # Le 27 pagine /categoria/{slug} esistevano dal cantiere «farsi

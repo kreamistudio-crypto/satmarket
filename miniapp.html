@@ -14127,6 +14127,19 @@
     .nav-logo .brand-jar,.nav-logo .bolt{display:none}
     .nav-logo .lockup{font-size:30px}
   }
+  /* LA TOPBAR STRETTA SI STRINGE LEI (25 nov 2026, cantiere logo-bordo):
+     con cinque voci (le celle a strati sono larghe quanto la scritta piu'
+     lunga) fra 768 e ~1020 px le voci non ci stavano, e a uscire dal bordo
+     sinistro era il marchio: misurato nel collaudo, di 102 px a 768 e di
+     40 a 900. Qui le pillole perdono un po' d'aria e un punto di corpo,
+     cosi' il marchio resta dentro con almeno 8 px; da 1024 in su tutto
+     com'era. */
+  @media (min-width:768px) and (max-width:1023px){
+    nav{gap:2px}
+    nav button{padding:9px 9px;font-size:13px}
+    nav button.sell{margin-left:4px}
+    nav .tema-btn,nav .notizie-testa,nav .avatar-btn.on{margin-left:6px}
+  }
 
   /* ====== LE DUE STRISCE, PIU' GRANDI SUL WEB (ago 2026) ======
      Decisione di Andrea: dal browser le card di «Da scoprire» e delle
