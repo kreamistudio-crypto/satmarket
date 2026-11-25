@@ -37372,8 +37372,9 @@ def _censimento(acceso, dopo=None):
               "raccolta_min_garantita_euro", "raccolta_vendite_min",
               "raccolta_zap_max_sats", "_raccolte_leve",
               # le promozioni a pagamento (23 nov 2026): la riga dei
-              # prezzi di In evidenza CHIAMA `listino_evidenza()`
-              "listino_evidenza",
+              # prezzi di In evidenza CHIAMA `listino_evidenza()`, e dal
+              # 25 nov le scale `scalini_promo()` e `prezzo_a_scalini()`
+              "scalini_promo", "prezzo_a_scalini", "listino_evidenza",
               "_leve_stato"):
         exec(pezzo(f), amb)
     # ...e lo stato dell'ultimo giro, che `__missing__` farebbe 7
@@ -222526,13 +222527,29 @@ def prove_promozioni():
     esempio = open("config_esempio.py", encoding="utf-8").read()
 
     # ---- 1. LE LEVE, coi prezzi decisi da Andrea il 23 nov ----------
-    for riga in ("PROMOZIONI_ATTIVE = True", "PROMO_IN_CIMA_SATS = 5_000",
+    # (i prezzi fissi del 23 nov sono diventati SCALINI il 25 nov: i
+    # numeri proposti quel giorno e approvati da Andrea)
+    for riga in ("PROMOZIONI_ATTIVE = True",
+                 "PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))",
                  "PROMO_IN_CIMA_ORE = 24",
-                 "PROMO_EVIDENZA_SATS = {7: 15_000, 15: 25_000}",
-                 "PROMO_EVIDENZA_POSTI = 8", "PROMO_SCOPRIRE_SATS = 50_000",
+                 "PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}",
+                 "PROMO_EVIDENZA_POSTI = 8",
                  "PROMO_SCOPRIRE_GIORNI = 30"):
         prova(f"la leva c'e' col suo valore: {riga}", True, riga in src)
         prova(f"...e nel config d'esempio", True, riga in esempio)
+    for riga in ("PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),\n"
+                 "                          (5, 25_000), (6, 35_000), (7, 50_000))",
+                 "PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),\n"
+                 "                          (3, 50_000), (4, 70_000), (5, 100_000))"):
+        prova(f"la scala c'e' nel config d'esempio: {riga.split(' =')[0]}",
+              True, riga in esempio)
+        prova("...e nel server, con gli stessi numeri", True,
+              riga.replace("\n                          ",
+                           "\n                              ") in src)
+    prova("i prezzi fissi di prima non li legge piu' nessuno", (0, 0, 0),
+          tuple(codice(src).count(f"import {n}") for n in (
+              "PROMO_IN_CIMA_SATS", "PROMO_EVIDENZA_SATS",
+              "PROMO_SCOPRIRE_SATS")))
     for col in ('"promo_scoprire_fino INTEGER DEFAULT 0"',
                 '"promo_consigliato INTEGER DEFAULT 0"',
                 '"evidenza_fino INTEGER DEFAULT 0"'):
@@ -222561,20 +222578,57 @@ def prove_promozioni():
            for m in ("promo_cima", "promo_evidenza", "promo_scoprire")])
 
     # ---- 3. I PEZZI PURI, girati --------------------------------------
-    amb = {"PROMO_EVIDENZA_SATS": {7: 15_000, 15: 25_000, "x": 3, 0: 9,
-                                   400: 1, 30: 0},
-           "PROMO_IN_CIMA_SATS": 5_000, "PROMO_SCOPRIRE_SATS": 50_000,
+    amb = {"PROMO_EVIDENZA_SCALINI": ((0, 5_000), (2, 10_000), (4, 15_000),
+                                      (5, 25_000), (6, 35_000), (7, 50_000)),
+           "PROMO_EVIDENZA_DURATE": {7: 1, 15: 1.7, "x": 3, 0: 9, 400: 1,
+                                     30: 0},
+           "PROMO_IN_CIMA_SCALINI": ((0, 2_000), (3, 5_000), (6, 8_000),
+                                     (10, 12_000)),
+           "PROMO_SCOPRIRE_SCALINI": ((0, 20_000), (1, 30_000), (2, 40_000),
+                                      (3, 50_000), (4, 70_000), (5, 100_000)),
            "PROMO_SCOPRIRE_GIORNI": 30, "PROMO_IN_CIMA_ORE": 24}
-    for nome in ("listino_evidenza", "_voce_promo", "_promo_dal_riferimento",
-                 "in_cima_da"):
+    for nome in ("scalini_promo", "prezzo_a_scalini", "listino_evidenza",
+                 "_voce_promo", "_promo_dal_riferimento", "in_cima_da"):
         exec(pezzo(nome), amb)
-    prova("il listino salta le voci storte e resta ordinato",
-          [(7, 15_000), (15, 25_000)], amb["listino_evidenza"]())
+    prova("il listino salta le durate storte e resta ordinato, a fila vuota "
+          "dal primo scalino", [(7, 5_000), (15, 8_500)],
+          amb["listino_evidenza"]())
+    # I PREZZI A SCALINI (25 nov 2026, Andrea: «se ci sono già 5 card, la
+    # sesta costerà tanto»): la tabella approvata, posto per posto
+    prova("Mensola, 7 giorni: lo scalino per 0..9 posti gia' presi",
+          [5_000, 5_000, 10_000, 10_000, 15_000, 25_000, 35_000, 50_000,
+           50_000, 50_000],
+          [dict(amb["listino_evidenza"](n))[7] for n in range(10)])
+    prova("...e i 15 giorni 1,7 volte tanto", [8_500, 17_000, 85_000],
+          [dict(amb["listino_evidenza"](n))[15] for n in (0, 2, 7)])
+    prova("In cima: lo scalino per gli annunci saliti nelle ultime 24 ore",
+          [2_000, 2_000, 5_000, 5_000, 8_000, 8_000, 12_000, 12_000],
+          [amb["_voce_promo"]("cima", n)[1] for n in (0, 2, 3, 5, 6, 9, 10, 40)])
+    prova("Da scoprire: lo scalino per i negozi gia' dentro",
+          [20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 100_000],
+          [amb["_voce_promo"]("scoprire", n)[1] for n in (0, 1, 2, 3, 4, 5, 12)])
+    sc = amb["scalini_promo"]
+    prova("la scala salta le coppie storte, a zero e negative, e si "
+          "rimette in ordine; una leva che non e' una scala da' []",
+          ([(0, 7), (2, 9)], [], [], []),
+          (sc([(2, 9), ("x", 1), (0, 7), (1, 0), (-1, 5), (3,)]), sc(7),
+           sc(None), sc(())))
+    prova("...e una scala che parte da piu' in alto e' spenta sotto la "
+          "prima soglia", (0, 9), (amb["prezzo_a_scalini"]([(2, 9)], 1),
+                                   amb["prezzo_a_scalini"]([(2, 9)], 2)))
+    prova("...la scala che torna dal pannello (liste e chiavi di testo) "
+          "vale lo stesso", 8_500,
+          (amb.update(PROMO_EVIDENZA_DURATE={"15": 1.7}),
+           dict(amb["listino_evidenza"](0)).get(15))[1])
+    amb["PROMO_EVIDENZA_DURATE"] = {7: 1, 15: 1.7}
     prova("le voci che si comprano, e quelle che no",
-          [("promo_cima", 5_000, 0), ("promo_evidenza", 25_000, 15),
-           ("promo_scoprire", 50_000, 30), None, None, None],
+          [("promo_cima", 2_000, 0), ("promo_evidenza", 8_500, 15),
+           ("promo_scoprire", 20_000, 30), None, None, None],
           [amb["_voce_promo"](t) for t in
            ("cima", "evidenza:15", "scoprire", "evidenza:3", "boh", None)])
+    amb["PROMO_IN_CIMA_SCALINI"] = ()
+    prova("una scala vuota spegne quella sola", (None, True),
+          (amb["_voce_promo"]("cima"), amb["_voce_promo"]("scoprire") is not None))
     rif = amb["_promo_dal_riferimento"]
     prova("il riferimento si rilegge: annuncio, annuncio:giorni, giorni",
           [(12, 0), (12, 7), (0, 30), (0, 0)],
@@ -222670,9 +222724,13 @@ def prove_promozioni():
           < c.index("promo_in_cima_canale(aid)"))
 
     # ---- 7. L'APP -----------------------------------------------------
-    prova("la card in evidenza porta l'etichetta, e mai da esaurita", True,
-          "const ev = !esa && inEvidenza(l);" in mini
-          and '<div class="card-evidenza">In evidenza</div>' in mini)
+    # L'ETICHETTA SE NE VA ANCHE DA RICERCHE E CATEGORIE (25 nov 2026,
+    # Andrea: «creava solo confusione»): resta la cornice, i badge di
+    # stato tornano nel loro angolo
+    prova("la card promossa non porta piu' l'etichetta, e la classe mai da "
+          "esaurita", (True, 0, 0),
+          ("const ev = !esa && inEvidenza(l);" in mini,
+           mini.count("card-evidenza"), mini.count("){top:32px}")))
     # «anzi più ravvicinati i paragrafi» (Andrea, 24 nov 2026 sera): sul
     # telefono «In evidenza» sale verso la card grande e le categorie
     # verso «In evidenza», senza toccare il CSS di «In evidenza»
@@ -222797,7 +222855,7 @@ const conta = (h, x) => h.split(x).length - 1;
 console.log(JSON.stringify([conta(ev, 'class="promo-durata"'),
   conta(ev, 'aria-pressed="true"'), ev.includes('onclick="scegliGiorniPromo(this, 15)"'),
   conta(ev, 'promo-guarda'), ev.includes('class="promo-ante">'),
-  ev.includes('pa-eti'), ev.includes('<svg'), ev.includes('onchange="scegliVocePromo(this)"'),
+  ev.includes('pa-mensola') && !ev.includes('pa-eti'), ev.includes('<svg'), ev.includes('onchange="scegliVocePromo(this)"'),
   sp.includes(' disabled'), sp.includes('class="promo-ante" hidden>'), sp.includes('pa-s2'),
   sp.includes('serve il banner')]));""")
     if r is None:
@@ -222860,10 +222918,88 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
     prova("«Da scoprire» vende la card E la pagina dedicata, con la frase di "
           "Andrea, nel foglio, nel suo cassetto e nella conferma; «dopo l'ok "
           "del moderatore» non c'e' piu'", (True, 4, 0),
-          ("const SCOPRIRE_COSA = 'La card del tuo negozio in home e una pagina "
-           "dedicata, '\n  + 'preparata da noi con le tue foto e il tuo testo.';" in mini,
+          ("const SCOPRIRE_COSA = 'La card grande del tuo negozio in cima alla home e una '\n"
+           "  + 'pagina dedicata, preparata da noi con le tue foto e il tuo testo.';" in mini,
            mini.count("SCOPRIRE_COSA"),
            mini.count("dopo l\\'ok del moderatore")))
+    _srv_promo_pre = pezzo("_incassa_promo")
+    # ---- 7b-bis. «MENSOLA» E I PREZZI A SCALINI (25 nov 2026, Andrea:
+    # «più che In evidenza la chiamerei mensola»; «la sesta card costerà
+    # tanto»). I testi sono quelli proposti e approvati quel giorno.
+    prova("la voce si chiama «Mensola», coi testi nuovi; niente etichetta "
+          "e niente «primo giorno in cima»", (True, True, True, True, 0, 0),
+          ("titolo: 'Mensola', durate," in ap,
+           "'Sulla mensola in home, fra le prime cose che si vedono.'" in ap,
+           "`È sulla mensola fino al ${dataPromo(e.fino)}: i giorni si aggiungono.`" in ap,
+           "`La mensola è piena: il prossimo posto si libera il ${dataPromo(e.libero_da)}`" in ap,
+           _senza_commenti_js(ap).count("etichetta."),
+           _senza_commenti_js(ap).count("anche in cima")))
+    prova("...la riga dei prezzi a scalini sotto le voci, nel foglio e nella "
+          "conferma del negozio", (True, 3),
+          ("const PROMO_SCALINI = 'Il prezzo sale man mano che i posti si riempiono.';" in mini,
+           mini.count("PROMO_SCALINI")))
+    prova("...il «Fatto!» dice la mensola, nell'app e nel bot, senza «anche "
+          "in cima»", (True, True, 0),
+          ("`⭐ Fatto! Il tuo annuncio è sulla mensola fino al ${dataPromo(d.fino || 0)}.`" in mini,
+           "\"⭐ <b>Fatto!</b> Il tuo annuncio è sulla mensola \"" in _srv_promo_pre,
+           mini.count("e oggi è anche in cima") + _srv_promo_pre.count("in cima.\")")))
+    _ant = pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};")
+    prova("...l'anteprima della Mensola: la linea di luce sotto le card, la "
+          "tua che entra per prima; Da scoprire: la grande, la tua da destra",
+          (True, True, True, True),
+          ("'<div class=\"pa-mensola\"></div><div class=\"pa-card pa-tuo pa-c1\"></div>'" in _ant,
+           ".pa-mensola{position:absolute;left:0;right:0;top:106px;" in mini,
+           "@keyframes pa-s2{0%,20%{left:90%}55%,100%{left:4%}}" in mini,
+           # lo stato fermo e' l'ARRIVO (effetti ridotti): la tua al primo posto
+           ".pa-s2{left:4%;" in mini))
+    prova("...e l'icona e' la mensolina con due card, non piu' la stella",
+          (False, True),
+          ("M12 7.3l1.4 2.9" in mini,
+           '<rect class="ip-p" x="2.5" y="17.5" width="19" height="2.2" rx="1.1"/>' in mini))
+    c = codice(pezzo("compra_promo"))
+    prova("compra: lo scalino si legge coi posti di adesso, dopo le guardie "
+          "e PRIMA della ripresa (che confronta i sats)", True,
+          c.index("posti_evidenza(con, adesso, aid)")
+          < c.index("presi = _presi_promo(con, motivo, adesso, aid, user[\"id\"])")
+          < c.index("voce = _voce_promo(d.get(\"tipo\"), presi)")
+          < c.index("vive = con.execute(")
+          < c.index("await crea_invoice_escrow("))
+    prova("...la mensola piena si dice con le parole nuove", True,
+          '"La mensola è piena: il prossimo "' in c)
+    li = codice(pezzo("listino_promo"))
+    prova("il listino mostra lo scalino di adesso, per tutte e tre", (True, True, True),
+          ("prezzo_a_scalini(PROMO_IN_CIMA_SCALINI," in li,
+           "for g, s in listino_evidenza(occ)]" in li,
+           "prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi_sc)" in li))
+    # i presi, girati su un database finto
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript("""
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, motivo TEXT,
+        riferimento TEXT, stato TEXT, pagato_il INT);
+      INSERT INTO pagamenti(motivo,riferimento,stato,pagato_il) VALUES
+        ('promo_cima','1','pagato',9000),('promo_cima','1','pagato',9500),
+        ('promo_cima','2','pagato',8000),('promo_cima','3','creato',9000),
+        ('promo_cima','4','pagato',100),('promo_evidenza','5:7','pagato',9000);
+      CREATE TABLE annunci(id INTEGER PRIMARY KEY, stato TEXT,
+        evidenza_fino INT DEFAULT 0);
+      INSERT INTO annunci VALUES(1,'attivo',20000),(2,'attivo',30000),
+        (3,'venduto',20000);
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, promo_scoprire_fino INT);
+      INSERT INTO utenti VALUES(1,20000),(2,20000),(3,500),(4,0);
+    """)
+    amb = {"PROMO_IN_CIMA_ORE": 1, "PROMO_EVIDENZA_POSTI": 8}
+    exec(pezzo("posti_evidenza"), amb)
+    exec(pezzo("_presi_promo"), amb)
+    pp = amb["_presi_promo"]
+    prova("i presi: In cima conta gli annunci pagati nell'ultima ora (uno "
+          "salito due volte vale uno), la Mensola i posti senza chi allunga, "
+          "Da scoprire i negozi vivi senza chi rinnova",
+          [2, 2, 1, 2, 1, 0],
+          [pp(con, "promo_cima", 10000), pp(con, "promo_evidenza", 10000),
+           pp(con, "promo_evidenza", 10000, 1), pp(con, "promo_scoprire", 10000, tg_id=4),
+           pp(con, "promo_scoprire", 10000, tg_id=1), pp(con, "boh", 10000)])
+    con.close()
     _srv_promo = pezzo("_incassa_promo")
     prova("la pagina dedicata si chiede in Assistenza solo alla PRIMA entrata, "
           "nella stessa transazione, e solo con l'Assistenza accesa",
@@ -223165,11 +223301,12 @@ INSERT INTO annunci VALUES
     # centro, sulla fascia; le card della fila senza etichetta e cornice
     # (24 nov 2026 sera, Andrea, vista la mensola di luce: «la scritta in
     # evidenza ora si può anche togliere») il titolo se ne va di nuovo
+    # (25 nov 2026: la fila si chiama «Mensola», scelto da Andrea)
     prova("«In evidenza» senza titolo (lo dice la mensola), e il nome resta "
-          "sulla fila per chi legge ad alta voce",
+          "sulla fila per chi legge ad alta voce: «Mensola»",
           (False, True),
           ('section-label' in _evs,
-           'id="evidenzaFila" role="region" aria-label="In evidenza"' in _evs))
+           'id="evidenzaFila" role="region" aria-label="Mensola"' in _evs))
     # «Esplora il lavoro» prende il posto di «Esplora per categorie» in
     # Lavoro, e ne prende anche il titolo al centro (24 nov 2026, Andrea:
     # «sistemalo», era rimasto a sinistra con la linea puntinata)
@@ -223218,7 +223355,8 @@ INSERT INTO annunci VALUES
           "senza cornice (nella griglia restano)",
           (True, True, True, True),
           ("#evidenzaSez .ev-strip .card{box-shadow:0 10px 18px rgba(0,0,0,.38),0 3px 6px rgba(0,0,0,.22)}" in _css,
-           "#evidenzaSez .card.ev .card-evidenza{display:none}" in _css,
+           # l'etichetta non c'e' piu' da nessuna parte (25 nov 2026)
+           "card-evidenza" not in mini,
            "#evidenzaSez .card.ev{outline:none}" in _css,
            ".card.ev{outline:2px solid var(--sats-deep);outline-offset:-2px}" in _css))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",

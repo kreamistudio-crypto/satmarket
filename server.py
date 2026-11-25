@@ -1899,26 +1899,45 @@ try:
     from config import PROMOZIONI_ATTIVE
 except ImportError:
     PROMOZIONI_ATTIVE = True
+# I PREZZI A SCALINI (25 nov 2026, Andrea: «se non c'è nulla in
+# evidenza la card dovrebbe costare poco... se ci sono già 5 card, la
+# sesta costerà tanto»): ogni promozione ha la sua scala, coppie
+# (QUANTI GIA' PRESI, SATS). Vale lo scalino piu' alto la cui soglia e'
+# raggiunta: con 0 presi il primo, e oltre l'ultimo resta l'ultimo. Il
+# conto dei presi si fa alla FATTURA (`_presi_promo`), come i posti.
+# Una scala vuota = quella promozione e' spenta (le altre restano). I
+# numeri sono quelli proposti il 25 nov e approvati da Andrea («ok»).
+# Prima erano prezzi fissi (`PROMO_IN_CIMA_SATS` 5.000, `PROMO_EVIDENZA_
+# SATS` {7: 15.000, 15: 25.000}, `PROMO_SCOPRIRE_SATS` 50.000): quelle
+# righe, se restano nel config del VPS, non le legge piu' nessuno.
 # «⬆️ In cima»: l'annuncio torna primo fra i «Più recenti», come appena
-# pubblicato, e riesce nel nostro canale. Una volta, niente durata.
-# 0 = questa promozione e' spenta (le altre restano).
+# pubblicato, e riesce nel nostro canale. Una volta, niente durata. I
+# presi sono gli annunci saliti in cima PAGANDO nelle ultime
+# PROMO_IN_CIMA_ORE ore.
 try:
-    from config import PROMO_IN_CIMA_SATS
+    from config import PROMO_IN_CIMA_SCALINI
 except ImportError:
-    PROMO_IN_CIMA_SATS = 5_000
+    PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))
 # ...al massimo una volta ogni tante ore per annuncio: il conto parte da
 # quando l'annuncio e' salito in cima l'ultima volta (o e' nato).
 try:
     from config import PROMO_IN_CIMA_ORE
 except ImportError:
     PROMO_IN_CIMA_ORE = 24
-# «⭐ In evidenza»: la fila in home e l'etichetta sulla card, per GIORNI
-# -> SATS. Il primo giorno anche in cima. Un dizionario vuoto (o tutti
-# zero) = spenta.
+# «⭐ Mensola» (fino al 25 nov 2026 «In evidenza»: il nome l'ha scelto
+# Andrea, «sembra proprio una mensola quella che si vede nella home»):
+# la fila in home, senza etichetta. La scala e' per la durata piu'
+# corta; le altre durate la moltiplicano (GIORNI -> VOLTE). I presi
+# sono i posti gia' occupati. Un dizionario vuoto = spenta.
 try:
-    from config import PROMO_EVIDENZA_SATS
+    from config import PROMO_EVIDENZA_SCALINI
 except ImportError:
-    PROMO_EVIDENZA_SATS = {7: 15_000, 15: 25_000}
+    PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),
+                              (5, 25_000), (6, 35_000), (7, 50_000))
+try:
+    from config import PROMO_EVIDENZA_DURATE
+except ImportError:
+    PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}
 # I posti della fila: oltre, si aspetta che uno si liberi (e l'app dice
 # da che giorno). Un annuncio gia' in evidenza che allunga NON prende un
 # posto nuovo: il suo ce l'ha.
@@ -1926,15 +1945,17 @@ try:
     from config import PROMO_EVIDENZA_POSTI
 except ImportError:
     PROMO_EVIDENZA_POSTI = 8
-# «🏪 Il negozio in Da scoprire»: quanto costa e per quanti giorni. Dopo
+# «🏪 Il negozio in Da scoprire»: la scala e per quanti giorni. Dopo
 # la scadenza la card esce da «Da scoprire» ma il negozio RESTA fra i
 # Consigliati, finche' un moderatore non lo toglie (decisione di Andrea:
 # «possono essere anche infiniti lì»). Nessun limite di posti: la fila
-# gira a ogni apertura e scorre da sola. 0 = spenta.
+# gira a ogni apertura e scorre da sola; i presi sono i negozi che ci
+# sono gia'. Una scala vuota = spenta.
 try:
-    from config import PROMO_SCOPRIRE_SATS
+    from config import PROMO_SCOPRIRE_SCALINI
 except ImportError:
-    PROMO_SCOPRIRE_SATS = 50_000
+    PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),
+                              (3, 50_000), (4, 70_000), (5, 100_000))
 try:
     from config import PROMO_SCOPRIRE_GIORNI
 except ImportError:
@@ -39851,19 +39872,28 @@ def _leve_stato():
                          "ne compra di nuove, quelle gia' pagate restano",
                   acceso="i venditori possono pagare In cima, In "
                          "evidenza e il negozio in Da scoprire"),
-            _leva("Promozione In cima: prezzo (sats)",
-                  "PROMO_IN_CIMA_SATS", int(PROMO_IN_CIMA_SATS or 0),
+            _leva("Promozione In cima: prezzi (gia' presi: sats)",
+                  "PROMO_IN_CIMA_SCALINI",
+                  _elenco(f"{n}+ {s}" for n, s in
+                          scalini_promo(PROMO_IN_CIMA_SCALINI)),
                   spento="In cima non si vende"),
             _leva("Promozione In cima: ore fra due volte",
                   "PROMO_IN_CIMA_ORE", int(PROMO_IN_CIMA_ORE or 0)),
-            _leva("Promozione In evidenza: prezzi (giorni: sats)",
-                  "PROMO_EVIDENZA_SATS",
+            _leva("Promozione Mensola: prezzi 1a durata (gia' presi: sats)",
+                  "PROMO_EVIDENZA_SCALINI",
+                  _elenco(f"{n}+ {s}" for n, s in
+                          scalini_promo(PROMO_EVIDENZA_SCALINI)),
+                  spento="la Mensola non si vende"),
+            _leva("Promozione Mensola: durate (giorni: sats a fila vuota)",
+                  "PROMO_EVIDENZA_DURATE",
                   _elenco(f"{g} gg {s}" for g, s in listino_evidenza()),
-                  spento="In evidenza non si vende"),
-            _leva("Promozione In evidenza: posti", "PROMO_EVIDENZA_POSTI",
+                  spento="la Mensola non si vende"),
+            _leva("Promozione Mensola: posti", "PROMO_EVIDENZA_POSTI",
                   int(PROMO_EVIDENZA_POSTI or 0)),
-            _leva("Negozio in Da scoprire: prezzo (sats)",
-                  "PROMO_SCOPRIRE_SATS", int(PROMO_SCOPRIRE_SATS or 0),
+            _leva("Negozio in Da scoprire: prezzi (gia' dentro: sats)",
+                  "PROMO_SCOPRIRE_SCALINI",
+                  _elenco(f"{n}+ {s}" for n, s in
+                          scalini_promo(PROMO_SCOPRIRE_SCALINI)),
                   spento="la card del negozio in Da scoprire non si vende"),
             _leva("Negozio in Da scoprire: giorni", "PROMO_SCOPRIRE_GIORNI",
                   int(PROMO_SCOPRIRE_GIORNI or 0)),
@@ -62727,20 +62757,56 @@ MSG_PROMO_SPENTE = "Le promozioni non sono attive al momento"
 MSG_PROMO_SPENTA = "Questa promozione non è attiva al momento"
 
 
-def listino_evidenza() -> list:
-    """Le durate di «In evidenza», come [(giorni, sats)] dalla piu' corta.
-    Una voce storta o a zero si salta in silenzio: una leva scritta male
-    spegne quella durata, mai le altre — e mai un 500 sulla scheda."""
+def scalini_promo(scala) -> list:
+    """Una scala di prezzi pulita: [(soglia, sats)] in ordine di soglia.
+    Una coppia storta, negativa o a zero si salta in silenzio, e una
+    leva che non e' una scala da' []: una leva scritta male spegne quella
+    promozione, mai le altre — e mai un 500 sulla scheda."""
     fuori = []
     try:
-        voci = dict(PROMO_EVIDENZA_SATS or {}).items()
-    except (TypeError, ValueError):
+        voci = list(scala or ())
+    except TypeError:
         return []
-    for g, s in voci:
+    for v in voci:
         try:
-            g, s = int(g), int(s)
+            soglia, sats = (int(x) for x in v)
         except (TypeError, ValueError):
             continue
+        if soglia >= 0 and sats > 0:
+            fuori.append((soglia, sats))
+    return sorted(dict(fuori).items())
+
+
+def prezzo_a_scalini(scala, presi: int) -> int:
+    """Lo scalino che tocca a chi arriva quando `presi` posti sono gia'
+    presi: il piu' alto la cui soglia e' raggiunta. 0 = spenta (scala
+    vuota, o nessuno scalino parte da cosi' in basso)."""
+    prezzo = 0
+    for soglia, sats in scalini_promo(scala):
+        if max(0, int(presi or 0)) >= soglia:
+            prezzo = sats
+    return prezzo
+
+
+def listino_evidenza(presi: int = 0) -> list:
+    """Le durate della Mensola, come [(giorni, sats)] dalla piu' corta,
+    col prezzo dello scalino di `presi`: la scala vale per la durata,
+    moltiplicata per le sue VOLTE e arrotondata al sat. Una durata storta
+    o a zero si salta in silenzio, come le coppie della scala."""
+    base = prezzo_a_scalini(PROMO_EVIDENZA_SCALINI, presi)
+    if base <= 0:
+        return []
+    fuori = []
+    try:
+        voci = dict(PROMO_EVIDENZA_DURATE or {}).items()
+    except (TypeError, ValueError):
+        return []
+    for g, volte in voci:
+        try:
+            g, volte = int(g), float(volte)
+        except (TypeError, ValueError):
+            continue
+        s = int(round(base * volte))
         if 0 < g <= 365 and s > 0:
             fuori.append((g, s))
     return sorted(fuori)
@@ -62773,27 +62839,52 @@ def in_cima_da(creato: int) -> int:
     return int(creato or 0) + max(0, int(PROMO_IN_CIMA_ORE or 0)) * 3600
 
 
-def _voce_promo(tipo: str):
+def _voce_promo(tipo: str, presi: int = 0):
     """Il tipo chiesto dal client -> (motivo, sats, giorni), o None se
-    non esiste o e' spento. E' l'UNICO posto che legge i prezzi: la
-    fattura, il listino della scheda e la verifica della ripresa
-    chiedono qui."""
+    non esiste o e' spento; i sats sono quelli dello scalino di `presi`
+    (`_presi_promo`). E' l'UNICO posto che legge i prezzi: la fattura, il
+    listino della scheda e la verifica della ripresa chiedono qui."""
     tipo = (tipo or "").strip().lower()
     if tipo == "cima":
-        s = int(PROMO_IN_CIMA_SATS or 0)
+        s = prezzo_a_scalini(PROMO_IN_CIMA_SCALINI, presi)
         return ("promo_cima", s, 0) if s > 0 else None
     if tipo.startswith("evidenza:"):
         try:
             g = int(tipo.split(":", 1)[1])
         except ValueError:
             return None
-        s = dict(listino_evidenza()).get(g, 0)
+        s = dict(listino_evidenza(presi)).get(g, 0)
         return ("promo_evidenza", s, g) if s > 0 else None
     if tipo == "scoprire":
-        s = int(PROMO_SCOPRIRE_SATS or 0)
+        s = prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi)
         g = int(PROMO_SCOPRIRE_GIORNI or 0)
         return ("promo_scoprire", s, g) if s > 0 and g > 0 else None
     return None
+
+
+def _presi_promo(con, motivo: str, adesso: int, aid: int = 0,
+                 tg_id: int = 0) -> int:
+    """Quanti posti sono gia' presi, per lo scalino del prezzo:
+    - In cima: gli annunci saliti in cima PAGANDO nelle ultime
+      PROMO_IN_CIMA_ORE ore (sono quelli che stanno lassu');
+    - Mensola: i posti occupati, senza l'annuncio che allunga (il suo
+      posto ce l'ha: `posti_evidenza`);
+    - Da scoprire: i negozi con la card viva, senza chi rinnova.
+    Chi allunga paga quindi lo scalino di chi arriva ultimo dopo gli
+    altri — mai il suo posto contato due volte."""
+    if motivo == "promo_cima":
+        ore = max(0, int(PROMO_IN_CIMA_ORE or 0))
+        return con.execute(
+            "SELECT COUNT(DISTINCT riferimento) FROM pagamenti "
+            "WHERE motivo='promo_cima' AND stato='pagato' AND pagato_il>?",
+            (adesso - ore * 3600,)).fetchone()[0] or 0
+    if motivo == "promo_evidenza":
+        return posti_evidenza(con, adesso, aid)[0]
+    if motivo == "promo_scoprire":
+        return con.execute(
+            "SELECT COUNT(*) FROM utenti WHERE promo_scoprire_fino>? "
+            "AND tg_id<>?", (adesso, int(tg_id or 0))).fetchone()[0] or 0
+    return 0
 
 
 def _banner_vivo(u) -> bool:
@@ -62959,12 +63050,14 @@ async def listino_promo(annuncio: int = 0,
             if not a:
                 raise HTTPException(400, motivo)
             da = in_cima_da(a["creato"])
-            fuori["cima"] = {"sats": int(PROMO_IN_CIMA_SATS or 0),
+            presi_cima = _presi_promo(con, "promo_cima", adesso)
+            fuori["cima"] = {"sats": prezzo_a_scalini(PROMO_IN_CIMA_SCALINI,
+                                                      presi_cima),
                              "da": da if da > adesso else 0}
             occ, prossimo = posti_evidenza(con, adesso, a["id"])
             fuori["evidenza"] = {
                 "durate": [{"giorni": g, "sats": s}
-                           for g, s in listino_evidenza()],
+                           for g, s in listino_evidenza(occ)],
                 "posti": max(0, int(PROMO_EVIDENZA_POSTI or 0)),
                 "occupati": occ, "libero_da": prossimo,
                 "fino": (a["evidenza_fino"]
@@ -62975,8 +63068,10 @@ async def listino_promo(annuncio: int = 0,
                             "FROM utenti WHERE tg_id=?",
                             (user["id"],)).fetchone()
             fino = int((u["promo_scoprire_fino"] if u else 0) or 0)
+            presi_sc = _presi_promo(con, "promo_scoprire", adesso,
+                                    tg_id=user["id"])
             fuori["scoprire"] = {
-                "sats": int(PROMO_SCOPRIRE_SATS or 0),
+                "sats": prezzo_a_scalini(PROMO_SCOPRIRE_SCALINI, presi_sc),
                 "giorni": int(PROMO_SCOPRIRE_GIORNI or 0),
                 "banner": _banner_vivo(u),
                 "fino": fino if fino > adesso else 0,
@@ -63014,6 +63109,7 @@ async def compra_promo(req: Request,
     motivo, prezzo, giorni = voce
     adesso = int(time.time())
     con = db()
+    aid = 0
     if motivo in ("promo_cima", "promo_evidenza"):
         try:
             aid = int(d.get("annuncio_id") or 0)
@@ -63031,8 +63127,8 @@ async def compra_promo(req: Request,
             occ, prossimo = posti_evidenza(con, adesso, aid)
             if prossimo:
                 con.close()
-                raise HTTPException(409, "I posti in evidenza sono tutti "
-                                         "presi: il prossimo si libera il "
+                raise HTTPException(409, "La mensola è piena: il prossimo "
+                                         "posto si libera il "
                                          + _data_sponsor(prossimo))
         riferimento = str(aid) + (f":{giorni}" if giorni else "")
         memo = (f"Barattolo promozione #{user['id']}: "
@@ -63053,6 +63149,16 @@ async def compra_promo(req: Request,
         riferimento = str(giorni)
         memo = (f"Barattolo promozione #{user['id']}: negozio in "
                 f"Da scoprire {giorni} giorni")
+    # LO SCALINO DEL PREZZO si legge QUI, coi posti di adesso (25 nov
+    # 2026): la ripresa qui sotto confronta anche i sats, quindi se nel
+    # frattempo la fila si e' riempita la fattura vecchia si chiude e ne
+    # nasce una al prezzo nuovo — mai un prezzo vecchio a fila cambiata.
+    presi = _presi_promo(con, motivo, adesso, aid, user["id"])
+    voce = _voce_promo(d.get("tipo"), presi)
+    if not voce:
+        con.close()
+        raise HTTPException(400, MSG_PROMO_SPENTA)
+    prezzo = voce[1]
     # LA RIPRESA, nella finestra fisica del pagamento (30 minuti), come
     # `sblocca_banner` e `_riservati`
     segni = ",".join("?" * len(MOTIVI_PROMO))
@@ -63233,9 +63339,8 @@ async def _incassa_promo(pagamento_id: int) -> dict:
                            if pagina_da_fare else None)
         elif applicata and motivo == "promo_evidenza":
             await notifica(p["tg_id"],
-                           "⭐ <b>Fatto!</b> Il tuo annuncio è in evidenza "
-                           f"fino al {_data_sponsor(fino)}, e oggi è anche "
-                           "in cima.")
+                           "⭐ <b>Fatto!</b> Il tuo annuncio è sulla mensola "
+                           f"fino al {_data_sponsor(fino)}.")
         elif applicata:
             await notifica(p["tg_id"],
                            "⬆️ <b>Fatto!</b> Il tuo annuncio è tornato in "

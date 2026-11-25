@@ -38650,7 +38650,19 @@ mai il kind 0 di nessuno: regola ferrea 2).
   prima della fattura: leva, annuncio promuovibile `_annuncio_promuovibile`,
   24 ore `in_cima_da`, posti `posti_evidenza`, banner vivo `_banner_vivo`)
   e `GET /api/promo/listino` (prezzi da `listino_evidenza` e dalle leve:
-  il client non ne scrive). Incasso `_incassa_promo` (In cima:
+  il client non ne scrive). I PREZZI A SCALINI (25 nov 2026): ogni voce
+  ha la sua scala (`PROMO_IN_CIMA_SCALINI`, `PROMO_EVIDENZA_SCALINI` per
+  la durata piu' corta moltiplicata da `PROMO_EVIDENZA_DURATE`,
+  `PROMO_SCOPRIRE_SCALINI`), coppie (gia' presi, sats) pulite da
+  `scalini_promo` e lette da `prezzo_a_scalini`; i presi li conta
+  `_presi_promo` (In cima: annunci distinti pagati nelle ultime
+  `PROMO_IN_CIMA_ORE`; Mensola: `posti_evidenza` senza chi allunga;
+  Da scoprire: negozi con la card viva senza chi rinnova). `_voce_promo(tipo,
+  presi)` resta l'unico che legge i prezzi; in `compra_promo` lo scalino
+  si rilegge dopo le guardie e prima della ripresa, che confrontando i
+  sats rifà la fattura se la fila è cambiata. «In evidenza» per
+  l'utente si chiama «Mensola» dal 25 nov; motivi, colonne e id interni
+  restano `evidenza`. Incasso `_incassa_promo` (In cima:
   `creato` = adesso e `promo_in_cima_canale`; In evidenza:
   `annunci.evidenza_fino`, che si somma, e il primo giorno in cima;
   negozio: `utenti.promo_scoprire_fino` e `promo_consigliato` = 1),
