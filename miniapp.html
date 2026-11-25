@@ -39934,6 +39934,13 @@ function minutiSecondi(sec){
    staccato come prima. L'id serve all'orologio, che al passaggio viva
    → morta ridisegna questo riquadro e nient'altro. */
 function pannelloDaPagare(o){
+  /* PAGATO IN EURO (25 nov 2026, Andrea: «dovrei vedere l'ordine
+     peer-to-peer»): se il deposito lo sta saldando uno scambio nato da
+     «Non hai sats?», qui niente fattura Lightning ma la strada di quello
+     scambio, col suo tasto di sempre */
+  const ve = typeof viaEuroScambioDellOrdine === 'function' ? viaEuroScambioDellOrdine(o.id) : null;
+  if (ve) return `<div class="payout pag-evidenza" id="ordDaPagare">
+      <button class="btn orange" onclick="viaEuroSegui('${esc(ve.id)}')">Riprendi il pagamento</button></div>`;
   const resta = scadenzaFatturaOrdine(o) - Date.now() / 1000;
   const corpo = (o.fattura && resta > 0)
     ? `<h4>⚡ Manca il tuo pagamento</h4>
@@ -44004,7 +44011,8 @@ function openOrder(id){
       ${busteOrdine(o)}
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? pannelloDaPagare(o)
-        + `<button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>` : ''}
+        + (typeof viaEuroScambioDellOrdine === 'function' && viaEuroScambioDellOrdine(o.id) ? ''
+           : `<button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`) : ''}
       ${/* L'ANNULLO DEL VENDITORE (1 ott 2026): finche' non ha spedito
             — in attesa del pagamento o coi sats gia' in cassaforte — e
             mai a pagamento in volo. Da 'shipped' in poi il bottone non
@@ -85501,6 +85509,20 @@ function viaEuroHoPagato(){
 }
 /* «RIPRENDI IL PAGAMENTO»: nella pagina dello scambio nato dalla cassa,
    finche' c'e' un passo del foglio da fare */
+/* lo scambio «Non hai sats?» ancora in corsa che salda il deposito
+   dell'ordine `id` del mercatino (la riga la scrive `viaEuroDeposito`) */
+function viaEuroScambioDellOrdine(id){
+  const n = Number(id) || 0;
+  if (!(n > 0)) return null;
+  const tutti = ordiniP2P();
+  for (const k in tutti) {
+    const p = tutti[k];
+    if (!p || !p.viaEuro || p.lato !== 'compro' || Number(p.viaEuro.ordine) !== n) continue;
+    const passo = viaEuroPasso(p);
+    if (passo === 'attesa' || passo === 'paga' || passo === 'controllo') return p;
+  }
+  return null;
+}
 function viaEuroRiprendiP2P(o){
   if (!o || !o.viaEuro || o.lato !== 'compro') return '';
   const passo = viaEuroPasso(o);
