@@ -17993,7 +17993,8 @@ def _via_euro_cambia(momento: str, dettaglio: str) -> bool:
     annullo e ritorno nel libro tranne quello di un moderatore."""
     if momento == "garanzia_pagata":
         return dettaglio == "active"
-    if momento in ("recapito", "concluso", "tornato"):
+    if momento in ("recapito", "concluso", "tornato", "annullo_chiesto",
+                   "payout_fallito"):
         return True
     if momento == "annullato":
         return dettaglio != "admin"
@@ -18003,7 +18004,9 @@ def _via_euro_cambia(momento: str, dettaglio: str) -> bool:
 def _testo_via_euro(momento: str, dettaglio: str, nome: str = "",
                     cifra: str = "", detto: bool = False, minuti: int = 0) -> str:
     """PURA: la frase a chi paga in euro (testi approvati da Andrea il 25
-    nov 2026), o '' = resta quella di sempre. `nome` e' di chi vende, gia'
+    nov 2026, sera: le quattro prime, poi l'annullo chiesto, il pagamento
+    fermo e «rischi di perdere gli euro» al posto di «il pagamento si
+    annulla», che faceva pensare a un rimborso), o '' = resta quella di sempre. `nome` e' di chi vende, gia'
     scappato; `cifra` gli euro come li dice il libro; `detto` = il recapito
     e' gia' arrivato; `minuti` il tempo per pagare (0 = la riga non c'e')."""
     if not _via_euro_cambia(momento, dettaglio):
@@ -18018,12 +18021,46 @@ def _testo_via_euro(momento: str, dettaglio: str, nome: str = "",
     if momento in ("garanzia_pagata", "recapito"):
         return (f"💶 <b>Manda {quanto} {a_chi}:</b> i dati sono nell'ordine. "
                 "Poi tocca «Ho inviato gli euro»."
-                + (f"\n\n⏱ Hai {_durata_detta_p2p(int(minuti) * 60)}, poi il "
-                   "pagamento si annulla." if minuti else ""))
+                + (f"\n\n⏱ Hai {_durata_detta_p2p(int(minuti) * 60)}: "
+                   + VIA_EURO_RISCHIO if minuti else ""))
     if momento == "concluso":
         return f"✅ <b>{chi} ha ricevuto gli euro:</b> il tuo acquisto è pagato."
+    if momento == "annullo_chiesto":
+        return (f"↩️ <b>{chi} chiede di annullare il pagamento.</b> Se non hai "
+                "mandato gli euro e sei d'accordo, tocca «Annulla il pagamento» "
+                "nell'ordine; se li hai già mandati, tocca «Ho inviato gli euro».")
+    if momento == "payout_fallito":
+        return ("⚠️ <b>Il pagamento del tuo acquisto si è fermato:</b> i sats "
+                "restano bloccati per te. Scrivici da Assistenza e lo sistemiamo.")
     return ("❌ <b>Il pagamento in euro è stato annullato:</b> l'acquisto non è "
             "pagato. Se avevi già mandato gli euro, scrivici da Assistenza.")
+
+
+# la conseguenza del tasto non toccato, detta uguale in ogni posto (e nella
+# schermata dell'ordine, `viaEuroPassi`)
+VIA_EURO_RISCHIO = ("se non lo tocchi in tempo, l'acquisto salta e rischi di "
+                    "perdere gli euro che hai mandato.")
+
+
+def _sollecito_via_euro(momento: str, nome: str = "", resto_s: int = 0) -> str:
+    """PURA: il promemoria degli euro a chi paga in euro (testi approvati da
+    Andrea il 25 nov 2026), al posto di quello dello scambio: col tempo per
+    pagare quello a meta' e quello degli ultimi dieci minuti, senza tempo uno
+    solo. '' = resta quello di sempre."""
+    chi = nome or "Chi vende"
+    a_chi = (("ad " if nome[:1].lower() in "aeiou" else "a ") + nome) if nome \
+        else "a chi vende"
+    if momento.startswith("euro_tempo"):
+        resto = _durata_detta_p2p(max(0, int(resto_s)))
+        if int(resto_s) <= 10 * 60:
+            return (f"⏰ Mancano {resto}: hai già mandato gli euro? Tocca subito "
+                    "«Ho inviato gli euro» nell'ordine: " + VIA_EURO_RISCHIO)
+        return (f"💶 Promemoria: hai ancora {resto} per mandare gli euro {a_chi} "
+                "e toccare «Ho inviato gli euro». I dati sono nell'ordine.")
+    if momento.startswith("euro_sollecito"):
+        return (f"💶 Promemoria: {chi} aspetta i tuoi euro. I dati sono "
+                "nell'ordine: mandali e tocca «Ho inviato gli euro».")
+    return ""
 
 
 def _bottone_via_euro(ordine_id: int) -> tuple:
@@ -78451,7 +78488,7 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
     terne, com'era: chi non presta niente non vede cambiare niente."""
     fuori = []
     righe = con.execute(
-        "SELECT id, ordine, momento, giro, tg_id, testo, quando, fonte "
+        "SELECT id, ordine, momento, giro, tg_id, testo, quando, scade, fonte "
         "FROM p2p_attese WHERE scade<=? ORDER BY scade, id",
         (adesso,)).fetchall()
     for r in righe:
@@ -78605,6 +78642,27 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
         _moneta = _coin(con, r["ordine"]) if _coin else ""
         if _moneta:
             testo = p2p_coin_frase(testo, _moneta)
+        # «NON HAI SATS?» (25 nov 2026, via-euro-avvisi): a chi paga in euro
+        # un oggetto del mercatino il promemoria degli euro ha le parole sue,
+        # e sotto OGNI attesa «📦 Apri l'ordine». `globals()`: i banchi che
+        # ritagliano questa funzione non lo portano. Un guasto lascia tutto
+        # com'era
+        n_ve = 0
+        try:
+            _ve = globals().get("_ordine_via_euro")
+            n_ve = _ve(con, r["ordine"], r["tg_id"]) if _ve else 0
+            if n_ve and r["fonte"] == "sollecito_euro":
+                resto_s = 0
+                if str(r["momento"]).startswith("euro_tempo"):
+                    resto_s = (int(r["quando"] or 0) + _minuti_pagare_scelta_p2p(
+                        _minuti_pagare_ordine_p2p(con, r["ordine"])) * 60
+                        - int(r["scade"] or 0))
+                testo = _sollecito_via_euro(
+                    str(r["momento"]), _nome_altro_p2p(con, r["ordine"], r["tg_id"], adesso),
+                    resto_s) or testo
+        except Exception as e:
+            print(f"⚠️ Attese P2P: {corto} il promemoria di «Non hai sats?» non "
+                  f"si fa ({type(e).__name__}: {e}): resta quello di sempre", flush=True)
         if bottoni is not None:
             # (dal 10 ott 2026 anche i solleciti — a chi vende e a chi
             # compra — portano il bottone: dicono «dalla pagina dello
@@ -78619,6 +78677,9 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
             bottoni[len(fuori)] = (P2P_BOTTONE_SCAMBIO,
                                    f"{LINK_LIBRO_P2P}?scambio={r['ordine']}")
         fuori.append((r["tg_id"], testo, r["fonte"]))
+        # ...e a chi paga in euro l'ordine al posto dello scambio (vedi sopra)
+        if bottoni is not None and n_ve:
+            bottoni[len(fuori) - 1] = _bottone_via_euro(n_ve)
     q = con.execute("SELECT MIN(scade) FROM p2p_attese").fetchone()
     con.commit()
     return fuori, int((q and q[0]) or 0)
@@ -85517,11 +85578,12 @@ async def _manda_evento_p2p(ev: dict, fatto: dict):
             except Exception:
                 pass
             # ...ma a chi paga in euro un oggetto del mercatino (25 nov
-            # 2026, via-euro-avvisi), sotto le sue frasi, «📦 Apri l'ordine»:
-            # lo scambio non lo deve vedere. Un guasto lascia i bottoni
+            # 2026, via-euro-avvisi), sotto ogni avviso — dispute comprese,
+            # col sì di Andrea — «📦 Apri l'ordine»: lo scambio non lo deve
+            # vedere. Un guasto lascia i bottoni
             try:
                 _ve = globals().get("_ordine_via_euro")
-                if _ve and _via_euro_cambia(fatto["momento"], ev.get("dettaglio") or ""):
+                if _ve:
                     for tg, _ in avvisi:
                         n_ve = _ve(con, ev["ordine"], tg)
                         if n_ve:

@@ -215071,7 +215071,7 @@ def prove_non_hai_sats():
           "viaEuroScambioDellOrdine(o.id)" in pdp
           and "const v = viaEuroPassoOrdine(ve);" in pdp
           and "Sto preparando il pagamento…" in pvo
-          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho inviato gli euro</button>" in pvo
+          and "viaEuroPassi(p, 'viaEuroSeguo=" in pvo and "viaEuroPasso1(p, nome)" in pvo
           and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
           and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
           and "if (!v || v.orma !== ormaBox) box.outerHTML = pannelloDaPagare(o);" in mini)
@@ -215158,12 +215158,13 @@ console.log(JSON.stringify(r));
     prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
           "…», «Ho inviato gli euro», «… sta controllando il pagamento», «Puoi chiudere "
           "l'app, ti avvisiamo noi.»", True,
-          "Sto preparando il pagamento…" in rp and "'Manda ' + String(o.euro) + ' € a ' + nome" in rp
-          and ">Ho inviato gli euro</button>" in rp and "' sta controllando il pagamento'" in rp
+          "Sto preparando il pagamento…" in rp and "viaEuroPasso1(o, nome)" in rp
+          and "viaEuroPassi(o, 'viaEuroHoPagato()')" in rp and "' sta controllando il pagamento'" in rp
           and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
     prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
           "«Ho pagato» e' il suo gesto", True,
-          "recapitoCompratoreP2P(o)" in rp and "rigaTempoPagareP2P(o)" in rp
+          "recapitoCompratoreP2P(o)" in _fn_js(mini, "function viaEuroPassi(o, gesto){")
+          and "rigaTempoPagareP2P(o)" in _fn_js(mini, "function viaEuroPassi(o, gesto){")
           and "euroInviatiP2P();" in _fn_js(mini, "function viaEuroHoPagato(){"))
     hp = _fn_js(mini, "function viaEuroHoPagato(){")
     prova("...senza passare dalla pagina P2P: lo scambio si presta a "
@@ -215235,8 +215236,11 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
     # peer-to-peer». Le quattro frasi le ha approvate lui il 25 nov sera.
     con, amb = _banco_eventi_p2p()
     for f in ("_tabella_via_euro", "_lega_via_euro", "_ordine_via_euro",
-              "_via_euro_cambia", "_testo_via_euro", "_bottone_via_euro"):
+              "_via_euro_cambia", "_testo_via_euro", "_bottone_via_euro",
+              "_sollecito_via_euro"):
         exec(_senza_prosa(pezzo(f)), amb)
+    i_r = _SORGENTE.index("\nVIA_EURO_RISCHIO = (") + 1
+    exec(_SORGENTE[i_r:_SORGENTE.index(")\n", i_r) + 2], amb)
     amb["BOTTONE_ORDINE_VENDUTO"] = "📦 Apri l'ordine"
     amb["URL_PUBBLICO"] = "https://barattolo.store"
     tv = amb["_testo_via_euro"]
@@ -215244,7 +215248,8 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
         "🔒 <b>Alan ha preparato i sats per il tuo acquisto.</b> Tra poco ti "
         "dice dove mandare 5 €.",
         "💶 <b>Manda 5 € ad Alan:</b> i dati sono nell'ordine. Poi tocca «Ho "
-        "inviato gli euro».\n\n⏱ Hai 30 minuti, poi il pagamento si annulla.",
+        "inviato gli euro».\n\n⏱ Hai 30 minuti: se non lo tocchi in tempo, "
+        "l'acquisto salta e rischi di perdere gli euro che hai mandato.",
         "✅ <b>Alan ha ricevuto gli euro:</b> il tuo acquisto è pagato.",
         "❌ <b>Il pagamento in euro è stato annullato:</b> l'acquisto non è "
         "pagato. Se avevi già mandato gli euro, scrivici da Assistenza."],
@@ -215257,15 +215262,34 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           "💶 <b>Manda 5 € a Luca:</b> i dati sono nell'ordine. Poi tocca «Ho "
           "inviato gli euro».",
           tv("garanzia_pagata", "active", "Luca", "5 €", detto=True))
+    prova("...e le due approvate dopo: l'annullo chiesto da chi vende, il "
+          "pagamento fermo", [
+        "↩️ <b>Alan chiede di annullare il pagamento.</b> Se non hai mandato "
+        "gli euro e sei d'accordo, tocca «Annulla il pagamento» nell'ordine; se "
+        "li hai già mandati, tocca «Ho inviato gli euro».",
+        "⚠️ <b>Il pagamento del tuo acquisto si è fermato:</b> i sats restano "
+        "bloccati per te. Scrivici da Assistenza e lo sistemiamo."],
+          [tv("annullo_chiesto", "", "Alan"), tv("payout_fallito", "TIMEOUT", "Alan")])
+    sv = amb["_sollecito_via_euro"]
+    prova("i promemoria degli euro: a meta' tempo, negli ultimi dieci minuti, "
+          "e senza tempo (gli altri restano quelli di sempre)", [
+        "💶 Promemoria: hai ancora 30 minuti per mandare gli euro ad Alan e "
+        "toccare «Ho inviato gli euro». I dati sono nell'ordine.",
+        "⏰ Mancano 10 minuti: hai già mandato gli euro? Tocca subito «Ho "
+        "inviato gli euro» nell'ordine: se non lo tocchi in tempo, l'acquisto "
+        "salta e rischi di perdere gli euro che hai mandato.",
+        "💶 Promemoria: Alan aspetta i tuoi euro. I dati sono nell'ordine: "
+        "mandali e tocca «Ho inviato gli euro».", ""],
+          [sv("euro_tempo1", "Alan", 1800), sv("euro_tempo3", "Alan", 600),
+           sv("euro_sollecito2", "Alan"), sv("fiat_sollecito1", "Alan")])
     prova("...ogni annullo e ritorno nel libro ha la stessa frase; le dispute, "
           "il moderatore e la garanzia non ancora attiva restano quelle di sempre",
-          ([True] * 4, [""] * 5),
+          ([True] * 4, [""] * 4),
           ([tv(m, d).startswith("❌") for m, d in (
               ("annullato", ""), ("annullato", "cooperative"),
               ("tornato", "payment-window-republished"), ("tornato", "taker-timeout"))],
            [tv(m, d) for m, d in (("annullato", "admin"), ("rilasciato", "admin"),
-                                  ("disputa", ""), ("garanzia_pagata", "invoice-next"),
-                                  ("annullo_chiesto", ""))]))
+                                  ("disputa", ""), ("garanzia_pagata", "invoice-next"))]))
     prova("il bottone porta all'ORDINE del mercatino",
           ("📦 Apri l'ordine", "https://barattolo.store/?ordine=77"),
           amb["_bottone_via_euro"](77))
@@ -215306,6 +215330,24 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           "recensire lo scambio", "✅ <b>Alan ha ricevuto gli euro:</b> il tuo "
           "acquisto è pagato.",
           ev_ve("success", "mostro", ORA + 900).get(A, ""))
+    # i promemoria, quando partono: il giudice «tocca ancora a lui» qui
+    # dice sempre si' (non e' lui sotto prova)
+    amb["_sollecito_euro_p2p_fermo"] = lambda c, r: ""
+    for tg, mom in ((A, "euro_sollecito1"), (B, "fiat_sollecito1")):
+        con.execute("INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                    "quando, scade, fonte) VALUES(?,?,0,?,'la frase di sempre',?,?,?)",
+                    (ORDV, mom, tg, ORA, ORA + 1000,
+                     "sollecito_euro" if tg == A else "sollecito"))
+    btn = {}
+    fuori_ve, _ = amb["_scarica_attese_p2p"](con, ORA + 1001, btn)
+    prova("il promemoria degli euro a chi paga in euro ha le parole sue e il "
+          "bottone all'ordine; a chi vende tutto come sempre",
+          [(A, "💶 Promemoria: Alan aspetta i tuoi euro. I dati sono "
+               "nell'ordine: mandali e tocca «Ho inviato gli euro».",
+            ("📦 Apri l'ordine", "https://barattolo.store/?ordine=77")),
+           (B, "la frase di sempre", amb["P2P_BOTTONE_SCAMBIO"])],
+          sorted((t, x, btn.get(i, ("", ""))[0] if t == B else btn.get(i))
+                 for i, (t, x, _f) in enumerate(fuori_ve)))
     con.close()
     # ...e i fili: il legame nasce col deposito, e il bot lo usa per le frasi
     # e per il bottone, sugli eventi e sul recapito
@@ -215316,7 +215358,21 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           and 'via_euro = _testo_via_euro(' in pezzo("_avvisi_evento_p2p")
           and "bottoni[tg] = _bottone_via_euro(n_ve)" in pezzo("_manda_evento_p2p")
           and "esito = await notifica(a_chi, testo, _bottone_via_euro(n_ve))" in srv
-          and 'if n_ve and testo.startswith("💶 "):' in srv)
+          and 'if n_ve and testo.startswith("💶 "):' in srv
+          and "bottoni[len(fuori) - 1] = _bottone_via_euro(n_ve)" in pezzo("_scarica_attese_p2p")
+          and "if _ve:\n                    for tg, _ in avvisi:" in pezzo("_manda_evento_p2p"))
+    # --- «Annulla il pagamento» e i due passi nella schermata (25 nov 2026) ---
+    pas = _fn_js(mini, "function viaEuroPassi(o, gesto){")
+    prova("i due passi approvati, e «Annulla il pagamento» solo con l'annullo "
+          "chiesto da chi vende, che manda il `cancel` senza la pagina dello "
+          "scambio", True,
+          "'1. Manda ' + String(o.euro) + ' € ' + a + nome + ' con i dati qui sotto'"
+          in _fn_js(mini, "function viaEuroPasso1(o, nome){")
+          and "2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in "
+          "tempo, l\\'acquisto salta e rischi di perdere gli euro che hai mandato." in pas
+          and "o.stato === 'annullo_proposto'" in pas and ">Annulla il pagamento</button>" in pas
+          and "await chiamataOrdineP2P(o, 'cancel');" in _fn_js(mini, "async function viaEuroAnnulla(id){")
+          and "o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto'" in _fn_js(mini, "function viaEuroPasso(o){"))
 
 
 def prove_chiedi_al_venditore():

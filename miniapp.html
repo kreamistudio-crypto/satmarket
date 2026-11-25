@@ -85628,7 +85628,10 @@ let viaEuroBattito = null;
 function viaEuroPasso(o){
   if (!o || P2P_FINALI.indexOf(o.stato) >= 0 || o.stato === 'rilasciato') return 'fine';
   if (o.stato === 'euro_inviati') return 'controllo';
-  if (o.stato === 'attivo') return recapitoEuroArrivatoP2P(o) ? 'paga' : 'attesa';
+  /* (25 nov 2026) con l'annullo chiesto da una parte lo scambio e' ancora
+     attivo: si resta sul pagamento, col tasto per accettare */
+  if (o.stato === 'attivo' || o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto')
+    return recapitoEuroArrivatoP2P(o) ? 'paga' : 'attesa';
   if (['prendo', 'attesa_mia_fattura', 'attesa_hold_venditore'].indexOf(o.stato) >= 0) return 'attesa';
   return 'pagina';
 }
@@ -85676,14 +85679,42 @@ function renderViaEuroPasso(){
     return;
   }
   if (passo === 'paga') {
-    if (tit) tit.textContent = 'Manda ' + String(o.euro) + ' € a ' + nome;
-    box.innerHTML = recapitoCompratoreP2P(o)
-      + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')
-      + '<button type="button" class="btn primary" onclick="viaEuroHoPagato()">Ho inviato gli euro</button>';
+    if (tit) tit.textContent = viaEuroPasso1(o, nome);
+    box.innerHTML = viaEuroPassi(o, 'viaEuroHoPagato()');
     return;
   }
   if (tit) tit.textContent = nome + ' sta controllando il pagamento';
   box.innerHTML = '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>';
+}
+/* I DUE PASSI (25 nov 2026, scritte approvate da Andrea: chi paga in euro e'
+   un principiante, e se non tocca il tasto in tempo perde gli euro). Il
+   primo e' il titolo; sotto il recapito e il tempo, poi il secondo e il
+   tasto. Con l'annullo chiesto da chi vende, anche «Annulla il pagamento». */
+function viaEuroPasso1(o, nome){
+  const a = /^[aeiou]/i.test(String(nome || '')) ? 'ad ' : 'a ';
+  return '1. Manda ' + String(o.euro) + ' € ' + a + nome + ' con i dati qui sotto';
+}
+function viaEuroPassi(o, gesto){
+  return recapitoCompratoreP2P(o)
+    + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')
+    + '<div class="via-euro-sotto">2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l\'acquisto salta e rischi di perdere gli euro che hai mandato.</div>'
+    + '<button type="button" class="btn primary" onclick="' + gesto + '">Ho inviato gli euro</button>'
+    + (o.stato === 'annullo_proposto'
+       ? '<button type="button" class="btn ghost" onclick="viaEuroAnnulla(\'' + esc(o.id) + '\')">Annulla il pagamento</button>' : '');
+}
+/* «ANNULLA IL PAGAMENTO»: chi vende ha chiesto di annullare e chi paga in
+   euro accetta, senza passare dalla pagina dello scambio (le sue parole
+   parlano di «scambio»). E' il `cancel` di sempre; il resto lo dice la
+   pagina dell'ordine quando lo scambio risulta annullato. */
+async function viaEuroAnnulla(id){
+  const o = ordiniP2P()[id];
+  if (!o || o.stato !== 'annullo_proposto') return;
+  if (typeof preseChiuseP2P === 'function' && preseChiuseP2P()) { toast(P2P_PRESE_DOMANI); return; }
+  haptic();
+  const rip = attesaP2P('');
+  try { await chiamataOrdineP2P(o, 'cancel'); }
+  catch(e) { diarioP2P('annullo via euro ' + String(id).slice(0, 8) + ': ' + ((e && e.message) || e)); }
+  finally { if (rip) rip(); }
 }
 function viaEuroHoPagato(){
   const id = viaEuroSeguo;
@@ -85726,10 +85757,8 @@ function viaEuroPassoOrdine(p){
   if (passo === 'attesa')
     return {orma, html: '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>'};
   if (passo === 'paga')
-    return {orma, html: '<h4>' + esc('Manda ' + String(p.euro) + ' € a ' + nome) + '</h4>'
-      + recapitoCompratoreP2P(p)
-      + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(p) : '')
-      + '<button type="button" class="btn primary" onclick="viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()">Ho inviato gli euro</button>'};
+    return {orma, html: '<h4>' + esc(viaEuroPasso1(p, nome)) + '</h4>'
+      + viaEuroPassi(p, 'viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()')};
   if (passo === 'controllo')
     return {orma, html: '<h4>' + esc(nome + ' sta controllando il pagamento') + '</h4>'
       + '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>'};
