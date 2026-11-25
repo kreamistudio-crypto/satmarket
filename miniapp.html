@@ -85340,11 +85340,13 @@ let myViaEuro = false;      // il cancello, da /api/me
 let myViaEuroMax = 0;       // il tetto in euro, da /api/me (100)
 let viaEuroSats = 0;        // il totale dell'ordine dell'ultima porta accesa
 let viaEuroLibroTentato = 0;
-/* i metodi di chi compra senza sats: tutti i VELOCI in euro (25 nov 2026,
+/* i metodi di chi compra senza sats: i VELOCI in euro (25 nov 2026,
    Andrea: «Tutti i veloci»; erano solo SEPA Instant e Satispay). I lenti
    no: il deposito dell'oggetto dura 4 ore e un bonifico di giorni lo
-   farebbe scadere; i contanti a distanza non si danno. */
-const VIA_EURO_METODI = ['SEPA Instant', 'Satispay', 'Revolut', 'PayPal'];
+   farebbe scadere; i contanti a distanza non si danno. PAYPAL NO (25 nov
+   sera, Andrea: «leva PayPal»): chi paga puo' contestare settimane dopo
+   e farsi ridare i soldi, coi sats gia' partiti. */
+const VIA_EURO_METODI = ['SEPA Instant', 'Satispay', 'Revolut'];
 /* i metodi che chi compra ha detto di NON avere («Non ho Revolut»): solo
    in memoria, finche' l'app resta aperta */
 let viaEuroNonHo = [];
@@ -85439,7 +85441,7 @@ function payViaEuroVista(sats){
 /* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
    euro interi), e sotto in piccolo da cosa e' fatto. Il metodo si
    sceglie solo se l'offerta ne ha piu' d'uno fra quelli decisi. */
-const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut', 'PayPal': 'PayPal'};
+const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut'};
 let viaEuroScelto = null;   // {id, euro, metodo} dell'offerta mostrata
 let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in memoria
 async function apriViaEuro(dove){
@@ -85659,7 +85661,7 @@ function renderViaEuroPasso(){
     if (tit) tit.textContent = 'Manda ' + String(o.euro) + ' € a ' + nome;
     box.innerHTML = recapitoCompratoreP2P(o)
       + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')
-      + '<button type="button" class="btn primary" onclick="viaEuroHoPagato()">Ho pagato</button>';
+      + '<button type="button" class="btn primary" onclick="viaEuroHoPagato()">Ho inviato gli euro</button>';
     return;
   }
   if (tit) tit.textContent = nome + ' sta controllando il pagamento';
@@ -85709,7 +85711,7 @@ function viaEuroPassoOrdine(p){
     return {orma, html: '<h4>' + esc('Manda ' + String(p.euro) + ' € a ' + nome) + '</h4>'
       + recapitoCompratoreP2P(p)
       + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(p) : '')
-      + '<button type="button" class="btn primary" onclick="viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()">Ho pagato</button>'};
+      + '<button type="button" class="btn primary" onclick="viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()">Ho inviato gli euro</button>'};
   if (passo === 'controllo')
     return {orma, html: '<h4>' + esc(nome + ' sta controllando il pagamento') + '</h4>'
       + '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>'};
