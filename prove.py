@@ -52134,13 +52134,27 @@ def prove_scoprire():
 
     # ---- 4. IL CLIENT: la sezione, il renderer, il gesto.
     # L'ORDINE NUOVO (23 nov 2026, Andrea): «Da scoprire» in testa, poi
-    # «In evidenza», POI le categorie, poi gli scambi P2P e gli strumenti
+    # «In evidenza», POI le categorie e gli strumenti; gli scambi P2P dal
+    # 25 nov 2026 (cantiere fascia-p2p) stanno SOTTO gli strumenti
     prova("la sezione sta in testa, prima di «In evidenza» e delle categorie",
           True, mini.index('id="scoprireSez"') < mini.index('id="evidenzaSez"')
-          < mini.index('id="catSez"') < mini.index('id="p2pVetrinaSez"')
-          < mini.index('<div class="strumenti">'))
+          < mini.index('id="catSez"') < mini.index('<div class="strumenti">')
+          < mini.index('id="p2pVetrinaSez"'))
     prova("...e nasce nascosta: la accendono i flag", True,
           '<div id="scoprireSez" style="display:none">' in mini)
+    # IL FOGLIO DEL MERCATINO (25 nov 2026, cantiere fascia-p2p, Andrea:
+    # le categorie sembravano «una fascia a sé stante», non la testa delle
+    # card che filtrano): dalle categorie alla sentinella tutto sta in
+    # #foglioMerc, e «In evidenza» resta fuori, sopra
+    _f = mini.index('<div id="foglioMerc">')
+    prova("dalle categorie alle card il mercatino sta su un foglio, «In evidenza» fuori",
+          [True, True, True],
+          [mini.index('id="evidenzaSez"') < _f < mini.index('<div id="catSez">')
+           < mini.index('<div class="strumenti">') < mini.index('<div class="grid" id="grid">')
+           < mini.index('<div id="gridSentinella"'),
+           mini.index('<div id="gridSentinella" style="height:1px"></div>\n    </div>\n')
+           < mini.index('id="view-dettaglio"'),
+           "#foglioMerc{margin-top:10px;padding-top:4px;border-radius:26px 26px 0 0;" in mini])
     # il censimento ESATTO dei chiamanti: renderChips (il giro di
     # sempre), toccaScoperta (l'anello prima della rete) e i due rami
     # DEMO del pannello Filtri (dove renderChips non passa).
@@ -52343,10 +52357,13 @@ def prove_scoprire():
     # fa casino con le card»): per qualche ora erano dentro la griglia dopo
     # la sesta card; ora stanno al loro posto di casa, davanti a #grid, e
     # nessuno li sposta piu'
-    _casa = mini[mini.index('<div class="occ-banner" id="occasioniBanner"'):]
+    # ...e dal 25 nov 2026 (cantiere fascia-p2p) stanno con gli altri
+    # filtri, sotto «Più recenti» e «Filtro», PRIMA della fascia P2P
+    _casa = mini.index('<div class="occ-banner" id="occasioniBanner"')
     prova("i banner delle occasioni stanno sopra la griglia e nessuno li sposta",
           (True, 0, 0, 0),
-          (_casa.index('<div class="grid" id="grid">') < 200,
+          (mini.index('<div id="filtriBox"') < _casa < mini.index('<div id="p2pVetrinaSez"')
+           < mini.index('<div class="grid" id="grid">'),
            mini.count("function posaOccasioni("), mini.count("function parcheggiaOccasioni("),
            mini.count("#grid > #occasioniBanner")))
     # IL NEGOZIO DI «DA SCOPRIRE» SALE GIA' PIENO (24 nov 2026, Andrea: «il
@@ -67473,9 +67490,21 @@ def prove_card_p2p_vetrina():
           [False, False, False],
           ["el('grid')" in blocco, "#grid" in blocco, "innestaCardP2P" in mini])
     sez = re.search(r'<div id="p2pVetrinaSez"[^>]*>', mini)
-    prova("la sezione «Scambi P2P» nasce nascosta, sopra gli strumenti della griglia",
+    # SOTTO «Più recenti» e «Filtro», subito prima delle card (25 nov 2026,
+    # cantiere fascia-p2p, Andrea: «Troppo confusionario messo lì»)
+    prova("la sezione «Scambi P2P» nasce nascosta, sotto gli strumenti e il filtro, "
+          "prima della griglia",
           [True, True], [bool(sez) and 'style="display:none"' in sez.group(0),
-                         bool(sez) and sez.start() < mini.index('<div class="strumenti">')])
+                         bool(sez) and mini.index('<div class="strumenti">')
+                         < mini.index('<div id="filtriBox"') < sez.start()
+                         < mini.index('<div class="grid" id="grid">')])
+    # ...in una fascia a se': la luce scende dall'alto (quella di «In
+    # evidenza» sale da sotto) e le card hanno l'ombra profonda
+    prova("...in una fascia a se', con la luce dall'alto e le card sollevate",
+          [True, True, True],
+          ["#p2pVetrinaSez{margin:14px 0 10px;" in mini,
+           "radial-gradient(70% 120px at 50% 0,rgba(247,147,26,.30)" in mini,
+           "#p2pVetrinaSez .p2p-vt-fila .card{box-shadow:0 12px 20px" in mini])
     prova("la griglia disegnata ridisegna la fila (accesa o spenta con la vista)", True,
           "renderVetrinaP2P();" in pezzo_js(mini, "function renderGrid(items){", "\n}\n"))
     # ⚠️ DAI RELAY NIENTE (26 set 2026, ritocco di Andrea a 7ee92f5): la
@@ -67517,6 +67546,16 @@ def prove_card_p2p_vetrina():
     _fc = pezzo_js(mini, "function filaCardP2P(html, spenta){", "\n}\n")
     prova("...e dice il suo stato a chi legge ad alta voce, col nome che c'era gia'", True,
           'role="switch" aria-checked="${spenta ? \'false\' : \'true\'}" aria-label="Scambi P2P nella home"' in _fc)
+    # COL BITCOIN (25 nov 2026, cantiere fascia-p2p, Andrea: «va bene
+    # l'interruttore col Bitcoin»): la moneta ₿ nel pallino, e spenta la
+    # fascia prende `spenta` per stare in mezzo
+    prova("...ed e' l'interruttore col bitcoin, e spenta la fascia sta in mezzo",
+          [True, True, True, True, False],
+          ['class="p2p-vt-btc${spenta ? \'\' : \' su\'}"' in _fc,
+           '<span aria-hidden="true">₿</span></button>' in _fc,
+           "sez.classList[spenta ? 'add' : 'remove']('spenta');" in _fc,
+           "#p2pVetrinaSez.spenta .p2p-vt-testa{padding-top:12px;padding-bottom:12px}" in mini,
+           ".leva-interruttore.piccola" in mini])
     prova("l'interruttore vive in «Aspetto», sotto gli effetti ridotti", True,
           0 < mini.index('<div id="fxRiga"></div>') < mini.index('<div id="filaP2PRiga"></div>')
           < mini.index('id="accIdentita"'))
@@ -67925,7 +67964,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     casa: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="false"')
       && el('p2pVetrinaLeva').innerHTML.includes('onclick="setFilaP2P(true)"'),
     giri: TIMERS.length, leva: el('filaP2PRiga').innerHTML.includes('aria-checked="false"'),
-    timbri: TIMBRATI.slice()};
+    timbri: TIMBRATI.slice(), inMezzo: el('p2pVetrinaSez').classList.contains('spenta')};
   await giro();
   renderVetrinaP2P();
   /* ...e neanche i due ritorni che la chiedono subito: la pagina che torna
@@ -67938,7 +67977,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   setFilaP2P(true);                      // dal «Mostra» della home o dal Profilo: la stessa
   out.riaccesa = {sez: el('p2pVetrinaSez').style.display, guscio: el('p2pVetrinaGuscio').style.display,
     casa: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
-    giri: TIMERS.map(t => t.ms), timbri: TIMBRATI.slice()};
+    giri: TIMERS.map(t => t.ms), timbri: TIMBRATI.slice(),
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta')};
   await giro();
   out.riaccesaChiede = [FETCH.length, FETCH.length ? FETCH[FETCH.length - 1].cache : ''];
   renderVetrinaP2P();                                // accesa: un giro armato fra un minuto
@@ -68151,12 +68191,13 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     prova("...spento: via le card, resta il titolo con l'interruttore spento, nessun giro, "
           "il timbro sul profilo",
           {"sez": "", "guscio": "none", "casa": True, "giri": 0, "leva": True,
-           "timbri": ["p2p_home_via"]},
+           "timbri": ["p2p_home_via"], "inMezzo": True},
           o["spenta2"])
     prova("...e spento non chiede niente al server, nemmeno tornando in Esplora o sulla pagina "
           "(nessun giro si arma)", [0, 0, 0], o["spentaNonChiede"])
     prova("...riacceso (dalla home o dal Profilo): la fila torna e chiede SUBITO la fotografia",
-          {"sez": "", "guscio": "", "casa": True, "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"]},
+          {"sez": "", "guscio": "", "casa": True, "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"],
+           "inMezzo": False},
           o["riaccesa"])
     prova("...senza cache", [1, "no-cache"], o["riaccesaChiede"])
     prova("...spento su un ALTRO dispositivo (il timbro piu' nuovo arriva con /api/me): spento qui",

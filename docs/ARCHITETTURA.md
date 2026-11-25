@@ -7898,6 +7898,18 @@
   Titolo al centro (griglia a tre colonne, «Vedi tutti» a destra). La
   card e' alta 240 px (foto 150x139,5, metodi su una riga coi puntini,
   ⏱ e 🔐 come sole icone accanto alla moneta della rete).
+  Dal 25 nov 2026 (cantiere fascia-p2p) la sezione sta SOTTO gli
+  strumenti («Più recenti», «Filtro», `#filtriBox` e i banner delle
+  occasioni), subito prima di `#mercMappaBox` e della griglia, in una FASCIA a tutta
+  larghezza con la luce arancio dall'alto; l'interruttore e' quello col
+  bitcoin (`.p2p-vt-btc`, moneta ₿ nel pallino), e spenta la sezione
+  prende la classe `spenta` (stesso respiro sopra e sotto la testa):
+  Nello stesso cantiere IL FOGLIO DEL MERCATINO: `#foglioMerc` avvolge
+  tutto da `#catSez` a `#gridSentinella` (categorie, strumenti, banner
+  delle occasioni, fascia P2P, mappa, griglia), un foglio piu' chiaro con
+  gli angoli tondi e il bordo acceso, e i banner `#occasioniBanner` stanno
+  fra `#filtriBox` e la fascia P2P.
+  Cantieri, «La fila Scambi P2P in una fascia a sé».
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
@@ -38674,8 +38686,8 @@ mai il kind 0 di nessuno: regola ferrea 2).
   arancio ferma, disegnata sullo sfondo di `.ev-strip`, al posto delle due
   onde di `ondeEvidenza`, tolte: Cantieri, «La home ripulita», «La luce
   sotto In evidenza» e «La mensola di luce»; sul telefono le sue card sono larghe quanto serve per vederne due e mezza, `calc((100vw - var(--pad) - 20px) / 2.5)`, e sul computer 150: «Il primo schermo del telefono», col calcolo che c'era prima e perché è andato via),
-  `#catSez`, `#lavSez`, `#p2pVetrinaSez`, e sopra la griglia i due banner
-  `#occasioniBanner` (dal 24 nov). A vetrina nuda la griglia salta gli
+  `#catSez`, `#lavSez`, gli strumenti (dal 25 nov dentro `#foglioMerc`, che va da `#catSez` alla griglia), i due banner
+  `#occasioniBanner` (dal 24 nov; dal 25 sotto gli strumenti), `#p2pVetrinaSez` e la griglia. A vetrina nuda la griglia salta gli
   annunci che la fila «In evidenza» sta mostrando (`nellaFilaEvidenza`,
   la stessa domanda di renderEvidenza). Il tocco su un negozio della
   fila (card o quadrato) passa da `apriNegozioDaScoprire`: la pagina sale
