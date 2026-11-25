@@ -14,11 +14,15 @@ il server vecchio.
 | **Il PC di Andrea** (`C:\Users\Andrea\BarattoloBackup\`) | lo specchio di `foto/` e degli ultimi archivi — la seconda gamba, se Telegram non c'è |
 | **GitHub** (repo privato) | tutto il codice, `deploy/` compreso. Si clona e basta |
 
-I sats dell'escrow NON dipendono da niente di tutto questo: LNbits gira
-su Spark (remoto) e la seed sono le 24 parole offline. Ma **senza il
-database non si sa più di chi sono**: i `payment_hash` che legano ogni
-pagamento al suo ordine vivono solo lì. È il motivo per cui questo
-foglio esiste.
+I sats dell'escrow NON stanno su questa macchina: dal set 2026 la
+cassaforte è «nodo», cioè LNbits sul VPS coi soldi sul LND del nodo
+Mostro (il ponte è WireGuard), e si salvano con le 24 parole del nodo e
+il suo SCB (`SE-MUORE.md`, «Il nodo»). (Fino al set 2026 qui c'era
+scritto «LNbits gira su Spark»: non è più vero dal doppio wallet.) Ma
+**senza il database non si sa più di chi sono**: i `payment_hash` che
+legano ogni pagamento al suo ordine vivono solo lì, e nel database di
+LNbits che viaggia nello stesso archivio (`lnbits/`). È il motivo per
+cui questo foglio esiste.
 
 ## La sequenza del disastro
 
@@ -100,6 +104,13 @@ foglio esiste.
 7. **Rimettere il timer dei backup** (vedi `barattolo-backup.service`)
    e la chiave SSH del pull sul server nuovo — il disastro successivo
    non aspetta che ce lo si ricordi.
+8. **LNbits e il ponte verso il nodo**: `lnbits/` dell'archivio in
+   `/opt/lnbits`, `docker compose up -d`; il tunnel WireGuard con una
+   chiave privata NUOVA (quella vecchia non è nell'archivio, apposta) e
+   la pubblica scritta sul nodo (`SE-MUORE.md`, «LNbits»).
+9. **Il battito** (`deploy/battito/`, PRODUZIONE «IL QUADRO DEI SERVIZI
+   E I BATTITI»): senza, il quadro non vede i servizi di questa
+   macchina.
 
 ## Cosa NON si recupera
 
@@ -166,6 +177,8 @@ provata: si rifà il drill, non si lascia la frase sulla fiducia.
 
 ## L'altra macchina
 
+Il piano di tutte le macchine, una riga per servizio, è
+**`SE-MUORE.md`**, accanto a questo.
 Il relay ha il suo foglio: **`RIPRISTINO-RELAY.md`**, accanto a questo.
 ⚠️ Da sapere prima di aprirlo: **la chiave age di Barattolo apre anche
 quello**, mentre il nodo ha la sua — è la confusione che è già costata

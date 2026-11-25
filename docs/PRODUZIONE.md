@@ -1617,6 +1617,69 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   `journalctl -u barattolo --since "-2min" --no-pager | tail -80`.
   SPEGNERLA (emergenza): `SENTINELLA_ATTIVA = False` nel config e
   riavvio.
+- IL QUADRO DEI SERVIZI E I BATTITI (25 nov 2026, cantiere
+  quadro-servizi; il perché in CANTIERI, «Il quadro dei servizi»; il
+  piano «se muore X» in `deploy/SE-MUORE.md`). Il server tiene il quadro
+  (pannello admin, cassetto «🩺 Servizi») e batte da solo per «vps»; le
+  altre macchine battono con `deploy/battito/battito.sh` dal timer
+  `battito.timer` (ogni cinque minuti). Un servizio muto da venti minuti
+  = avviso nella stanza degli errori; il relay guarda il VPS da fuori
+  (`GUARDA_VPS=1`) e grida su Telegram dopo un quarto d'ora.
+  DUE LEVE: `QUADRO_SERVIZI` (di serie True: è l'interruttore
+  d'emergenza) e il segreto `BATTITO_SEGRETO` (vuoto = la rotta non
+  esiste, si vede il solo VPS). Il pannello delle leve dice se la porta
+  è aperta, mai il segreto.
+  L'ORDINE, UN COMANDO ALLA VOLTA, DOPO LA PROMOZIONE:
+  1) IL SEGRETO, sul PC in PowerShell, dritto negli appunti (non si
+  vede, non si incolla in chat):
+  `python -c "import secrets; print(secrets.token_hex(32))" | Set-Clipboard`
+  2) SUL VPS, prima si guarda (deve uscire niente), poi la copia, poi la
+  riga: `grep -n "^BATTITO_SEGRETO" /srv/barattolo/config.py` ·
+  `cp -a /srv/barattolo/config.py /root/config.py.prima-battito` ·
+  `read -s S && printf '\nBATTITO_SEGRETO = "%s"\n' "$S" | sudo tee -a /srv/barattolo/config.py >/dev/null && unset S && grep -c "^BATTITO_SEGRETO" /srv/barattolo/config.py`
+  (deve dire 1), poi `systemctl restart barattolo` e
+  `journalctl -u barattolo --since "2 min ago" --no-pager | grep 🩺` —
+  «Quadro dei servizi: acceso — battiti delle altre macchine APERTI».
+  3) SU OGNI MACCHINA, il file del segreto (stessi appunti del passo 1):
+  `sudo install -d -m 700 /etc/battito /var/lib/battito` e poi
+  `read -s S && printf 'BATTITO_URL="https://barattolo.store/api/battito"\nBATTITO_SEGRETO="%s"\nMACCHINA="VPS"\n' "$S" | sudo tee /etc/battito/battito.conf >/dev/null && sudo chmod 600 /etc/battito/battito.conf && unset S`
+  (`MACCHINA` = VPS, NODO, RELAY o COLLAUDO). Sul NODO una riga in più,
+  perché esce solo da Tor:
+  `printf 'TOR_SOCKS="172.28.1.3:9050"\n' | sudo tee -a /etc/battito/battito.conf >/dev/null`.
+  Sul RELAY l'occhio sul VPS, col Telegram della ronda del relay (il
+  file si legge con la shell, il token non si copia):
+  `printf 'GUARDA_VPS=1\n. /opt/relay/telegram.conf; TG_TOKEN="$BOT_TOKEN"; TG_CHAT="$CHAT_ID"\n' | sudo tee -a /etc/battito/battito.conf >/dev/null`.
+  4) I FILE. Sul VPS dal repo che c'è già:
+  `sudo install -m 755 /srv/barattolo/deploy/battito/battito.sh /usr/local/bin/ && sudo install -m 644 /srv/barattolo/deploy/battito/battito.service /srv/barattolo/deploy/battito/battito.timer /etc/systemd/system/ && sudo install -m 644 /srv/barattolo/deploy/battito/servizi-vps /etc/battito/servizi`.
+  Sulle altre tre dal PC (`cmd /c` conta: il `>` di PowerShell 5.1
+  riscrive i byte in UTF-16), con `servizi-nodo`, `servizi-relay` o
+  `servizi-collaudo` al posto di `servizi-X`:
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `cmd /c "for %f in (battito.sh battito.service battito.timer servizi-X) do git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/battito/%f > %TEMP%\%f"`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\battito.sh $env:TEMP\battito.service $env:TEMP\battito.timer $env:TEMP\servizi-X debian@<macchina>.lnvps.cloud:/tmp/`
+  e sulla macchina:
+  `cd /tmp && sed -i 's/\r$//' battito.sh battito.service battito.timer servizi-X && sh -n battito.sh && sudo install -m 755 battito.sh /usr/local/bin/ && sudo install -m 644 battito.service battito.timer /etc/systemd/system/ && sudo install -m 644 servizi-X /etc/battito/servizi`.
+  5) IL PRIMO GIRO A MANO: `sudo /usr/local/bin/battito.sh` — una riga
+  `battito: vivi relay:200 n8n:200; fermi nessuno`. Accanto al nome il
+  codice del VPS: `404` = manca la riga del passo 2, `403` = segreti
+  diversi, `000` = rete (o Tor, sul nodo). Un servizio fra i «fermi» è
+  un controllo che non passa: si guarda la sua riga in
+  `/etc/battito/servizi` (i nomi dei container e le porte sono quelli
+  attesi, non letti dalla macchina). Sul relay in fondo `battito: VPS ok`.
+  6) IL TIMER: `sudo systemctl daemon-reload && sudo systemctl enable --now battito.timer && systemctl list-timers battito.timer`.
+  Dopo cinque minuti il cassetto 🩺 mostra il servizio verde.
+  TORNARE INDIETRO, su una macchina: `sudo systemctl disable --now battito.timer`
+  (il quadro avvisa dopo venti minuti che tace: è giusto così). Sul VPS,
+  per spegnere tutto: `QUADRO_SERVIZI = False` nel config e riavvio.
+  IL BACKUP DEL RELAY E N8N: `backup-relay.sh` nuovo prende anche
+  `/opt/n8n-barattolo` (database copiato a caldo, `.env` con la chiave).
+  Prima di installarlo, sul RELAY, in sola lettura:
+  `sudo du -sh /opt/n8n-barattolo/dati && sudo find /opt/n8n-barattolo/dati -name '*.sqlite'`
+  (quanto pesa: entra in ogni archivio, e ne restano 14); poi
+  `sudo cp /usr/local/sbin/backup-relay.sh /root/backup-relay.sh.prima-n8n`,
+  il file dal repo come al passo 4, `sudo install -m 755 /tmp/backup-relay.sh /usr/local/sbin/`
+  e un giro a mano, `sudo /usr/local/sbin/backup-relay.sh`: nell'elenco
+  devono comparire `n8n-barattolo/.env` e il suo `.sqlite`.
 - IL COOKIE SUL TUNNEL (10 ott 2026, cantiere cookie-onion): dal `.onion`
   il login reggeva SOLO con Tor Browser, che tratta l'onion come contesto
   sicuro; Chrome, Brave e Vanadium con Orbot scartano un cookie «Secure»

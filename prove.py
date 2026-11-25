@@ -36982,6 +36982,8 @@ _SEGRETI_FINTI = {
     "P2P_FINESTRA_SEGRETO": "SEGRETO-porta-del-tempo-per-pagare",
     # la porta da cui la ronda del nodo chiede i payout (28 set 2026)
     "RONDA_NODO_SEGRETO": "SEGRETO-porta-della-ronda-del-nodo",
+    # la porta dei battiti delle macchine (25 nov 2026, quadro-servizi)
+    "BATTITO_SEGRETO": "SEGRETO-porta-dei-battiti",
     # le quattro chiavi dell'app su X (9 ott 2026, la cassa di
     # risonanza): nel pannello esce il FATTO che ci sono
     "X_API_KEY": "SEGRETO-x-api-key",
@@ -37299,6 +37301,9 @@ def _censimento(acceso, dopo=None):
     amb["URL_PUBBLICO"] = "https://barattolo.store"
     for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
               "eventi_p2p_attivi", "ronda_nodo_attiva", "_leva", "_elenco",
+              # il quadro dei servizi (25 nov 2026): la sua riga CHIAMA
+              # `battito_attivo()`, la trappola del 7 un'altra volta
+              "battito_attivo",
               # il tempo per pagare (18 nov 2026): la riga della porta CHIAMA
               # il suo giudice, la trappola del 7 ancora una volta
               "finestra_p2p_attiva",
@@ -133222,6 +133227,227 @@ def _livelli_dal_sorgente():
     return amb["LIVELLI"]
 
 
+def prove_quadro_servizi():
+    """IL QUADRO DEI SERVIZI (25 nov 2026, cantiere quadro-servizi, Andrea:
+    «un monitor di tutte le applicazioni che abbiamo, in che status sono,
+    che uptime hanno»). Qui i giudici del server su un database di cartone
+    e un orologio finto — il battito, l'uptime, il silenzio detto una
+    volta, l'eta' del backup — la porta dei battiti, e le sentinelle sulle
+    meta' fuori dal server: battito.sh, i file dei servizi delle macchine,
+    il cassetto del pannello e il database di n8n nel backup del relay.
+    Il giro col server vero sta in `collaudo_quadro_servizi`."""
+    import sqlite3
+    import subprocess as _sp
+    import hmac as _hmac
+    import html as _html
+    print("\n[il quadro dei servizi: battiti, uptime, silenzi e la porta]")
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    def amb_con(segreto):
+        amb = {"__builtins__": __builtins__, "HTTPException": _H,
+               "hmac": _hmac, "html": _html}
+        amb["BATTITO_" + "SEGRETO"] = segreto
+        i = _SORGENTE.index("\nSERVIZI_NOTI = (") + 1
+        f = _SORGENTE.index("\ndef _giorni_certificato(", i)
+        exec(_SORGENTE[i:f], amb)
+        exec(pezzo("_servizi_testo_avviso"), amb)
+        return amb
+
+    a = amb_con("")
+    F = a["SERVIZI_FETTA_S"]
+    T0 = 1_800_000_000 // F * F          # l'inizio di una fetta
+    nomi = [s[0] for s in a["SERVIZI_NOTI"]]
+    prova("i nove servizi, nell'ordine del quadro",
+          ["vps", "onion", "lnbits", "nodo", "mostro", "relay", "n8n",
+           "collaudo", "runner"], nomi)
+    prova("un battito ogni cinque minuti, giu' dopo venti (Tor e' lento)",
+          (300, 1200), (F, a["SERVIZI_SILENZIO_S"]))
+
+    def alza(*args):
+        try:
+            a["servizi_battito"](sqlite3.connect(":memory:"), *args)
+            return "passa"
+        except ValueError:
+            return "ValueError"
+    prova("un servizio sconosciuto: ValueError", "ValueError",
+          alza("posta", T0))
+    prova("un nome vuoto: ValueError", "ValueError", alza("", T0))
+    prova("l'eta' del backup negativa: ValueError", "ValueError",
+          alza("relay", T0, -1))
+    prova("...un testo: ValueError", "ValueError", alza("relay", T0, "5"))
+    prova("...un booleano (True e' un int in python): ValueError",
+          "ValueError", alza("relay", T0, True))
+    prova("...oltre il tetto: ValueError", "ValueError",
+          alza("relay", T0, a["SERVIZI_BACKUP_ORE_TETTO"] + 1))
+    prova("un battito buono, col backup: passa", "passa",
+          alza("relay", T0, 5))
+
+    con = sqlite3.connect(":memory:")
+    batti, quadro = a["servizi_battito"], a["servizi_quadro"]
+    q = {r["chiave"]: r for r in quadro(con, T0)}
+    prova("senza battiti tutti «mai», niente uptime", (["mai"] * 9, None),
+          ([r["stato"] for r in q.values()], q["relay"]["uptime"]))
+    # un'ora di battiti (13 fette, da T0 a T0+60 min), poi un'ora di silenzio
+    for k in range(13):
+        batti(con, "relay", T0 + k * F + 7)
+        batti(con, "relay", T0 + k * F + 9)      # il doppione della fetta
+    batti(con, "relay", T0 - 5 * F)               # uno in ritardo, vecchio
+    prova("un battito vecchio arrivato tardi non porta indietro l'ultimo",
+          (T0 - 5 * F, T0 + 12 * F + 9), tuple(con.execute(
+              "SELECT primo, ultimo FROM servizi_stato").fetchone()))
+    con.execute("DELETE FROM servizi_fette WHERE fetta < ?", (T0 // F,))
+    con.execute("UPDATE servizi_stato SET primo=?", (T0 + 7,))
+    prova("due battiti nella stessa fetta contano una volta", 13,
+          con.execute("SELECT COUNT(*) FROM servizi_fette").fetchone()[0])
+    q = {r["chiave"]: r for r in quadro(con, T0 + 12 * F + 60)}
+    prova("battuto da un minuto: su, uptime 100", ("su", 100.0, 51),
+          (q["relay"]["stato"], q["relay"]["uptime"], q["relay"]["da_s"]))
+    prova("...e gli altri restano «mai»", "mai", q["nodo"]["stato"])
+    q = {r["chiave"]: r for r in quadro(con, T0 + 12 * F + 19 * 60)}
+    prova("diciannove minuti di silenzio: ancora su", "su", q["relay"]["stato"])
+    q = {r["chiave"]: r for r in quadro(con, T0 + 12 * F + 21 * 60)}
+    prova("ventuno: giu'", "giu", q["relay"]["stato"])
+    q = {r["chiave"]: r for r in quadro(con, T0 + 25 * F)}
+    prova("13 fette battute su 26: uptime 50", 50.0, q["relay"]["uptime"])
+
+    vecchio = sqlite3.connect(":memory:")
+    for k in range(40 * 288):                     # quaranta giorni pieni
+        batti(vecchio, "nodo", T0 + k * F)
+    q = {r["chiave"]: r for r in quadro(vecchio, T0 + (40 * 288 - 1) * F)}
+    prova("la finestra e' di trenta giorni, e non si va mai oltre 100",
+          100.0, q["nodo"]["uptime"])
+    prova("la potatura toglie le fette oltre la finestra (piu' un giorno)",
+          (40 * 288 - 1) - 31 * 288,
+          a["servizi_pota"](vecchio, T0 + (40 * 288 - 1) * F))
+    prova("...e l'uptime resta quello", 100.0,
+          {r["chiave"]: r for r in quadro(
+              vecchio, T0 + (40 * 288 - 1) * F)}["nodo"]["uptime"])
+
+    # l'eta' del backup cresce col tempo che passa
+    batti(con, "relay", T0 + 30 * F, 5)
+    q = {r["chiave"]: r for r in quadro(con, T0 + 30 * F + 3 * 3600)}
+    prova("backup di 5 ore, detto tre ore fa: 8 ore", (8, False),
+          (q["relay"]["backup_ore"], q["relay"]["backup_vecchio"]))
+    batti(con, "relay", T0 + 31 * F, 49)
+    q = {r["chiave"]: r for r in quadro(con, T0 + 31 * F)}
+    prova("oltre le 48 ore: vecchio", (49, True),
+          (q["relay"]["backup_ore"], q["relay"]["backup_vecchio"]))
+    batti(con, "relay", T0 + 32 * F)
+    q = {r["chiave"]: r for r in quadro(con, T0 + 32 * F)}
+    prova("un battito SENZA backup non cancella l'ultima eta' detta", 49,
+          q["relay"]["backup_ore"])
+
+    # il silenzio si dice una volta, e il ritorno una volta
+    av = a["servizi_da_avvisare"]
+    con2 = sqlite3.connect(":memory:")
+    batti(con2, "n8n", T0)
+    prova("battuto adesso: niente da dire", [], av(con2, T0 + 60))
+    prova("muto da 21 minuti: un avviso «giu»", [("n8n", "n8n", "giu", 21)],
+          av(con2, T0 + 21 * 60))
+    prova("...e al giro dopo niente: una volta sola", [],
+          av(con2, T0 + 26 * 60))
+    batti(con2, "n8n", T0 + 30 * 60)
+    prova("torna a battere: un avviso «su»", [("n8n", "n8n", "su", 0)],
+          av(con2, T0 + 30 * 60))
+    prova("...una volta sola anche questo", [], av(con2, T0 + 31 * 60))
+    prova("chi non ha mai battuto non e' giu': non e' installato", [],
+          [x for x in av(con2, T0 + 99 * 60) if x[0] != "n8n"])
+    prova("l'avviso dice il nome e da quanto, e dove guardare", True,
+          all(x in a["_servizi_testo_avviso"]("n8n", "n8n", "giu", 21)
+              for x in ("n8n", "21 minuti", "SE-MUORE")))
+    prova("...un nome passa da html.escape", True,
+          "&lt;b&gt;" in a["_servizi_testo_avviso"]("x", "<b>", "su", 0))
+
+    # LA PORTA
+    def porta(segreto, header):
+        try:
+            amb_con(segreto)["_porta_battito"](header)
+            return 200
+        except _H as e:
+            return e.code
+    vero = "battito-" + "finto"
+    prova("senza segreto la rotta non esiste (404)", 404,
+          porta("", "Bearer " + vero))
+    prova("col segnaposto la rotta non esiste (404)", 404,
+          porta("INCOLLA_QUI_UN_SEGRETO_CASUALE", "Bearer x"))
+    prova("segreto sbagliato: 403", 403, porta(vero, "Bearer altro"))
+    prova("senza Bearer: 403", 403, porta(vero, vero))
+    prova("un header non ASCII: 403, non un'esplosione", 403,
+          porta(vero, "Bearer caffè"))
+    prova("il segreto giusto passa", 200, porta(vero, "Bearer " + vero))
+    rotta = _SORGENTE[_SORGENTE.index('@app.post("/api/battito")'):]
+    rotta = rotta[:rotta.index("\n\n\n")]
+    prova("la rotta passa dalla porta PRIMA di leggere il corpo", True,
+          rotta.index("_porta_battito(") < rotta.index("await req.json()"))
+    prova("...un corpo che non e' un oggetto e' un 400, non un'esplosione",
+          True, "isinstance(d, dict)" in rotta)
+    adm = _SORGENTE[_SORGENTE.index('@app.get("/api/admin/servizi")'):]
+    adm = adm[:adm.index("\n\n\n")]
+    prova("il quadro e' solo per gli admin", True,
+          "e_admin(user[\"id\"])" in adm and "403" in adm)
+    prova("il pannello delle leve dice se la porta e' aperta, mai il segreto",
+          True, '"BATTITO_SEGRETO", battito_attivo(),' in _SORGENTE)
+    prova("il segreto non si cambia dal pannello", True,
+          '"BATTITO_SEGRETO",' in _SORGENTE[
+              _SORGENTE.index("LEVE_MAI_DAL_PANNELLO = frozenset({"):
+              _SORGENTE.index("})", _SORGENTE.index(
+                  "LEVE_MAI_DAL_PANNELLO = frozenset({"))])
+    giro = pezzo("orologio_servizi")
+    prova("i certificati non si chiedono in collaudo (niente rete)", True,
+          "not MODALITA_COLLAUDO" in giro)
+    prova("gli avvisi vanno nella stanza degli errori", True,
+          giro.count('argomento="errori"') == 2)
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+    prova("config_esempio dichiara il segreto col segnaposto e la leva "
+          "accesa", True,
+          '\nBATTITO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"\n' in esempio
+          and "\nQUADRO_SERVIZI = True\n" in esempio)
+
+    # LE META' FUORI DAL SERVER
+    cartella = os.path.join(QUI, "deploy", "battito")
+    nei_file = set()
+    for nome in sorted(os.listdir(cartella)):
+        if nome.startswith("servizi-"):
+            for r in open(os.path.join(cartella, nome), encoding="utf-8"):
+                r = r.strip()
+                if r and not r.startswith("#"):
+                    prova(f"{nome}: tre campi separati da | ({r[:20]}…)", 3,
+                          len(r.split("|")))
+                    nei_file.add(r.split("|")[0])
+    prova("ogni nome nei file delle macchine e' un servizio noto", [],
+          sorted(nei_file - set(nomi)))
+    prova("ogni servizio noto ha la sua riga su una macchina", [],
+          sorted(set(nomi) - nei_file))
+    sh = open(os.path.join(cartella, "battito.sh"), encoding="utf-8").read()
+    try:
+        r = _sp.run(["sh", "-n", os.path.join(cartella, "battito.sh")],
+                    capture_output=True, timeout=20)
+        prova("battito.sh: la sintassi della shell regge", 0, r.returncode)
+    except (OSError, _sp.SubprocessError) as e:
+        salta("battito.sh: sh -n", f"niente shell ({e})")
+    manda = sh[sh.index("manda() {"):sh.index("\n}\n", sh.index("manda() {"))]
+    prova("il segreto va a curl da stdin (-K -), mai negli argomenti", True,
+          "-K -" in manda and "Authorization: Bearer" in manda
+          and "BATTITO_SEGRETO" not in manda[manda.index("| curl"):])
+    prova("l'occhio sul VPS grida al terzo giro, e il conto non avanza "
+          "se Telegram non parte", True,
+          '[ "$ora" -eq 3 ]' in sh and "|| exit 1   # il conto non avanza" in sh)
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    prova("il cassetto 🩺 Servizi c'e' e il pannello lo chiede", True,
+          "function boxServizi()" in mini and "${boxServizi()}" in mini
+          and "`${API_BASE}/admin/servizi`" in mini)
+    relay = open(os.path.join(QUI, "deploy", "relay", "backup-relay.sh"),
+                 encoding="utf-8").read()
+    prova("il backup del relay prende n8n, e si ferma senza il suo "
+          "database", True,
+          "N8N=/opt/n8n-barattolo" in relay
+          and "n8n senza database nell'archivio: mi fermo" in relay
+          and "n8n-barattolo/.env" in relay)
+
+
 def _ronda_nodo_modulo():
     """deploy/nodo/ronda-pagamenti.py caricato come modulo: e' solo
     stdlib, e il suo main() non parte all'import."""
@@ -187922,7 +188148,9 @@ def prove_canale_admin():
           # (23 nov 2026, promozioni) la promozione pagata che non si
           # applica negli errori; la promozione comprata e il /promossi
           # di un admin (tolta o rimborsata) nei riepiloghi
-          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 39,
+          # (25 nov 2026, quadro-servizi) il servizio che tace o torna, e
+          # il certificato vicino alla scadenza: negli errori
+          {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 41,
            "liquidita": 5, "moderazione": 28, "riepiloghi": 30}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
@@ -187991,7 +188219,8 @@ def prove_canale_admin():
           "promozione comprata, quella pagata che non si applica, il "
           "/promossi di un admin e la pagina dedicata da preparare; e il "
           "nome e la foto scelti da approvare; e la pagina collegata a un "
-          "negozio dal pannello)", 125,
+          "negozio dal pannello; dal 25 nov il servizio del quadro che tace "
+          "o torna, e il certificato vicino alla scadenza)", 127,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -223312,7 +223541,7 @@ CATEGORIE = {
     audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto
     """.split(),
     "infrastruttura": """
-    categorie_delle_prove widget_prova widget_ordini
+    categorie_delle_prove widget_prova widget_ordini quadro_servizi
     nome_nostr initdata portachiavi piu_account_ovunque
     pallino_altri_account account_doppio login_dal_bot
     dizionari_nel_loop logout_apk logout_apk_due nome_da_nostr
@@ -224427,6 +224656,7 @@ def main():
               prove_relay_chiavi,
               prove_p2p_sconto,
               prove_ronda_nodo,
+              prove_quadro_servizi,
               prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,
