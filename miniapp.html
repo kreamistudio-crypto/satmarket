@@ -2849,7 +2849,9 @@
      card degli scambi P2P, sono troppo lunghe rispetto alle altre»):
      erano mezza fila (173 px a 390), adesso 150 come la fila di sopra */
   .p2p-vt-fila .card{flex:0 0 150px;width:150px}
-  /* IL TITOLO AL CENTRO, «Vedi tutti» a destra (24 nov 2026, cantiere
+  /* (dal 26 nov 2026 il titolo della fascia P2P sta a sinistra: vedi LA
+     LUCE DI LATO E LA LAMPADINA; la griglia qui sotto resta la base)
+     IL TITOLO AL CENTRO, «Vedi tutti» a destra (24 nov 2026, cantiere
      home-card-pulite): tre colonne, quella di sinistra vuota, cosi' il
      titolo con l'interruttore sta in mezzo alla riga e non si sposta col
      numero delle card. A 320 px la colonna di destra si allarga quanto
@@ -2871,11 +2873,40 @@
      filo di luce sul bordo di sopra e un'ombra leggera ai due bordi. Le
      card hanno l'ombra profonda delle card in evidenza. Spenta, restano
      titolo e interruttore dentro la stessa luce. Uguale nei due temi. */
-  #p2pVetrinaSez{margin:14px 0 10px;
-    background:radial-gradient(70% 120px at 50% 0,rgba(247,147,26,.30),rgba(247,147,26,0) 100%),
-      linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.18));
+  /* LA LUCE DI LATO E LA LAMPADINA (26 nov 2026 notte, cantiere
+     luce-p2p; Andrea, fra quattro stili nuovi «la 4 è bellissima», poi
+     «quando lo accendi si colora in arancio anche verso destra», «fluido
+     il movimento del colore che si espande», «non un pannello di luce
+     netto […] ma come se fosse una lampadina che si accende», e fra due
+     video «l2»). Titolo a SINISTRA, «Vedi tutti» a destra. La fascia ha
+     sempre una luce arancio che entra dall'angolo in alto a sinistra;
+     ACCESA, sopra si posano la luce dall'alto di prima (`::before`) e il
+     filo e le ombre ai bordi (`::after`). Quando si accende con un tocco
+     (`si-accende`, la mette `filaCardP2P` solo nel passaggio da chiusa
+     ad aperta: mai all'apertura della pagina ne' tornando in Esplora) la
+     luce dall'alto nasce piccola vicino al titolo e si allarga sfumata su
+     tutta la fascia in poco piu' di un secondo; e' piu' larga della
+     fascia (-40% ai lati) e sfuma a zero prima dei suoi bordi, cosi'
+     mentre cresce non mostra mai uno spigolo. Con gli effetti ridotti
+     niente movimento: la regola universale toglie l'animazione e resta
+     la luce accesa. */
+  #p2pVetrinaSez{margin:14px 0 10px;position:relative;isolation:isolate;overflow:hidden;
+    background:radial-gradient(70% 160px at 0 0,rgba(247,147,26,.34),rgba(247,147,26,0) 100%)}
+  #p2pVetrinaSez > *{position:relative;z-index:1}
+  #p2pVetrinaSez:not(.spenta)::before{content:"";position:absolute;top:0;bottom:0;left:-40%;right:-40%;
+    z-index:0;pointer-events:none;
+    background:radial-gradient(50% 120px at 50% 0,rgba(247,147,26,.26),rgba(247,147,26,0) 100%)}
+  #p2pVetrinaSez:not(.spenta)::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.18));
     box-shadow:inset 0 1px 0 rgba(247,147,26,.25)}
-  #p2pVetrinaSez .p2p-vt-testa{padding-top:14px}
+  #p2pVetrinaSez.si-accende::before{transform-origin:28% 0;
+    animation:p2pLuceDiffonde 1.1s cubic-bezier(.25,.7,.3,1) both}
+  #p2pVetrinaSez.si-accende::after{animation:p2pLuceVela .9s ease-out both}
+  @keyframes p2pLuceDiffonde{0%{opacity:0;transform:scale(.35,.7)}35%{opacity:.9}100%{opacity:1;transform:none}}
+  @keyframes p2pLuceVela{from{opacity:0}to{opacity:1}}
+  #p2pVetrinaSez .p2p-vt-testa{display:flex;align-items:center;gap:10px;padding-top:14px}
+  #p2pVetrinaSez .p2p-vt-titolo .section-label{font-size:13px}
+  #p2pVetrinaSez .p2p-vt-tutti{margin-left:auto}
   #p2pVetrinaSez .p2p-vt-fila{padding-top:12px;padding-bottom:22px}
   #p2pVetrinaSez .p2p-vt-fila .card{box-shadow:0 12px 20px rgba(0,0,0,.42),0 3px 6px rgba(0,0,0,.25)}
   /* spenta: lo stesso respiro sopra e sotto, titolo e interruttore in
@@ -117611,7 +117642,20 @@ function filaCardP2P(html, spenta, attesa){
   /* spenta, la fascia resta col solo titolo: `spenta` le da' lo stesso
      respiro sopra e sotto, cosi' titolo e interruttore stanno in mezzo
      (25 nov 2026, cantiere fascia-p2p) */
+  /* la lampadina (26 nov 2026, cantiere luce-p2p): solo nel passaggio da
+     chiusa ad aperta di una fascia gia' sulla pagina, cioe' dopo un tocco
+     sull'interruttore (o le card che arrivano dopo il tocco) */
+  const siAccende = !chiusa && sez.classList.contains('spenta');
   sez.classList[chiusa ? 'add' : 'remove']('spenta');
+  if (chiusa) sez.classList.remove('si-accende');
+  if (siAccende) {
+    sez.classList.add('si-accende');
+    /* via a luce ferma (la fine della luce dall'alto, la piu' lunga), cosi'
+       un ritorno in Esplora non la riaccende; niente timer */
+    sez.onanimationend = e => {
+      if (e.pseudoElement === '::before') sez.classList.remove('si-accende');
+    };
+  }
   /* l'interruttore si riscrive intero: lo stato sta tutto nel markup.
      Dal 25 nov 2026 e' quello COL BITCOIN (`p2p-vt-btc`, Andrea fra
      quattro prove: «va bene l'interruttore col Bitcoin»): il pallino e'

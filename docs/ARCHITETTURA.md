@@ -7925,6 +7925,16 @@
   gli angoli tondi e il bordo acceso, e i banner `#occasioniBanner` stanno
   fra `#filtriBox` e la fascia P2P.
   Cantieri, «La fila Scambi P2P in una fascia a sé».
+  Dal 26 nov 2026 (cantiere luce-p2p) il titolo della fascia sta A
+  SINISTRA (flex, «Vedi tutti» spinto a destra) e la luce arancio entra
+  da sinistra; accesa, `::before` colora tutta la fascia e `::after` porta
+  filo e velature. Nel SOLO passaggio da chiusa ad aperta di una fascia
+  gia' sulla pagina `filaCardP2P` mette `si-accende`: la luce cresce da
+  `transform-origin:28% 0` come una lampadina (il `::before` e' piu'
+  largo della fascia, -40% ai lati, cosi' crescendo non mostra spigoli) e
+  la classe se ne va su `animationend` del `::before`, senza timer. Non
+  parte all'apertura della pagina ne' al ritorno in Esplora; con gli
+  effetti ridotti niente animazione. Cantieri, «La luce di lato e la lampadina».
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·

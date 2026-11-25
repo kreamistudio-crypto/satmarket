@@ -67586,8 +67586,25 @@ def prove_card_p2p_vetrina():
     prova("...in una fascia a se', con la luce dall'alto e le card sollevate",
           [True, True, True],
           ["#p2pVetrinaSez{margin:14px 0 10px;" in mini,
-           "radial-gradient(70% 120px at 50% 0,rgba(247,147,26,.30)" in mini,
+           "radial-gradient(50% 120px at 50% 0,rgba(247,147,26,.26)" in mini,
            "#p2pVetrinaSez .p2p-vt-fila .card{box-shadow:0 12px 20px" in mini])
+    # LA LUCE DI LATO E LA LAMPADINA (26 nov 2026, cantiere luce-p2p,
+    # Andrea: «come se fosse una lampadina che si accende», poi «l2»): la
+    # luce di lato sempre, quella dall'alto solo accesa, e il movimento
+    # solo nel passaggio da chiusa ad aperta, tolto a fine animazione
+    # senza timer; il titolo a sinistra
+    _fc2 = pezzo_js(mini, "function filaCardP2P(html, spenta, attesa){", "\n}\n")
+    prova("...con la luce di lato, e accesa la lampadina che si diffonde",
+          [True, True, True, True, True, True, False],
+          ["background:radial-gradient(70% 160px at 0 0,rgba(247,147,26,.34)" in mini,
+           "#p2pVetrinaSez:not(.spenta)::before{" in mini,
+           "#p2pVetrinaSez.si-accende::before{transform-origin:28% 0;" in mini,
+           "const siAccende = !chiusa && sez.classList.contains('spenta');" in _fc2
+           and _fc2.index("const siAccende") < _fc2.index("sez.classList[chiusa ? 'add' : 'remove']('spenta');")
+           < _fc2.index("if (chiusa) sez.classList.remove('si-accende');") < _fc2.index("if (siAccende) {"),
+           "if (e.pseudoElement === '::before') sez.classList.remove('si-accende');" in _fc2,
+           "#p2pVetrinaSez .p2p-vt-tutti{margin-left:auto}" in mini,
+           "setTimeout" in _fc2])
     prova("la griglia disegnata ridisegna la fila (accesa o spenta con la vista)", True,
           "renderVetrinaP2P();" in pezzo_js(mini, "function renderGrid(items){", "\n}\n"))
     # ⚠️ DAI RELAY NIENTE (26 set 2026, ritocco di Andrea a 7ee92f5): la
@@ -67878,6 +67895,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   await giro();
   out.cambiFila = [p2pCambiPub['0b0e7c3e-1111-4222-8333-444455556666'], 'f7' in p2pCambiPub];
   out.fila = {display: el('p2pVetrinaSez').style.display, card: conta(),
+              luce: el('p2pVetrinaSez').classList.contains('si-accende'),
               conta: el('p2pVetrinaConta').textContent, fetch: FETCH.length,
               url: FETCH[0] && FETCH[0].url, metodo: FETCH[0] && FETCH[0].metodo,
               auth: FETCH[0] && FETCH[0].h['X-Tg-Init-Data'], volto: p2pFacce.f7 && p2pFacce.f7.nome,
@@ -68062,7 +68080,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   out.riaccesa = {sez: el('p2pVetrinaSez').style.display, guscio: el('p2pVetrinaGuscio').style.display,
     casa: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
     giri: TIMERS.map(t => t.ms), timbri: TIMBRATI.slice(),
-    inMezzo: el('p2pVetrinaSez').classList.contains('spenta')};
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'),
+    luce: el('p2pVetrinaSez').classList.contains('si-accende')};
   await giro();
   out.riaccesaChiede = [FETCH.length, FETCH.length ? FETCH[FETCH.length - 1].cache : ''];
   renderVetrinaP2P();                                // accesa: un giro armato fra un minuto
@@ -68091,7 +68110,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   const fascia = () => ({sez: el('p2pVetrinaSez').style.display,
     guscio: el('p2pVetrinaGuscio').style.display,
     acceso: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
-    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'), card: conta()});
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'), card: conta(),
+    luce: el('p2pVetrinaSez').classList.contains('si-accende')});
   out.primoSpenta = fascia();
   setFilaP2P(true);
   out.primoTocco = fascia();
@@ -68251,7 +68271,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           "sessione, i volti nella cache, e il giro dopo a un minuto",
           {"display": "", "card": 6, "conta": "6", "fetch": 1, "url": "/api/p2p/libro",
            "metodo": "GET", "auth": "INIT", "volto": "Luca", "prossimo": [True],
-           "primaCard": "f7"}, o["fila"])
+           "primaCard": "f7", "luce": False}, o["fila"])
     prova("(28 set 2026) ...il volto della fotografia entra nella cache unica e nella card; "
           "gli altri restano la sagoma: senza `miei` nessuno e' «?»",
           ["Luca", False, 5, True], o["voltiFila"])
@@ -68311,7 +68331,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           "(nessun giro si arma)", [0, 0, 0], o["spentaNonChiede"])
     prova("...riacceso (dalla home o dal Profilo): la fila torna e chiede SUBITO la fotografia",
           {"sez": "", "guscio": "", "casa": True, "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"],
-           "inMezzo": False},
+           "inMezzo": False, "luce": True},
           o["riaccesa"])
     prova("...senza cache", [1, "no-cache"], o["riaccesaChiede"])
     prova("...spento su un ALTRO dispositivo (il timbro piu' nuovo arriva con /api/me): spento qui",
@@ -68324,10 +68344,10 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     # sparisce mentre le card arrivano, e arrivano in un colpo solo
     prova("IL PRIMO TOCCO a fascia spenta e fotografia mai chiesta: la fascia resta "
           "com'era, con l'interruttore gia' acceso, e le card arrivano col giro",
-          [{"sez": "", "guscio": "none", "acceso": False, "inMezzo": True, "card": 0},
-           {"sez": "", "guscio": "none", "acceso": True, "inMezzo": True, "card": 0},
+          [{"sez": "", "guscio": "none", "acceso": False, "inMezzo": True, "card": 0, "luce": False},
+           {"sez": "", "guscio": "none", "acceso": True, "inMezzo": True, "card": 0, "luce": False},
            {"sez": "", "guscio": "", "acceso": True, "inMezzo": False, "card": 1,
-            "chiesto": 1}],
+            "chiesto": 1, "luce": True}],
           [o["primoSpenta"], o["primoTocco"], o["primoArrivo"]])
     prova("...e se la fotografia torna vuota la fascia se ne va, come sempre",
           ["", "none"], [o["primoVuotoAttesa"], o["primoVuoto"]])
