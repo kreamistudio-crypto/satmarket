@@ -44538,6 +44538,25 @@ def prove_seo():
     ds = pezzo_js(testo_mini, "async function doSearch(){", "\n}\n")
     prova("cercare spegne il reparto", True,
           "if (q && activeCat !== 'Tutto') spegniReparto();" in ds)
+    # L'INVIO PORTA AI RISULTATI (25 nov 2026, cantiere scatti-home,
+    # Andrea: «in automatico l'app dovrebbe scorrere verso il basso e
+    # mostrarmi ciò che ha trovato»): la bandierina dello scaffale, armata
+    # SOLO con una query (dopo il ritorno del campo vuoto), in demo DOPO
+    # il disegno e coi dati vivi PRIMA della domanda — la consuma il primo
+    # renderGrid coi risultati
+    _i_vuoto = ds.find("if (!q) {")
+    _f_vuoto = ds.find("\n  }\n", _i_vuoto)
+    _i_demo = ds.find("if (DEMO) {\n    /* In demo non c'è nessun server")
+    _f_demo = ds.find("\n  }\n", _i_demo)
+    prova("l'invio con una query porta ai risultati: in demo dopo il disegno, "
+          "coi dati vivi prima della domanda, a campo vuoto no",
+          [True, True, True],
+          [0 < _f_vuoto < _i_demo
+           and "armaScrollReparto" not in ds[:_f_vuoto],
+           "renderGrid();\n    armaScrollReparto(true);\n    return;"
+           in ds[_i_demo:_f_demo],
+           0 < _f_demo < ds.find("armaScrollReparto(true);", _f_demo)
+           < ds.find("loadListings()", _f_demo)])
     sr = pezzo_js(testo_mini, "function spegniReparto(){", "\n}\n")
     # NIENTE setCat qui dentro: ricaricherebbe la prima pagina intera
     # in GARA con la fetch dei risultati — vincerebbe chi arriva
@@ -67570,7 +67589,7 @@ def prove_card_p2p_vetrina():
           ['<span id="p2pVetrinaLeva"' in _testa,
            _testa.index('Scambi P2P <span class="conta"') < _testa.index('id="p2pVetrinaLeva"'),
            'p2pVetrinaVia' in mini])
-    _fc = pezzo_js(mini, "function filaCardP2P(html, spenta){", "\n}\n")
+    _fc = pezzo_js(mini, "function filaCardP2P(html, spenta, attesa){", "\n}\n")
     prova("...e dice il suo stato a chi legge ad alta voce, col nome che c'era gia'", True,
           'role="switch" aria-checked="${spenta ? \'false\' : \'true\'}" aria-label="Scambi P2P nella home"' in _fc)
     # COL BITCOIN (25 nov 2026, cantiere fascia-p2p, Andrea: «va bene
@@ -67580,7 +67599,7 @@ def prove_card_p2p_vetrina():
           [True, True, True, True, False],
           ['class="p2p-vt-btc${spenta ? \'\' : \' su\'}"' in _fc,
            '<span aria-hidden="true">₿</span></button>' in _fc,
-           "sez.classList[spenta ? 'add' : 'remove']('spenta');" in _fc,
+           "sez.classList[chiusa ? 'add' : 'remove']('spenta');" in _fc,
            "#p2pVetrinaSez.spenta .p2p-vt-testa{padding-top:12px;padding-bottom:12px}" in mini,
            ".leva-interruttore.piccola" in mini])
     prova("l'interruttore vive in «Aspetto», sotto gli effetti ridotti", True,
@@ -68022,6 +68041,36 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   myTgId = null; renderVetrinaP2P();
   out.anonimoLeva = el('filaP2PRiga').innerHTML.includes('questo dispositivo');
   myTgId = 111;
+  /* IL PRIMO TOCCO (25 nov 2026, cantiere scatti-home, dal video di
+     Andrea): l'app aperta con la fascia SPENTA non ha mai chiesto la
+     fotografia, e al primo tocco la fascia senza card spariva tutta per
+     il tempo della domanda. In attesa resta com'era — in mezzo, senza
+     guscio — con l'interruttore gia' acceso; le card arrivano col giro */
+  HINT = {p2p_home_su: 1000, p2p_home_via: 2000};
+  TIMERS.length = 0; p2pVetrinaTimer = null; FETCH.length = 0;
+  p2pVetrinaFoto = null; p2pVetrinaFirma = null;
+  renderVetrinaP2P();
+  const fascia = () => ({sez: el('p2pVetrinaSez').style.display,
+    guscio: el('p2pVetrinaGuscio').style.display,
+    acceso: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'), card: conta()});
+  out.primoSpenta = fascia();
+  setFilaP2P(true);
+  out.primoTocco = fascia();
+  await giro();
+  out.primoArrivo = Object.assign(fascia(), {chiesto: FETCH.length});
+  /* ...e se la fotografia torna VUOTA la regola resta quella di sempre:
+     senza card la fascia se ne va */
+  HINT = {p2p_home_su: 1000, p2p_home_via: 2000};
+  TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaFoto = null; p2pVetrinaFirma = null;
+  renderVetrinaP2P();
+  const fotoPiena = FOTO;
+  FOTO = {eventi: [], quando: ADESSO};
+  setFilaP2P(true);
+  out.primoVuotoAttesa = el('p2pVetrinaSez').style.display;
+  await giro();
+  out.primoVuoto = el('p2pVetrinaSez').style.display;
+  FOTO = fotoPiena; HINT = {};
   out.relay = LOG.filter(x => x.startsWith('RELAY')).concat(ALLOG.filter(x => x.startsWith('RELAY')));
   out.frecce = [FRECCE.length, [...new Set(FRECCE)]];
   process.stdout.write(JSON.stringify(out));
@@ -68233,6 +68282,17 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     prova("...chi la fila non la vedrebbe non vede ne' l'interruttore ne' la sezione", ["", "none"],
           o["nonLaVede"])
     prova("...e per chi non e' entrato la scelta vale su questo dispositivo", True, o["anonimoLeva"])
+    # IL PRIMO TOCCO (25 nov 2026, cantiere scatti-home): la fascia non
+    # sparisce mentre le card arrivano, e arrivano in un colpo solo
+    prova("IL PRIMO TOCCO a fascia spenta e fotografia mai chiesta: la fascia resta "
+          "com'era, con l'interruttore gia' acceso, e le card arrivano col giro",
+          [{"sez": "", "guscio": "none", "acceso": False, "inMezzo": True, "card": 0},
+           {"sez": "", "guscio": "none", "acceso": True, "inMezzo": True, "card": 0},
+           {"sez": "", "guscio": "", "acceso": True, "inMezzo": False, "card": 1,
+            "chiesto": 1}],
+          [o["primoSpenta"], o["primoTocco"], o["primoArrivo"]])
+    prova("...e se la fotografia torna vuota la fascia se ne va, come sempre",
+          ["", "none"], [o["primoVuotoAttesa"], o["primoVuoto"]])
     prova("L'ANONIMO chiede la fotografia senza initData", [1, False], o["anonimo"])
     prova("LEVA SPENTA SUL SERVER (fotografia vuota): la fila sparisce",
           {"display": "none", "card": 0}, o["serverSpento"])
@@ -144499,7 +144559,8 @@ function nuovaImg(attr){
     dataset: {src: (attr.match(/data-src="([^"]*)"/) || [])[1] || ''},
     arrivata: !!src, attr};
   im.classList = {contains: c => im._cls.has(c),
-    toggle: (c, si) => { if (si) im._cls.add(c); else im._cls.delete(c); }};
+    toggle: (c, si) => { if (si) im._cls.add(c); else im._cls.delete(c); },
+    remove: (...cs) => cs.forEach(c => im._cls.delete(c))};
   im.getAttribute = n => n === 'src' ? (im._src || null) : null;
   Object.defineProperty(im, 'src', {get: () => im._src,
     set: v => { im._src = v; richieste.push(v); }});
@@ -144833,6 +144894,38 @@ caso('lo scorrimento', () => {
   giro();
   dice('...e il giro ricomincia: il primo rientra dall alto',
        ['attivo+entra', '-', 'esce'], classi());
+});
+
+/* LA CORSA FINITA SE NE VA (25 nov 2026, cantiere scatti-home, dal video
+   di Andrea): la home esce di scena con display:none a ogni card aperta,
+   e al ritorno il browser rigioca ogni animazione rimasta attaccata —
+   l ultima corsa si rivedeva intera. Gli ascoltatori sono quelli SCRITTI
+   SULL IMMAGINE dalla card, eseguiti come li eseguirebbe il browser
+   (this = l immagine): finita o interrotta, la corsa toglie le sue
+   classi, e il passaggio dopo corre come sempre. */
+const ascolta = (im, ev) => {
+  const m = im.attr.match(new RegExp('\\s' + ev + '="([^"]*)"'));
+  if (m) (function(codice){ eval(codice); }).call(im, m[1]);
+  return !!m;
+};
+caso('la corsa finita se ne va', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  rifai(); giro(); arrivano(); giro();
+  dice('una corsa: il primo esce e il secondo entra',
+       ['esce', 'attivo+entra', '-'], classi());
+  const im = immaginiCard();
+  dice('ogni logo ascolta la fine e l interruzione della sua corsa',
+       [true, true, true, true], [ascolta(im[0], 'onanimationend'),
+       ascolta(im[1], 'onanimationend'), ascolta(im[2], 'onanimationend'),
+       ascolta(im[2], 'onanimationcancel')]);
+  dice('...e finita la corsa le classi se ne vanno: al ritorno niente da rigiocare',
+       ['-', 'attivo', '-'], classi());
+  arrivano(); giro();
+  dice('il passaggio dopo corre come sempre', ['-', 'esce', 'attivo+entra'],
+       classi());
+  ascolta(im[1], 'onanimationcancel'); ascolta(im[2], 'onanimationcancel');
+  dice('...e una corsa interrotta a meta (la card che si apre) non resta attaccata',
+       ['-', '-', 'attivo'], classi());
 });
 
 /* SI MUOVE SOLO SE SI VEDE (set 2026, ritocco di Andrea): con meno di
