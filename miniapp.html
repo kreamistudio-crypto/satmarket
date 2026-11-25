@@ -8438,7 +8438,19 @@
 
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
-  .view.active{display:block;animation:fadein .18s ease}
+  /* NESSUNA VISTA SBIADISCE (25 nov 2026, cantiere salti-home, Andrea
+     dalla webapp: «quando passo dal p2p alla home del mercatino mezzo
+     secondo schermata nera», poi «si correggi anche quello» per Swap,
+     Ordini e la card aperta). Fino a quel giorno qui c'era
+     `animation:fadein .18s ease`, che parte da opacity 0 sul fondo
+     scuro: misurato nel browser, il primo fotogramma della vista nuova
+     (il piu' pesante: impaginarla tutta) si dipingeva TRASPARENTE, e sul
+     telefono quel fotogramma lungo e' il nero. Adesso la pagina nuova
+     compare piena al primo fotogramma, come le schede di un'app. Le corse
+     che una vista ha di suo restano sue (la salita del negozio, la
+     morfosi di Vendi); il `@keyframes fadein` resta ai fogli e ai
+     modali, che si aprono SOPRA la pagina e non lasciano mai il nero. */
+  .view.active{display:block}
   /* il negozio aperto da «Da scoprire» sale dal basso (24 nov 2026,
      apriNegozioDaScoprire); la regola universale degli effetti ridotti la
      spegne come ogni altra corsa */
@@ -24898,7 +24910,14 @@ function go(view){
    vorra' aggiungerne una deve prima garantire che il suo markup
    sopravviva al ritorno, com'e' per la vetrina: e' quel che hanno
    fatto le sorelle di LISTE_RITORNO (5 ott 2026), negozio compreso. */
+let striscaFerma = null;   /* vedi LA STRISCIA RESTA DOV'E' in tornaATutto */
 function posizioneDaRendere(view){
+  if (view === 'esplora' && navApplicando && striscaFerma) {
+    const top = striscaFerma.top;
+    striscaFerma = null;
+    const cs = el('catSez');
+    if (cs) return Math.max(0, Math.round(window.scrollY + cs.getBoundingClientRect().top - top));
+  }
   if (view === 'esplora' && navApplicando && vetrinaPos
       && vetrinaPos.n === el('grid').children.length) return vetrinaPos.y;
   /* le liste sorelle (LISTE_RITORNO): stesso giudice, stessa cintura
@@ -28478,9 +28497,95 @@ function scorriSottoHeader(sez){
   const hdr = document.querySelector('#view-esplora header');
   const sotto = (hdr ? hdr.offsetHeight : 0)
               + (el('chips') ? el('chips').offsetHeight : 0) + 4;
+  /* - restoMorbido: la fascia che si sta ancora chiudendo SOPRA `sez`
+     (o la riga che si sta aprendo) cambiera' il posto d'arrivo, e lo
+     scorrimento deve puntare a dove `sez` sara' a corsa finita */
   window.scrollTo({
-    top: Math.max(0, scrollY + sez.getBoundingClientRect().top - sotto),
+    top: Math.max(0, scrollY + sez.getBoundingClientRect().top - sotto - restoMorbido(sez)),
     behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+/* LE FASCE DELLA HOME ENTRANO ED ESCONO SENZA SCATTO (25 nov 2026,
+   cantiere salti-home, Andrea dal telefono: «quando schiaccio sulle
+   icone categorie salta tutto»). Toccata una categoria, la fascia
+   «Scambi P2P» spariva in un fotogramma (78 px, spenta; molti di piu'
+   con le card) e la riga delle sottocategorie compariva nello stesso
+   istante (139 px): tutto quel che sta sotto saltava, e subito dopo
+   partiva lo scorrimento. Adesso la fascia che cambia altezza la cambia
+   in 0,28 s — altezza, margini e trasparenza — e lo scorrimento parte
+   insieme, gia' puntato sull'arrivo (restoMorbido): un movimento solo.
+   `cambia` fa il cambio vero (display, classi, contenuto) come prima;
+   qui si misura prima e dopo e si fa scorrere la differenza. Fuori dalla
+   home in vista, con gli effetti ridotti, o dove il layout non c'e' (i
+   banchi delle prove) il cambio resta secco, com'era. */
+const MORBIDA_MS = 280;
+function altezzaMorbida(box, cambia){
+  if (!box) { cambia(); return; }
+  if (box._morbidaFine) box._morbidaFine();   /* una corsa a meta' si posa */
+  const vivo = typeof box.getBoundingClientRect === 'function'
+    && box.isConnected && !effettiRidotti()
+    && el('view-esplora')?.classList.contains('active')
+    && document.visibilityState !== 'hidden';
+  if (!vivo) { cambia(); return; }
+  const fuori = b => {
+    if (b.style.display === 'none') return {h: 0, mt: 0, mb: 0, pt: 0, pb: 0};
+    const cs = getComputedStyle(b);
+    return {h: b.getBoundingClientRect().height,
+            mt: parseFloat(cs.marginTop) || 0, mb: parseFloat(cs.marginBottom) || 0,
+            pt: parseFloat(cs.paddingTop) || 0, pb: parseFloat(cs.paddingBottom) || 0};
+  };
+  const a = fuori(box);
+  cambia();
+  const z = fuori(box);
+  const tot = m => m.h + m.mt + m.mb;
+  if (Math.abs(tot(a) - tot(z)) < 1) return;
+  const sparisce = box.style.display === 'none';
+  if (sparisce) box.style.display = '';
+  const st = box.style;
+  st.transition = 'none';
+  st.overflow = 'hidden';
+  st.boxSizing = 'border-box';
+  const metti = m => {
+    st.height = m.h + 'px'; st.marginTop = m.mt + 'px'; st.marginBottom = m.mb + 'px';
+    st.paddingTop = m.pt + 'px'; st.paddingBottom = m.pb + 'px';
+  };
+  metti(a);
+  st.opacity = a.h ? '' : '0';
+  void box.offsetHeight;   /* il punto di partenza si dipinge davvero */
+  const t = `${MORBIDA_MS}ms ease`;
+  st.transition = `height ${t},margin ${t},padding ${t},opacity ${t}`;
+  metti(z);
+  st.opacity = z.h ? '1' : '0';
+  box._morbidaArrivo = tot(z);
+  box._morbidaMt = z.mt;
+  let timer = 0;
+  const fine = () => {
+    clearTimeout(timer);
+    box._morbidaFine = null; box._morbidaArrivo = box._morbidaMt = null;
+    st.transition = st.overflow = st.boxSizing = st.height = '';
+    st.marginTop = st.marginBottom = st.paddingTop = st.paddingBottom = st.opacity = '';
+    if (sparisce) st.display = 'none';
+  };
+  box._morbidaFine = fine;
+  timer = setTimeout(fine, MORBIDA_MS + 40);
+}
+/* quanto cambiera' ancora, a corsa finita, l'altezza delle fasce in
+   corsa che stanno SOPRA `sez` nella pagina */
+function restoMorbido(sez){
+  let r = 0;
+  ['sottoRigaWrap', 'p2pVetrinaSez'].forEach(id => {
+    const b = el(id);
+    if (!b || b._morbidaArrivo == null) return;
+    const cs = getComputedStyle(b);
+    /* la fascia stessa: il suo margine di sopra sta ancora crescendo
+       (o calando), e il suo bordo scendera' (o salira') di tanto */
+    if (b === sez) { r -= b._morbidaMt - (parseFloat(cs.marginTop) || 0); return; }
+    if (b.contains(sez)) return;
+    if (!(b.compareDocumentPosition(sez) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+    const ora = b.getBoundingClientRect().height
+      + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    r += ora - b._morbidaArrivo;
+  });
+  return r;
 }
 /* Il gesto della card: accende il suo filtro, e IL RITOCCO DELLA CARD
    ACCESA SPEGNE — il gesto del barattolino e della card categoria. E'
@@ -28825,7 +28930,21 @@ function consumaGradinoReparto(){
    sempre. Torna true quando il passo indietro e' partito: il
    chiamante non deve piu' toccare niente. */
 function tornaATutto(){
+  /* LA STRISCIA RESTA DOV'E' (25 nov 2026, cantiere salti-home): chi
+     chiude il reparto dalla striscia la sta guardando, e il passo
+     indietro lo riportava alla posizione salvata della vetrina — di
+     solito la cima — con un salto secco. Se la striscia e' in vista si
+     segna dov'e' sullo schermo, e il ritorno (posizioneDaRendere) la
+     rimette li'. Dalle pillole appiccicate, a striscia fuori schermo,
+     resta il ritorno di sempre. */
+  const cs = el('catSez');
+  const r = cs && el('view-esplora').classList.contains('active')
+    ? cs.getBoundingClientRect() : null;
+  const hdr = document.querySelector('#view-esplora header');
+  striscaFerma = (r && r.bottom > (hdr ? hdr.offsetHeight : 0) && r.top < window.innerHeight)
+    ? {top: r.top} : null;
   if (consumaGradinoReparto()) return true;
+  striscaFerma = null;
   setCat('Tutto');
   return false;
 }
@@ -29315,7 +29434,9 @@ function renderSottoRiga(){
   sottoRigaFirma = firma;
   const sez = el('catSez');
   if (!voci.length) {
-    wrap.style.display = 'none'; riga.innerHTML = ''; sottoRigaCat = '';
+    /* la riga che se ne va si chiude scorrendo (altezzaMorbida) */
+    altezzaMorbida(wrap, () => { wrap.style.display = 'none'; riga.innerHTML = ''; });
+    sottoRigaCat = '';
     if (sez) sez.classList.remove('con-sotto');
     return;
   }
@@ -29337,8 +29458,11 @@ function renderSottoRiga(){
      ripeteva il disegno della categoria che sta gia' accesa sopra. Per
      tornare a tutta la categoria si ritocca lo scaffale acceso; per
      uscire, la categoria (con la sua ✕). */
-  riga.innerHTML = voci.map(v => card(v.id, v.nome, v.n, figSotto(v.id, c))).join('');
-  wrap.style.display = '';
+  /* ...e quella che arriva si apre scorrendo, insieme alla sua entrata */
+  altezzaMorbida(wrap, () => {
+    riga.innerHTML = voci.map(v => card(v.id, v.nome, v.n, figSotto(v.id, c))).join('');
+    wrap.style.display = '';
+  });
   if (sez) sez.classList.add('con-sotto');
   if (entra) entraSottoRiga(wrap, riga);
   aggiornaFrecce('sottoRiga');
@@ -117396,6 +117520,10 @@ function filaCardP2P(html, spenta, attesa){
   const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
   if (!sez || !fila) return;
   const chiusa = spenta || (attesa && !html.length);
+  /* l'altezza che cambia scorre invece di saltare (altezzaMorbida,
+     cantiere salti-home): la fascia che sparisce col tocco di una
+     categoria, o che torna con «Tutto» */
+  altezzaMorbida(sez, () => {
   sez.style.display = (html.length || chiusa) ? '' : 'none';
   const guscio = el('p2pVetrinaGuscio');
   if (guscio) guscio.style.display = chiusa ? 'none' : '';
@@ -117412,6 +117540,7 @@ function filaCardP2P(html, spenta, attesa){
     role="switch" aria-checked="${spenta ? 'false' : 'true'}" aria-label="Scambi P2P nella home"
     onclick="setFilaP2P(${spenta ? 'true' : 'false'})"><span aria-hidden="true">₿</span></button>`;
   fila.innerHTML = html.join('');
+  });
   /* le frecce seguono il contenuto, come nelle due strisce: sei card
      o due cambiano quanto c'e' da scorrere, e la riga riporta all'inizio */
   aggiornaFrecce('p2pVetrinaFila');

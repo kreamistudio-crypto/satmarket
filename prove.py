@@ -39638,6 +39638,7 @@ def prove_liste_ritorno():
         "const document = {querySelector: () => ({id: 'view-' + attiva})};\n"
         + pezzo_js(mini, "const LISTE_RITORNO = {", "\n};\n") + "\n};\n"
         + "let listePos = {};\n"
+        + "let striscaFerma = null;   /* salti-home: la striscia ferma, qui mai alzata */\n"
         + "function salva(){\n" + blocco + "\n}\n"
         + pezzo_js(mini, "function posizioneDaRendere(view){", "\n}\n")
         + "\n}\n" + r"""
@@ -67784,6 +67785,7 @@ function aggiornaFrecce(id){ FRECCE.push(id); }
         + pezzo_js(mini, "function ordineDaEvento(ev, adesso){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function libroDaEventi(eventi, adesso){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function capiP2P(da, a){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function altezzaMorbida(box, cambia){", "\n}\n") + "\n}\n" \
         + blocco + r"""
 const ADESSO = Math.floor(Date.now() / 1000);
 const O = (id, lato, euro, extra) => Object.assign({id, lato, euro, euroMax: 0, sats: 0,
@@ -143867,6 +143869,164 @@ console.log(JSON.stringify({
     prova("...un abbonamento che non e' fra le card del negozio non conta",
           "scendi", out["fuori"])
     prova("...e vuole il vero booleano", "scendi", out["storto"])
+
+
+def prove_salti_home():
+    """I SALTI DELLA HOME (25 nov 2026, cantiere salti-home, Andrea dal
+    telefono in produzione: «quando passo dal p2p alla home del mercatino
+    mezzo secondo schermata nera» e «quando schiaccio sulle icone categorie
+    salta tutto»). Tre cure: la home e le schede del P2P non sbiadiscono
+    dal nero; la fascia «Scambi P2P» e la riga delle sottocategorie cambiano
+    altezza scorrendo (altezzaMorbida) e lo scorrimento del reparto punta
+    all'arrivo (restoMorbido); la ✕ della categoria lascia la striscia
+    dov'e' (striscaFerma). Le meccaniche girano in node sulle funzioni
+    vere, con un DOM di cartone che sa le altezze."""
+    print("\n[i salti della home: niente nero, fasce che scorrono]")
+    import shutil, subprocess
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+
+    # --- 1) IL NERO: nessuna vista riparte da trasparente -----------------
+    # (prima solo home e P2P; poi Andrea: «si correggi anche quello», per
+    # Swap, Ordini e la card aperta)
+    prova("ogni vista compare piena, senza partire da trasparente",
+          [True, False],
+          [".view.active{display:block}" in css,
+           bool(re.search(r"\.view\.active\{[^}]*animation", css))])
+    prova("...il fadein resta ai fogli e ai modali, che si aprono SOPRA la pagina",
+          [True, True],
+          ["#testModale.open{animation:fadein .18s}" in css,
+           ".sheet-bg.open{display:block;animation:fadein .15s}" in css])
+    prova("...e le corse proprie delle viste restano loro (la salita del negozio)",
+          True, "#view-negozio.active.sale-dal-basso{animation:negozio-sale" in css)
+
+    # --- 2) LE FASCE: chi le usa -----------------------------------------
+    fc = pezzo_js(mini, "function filaCardP2P(html, spenta, attesa){", "\n}\n")
+    rs = pezzo_js(mini, "function renderSottoRiga(){", "\n}\n")
+    ss = pezzo_js(mini, "function scorriSottoHeader(sez){", "\n}")
+    prova("la fascia «Scambi P2P» cambia altezza scorrendo, e il contenuto passa da li'",
+          [True, True],
+          ["altezzaMorbida(sez, () => {" in fc,
+           0 < fc.index("altezzaMorbida(sez, () => {") < fc.index("sez.style.display = (html.length || chiusa) ? '' : 'none';")
+           < fc.index("fila.innerHTML = html.join('');") < fc.index("aggiornaFrecce('p2pVetrinaFila');")])
+    prova("la riga delle sottocategorie si apre e si chiude scorrendo", 2,
+          rs.count("altezzaMorbida(wrap, () => {"))
+    prova("lo scorrimento del reparto punta a dove la pagina sara' a corsa finita", True,
+          "- sotto - restoMorbido(sez)" in ss)
+
+    # --- 3) LA STRISCIA FERMA: la ✕ della categoria ----------------------
+    tt = pezzo_js(mini, "function tornaATutto(){", "\n}\n")
+    pd = pezzo_js(mini, "function posizioneDaRendere(view){", "\n}\n")
+    prova("la ✕ della categoria segna la striscia PRIMA del passo indietro, e la butta se non parte",
+          True,
+          0 < tt.index("striscaFerma = (r && r.bottom") < tt.index("if (consumaGradinoReparto()) return true;")
+          < tt.index("striscaFerma = null;"))
+    prova("...e il ritorno la rimette dov'era, prima della posizione salvata della vetrina",
+          True,
+          0 <= pd.index("if (view === 'esplora' && navApplicando && striscaFerma) {")
+          < pd.index("if (view === 'esplora' && navApplicando && vetrinaPos"))
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco delle fasce che scorrono gira in node", "node non c'e'")
+        return
+    am = pezzo_js(mini, "function altezzaMorbida(box, cambia){", "\n}\n") + "\n}\n"
+    rm = pezzo_js(mini, "function restoMorbido(sez){", "\n}\n") + "\n}\n"
+    banco = r"""
+let RIDOTTI = false, ATTIVA = true;
+const effettiRidotti = () => RIDOTTI;
+const MORBIDA_MS = 280;
+const Node = {DOCUMENT_POSITION_FOLLOWING: 4};
+const document = {visibilityState: 'visible'};
+const TIMER = new Map(); let N = 0;
+const setTimeout = (f) => { TIMER.set(++N, f); return N; };
+const clearTimeout = (k) => { TIMER.delete(k); };
+const corri = () => { for (const [k, f] of [...TIMER]) { TIMER.delete(k); f(); } };
+/* il cartone: l'altezza la dice `alto` quando si vede, l'altezza
+   scritta a mano vince (come nel browser), i margini dal «CSS» */
+function scatola(id, alto, mt, mb, ordine){
+  const b = {id, alto, ordine, isConnected: true, style: {display: ''}, cm: {mt, mb},
+    getBoundingClientRect(){
+      if (this.style.display === 'none') return {height: 0, top: 0};
+      return {height: this.style.height ? parseFloat(this.style.height) : this.alto, top: 0}; },
+    get offsetHeight(){ return this.getBoundingClientRect().height; },
+    contains(x){ return x === this; },
+    compareDocumentPosition(x){ return x.ordine > this.ordine ? 4 : 2; }};
+  return b;
+}
+const getComputedStyle = b => ({
+  marginTop: b.style.marginTop || (b.style.display === 'none' ? '0' : b.cm.mt + 'px'),
+  marginBottom: b.style.marginBottom || (b.style.display === 'none' ? '0' : b.cm.mb + 'px'),
+  paddingTop: '0px', paddingBottom: '0px'});
+const VISTA = {classList: {contains: () => ATTIVA}};
+const EL = {};
+const el = id => id === 'view-esplora' ? VISTA : EL[id];
+""" + am + rm + r"""
+const out = {};
+/* A) la fascia spenta (78 + 14 + 10) se ne va: resta in pagina mentre si chiude */
+const f = EL.p2pVetrinaSez = scatola('p2pVetrinaSez', 78, 14, 10, 2);
+const strum = scatola('strumenti', 39, 0, 0, 3);
+altezzaMorbida(f, () => { f.style.display = 'none'; });
+out.chiude = [f.style.display, f.style.height, f.style.marginTop, f.style.opacity, f.style.overflow];
+/* a meta' corsa (finta: 40 px) lo scorrimento sa che sotto mancano ancora 40+... */
+f.style.height = '40px'; f.style.marginTop = '7px'; f.style.marginBottom = '5px';
+out.resto = restoMorbido(strum);
+out.restoSopra = restoMorbido(scatola('catSez', 157, 0, 0, 1));
+corri();
+out.finita = [f.style.display, f.style.height, f.style.marginTop, f.style.overflow, f._morbidaFine];
+/* B) e torna: parte da zero e trasparente */
+altezzaMorbida(f, () => { f.style.display = ''; });
+out.apre = [f.style.display, f.style.height, f.style.opacity];
+/* una seconda corsa a meta' posa la prima e riparte dal punto vero */
+altezzaMorbida(f, () => { f.style.display = 'none'; });
+out.seconda = [f.style.display, f.style.height];
+corri();
+out.posata = [f.style.display, f.style.height];
+/* C) controprove: effetti ridotti, home dietro, cambio senza differenza */
+RIDOTTI = true;
+altezzaMorbida(f, () => { f.style.display = ''; });
+out.ridotti = [f.style.display, f.style.height, TIMER.size];
+RIDOTTI = false; ATTIVA = false;
+altezzaMorbida(f, () => { f.style.display = 'none'; });
+out.dietro = [f.style.display, f.style.height, TIMER.size];
+ATTIVA = true;
+altezzaMorbida(f, () => {});
+out.uguale = [f.style.height, TIMER.size];
+/* D) il cartone senza misure (i banchi delle altre prove): cambio secco */
+const nudo = {style: {display: ''}};
+altezzaMorbida(nudo, () => { nudo.style.display = 'none'; });
+out.nudo = nudo.style.display;
+/* E) la riga che si apre: il suo margine di sopra sta ancora crescendo */
+const r = EL.sottoRigaWrap = scatola('sottoRigaWrap', 139, 10, 0, 1.5);
+r.style.display = 'none';
+altezzaMorbida(r, () => { r.style.display = ''; });
+out.riga = [r.style.height, r.style.marginTop];
+r.style.marginTop = '0px';   /* a inizio corsa il margine e' ancora zero */
+out.restoRiga = restoMorbido(r);
+corri();
+console.log(JSON.stringify(out));
+"""
+    r = subprocess.run([node, "-e", banco], capture_output=True, text=True, timeout=60)
+    try:
+        o = json.loads(r.stdout or "null") or {}
+    except ValueError:
+        o = {"errore": (r.stderr or r.stdout)[-400:]}
+    prova("la fascia che sparisce resta in pagina e si chiude dalla sua altezza vera",
+          ["", "0px", "0px", "0", "hidden"], o.get("chiude", o))
+    prova("...lo scorrimento sa quanto manca ancora sotto di lei (40+7+5 = 52), e niente sopra",
+          [52, 0], [o.get("resto"), o.get("restoSopra")])
+    prova("...e a corsa finita e' sparita davvero, senza stili lasciati", ["none", "", "", "", None],
+          o.get("finita"))
+    prova("la fascia che torna parte da zero e trasparente", ["", "78px", "1"],
+          o.get("apre"))
+    prova("...una seconda corsa a meta' posa la prima e si chiude da dov'era", [["", "0px"], ["none", ""]],
+          [o.get("seconda"), o.get("posata")])
+    prova("CONTROPROVE: effetti ridotti, home dietro e nessuna differenza fanno il cambio secco",
+          [["", "", 0], ["none", "", 0], ["", 0]],
+          [o.get("ridotti"), o.get("dietro"), o.get("uguale")])
+    prova("...e un cartone senza misure (gli altri banchi) cambia secco come prima", "none", o.get("nudo"))
+    prova("la riga che si apre cresce da zero, e il suo margine che cresce sposta l'arrivo (-10)",
+          [["139px", "10px"], -10], [o.get("riga"), o.get("restoRiga")])
 
 
 def prove_consigliati():
@@ -224579,7 +224739,7 @@ CATEGORIE = {
     promesse_badge promesse_raggiungibili percentuale_della_promessa
     verde_e_filtri prezzo_accordo scoprire scoprire_quadra strisce_web sponsor
     numeri_negozio racconto_girato racconti_bozza storia_dal_link
-    consigliati link_invito_canale guardia_is_bot altri_scorrimento widget ricerca
+    consigliati salti_home link_invito_canale guardia_is_bot altri_scorrimento widget ricerca
     condivisione_venditore condividi_col_link link_dentro_telegram
     zona_comune_in_modifica cassa_strada_chiusa casa_vuota_gratis
     spedizione_standard cambio_converte paga_ora apri_nel_wallet
@@ -225691,6 +225851,7 @@ def main():
               prove_racconti_bozza,
               prove_storia_dal_link,
               prove_consigliati,
+              prove_salti_home,
               prove_link_invito_canale,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
