@@ -96122,3 +96122,13 @@ COSA. `doSearch` toglie il fuoco al campo (`el('q').blur()`) a ogni invio, prima
 PROVATO. Nel browser (Chromium, 360×785 come telefono): col codice di develop dopo l'invio il fuoco restava su `#q`, col nuovo no, e lo scroll ai risultati resta quello (y=103 in demo) — LA CONTROPROVA. `prove_seo`: il blur sta in `doSearch` prima dello spegnimento del reparto e del ramo a campo vuoto; tolto apposta, la prova è rossa. Suite severa (31.666) e collaudi della CI (174) verdi nel venv senza coincurve.
 
 RESTA DA GUARDARE. Sul telefono di Andrea dopo la promozione: la tastiera che si chiude e i risultati interi in vista.
+
+## La home da PC al passo col telefono (25 nov 2026, cantiere home-pc; Andrea, controllata la home nuova in produzione: «i filtri, offerte a tempo e sconti nei negozi nel formato PC, browser del PC, mettili più piccoli, e inoltre sistema l'interfaccia PC perché [...] non è al passo con quella della versione mobile. Difatti anche il logo non è quello»; «ok» alle cinque righe della proposta)
+
+COSA. Solo CSS, solo da 768 px in su (il telefono non cambia di un pixel: scatti a 360 confrontati prima/dopo, le differenze sono solo le animazioni, uguali fra due giri dello stesso codice). 1) Il marchio in topbar come in testata sul telefono dal 23 nov: solo «₿arattolo», a 30 px; via la tessera del barattolo (sta già nella barra Cerca) e il fulmine. Da 900 in su: nella fascia stretta 768-899 resta la tessera, com'era. 2) Via la hero «Compra e vendi in sats.» col barattolo che fluttuava: sul telefono non c'è, e Barattolo non è più solo il mercatino in sats. Il markup resta (spento da `.hero{display:none}`), perché `barattolo-hero.png` lo contano altre prove. 3) La Mensola nel browser del PC prende la colonna della griglia (era 150 px, più piccola delle card del mercatino: 263 a 1440), stesso conto della fila P2P. 4) I banner Offerte a tempo / Sconti dei negozi da 684x167 a 420x102 al massimo, affiancati al centro, sempre a 328/80: il disegno cala col riquadro.
+
+PERCHÉ COSÌ. Andrea guarda la home dal telefono e l'ha approvata; da PC era rimasta la versione di agosto (hero, logo col fulmine, mensola minuscola, banner a mezza pagina). Scatti di confronto in /mnt/project-files/home-pc/.
+
+NON TOCCATO. La fascia P2P e i loghi dei Consigliati (un altro thread, «Fermare gli scatti in home»), le voci della topbar, le categorie, Da scoprire. Nessun testo nuovo.
+
+DA GUARDARE. Nel collaudo locale, con la voce «Aste» in topbar, fra 900 e ~940 px il marchio esce ancora dal bordo sinistro (di 40 px; prima di 89): c'era già, ed è la stessa fascia stretta del cantiere di agosto.
