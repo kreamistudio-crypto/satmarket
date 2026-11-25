@@ -988,3 +988,9 @@ frase: Sul computer le foto del tuo annuncio stanno in fila, una accanto all'alt
 dove: Vendi → le foto (sul computer); la scheda di un annuncio → la foto; Assistenza e chat dell'ordine → Ctrl+V nella casella.
 leva: nessuna
 pubblico: sì
+
+## 2026-11-25 · cerco-richieste
+frase: Se nel mercatino non trovi quello che cerchi, adesso puoi chiederlo: scrivi cosa ti serve (un buono, un voucher, buoni carburante…), la categoria e, se vuoi, il budget massimo in sats. Barattolo sceglie i venditori più adatti e il bot li avvisa: chi ce l'ha ti fa un'offerta, che compri col deposito di garanzia come ogni annuncio. In home i riquadri nuovi: «Offerte», «Sconti» e «Cerco».
+dove: Esplora → il riquadro «Cerco» sotto «Offerte» e «Sconti»; oppure una ricerca senza risultati → «🙋 Chiedilo a tutti».
+leva: RICHIESTE (accesa di serie, aperta a tutti)
+pubblico: no

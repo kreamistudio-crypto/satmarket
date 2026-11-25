@@ -45955,13 +45955,16 @@ def prove_ai_segnala():
     corpo = _SORGENTE
     prova("nessuno rifiuta piu' con la costante nuda", 0,
           corpo.count("HTTPException(400, MSG_RIFIUTO)"))
-    prova("...i sei passano tutti dal compositore", 6,
+    # (25 nov 2026) OTTO: i due di «Cerco» (POST /api/richieste, il
+    # filtro parole e la moderazione AI) passano di qui come gli annunci
+    prova("...gli otto passano tutti dal compositore", 8,
           corpo.count("HTTPException(400, messaggio_rifiuto("))
     # IL FILTRO PAROLE PASSA LA SUA CATEGORIA, che e' piu' precisa
     # della famiglia (nove voci contro quattro): se un domani
     # tornasse a non passarla, quei tre rifiuti direbbero la lista
     # dei nove a chi la categoria ce l'aveva gia' in mano.
-    prova("...e i tre del filtro parole dicono QUALE categoria", 3,
+    prova("...e i quattro del filtro parole dicono QUALE categoria (il "
+          "quarto e' «Cerco»)", 4,
           corpo.count("messaggio_rifiuto(divieto="))
 
     # --- E IL MESSAGGIO DEVE STARE A SCHERMO QUANTO SERVE -------
@@ -45971,7 +45974,8 @@ def prove_ai_segnala():
     # resta i sei secondi di sempre, quindi gli errori corti non
     # si allungano di un millisecondo.
     _mini2 = open("miniapp.html", encoding="utf-8").read()
-    prova("i tre rifiuti del client passano da tempoLettura", 3,
+    # il quarto (25 nov 2026) e' la richiesta di «Cerco» rifiutata
+    prova("i quattro rifiuti del client passano da tempoLettura", 4,
           _mini2.count("toast(e, tempoLettura(e))"))
     prova("...e nessuno tiene piu' il tempo fisso", 0,
           _mini2.count("Errore nella pubblicazione', 6000)")
@@ -46385,10 +46389,11 @@ def prove_filtro_avorio():
     # --- 4) LA PAROLA ARRIVA A CHI RIFIUTA --------------------------
     # i tre siti che rispondono al venditore la passano al messaggio,
     # e i cinque che scrivono il registro ci mettono la parola
-    prova("i tre rifiuti del filtro passano la parola", 3,
+    # il quarto sito (25 nov 2026) e' la richiesta di «Cerco»
+    prova("i quattro rifiuti del filtro passano la parola", 4,
           len(re.findall(r"messaggio_rifiuto\(divieto=\w+,\s*parola=parola\)",
                          codice(src))))
-    prova("...e i cinque registri dello strato 1 scrivono la parola", 5,
+    prova("...e i sei registri dello strato 1 scrivono la parola", 6,
           len(re.findall(r'registra_moderazione\(\s*"parole", "vietato",'
                          r"\s*motivo_parole\(", codice(src))))
     prova("...e nessuno scrive piu' la sola categoria", 0,
@@ -51977,8 +51982,11 @@ def prove_scoprire():
     # scritta del lancio su un velo suo (`lancio`), e il suo contrasto lo
     # prova la sezione 6bis, derivato dal CSS. Il suo FILE resta sorvegliato
     # qui sotto con le sorelle (`FILE_CARD`): esiste e regge le due misure.
-    BANNER = {"lampo.webp": "Offerte a tempo",
-              "sconto.webp": "Sconti dei negozi"}
+    # (25 nov 2026, cantiere richieste) i titoli si accorciano, Andrea:
+    # «al posto di offerte a tempo, solo offerte, e al posto di sconti
+    # dei negozi, solo sconti»
+    BANNER = {"lampo.webp": "Offerte",
+              "sconto.webp": "Sconti"}
     # ...E L'ELENCO SI DERIVA DAL CATALOGO invece di essere ricordato
     # (ago 2026, col primo spazio in vetrina): la fascia si misura per
     # le card su cui l'APP scrive il titolo, e lo spazio in vetrina non
@@ -52172,11 +52180,13 @@ def prove_scoprire():
     # ---- 4. IL CLIENT: la sezione, il renderer, il gesto.
     # L'ORDINE NUOVO (23 nov 2026, Andrea): «Da scoprire» in testa, poi
     # «In evidenza», POI le categorie e gli strumenti; gli scambi P2P dal
-    # 25 nov 2026 (cantiere fascia-p2p) stanno SOTTO gli strumenti
+    # 25 nov 2026 (cantiere fascia-p2p) stanno SOTTO gli strumenti, e la
+    # sera stessa (cantiere richieste, foto 46 approvata da Andrea) salgono
+    # SUBITO SOTTO LE CATEGORIE, prima di ordinamento e filtri
     prova("la sezione sta in testa, prima di «In evidenza» e delle categorie",
           True, mini.index('id="scoprireSez"') < mini.index('id="evidenzaSez"')
-          < mini.index('id="catSez"') < mini.index('<div class="strumenti">')
-          < mini.index('id="p2pVetrinaSez"'))
+          < mini.index('id="catSez"') < mini.index('id="p2pVetrinaSez"')
+          < mini.index('<div class="strumenti">'))
     prova("...e nasce nascosta: la accendono i flag", True,
           '<div id="scoprireSez" style="display:none">' in mini)
     # IL FOGLIO DEL MERCATINO (25 nov 2026, cantiere fascia-p2p, Andrea:
@@ -52395,11 +52405,13 @@ def prove_scoprire():
     # la sesta card; ora stanno al loro posto di casa, davanti a #grid, e
     # nessuno li sposta piu'
     # ...e dal 25 nov 2026 (cantiere fascia-p2p) stanno con gli altri
-    # filtri, sotto «Più recenti» e «Filtro», PRIMA della fascia P2P
+    # filtri, sotto «Più recenti» e «Filtro»; la sera (cantiere richieste)
+    # la fascia P2P sale sotto le categorie e i riquadri, ora tre con
+    # «Cerco», toccano la griglia
     _casa = mini.index('<div class="occ-banner" id="occasioniBanner"')
     prova("i banner delle occasioni stanno sopra la griglia e nessuno li sposta",
           (True, 0, 0, 0),
-          (mini.index('<div id="filtriBox"') < _casa < mini.index('<div id="p2pVetrinaSez"')
+          (mini.index('<div id="p2pVetrinaSez"') < mini.index('<div id="filtriBox"') < _casa
            < mini.index('<div class="grid" id="grid">'),
            mini.count("function posaOccasioni("), mini.count("function parcheggiaOccasioni("),
            mini.count("#grid > #occasioniBanner")))
@@ -53308,6 +53320,10 @@ function go(v){ scritte.push('go:' + v); }
 let asteSu = false;
 function asteAccese(){ return asteSu; }
 function vaiAste(){ scritte.push('vaiAste'); }
+/* «Cerco» (25 nov 2026, cantiere richieste): qui la porta e' chiusa,
+   il riquadro ha il suo banco in prove_richieste */
+function cercoAttivo(){ return false; }
+const CERCO_RIQUADRO = '';
 /* LA CARD «P2P IN ARRIVO» (30 set 2026): lo stato che manda la busta.
    Si parte da quello di questi giorni, e il banco lo muove. */
 let p2pArrivo = {stato: 'arrivo', fino: '2026-10-10'};
@@ -67548,13 +67564,17 @@ def prove_card_p2p_vetrina():
           [False, False, False],
           ["el('grid')" in blocco, "#grid" in blocco, "innestaCardP2P" in mini])
     sez = re.search(r'<div id="p2pVetrinaSez"[^>]*>', mini)
-    # SOTTO «Più recenti» e «Filtro», subito prima delle card (25 nov 2026,
-    # cantiere fascia-p2p, Andrea: «Troppo confusionario messo lì»)
-    prova("la sezione «Scambi P2P» nasce nascosta, sotto gli strumenti e il filtro, "
-          "prima della griglia",
+    # SOTTO «Più recenti» e «Filtro» per qualche ora (25 nov 2026,
+    # cantiere fascia-p2p, Andrea: «Troppo confusionario messo lì»), poi
+    # SUBITO SOTTO LE CATEGORIE (la sera, cantiere richieste: la home
+    # della foto 46 approvata — categorie, P2P, ordinamento e filtri, i
+    # tre riquadri, le card)
+    prova("la sezione «Scambi P2P» nasce nascosta, sotto le categorie e "
+          "prima degli strumenti e del filtro",
           [True, True], [bool(sez) and 'style="display:none"' in sez.group(0),
-                         bool(sez) and mini.index('<div class="strumenti">')
-                         < mini.index('<div id="filtriBox"') < sez.start()
+                         bool(sez) and mini.index('<div id="catSez"') < sez.start()
+                         < mini.index('<div class="strumenti">')
+                         < mini.index('<div id="filtriBox"')
                          < mini.index('<div class="grid" id="grid">')])
     # ...in una fascia a se': la luce scende dall'alto (quella di «In
     # evidenza» sale da sotto) e le card hanno l'ombra profonda
@@ -100376,7 +100396,9 @@ def prove_ricarica_resta():
     # (17 nov 2026, chiedi-locker) la quindicesima: `apriCorrieriDaUrl`
     # (17 nov 2026, raccolta) la sedicesima: `apriRaccoltaDaUrl`, il tasto
     # «🎯 Apri la raccolta» degli avvisi
-    prova("le porte dei link d'arrivo sono sedici, ognuna con la sua bandierina", [16, []],
+    # (25 nov 2026, richieste) la diciassettesima: `apriCercoDaUrl`, il
+    # tasto «Offri» dell'avviso a chi vende (`/?cerco=<id>`)
+    prova("le porte dei link d'arrivo sono diciassette, ognuna con la sua bandierina", [17, []],
           [len(porte), [p for p, b in bandiere.items() if not b]])
     prova("...e spegniLinkDaUrl le alza tutte", [],
           [b for b in bandiere.values() if not re.search(r"\b%s = " % b, sp)])
@@ -205624,6 +205646,236 @@ def prove_raccolte():
            r.get("filaVetrina")])
 
 
+def prove_richieste():
+    """«CERCO», LE RICHIESTE DI CHI CERCA (25 nov 2026, cantiere richieste,
+    Andrea: la proposta approvata, «Accendila già dappertutto, a tutti»).
+    Qui i pezzi veri, eseguiti; il giro sulle rotte vere e' `collaudo_richieste`:
+     · le leve di serie (aperta a tutti, la moderazione AI SPENTA);
+     · i giudici: le parole che contano, chi vede la porta, il prefiltro
+       sul database gemello (categoria, parole, muti, ferie, tetto del
+       giorno, gia' avvisati, chi chiede), la scelta AI fail-open;
+     · le sentinelle: i testi col lessico del deposito, il tasto «Offri»
+       che apre `/?cerco=`, l'offerta legata dalla pubblicazione, le
+       tabelle nella cancellazione;
+     · il client in node: i giorni a parole, la card che scappa i testi,
+       e l'etichetta del megafono che esce solo sopra «Sconti»."""
+    print("\n[«Cerco»: le richieste di chi cerca]")
+    import re as _re, sqlite3, asyncio as _as, time as _t
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. LE LEVE DI SERIE
+    def _di_serie(nome):
+        m = _re.search(r"from config import %s\nexcept ImportError:\n"
+                       r"    %s = (.+)\n" % (nome, nome), srv)
+        return m.group(1).strip() if m else None
+    prova("leve di serie: «Cerco» accesa e aperta a tutti, il modello Haiku",
+          ["True", "False", '"claude-haiku-4-5-20251001"'],
+          [_di_serie("RICHIESTE"), _di_serie("RICHIESTE_SOLO_MODERATORI"),
+           _di_serie("RICHIESTE_MODELLO")])
+    prova("...e la moderazione AI degli annunci nasce SPENTA (Andrea)", "False",
+          _di_serie("MODERAZIONE_AI"))
+    # spenta, le due porte dell'AI escono SUBITO: nessuna chiamata
+    for _nome, _vuoto in (("moderazione_ai", "None"), ("moderazione_ai_lotto", "{}")):
+        _c = srv[srv.index("async def %s(" % _nome):]
+        _c = _c[:_c.index("\n\n\n")]
+        _i = _c.index('"""', _c.index('"""') + 3) + 3 if '"""' in _c[:400] else 0
+        _testa = _c[_i:_i + 120]
+        prova("%s a leva spenta esce per prima cosa" % _nome, True,
+              ("if not MODERAZIONE_AI:\n        return %s" % _vuoto) in _testa)
+
+    # ---- 2. I GIUDICI, eseguiti
+    i = srv.index("_RICHIESTE_PAROLE_VUOTE = frozenset(")
+    f = srv.index("\n\n\nPROMPT_RICHIESTE = (", i)
+    amb = {"re": _re, "time": _t, "unicodedata": __import__("unicodedata"),
+           "RICHIESTE": True, "RICHIESTE_SOLO_MODERATORI": False,
+           "RICHIESTE_TETTO_GIORNO": 3, "RICHIESTE_PREFILTRO": 20,
+           "e_admin": lambda t: t == 999}
+    exec(pezzo("normalizza"), amb)
+    exec(pezzo("in_ferie"), amb)
+    exec(srv[i:f], amb)
+    prova("le parole che contano: niente «cerco», articoli, numeri, euro",
+          ["buono", "amazon"], amb["_parole_richiesta"]("Cerco un buono Amazon da 50 €"))
+    prova("...accenti e maiuscole spianati come nel filtro", ["biglietto", "concerto"],
+          amb["_parole_richiesta"]("BIGLIETTO per il concèrto"))
+    prova("la porta: aperta a tutti", [True, True],
+          [amb["richieste_per"](111), amb["richieste_per"](999)])
+    amb["RICHIESTE_SOLO_MODERATORI"] = True
+    prova("...a solo-moderatori, solo chi passa e_admin", [False, True],
+          [amb["richieste_per"](111), amb["richieste_per"](999)])
+    amb["RICHIESTE"] = False
+    prova("...e a leva spenta per nessuno", [False, False],
+          [amb["richieste_per"](111), amb["richieste_per"](999)])
+    amb["RICHIESTE"], amb["RICHIESTE_SOLO_MODERATORI"] = True, False
+
+    # il prefiltro su un database gemello
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, ferie_fino INTEGER DEFAULT 0);"
+        "CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INT, titolo TEXT,"
+        " descrizione TEXT, categoria TEXT, stato TEXT);"
+        "CREATE TABLE richieste_muti(tg_id INTEGER PRIMARY KEY, creato INT);"
+        "CREATE TABLE richieste_avvisati(richiesta_id INT, tg_id INT, creato INT,"
+        " PRIMARY KEY(richiesta_id, tg_id));")
+    ora = int(_t.time())
+    for tg, ferie in ((10, 0), (11, 0), (12, 0), (13, ora + 9999), (14, 0),
+                      (15, 0), (16, 0), (17, None)):
+        con.execute("INSERT INTO utenti VALUES(?,?)", (tg, ferie))
+    for vid, tit, cat, st in (
+            (10, "Buono Amazon 25 euro", "Buoni ed esperienze", "attivo"),
+            (10, "Buono Amazon 100", "Buoni ed esperienze", "attivo"),
+            (11, "Gift card Steam", "Buoni ed esperienze", "attivo"),
+            (12, "Libro di cucina amazonico", "Libri", "attivo"),
+            (13, "Buono Amazon in ferie", "Buoni ed esperienze", "attivo"),
+            (14, "Buono Amazon muto", "Buoni ed esperienze", "attivo"),
+            (15, "Buono Amazon pieno", "Buoni ed esperienze", "attivo"),
+            (16, "Sedia di legno", "Casa", "attivo"),
+            (17, "Buono Amazon venduto", "Buoni ed esperienze", "venduto"),
+            (1, "Buono Amazon mio", "Buoni ed esperienze", "attivo")):
+        con.execute("INSERT INTO annunci(venditore_id, titolo, descrizione, "
+                    "categoria, stato) VALUES(?,?,'',?,?)", (vid, tit, cat, st))
+    con.execute("INSERT INTO richieste_muti VALUES(14, 0)")
+    for rid in (90, 91, 92):
+        con.execute("INSERT INTO richieste_avvisati VALUES(?,15,?)", (rid, ora - 60))
+    rich = {"id": 7, "tg_id": 1, "testo": "Cerco un buono Amazon",
+            "categoria": "Buoni ed esperienze"}
+    cand = amb["_candidati_richiesta"](con, rich)
+    prova("il prefiltro: prima chi vende cose simili, poi la sola categoria, "
+          "poi le sole parole", [10, 11, 12], [c["tg_id"] for c in cand])
+    prova("...fuori chi e' in ferie, chi ha spento, chi ha gia' i 3 del "
+          "giorno, l'annuncio non attivo e chi chiede", set(),
+          {13, 14, 15, 17, 1} & {c["tg_id"] for c in cand})
+    prova("...e ognuno porta i suoi titoli (al piu' tre)",
+          ["Buono Amazon 100", "Buono Amazon 25 euro"], cand[0]["titoli"])
+    con.execute("INSERT INTO richieste_avvisati VALUES(7,10,?)", (ora,))
+    prova("chi e' gia' stato avvisato di questa richiesta non lo e' due volte",
+          [11, 12], [c["tg_id"] for c in amb["_candidati_richiesta"](con, rich)])
+    con.execute("UPDATE richieste_avvisati SET creato=? WHERE tg_id=15", (ora - 90000,))
+    prova("...e il tetto del giorno guarda le sole ultime 24 ore", True,
+          15 in [c["tg_id"] for c in amb["_candidati_richiesta"](con, rich)])
+    con.close()
+
+    # la scelta dell'AI: fail-open in ogni strada storta
+    i = srv.index("async def _scegli_venditori(")
+    f = srv.index("\n\n\n", i)
+
+    class _Blocco:
+        type = "text"
+        def __init__(self, t): self.text = t
+
+    class _Ai:
+        risposta, chiamate = "", 0
+        class messages:
+            @staticmethod
+            def create(**kw):
+                _Ai.chiamate += 1
+                if _Ai.risposta is None:
+                    raise RuntimeError("giu'")
+                return type("R", (), {"content": [_Blocco(_Ai.risposta)]})()
+    amb2 = {"re": _re, "asyncio": _as, "ai": _Ai, "RICHIESTE_VENDITORI": 5,
+            "RICHIESTE_MODELLO": "m", "ANTHROPIC_API_KEY": "chiave",
+            "PROMPT_RICHIESTE": "{n}"}
+    exec(srv[i:f], amb2)
+    sette = [{"tg_id": n, "titoli": ["x"]} for n in range(1, 8)]
+    sc = lambda c: _as.run(amb2["_scegli_venditori"]({"testo": "t", "categoria": "c"}, c))
+    _Ai.risposta = "3, 1, 99, 3, 7"
+    prova("l'AI sceglie: i suoi numeri, senza doppioni ne' fuori elenco",
+          [3, 1, 7], sc(sette))
+    _Ai.risposta = "nessuno"
+    prova("...una risposta storta = i primi 5 del prefiltro", [1, 2, 3, 4, 5], sc(sette))
+    _Ai.risposta = None
+    prova("...un errore = i primi 5 (l'avviso parte comunque)", [1, 2, 3, 4, 5], sc(sette))
+    _Ai.chiamate = 0
+    prova("...e con 5 candidati o meno l'AI non si chiama nemmeno",
+          ([1, 2, 3], 0), (sc(sette[:3]), _Ai.chiamate))
+    amb2["ANTHROPIC_API_KEY"] = "INCOLLA_QUI_LA_API_KEY"
+    prova("...ne' senza la chiave", ([1, 2, 3, 4, 5], 0), (sc(sette), _Ai.chiamate))
+
+    # ---- 3. LE SENTINELLE
+    i = srv.index("async def _avvisa_venditori_richiesta(")
+    avv = srv[i:srv.index("\n\n\n", i)]
+    prova("l'avviso a chi vende: il deposito di garanzia, il tasto «Offri» "
+          "che apre la richiesta, la cifra coi puntini", [True, True, True],
+          ["deposito di garanzia" in avv,
+           '"Offri", link_telegram("cerco", richiesta_id)' in avv,
+           "_fmt_sats(rich['budget_sats'])" in avv])
+    _blocco = srv[srv.index("_RICHIESTE_PAROLE_VUOTE = frozenset("):
+                  srv.index('@app.post("/api/me/avvisi-mercatino")')]
+    _testi = codice(_blocco).lower() if "codice" in globals() else _blocco.lower()
+    prova("lessico: mai «assicurat» ne' «escrow» nei testi di «Cerco»", True,
+          "assicurat" not in _testi and "escrow" not in _testi)
+    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 3,
+          _blocco.count("html.escape("))
+    _pub = srv[srv.index("async def pubblica("):]
+    _pub = _pub[:_pub.index("\n@app.")]
+    _lega = r'collega_offerta_richiesta\(d\.get\("richiesta_id"\),\s*annuncio_id,\s*user\["id"\], %s\)'
+    prova("la pubblicazione lega l'offerta: avviso solo se in vetrina", [1, 1],
+          [len(_re.findall(_lega % "True", _pub)), len(_re.findall(_lega % "False", _pub))])
+    _canc = srv[srv.index("CANCELLA_TOGLI"):]
+    _canc = _canc[:_canc.index("\n)\n")]
+    prova("la cancellazione dell'account porta via le quattro tabelle", [],
+          [t for t in ("richieste", "richieste_avvisati", "richieste_offerte",
+                       "richieste_muti") if '"%s"' % t not in _canc])
+    prova("la porta del client la dice /api/me", True,
+          'profilo["richieste"] = richieste_per(user["id"])' in srv)
+    prova("il tasto del bot arriva come /?cerco=<id>", True,
+          "cerco_" in mini[mini.index("function percorsoDaStartapp("):][:4000])
+    prova("Vendi porta richiesta_id solo quando si offre, e uscendo si scorda",
+          [True, True],
+          ["...(offertaRichiesta ? {richiesta_id: offertaRichiesta.id} : {})" in mini,
+           "offertaRichiesta = null" in mini])
+
+    # ---- 4. IL CLIENT IN NODE
+    i = mini.index("/* i giorni che restano, a parole (PURA) */")
+    f = mini.index("function renderCerco(){", i)
+    js = ("const fmt = n => String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ');\n"
+          "const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+          ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n"
+          "const icoCategoria = c => '[' + c + ']';\n"
+          + mini[i:f] +
+          "\nconst ora = Math.floor(Date.now()/1000), f = {};\n"
+          "f.molti = cercoScade(ora + 5*86400 + 60); f.uno = cercoScade(ora + 86400 + 60);\n"
+          "f.oggi = cercoScade(ora + 3600); f.fine = cercoScade(ora - 1);\n"
+          "f.altrui = cardRichiesta({id: 4, testo: '<img src=x>', categoria: 'Libri',"
+          " budget_sats: 50000, scade: ora + 3*86400, mia: false, offerte: 1});\n"
+          "f.mia = cardRichiesta({id: 5, testo: 'buono', categoria: 'Libri',"
+          " budget_sats: 0, scade: ora + 3*86400, mia: true, offerte: 2,"
+          " annunci: [{id: 9, titolo: '<b>Buono</b>', prezzo_sats: 1000}]});\n"
+          "console.log(JSON.stringify(f));\n")
+    r = _node_banco(js)
+    if r is None:
+        salta("«Cerco» in node", "node non c'e'")
+    else:
+        prova("i giorni a parole", ["ancora 5 giorni", "ancora 1 giorno",
+                                    "scade oggi", "scade adesso"],
+              [r.get("molti"), r.get("uno"), r.get("oggi"), r.get("fine")])
+        _a, _m = r.get("altrui", ""), r.get("mia", "")
+        prova("la card degli altri: testo scappato, budget, «Offri»",
+              [False, True, True, False],
+              ["<img src=x>" in _a, "50 000" in _a, "offriPerRichiesta(4)" in _a,
+               "chiudiRichiesta" in _a])
+        prova("la mia: le offerte (scappate) e «Chiudi la richiesta», niente «Offri»",
+              [True, False, True, False, True],
+              ["openDetail(9)" in _m, "<b>Buono</b>" in _m, "chiudiRichiesta(5)" in _m,
+               "offriPerRichiesta" in _m, "2 offerte" in _m])
+    # l'etichetta del megafono esce SOLO sopra «Sconti»: da sola andrebbe
+    # sopra l'ordinamento e i filtri
+    prova("l'etichetta che esce nasce nascosta e si accende solo dopo «Sconti»",
+          [True, True],
+          [bool(_re.search(r"\.occ-cerco \.cerco-eti\{[^}]*display:none", mini)),
+           '#occasioniBanner [data-id="sconto"] ~ .occ-cerco .cerco-eti{display:block}' in mini])
+    prova("il riquadro sta in coda ai due, mai in DEMO, vetrina o barattolo",
+          [True, True],
+          ["const cerco = !vistaBarattolo && cercoAttivo();" in mini,
+           "function cercoAttivo(){ return cercoLeva && !DEMO && !VETRINA; }" in mini])
+    for _f in ("occ-offerte.webp", "occ-sconti.webp", "cerco.webp",
+               "cerco-etichetta.webp"):
+        prova("il disegno %s c'e' e la rotta lo serve" % _f, (True, True),
+              (os.path.exists(os.path.join("assets", "scoprire", _f)),
+               '"%s"' % _f in srv[srv.index("FILE_SCOPRIRE = ("):][:900]))
+
+
 def prove_premi_fedelta():
     """I PREMI FEDELTA' DEL NEGOZIO (17 nov 2026, cantiere premi-fedelta,
     scelta di Andrea sulla scheda: «Sì, premi del negozio»). Qui i pezzi
@@ -224235,7 +224487,7 @@ CATEGORIE = {
     meta_cauzione_auto
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
@@ -225725,6 +225977,7 @@ def main():
               prove_notifiche_telefono,
               prove_mancia_venditore,
               prove_raccolte,
+              prove_richieste,
               prove_premi_fedelta,
               prove_app_negozio,
               prove_cassa_solo_negozio,

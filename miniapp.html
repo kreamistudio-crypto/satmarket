@@ -1816,6 +1816,72 @@
      la coppia al centro; sul tablet stretto si restringono da soli. */
   @media (min-width:768px){#occasioniBanner{grid-template-columns:repeat(2,minmax(0,420px));
     justify-content:center}}
+  /* I TRE RIQUADRI DELLE OCCASIONI (25 nov 2026, cantiere richieste,
+     scelti da Andrea fra una quarantina di prove: /mnt/project-files/
+     richieste/, «ora è veramente perfetto» la 46). «Offerte» e «Sconti»
+     AFFIANCATI E BASSI (160x68 a 360: «i quadrati sono troppo alti»,
+     poi «leggermente più bassi»), «Cerco» LARGO SOTTO (328x86). Un
+     disegno solo li lega: il nastro di luce parte dalla sveglia, passa
+     dietro la scatola, esce in basso a destra ed entra nell'arco del
+     megafono — per questo le MISURE SONO RAPPORTI e non pixel: a ogni
+     larghezza i tre pezzi restano allineati come nel disegno intero.
+     Il velo scuro sotto i titoli sta DENTRO i file (lo stesso delle
+     prove viste da Andrea): il nastro nasce sotto «Offerte», e il
+     contrasto del titolo non deve dipendere dal CSS. */
+  #occasioniBanner{grid-template-columns:1fr 1fr;position:relative}
+  #occasioniBanner .scoprire-card[data-id]{aspect-ratio:160/68}
+  #occasioniBanner .scoprire-card.occ-cerco{grid-column:1/-1;
+    aspect-ratio:328/86;overflow:visible;background:none}
+  /* il megafono ha lo sfondo arancio, le altre due no (Andrea: «lo
+     sfondo arancione lasciamelo solo sul megafono»): sta nei disegni */
+  .occ-cerco .cerco-fondo{position:absolute;inset:0;border-radius:inherit;
+    overflow:hidden;background:var(--cat-fondo)}
+  #occasioniBanner .occ-cerco .cerco-fondo img{inset:0;width:100%;
+    height:100%;object-position:right 60%}
+  /* L'ETICHETTA CHE ESCE (Andrea: «quella superiore falla uscire proprio
+     fuori»): la stessa etichetta del disegno, ritagliata, nello stesso
+     punto — e quel che sta dentro il riquadro combacia col disegno, quel
+     che sporge si appoggia sopra «Sconti». Il punto e' in % della
+     LARGHEZZA (anche l'alto: margin-top in % si misura sulla larghezza),
+     perche' il disegno si scala sulla larghezza: 580/1040 da sinistra,
+     largo 165/1040, e in alto 30/1040 meno lo scarto del taglio a
+     «right 60%» (0,6 x (498/1040 - 86/328)) = -10,11%. */
+  .occ-cerco .cerco-eti{position:absolute;inset:0;pointer-events:none;
+    z-index:2;display:none}
+  /* l'etichetta esce SOLO sopra «Sconti»: senza la scatola accanto
+     andrebbe a coprire l'ordinamento e i filtri, e allora resta dentro */
+  #occasioniBanner [data-id="sconto"] ~ .occ-cerco .cerco-eti{display:block}
+  #occasioniBanner .occ-cerco .cerco-eti img{inset:auto;left:55.77%;top:0;
+    margin-top:-10.11%;width:15.87%;height:auto;object-fit:fill;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.45))}
+  /* SI MUOVONO COME LE SORELLE (Andrea: «le immagini si devono muovere
+     leggermente, come già fanno»): la sveglia e la scatola tengono la
+     loro onda e il loro respiro (data-id), il megafono respira lento
+     come il ₿ del P2P — e l'etichetta respira con lui, nello STESSO
+     strato di misura: stessa origine, stessa animazione, mai staccati */
+  .occ-cerco .cerco-fondo img,.occ-cerco .cerco-eti{
+    animation:sc-alone 9s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .occ-cerco .cerco-fondo img,.occ-cerco .cerco-eti{animation:none}}
+  /* sul computer la coppia resta stretta: due colonne da 324 e «Cerco»
+     largo quanto loro (656), al centro — i riquadri da 420 di ieri
+     sarebbero cartelloni */
+  @media (min-width:768px){#occasioniBanner{
+    grid-template-columns:repeat(2,minmax(0,324px))}}
+  /* la pagina «Cerco» */
+  .cerco-modulo{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .cerco-lista{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+  .cerco-card{background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:12px 14px}
+  .cerco-testa{display:flex;gap:10px;align-items:flex-start}
+  .cerco-testa .cat-ico{flex:0 0 auto}
+  .cerco-budget{font-size:14px;color:var(--sats);font-weight:700;margin-top:3px}
+  .cerco-offerta{display:flex;justify-content:space-between;gap:10px;
+    width:100%;margin-top:8px;padding:9px 12px;border-radius:10px;
+    border:1px solid var(--line);background:none;color:inherit;
+    font:inherit;text-align:left;cursor:pointer}
+  .cerco-muto{display:flex;gap:8px;align-items:center;margin:22px 0 8px;
+    color:var(--muted);font-size:14px}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -1881,6 +1947,10 @@
     font-family:'Baloo 2',system-ui,sans-serif;font-size:17px;
     line-height:1.15;font-weight:800;color:#FAF4E4}
   .scoprire-card img ~ .sc-titolo{display:flex}
+  /* «Cerco» (cantiere richieste): il suo disegno sta dentro due strati
+     (.cerco-fondo, .cerco-eti), quindi il titolo non e' fratello
+     dell'img e si accende qui, sopra l'etichetta che esce */
+  .occ-cerco .sc-titolo{display:flex;z-index:3}
   /* LA CARD «P2P IN ARRIVO» (30 set 2026, richiesta di Andrea): la
      scritta grande — «In arrivo il 10/10/26» — non sta nella scatola
      del titolo (96px, tarata su «Sconti dei negozi») e non sta nella
@@ -15277,6 +15347,46 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('sottoRiga',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
+    <!-- LA FASCIA P2P SALE SOTTO LE CATEGORIE (25 nov 2026, cantiere
+         richieste, Andrea: categorie, poi gli scambi P2P, poi conta,
+         ordinamento e filtro, poi i tre riquadri, poi il mercatino —
+         «Bellissimo così»). Il giorno prima stava sotto gli strumenti
+         (la nota qui sotto): e' cambiato il posto, non la fascia. -->
+    <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
+         Nasce spenta: la accende renderVetrinaP2P solo con la leva del
+         server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
+    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): fino al 24 nov 2026 una
+         riga sua, «Scambi P2P nascosti · Mostra»; adesso e' l'interruttore
+         accanto al titolo (cantiere home-card-pulite, Andrea: «affianco
+         alla scritta scambi P2P metti un tasto tipo toggle per nascondere
+         quelle card velocemente»): spento, restano titolo e interruttore -->
+    <!-- SOTTO GLI STRUMENTI (25 nov 2026, cantiere fascia-p2p, Andrea:
+         «mettere quella riga proprio prima delle card del mercatino,
+         sotto ai toggle più recenti e il toggle del filtro»): fino a quel
+         giorno stava fra le categorie e gli strumenti. Adesso e' una
+         fascia a se' (vedi LA FASCIA A SE' nel CSS). -->
+    <div id="p2pVetrinaSez" style="display:none">
+      <div class="p2p-vt-testa">
+        <div class="p2p-vt-titolo">
+          <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
+          <span id="p2pVetrinaLeva" class="p2p-vt-leva"></span>
+        </div>
+        <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
+      </div>
+      <!-- LE FRECCE ANCHE QUI (6 ott 2026, ritocco di Andrea): dal PC la
+           fila mostra quattro card e le altre restano di lato, e col
+           mouse non c'era modo di arrivarci. Lo stesso guscio, le stesse
+           frecce e la stessa rotellina delle due strisce di sopra (vedi
+           LE FRECCE DELLE DUE STRISCE): nascono spente, sul telefono non
+           esistono, e le accende il solo blocco del web. -->
+      <div class="strip-wrap" id="p2pVetrinaGuscio">
+        <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
+        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
+          onclick="scorriFila('p2pVetrinaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
+          onclick="scorriFila('p2pVetrinaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
     <!-- LE CARD DEL LAVORO (23 ott 2026): al posto delle categorie del
          mercato, che in Lavoro si spengono, gli scaffali dei servizi.
          Le disegna renderLavoro(); si vedono SOLO in Lavoro (il CSS su
@@ -15422,43 +15532,12 @@ document.getElementById('cartello')?.remove();</script>
          renderOccasioni; senza occasioni vive il riquadro e' spento.
          Dal 25 nov 2026 (cantiere fascia-p2p) stanno sotto «Più recenti»
          e «Filtro», con gli altri filtri, e PRIMA della fascia P2P: tutti
-         i filtri insieme, poi gli scambi, poi le card. -->
+         i filtri insieme, poi gli scambi, poi le card.
+         DAL 25 NOV 2026 SERA (cantiere richieste) LA FASCIA P2P E' SALITA
+         sotto le categorie, e qui i riquadri sono TRE, legati da un nastro
+         di luce: «Offerte» e «Sconti» affiancati e bassi, «Cerco» largo
+         sotto (vedi I TRE RIQUADRI DELLE OCCASIONI nel CSS). -->
     <div class="occ-banner" id="occasioniBanner" style="display:none"></div>
-    <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
-         Nasce spenta: la accende renderVetrinaP2P solo con la leva del
-         server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
-    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): fino al 24 nov 2026 una
-         riga sua, «Scambi P2P nascosti · Mostra»; adesso e' l'interruttore
-         accanto al titolo (cantiere home-card-pulite, Andrea: «affianco
-         alla scritta scambi P2P metti un tasto tipo toggle per nascondere
-         quelle card velocemente»): spento, restano titolo e interruttore -->
-    <!-- SOTTO GLI STRUMENTI (25 nov 2026, cantiere fascia-p2p, Andrea:
-         «mettere quella riga proprio prima delle card del mercatino,
-         sotto ai toggle più recenti e il toggle del filtro»): fino a quel
-         giorno stava fra le categorie e gli strumenti. Adesso e' una
-         fascia a se' (vedi LA FASCIA A SE' nel CSS). -->
-    <div id="p2pVetrinaSez" style="display:none">
-      <div class="p2p-vt-testa">
-        <div class="p2p-vt-titolo">
-          <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
-          <span id="p2pVetrinaLeva" class="p2p-vt-leva"></span>
-        </div>
-        <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
-      </div>
-      <!-- LE FRECCE ANCHE QUI (6 ott 2026, ritocco di Andrea): dal PC la
-           fila mostra quattro card e le altre restano di lato, e col
-           mouse non c'era modo di arrivarci. Lo stesso guscio, le stesse
-           frecce e la stessa rotellina delle due strisce di sopra (vedi
-           LE FRECCE DELLE DUE STRISCE): nascono spente, sul telefono non
-           esistono, e le accende il solo blocco del web. -->
-      <div class="strip-wrap" id="p2pVetrinaGuscio">
-        <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
-        <button class="strip-frec sx off" type="button" aria-label="Scorri indietro"
-          onclick="scorriFila('p2pVetrinaFila',-1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="strip-frec dx off" type="button" aria-label="Scorri avanti"
-          onclick="scorriFila('p2pVetrinaFila',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-      </div>
-    </div>
     <div id="mercMappaBox"></div>
     <div class="grid" id="grid"></div>
     <div class="empty" id="gridEmpty" style="display:none">
@@ -15479,6 +15558,9 @@ document.getElementById('cartello')?.remove();</script>
            rimpicciolito si assottiglierebbe (il calco del coming soon) -->
       <button class="btn orange" id="emptyEsplora" style="display:none" onclick="alternaBarattolo()"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true" style="width:20px;height:20px;stroke-width:1.9"><path class="velo" d="M10.9 3.6c3.9-.2 7.2 2.8 7.3 6.6.1 3.8-2.9 7-6.8 7.1-3.9.1-7.1-2.9-7.2-6.7-.1-3.8 2.8-6.9 6.7-7z"/><path d="M15.9 15.3l4.6 4.8"/></svg>Esplora il mercatino</button>
       <button class="btn ghost" id="btnAvvisami" style="display:none" onclick="avvisamiDaRicerca()">🔔 Avvisami se arriva</button>
+      <!-- «CERCO» (25 nov 2026): la ricerca a vuoto diventa una richiesta
+           a tutti i venditori, col testo cercato gia' scritto -->
+      <button class="btn ghost" id="btnChiedilo" style="display:none" onclick="chiediloATutti()">🙋 Chiedilo a tutti</button>
     </div>
     <!-- La sentinella dello scroll infinito: quando si avvicina allo
          schermo si carica la pagina di annunci successiva -->
@@ -16947,6 +17029,28 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- ============ VISTA: «CERCO» (25 nov 2026, cantiere richieste) ======
+       Vista INTERNA come le raccolte: il modulo sta qui, gli elenchi li
+       scrive renderCerco() con quel che manda /api/richieste, con esc()
+       su ogni testo. voceNav la fa ricadere su «esplora». -->
+  <div class="view" id="view-cerco">
+    <button class="back" onclick="navIndietro()">← Torna</button>
+    <div class="sicu">
+      <div class="sicu-hero">
+        <h2>🙋 Cerco</h2>
+        <p class="occhiello">Scrivi cosa cerchi: avvisiamo i venditori che possono avercelo</p>
+      </div>
+      <div class="cerco-modulo">
+        <div class="field"><input id="cercoTesto" maxlength="140" autocomplete="off" placeholder="Es. un buono Amazon da 50 €"></div>
+        <div class="field"><select id="cercoCat" hidden><option value=""></option></select>
+          <button type="button" class="campo-scelta" id="cercoCatBtn" onclick="cercoPrepara();apriPicker('cercoCat')" aria-haspopup="dialog"><span class="cs-val"><span class="cs-vuoto">Scegli la categoria</span></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
+        <div class="field"><input id="cercoBudget" inputmode="numeric" autocomplete="off" placeholder="Budget massimo in sats (facoltativo)"></div>
+        <button class="btn orange" id="cercoInvia" onclick="inviaRichiesta()">📣 Chiedilo a tutti</button>
+      </div>
+      <div id="cercoCorpo"></div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: I CONSIGLIATI ============ -->
   <!-- I negozi che ci piacciono (set 2026). Vista INTERNA come la
        classifica: fuori da RADICI, quindi navRiflette la spinge e il
@@ -16994,6 +17098,9 @@ document.getElementById('cartello')?.remove();</script>
                 aria-label="Chiudi la modifica">✕</button>
       </div>
       <div class="sub" id="sellSottotitolo">3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.</div>
+      <!-- «Offri» da una richiesta di «Cerco» (25 nov 2026): la nota resta
+           finche' si pubblica o si esce (vestiOffertaRichiesta) -->
+      <div class="trust-note" id="cercoNotaVendi" style="display:none;margin:0 0 14px">🙋 <span>Stai offrendo a chi cerca: <b id="cercoNotaTesto"></b></span></div>
       <div id="editBanner" style="display:none;margin:2px 0 14px;padding:10px 14px;background:var(--sats-soft);border:1.5px solid #F7C87F;border-radius:14px;font-size:13px;font-weight:700;color:var(--sats-text)"></div>
       <div class="field field-foto">
         <input type="file" id="sellPhotos" accept="image/*,.heic,.heif" multiple style="display:none" onchange="fotoScelte(event)">
@@ -20014,6 +20121,11 @@ function percorsoDaStartapp(p){
      «📦 Come spedisci». Si rilegge in `/?corrieri=1`, che
      `apriCorrieriDaUrl` sa aprire */
   if (p === 'corrieri') return '/?corrieri=1';
+  /* «CERCO» (25 nov 2026, cantiere richieste): il tasto «Offri»
+     dell'avviso ai venditori, `cerco_<id>` (lo scrive `link_telegram`).
+     Si rilegge in `/?cerco=<id>`, che `apriCercoDaUrl` sa aprire */
+  const ce = /^cerco_([1-9][0-9]{0,11})$/.exec(p);
+  if (ce) return '/?cerco=' + ce[1];
   const as = /^assistenza_(-?[1-9][0-9]{0,18})$/.exec(p);
   if (as) return '/?assistenza=' + as[1];
   const sc = /^scambio_([0-9a-zA-Z-]{8,64})_chat$/.exec(p);
@@ -23369,6 +23481,8 @@ function voceNav(view){
   else if (view === 'giftcard') view = 'p2p';
   // le raccolte si aprono dalla tessera della vetrina (17 nov 2026)
   else if (view === 'raccolte') view = 'esplora';
+  // ...e «Cerco», dal suo riquadro in home (25 nov 2026)
+  else if (view === 'cerco') view = 'esplora';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
   else if (view === 'astepresto') view = cellaSwap() ? 'esplora' : 'aste';
@@ -24580,6 +24694,8 @@ function go(view){
   /* il bottone di «Pubblica annuncio» si misura PRIMA che la vista se ne
      vada: e' da li' che il ritorno lo riporta nel + (lasciaMorfoVendi) */
   const daVendi = view !== 'vendi' ? misuraRitornoVendi() : null;
+  /* «Offri» (25 nov 2026): uscendo da Vendi la richiesta si lascia */
+  if (view !== 'vendi' && offertaRichiesta) { offertaRichiesta = null; vestiOffertaRichiesta(); }
   /* LA SALITA DEL NEGOZIO NON RIPARTE (25 nov 2026, Andrea dal telefono:
      «guarda come scatta», sul suo negozio in «Da scoprire»). Due colpi:
      1) il disegno del negozio richiama go('negozio') quando i dati
@@ -27317,11 +27433,16 @@ const SCOPRIRE = [
    delle card che navigano. Stessi disegni, stessi testi, stesso tocco
    (toccaScoperta) e stesso anello: cambia solo il posto. */
 const OCCASIONI = [
-  {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
+  /* (25 nov 2026, cantiere richieste) i disegni NUOVI dei riquadri
+     (`occ`): tagliati da un disegno solo, col nastro di luce che passa
+     dalla sveglia alla scatola e scende nel megafono di «Cerco». I
+     titoli si accorciano (Andrea: «solo offerte», «solo sconti»); le
+     card di «Da scoprire», dove ci fossero ancora, tengono `file`. */
+  {id: 'lampo', file: 'lampo.webp', occ: 'occ-offerte.webp', emoji: '⚡', testo: 'Offerte',
    vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
                     : !!(occasioniServer && occasioniServer.lampo),
    accesa: () => filtroLampo},
-  {id: 'sconto', file: 'sconto.webp', emoji: '🎁', testo: 'Sconti dei negozi',
+  {id: 'sconto', file: 'sconto.webp', occ: 'occ-sconti.webp', emoji: '🎁', testo: 'Sconti',
    vivo: () => DEMO ? listings.some(l => scontoQui(l, 1))
                     : !!(occasioniServer && occasioniServer.sconto),
    accesa: () => filtroSconto},
@@ -27611,8 +27732,13 @@ function renderOccasioni(){
   const box = el('occasioniBanner');
   if (!box) return;
   const vive = vistaBarattolo ? [] : OCCASIONI.filter(v => v.vivo());
-  box.style.display = vive.length ? '' : 'none';
-  const firma = vive.map(v => v.id + (v.accesa() ? '!' : '')).join('|');
+  /* «Cerco» (25 nov 2026): il terzo riquadro, largo sotto i due, a chi
+     ce l'ha (il server lo dice in /api/me); non e' un filtro della
+     griglia ma una porta, quindi niente anello acceso */
+  const cerco = !vistaBarattolo && cercoAttivo();
+  box.style.display = (vive.length || cerco) ? '' : 'none';
+  const firma = vive.map(v => v.id + (v.accesa() ? '!' : '')).join('|')
+    + (cerco ? '|cerco' : '');
   if (firma === occasioniFirma) return;
   occasioniFirma = firma;
   box.innerHTML = vive.map(v => `
@@ -27621,11 +27747,11 @@ function renderOccasioni(){
          aria-pressed="${v.accesa() ? 'true' : 'false'}"
          onclick="toccaScoperta(this.dataset.id)"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
-      <img src="/assets/scoprire/${v.file}" alt="" loading="lazy"
+      <img src="/assets/scoprire/${v.occ || v.file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${esc(v.testo)}</span
       ><span class="sc-titolo" aria-hidden="true">${esc(v.testo)}</span>
-    </div>`).join('');
+    </div>`).join('') + (cerco ? CERCO_RIQUADRO : '');
 }
 
 /* I QUADRATI DEI NEGOZI SOTTO LA CARD GRANDE (23 nov 2026, Andrea:
@@ -28873,6 +28999,9 @@ function renderGrid(items){
   const ba = el('btnAvvisami');
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
+  const bc = el('btnChiedilo');
+  if (bc) bc.style.display =
+    (!data.length && cercoAttivo() && !vistaBarattolo) ? '' : 'none';
   el('grid').innerHTML = data.filter(l => !nellaFilaEvidenza(l)).map(cardHTML).join('');
   grigliaArrivata();
   /* la fila «In evidenza» (23 nov 2026) e le card P2P in vetrina: le
@@ -44252,6 +44381,191 @@ function openOrder(id){
       o.role!=='seller'), 250);
   }
 }
+/* ══ «CERCO»: LE RICHIESTE DI CHI CERCA (25 nov 2026, cantiere richieste) ══
+   Chi non trova quel che vuole lo scrive, e il server avvisa i venditori
+   adatti (li sceglie l'AI fra quelli che vendono gia' cose simili: vedi
+   «CERCO» nel server). Qui: il riquadro col megafono in home, la pagina
+   (scrivi la tua, le tue con le offerte arrivate, quelle degli altri con
+   «Offri»), e il bottone nella ricerca vuota. L'OFFERTA E' UN ANNUNCIO
+   NORMALE: «Offri» apre Vendi con la richiesta in mano, e la
+   pubblicazione porta `richiesta_id` — si compra col deposito di
+   garanzia come ogni altro. La porta la apre il server (`richieste` di
+   /api/me): aperta a tutti (Andrea: «a tutti»), la leva
+   `RICHIESTE_SOLO_MODERATORI` la richiude ai moderatori. */
+let cercoLeva = false;          // da /api/me: il server dice se c'e'
+let cercoDati = null;           // l'ultima busta di /api/richieste
+let offertaRichiesta = null;    // {id, testo, categoria} mentre si offre
+function cercoAttivo(){ return cercoLeva && !DEMO && !VETRINA; }
+
+/* IL RIQUADRO in home, sotto «Offerte» e «Sconti» (vedi I TRE RIQUADRI
+   DELLE OCCASIONI nel CSS). Il disegno e l'etichetta che esce stanno in
+   due strati della stessa misura, che respirano insieme: l'etichetta
+   resta incollata al megafono anche mentre si muove. */
+const CERCO_RIQUADRO = `
+    <div class="scoprire-card occ-cerco" role="button" tabindex="0"
+         aria-label="Cerco" onclick="apriCerco()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriCerco();}">
+      <span class="cerco-fondo"><img src="/assets/scoprire/cerco.webp" alt=""
+        loading="lazy" decoding="async" onerror="this.remove()"></span>
+      <span class="cerco-eti" aria-hidden="true"><img
+        src="/assets/scoprire/cerco-etichetta.webp" alt="" loading="lazy"
+        decoding="async" onerror="this.remove()"></span>
+      <span class="sc-titolo" aria-hidden="true">Cerco</span>
+    </div>`;
+
+PICKER.cercoCat = {titolo: 'Categoria',
+  voci: () => [...el('sellCat').options].map(o => ({val: o.value,
+    resa: `${icoCategoria(o.value)}<span><b>${esc(o.value)}</b></span>`})),
+  campo: v => v ? `${icoCategoria(v)}<span>${esc(v)}</span>`
+                : '<span class="cs-vuoto">Scegli la categoria</span>'};
+
+/* LA PORTA: il riquadro, il bottone della ricerca vuota (che porta con
+   se' la ricerca fatta), il tasto «Offri» dell'avviso del bot */
+function apriCerco(testo){
+  haptic();
+  if (!cercoAttivo()) return;
+  go('cerco');
+  cercoPrepara();
+  if (typeof testo === 'string' && el('cercoTesto')) {
+    el('cercoTesto').value = testo.slice(0, 140);
+    if (activeCat && activeCat !== 'Tutto' && el('cercoCat')) {
+      el('cercoCat').value = activeCat;
+      aggiornaPicker('cercoCat');
+    }
+  }
+  caricaCerco();
+}
+function chiediloATutti(){ apriCerco(el('q').value.trim()); }
+/* le voci del modulo sono quelle di Vendi: si copiano la prima volta */
+function cercoPrepara(){
+  const sel = el('cercoCat');
+  if (!sel || sel.options.length > 1) return;
+  sel.innerHTML = '<option value=""></option>' + [...el('sellCat').options]
+    .map(o => `<option>${esc(o.value)}</option>`).join('');
+}
+
+async function caricaCerco(){
+  const box = el('cercoCorpo');
+  if (box && !cercoDati) box.innerHTML = '<div class="hint">Carico le richieste…</div>';
+  try {
+    const r = await fetch(`${API_BASE}/richieste`, {headers: {'X-Tg-Init-Data': authHdr()}});
+    cercoDati = r.ok ? await r.json() : null;
+  } catch(e) { cercoDati = null; }
+  renderCerco();
+}
+
+/* i giorni che restano, a parole (PURA) */
+function cercoScade(sec){
+  const s = (Number(sec) || 0) - Math.floor(Date.now() / 1000);
+  if (s <= 0) return 'scade adesso';
+  const g = Math.floor(s / 86400);
+  if (g >= 2) return `ancora ${g} giorni`;
+  return g === 1 ? 'ancora 1 giorno' : 'scade oggi';
+}
+function cardRichiesta(r){
+  const budget = r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
+  const conto = r.offerte ? ` · 📬 ${r.offerte} ${r.offerte === 1 ? 'offerta' : 'offerte'}` : '';
+  let piede;
+  if (r.mia) {
+    const ann = (r.annunci || []).map(a =>
+      `<button type="button" class="cerco-offerta" onclick="openDetail(${Number(a.id)})"><span>${esc(a.titolo)}</span><b class="mono">${fmt(a.prezzo_sats)}</b></button>`).join('');
+    piede = `${ann}<button class="btn ghost mini" style="margin-top:10px" onclick="chiudiRichiesta(${Number(r.id)})">Chiudi la richiesta</button>`;
+  } else {
+    piede = `<button class="btn orange" style="margin-top:12px;width:100%" onclick="offriPerRichiesta(${Number(r.id)})">Offri</button>`;
+  }
+  return `<div class="cerco-card">
+      <div class="cerco-testa">${icoCategoria(r.categoria)}<div><b>${esc(r.testo)}</b>${budget}
+        <div class="hint" style="margin:2px 0 0">${esc(r.categoria)} · ${esc(cercoScade(r.scade))}${conto}</div></div></div>
+      ${piede}
+    </div>`;
+}
+function renderCerco(){
+  const box = el('cercoCorpo');
+  if (!box) return;
+  const d = cercoDati;
+  if (!d) { box.innerHTML = '<div class="hint">Le richieste adesso non si caricano: riprova fra poco.</div>'; return; }
+  const tutte = d.richieste || [];
+  const mie = tutte.filter(r => r.mia), altre = tutte.filter(r => !r.mia);
+  box.innerHTML = `
+    ${mie.length ? `<div class="section-label" style="padding:22px 0 0">Le tue richieste</div>
+      <div class="cerco-lista">${mie.map(cardRichiesta).join('')}</div>` : ''}
+    <div class="section-label" style="padding:22px 0 0">Cercano</div>
+    ${altre.length ? `<div class="cerco-lista">${altre.map(cardRichiesta).join('')}</div>`
+      : '<div class="hint" style="margin-top:8px">Nessuna richiesta aperta, per ora.</div>'}
+    <label class="cerco-muto"><input type="checkbox" ${d.muto ? 'checked' : ''}
+      onchange="mutoRichieste(this.checked)"> 🔕 Non avvisarmi delle richieste</label>`;
+}
+
+async function inviaRichiesta(){
+  haptic();
+  const testo = (el('cercoTesto').value || '').trim();
+  const categoria = el('cercoCat').value || '';
+  const budget = Math.max(0, Math.floor(Number(String(el('cercoBudget').value || '0').replace(/\D/g, '')) || 0));
+  if (testo.length < 4) { toast('Scrivi cosa cerchi'); return; }
+  if (!categoria) { toast('Scegli la categoria'); return; }
+  const ripristina = bottoneInAttesa(el('cercoInvia'), 'Invio…');
+  try {
+    const r = await fetch(`${API_BASE}/richieste`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({testo, categoria, budget_sats: budget})});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const e = j.detail || 'Non ci sono riuscito, riprova'; toast(e, tempoLettura(e)); return; }
+    el('cercoTesto').value = ''; el('cercoBudget').value = '';
+    toast('📣 Richiesta inviata: avvisiamo i venditori adatti', 5000);
+    caricaCerco();
+  } finally { ripristina(); }
+}
+async function chiudiRichiesta(id){
+  haptic();
+  const r = await fetch(`${API_BASE}/richieste/${Number(id)}/chiudi`,
+    {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+  if (!r.ok) { toast('Non ci sono riuscito, riprova'); return; }
+  caricaCerco();
+}
+async function mutoRichieste(muto){
+  haptic();
+  const r = await fetch(`${API_BASE}/me/richieste-muto`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({muto: !!muto})});
+  if (!r.ok) { toast('Non ci sono riuscito, riprova'); return; }
+  if (cercoDati) cercoDati.muto = !!muto;
+}
+
+/* «OFFRI»: Vendi con la richiesta in mano. La categoria e' quella della
+   richiesta; il resto lo scrive chi vende, che sa cosa ha. La nota in
+   testa al form lo ricorda, e se ne va appena si pubblica o si esce. */
+function offriPerRichiesta(id){
+  const r = (cercoDati && cercoDati.richieste || []).find(x => x.id === Number(id));
+  if (!r) return;
+  offertaRichiesta = {id: r.id, testo: r.testo, categoria: r.categoria};
+  go('vendi');
+  if (el('sellCat') && [...el('sellCat').options].some(o => o.value === r.categoria)) {
+    el('sellCat').value = r.categoria;
+    aggiornaPicker('sellCat');
+    PICKER.sellCat.poi();
+  }
+  vestiOffertaRichiesta();
+}
+function vestiOffertaRichiesta(){
+  const n = el('cercoNotaVendi');
+  if (!n) return;
+  n.style.display = offertaRichiesta ? '' : 'none';
+  if (offertaRichiesta) el('cercoNotaTesto').textContent = offertaRichiesta.testo;
+}
+
+/* IL TASTO «OFFRI» DELL'AVVISO DEL BOT: `cerco_<id>` arriva come
+   `/?cerco=<id>` (percorsoDaStartapp). Una volta sola, dopo /api/me (e'
+   lui che dice se la porta c'e'). */
+const CERCO_URL = /^\/(miniapp\.html)?$/.test(location.pathname)
+  && /[?&]cerco=[1-9][0-9]{0,11}(?:&|$)/.test(location.search);
+let cercoUrlAperto = false;
+function apriCercoDaUrl(){
+  if (!CERCO_URL || cercoUrlAperto) return;
+  cercoUrlAperto = true;
+  if (!cercoAttivo()) return;
+  apriCerco();
+}
+
 /* ═══ LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore) ═══
    IL CASO: chi compra un libro a 11 € voleva lasciare di piu', e l'app
    non glielo permetteva (un'offerta sopra il prezzo non esiste, ed e'
@@ -67441,6 +67755,8 @@ async function publish(){
         ...(duplicaDaId && !sellFoto.length
             ? {copia_foto_da: duplicaDaId} : {}),
         ...variantiPayload(),
+        /* «Offri» da una richiesta di «Cerco» (25 nov 2026) */
+        ...(offertaRichiesta ? {richiesta_id: offertaRichiesta.id} : {}),
         foto:sellFoto, didascalie:didascaliePayload()})});
     const d = await r.json().catch(()=>({}));
     /* 413: il corpo intero e' stato rifiutato prima di arrivare al
@@ -67504,6 +67820,8 @@ async function publish(){
      ritroverebbe il banner «stai duplicando» sopra un form vuoto —
      e la prossima pubblicazione erediterebbe delle foto che nessuno
      ha piu' chiesto */
+  /* ...e l'offerta a una richiesta e' partita con l'annuncio */
+  offertaRichiesta = null; vestiOffertaRichiesta();
   duplicaDaId = null; duplicaTitolo = ''; fotoAttuali = [];
   didascaliaDi.clear(); fotoNomeDi.clear(); impostaVariantiForm(null);
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
@@ -124832,6 +125150,7 @@ function spegniLinkDaUrl(){
   offertaAperta = barattoloAperto = invitoDaUrlMostrato = true;
   bozzaAperta = ordineUrlAperto = assistenzaUrlAperta = true;
   appNegozioUrlAperto = corrieriUrlAperto = raccoltaUrlAperta = true;
+  cercoUrlAperto = true;   /* «Cerco» (25 nov 2026): il tasto «Offri» del bot */
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
@@ -124901,6 +125220,7 @@ async function avviaVetrina(){
     apriOrdineDaUrl();
     apriAssistenzaDaUrl();
     apriCorrieriDaUrl();
+    apriCercoDaUrl();
     apriRaccoltaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
@@ -125258,6 +125578,10 @@ async function avvia(){
     /* LE RACCOLTE (17 nov 2026): la leva viva e quante sono in vetrina
        (la tessera c'e' solo con almeno una); un server di ieri tace */
     raccolteAttive = !!me.raccolte;
+    /* «CERCO» (25 nov 2026): la porta viva (un server di ieri tace:
+       spenta). Il riquadro si ridisegna con le occasioni */
+    cercoLeva = me.richieste === true;
+    occasioniFirma = ''; renderOccasioni();
     raccolteVive = (me.raccolte && Number(me.raccolte.vive)) || 0;
     /* LA CANCELLAZIONE DELL'ACCOUNT (1 nov 2026): la leva viva — un
        server di ieri non la manda, e la voce resta spenta */
@@ -125480,6 +125804,7 @@ async function avvia(){
     apriOrdineDaUrl();
     apriAssistenzaDaUrl();
     apriCorrieriDaUrl();
+    apriCercoDaUrl();
     apriRaccoltaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
