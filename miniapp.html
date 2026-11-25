@@ -85490,6 +85490,12 @@ function renderViaEuroPasso(){
   if (passo === 'fine' || passo === 'pagina') {
     viaEuroSeguo = '';
     chiudiFoglioP2P('viaEuroSheet');
+    /* finito bene: si torna all'ORDINE del mercatino, non allo scambio */
+    const n = o && o.viaEuro ? Number(o.viaEuro.ordine) || 0 : 0;
+    if (n > 0 && (o.stato === 'concluso' || o.stato === 'rilasciato')) {
+      loadOrders().then(() => { if (orders.find(x => x.id === n)) openOrder(n); }).catch(() => {});
+      return;
+    }
     if (o) apriOrdineP2P(o.id);
     return;
   }
@@ -85513,8 +85519,13 @@ function viaEuroHoPagato(){
   const id = viaEuroSeguo;
   if (!id) return;
   haptic();
-  if (p2pOrdineAperto !== id) apriOrdineP2P(id);
-  euroInviatiP2P();
+  /* SENZA PASSARE DALLA PAGINA P2P (25 nov 2026, Andrea: «Sam non deve
+     neanche sapere che cos'e' la scheda peer-to-peer»): la conferma di
+     sempre esce dove si e'. `euroInviatiP2P` legge lo scambio aperto una
+     volta sola, subito: lo si presta e si rimette com'era. */
+  const prima = p2pOrdineAperto;
+  p2pOrdineAperto = id;
+  try { euroInviatiP2P(); } finally { p2pOrdineAperto = prima; }
 }
 /* «RIPRENDI IL PAGAMENTO»: nella pagina dello scambio nato dalla cassa,
    finche' c'e' un passo del foglio da fare */

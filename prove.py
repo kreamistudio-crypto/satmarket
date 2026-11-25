@@ -214893,6 +214893,15 @@ console.log(JSON.stringify(r));
           "«Ho pagato» e' il suo gesto", True,
           "recapitoCompratoreP2P(o)" in rp and "rigaTempoPagareP2P(o)" in rp
           and "euroInviatiP2P();" in _fn_js(mini, "function viaEuroHoPagato(){"))
+    hp = _fn_js(mini, "function viaEuroHoPagato(){")
+    prova("...senza passare dalla pagina P2P: lo scambio si presta a "
+          "`euroInviatiP2P` e si rimette com'era (25 nov 2026)", True,
+          "apriOrdineP2P" not in hp
+          and "try { euroInviatiP2P(); } finally { p2pOrdineAperto = prima; }" in hp
+          and "const o = ordiniP2P()[p2pOrdineAperto];" in _fn_js(mini, "function euroInviatiP2P(){"))
+    prova("...e a scambio concluso si torna all'ORDINE del mercatino", True,
+          "if (n > 0 && (o.stato === 'concluso' || o.stato === 'rilasciato')) {" in rp
+          and "openOrder(n);" in rp)
     prova("«Riprendi il pagamento» nella pagina dello scambio nato dalla cassa",
           True, "(typeof viaEuroRiprendiP2P === 'function' ? viaEuroRiprendiP2P(o) : '') +" in mini
           and ">Riprendi il pagamento</button>" in _fn_js(mini, "function viaEuroRiprendiP2P(o){"))
