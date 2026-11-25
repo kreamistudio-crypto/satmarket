@@ -85396,13 +85396,27 @@ function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo){
   }
   return meglio;
 }
+/* GLI ORDINI CHE CHI PAGA IN EURO PUO' PRENDERE (25 nov 2026, dalla prova
+   con Alan e Sam): fuori quelli col filtro «almeno N scambi P2P
+   completati» (chi paga in euro di solito non ne ha, e la presa verrebbe
+   rifiutata) se il server non ha detto che posso prenderli, e quelli su
+   cui il server ha gia' detto di no. */
+function viaEuroOrdiniPrendibili(){
+  const tutti = (p2pLibro && Array.isArray(p2pLibro.ordini)) ? p2pLibro.ordini : [];
+  return tutti.filter(o => {
+    const v = (o && typeof p2pPrendibili === 'object' && p2pPrendibili[o.id]) || null;
+    if (v && v.ok === false) return false;
+    const filtro = typeof filtroOrdineP2P === 'function' ? filtroOrdineP2P(o) : 0;
+    return !(filtro > 0) || !!(v && v.ok === true);
+  });
+}
 /* l'offerta di adesso per un ordine da `sats`, col libro che c'e' */
 function viaEuroOfferta(sats){
   if (!viaEuroPerMe() || !p2pLibro || !(sats > 0)) return null;
   const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
   const fee = commissioneVivaP2P();
   if (fee === null) return null;
-  const o = viaEuroScelta(p2pLibro.ordini, sats, perSat, fee, ordiniP2P(), viaEuroNonHo);
+  const o = viaEuroScelta(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo);
   if (!o || !(myViaEuroMax > 0) || o.euro > myViaEuroMax) return null;
   return o;
 }
@@ -85765,7 +85779,7 @@ function viaEuroFissiOra(sats){
   const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
   const fee = commissioneVivaP2P();
   if (fee === null) return [];
-  return viaEuroFissi(p2pLibro.ordini, sats, perSat, fee, ordiniP2P(), viaEuroNonHo).filter(c => c.euro <= myViaEuroMax);
+  return viaEuroFissi(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo).filter(c => c.euro <= myViaEuroMax);
 }
 /* la ricerca di Mario, come la dice il server: {richiesta, annuncio_id, stato} */
 let viaEuroCerca = null;
