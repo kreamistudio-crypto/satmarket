@@ -29399,6 +29399,13 @@ function spegniReparto(){
 async function doSearch(){
   haptic();
   const q = el('q').value.trim();
+  /* L'INVIO CHIUDE LA TASTIERA (25 nov 2026, cantiere tastiera-ricerca,
+     Andrea: «dopo l'invio la tastiera chiudila in automatico»): sul
+     telefono restava aperta e copriva meta' dei risultati appena
+     raggiunti. Il campo perde il fuoco e la tastiera se ne va; la parola
+     cercata resta scritta. Ogni invio, anche a campo vuoto: e' il gesto
+     di «ho finito di scrivere». */
+  el('q').blur();
   /* LA RICERCA GUARDA TUTTI GLI ARTICOLI (ago 2026, decisione di
      Andrea): premere invio da dentro un reparto lo spegne — l'AI non
      ha mai filtrato per categoria, ma DEMO e vetrina anonima si', e

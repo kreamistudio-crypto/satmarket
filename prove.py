@@ -44557,6 +44557,11 @@ def prove_seo():
            in ds[_i_demo:_f_demo],
            0 < _f_demo < ds.find("armaScrollReparto(true);", _f_demo)
            < ds.find("loadListings()", _f_demo)])
+    # L'INVIO CHIUDE LA TASTIERA (25 nov 2026, cantiere tastiera-ricerca):
+    # il campo perde il fuoco a ogni invio, prima di ogni ramo
+    prova("l'invio chiude la tastiera, a ogni invio e prima di ogni ramo", True,
+          0 < ds.find("el('q').blur();") < ds.find("if (q && activeCat")
+          and ds.find("el('q').blur();") < ds.find("if (!q) {"))
     sr = pezzo_js(testo_mini, "function spegniReparto(){", "\n}\n")
     # NIENTE setCat qui dentro: ricaricherebbe la prima pagina intera
     # in GARA con la fetch dei risultati — vincerebbe chi arriva
