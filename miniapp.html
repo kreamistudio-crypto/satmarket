@@ -27731,7 +27731,12 @@ let occasioniFirma = '';
 function renderOccasioni(){
   const box = el('occasioniBanner');
   if (!box) return;
-  const vive = vistaBarattolo ? [] : OCCASIONI.filter(v => v.vivo());
+  /* SEMPRE IN VISTA (25 nov 2026 sera, Andrea: «quando non c'è nessuna
+     offerta a tempo o sconto comunque le card si devono sempre vedere»):
+     i due riquadri non aspettano piu' i flag della busta (`vivo`). Un
+     filtro acceso senza niente da mostrare trova la griglia vuota, e si
+     spegne dallo stesso riquadro. Col barattolo aperto restano spenti. */
+  const vive = vistaBarattolo ? [] : OCCASIONI;
   /* «Cerco» (25 nov 2026): il terzo riquadro, largo sotto i due, a chi
      ce l'ha (il server lo dice in /api/me); non e' un filtro della
      griglia ma una porta, quindi niente anello acceso */

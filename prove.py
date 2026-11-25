@@ -53421,8 +53421,11 @@ dice("a chi ha gia votato la card RESTA", ['p2p','lampo','sconto'],
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
 // (fino al 24 nov 2026 con lei restava la card delle aste: tolta,
-// cantiere home-card-pulite)
-dice('...e senza occasioni resta lei sola', ['p2p'], idCard());
+// cantiere home-card-pulite). DAL 25 NOV 2026 SERA i due riquadri
+// restano anche senza occasioni (Andrea: «le card si devono sempre
+// vedere»): nella fila resta lei sola, sopra la griglia loro due
+dice('...e senza occasioni nella fila resta lei sola, e i riquadri restano',
+     ['p2p','lampo','sconto'], idCard());
 // IL PREZZO DICHIARATO: con una card fissa la sezione non puo' piu'
 // sparire — il display:none era la proprieta' piu' forte del blocco,
 // e questa riga e' il posto dove il suo prezzo si vede.
@@ -205865,6 +205868,9 @@ def prove_richieste():
           [True, True],
           [bool(_re.search(r"\.occ-cerco \.cerco-eti\{[^}]*display:none", mini)),
            '#occasioniBanner [data-id="sconto"] ~ .occ-cerco .cerco-eti{display:block}' in mini])
+    # (25 nov 2026 sera) i due riquadri restano anche senza occasioni
+    prova("Offerte e Sconti sempre in vista, fuori dal barattolo", True,
+          "const vive = vistaBarattolo ? [] : OCCASIONI;" in mini)
     prova("il riquadro sta in coda ai due, mai in DEMO, vetrina o barattolo",
           [True, True],
           ["const cerco = !vistaBarattolo && cercoAttivo();" in mini,
