@@ -222710,24 +222710,28 @@ def prove_promozioni():
 
     # ---- 1. LE LEVE, coi prezzi decisi da Andrea il 23 nov ----------
     # (i prezzi fissi del 23 nov sono diventati SCALINI il 25 nov: i
-    # numeri proposti quel giorno e approvati da Andrea)
+    # numeri proposti quel giorno e approvati da Andrea, rifatti da lui
+    # la sera stessa)
     for riga in ("PROMOZIONI_ATTIVE = True",
-                 "PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))",
                  "PROMO_IN_CIMA_ORE = 24",
+                 "PROMO_SCOPRIRE_POSTI = 10",
                  "PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}",
                  "PROMO_EVIDENZA_POSTI = 8",
                  "PROMO_SCOPRIRE_GIORNI = 30"):
         prova(f"la leva c'e' col suo valore: {riga}", True, riga in src)
         prova(f"...e nel config d'esempio", True, riga in esempio)
-    for riga in ("PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),\n"
-                 "                          (5, 25_000), (6, 35_000), (7, 50_000))",
+    for riga in ("PROMO_EVIDENZA_SCALINI = ((0, 7_000), (1, 9_000), (2, 12_000),\n"
+                 "                          (3, 15_000), (4, 19_000), (5, 24_000),\n"
+                 "                          (6, 31_000), (7, 40_000))",
                  "PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),\n"
-                 "                          (3, 50_000), (4, 70_000), (5, 100_000))"):
+                 "                          (3, 45_000), (4, 50_000))",
+                 "PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (4, 8_000), (5, 11_000),\n"
+                 "                         (6, 14_000), (7, 17_000), (8, 20_000))"):
         prova(f"la scala c'e' nel config d'esempio: {riga.split(' =')[0]}",
               True, riga in esempio)
+        _rientro = " " * len(riga.split("(")[0] + "(")
         prova("...e nel server, con gli stessi numeri", True,
-              riga.replace("\n                          ",
-                           "\n                              ") in src)
+              riga.replace("\n" + _rientro, "\n    " + _rientro) in src)
     prova("i prezzi fissi di prima non li legge piu' nessuno", (0, 0, 0),
           tuple(codice(src).count(f"import {n}") for n in (
               "PROMO_IN_CIMA_SATS", "PROMO_EVIDENZA_SATS",
@@ -222760,35 +222764,41 @@ def prove_promozioni():
            for m in ("promo_cima", "promo_evidenza", "promo_scoprire")])
 
     # ---- 3. I PEZZI PURI, girati --------------------------------------
-    amb = {"PROMO_EVIDENZA_SCALINI": ((0, 5_000), (2, 10_000), (4, 15_000),
-                                      (5, 25_000), (6, 35_000), (7, 50_000)),
+    amb = {"PROMO_EVIDENZA_SCALINI": ((0, 7_000), (1, 9_000), (2, 12_000),
+                                      (3, 15_000), (4, 19_000), (5, 24_000),
+                                      (6, 31_000), (7, 40_000)),
            "PROMO_EVIDENZA_DURATE": {7: 1, 15: 1.7, "x": 3, 0: 9, 400: 1,
                                      30: 0},
-           "PROMO_IN_CIMA_SCALINI": ((0, 2_000), (3, 5_000), (6, 8_000),
-                                     (10, 12_000)),
+           "PROMO_IN_CIMA_SCALINI": ((0, 2_000), (3, 5_000), (4, 8_000),
+                                     (5, 11_000), (6, 14_000), (7, 17_000),
+                                     (8, 20_000)),
            "PROMO_SCOPRIRE_SCALINI": ((0, 20_000), (1, 30_000), (2, 40_000),
-                                      (3, 50_000), (4, 70_000), (5, 100_000)),
+                                      (3, 45_000), (4, 50_000)),
            "PROMO_SCOPRIRE_GIORNI": 30, "PROMO_IN_CIMA_ORE": 24}
     for nome in ("scalini_promo", "prezzo_a_scalini", "listino_evidenza",
                  "_voce_promo", "_promo_dal_riferimento", "in_cima_da"):
         exec(pezzo(nome), amb)
     prova("il listino salta le durate storte e resta ordinato, a fila vuota "
-          "dal primo scalino", [(7, 5_000), (15, 8_500)],
+          "dal primo scalino", [(7, 7_000), (15, 11_900)],
           amb["listino_evidenza"]())
     # I PREZZI A SCALINI (25 nov 2026, Andrea: «se ci sono già 5 card, la
-    # sesta costerà tanto»): la tabella approvata, posto per posto
+    # sesta costerà tanto»): la tabella approvata, posto per posto — quella
+    # rifatta la sera (Mensola da 7.000 a 40.000, in alto al massimo
+    # 20.000, il negozio nella home da 20.000 a 50.000)
     prova("Mensola, 7 giorni: lo scalino per 0..9 posti gia' presi",
-          [5_000, 5_000, 10_000, 10_000, 15_000, 25_000, 35_000, 50_000,
-           50_000, 50_000],
+          [7_000, 9_000, 12_000, 15_000, 19_000, 24_000, 31_000, 40_000,
+           40_000, 40_000],
           [dict(amb["listino_evidenza"](n))[7] for n in range(10)])
-    prova("...e i 15 giorni 1,7 volte tanto", [8_500, 17_000, 85_000],
+    prova("...e i 15 giorni 1,7 volte tanto", [11_900, 20_400, 68_000],
           [dict(amb["listino_evidenza"](n))[15] for n in (0, 2, 7)])
-    prova("In cima: lo scalino per gli annunci saliti nelle ultime 24 ore",
-          [2_000, 2_000, 5_000, 5_000, 8_000, 8_000, 12_000, 12_000],
-          [amb["_voce_promo"]("cima", n)[1] for n in (0, 2, 3, 5, 6, 9, 10, 40)])
-    prova("Da scoprire: lo scalino per i negozi gia' dentro",
-          [20_000, 30_000, 40_000, 50_000, 70_000, 100_000, 100_000],
-          [amb["_voce_promo"]("scoprire", n)[1] for n in (0, 1, 2, 3, 4, 5, 12)])
+    prova("La card in alto: lo scalino per gli annunci saliti nelle ultime "
+          "24 ore, fino al tetto di 20.000",
+          [2_000, 2_000, 5_000, 8_000, 11_000, 14_000, 17_000, 20_000, 20_000],
+          [amb["_voce_promo"]("cima", n)[1] for n in (0, 2, 3, 4, 5, 6, 7, 8, 40)])
+    prova("Il negozio nella home: lo scalino per i negozi gia' dentro, "
+          "fermo a 50.000 dal quinto",
+          [20_000, 30_000, 40_000, 45_000, 50_000, 50_000, 50_000],
+          [amb["_voce_promo"]("scoprire", n)[1] for n in (0, 1, 2, 3, 4, 5, 9)])
     sc = amb["scalini_promo"]
     prova("la scala salta le coppie storte, a zero e negative, e si "
           "rimette in ordine; una leva che non e' una scala da' []",
@@ -222799,12 +222809,12 @@ def prove_promozioni():
           "prima soglia", (0, 9), (amb["prezzo_a_scalini"]([(2, 9)], 1),
                                    amb["prezzo_a_scalini"]([(2, 9)], 2)))
     prova("...la scala che torna dal pannello (liste e chiavi di testo) "
-          "vale lo stesso", 8_500,
+          "vale lo stesso", 11_900,
           (amb.update(PROMO_EVIDENZA_DURATE={"15": 1.7}),
            dict(amb["listino_evidenza"](0)).get(15))[1])
     amb["PROMO_EVIDENZA_DURATE"] = {7: 1, 15: 1.7}
     prova("le voci che si comprano, e quelle che no",
-          [("promo_cima", 2_000, 0), ("promo_evidenza", 8_500, 15),
+          [("promo_cima", 2_000, 0), ("promo_evidenza", 11_900, 15),
            ("promo_scoprire", 20_000, 30), None, None, None],
           [amb["_voce_promo"](t) for t in
            ("cima", "evidenza:15", "scoprire", "evidenza:3", "boh", None)])
@@ -223023,7 +223033,8 @@ console.log(JSON.stringify([a, b, c]));""")
     prova("...la carta lucida e' la ricetta della porta Streak", True,
           ".btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,"
           "rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%)," in mini)
-    _v = (pezzo_js(mini, "const ICONA_PROMO = {", "\n};") + "\n};\n"
+    _v = (re.search(r"^const PROMO_ETICHETTA = .*$", mini, re.M).group(0) + "\n"
+          + pezzo_js(mini, "const ICONA_PROMO = {", "\n};") + "\n};\n"
           + pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};") + "\n};\n"
           + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n") + "\n}\n")
     r = _node_banco("""
@@ -223071,7 +223082,7 @@ console.log(JSON.stringify([conta(ev, 'class="promo-durata"'),
           "spenta (se il cassetto del banner c'e'), la riga che lo dice e il "
           "tasto che porta al banner", (True, True, True, True, True, True),
           ("serve: promoServeBanner ? 'Prima serve il banner" in ap,
-           "no: (sc.banner || cassettoBanner) ? ''" in ap
+           ": (sc.banner || cassettoBanner) ? ''" in ap
            and "&& !sc.banner && cassettoBanner;" in ap,
            "if (promoScelta === 'scoprire' && promoServeBanner) return "
            "apriCassettoProfilo('accBanner');" in ap,
@@ -223101,7 +223112,7 @@ console.log(JSON.stringify([a.includes(' disabled'), a.includes('data-serve="ban
     prova("«Da scoprire» vende la card E la pagina dedicata, con la frase di "
           "Andrea, nel foglio, nel suo cassetto e nella conferma; «dopo l'ok "
           "del moderatore» non c'e' piu'", (True, 4, 0),
-          ("const SCOPRIRE_COSA = 'La card grande del tuo negozio in cima alla home e una '\n"
+          ("const SCOPRIRE_COSA = 'La card grande del tuo negozio in alto nella home e una '\n"
            "  + 'pagina dedicata, preparata da noi con le tue foto e il tuo testo.';" in mini,
            mini.count("SCOPRIRE_COSA"),
            mini.count("dopo l\\'ok del moderatore")))
@@ -223568,6 +223579,99 @@ INSERT INTO annunci VALUES
            ".card.ev" not in mini))
     prova("le card degli scambi P2P in home larghe come quelle in evidenza",
           True, ".p2p-vt-fila .card{flex:0 0 150px;width:150px}" in mini)
+
+    # ---- 7d. LA CARD SPINTA IN ALTO SI VEDE, E IL NEGOZIO NELLA HOME HA
+    # DIECI POSTI (25 nov 2026 sera, Andrea: la card «deve essere
+    # scontornata e messa in evidenza, magari con una scritta sopra», e
+    # «dal 10º in poi non è più possibile, metti un limite di 10»)
+    prova("l'etichetta della card in alto: la colonna additiva e la "
+          "vetrina che la porta", (True, True),
+          ('"sponsor_fino INTEGER DEFAULT 0",' in src,
+           "a.sponsor_fino, " in src[src.index("CAMPI_VETRINA = ("):
+                                     src.index("\n)\n", src.index("CAMPI_VETRINA = ("))]))
+    _inc = pezzo("_incassa_promo")
+    prova("...la scrive l'incasso della card in alto, per PROMO_IN_CIMA_ORE "
+          "da adesso (insieme alla data che la fa salire)", (True, True),
+          ("fino = adesso + max(0, int(PROMO_IN_CIMA_ORE or 0)) * 3600" in _inc,
+           'UPDATE annunci SET creato=?, sponsor_fino=? "\n'
+           '                            "WHERE id=?", (adesso, fino, aid))' in _inc))
+    prova("...e il rimborso la toglie (la data no)", True,
+          "UPDATE annunci SET sponsor_fino=0 WHERE id=? " in pezzo("_disfa_promo"))
+    _amb = {"PROMO_SCOPRIRE_POSTI": 3}
+    exec(pezzo("posti_scoprire"), _amb)
+    _c = _sq.connect(":memory:")
+    _c.row_factory = _sq.Row
+    _c.executescript("""
+CREATE TABLE utenti(tg_id INTEGER, promo_scoprire_fino INTEGER);
+INSERT INTO utenti VALUES(1, 500),(2, 300),(3, 0),(4, 50),(5, 900);""")
+    _ps = _amb["posti_scoprire"]
+    _r1 = (_ps(_c, 100), _ps(_c, 100, 2), _ps(_c, 400))
+    _amb["PROMO_SCOPRIRE_POSTI"] = 0
+    _r2 = _ps(_c, 100)
+    _c.close()
+    prova("i posti del negozio nella home: pieni = il prossimo che si "
+          "libera; chi rinnova non aspetta se stesso; una card scaduta non "
+          "conta; 0 = senza limite",
+          ((3, 300), (2, 0), (2, 0), (3, 0)), _r1 + (_r2,))
+    _cp = pezzo("compra_promo")
+    prova("...la fattura del negozio guarda i posti PRIMA dello scalino e "
+          "della fattura, e dice quando si libera", (True, True),
+          (_cp.index("posti_scoprire(con, adesso, user[\"id\"])")
+           < _cp.index("presi = _presi_promo(") < _cp.index("crea_invoice_escrow("),
+           '"I negozi nella home sono al "' in _cp))
+    prova("...e il listino li manda al foglio", True,
+          '"occupati": occ_sc, "libero_da": libero_sc,' in pezzo("listino_promo"))
+    prova("la leva dei posti e' sul pannello", True,
+          '"PROMO_SCOPRIRE_POSTI", int(PROMO_SCOPRIRE_POSTI or 0)),' in src)
+    _ch = pezzo_js(mini, "const cardHTML = l => {", "\n    </div>`; };")
+    prova("la card: l'etichetta e la cornice finche' la data corre, con la "
+          "parola scelta in un posto solo", (True, True, True, True),
+          ("const sponsor = (+l.sponsorFino || 0) * 1000 > Date.now();" in _ch,
+           "${sponsor?' sponsor':''}" in _ch,
+           "<div class=\"info\">\n        ${sponsor ? `<div class=\"card-sponsor\">${PROMO_ETICHETTA}</div>` : ''}\n        <div class=\"title\">" in _ch,
+           "    sponsorFino:a.sponsor_fino||0,\n" in mini))
+    prova("...la card tinta d'arancio sopra il SUO colore (background-image), "
+          "il bollino sopra il titolo", (True, True, 0),
+          ("  .card.sponsor{\n    background-image:linear-gradient(" in _css,
+           "  .card-sponsor{display:inline-block;" in _css,
+           _css[_css.index("  .card.sponsor{"):_css.index("}", _css.index("  .card.sponsor{"))].count("overflow")))
+    _ant = pezzo_js(mini, "const ANTEPRIMA_PROMO = {", "\n};")
+    prova("l'anteprima della card in alto: arrivata in testa si accende con "
+          "la tinta, il bollino e la cornice", (True, True, True, True),
+          ("<span class=\"pa-sp\">' + PROMO_ETICHETTA + '</span>" in _ant,
+           "@keyframes pa-sp{0%,62%{opacity:0;" in _css,
+           "76%,100%{top:8px;left:21%;transform:none;\n"
+           "      box-shadow:0 0 0 1.5px #FF8A00" in _css,
+           "  .pa-v.pa-vt{background-image:linear-gradient(" in _css))
+    prova("...l'arancio delle card promosse e' scritto in chiaro: "
+          "var(--orange) qui non esiste", 0,
+          sum(_css[_css.index(k):_css.index("}", _css.index(k))].count("var(--orange)")
+              for k in ("  .card.sponsor{", "  .card-sponsor{", "  .pa-v.pa-vt{", "  .pa-sp{")))
+    # «IN VETRINA» (25 nov 2026, Andrea: «togli tappo», poi «usa la 6» fra
+    # sei anteprime, «e metti la scritta in vetrina»)
+    prova("la parola e' «In vetrina», e la dicono anche il toast e il bot",
+          (True, True, True),
+          ("const PROMO_ETICHETTA = 'In vetrina';" in mini,
+           "toast('⬆️ Fatto! Il tuo annuncio è in vetrina per 24 ore.', 6000);" in mini,
+           '"⬆️ <b>Fatto!</b> Il tuo annuncio è in vetrina "\n'
+           '                           "per 24 ore.")' in _inc))
+    prova("...e Tappo disegnato non c'e' piu': ne' file, ne' rotta, ne' "
+          "immagine nella card o nell'anteprima", (False, 0, 0, 0),
+          (os.path.exists(os.path.join("assets", "tappo-saluta.webp")),
+           src.count("tappo-saluta"), mini.count("tappo-saluta"),
+           mini.count("card-tappo") + mini.count("pa-tappo")))
+    _apv = _senza_commenti_js(ap)
+    prova("il foglio: la voce in alto col suo nome nuovo, il negozio «nella "
+          "home», e «In cima» e «Da scoprire» non si leggono piu'",
+          (True, True, True, 0, 0),
+          ("titolo: `${PROMO_ETICHETTA}, ${fmt(c.sats)} sats`" in _apv,
+           "titolo: `Il negozio nella home, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`" in _apv,
+           "I negozi nella home sono al completo: il prossimo posto si libera il" in _apv,
+           _apv.count("In cima"), _apv.count("Da scoprire")))
+    _cs = _senza_commenti_js(pezzo_js(mini, "async function chiediPromoScoprire(){", "\n}\n"))
+    prova("...anche dal cassetto del negozio", (True, 0, True),
+          ("titolo: `Il negozio nella home," in _cs, _cs.count("Da scoprire"),
+           "sc.libero_da && !sc.fino" in _cs))
 
     # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
     prova("collaudo_promozioni e' fra i collaudi della CI", True,

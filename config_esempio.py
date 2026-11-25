@@ -643,23 +643,28 @@ SLUG_NEGOZIO_PREZZO_SATS = 5_000
 PROMOZIONI_ATTIVE = True
 # I PREZZI A SCALINI (25 nov 2026): coppie (QUANTI GIA' PRESI, SATS);
 # vale lo scalino piu' alto raggiunto. Una scala vuota spegne quella sola.
-# «⬆️ In cima»: torna primo fra i più recenti e riesce nel canale. I
-# presi: gli annunci saliti in cima pagando nelle ultime PROMO_IN_CIMA_ORE.
+# «⬆️ In vetrina» (era «In cima»): torna primo fra i più recenti,
+# riesce nel canale e per PROMO_IN_CIMA_ORE porta l'etichetta. I presi:
+# gli annunci saliti in cima pagando nelle ultime PROMO_IN_CIMA_ORE.
 # Al massimo una volta ogni PROMO_IN_CIMA_ORE per annuncio.
-PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (6, 8_000), (10, 12_000))
+PROMO_IN_CIMA_SCALINI = ((0, 2_000), (3, 5_000), (4, 8_000), (5, 11_000),
+                         (6, 14_000), (7, 17_000), (8, 20_000))
 PROMO_IN_CIMA_ORE = 24
 # «⭐ Mensola» (era «In evidenza»): la scala vale per la durata piu' corta,
 # le altre la moltiplicano (giorni -> volte). I presi: i posti occupati
 # dei PROMO_EVIDENZA_POSTI.
-PROMO_EVIDENZA_SCALINI = ((0, 5_000), (2, 10_000), (4, 15_000),
-                          (5, 25_000), (6, 35_000), (7, 50_000))
+PROMO_EVIDENZA_SCALINI = ((0, 7_000), (1, 9_000), (2, 12_000),
+                          (3, 15_000), (4, 19_000), (5, 24_000),
+                          (6, 31_000), (7, 40_000))
 PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}
 PROMO_EVIDENZA_POSTI = 8
-# «🏪 Il negozio in Da scoprire»: poi resta per sempre fra i Consigliati.
-# I presi: i negozi che ci sono gia'.
+# «🏪 Il negozio nella home» (era «Da scoprire»): poi resta per sempre
+# fra i Consigliati. I presi: i negozi PAGATI che ci sono gia'. I posti:
+# tutti i negozi dentro, regali compresi (0 = senza limite).
 PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),
-                          (3, 50_000), (4, 70_000), (5, 100_000))
+                          (3, 45_000), (4, 50_000))
 PROMO_SCOPRIRE_GIORNI = 30
+PROMO_SCOPRIRE_POSTI = 10
 
 # LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026): gli unici
 # domini che una descrizione di annuncio rende TOCCABILI. Tutto il
