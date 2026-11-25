@@ -243,3 +243,4 @@ collaudo_foto_varianti.py
 collaudo_scorta_codici.py
 collaudo_quadro_servizi.py
 collaudo_richieste.py
+collaudo_categorie_una_volta.py

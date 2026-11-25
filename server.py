@@ -9557,7 +9557,10 @@ def init_db():
         categoria_nuova TEXT DEFAULT '',
         motivo TEXT DEFAULT '',
         creato INTEGER DEFAULT 0,
-        stato TEXT DEFAULT 'proposta',   -- proposta | applicata | scartata
+        stato TEXT DEFAULT 'proposta',   -- proposta | applicata | scartata | tenuta
+        -- «tenuta» (25 nov 2026): l'AI ha risposto «resta dov'e'».
+        -- Non e' una decisione e non va in coda: e' la memoria della
+        -- domanda gia' fatta, perche' il giro dell'ora non la ripaghi.
         deciso_da INTEGER DEFAULT 0,     -- tg_id del moderatore
         deciso_il INTEGER DEFAULT 0
     );
@@ -107256,7 +107259,13 @@ async def _chiedi_categorie(voci: list) -> dict:
     e' un prompt che diverge: si corregge una, si dimentica l'altra, e
     la coda si riempie di proposte diverse secondo chi le ha chieste.
     Fail-open come tutta la moderazione: se la chiamata esplode, il
-    lotto passa e si riprova al giro dopo."""
+    lotto passa e si riprova al giro dopo.
+
+    IL FALLIMENTO DICE None, NON {} (25 nov 2026): {} vuol dire «l'AI
+    li ha guardati e restano tutti dove sono», e il giro se lo segna
+    (le righe «tenuta»). Una chiamata esplosa non ha guardato niente, e
+    segnarla come risposta toglierebbe quegli annunci dalla coda per
+    sempre senza che nessuno li abbia visti."""
     import ricategorizza
     corpo = "\n\n".join(
         f"ANNUNCIO {i}\nTITOLO: {(t or '')[:160]}\n"
@@ -107271,7 +107280,7 @@ async def _chiedi_categorie(voci: list) -> dict:
             messages=[{"role": "user", "content": corpo}])
     except Exception as e:
         print(f"⚠️ Lotto di ricategorizzazione saltato: {e}")
-        return {}
+        return None
     testo = "".join(b.text for b in r.content if b.type == "text")
     ora = {i: c for i, _, _, c in voci}
     fuori = {}
@@ -107308,7 +107317,17 @@ async def ricategorizza_automatico():
       2. e non si ripaga due volte cio' che e' gia' in coda: niente
          chiamata per gli annunci che hanno gia' una proposta in
          attesa sulla categoria che hanno adesso;
-      3. il tetto per giro, che un'ondata la digerisce in piu' ore.
+      3. il tetto per giro, che un'ondata la digerisce in piu' ore;
+      4. CHIESTO E' CHIESTO (25 nov 2026, visto da Andrea: venti
+         proposte nuove a ogni ora, quasi tutte magliette da
+         «Bitcoin» ad «Abbigliamento»). Il «resta dov'e'» dell'AI non
+         lasciava traccia: l'annuncio tornava nel giro dopo, si
+         ripagava la domanda, e prima o poi l'AI rispondeva diverso —
+         la coda si riempiva di ripensamenti, un'ora alla volta. Ora
+         anche il «resta» si scrive (stato «tenuta», fuori dalla coda
+         dei moderatori), e il freno 2 lo copre gia': l'annuncio si
+         richiede solo se cambia categoria. Andrea: «la tengo, ma una
+         volta sola».
     Piu' la leva del config, che la spegne del tutto.
 
     CONSEGUENZA DICHIARATA del freno 1: un annuncio deciso resta
@@ -107350,17 +107369,40 @@ async def ricategorizza_automatico():
         if not righe:
             return
         proposte = {}
+        guardati = []          # solo i lotti a cui l'AI ha risposto davvero
         for i in range(0, len(righe), 20):
             lotto = righe[i:i + 20]
-            proposte.update(await _chiedi_categorie(
+            fuori = await _chiedi_categorie(
                 [(r["id"], r["titolo"], r["descrizione"], r["categoria"])
-                 for r in lotto]))
+                 for r in lotto])
+            if fuori is None:
+                continue       # esplosa: nessuno guardato, si riprova
+            proposte.update(fuori)
+            guardati += [r["id"] for r in lotto]
         ora = {r["id"]: (r["categoria"], r["titolo"]) for r in righe}
+        adesso = int(time.time())
+        # IL FRENO 4: chi l'AI ha guardato e lasciato dov'e' si segna,
+        # con la categoria di adesso — cosi' il NOT EXISTS lo salta
+        # finche' quella non cambia. Mai sopra una riga DECISA.
+        tenuti = [i for i in guardati if i not in proposte]
+        if tenuti:
+            con = db()
+            con.executemany(
+                "INSERT INTO categoria_proposta(annuncio_id, categoria_ora, "
+                "categoria_nuova, motivo, creato, stato, deciso_da, "
+                "deciso_il) VALUES(?,?,?,'',?,'tenuta',0,0) "
+                "ON CONFLICT(annuncio_id) DO UPDATE SET "
+                "categoria_ora=excluded.categoria_ora, "
+                "categoria_nuova=excluded.categoria_nuova, "
+                "creato=excluded.creato, stato='tenuta' "
+                "WHERE categoria_proposta.stato IN ('proposta','tenuta')",
+                [(i, ora[i][0], ora[i][0], adesso) for i in tenuti])
+            con.commit()
+            con.close()
         if not proposte:
             print(f"🗂 Ricategorizzazione: {len(righe)} guardati, "
                   f"nessuno da spostare")
             return
-        adesso = int(time.time())
         con = db()
         con.executemany(
             "INSERT INTO categoria_proposta(annuncio_id, categoria_ora, "
@@ -107374,8 +107416,10 @@ async def ricategorizza_automatico():
             # La cintura del freno 1: anche se un domani la query
             # sopra se ne dimenticasse, una riga DECISA non si
             # sovrascrive mai da qui. E' il registro di chi ha deciso
-            # cosa, e la macchina non lo cancella.
-            "WHERE categoria_proposta.stato='proposta'",
+            # cosa, e la macchina non lo cancella. Una «tenuta» invece
+            # si', che non e' una decisione: e' una domanda vecchia, e
+            # l'annuncio e' tornato qui perche' ha cambiato categoria.
+            "WHERE categoria_proposta.stato IN ('proposta','tenuta')",
             [(i, ora[i][0], nuova, adesso) for i, nuova in proposte.items()])
         con.commit()
         con.close()

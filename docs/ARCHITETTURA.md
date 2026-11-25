@@ -28534,6 +28534,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e la coda si riempie di proposte diverse secondo chi le ha chieste.
   Fail-open totale come la moderazione: lotto saltato = si riprova al
   giro dopo.
+  IL FRENO 4, CHIESTO È CHIESTO (25 nov 2026, cantiere
+  categorie-una-volta; Andrea: «la tengo, ma una volta sola»). I tre
+  freni ricordavano le proposte e le decisioni, ma NON il «resta
+  dov'è»: un annuncio che l'AI lasciava al suo posto non lasciava
+  traccia, tornava al giro dopo e la domanda si ripagava ogni ora — e
+  prima o poi l'AI rispondeva diverso, così la coda si riempiva di
+  proposte nuove sugli stessi annunci (quattro «🗂 N nuove proposte»
+  in una sera). Ora chi sta in un lotto a cui l'AI ha RISPOSTO e non
+  ha una proposta si segna nella stessa tabella con lo stato
+  `tenuta` (categoria_ora = categoria_nuova = quella di adesso): il
+  NOT EXISTS del freno 2 già lo salta finché la categoria resta
+  quella, e la coda dei moderatori non lo vede (filtra
+  `stato='proposta'`). Un annuncio che cambia categoria si richiede:
+  la domanda è nuova. Il lotto ESPLOSO non segna niente, ed è per
+  questo che `_chiedi_categorie` rende `None` e non `{}` quando la
+  chiamata cade: `{}` vuol dire «tutti a posto», e segnare «tenuti»
+  venti annunci che nessuno ha guardato li toglierebbe dal giro per
+  sempre. Tenute e proposte si riscrivono solo da righe ancora aperte
+  (`stato IN ('proposta','tenuta')`): una decisa resta del moderatore.
+  Spegnere la leva (`RICATEGORIZZA_AUTO = False`) era l'alternativa
+  offerta ad Andrea, scartata da lui: i nuovi importati in «Altro»
+  meritano una proposta. Provato da `collaudo_categorie_una_volta`
+  (la funzione vera con l'AI finta) e `prove_categorie_una_volta`.
   LA REGOLA «BITCOIN» È TEMATICA (ago 2026, dal campo: 19 proposte, e
   UNDICI tiravano fuori da «Bitcoin» sacche, poster cypherpunk e
   magliette — Andrea le scartava a mano). Non era il modello a

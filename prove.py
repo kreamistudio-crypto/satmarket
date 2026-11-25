@@ -133463,6 +133463,36 @@ def _livelli_dal_sorgente():
     return amb["LIVELLI"]
 
 
+def prove_categorie_una_volta():
+    """LE CATEGORIE CHIESTE UNA VOLTA SOLA (25 nov 2026, cantiere
+    categorie-una-volta, Andrea: «la tengo, ma una volta sola»). Il giro
+    dell'ora ripagava ogni ora la stessa domanda all'AI, perche' il
+    «resta dov'e'» non lasciava traccia. Qui le sentinelle sul sorgente:
+    il fallimento dice None (non {}, che vorrebbe dire «tutti a posto»),
+    il giro segna «tenuta» SOLO chi sta in un lotto che ha risposto, e
+    una riga decisa da un moderatore non la riscrive nessuno. Il giro
+    vero, con l'AI finta, sta in `collaudo_categorie_una_volta`."""
+    print("\n[le categorie chieste una volta sola]")
+    chiedi = pezzo("_chiedi_categorie")
+    prova("_chiedi_categorie: la chiamata esplosa rende None",
+          True, "return None" in chiedi)
+    prova("...e non piu' il {} che sembrava «tutti a posto»",
+          False, "return {}" in chiedi.split("except", 1)[-1])
+    giro = pezzo("ricategorizza_automatico")
+    prova("il giro salta i lotti esplosi senza segnarli",
+          True, "if fuori is None:" in giro and "guardati" in giro)
+    prova("chi resta dov'e' si segna «tenuta»", True, "'tenuta'" in giro)
+    prova("tenute e proposte si riscrivono solo se ancora aperte "
+          "(deciso e' deciso)", 2,
+          giro.count("WHERE categoria_proposta.stato IN "
+                     "('proposta','tenuta')"))
+    prova("una tenuta non si richiede finche' la categoria e' quella",
+          True, "p.categoria_ora=a.categoria" in giro)
+    prova("la coda dei moderatori mostra solo le proposte", True,
+          "p.stato='proposta'" in _SORGENTE[
+              _SORGENTE.index("_SQL_PROPOSTE = "):][:600])
+
+
 def prove_quadro_servizi():
     """IL QUADRO DEI SERVIZI (25 nov 2026, cantiere quadro-servizi, Andrea:
     «un monitor di tutte le applicazioni che abbiamo, in che status sono,
@@ -224512,7 +224542,7 @@ CATEGORIE = {
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
-    ricategorizza collaudo_ricategorizza asta proxy_asta annullo
+    ricategorizza collaudo_ricategorizza categorie_una_volta asta proxy_asta annullo
     annullo_venditore spunta_rimborso abbandonati pagamenti_non_arrivati
     ritiro disarmo importo_uscita foto foto_scarti fotocamera_pagina
     tela_bugiarda duplica_annuncio avatar foto_spenta
@@ -225696,6 +225726,7 @@ def main():
               prove_p2p_sconto,
               prove_ronda_nodo,
               prove_quadro_servizi,
+              prove_categorie_una_volta,
               prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,
