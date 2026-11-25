@@ -7810,6 +7810,43 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_avvisi_ricerca_tg
         ON avvisi_ricerca(tg_id);
+    CREATE TABLE IF NOT EXISTS richieste(
+        -- «CERCO» (25 nov 2026, cantiere richieste): chi cerca lo
+        -- scrive, e l'AI avvisa i venditori adatti (vedi «CERCO»: LE
+        -- RICHIESTE DI CHI CERCA)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tg_id INTEGER NOT NULL,
+        testo TEXT NOT NULL,
+        categoria TEXT DEFAULT '',
+        budget_sats INTEGER DEFAULT 0,  -- 0 = nessun tetto
+        stato TEXT DEFAULT 'aperta',    -- aperta | chiusa
+        creato INTEGER, scade INTEGER,
+        avvisati INTEGER DEFAULT 0,     -- quanti venditori avvisati
+        avviso_id INTEGER DEFAULT 0     -- l'avviso di ricerca gemello
+    );
+    CREATE INDEX IF NOT EXISTS idx_richieste_stato
+        ON richieste(stato, scade);
+    CREATE TABLE IF NOT EXISTS richieste_avvisati(
+        -- chi e' stato avvisato di quale richiesta: il dedup e il tetto
+        -- di RICHIESTE_TETTO_GIORNO avvisi al giorno per venditore
+        richiesta_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        creato INTEGER,
+        PRIMARY KEY(richiesta_id, tg_id)
+    );
+    CREATE TABLE IF NOT EXISTS richieste_offerte(
+        -- l'annuncio offerto a una richiesta (dal tasto «Offri»)
+        richiesta_id INTEGER NOT NULL,
+        annuncio_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,         -- chi offre
+        creato INTEGER,
+        PRIMARY KEY(richiesta_id, annuncio_id)
+    );
+    CREATE TABLE IF NOT EXISTS richieste_muti(
+        -- «🔕»: i venditori che non vogliono gli avvisi delle richieste
+        tg_id INTEGER PRIMARY KEY,
+        creato INTEGER
+    );
     CREATE TABLE IF NOT EXISTS codici_sconto(
         -- I CODICI SCONTO DEL VENDITORE (ago 2026): «SATOSHI10»
         -- scritto alla cassa vale -X% sugli articoli. Il venditore lo
@@ -23740,6 +23777,19 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # meta' erano gia' state avvisate di un annuncio, una riga basta)
         con.execute("UPDATE avvisi_ricerca SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # ...e le richieste di «Cerco» (25 nov 2026), con le offerte
+        # fatte e il «🔕» (una riga basta, se l'avevano spento tutti e due)
+        con.execute("UPDATE richieste SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE richieste_offerte SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE OR IGNORE richieste_avvisati SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM richieste_avvisati WHERE tg_id=?",
+                    (id_nostr,))
+        con.execute("UPDATE OR IGNORE richieste_muti SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM richieste_muti WHERE tg_id=?", (id_nostr,))
         con.execute("UPDATE OR IGNORE avvisi_notificati SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM avvisi_notificati WHERE tg_id=?",
@@ -29629,6 +29679,18 @@ def _leggi_verdetto(verdetto: str):
     return None                        # "OK" o risposta strana: si passa
 
 
+# L'AI NON MODERA PIU' DI SERIE (25 nov 2026, cantiere richieste, Andrea:
+# l'AI non deve piu' servire alla moderazione degli annunci): la leva
+# MODERAZIONE_AI nasce SPENTA — eccezione sua alla regola delle leve
+# accese. Spenta, i due strati dell'AI (`moderazione_ai` e la sorella a
+# lotti) tacciono come a chiave assente: resta il filtro parole, che e'
+# gratis, e i moderatori che vedono tutto cio' che entra.
+try:
+    from config import MODERAZIONE_AI
+except ImportError:
+    MODERAZIONE_AI = False
+
+
 async def moderazione_ai(titolo: str, descrizione: str):
     """Strato 2: il secondo paio d'occhi. Ritorna None se ok, oppure
     la coppia (esito, motivo) con esito 'vietato' (caso netto) o
@@ -29636,6 +29698,8 @@ async def moderazione_ai(titolo: str, descrizione: str):
     chiave API non c'e' o la chiamata fallisce si lascia passare
     senza bloccare nessuno: il filtro parole ha gia' fatto la sua
     parte."""
+    if not MODERAZIONE_AI:
+        return None
     if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
         return None
     try:
@@ -29685,6 +29749,8 @@ async def moderazione_ai_lotto(voci: list) -> dict:
     voce passa; i numeri che non appartengono al lotto (allucinati)
     si ignorano."""
     if not voci:
+        return {}
+    if not MODERAZIONE_AI:
         return {}
     if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
         return {}
@@ -33320,6 +33386,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         registra_moderazione("ai", "dubbio", motivo_dubbio, d["titolo"],
                              annuncio_id, user["id"])
         await avvisa_revisione(annuncio_id, motivo_dubbio)
+        # l'offerta a una richiesta si lega anche qui, senza avviso: la
+        # lista di chi cerca la mostra quando l'annuncio entra in vetrina
+        if d.get("richiesta_id"):
+            await collega_offerta_richiesta(d.get("richiesta_id"),
+                                            annuncio_id, user["id"], False)
         return {"ok": True, "id": annuncio_id, "revisione": True,
                 "attesa_ore": REVISIONE_ATTESA_ORE, **conto_foto}
     # --- Strato 3: i moderatori vedono tutto cio' che entra in vetrina ---
@@ -33346,6 +33417,11 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         # ...e chi ha un avviso di ricerca che matcha ricevera' il suo
         # «e' arrivato» (stessa coda-e-finestra, notifiche aggregate).
         accoda_match(annuncio_id)
+    # «Offri» da una richiesta (25 nov 2026, cantiere richieste): chi
+    # cerca riceve l'avviso adesso che l'annuncio e' in vetrina
+    if d.get("richiesta_id"):
+        await collega_offerta_richiesta(d.get("richiesta_id"), annuncio_id,
+                                        user["id"], True)
     await premia_distintivi(user["id"])   # bottega avviata?
     # Il venditore irraggiungibile lo viene a sapere SUBITO, una volta
     # sola (timbro): la riga del form gliel'ha appena detto, questo e'
@@ -40109,6 +40185,22 @@ def _leve_stato():
                   "DIGITALE_MIN_VENDITE", DIGITALE_MIN_VENDITE,
                   spento="chiunque può pubblicare codici e buoni"),
         ]},
+        # «CERCO» (25 nov 2026, cantiere richieste): accesa di serie, solo
+        # i moderatori finche' Andrea non la apre
+        {"gruppo": "🙋 Cerco", "voci": [
+            _leva("Le richieste di «Cerco»", "RICHIESTE", bool(RICHIESTE),
+                  acceso="chi cerca scrive cosa vuole, e l'AI avvisa i "
+                         "venditori adatti",
+                  spento="niente riquadro «Cerco» né bottone nella "
+                         "ricerca vuota"),
+            _leva("«Cerco» solo per i moderatori",
+                  "RICHIESTE_SOLO_MODERATORI",
+                  bool(RICHIESTE_SOLO_MODERATORI),
+                  acceso="la vedono solo le persone di ADMIN_IDS",
+                  spento="la vedono tutti"),
+            _leva("Il modello che sceglie i venditori",
+                  "RICHIESTE_MODELLO", RICHIESTE_MODELLO),
+        ]},
         {"gruppo": "🛡 Moderazione", "voci": [
             _leva("Terza via (il dubbio va in revisione)",
                   "MODERAZIONE_REVISIONE", bool(MODERAZIONE_REVISIONE),
@@ -40121,6 +40213,13 @@ def _leve_stato():
                   spento="la coda in attesa non ci richiama più (gli "
                          "annunci restano comunque fermi: mai online da "
                          "soli)"),
+            # (25 nov 2026, cantiere richieste) nasce SPENTA
+            _leva("L'AI controlla annunci e richieste",
+                  "MODERAZIONE_AI", bool(MODERAZIONE_AI),
+                  acceso="dopo il filtro parole anche l'AI legge ogni "
+                         "annuncio e ogni richiesta di «Cerco»",
+                  spento="resta il filtro parole, e i moderatori vedono "
+                         "tutto cio' che entra"),
             _leva("Categorie proposte dopo ogni import",
                   "RICATEGORIZZA_AUTO", bool(RICATEGORIZZA_AUTO),
                   spento="la coda «Categorie da sistemare» non si riempie "
@@ -57879,6 +57978,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # benvenuto del bot non lo rivede): il link della leva TAPPO_LINK,
     # gia' passato dalla forma t.me/<bot>; vuota = niente voce.
     profilo["tappo_link"] = TAPPO_LINK or ""
+    # «CERCO» (25 nov 2026, cantiere richieste): il riquadro in home e il
+    # bottone della ricerca vuota solo a chi ce l'ha. Il FATTO, dal giudice
+    profilo["richieste"] = richieste_per(user["id"])
     if ASSISTENZA_ATTIVA:
         _cn = db()
         try:
@@ -64802,6 +64904,418 @@ async def elimina_avviso_ricerca(avviso_id: int,
     con.commit()
     con.close()
     return {"ok": True}
+
+
+# ═══ «CERCO»: LE RICHIESTE DI CHI CERCA (25 nov 2026, cantiere richieste) ═══
+# L'idea e' di Andrea: chi non trova quel che vuole lo SCRIVE («cerco un
+# buono Amazon da 50 €», «cerco buoni carburante») e la richiesta non
+# resta ferma in bacheca ad aspettare che qualcuno passi di li' — «usare
+# l'AI per intercettare chi puo' soddisfarla». Le parti, e ognuna ha il
+# suo perche':
+#  · LA RICHIESTA: un testo, la categoria, un budget massimo in sats
+#    (facoltativo). Aperta RICHIESTE_GIORNI giorni, al piu'
+#    RICHIESTE_MAX_APERTE aperte per persona: una bacheca che si riempie
+#    di richieste dimenticate e' una bacheca che nessuno legge.
+#  · IL FILTRO PAROLE e' quello degli annunci (`termine_vietato`), gratis
+#    e istantaneo. L'AI non modera piu' (Andrea, 25 nov 2026: «l'AI non
+#    deve servire alla moderazione»): solo a leva MODERAZIONE_AI accesa
+#    passa anche dal secondo paio d'occhi, come gli annunci.
+#  · CHI AVVISARE lo sceglie l'AI, ma NON va a memoria: il server
+#    prefiltra fino a RICHIESTE_PREFILTRO venditori dal database (chi ha
+#    annunci attivi nella stessa categoria o con le stesse parole, tolti
+#    chi ha spento gli avvisi e chi ne ha gia' ricevuti RICHIESTE_TETTO_
+#    GIORNO nelle ultime 24 ore) e il modello piccolo (RICHIESTE_MODELLO)
+#    ne sceglie RICHIESTE_VENDITORI leggendo i loro titoli. Se l'AI tace,
+#    sbaglia o la chiave manca, i primi della lista (gia' in ordine di
+#    somiglianza): l'avviso parte comunque. Nessuno somiglia = nessun
+#    avviso: meglio una richiesta ferma che uno spam a caso.
+#  · L'OFFERTA E' UN ANNUNCIO NORMALE collegato alla richiesta
+#    (`richieste_offerte`): si compra con «🔒 Compra in sicurezza» e il
+#    deposito di garanzia, come ogni altro — nessuna strada dei soldi
+#    nuova. Chi cerca riceve l'avviso quando l'annuncio e' in vetrina.
+#  · L'ANNUNCIO CHE ARRIVA DOPO: la richiesta apre anche un avviso di
+#    ricerca (`avvisi_ricerca`) con le sue parole, se c'e' posto — il
+#    motore di «🔔 Avvisami se arriva», che c'era gia'. Si chiude con lei.
+# APERTA A TUTTI da subito (Andrea, 25 nov 2026: «Accendila già
+# dappertutto, a tutti»): eccezione alla regola delle leve nuove (prima
+# solo Andrea e Alan). `RICHIESTE_SOLO_MODERATORI = True` nel config la
+# richiude ai moderatori senza un deploy.
+try:
+    from config import RICHIESTE
+except ImportError:
+    RICHIESTE = True
+try:
+    from config import RICHIESTE_SOLO_MODERATORI
+except ImportError:
+    RICHIESTE_SOLO_MODERATORI = False
+# Il modello che sceglie i venditori: Haiku 4.5 (Andrea, 25 nov 2026:
+# «ok perfetto»), una leva sua perche' si cambia senza toccare la ricerca
+try:
+    from config import RICHIESTE_MODELLO
+except ImportError:
+    RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
+RICHIESTE_MAX_APERTE = 3
+RICHIESTE_GIORNI = 14
+RICHIESTE_VENDITORI = 5
+RICHIESTE_PREFILTRO = 20
+RICHIESTE_TETTO_GIORNO = 3
+RICHIESTE_TESTO_MAX = 140
+
+# Le parole che non dicono COSA si cerca: fuori dall'avviso di ricerca
+# (che le vuole TUTTE: «cerco» non sta nel titolo di nessun annuncio) e
+# dal confronto coi titoli dei venditori
+_RICHIESTE_PAROLE_VUOTE = frozenset(
+    "cerco cerca cerchiamo cercasi voglio vorrei compro comprerei acquisto "
+    "un una uno il lo la i gli le l di da del della dello dei degli delle "
+    "per con su in a al alla ai agli alle e o ed che chi mi ci qualcuno "
+    "qualcosa euro eur sats sat valore anche ho ha".split())
+
+
+def richieste_per(tg_id: int) -> bool:
+    """«CERCO» C'E' PER QUESTA PERSONA? La leva, e a solo-moderatori
+    acceso la sola lista dei moderatori. Decide il server, a ogni
+    richiesta: il client lo legge in `richieste.attivo` di /api/me."""
+    if not RICHIESTE:
+        return False
+    if RICHIESTE_SOLO_MODERATORI:
+        return e_admin(int(tg_id or 0))
+    return True
+
+
+def _parole_richiesta(testo: str) -> list:
+    """PURA: le parole che dicono cosa si cerca, normalizzate, senza le
+    vuote e senza i numeri (il «50» di «buono da 50 €» non sta nel
+    titolo di chi lo vende, o ci sta scritto «cinquanta»)."""
+    return [p for p in normalizza(testo or "").split()
+            if len(p) >= 3 and not p.isdigit()
+            and p not in _RICHIESTE_PAROLE_VUOTE]
+
+
+def _richiesta_pubblica(r, mio_id: int, offerte: int) -> dict:
+    return {"id": r["id"], "testo": r["testo"], "categoria": r["categoria"],
+            "budget_sats": r["budget_sats"] or 0, "scade": r["scade"],
+            "creato": r["creato"], "stato": r["stato"],
+            "mia": r["tg_id"] == mio_id, "offerte": offerte}
+
+
+def _chiudi_richieste_scadute(con) -> None:
+    """Le scadute si chiudono alla lettura (nessun timer in piu'), e il
+    loro avviso di ricerca se ne va con loro."""
+    adesso = int(time.time())
+    for r in con.execute("SELECT id, avviso_id FROM richieste WHERE "
+                         "stato='aperta' AND scade<?", (adesso,)).fetchall():
+        con.execute("UPDATE richieste SET stato='chiusa' WHERE id=?",
+                    (r["id"],))
+        if r["avviso_id"]:
+            con.execute("DELETE FROM avvisi_ricerca WHERE id=?",
+                        (r["avviso_id"],))
+
+
+def _candidati_richiesta(con, rich: dict) -> list:
+    """Il prefiltro del database: i venditori con annunci attivi che
+    somigliano alla richiesta, in ordine di somiglianza. Ognuno con al
+    piu' tre titoli, quelli che l'AI leggera'. Tolti: chi cerca, chi ha
+    spento gli avvisi («🔕»), chi e' in ferie, chi e' gia' stato avvisato
+    di questa richiesta, e chi ne ha gia' ricevuti RICHIESTE_TETTO_GIORNO
+    nelle ultime 24 ore."""
+    adesso = int(time.time())
+    parole = _parole_richiesta(rich["testo"])
+    muti = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_muti").fetchall()}
+    pieni = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_avvisati WHERE creato>? "
+        "GROUP BY tg_id HAVING COUNT(*)>=?",
+        (adesso - 86400, RICHIESTE_TETTO_GIORNO)).fetchall()}
+    righe = con.execute(
+        "SELECT a.venditore_id, a.titolo, a.descrizione, a.categoria, "
+        "u.ferie_fino FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
+        "WHERE a.stato='attivo' AND a.venditore_id!=? "
+        "ORDER BY a.id DESC LIMIT 5000", (rich["tg_id"],)).fetchall()
+    punti: dict = {}
+    titoli: dict = {}
+    for a in righe:
+        v = a["venditore_id"]
+        if v in muti or v in pieni or in_ferie(a["ferie_fino"] or 0, adesso):
+            continue
+        token = normalizza(f"{a['titolo']} {a['descrizione'] or ''}").split()
+        p = (2 if a["categoria"] == rich["categoria"] else 0) + sum(
+            1 for w in parole if any(t.startswith(w) for t in token))
+        if p <= 0:
+            continue
+        punti[v] = punti.get(v, 0) + p
+        if len(titoli.setdefault(v, [])) < 3:
+            titoli[v].append(a["titolo"][:60])
+    gia = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_avvisati WHERE richiesta_id=?",
+        (rich["id"],)).fetchall()}
+    ordine = sorted((v for v in punti if v not in gia),
+                    key=lambda v: (-punti[v], v))[:RICHIESTE_PREFILTRO]
+    return [{"tg_id": v, "titoli": titoli[v]} for v in ordine]
+
+
+PROMPT_RICHIESTE = (
+    "Sei l'assistente di un mercatino online. Ti do la richiesta di chi "
+    "cerca qualcosa e un elenco numerato di venditori, ognuno con alcuni "
+    "dei suoi annunci. Scegli i venditori che piu' probabilmente possono "
+    "offrire quel che si cerca, al massimo {n}. Rispondi SOLO con i "
+    "numeri, separati da virgole, dal piu' adatto. Nessun altro testo.")
+
+
+async def _scegli_venditori(rich: dict, candidati: list) -> list:
+    """L'AI sceglie i RICHIESTE_VENDITORI piu' adatti fra i candidati del
+    prefiltro. Fail-open: chiave assente, errore o risposta storta = i
+    primi della lista, che e' gia' in ordine di somiglianza."""
+    primi = [c["tg_id"] for c in candidati[:RICHIESTE_VENDITORI]]
+    if len(candidati) <= RICHIESTE_VENDITORI:
+        return primi
+    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY.startswith("INCOLLA"):
+        return primi
+    elenco = "\n".join(f"{i}. " + " · ".join(c["titoli"])
+                       for i, c in enumerate(candidati, 1))
+    try:
+        r = await asyncio.to_thread(
+            ai.messages.create,
+            model=RICHIESTE_MODELLO, max_tokens=40, timeout=15,
+            system=PROMPT_RICHIESTE.format(n=RICHIESTE_VENDITORI),
+            messages=[{"role": "user", "content":
+                       f"RICHIESTA: {rich['testo']}\n"
+                       f"CATEGORIA: {rich['categoria']}\n\n"
+                       f"VENDITORI:\n{elenco}"}])
+        testo = "".join(b.text for b in r.content if b.type == "text")
+        scelti = []
+        for n in re.findall(r"\d+", testo):
+            i = int(n)
+            if 1 <= i <= len(candidati):
+                v = candidati[i - 1]["tg_id"]
+                if v not in scelti:
+                    scelti.append(v)
+        return scelti[:RICHIESTE_VENDITORI] or primi
+    except Exception as e:
+        print(f"⚠️ Scelta AI dei venditori saltata (vanno i primi): {e}")
+        return primi
+
+
+async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
+    """In sottofondo, dopo la nascita della richiesta: prefiltro, scelta,
+    avviso. Fail-open totale: chi ha chiesto ha gia' la sua risposta."""
+    try:
+        con = db()
+        r = con.execute("SELECT * FROM richieste WHERE id=? AND "
+                        "stato='aperta'", (richiesta_id,)).fetchone()
+        if not r:
+            con.close()
+            return
+        rich = dict(r)
+        candidati = _candidati_richiesta(con, rich)
+        con.close()
+        scelti = await _scegli_venditori(rich, candidati)
+        if not scelti:
+            return
+        adesso = int(time.time())
+        con = db()
+        for v in scelti:
+            con.execute("INSERT OR IGNORE INTO richieste_avvisati"
+                        "(richiesta_id, tg_id, creato) VALUES(?,?,?)",
+                        (richiesta_id, v, adesso))
+        con.execute("UPDATE richieste SET avvisati=avvisati+? WHERE id=?",
+                    (len(scelti), richiesta_id))
+        con.commit()
+        con.close()
+        budget = (f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
+                  if rich["budget_sats"] else "")
+        testo = (f"🙋 Qualcuno cerca: <b>{html.escape(rich['testo'])}</b>"
+                 f"{budget}\nSe ce l'hai, fagli un'offerta: la paga col "
+                 f"deposito di garanzia, come ogni annuncio.")
+        for v in scelti:
+            await notifica(v, testo, bottone=(
+                "Offri", link_telegram("cerco", richiesta_id)))
+            await asyncio.sleep(0.2)   # mai raffiche sull'API Telegram
+    except Exception as e:
+        print(f"⚠️ Avviso ai venditori della richiesta {richiesta_id} "
+              f"saltato: {e}")
+
+
+@app.get("/api/richieste")
+async def lista_richieste(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """La bacheca: le richieste aperte di tutti (le mie in testa), coi
+    conti delle offerte; per le mie anche gli annunci offerti."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not richieste_per(user["id"]):
+        raise HTTPException(404, "Non disponibile")
+    con = db()
+    _chiudi_richieste_scadute(con)
+    con.commit()
+    righe = con.execute(
+        "SELECT * FROM richieste WHERE stato='aperta' "
+        "ORDER BY (tg_id=?) DESC, id DESC LIMIT 200",
+        (user["id"],)).fetchall()
+    conti = {r["richiesta_id"]: r["n"] for r in con.execute(
+        "SELECT o.richiesta_id, COUNT(*) AS n FROM richieste_offerte o "
+        "JOIN annunci a ON a.id=o.annuncio_id WHERE a.stato='attivo' "
+        "GROUP BY o.richiesta_id").fetchall()}
+    voci = []
+    for r in righe:
+        v = _richiesta_pubblica(r, user["id"], conti.get(r["id"], 0))
+        if v["mia"]:
+            v["annunci"] = [
+                {"id": a["id"], "titolo": a["titolo"],
+                 "prezzo_sats": a["prezzo_sats"]}
+                for a in con.execute(
+                    "SELECT a.id, a.titolo, a.prezzo_sats FROM "
+                    "richieste_offerte o JOIN annunci a ON a.id=o.annuncio_id "
+                    "WHERE o.richiesta_id=? AND a.stato='attivo' "
+                    "ORDER BY o.creato DESC", (r["id"],)).fetchall()]
+        voci.append(v)
+    muto = bool(con.execute("SELECT 1 FROM richieste_muti WHERE tg_id=?",
+                            (user["id"],)).fetchone())
+    con.close()
+    return {"richieste": voci, "muto": muto,
+            "max_aperte": RICHIESTE_MAX_APERTE, "giorni": RICHIESTE_GIORNI}
+
+
+@app.post("/api/richieste")
+async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not richieste_per(user["id"]):
+        raise HTTPException(404, "Non disponibile")
+    d = await leggi_json(req)
+    testo = " ".join(str(d.get("testo") or "").split())[:RICHIESTE_TESTO_MAX]
+    if len(testo) < 4:
+        raise HTTPException(400, "Scrivi cosa cerchi")
+    categoria = d.get("categoria") or ""
+    if categoria not in CATEGORIE:
+        raise HTTPException(400, "Scegli la categoria")
+    try:
+        budget = int(d.get("budget_sats") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Budget non valido")
+    if budget < 0 or budget > 2_100_000_000_000_000:
+        raise HTTPException(400, "Budget non valido")
+    # strato 1, lo stesso degli annunci
+    trovato = termine_vietato(testo, "")
+    if trovato:
+        divieto, parola = trovato
+        registra_moderazione("parole", "vietato",
+                             motivo_parole(divieto, parola), testo,
+                             venditore_id=user["id"])
+        raise HTTPException(400, messaggio_rifiuto(divieto=divieto, parola=parola))
+    # strato 2 solo a leva accesa (moderazione_ai la guarda da sola)
+    verdetto = await moderazione_ai(testo, "")
+    if verdetto:
+        registra_moderazione("ai", verdetto[0], verdetto[1], testo,
+                             venditore_id=user["id"])
+        raise HTTPException(400, messaggio_rifiuto(verdetto[1]))
+    con = db()
+    _chiudi_richieste_scadute(con)
+    aperte = con.execute("SELECT COUNT(*) AS n FROM richieste WHERE "
+                         "tg_id=? AND stato='aperta'",
+                         (user["id"],)).fetchone()["n"]
+    if aperte >= RICHIESTE_MAX_APERTE:
+        con.commit()
+        con.close()
+        raise HTTPException(400, f"Hai già {RICHIESTE_MAX_APERTE} richieste "
+                                 "aperte: chiudine una per farne una nuova")
+    adesso = int(time.time())
+    # l'avviso di ricerca gemello, se c'e' posto e ci sono parole vere
+    avviso_id = 0
+    parole = _parole_richiesta(testo)[:3]
+    quanti = con.execute("SELECT COUNT(*) AS n FROM avvisi_ricerca WHERE "
+                         "tg_id=?", (user["id"],)).fetchone()["n"]
+    if parole and quanti < MAX_AVVISI_UTENTE:
+        cur = con.execute(
+            "INSERT INTO avvisi_ricerca(tg_id, categorie, comune, lat, lon, "
+            "raggio_km, prezzo_max_sats, prezzo_max_eur, parole, attivo, "
+            "creato) VALUES(?,?,'',0,0,0,?,0,?,1,?)",
+            (user["id"], f"|{categoria}|", budget, " ".join(parole), adesso))
+        avviso_id = cur.lastrowid
+    cur = con.execute(
+        "INSERT INTO richieste(tg_id, testo, categoria, budget_sats, stato, "
+        "creato, scade, avviso_id) VALUES(?,?,?,?,'aperta',?,?,?)",
+        (user["id"], testo, categoria, budget, adesso,
+         adesso + RICHIESTE_GIORNI * 86400, avviso_id))
+    rid = cur.lastrowid
+    con.commit()
+    con.close()
+    asyncio.create_task(_avvisa_venditori_richiesta(rid))
+    return {"ok": True, "id": rid}
+
+
+@app.post("/api/richieste/{richiesta_id}/chiudi")
+async def chiudi_richiesta(richiesta_id: int, x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    r = con.execute("SELECT avviso_id FROM richieste WHERE id=? AND tg_id=? "
+                    "AND stato='aperta'", (richiesta_id, user["id"])).fetchone()
+    if not r:
+        con.close()
+        raise HTTPException(404, "Richiesta non trovata")
+    con.execute("UPDATE richieste SET stato='chiusa' WHERE id=?",
+                (richiesta_id,))
+    if r["avviso_id"]:
+        con.execute("DELETE FROM avvisi_ricerca WHERE id=? AND tg_id=?",
+                    (r["avviso_id"], user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+@app.post("/api/me/richieste-muto")
+async def muto_richieste(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """«🔕»: il venditore che non vuole gli avvisi delle richieste."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    if d.get("muto"):
+        con.execute("INSERT OR IGNORE INTO richieste_muti(tg_id, creato) "
+                    "VALUES(?,?)", (user["id"], int(time.time())))
+    else:
+        con.execute("DELETE FROM richieste_muti WHERE tg_id=?", (user["id"],))
+    con.commit()
+    con.close()
+    return {"ok": True, "muto": bool(d.get("muto"))}
+
+
+async def collega_offerta_richiesta(richiesta_id, annuncio_id: int,
+                                    venditore_id: int, attivo: bool) -> None:
+    """L'annuncio appena pubblicato come OFFERTA a una richiesta (dal
+    tasto «Offri»): si lega, e a chi cerca arriva l'avviso — solo se
+    l'annuncio e' gia' in vetrina (quello in revisione si vede nella
+    lista quando un moderatore lo approva). Fail-open: l'annuncio e'
+    nato comunque."""
+    try:
+        rid = int(richiesta_id or 0)
+    except (TypeError, ValueError):
+        return
+    if rid <= 0:
+        return
+    try:
+        con = db()
+        r = con.execute("SELECT * FROM richieste WHERE id=? AND "
+                        "stato='aperta' AND tg_id!=?",
+                        (rid, venditore_id)).fetchone()
+        if not r:
+            con.close()
+            return
+        con.execute("INSERT OR IGNORE INTO richieste_offerte(richiesta_id, "
+                    "annuncio_id, tg_id, creato) VALUES(?,?,?,?)",
+                    (rid, annuncio_id, venditore_id, int(time.time())))
+        a = con.execute("SELECT titolo FROM annunci WHERE id=?",
+                        (annuncio_id,)).fetchone()
+        con.commit()
+        con.close()
+        if attivo and a:
+            await notifica(
+                r["tg_id"],
+                f"📬 C'è un'offerta per la tua richiesta "
+                f"«{html.escape(r['testo'])}»: <b>{html.escape(a['titolo'])}</b>",
+                bottone=("Apri l'annuncio", link_telegram("annuncio",
+                                                          annuncio_id)))
+    except Exception as e:
+        print(f"⚠️ Offerta alla richiesta {richiesta_id} non collegata: {e}")
 
 
 @app.post("/api/me/avvisi-mercatino")
@@ -78546,6 +79060,15 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
             # che inciampa non ferma il battito (la lezione dei solleciti)
             try:
                 perche = _promemoria_recensione_p2p_fermo(con, r)
+                # (25 nov 2026, via-euro-annullo) chi ha pagato in euro un
+                # oggetto del mercatino lo scambio non lo vede, e la sua
+                # pagina — dove sta la recensione — non gliela si apre: il
+                # promemoria non gli parte (la recensione dell'oggetto ha
+                # la strada sua, quella del mercatino)
+                _ve = globals().get("_ordine_via_euro")
+                if not perche and _ve and _ve(con, r["ordine"], r["tg_id"]):
+                    perche = ("ha pagato in euro un acquisto del mercatino: lo "
+                              "scambio non lo vede")
                 if not perche:
                     promemoria = _testo_promemoria_recensione_p2p(
                         _nome_altro_p2p(con, r["ordine"], r["tg_id"], adesso))
@@ -127280,7 +127803,13 @@ def asset_sottocategoria(nome: str, if_none_match: str = Header("")):
 # quella cartella ha la whitelist degli slug dei reparti, e le aste un
 # reparto non sono.
 FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp",
-                 "to-the-moon.webp", "aste.webp", "aste-tessera.webp")
+                 "to-the-moon.webp", "aste.webp", "aste-tessera.webp",
+                 # i tre riquadri delle occasioni, 25 nov 2026, cantiere
+                 # richieste: «Offerte» e «Sconti» tagliati da un disegno
+                 # solo col nastro di luce che li lega, «Cerco» col
+                 # megafono, e la sua etichetta che esce dal riquadro
+                 "occ-offerte.webp", "occ-sconti.webp", "cerco.webp",
+                 "cerco-etichetta.webp")
 
 
 # Le anteprime dei reparti (ago 2026): l'og:image di
@@ -133717,6 +134246,9 @@ CANCELLA_TOGLI = (
     ("avvisi_app", "tg_id"), ("avvisi_notificati", "tg_id"),
     ("push_iscrizioni", "tg_id"),
     ("avvisi_ricerca", "tg_id"), ("badge_utente", "tg_id"),
+    # «Cerco» (25 nov 2026): le sue richieste, i suoi avvisi, il suo «🔕»
+    ("richieste", "tg_id"), ("richieste_avvisati", "tg_id"),
+    ("richieste_offerte", "tg_id"), ("richieste_muti", "tg_id"),
     ("premi_fedelta_maturati", "compratore_id"),
     ("premi_fedelta_maturati", "venditore_id"),
     ("barattoli_condivisi", "tg_id"),
