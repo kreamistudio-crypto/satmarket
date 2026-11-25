@@ -52259,12 +52259,12 @@ def prove_scoprire():
     # Con find() e non index(): una riga tolta deve far ROSSA questa
     # prova, non farla esplodere portandosi via le sorelle.
     prova("il tocco che naviga esce prima di ogni filtro", True,
-          0 <= _ts.find("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }")
+          0 <= _ts.find("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; scopertaToccata = ''; return; }")
           < _ts.find("filtroLampo = !acceso;"))
     # ...e prima anche dell'haptic: vaiP2P ha il suo, e batterlo due
     # volte si sente
     prova("...e l'haptic lo da' la strada che si prende", True,
-          0 <= _ts.find("voce.tocca(); cardToccata = ''; return;") < _ts.find("haptic();"))
+          0 <= _ts.find("voce.tocca(); cardToccata = ''; scopertaToccata = ''; return;") < _ts.find("haptic();"))
     # LA VOCE: in TESTA (decisione di Andrea, col costo sulle offerte
     # a tempo accettato e misurato), e NON e' un interruttore.
     _cat = mini[mini.index("const SCOPRIRE = ["):
@@ -52392,9 +52392,52 @@ def prove_scoprire():
            "const w = vw - 2 * pad, h = insegna ? w / 3 : w * 130 / 272;" in _vo))
     prova("...la card toccata si dimentica a ogni tocco, e la testata e' solo del volo",
           (True, True, True),
-          ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }" in mini,
-           "cardToccata = '';" in _ds,
+          ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; scopertaToccata = ''; return; }" in mini,
+           "cardToccata = ''; scopertaToccata = '';" in _ds,
            "if (!ridisegno && !negozioInVolo) negozioTestataDi = {chi: '', src: ''};" in _an.split("try {")[0]))
+    # IL MIO NEGOZIO NON VOLA (25 nov 2026, Andrea: «Under AI sì, To the
+    # Moon no»): apriNegozio aspetta la bozza del proprietario, e il volo
+    # toglieva il velo su una pagina non ancora aperta
+    prova("il proprietario non vola: il suo negozio sale e si riempie dopo",
+          (True, True),
+          ("const mio = !!myNegozio && chi === myNegozio;\n  if (negozioPronto(chi) && !mio) {" in _ds,
+           _ds.find("&& !mio) {") < _ds.find("voloNegozio(card, chi, aperto, da)")
+           < _ds.find("negozioInAttesa(chi);")))
+    # LA TESTATA ANCHE DAL TONDO (25 nov 2026): senza banner, in cima va
+    # l'immagine della card di «Da scoprire»; col banner niente testata
+    _ct = pezzo_js(mini, "function conTestata(chi, id, apri){", "\n}") + "\n}\n"
+    _esito = _node_banco("""
+let negozioTestataDi = {chi: '', src: ''}, negozioInVolo = false;
+let pronti = {};
+const negozioPronto = chi => pronti[chi] || null;
+const bannerNegozio = v => (v && v.banner && v.banner.foto && v.banner.link) ? 'b' : '';
+const CSS = {escape: x => x};
+const document = {querySelector: s => s.includes('data-id="ai"')
+  ? {currentSrc: '/assets/racconti/ai-cop.webp'} : null};
+""" + _ct + """
+const apri = () => { if (!negozioInVolo) negozioTestataDi = {chi: '', src: ''};
+  return negozioTestataDi.src || '-'; };
+const r = {};
+pronti.n1 = {venditore: {}};
+r.senza_banner = conTestata('n1', 'ai', apri);
+pronti.n1 = {venditore: {banner: {foto: 'x.jpg', link: 'https://x'}}};
+r.col_banner = conTestata('n1', 'ai', apri);
+delete pronti.n1;
+r.non_pronto = conTestata('n1', 'ai', apri);
+pronti.n1 = {venditore: {}};
+r.senza_voce = conTestata('n1', '', apri);
+r.flag = negozioInVolo;
+console.log(JSON.stringify(r));
+""")
+    if _esito is None:
+        salta("la testata dal tondo", "serve node")
+    else:
+        prova("in node: senza banner la testata e' l'immagine della card, col banner "
+              "o senza pronto niente testata, e il flag torna giu'",
+              {"senza_banner": "/assets/racconti/ai-cop.webp", "col_banner": "-",
+               "non_pronto": "-", "senza_voce": "-", "flag": False}, _esito)
+    prova("...e passano di li' le due strade del tocco", 2,
+          _ds.count("conTestata(chi, daId, () => apriNegozio("))
     # (Andrea, sul video: «appena tocchi la card sembra che prima di
     # allargarsi si rimpicciolisca per un attimo») il `:active` di tutte le
     # card toglieva lo scale della fila: premuta, ogni card tiene la misura

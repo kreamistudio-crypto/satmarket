@@ -1931,14 +1931,6 @@
     #scoprireStrip .scoprire-card.sc-quadra{width:114.7px}
     #scoprireStrip .sc-quadra-eti{font-size:14.1px}
   }
-  @media (min-width:360px) and (max-width:767px){
-    #scoprireStrip{padding-left:calc((100vw - 264px) / 2);padding-right:calc((100vw - 126.2px) / 2)}
-    #scoprireStrip .scoprire-card{width:264px}
-    #scoprireStrip .sc-titolo{left:13.6px;width:93.2px;font-size:16.5px}
-    #scoprireStrip .sc-lancio{font-size:15.5px}
-    #scoprireStrip .scoprire-card.sc-quadra{width:126.2px}
-    #scoprireStrip .sc-quadra-eti{font-size:15.5px}
-  }
   /* DA 375 A 411 LE CARD GRANDI CRESCONO FIN QUASI AI BORDI (24 nov
      2026 sera, Andrea: «le card di Da scoprire leggermente più grosse,
      così la linea della mensola si appoggia proprio sulla linea della
@@ -1949,8 +1941,15 @@
      del 10% (`--sc-larga`); scritte e quadrata in proporzione (i numeri
      sono quelli dei 316 di sotto, divisi per 316). Sono rimaste cosi'
      anche quando le card in evidenza sono diventate due e mezza («per il
-     resto è ottimo»). */
-  @media (min-width:375px) and (max-width:767px){
+     resto è ottimo»).
+     DA 360, E FINO AL TABLET (25 nov 2026, Andrea in produzione: «le card
+     grosse sono troppo piccole, non so perché»): il suo telefono dentro
+     Telegram e' largo 360, non 393 come negli scatti della sera prima, e
+     da 360 a 374 la card restava a 264 (290 ingrandita, l'80% dello
+     schermo). Ora la stessa misura vale da 360 a 767: a 360 la card fa
+     314 (346 ingrandita), da 412 in su 345 invece di 316. Le misure fisse
+     per 360 e per 412 sono andate via. */
+  @media (min-width:360px) and (max-width:767px){
     #scoprireStrip{--sc-larga:min(345px, calc((100vw - 14px) / 1.1));
       padding-left:calc((100vw - var(--sc-larga)) / 2);
       padding-right:calc((100vw - var(--sc-larga) * .4778) / 2)}
@@ -1960,14 +1959,6 @@
     #scoprireStrip .sc-lancio{font-size:calc(var(--sc-larga) * .0589)}
     #scoprireStrip .scoprire-card.sc-quadra{width:calc(var(--sc-larga) * .4778)}
     #scoprireStrip .sc-quadra-eti{font-size:calc(var(--sc-larga) * .0589)}
-  }
-  @media (min-width:412px) and (max-width:767px){
-    #scoprireStrip{padding-left:calc((100vw - 316px) / 2);padding-right:calc((100vw - 151.0px) / 2)}
-    #scoprireStrip .scoprire-card{width:316px}
-    #scoprireStrip .sc-titolo{left:16.3px;width:111.5px;font-size:19.8px}
-    #scoprireStrip .sc-lancio{font-size:18.6px}
-    #scoprireStrip .scoprire-card.sc-quadra{width:151px}
-    #scoprireStrip .sc-quadra-eti{font-size:18.6px}
   }
   .sc-q-pre{font-size:.7em;font-weight:800;letter-spacing:.1em;
     text-transform:uppercase;color:#FFA53D;line-height:1.1}
@@ -28205,7 +28196,10 @@ function toccaScoperta(id, daQuadro){
      il volo partiva dalla card grande, ovunque fosse nella fila (anche
      mezza fuori schermo: il video di Andrea del 24 nov sera) */
   cardToccata = daQuadro ? '' : id;
-  if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; return; }
+  /* (25 nov 2026) ...e la voce toccata, card O tondo: la sua immagine fa
+     da testata al negozio che non ha un banner (vedi testataDaScoprire) */
+  scopertaToccata = id;
+  if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; scopertaToccata = ''; return; }
   haptic();
   const acceso = id === 'sconto' ? filtroSconto : filtroLampo;
   if (id === 'sconto') {
@@ -29806,10 +29800,20 @@ function apriNegozioDaScoprire(chi, aperto, da){
      che la home finisse di prepararlo. */
   const card = cardToccata && mqNetflix.matches ? document.querySelector(
     `#scoprireStrip .scoprire-card[data-id="${CSS.escape(cardToccata)}"]`) : null;
-  cardToccata = '';
-  if (negozioPronto(chi)) {
+  const daId = scopertaToccata;
+  cardToccata = ''; scopertaToccata = '';
+  /* IL MIO NEGOZIO NON VOLA (25 nov 2026, Andrea dal telefono: «c'è ancora
+     il difetto quando clicco sulle card grosse [...] Under AI sì, To the
+     Moon no»): sul negozio di chi guarda apriNegozio ASPETTA la bozza del
+     venditore (bozzaDelVenditore) prima di disegnare, e il volo — che
+     conta su un disegno nello stesso giro — toglieva il velo su una
+     pagina non ancora aperta: la home tornava per un attimo, e il negozio
+     arrivava dopo. Al proprietario il negozio si apre come se non fosse
+     pronto: la pagina sale subito, e si riempie quando la bozza c'e'. */
+  const mio = !!myNegozio && chi === myNegozio;
+  if (negozioPronto(chi) && !mio) {
     if (card && !effettiRidotti() && voloNegozio(card, chi, aperto, da)) return;
-    const fatto = apriNegozio(chi, aperto, undefined, da);
+    const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));
     saleDalBasso();
     return fatto;
   }
@@ -29818,7 +29822,27 @@ function apriNegozioDaScoprire(chi, aperto, da){
   saleDalBasso();
   const qui = () => negozioInArrivo === chi
                  && !!el('view-negozio')?.classList.contains('active');
-  return apriNegozio(chi, aperto, undefined, da, undefined, qui);
+  return conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da, undefined, qui));
+}
+/* LA TESTATA ANCHE SENZA VOLO (25 nov 2026, Andrea: toccando il tondo di
+   un negozio senza banner la pagina si apriva senza immagine in cima;
+   «forse vuoi che i banner del negozio siano obbligatori? [...] però il
+   banner del negozio può essere diverso dalla card grossa»): il banner
+   non diventa obbligatorio. Se il negozio pronto NON ha un banner, in
+   cima va l'immagine della sua card di «Da scoprire», come dopo il volo;
+   se ce l'ha, si vede il suo banner e la testata resta spenta (mai la
+   stessa foto due volte). Senza il pronto non si sa se il banner c'e', e
+   la testata resta spenta. `negozioInVolo` tiene la testata per il giro
+   sincrono della chiamata, come nel volo (vedi apriNegozio). */
+function conTestata(chi, id, apri){
+  const pronto = negozioPronto(chi);
+  const img = id && pronto && !bannerNegozio(pronto.venditore)
+    ? document.querySelector(`#scoprireStrip .scoprire-card[data-id="${CSS.escape(id)}"] img`) : null;
+  const src = img ? (img.currentSrc || img.src) : '';
+  if (!src) return apri();
+  negozioTestataDi = {chi, src};
+  negozioInVolo = true;
+  try { return apri(); } finally { negozioInVolo = false; }
 }
 function saleDalBasso(){
   const v = el('view-negozio');
@@ -29888,7 +29912,7 @@ function preparaNegoziScoprire(codici){
    posto vero si misura quando la pagina c'e' (a VOLO_APRI_MS), e la copia
    ci scivola negli ultimi 160 ms; si toglie quando la foto del banner e'
    pronta (al piu' 400 ms dopo), mai su un riquadro vuoto. */
-let cardToccata = '', negozioInVolo = false;
+let cardToccata = '', scopertaToccata = '', negozioInVolo = false;
 let negozioTestataDi = {chi: '', src: ''};
 function testataNegozio(chi){
   const t = el('negozioTestata');
