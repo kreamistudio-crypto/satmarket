@@ -214933,7 +214933,7 @@ def prove_non_hai_sats():
     dep = _fn_js(mini, "async function viaEuroDeposito(id){")
     prova("la fattura al coordinatore e' il deposito: metodo giroconto con i "
           "sats che ha chiesto lui", True,
-          "{metodo: 'giroconto', sats_giroconto: sats}" in dep
+          "{metodo: 'giroconto', sats_giroconto: sats, p2p_ordine: id}" in dep
           and "'add-invoice', {payment_request: [null, d.invoice, null]}" in dep
           and "Number(o.satsMiei)" in dep)
     prova("...e lo scambio nato dalla cassa non apre il foglio «dove ricevere»",
@@ -215081,6 +215081,94 @@ console.log(JSON.stringify([P(null), P({stato: 'prendo'}), P({stato: 'attesa_mia
           ["fine", "attesa", "attesa", "attesa", "attesa", "paga", "controllo",
            "fine", "fine", "fine", "pagina", "pagina"],
           _js.loads(out2.stdout) if out2.returncode == 0 else out2.stderr[-300:])
+
+    # --- GLI AVVISI DEL BOT A CHI PAGA IN EURO (25 nov 2026) -----------------
+    # Andrea: chi paga in euro «non deve neanche sapere che cos'e' la scheda
+    # peer-to-peer». Le quattro frasi le ha approvate lui il 25 nov sera.
+    con, amb = _banco_eventi_p2p()
+    for f in ("_tabella_via_euro", "_lega_via_euro", "_ordine_via_euro",
+              "_via_euro_cambia", "_testo_via_euro", "_bottone_via_euro"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb["BOTTONE_ORDINE_VENDUTO"] = "📦 Apri l'ordine"
+    amb["URL_PUBBLICO"] = "https://barattolo.store"
+    tv = amb["_testo_via_euro"]
+    prova("le quattro frasi approvate, coi nomi e la cifra", [
+        "🔒 <b>Alan ha preparato i sats per il tuo acquisto.</b> Tra poco ti "
+        "dice dove mandare 5 €.",
+        "💶 <b>Manda 5 € ad Alan:</b> i dati sono nell'ordine. Poi tocca «Ho "
+        "inviato gli euro».\n\n⏱ Hai 30 minuti, poi il pagamento si annulla.",
+        "✅ <b>Alan ha ricevuto gli euro:</b> il tuo acquisto è pagato.",
+        "❌ <b>Il pagamento in euro è stato annullato:</b> l'acquisto non è "
+        "pagato. Se avevi già mandato gli euro, scrivici da Assistenza."],
+          [tv("garanzia_pagata", "active", "Alan", "5 €"),
+           tv("recapito", "", "Alan", "5 €", minuti=30),
+           tv("concluso", "", "Alan", "5 €"),
+           tv("annullato", "payment-window", "Alan", "5 €")])
+    prova("...il recapito gia' arrivato con la garanzia: subito «Manda»; «a» "
+          "davanti a una consonante; senza tempo la riga del tempo non c'e'",
+          "💶 <b>Manda 5 € a Luca:</b> i dati sono nell'ordine. Poi tocca «Ho "
+          "inviato gli euro».",
+          tv("garanzia_pagata", "active", "Luca", "5 €", detto=True))
+    prova("...ogni annullo e ritorno nel libro ha la stessa frase; le dispute, "
+          "il moderatore e la garanzia non ancora attiva restano quelle di sempre",
+          ([True] * 4, [""] * 5),
+          ([tv(m, d).startswith("❌") for m, d in (
+              ("annullato", ""), ("annullato", "cooperative"),
+              ("tornato", "payment-window-republished"), ("tornato", "taker-timeout"))],
+           [tv(m, d) for m, d in (("annullato", "admin"), ("rilasciato", "admin"),
+                                  ("disputa", ""), ("garanzia_pagata", "invoice-next"),
+                                  ("annullo_chiesto", ""))]))
+    prova("il bottone porta all'ORDINE del mercatino",
+          ("📦 Apri l'ordine", "https://barattolo.store/?ordine=77"),
+          amb["_bottone_via_euro"](77))
+    ORDV = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99"
+    A, B = 111, 222        # A paga in euro, B vende i sats
+    for chi, pub in ((A, "a" * 64), (B, "b" * 64)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
+                    (pub, chi))
+    con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+                "sats, euro, preso_da) VALUES(?,?,0,'in-progress','sell',1,9000,"
+                "'5,00 €',?)", (ORDV, B, A))
+    amb["_NOMI"][A] = "Alan"
+    prova("il legame: un id storto non lega niente, e si legge solo per chi "
+          "compra", (False, True, 77, 0, 0),
+          (amb["_lega_via_euro"](con, "x y", A, 77),
+           amb["_lega_via_euro"](con, ORDV, A, 77),
+           amb["_ordine_via_euro"](con, ORDV, A), amb["_ordine_via_euro"](con, ORDV, B),
+           amb["_ordine_via_euro"](con, "altro-scambio", A)))
+    ORA = 1_790_000_000
+
+    def ev_ve(azione, attore, quando, dettaglio=""):
+        d = {"order": ORDV, "action": azione, "ts": quando, "actor": attore,
+             "buyer": "a" * 64, "seller": "b" * 64}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = amb["_evento_p2p_pulito"](d, quando)
+        return dict(amb["_avvisi_evento_p2p"](
+            con, e, amb["_registra_evento_p2p"](con, e, quando), quando))
+    ev_ve("taken", "buyer", ORA, "invoice-next")
+    detti = ev_ve("hold-invoice-paid", "seller", ORA + 60, "active")
+    prova("dal vero banco: la garanzia bloccata, a chi paga in euro la frase sua "
+          "(e a chi vende quella di sempre)", (True, True),
+          (detti.get(A, "").startswith("🔒 <b>Alan ha preparato i sats per il tuo "
+                                      "acquisto.</b> Tra poco ti dice dove mandare 5,00 €."),
+           "Garanzia bloccata" in detti.get(B, "")))
+    prova("...e la chiusura: «il tuo acquisto è pagato», niente invito a "
+          "recensire lo scambio", "✅ <b>Alan ha ricevuto gli euro:</b> il tuo "
+          "acquisto è pagato.",
+          ev_ve("success", "mostro", ORA + 900).get(A, ""))
+    con.close()
+    # ...e i fili: il legame nasce col deposito, e il bot lo usa per le frasi
+    # e per il bottone, sugli eventi e sul recapito
+    prova("i fili: il deposito porta lo scambio, il server lo lega (anche alla "
+          "fattura ripresentata), le frasi e il bottone lo leggono", True,
+          srv.count('_lega_via_euro(con, d.get("p2p_ordine"), user["id"], ordine_id)') == 1
+          and 'if giroconto and _lega_via_euro(con, d.get("p2p_ordine"),' in srv
+          and 'via_euro = _testo_via_euro(' in pezzo("_avvisi_evento_p2p")
+          and "bottoni[tg] = _bottone_via_euro(n_ve)" in pezzo("_manda_evento_p2p")
+          and "esito = await notifica(a_chi, testo, _bottone_via_euro(n_ve))" in srv
+          and 'if n_ve and testo.startswith("💶 "):' in srv)
 
 
 def prove_chiedi_al_venditore():
