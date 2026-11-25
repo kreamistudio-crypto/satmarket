@@ -125394,6 +125394,123 @@ def prove_indirizzo_lightning():
           and "/.well-known/lnurlp/zap" in prod)
 
 
+def prove_grazie_zap():
+    """IL GRAZIE A CHI CI FA UNO ZAP (25 nov 2026, cantiere grazie-zap).
+    Andrea: il grazie «a tutti, anche chi ci manda 1 sat», il premio
+    (7 giorni in vetrina) solo da 21.000 sats in su, e il gesto del
+    premio resta del moderatore. Qui i pezzi PURI e le sentinelle; la
+    storia col server vero sta in `collaudo_indirizzo_lightning`."""
+    import html as _html
+    import sqlite3
+    amb = _banco_zap({"html": _html})
+    exec(pezzo("_fmt_sats"), amb)
+    for f in ("zap_testo_grazie", "zap_testo_premio", "zap_chi_e",
+              "zap_anonimo", "zap_avviso_generoso"):
+        exec(pezzo(f), amb)
+    i = _SORGENTE.index("ZAP_GENEROSO_SATS = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    prova("la soglia del premio e' 21.000 sats (Andrea, 25 nov)", 21_000,
+          amb["ZAP_GENEROSO_SATS"])
+    prova("il grazie, il testo approvato, con le migliaia all'italiana",
+          "Grazie per lo zap da 21.000 sats a Barattolo! ⚡ Ci aiuta a "
+          "tenere il mercatino libero e tutto in sats.",
+          amb["zap_testo_grazie"](21000))
+    prova("...uguale per 1 sat", True,
+          amb["zap_testo_grazie"](1).startswith("Grazie per lo zap da 1 sats"))
+    prova("il premio, il testo approvato, col titolo scappato",
+          "Per dirti grazie, il tuo annuncio «Bici &lt;rossa&gt;» resta in "
+          "vetrina per 7 giorni, gratis. 🧡", amb["zap_testo_premio"]("Bici <rossa>"))
+
+    # --- chi e': l'utente dall'app, la chiave Nostr, mai il badge dichiarato
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE utenti(tg_id INTEGER, nome TEXT, npub TEXT, "
+                "npub_verificata INTEGER, npub_accesso TEXT)")
+    k_acc, k_ver, k_dich, k_nessuno = "a1" * 32, "b2" * 32, "c3" * 32, "d4" * 32
+    n = amb["hex_to_npub"]
+    con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)", [
+        (-7, "Nativo", "", 0, n(k_acc)), (55, "Verificato", n(k_ver), 1, ""),
+        (66, "Furbo", n(k_dich), 0, "")])
+    chi = amb["zap_chi_e"]
+    prova("chi e': dall'app il tg_id in colonna; la chiave d'accesso; il "
+          "badge VERIFICATO; mai quello solo dichiarato; nessuno; il "
+          "semplice senza utente",
+          [42, -7, 55, 0, 0, 0],
+          [chi({"tg_id": 42, "tipo": "semplice"}, con),
+           chi({"tipo": "zap", "mittente": k_acc}, con),
+           chi({"tipo": "zap", "mittente": k_ver}, con),
+           chi({"tipo": "zap", "mittente": k_dich}, con),
+           chi({"tipo": "zap", "mittente": k_nessuno}, con),
+           chi({"tipo": "semplice", "mittente": ""}, con)])
+    con.close()
+    an = amb["zap_anonimo"]
+    prova("anon (NIP-57) si riconosce; senza tag no; una richiesta che non "
+          "si legge vale anonima", [True, False, True],
+          [an({"richiesta": json.dumps({"tags": [["p", "x"], ["anon"]]})}),
+           an({"richiesta": json.dumps({"tags": [["p", "x"]]})}),
+           an({"richiesta": "{rotta"})])
+    avv = amb["zap_avviso_generoso"](25000, 55, "Lu<ca>",
+                                     [{"id": 288, "titolo": "Bici"},
+                                      {"id": 169, "titolo": "Crema & co"}])
+    prova("l'avviso ai moderatori: i sats, chi, e un comando pronto per "
+          "annuncio, tutto scappato", True,
+          "25.000 sats da Lu&lt;ca&gt; (tg 55)" in avv
+          and "<code>/promossi premio 288</code> Bici" in avv
+          and "<code>/promossi premio 169</code> Crema &amp; co" in avv)
+    prova("...e senza annunci lo dice, senza comandi", (True, False),
+          ("Non ha annunci in vendita" in (v := amb["zap_avviso_generoso"](
+              21000, 55, "Luca", [])), "/promossi" in v))
+
+    # --- le sentinelle sul testo -------------------------------------
+    inc = codice(pezzo("_zap_incassa"))
+    prova("il grazie parte DOPO il cancello e dopo la ricevuta: una volta "
+          "sola, e i client contano lo zap prima", True,
+          inc.index("if not mia:") < inc.index("_zap_pubblica(")
+          < inc.index("await _zap_grazie(riga)"))
+    g = codice(pezzo("_zap_grazie"))
+    prova("il grazie: all'utente con notifica, sennò DM alla chiave (non "
+          "anon), sennò niente", True,
+          g.index("await notifica(tg_id, testo)")
+          < g.index("not zap_anonimo(riga)")
+          < g.index("await manda_dm_nostr(riga[\"mittente\"], testo)")
+          < g.index("return"))
+    prova("...il premio solo da utente e sopra la soglia, ai moderatori", True,
+          "if tg_id and riga[\"sats\"] >= ZAP_GENEROSO_SATS:" in g
+          and "await notifica_admin(zap_avviso_generoso(" in g)
+    prova("...e un intoppo non ferma l'orologio", True,
+          "except Exception as e:" in g)
+    cb = codice(pezzo("zap_fattura"))
+    prova("il callback legge chi paga SOLO senza Nostr e dopo i limiti, "
+          "senza mai alzare", True,
+          cb.index("in_attesa >= ZAP_MAX_ATTESA")
+          < cb.index("if not ev and (x_tg_init_data or barattolo_sessione):")
+          < cb.index("await zap_conia(")
+          and "except Exception:\n            chi_paga = 0" in cb
+          and "int(adesso) + ZAP_SCADENZA_S, chi_paga))" in cb)
+    tab = codice(pezzo("_zap_prepara_tabella"))
+    prova("la colonna tg_id nasce con la tabella e si aggiunge alle vecchie",
+          True, "tg_id INTEGER DEFAULT 0)" in tab
+          and "ALTER TABLE zap ADD COLUMN tg_id INTEGER DEFAULT 0" in tab)
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE zap(id INTEGER PRIMARY KEY, payment_hash TEXT)")
+    amb["_zap_prepara_tabella"](con)
+    amb["_zap_prepara_tabella"](con)
+    prova("...una tabella di ieri la prende, due volte senza alzare", True,
+          "tg_id" in {r[1] for r in con.execute("PRAGMA table_info(zap)")})
+    con.close()
+    pr = codice(pezzo("comando_promossi"))
+    prova("/promossi premio: 7 giorni sempre, la strada dell'evidenza, e il "
+          "grazie a chi vende solo a premio dato", True,
+          'cosa in ("evidenza", "premio")' in pr
+          and 'if cosa == "premio":\n                giorni = 7' in pr
+          and pr.index("asyncio.create_task(promo_in_cima_canale(aid))")
+          < pr.index("premiato = (int(a[\"venditore_id\"] or 0),")
+          and "await notifica(premiato[0], zap_testo_premio(premiato[1]))" in pr)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("l'app chiede la fattura dello zap dicendo chi e'", True,
+          "encodeURIComponent('Zap insieme a una mancia'),\n"
+          "      {headers:{'X-Tg-Init-Data':authHdr()}});" in mini)
+
+
 def _banco_swap(extra=None):
     """L'ambiente dell'indirizzo della quota: quello degli zap (swap@
     ne usa la lettura della fattura e le costanti) piu' i pezzi VERI
@@ -188297,8 +188414,10 @@ def prove_canale_admin():
           # di un admin (tolta o rimborsata) nei riepiloghi
           # (25 nov 2026, quadro-servizi) il servizio che tace o torna, e
           # il certificato vicino alla scadenza: negli errori
+          # (25 nov 2026, grazie-zap) lo zap generoso col comando del
+          # premio pronto: nei riepiloghi, come la quota di swap@
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 41,
-           "liquidita": 5, "moderazione": 28, "riepiloghi": 30}, per_stanza)
+           "liquidita": 5, "moderazione": 28, "riepiloghi": 31}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -188336,7 +188455,7 @@ def prove_canale_admin():
                                               "avvisa_profilo_mio",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "118 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "128 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -188367,7 +188486,8 @@ def prove_canale_admin():
           "/promossi di un admin e la pagina dedicata da preparare; e il "
           "nome e la foto scelti da approvare; e la pagina collegata a un "
           "negozio dal pannello; dal 25 nov il servizio del quadro che tace "
-          "o torna, e il certificato vicino alla scadenza)", 127,
+          "o torna, e il certificato vicino alla scadenza; e lo zap "
+          "generoso col comando del premio)", 128,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -214951,7 +215071,7 @@ def prove_non_hai_sats():
           "viaEuroScambioDellOrdine(o.id)" in pdp
           and "const v = viaEuroPassoOrdine(ve);" in pdp
           and "Sto preparando il pagamento…" in pvo
-          and "recapitoCompratoreP2P(p)" in pvo and "viaEuroHoPagato()\">Ho inviato gli euro</button>" in pvo
+          and "viaEuroPassi(p, 'viaEuroSeguo=" in pvo and "viaEuroPasso1(p, nome)" in pvo
           and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
           and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
           and "if (!v || v.orma !== ormaBox) box.outerHTML = pannelloDaPagare(o);" in mini)
@@ -215038,12 +215158,13 @@ console.log(JSON.stringify(r));
     prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
           "…», «Ho inviato gli euro», «… sta controllando il pagamento», «Puoi chiudere "
           "l'app, ti avvisiamo noi.»", True,
-          "Sto preparando il pagamento…" in rp and "'Manda ' + String(o.euro) + ' € a ' + nome" in rp
-          and ">Ho inviato gli euro</button>" in rp and "' sta controllando il pagamento'" in rp
+          "Sto preparando il pagamento…" in rp and "viaEuroPasso1(o, nome)" in rp
+          and "viaEuroPassi(o, 'viaEuroHoPagato()')" in rp and "' sta controllando il pagamento'" in rp
           and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
     prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
           "«Ho pagato» e' il suo gesto", True,
-          "recapitoCompratoreP2P(o)" in rp and "rigaTempoPagareP2P(o)" in rp
+          "recapitoCompratoreP2P(o)" in _fn_js(mini, "function viaEuroPassi(o, gesto){")
+          and "rigaTempoPagareP2P(o)" in _fn_js(mini, "function viaEuroPassi(o, gesto){")
           and "euroInviatiP2P();" in _fn_js(mini, "function viaEuroHoPagato(){"))
     hp = _fn_js(mini, "function viaEuroHoPagato(){")
     prova("...senza passare dalla pagina P2P: lo scambio si presta a "
@@ -215115,8 +215236,11 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
     # peer-to-peer». Le quattro frasi le ha approvate lui il 25 nov sera.
     con, amb = _banco_eventi_p2p()
     for f in ("_tabella_via_euro", "_lega_via_euro", "_ordine_via_euro",
-              "_via_euro_cambia", "_testo_via_euro", "_bottone_via_euro"):
+              "_via_euro_cambia", "_testo_via_euro", "_bottone_via_euro",
+              "_sollecito_via_euro"):
         exec(_senza_prosa(pezzo(f)), amb)
+    i_r = _SORGENTE.index("\nVIA_EURO_RISCHIO = (") + 1
+    exec(_SORGENTE[i_r:_SORGENTE.index(")\n", i_r) + 2], amb)
     amb["BOTTONE_ORDINE_VENDUTO"] = "📦 Apri l'ordine"
     amb["URL_PUBBLICO"] = "https://barattolo.store"
     tv = amb["_testo_via_euro"]
@@ -215124,7 +215248,8 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
         "🔒 <b>Alan ha preparato i sats per il tuo acquisto.</b> Tra poco ti "
         "dice dove mandare 5 €.",
         "💶 <b>Manda 5 € ad Alan:</b> i dati sono nell'ordine. Poi tocca «Ho "
-        "inviato gli euro».\n\n⏱ Hai 30 minuti, poi il pagamento si annulla.",
+        "inviato gli euro».\n\n⏱ Hai 30 minuti: se non lo tocchi in tempo, "
+        "l'acquisto salta e rischi di perdere gli euro che hai mandato.",
         "✅ <b>Alan ha ricevuto gli euro:</b> il tuo acquisto è pagato.",
         "❌ <b>Il pagamento in euro è stato annullato:</b> l'acquisto non è "
         "pagato. Se avevi già mandato gli euro, scrivici da Assistenza."],
@@ -215137,15 +215262,34 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           "💶 <b>Manda 5 € a Luca:</b> i dati sono nell'ordine. Poi tocca «Ho "
           "inviato gli euro».",
           tv("garanzia_pagata", "active", "Luca", "5 €", detto=True))
+    prova("...e le due approvate dopo: l'annullo chiesto da chi vende, il "
+          "pagamento fermo", [
+        "↩️ <b>Alan chiede di annullare il pagamento.</b> Se non hai mandato "
+        "gli euro e sei d'accordo, tocca «Annulla il pagamento» nell'ordine; se "
+        "li hai già mandati, tocca «Ho inviato gli euro».",
+        "⚠️ <b>Il pagamento del tuo acquisto si è fermato:</b> i sats restano "
+        "bloccati per te. Scrivici da Assistenza e lo sistemiamo."],
+          [tv("annullo_chiesto", "", "Alan"), tv("payout_fallito", "TIMEOUT", "Alan")])
+    sv = amb["_sollecito_via_euro"]
+    prova("i promemoria degli euro: a meta' tempo, negli ultimi dieci minuti, "
+          "e senza tempo (gli altri restano quelli di sempre)", [
+        "💶 Promemoria: hai ancora 30 minuti per mandare gli euro ad Alan e "
+        "toccare «Ho inviato gli euro». I dati sono nell'ordine.",
+        "⏰ Mancano 10 minuti: hai già mandato gli euro? Tocca subito «Ho "
+        "inviato gli euro» nell'ordine: se non lo tocchi in tempo, l'acquisto "
+        "salta e rischi di perdere gli euro che hai mandato.",
+        "💶 Promemoria: Alan aspetta i tuoi euro. I dati sono nell'ordine: "
+        "mandali e tocca «Ho inviato gli euro».", ""],
+          [sv("euro_tempo1", "Alan", 1800), sv("euro_tempo3", "Alan", 600),
+           sv("euro_sollecito2", "Alan"), sv("fiat_sollecito1", "Alan")])
     prova("...ogni annullo e ritorno nel libro ha la stessa frase; le dispute, "
           "il moderatore e la garanzia non ancora attiva restano quelle di sempre",
-          ([True] * 4, [""] * 5),
+          ([True] * 4, [""] * 4),
           ([tv(m, d).startswith("❌") for m, d in (
               ("annullato", ""), ("annullato", "cooperative"),
               ("tornato", "payment-window-republished"), ("tornato", "taker-timeout"))],
            [tv(m, d) for m, d in (("annullato", "admin"), ("rilasciato", "admin"),
-                                  ("disputa", ""), ("garanzia_pagata", "invoice-next"),
-                                  ("annullo_chiesto", ""))]))
+                                  ("disputa", ""), ("garanzia_pagata", "invoice-next"))]))
     prova("il bottone porta all'ORDINE del mercatino",
           ("📦 Apri l'ordine", "https://barattolo.store/?ordine=77"),
           amb["_bottone_via_euro"](77))
@@ -215186,6 +215330,24 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           "recensire lo scambio", "✅ <b>Alan ha ricevuto gli euro:</b> il tuo "
           "acquisto è pagato.",
           ev_ve("success", "mostro", ORA + 900).get(A, ""))
+    # i promemoria, quando partono: il giudice «tocca ancora a lui» qui
+    # dice sempre si' (non e' lui sotto prova)
+    amb["_sollecito_euro_p2p_fermo"] = lambda c, r: ""
+    for tg, mom in ((A, "euro_sollecito1"), (B, "fiat_sollecito1")):
+        con.execute("INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                    "quando, scade, fonte) VALUES(?,?,0,?,'la frase di sempre',?,?,?)",
+                    (ORDV, mom, tg, ORA, ORA + 1000,
+                     "sollecito_euro" if tg == A else "sollecito"))
+    btn = {}
+    fuori_ve, _ = amb["_scarica_attese_p2p"](con, ORA + 1001, btn)
+    prova("il promemoria degli euro a chi paga in euro ha le parole sue e il "
+          "bottone all'ordine; a chi vende tutto come sempre",
+          [(A, "💶 Promemoria: Alan aspetta i tuoi euro. I dati sono "
+               "nell'ordine: mandali e tocca «Ho inviato gli euro».",
+            ("📦 Apri l'ordine", "https://barattolo.store/?ordine=77")),
+           (B, "la frase di sempre", amb["P2P_BOTTONE_SCAMBIO"])],
+          sorted((t, x, btn.get(i, ("", ""))[0] if t == B else btn.get(i))
+                 for i, (t, x, _f) in enumerate(fuori_ve)))
     con.close()
     # ...e i fili: il legame nasce col deposito, e il bot lo usa per le frasi
     # e per il bottone, sugli eventi e sul recapito
@@ -215196,7 +215358,21 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           and 'via_euro = _testo_via_euro(' in pezzo("_avvisi_evento_p2p")
           and "bottoni[tg] = _bottone_via_euro(n_ve)" in pezzo("_manda_evento_p2p")
           and "esito = await notifica(a_chi, testo, _bottone_via_euro(n_ve))" in srv
-          and 'if n_ve and testo.startswith("💶 "):' in srv)
+          and 'if n_ve and testo.startswith("💶 "):' in srv
+          and "bottoni[len(fuori) - 1] = _bottone_via_euro(n_ve)" in pezzo("_scarica_attese_p2p")
+          and "if _ve:\n                    for tg, _ in avvisi:" in pezzo("_manda_evento_p2p"))
+    # --- «Annulla il pagamento» e i due passi nella schermata (25 nov 2026) ---
+    pas = _fn_js(mini, "function viaEuroPassi(o, gesto){")
+    prova("i due passi approvati, e «Annulla il pagamento» solo con l'annullo "
+          "chiesto da chi vende, che manda il `cancel` senza la pagina dello "
+          "scambio", True,
+          "'1. Manda ' + String(o.euro) + ' € ' + a + nome + ' con i dati qui sotto'"
+          in _fn_js(mini, "function viaEuroPasso1(o, nome){")
+          and "2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in "
+          "tempo, l\\'acquisto salta e rischi di perdere gli euro che hai mandato." in pas
+          and "o.stato === 'annullo_proposto'" in pas and ">Annulla il pagamento</button>" in pas
+          and "await chiamataOrdineP2P(o, 'cancel');" in _fn_js(mini, "async function viaEuroAnnulla(id){")
+          and "o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto'" in _fn_js(mini, "function viaEuroPasso(o){"))
 
 
 def prove_chiedi_al_venditore():
@@ -224120,7 +224296,7 @@ CATEGORIE = {
     profilo_sezioni profilo_elegante utenti_home negozi_fuori_dal_ciclo
     db_contesa_negozi negozi_grandi pc_tema_e_ricerca schermo_largo
     carrello_salvato bollino_staff anello_ovunque avvisi_mercatino
-    x_risonanza indirizzo_lightning foto_obbligatorie foto_varianti foto_in_fila_e_incolla vibrazione
+    x_risonanza indirizzo_lightning grazie_zap foto_obbligatorie foto_varianti foto_in_fila_e_incolla vibrazione
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
@@ -225506,7 +225682,7 @@ def main():
               prove_recensioni_ricevute,
               prove_recensioni_nascondibili,
               prove_x_risonanza,
-              prove_indirizzo_lightning,
+              prove_indirizzo_lightning, prove_grazie_zap,
               prove_indirizzo_swap,
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,

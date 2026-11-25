@@ -631,6 +631,40 @@ def main():
            abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",
                    (regalo,))[0] - (adesso + 17 * 86400)) < 120))
 
+    # IL PREMIO DELLO ZAP GENEROSO (25 nov 2026, cantiere grazie-zap): la
+    # stessa evidenza regalata, 7 giorni sempre, e il grazie a chi vende
+    print("\n[/promossi premio, il grazie dello zap generoso]")
+    premio = annuncio(3, "Miele <di casa>", adesso - 86400)
+    AVVISI.clear(); ADMIN.clear()
+    asyncio.run(_regala(999, f"/promossi premio {premio} 30"))
+    prova("in evidenza 7 giorni, anche se il moderatore scrive 30", True,
+          abs(uno("SELECT evidenza_fino FROM annunci WHERE id=?",
+                  (premio,))[0] - (adesso + 7 * 86400)) < 120)
+    prova("...a chi vende arriva il grazie, col titolo scappato",
+          ["Per dirti grazie, il tuo annuncio «Miele &lt;di casa&gt;» resta "
+           "in vetrina per 7 giorni, gratis. 🧡"],
+          [t for tg, t in AVVISI if tg == 3])
+    prova("...e i moderatori lo sanno", True,
+          any(f"/promossi premio {premio} 7" in x[0] for x in ADMIN))
+    AVVISI.clear()
+    asyncio.run(_regala(1, f"/promossi premio {premio}"))
+    prova("chi non e' admin non premia: niente grazie a chi vende", [],
+          [t for tg, t in AVVISI if tg == 3])
+    c = server.db()
+    try:
+        pieni = server.posti_evidenza(c, int(time.time()))[0]
+    finally:
+        c.close()
+    server.PROMO_EVIDENZA_POSTI = pieni
+    secondo = annuncio(3, "Marmellata", adesso - 86400)
+    AVVISI.clear()
+    asyncio.run(_regala(999, f"/promossi premio {secondo}"))
+    prova("a fila piena il premio non entra, e nessun grazie a vuoto",
+          (0, []), (uno("SELECT evidenza_fino FROM annunci WHERE id=?",
+                        (secondo,))[0] or 0,
+                    [t for tg, t in AVVISI if tg == 3]))
+    server.PROMO_EVIDENZA_POSTI = 8
+
     print(f"\n=== {VERDI[0]} verdi, {ROSSE[0]} rotte ===")
     return 1 if ROSSE[0] else 0
 
