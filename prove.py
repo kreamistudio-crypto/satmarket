@@ -52392,8 +52392,29 @@ def prove_scoprire():
           (2, True, True, True),
           (mini.count("tocca: () => apriNegozioDaScoprire("),
            _ds.find("if (negozioPronto(chi))") < _ds.find("negozioInAttesa(chi);"),
-           "@keyframes negozio-sale{from{transform:translateY(100%)}" in mini,
-           "e.currentTarget.classList.remove('sale-dal-basso')" in mini))
+           "@keyframes negozio-sale{from{transform:translateY(100vh)}" in mini,
+           "if (view !== 'negozio') el('view-negozio')?.classList.remove('sale-dal-basso');" in mini))
+    # LA SALITA NON SCATTA (25 nov 2026, Andrea: «guarda come scatta»,
+    # video dal telefono): la corsa parte dal fondo dello SCHERMO (con
+    # `100%` saltava quando la pagina si allungava all'arrivo dei dati),
+    # il secondo go('negozio') di renderNegozio non spegne e riaccende la
+    # vista che sta salendo, e la classe non si toglie a corsa finita (il
+    # `fadein` ripartiva: la pagina lampeggiava) ma uscendo dal negozio
+    _go = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("la salita del negozio non riparte e non lampeggia",
+          (0, True, True, 0, 0),
+          (mini.count("translateY(100%)}to{transform:none}}"),
+           "const restaSalita = vistaNuova.classList.contains('active')\n"
+           "    && vistaNuova.classList.contains('sale-dal-basso');" in _go,
+           _go.index("if (!restaSalita) {")
+           < _go.index("document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));"),
+           mini.count("salitaNegozioFinita"),
+           mini.count('onanimationend="salita')))
+    # IL LAMPO NERO in «Da scoprire» (stesso giorno, dalla mini app): lo
+    # strato della card resta montato, niente ridipinta a fine transizione
+    prova("le card di Da scoprire tengono il loro strato (niente lampo nero)",
+          True, "transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease;\n"
+          "      will-change:transform,opacity}" in mini)
     # IL VOLO DELLA CARD (24 nov 2026, Andrea: «si ingrandisce un po', ma
     # rimane comunque il bordo» e «la parte in basso [...] falla vedere un
     # po' prima»): solo dal telefono, solo col negozio pronto, mai con gli

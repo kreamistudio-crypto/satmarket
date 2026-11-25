@@ -1903,7 +1903,16 @@
       scroll-snap-type:x mandatory}
     #scoprireStrip .scoprire-card{scroll-snap-align:center;margin:0 -10px;
       transform:scale(.82);opacity:.55;
-      transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease}
+      transition:transform .5s ease, opacity .5s ease, box-shadow .5s ease;
+      will-change:transform,opacity}
+    /* IL LAMPO NERO (25 nov 2026, Andrea dalla mini app: «quando scorro
+       tra le varie card ogni tanto c'è un flash nero»): nel video la card
+       al centro sparisce per UN fotogramma circa mezzo secondo dopo lo
+       scorrimento, cioe' quando finisce la sua transizione di misura. E'
+       il momento in cui il telefono smonta lo strato della card e la
+       ridipinge; con `will-change` lo strato resta montato e non c'e'
+       niente da ridipingere. Ipotesi dal video, da riguardare sul
+       telefono vero: in un browser del computer il lampo non si vede. */
     #scoprireStrip .scoprire-card:active{transform:scale(.82) translateY(1px)}
     #scoprireStrip .scoprire-card.sc-centro{transform:scale(1.1);opacity:1;
       z-index:3;box-shadow:0 6px 12px rgba(0,0,0,.45)}
@@ -8322,7 +8331,11 @@
      apriNegozioDaScoprire); la regola universale degli effetti ridotti la
      spegne come ogni altra corsa */
   #view-negozio.active.sale-dal-basso{animation:negozio-sale .34s cubic-bezier(.2,.8,.2,1)}
-  @keyframes negozio-sale{from{transform:translateY(100%)}to{transform:none}}
+  /* (25 nov 2026, «guarda come scatta») dal fondo dello SCHERMO, non dal
+     fondo della pagina: con `100%` la partenza era l'altezza della vista,
+     e quando i dati arrivavano a salita in corso la pagina si allungava e
+     la corsa saltava di colpo piu' in basso */
+  @keyframes negozio-sale{from{transform:translateY(100vh)}to{transform:none}}
   /* IL VOLO DELLA CARD (24 nov 2026, voloNegozio): la card toccata si
      allarga fino alla testata del negozio, coi margini e gli angoli tondi
      («si ingrandisce un po', ma rimane comunque il bordo»), sopra un velo
@@ -15433,7 +15446,7 @@ document.getElementById('cartello')?.remove();</script>
   </div>
 
   <!-- ============ VISTA: NEGOZIO DEL VENDITORE ============ -->
-  <div class="view" id="view-negozio" onanimationend="salitaNegozioFinita(event)">
+  <div class="view" id="view-negozio">
     <!-- LA TESTATA DEL VOLO (24 nov 2026): la card di «Da scoprire» che e'
          volata fin qui; c'e' solo arrivando col volo (voloNegozio) -->
     <div class="negozio-testata" id="negozioTestata" hidden></div>
@@ -24495,8 +24508,25 @@ function go(view){
   /* il bottone di «Pubblica annuncio» si misura PRIMA che la vista se ne
      vada: e' da li' che il ritorno lo riporta nel + (lasciaMorfoVendi) */
   const daVendi = view !== 'vendi' ? misuraRitornoVendi() : null;
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  el('view-'+view).classList.add('active');
+  /* LA SALITA DEL NEGOZIO NON RIPARTE (25 nov 2026, Andrea dal telefono:
+     «guarda come scatta», sul suo negozio in «Da scoprire»). Due colpi:
+     1) il disegno del negozio richiama go('negozio') quando i dati
+     arrivano (renderNegozio), a salita gia' partita: togliere e rimettere
+     `active` con una lettura del layout in mezzo spegne e riaccende la
+     vista, e la corsa ricominciava dal fondo dello schermo; ora, se la
+     vista e' gia' quella attiva e sta salendo (o e' salita), resta com'e'.
+     2) a corsa finita la classe `sale-dal-basso` si toglieva, e
+     l'animazione tornava il `fadein` di ogni vista: la pagina spariva e
+     riappariva in un lampo. Ora la classe resta finche' si sta sul
+     negozio e se ne va QUI, uscendo: tornando alla vista non riparte. */
+  const vistaNuova = el('view-'+view);
+  const restaSalita = vistaNuova.classList.contains('active')
+    && vistaNuova.classList.contains('sale-dal-basso');
+  if (view !== 'negozio') el('view-negozio')?.classList.remove('sale-dal-basso');
+  if (!restaSalita) {
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    vistaNuova.classList.add('active');
+  }
   /* la musica della stradina suona solo sul tabellone (17 nov 2026) */
   if (view !== 'stradina' && typeof musicaStradinaFerma === 'function') musicaStradinaFerma();
   if ((view === 'stradina') !== temaStradina && typeof applicaTema === 'function') {
@@ -29851,8 +29881,9 @@ function negozioInAttesa(chi){
    istante con l'anello (`negozioInAttesa`), sale dal basso, e si riempie
    quando i dati arrivano; se nel frattempo si e' tornati indietro, il
    negozio non salta addosso (`qui`). La salita e' del CSS
-   (`.sale-dal-basso`), si toglie a corsa finita — o tornando alla vista
-   ripartirebbe — e con gli effetti ridotti non c'e'. Vale per le card
+   (`.sale-dal-basso`), resta finche' si sta sul negozio e si toglie
+   uscendo (in go(), dal 25 nov 2026: tolta a corsa finita faceva
+   ripartire il `fadein` della vista) — e con gli effetti ridotti non c'e'. Vale per le card
    grandi e per i quadrati dei negozi (tutti passano da `tocca`). */
 function apriNegozioDaScoprire(chi, aperto, da){
   if (!chi) return apriNegozio(chi);
@@ -30067,9 +30098,6 @@ function voloNegozio(card, chi, aperto, da){
     }, VOLO_MS - VOLO_APRI_MS);
   }, VOLO_APRI_MS);
   return true;
-}
-function salitaNegozioFinita(e){
-  if (e.animationName === 'negozio-sale') e.currentTarget.classList.remove('sale-dal-basso');
 }
 
 /* LA PAGINA DEL NEGOZIO RIDISEGNATA, non aperta: stessa strada di
