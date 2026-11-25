@@ -27990,6 +27990,8 @@ function cardConsigliati(voci){
            class="cons-logo${v.pieno ? ' cons-pieno' : ''}${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${esc(logoConsigliato(v))}"
            style="--giu:${giuLogoConsigliato(v.giu)}%"
            alt="" loading="lazy" decoding="async" fetchpriority="low"
+           onanimationend="fineCorsaConsigliato(this)"
+           onanimationcancel="fineCorsaConsigliato(this)"
            onerror="this.remove()">`).join('')}<span class="cat-emoji"
            aria-hidden="true">📣</span></span></span>
       <span class="cat-eti">Consigliati</span>
@@ -28012,12 +28014,20 @@ function cardConsigliati(voci){
    all'avvio. Da li' ognuno si chiede quando entra il precedente, e il
    ritmo torna quello chiesto. Un logo che non e' ancora arrivato non
    entra a meta': si aspetta il giro dopo.
-   LE CLASSI DI UNA CORSA RESTANO FINO ALLA CORSA DOPO, e non serve
-   toglierle prima: finita l'animazione, le regole di sempre dicono gia'
-   lo stato giusto (vedi il CSS), e al passaggio dopo ogni logo cambia
-   classe — chi e' entrato esce, chi e' uscito resta fermo o entra —
-   quindi l'animazione riparte sempre, senza fotogrammi d'attesa ne'
-   ascoltatori.
+   LE CLASSI DI UNA CORSA SE NE VANNO QUANDO LA CORSA FINISCE (25 nov
+   2026, cantiere scatti-home, dal video di Andrea: «guarda cosa succede
+   alla sezione esplora per categorie quando torno indietro da una card»).
+   Fino a quel giorno restavano fino alla corsa dopo, perche' finita
+   l'animazione le regole di sempre dicono gia' lo stato giusto (vedi il
+   CSS). Ma la home esce di scena con `display:none` a ogni card aperta,
+   e al ritorno il browser fa RIPARTIRE DA CAPO ogni animazione che trova
+   attaccata: l'ultima corsa si rivedeva intera, il logo vecchio che
+   esce e il nuovo che ricade dall'alto, come uno scatto della fila.
+   Adesso `animationend` le toglie (fineCorsaConsigliato), e anche
+   `animationcancel`: una corsa interrotta a meta' dalla card che si apre
+   non si rigioca al ritorno, e il logo resta fermo al suo posto. Al
+   passaggio dopo le classi tornano, e l'animazione parte come sempre. */
+/* ...e il resto del giro:
    EFFETTI RIDOTTI: niente corsa e niente giro, resta il PRIMO. Il
    giudice e' `effettiRidotti()`, chiesto a OGNI giro: la scelta si cambia
    da «🌗 Aspetto» senza ridisegnare la fila, e al giro dopo la card torna
@@ -28093,6 +28103,9 @@ function giraConsigliati(){
    corsa, `entra` a lui ed `esce` a chi c'era. Senza (gli effetti ridotti
    che riportano al primo) nessuna corsa: il cambio e' secco, e le classi
    di una corsa vecchia se ne vanno con lui. */
+function fineCorsaConsigliato(im){
+  im.classList.remove('entra', 'esce');
+}
 function accendiLogoConsigliato(loghi, k, prima = -1){
   loghi.forEach((x, j) => {
     x.classList.toggle('attivo', j === k);
@@ -29402,12 +29415,23 @@ async function doSearch(){
     loadListings().then(()=>renderGrid()).catch(()=>renderGrid());
     return;
   }
+  /* L'INVIO PORTA AI RISULTATI (25 nov 2026, cantiere scatti-home,
+     Andrea: «quando io digito qualcosa nella barra di ricerca e schiaccio
+     invio, in automatico l'app dovrebbe scorrere verso il basso e
+     mostrarmi ciò che ha trovato»): fino a quel giorno la pagina restava
+     ferma in cima, e i risultati andavano cercati scorrendo a mano. Lo
+     stesso arrivo dello scaffale — «N risultati» sotto l'header, coi
+     prodotti in vista — e la stessa bandierina, consumata dal primo
+     renderGrid coi risultati (armaScrollReparto). Solo con una query: a
+     campo vuoto l'invio ricomincia la vista e non porta da nessuna parte. */
   if (DEMO) {
     /* In demo non c'è nessun server che cerchi: filtro sui dati
        finti, che è quel che renderGrid sa già fare */
     renderGrid();
+    armaScrollReparto(true);
     return;
   }
+  armaScrollReparto(true);
   /* UNA STRADA SOLA per tutti (ago 2026), autenticati e anonimi: la
      ricerca vive dentro la VETRINA — `/api/listings?q=` — quindi è
      paginata come il resto e si compone con categoria, prezzo,
@@ -116603,6 +116627,7 @@ let p2pVetrinaTimer = null;         // il prossimo giro, se c'e'
 let p2pVetrinaInVolo = false;
 let p2pVetrinaFresca = false;       // la prossima domanda salta la cache (ritorno in Esplora)
 let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
+let p2pFilaInArrivo = false;        // interruttore appena acceso, card in arrivo (scatti-home)
 let p2pVetrinaMiei = new Set();     // gli ordini della fotografia pubblicati da me, per il server
 
 /* La vetrina e' quella nuda? */
@@ -116884,16 +116909,26 @@ function cardVetrinaOnchainP2P(o){
 /* `spenta` (24 nov 2026, cantiere home-card-pulite): chi guarda l'ha
    spenta con l'interruttore accanto al titolo. La sezione resta, col solo
    titolo e l'interruttore spento; le card e le frecce no. */
-function filaCardP2P(html, spenta){
+/* `attesa` (25 nov 2026, cantiere scatti-home, dal video di Andrea: «la
+   prima volta che schiaccio il toggle scambi peer-to-peer... scatta»):
+   l'interruttore e' appena stato acceso e le card sono in arrivo dal
+   server. Chi apre l'app con la fascia spenta non le ha mai chieste, e
+   senza card la fascia spariva tutta per il tempo della domanda: le card
+   del mercatino salivano al suo posto e poi venivano rispinte giu'. In
+   attesa la fascia resta com'era da spenta — stessa altezza, titolo e
+   interruttore in mezzo — ma con l'interruttore gia' acceso; le card
+   arrivano in un colpo solo, come dal secondo tocco in poi. */
+function filaCardP2P(html, spenta, attesa){
   const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
   if (!sez || !fila) return;
-  sez.style.display = (html.length || spenta) ? '' : 'none';
+  const chiusa = spenta || (attesa && !html.length);
+  sez.style.display = (html.length || chiusa) ? '' : 'none';
   const guscio = el('p2pVetrinaGuscio');
-  if (guscio) guscio.style.display = spenta ? 'none' : '';
+  if (guscio) guscio.style.display = chiusa ? 'none' : '';
   /* spenta, la fascia resta col solo titolo: `spenta` le da' lo stesso
      respiro sopra e sotto, cosi' titolo e interruttore stanno in mezzo
      (25 nov 2026, cantiere fascia-p2p) */
-  sez.classList[spenta ? 'add' : 'remove']('spenta');
+  sez.classList[chiusa ? 'add' : 'remove']('spenta');
   /* l'interruttore si riscrive intero: lo stato sta tutto nel markup.
      Dal 25 nov 2026 e' quello COL BITCOIN (`p2p-vt-btc`, Andrea fra
      quattro prove: «va bene l'interruttore col Bitcoin»): il pallino e'
@@ -116938,10 +116973,14 @@ function renderVetrinaP2P(){
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
      ogni pagina di annunci che arriva */
-  const firma = (via ? 'spenta|' : '') + html.join('');
+  /* LE CARD IN ARRIVO DOPO L'INTERRUTTORE (25 nov 2026, cantiere
+     scatti-home): vedi `attesa` in filaCardP2P. Vale solo finche' la
+     domanda partita dal tocco non torna (giroFotoVetrinaP2P la spegne) */
+  const attesa = vede && !html.length && p2pFilaInArrivo;
+  const firma = (via ? 'spenta|' : '') + (attesa ? 'attesa|' : '') + html.join('');
   if (firma === p2pVetrinaFirma) return;
   p2pVetrinaFirma = firma;
-  filaCardP2P(html, via);
+  filaCardP2P(html, via, attesa);
 }
 /* LA FOTOGRAFIA PER LA FILA: una GET leggera, che il server serve dalla
    memoria (cache privata di 30 s: un rientro in Esplora subito dopo non
@@ -117028,6 +117067,7 @@ function giroFotoVetrinaP2P(){
   p2pVetrinaChiesta = Date.now();
   chiediFotoVetrinaP2P().catch(() => false).then(() => {
     p2pVetrinaInVolo = false;
+    p2pFilaInArrivo = false;
     renderVetrinaP2P();          // ridisegna se e' cambiato, e riarma il giro
   });
 }
@@ -117087,6 +117127,9 @@ function setFilaP2P(mostra){
   else timbraVisto('p2p_home_via', quando);
   if (!mostra && p2pVetrinaTimer) { clearTimeout(p2pVetrinaTimer); p2pVetrinaTimer = null; }
   if (mostra) armaFotoVetrinaP2P(true);
+  /* in arrivo solo se una domanda e' davvero partita (o in volo): senza,
+     la fascia non aspetterebbe niente */
+  p2pFilaInArrivo = !!(mostra && (p2pVetrinaTimer || p2pVetrinaInVolo));
   renderVetrinaP2P();
 }
 function renderLevaFilaP2P(){
