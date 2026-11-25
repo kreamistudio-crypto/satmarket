@@ -207860,11 +207860,15 @@ def prove_swap_auto_schermate():
     if r is None:
         salta("lo swap automatico, le schermate", "node non c'e'")
         return
-    prova("card on-chain: la moneta ₿ del Cambio, col suo titolo",
-          (True, True), ("cambio-moneta btc" in r["oc"], "Preferisce ricevere on-chain" in r["oc"]))
-    prova("card Lightning: il fulmine", (True, False),
-          ("cambio-moneta ln" in r["ln"], "cambio-moneta btc" in r["ln"]))
-    prova("card senza il campo: niente moneta", False, "card-incasso" in r["niente"])
+    # (25 nov 2026, cantiere card-senza-rete, Andrea: «l'icona lighting o
+    # on chain direi di levarlo, se no ci sono troppe icone») la moneta
+    # di come riceve chi vende non sta piu' sulla card del mercatino: ne'
+    # la ₿ del Cambio ne' il fulmine, qualunque sia la scelta. Resta nella
+    # scheda (`pill-incasso`, qui sotto)
+    prova("(25 nov) card del mercatino: niente moneta, ne' on-chain ne' Lightning ne' senza scelta",
+          ["", "", ""], [r["oc"], r["ln"], r["niente"]])
+    prova("...e la scheda la dice ancora, con la moneta del Cambio", True,
+          "+ (l.incasso ? `<span class=\"pill pill-incasso\">${l.incasso === 'onchain'" in mini)
     prova("Profilo a leva spenta: vuoto", "", r["spento"])
     prova("Profilo: On-chain acceso, «Conferma» e il minimo in parole",
           (True, True, True),

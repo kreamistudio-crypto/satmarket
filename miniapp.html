@@ -11332,9 +11332,6 @@
   .pill-incasso{display:inline-flex;align-items:center;gap:6px}
   .pill-incasso .cambio-moneta.p2p-oc-moneta{width:20px;height:20px;margin-left:-6px}
   .pill-incasso .cambio-moneta.p2p-oc-moneta .cambio-svg{width:12px;height:12px}
-  .card .meta .ico .card-incasso{display:inline-flex}
-  .card .meta .ico .card-incasso .cambio-moneta.p2p-oc-moneta{width:15px;height:15px}
-  .card .meta .ico .card-incasso .cambio-moneta.p2p-oc-moneta .cambio-svg{width:10px;height:10px}
   .pill .taglia-ico{vertical-align:-3.5px;margin-right:1px}
   /* LA FAMIGLIA NELLA SCHEDA (set 2026): una riga per opzione — il
      nome sopra, i bottoncini sotto — col vestito delle pillole di
@@ -21410,12 +21407,14 @@ function iconeCard(l){
       ? 'Di persona, su appuntamento' : l.servDove === 'online'
       ? 'In videoconferenza, su appuntamento' : 'Su appuntamento'
       }">📅</span>`;
-  /* (2 nov 2026, swap-auto) come preferisce ricevere chi vende: la moneta
-     ₿ del Cambio (quella di SATS Routing) o il fulmine, mai la catena (Andrea) */
-  if (l.incasso)
-    i += `<span class="card-incasso" title="${l.incasso === 'onchain'
-      ? 'Preferisce ricevere on-chain' : 'Preferisce ricevere in Lightning'}">${
-      l.incasso === 'onchain' ? P2P_OC_MONETA : P2P_LN_MONETA}</span>`;
+  /* LA MONETA DI COME RICEVE CHI VENDE NON STA PIU' IN CARD (25 nov 2026,
+     cantiere card-senza-rete, Andrea: «leviamo pure il toggle nella card,
+     quello in basso a destra, che indica se un ordine è lighting o on
+     chain. Non serve saperlo in quel momento [...] pasticcia troppo la
+     card. Lasciamo solamente l'icona del furgoncino o delle mani»). Dal
+     2 nov 2026 (swap-auto) qui c'era la ₿ del Cambio o il fulmine: resta
+     nella scheda (`pill-incasso`), dove chi compra decide come pagare.
+     Solo il mercatino: le card del P2P hanno la loro rete e restano. */
   return i ? `<span class="ico">${i}</span>` : '';
 }
 function mapListing(a){
