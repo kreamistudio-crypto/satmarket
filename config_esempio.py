@@ -1026,6 +1026,11 @@ SWAP_FORNITORI_IN_PIU = []
 # (la VM di collaudo), dove un mempool pubblico non c'e'. Una voce di
 # SWAP_FORNITORI_IN_PIU puo' portare la sua chiave "mempool".
 SWAP_MEMPOOL_API = ""
+# LE ESTRAZIONI (26 nov 2026): da dove si leggono la cima della catena e
+# l'hash del blocco che sceglie il vincitore. SEMPRE il mainnet, anche
+# sulla prova: e' il blocco pubblico a fare da notaio. In collaudo la
+# catena e' finta e questa riga non si legge.
+ESTRAZIONI_MEMPOOL_API = "https://mempool.space/api"
 # IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero, decisione di
 # Andrea): dalla pagina «Cambio» chi passa il cancello cambia i SUOI sats
 # senza un ordine di mezzo — Lightning -> il suo indirizzo bitcoin (e,

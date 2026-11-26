@@ -96728,3 +96728,68 @@ STRADE SCARTATE. Una chiave `ordini_p2p` in `/api/negozio/{chi}` dal server (`_P
 PROVATO. `PROVE_SEVERE=1 python prove.py` nel worktree, sull'albero già ribasato su c318ae09 (Cerco «Offri», non mio): 31.935 passate, 0 fallite, 0 saltate (nostr-tools 2.25.2 installato fuori dal repo, come in CI). I 176 collaudi di `ci/collaudi.txt` verdi sull'albero prima del rebase e senza il ritocco dello username, `collaudo_racconti_bozza` rigirato dopo l'uno e l'altro. coi casi nuovi del giudice dei link in node (l'invito passa; `+abc`, `?x=1`, `http` e `/x` dopo l'invito no). `collaudo_racconti_bozza` verde, con la riga nuova: il link con lo username collega al codice; CONTROPROVA col server.py di prima: rosso. L'anteprima del negozio intero (Playwright, il miniapp.html del worktree, la vera `renderNegozio` con tre ordini di esempio e i volti finti): il riquadro sotto la pagina, il titolo della vetrina e il barattolo vuoto spariti, «Acquista» che scende alle card; in /mnt/project-files/dj-og/anteprima/negozio-jj-1..3.png.
 
 DA GUARDARE. Sul telefono vero con un ordine vero di JJ: il volto deve combaciare col negozio collegato. Chi guarda senza sessione (sito, anonimo) non vede il riquadro, salvo gli ordini on-chain. JJ deve aprire il negozio col suo account e il moderatore collegarlo dal pannello.
+
+## Le estrazioni sotto un annuncio (26 nov 2026)
+
+LA DOMANDA. Un venditore, Jj, vuole mettere in palio una PS4 fra chi si
+iscrive a Barattolo col suo link ref, per circa 30 giorni, e chiede un
+modo facile per estrarre il vincitore. Primo giro (proposta): un bottone
+admin per Jj. Andrea l'ha allargato: «sotto ogni prodotto si possa aprire
+una estrazione verso i propri ref o un link personalizzato nuovo dedicato
+per quella singola estrazione», e alla scheda «chi può aprirla» ha scelto
+TUTTI I VENDITORI SUBITO (non solo gli abilitati da lui, che era la
+raccomandazione per via del concorso a premi: vedi DA GUARDARE).
+
+COM'E' FATTA. Tabelle `estrazioni` ed `estrazioni_partecipanti`; quattro
+rotte (`POST /api/listings/{id}/estrazione`, `GET` della stessa,
+`/api/estrazioni/partecipa`, `/api/estrazioni/{id}/annulla`); il giro
+`giro_estrazioni` nell'orologio dei dieci minuti. Due modi: 'link' (un
+codice di 10 caratteri nel link `…/annuncio/<id>?invito=<ref>&estrazione=
+<codice>`: il ref fa diventare suo invitato chi e' nuovo) e 'inviti' (chi
+si collega col ref di sempre DENTRO la finestra, letto dalla tabella
+`inviti` in ordine di `creato`, fuori da `collega_invito` che resta
+com'era). LA TOMBOLA COL NOTAIO: numero in ordine d'arrivo e biglietto a
+caso; alla scadenza la lista si congela con l'impronta sha256 delle righe
+«numero:biglietto» e il blocco atteso e' cima+1; quando quel blocco e'
+minato (mempool.space, sempre mainnet) il vincitore e' hash mod N + 1.
+SOLO TELEGRAM (0 < tg_id < 2^52): un Nostr si crea gratis, e un account
+cancellato non partecipa. In palio non si compra: `guardia_estrazione`
+dopo la guardia dell'asta in `compra`, `_compra_set` (le due copie),
+`preventivo_ordine` e `fai_offerta`; il nastro 🎁 dalla
+`arricchisci_righe_vetrina` (fail-open). A estrazione fatta l'annuncio
+va 'venduto' (NIP-99 sold, spunta nel canale) e il bot da' a vincitore e
+venditore lo username dell'altro.
+
+STRADE SCARTATE. L'ordine a 0 sats per la consegna (lo avevo proposto
+io ad Andrea): il giro degli ordini vive del pagamento (deposito,
+fattura, la chat cifrata che si accende a 'locked'), e piegarlo a un
+premio voleva dire toccare decine di rotte e uno stato d'ordine nuovo
+(regola ferrea 4). Al suo posto i due contatti Telegram, e chi partecipa
+lo legge prima di «Partecipo». Il gancio dentro `collega_invito`: le
+prove lo eseguono isolato, e il giudice degli inviti non deve sapere
+delle estrazioni. Il seme da un servizio casuale o dal server: non
+verificabile da fuori. Piu' pezzi in palio: l'annuncio resterebbe da
+comprare e da vincere insieme; si duplica con quantita' 1. Il «Partecipo»
+senza codice per il modo link: il link dedicato servirebbe a niente.
+
+PROVATO. `collaudo_estrazioni` (51 prove, rotte vere e giro vero con la
+catena finta del collaudo: un blocco al minuto, hash =
+sha256("collaudo-blocco:h")): apertura e i suoi no, 409 sulla seconda,
+le guardie, numeri in ordine e uno a testa, no a venditore, Nostr e
+codice storto, la vista senza nomi, l'annullo solo a lista vuota, la
+chiusura con impronta e blocco, il vincitore giusto, l'annuncio esaurito,
+gli avvisi coi contatti, il modo inviti (finestra e solo Telegram,
+l'avviso una volta), lista vuota e annuncio sparito. Suite severa: vedi
+il verbale del push.
+
+DA GUARDARE. 1) LA LEGGE: in Italia un'estrazione a premi fatta da chi
+vende per promuoversi e' un «concorso a premi» (DPR 430/2001); fatta fra
+privati di solito no. Il bottone e' aperto a tutti per scelta di Andrea:
+il parere legale (come per MiCA) resta da chiedere prima di farne
+pubblicita'. 2) Il link dedicato e' un indirizzo del sito: dentro
+Telegram si apre nel browser e si entra col widget (come il link
+d'invito); una parola `startapp` per aprirlo nella Mini App e' un
+ritocco a parte. 3) Il proprio numero si legge nella scheda e
+nell'avviso del bot: un elenco «Le mie estrazioni» nel Profilo non c'e'.
+4) Dal vivo sulla vm-2050: aprire, partecipare da due account, chiudere
+e vedere il blocco vero.

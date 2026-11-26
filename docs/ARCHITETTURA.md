@@ -39044,3 +39044,34 @@ mai il kind 0 di nessuno: regola ferrea 2).
   (`fotoDiSerieBuono`: tessera disegnata nella tela col testo, JPEG come
   quelli di `ridimensiona`, scartata se `jpegVuoto`). Il server non
   sa niente: riceve un annuncio normale.
+
+  (`offertaRichiesta`).
+
+## LE ESTRAZIONI (26 nov 2026, cantiere estrazioni)
+
+Chi vende mette in palio il SUO annuncio. Il giudice e' il server
+(server.py, «LE ESTRAZIONI», prima di `orologio`); il client disegna
+(miniapp.html, «LE ESTRAZIONI»: `caricaEstrazione`, `htmlEstrazione`,
+il foglio `estrazioneSheet`).
+- Tabelle: `estrazioni` (modo 'inviti'|'link', `codice` del link,
+  finestra, stato aperta → attesa_blocco → estratta, oppure vuota o
+  annullata; l'indice unico parziale `idx_estrazione_viva` = una viva
+  per annuncio) e `estrazioni_partecipanti` (PK estrazione+tg_id, UNIQUE
+  estrazione+numero: i due giudici dei biglietti).
+- Rotte: `POST/GET /api/listings/{id}/estrazione`,
+  `POST /api/estrazioni/partecipa`, `POST /api/estrazioni/{id}/annulla`.
+  Nessuna rotta-pagina nuova: il link dedicato e' `/annuncio/<id>` con
+  `?invito=<ref>&estrazione=<codice>`, e il client ricorda il codice
+  sul dispositivo (localStorage `barattolo_estrazione`, legato
+  all'annuncio).
+- Il notaio: impronta sha256 della lista «numero:biglietto» alla
+  chiusura, blocco atteso = cima + 1, vincitore = int(hash) mod N + 1
+  (`estrazione_vincitore`, `estrazione_impronta`, pure). La catena e'
+  quella del mainnet (`ESTRAZIONI_MEMPOOL_API`, di serie mempool.space,
+  si cambia solo nel config); in collaudo e' finta (`_estrazione_mempool`).
+- Privacy: chi regala vede il conto e i biglietti, mai i nomi; il
+  contatto dell'altro esce solo a vincitore e venditore, a estrazione
+  fatta. Solo account Telegram (0 < tg_id < 2^52).
+- In palio non si compra: `guardia_estrazione` nelle quattro porte
+  (compra, set, preventivo, offerta). Il nastro: `in_palio` da
+  `arricchisci_righe_vetrina`.

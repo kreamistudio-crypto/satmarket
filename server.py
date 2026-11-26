@@ -9888,7 +9888,55 @@ def init_db():
         compratore_percento REAL DEFAULT 2.5,
         venditore_percento REAL DEFAULT 2.5
     );
+    CREATE TABLE IF NOT EXISTS estrazioni(
+        -- L'ESTRAZIONE SOTTO UN ANNUNCIO (26 nov 2026, cantiere
+        -- estrazioni, richiesta di Jj via Andrea): chi vende mette in
+        -- palio il SUO annuncio, e alla chiusura il primo blocco Bitcoin
+        -- dopo la scadenza sceglie il vincitore. Vedi «LE ESTRAZIONI».
+        -- `modo`: 'inviti' = partecipa chi arriva col link ref di sempre
+        -- nella finestra; 'link' = chi apre il link DEDICATO (`codice`)
+        -- e preme «Partecipo».
+        -- `stato`: aperta | attesa_blocco (lista congelata, si aspetta
+        -- il blocco `blocco_altezza`) | estratta | vuota (nessun
+        -- partecipante) | annullata.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        annuncio_id INTEGER NOT NULL,
+        venditore_id INTEGER NOT NULL,
+        modo TEXT NOT NULL CHECK (modo IN ('inviti','link')),
+        codice TEXT UNIQUE,
+        regolamento TEXT DEFAULT '',
+        aperta_il INTEGER NOT NULL,
+        chiude_il INTEGER NOT NULL,
+        stato TEXT NOT NULL DEFAULT 'aperta',
+        impronta TEXT DEFAULT '',
+        n_partecipanti INTEGER DEFAULT 0,
+        blocco_altezza INTEGER DEFAULT 0,
+        blocco_hash TEXT DEFAULT '',
+        vincitore_id INTEGER DEFAULT 0,
+        vincitore_numero INTEGER DEFAULT 0,
+        estratta_il INTEGER DEFAULT 0
+    );
+    -- UNA estrazione viva per annuncio: e' l'indice, non un SELECT, a
+    -- dirlo (due tocchi in volo si pestano qui).
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_estrazione_viva
+        ON estrazioni(annuncio_id) WHERE stato IN ('aperta','attesa_blocco');
+    CREATE TABLE IF NOT EXISTS estrazioni_partecipanti(
+        -- Il biglietto: un numero in ordine di arrivo e un codice a caso
+        -- che solo il partecipante vede accanto al suo numero. La lista
+        -- «numero:biglietto» si pubblica alla chiusura e la sua impronta
+        -- (sha256) e' quella che il blocco poi estrae: chiunque rifa' il
+        -- conto, e dai biglietti non si risale a nessuno.
+        estrazione_id INTEGER NOT NULL,
+        tg_id INTEGER NOT NULL,
+        numero INTEGER NOT NULL,
+        biglietto TEXT NOT NULL,
+        entrato INTEGER,
+        avvisato INTEGER DEFAULT 0,
+        PRIMARY KEY (estrazione_id, tg_id),
+        UNIQUE (estrazione_id, numero)
+    );
     """)
+
     # IL GIORNO DA CUI SI CONTANO LE VISITE (24 set 2026): il primo
     # avvio col cantiere lo scrive, e nessuno lo riscrive (OR IGNORE).
     # Serve al cassetto per dire «contate dal …» finche' le finestre
@@ -24080,6 +24128,14 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE punti_ritiro SET tg_id=? "
                     "WHERE tg_id=?", (id_telegram, id_nostr))
         con.execute("DELETE FROM punti_ritiro WHERE tg_id=?", (id_nostr,))
+        # LE ESTRAZIONI (26 nov 2026): quelle aperte dalla meta' che
+        # muore passano a chi sopravvive, come i suoi annunci. Biglietti
+        # la meta' Nostr non ne ha mai (si partecipa solo da Telegram):
+        # la riga c'e' perche' nessun biglietto resti a un id morto.
+        con.execute("UPDATE estrazioni SET venditore_id=? WHERE "
+                    "venditore_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM estrazioni_partecipanti WHERE tg_id=?",
+                    (id_nostr,))
         # IL BARATTOLO CONDIVISO segue l'utente (ago 2026): la PK e' il
         # tg_id, quindi la liturgia dei vicini — se le due meta' hanno
         # condiviso tutt'e due, vince la fotografia della meta' Telegram
@@ -31961,6 +32017,16 @@ def arricchisci_righe_vetrina(righe):
     # ricevere on-chain piuttosto che Lightning»): dalla sua scelta nel
     # Profilo, e solo dove lo swap automatico c'e' per lui.
     _segna_incasso_venditori(righe)
+    # 8) IN PALIO (26 nov 2026, cantiere estrazioni): il nastro 🎁 della
+    # card e la scheda senza «Acquista». UNA query per pagina, e
+    # fail-open: un nastro che manca non deve rompere la vetrina.
+    if tutti:
+        try:
+            palio = _annunci_in_palio(tutti)
+            for r in righe:
+                r["in_palio"] = 1 if r["id"] in palio else 0
+        except Exception:
+            pass
     return righe
 
 
@@ -47148,6 +47214,7 @@ async def fai_offerta(annuncio_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo oggetto è all'asta: l'offerta "
                                  "giusta è una puntata 🔨")
+    guardia_estrazione(con, a["id"])
     # Gli importati da Nostr sono trattabili come tutti: il venditore
     # solo-Nostr riceve l'offerta via DM NIP-17 col link all'annuncio,
     # entra col login Nostr e risponde da qui.
@@ -48834,6 +48901,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
                                      f"si aggiudica da solo, fuori dal set")
+        guardia_estrazione(con, a["id"])
         if e_abbonamento(a):
             # (20 nov 2026) un mese di canale si paga da solo: il giro del
             # link guarda un ordine per volta
@@ -49791,6 +49859,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Questo oggetto è all'asta: si "
                                  "aggiudica puntando, non si compra a "
                                  "prezzo fisso")
+    guardia_estrazione(con, a["id"])
     try:
         richiesti = max(1, int(d.get("quantita") or 1))
     except (TypeError, ValueError):
@@ -50325,6 +50394,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, f"«{a['titolo'][:40]}» è all'asta: "
                                      f"si aggiudica da solo, fuori dal set")
+        guardia_estrazione(con, a["id"])
         if e_abbonamento(a):
             # (20 nov 2026) un mese di canale si paga da solo: il giro del
             # link guarda un ordine per volta
@@ -50851,6 +50921,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Questo oggetto è all'asta: si "
                                  "aggiudica puntando, non si compra a "
                                  "prezzo fisso")
+    guardia_estrazione(con, a["id"])
 
     # La quantita' richiesta: assente o storta = 1 (i client di ieri).
     try:
@@ -111297,6 +111368,658 @@ async def avvisa_sconto_su_mono():
           f"venditori {mandati}")
 
 
+# ═════════════════════ LE ESTRAZIONI (26 nov 2026) ═════════════════════
+# Cantiere estrazioni, richiesta di un venditore (Jj: una PS4 in palio
+# fra chi si iscrive col suo link) portata da Andrea, che ha scelto il
+# bottone APERTO A TUTTI I VENDITORI. Sotto il proprio annuncio,
+# «🎁 Apri un'estrazione»: si sceglie CHI partecipa — 'inviti', chi si
+# iscrive col link ref di sempre dentro la finestra, o 'link', chi apre
+# un link NUOVO dedicato a quest'estrazione e preme «Partecipo» — e
+# QUANDO chiude.
+# LA TOMBOLA COL NOTAIO, cioe' perche' nessuno la puo' truccare, nemmeno
+# noi: ogni partecipante ha un numero (in ordine di arrivo) e un
+# biglietto a caso che vede solo lui. Alla chiusura la lista
+# «numero:biglietto» si CONGELA e si pubblica con la sua impronta
+# (sha256), e il vincitore lo sceglie il PRIMO BLOCCO BITCOIN MINATO
+# DOPO la chiusura: hash del blocco modulo partecipanti, piu' uno
+# (`estrazione_vincitore`). La lista e' ferma prima che quel blocco
+# esista, e il blocco non lo sceglie nessuno.
+# SOLO ACCOUNT TELEGRAM (decisione di Andrea, «Come sopra, solo account
+# Telegram» del primo giro): un'identita' Nostr si crea gratis in un
+# secondo, e una lista riempita da un furbo solo toglierebbe il senso.
+# LA CONSEGNA NON E' UN ORDINE: un premio non si paga, e il giro degli
+# ordini (deposito, fattura, chat cifrata che si accende al pagamento)
+# vive di un pagamento. A estrazione fatta vincitore e venditore
+# ricevono l'uno il contatto Telegram dell'altro (chi partecipa lo sa:
+# la scheda lo dice prima di «Partecipo»), e l'annuncio diventa
+# esaurito. I NOMI degli altri partecipanti non escono mai: a chi
+# regala arrivano il conto e i biglietti, come per gli inviti.
+# NIENTE QUI E' UN NUOVO STATO D'ORDINE (regola ferrea 4): l'estrazione
+# ha la sua tabella, e l'annuncio passa solo per 'attivo' e 'venduto'.
+try:
+    from config import ESTRAZIONI_MEMPOOL_API
+except ImportError:
+    # il mainnet, SEMPRE: e' il blocco pubblico a fare da notaio, anche
+    # sulla prova (che per i pagamenti sta su signet)
+    ESTRAZIONI_MEMPOOL_API = "https://mempool.space/api"
+ESTRAZIONI_ESPLORATORE = "https://mempool.space/block/"
+ESTRAZIONE_GIORNI_MIN = 1
+ESTRAZIONE_GIORNI_MAX = 60
+ESTRAZIONE_REGOLAMENTO_MAX = 600
+ESTRAZIONE_CODICE_LUNGHEZZA = 10
+ESTRAZIONE_BIGLIETTO_LUNGHEZZA = 8
+ESTRAZIONE_AVVISI_PER_GIRO = 300
+_FORMA_CODICE_ESTRAZIONE = re.compile(
+    "[" + "23456789BCDFGHJKMNPQRSTVWXYZ" + "]{%d}" % ESTRAZIONE_CODICE_LUNGHEZZA)
+_FORMA_HASH_BLOCCO = re.compile(r"[0-9a-f]{64}")
+# un account cancellato vive in [2^52, 2^53) (vedi `notifica`): non
+# partecipa, come un Nostr
+_ESTRAZIONE_ID_MAX = 2 ** 52
+
+
+def estrazione_vincitore(blocco_hash: str, n: int) -> int:
+    """PURA: il numero vincente, da 1 a n. L'hash del blocco letto come
+    numero, modulo i partecipanti, piu' uno: il conto che chiunque rifa'
+    a mano con l'hash scritto su mempool.space."""
+    if n <= 0:
+        return 0
+    return int(blocco_hash, 16) % n + 1
+
+
+def estrazione_impronta(righe) -> str:
+    """PURA: l'impronta della lista congelata — sha256 delle righe
+    «numero:biglietto», in ordine di numero, una per riga. E' quella
+    che si pubblica prima che il blocco esista."""
+    testo = "\n".join(f"{int(n)}:{b}" for n, b in righe)
+    return hashlib.sha256(testo.encode()).hexdigest()
+
+
+def _estrazione_ammessa(tg_id: int) -> bool:
+    """Chi puo' avere un biglietto: un account Telegram vivo."""
+    return 0 < int(tg_id or 0) < _ESTRAZIONE_ID_MAX
+
+
+def _codice_estrazione() -> str:
+    return "".join(secrets.choice(INVITO_ALFABETO)
+                   for _ in range(ESTRAZIONE_CODICE_LUNGHEZZA))
+
+
+def _annunci_in_palio(ids) -> set:
+    """Fra questi annunci, quali hanno un'estrazione viva (il nastro 🎁
+    della card). Una query."""
+    ids = list(ids)
+    if not ids:
+        return set()
+    con = db()
+    try:
+        return {r["annuncio_id"] for r in con.execute(
+            "SELECT annuncio_id FROM estrazioni WHERE stato IN "
+            "('aperta','attesa_blocco') AND annuncio_id IN "
+            f"({','.join('?' * len(ids))})", ids)}
+    finally:
+        con.close()
+
+
+def guardia_estrazione(con, annuncio_id: int):
+    """Un oggetto in palio non si compra, non si tratta e non si mette
+    nel set: si vince. Chiude la connessione prima del no, come le
+    guardie accanto a cui sta (l'asta)."""
+    if con.execute("SELECT 1 FROM estrazioni WHERE annuncio_id=? AND "
+                   "stato IN ('aperta','attesa_blocco')",
+                   (annuncio_id,)).fetchone():
+        con.close()
+        raise HTTPException(400, "Questo oggetto è in palio 🎁: si vince "
+                                 "partecipando all'estrazione, non si "
+                                 "compra")
+
+
+def _iscrivi_estrazione(con, estrazione_id: int, tg_id: int,
+                        avvisato: int = 0):
+    """Il biglietto di `tg_id`: quello che ha gia', o uno nuovo col
+    numero dopo l'ultimo. La UNIQUE sul numero e' il giudice: due
+    arrivi in volo si pestano li', e il secondo riprova col numero dopo.
+    Niente commit: e' del chiamante."""
+    for _ in range(5):
+        r = con.execute("SELECT numero, biglietto FROM "
+                        "estrazioni_partecipanti WHERE estrazione_id=? "
+                        "AND tg_id=?", (estrazione_id, tg_id)).fetchone()
+        if r:
+            return r
+        numero = con.execute("SELECT COALESCE(MAX(numero), 0) + 1 FROM "
+                             "estrazioni_partecipanti WHERE "
+                             "estrazione_id=?", (estrazione_id,)).fetchone()[0]
+        biglietto = "".join(secrets.choice(INVITO_ALFABETO)
+                            for _ in range(ESTRAZIONE_BIGLIETTO_LUNGHEZZA))
+        try:
+            con.execute("INSERT INTO estrazioni_partecipanti(estrazione_id, "
+                        "tg_id, numero, biglietto, entrato, avvisato) "
+                        "VALUES(?,?,?,?,?,?)",
+                        (estrazione_id, tg_id, numero, biglietto,
+                         int(time.time()), avvisato))
+        except sqlite3.IntegrityError:
+            continue
+    return con.execute("SELECT numero, biglietto FROM "
+                       "estrazioni_partecipanti WHERE estrazione_id=? AND "
+                       "tg_id=?", (estrazione_id, tg_id)).fetchone()
+
+
+def _raccogli_inviti(con, e) -> int:
+    """Il modo 'inviti': chi si e' collegato al venditore (tabella
+    `inviti`, il giudice di sempre `collega_invito`) dentro la finestra
+    e non ha ancora un biglietto, in ORDINE D'ARRIVO. Gira dall'orologio,
+    dalla scheda e un'ultima volta alla chiusura: l'ordine dei numeri e'
+    quello dei collegamenti, chiunque passi per primo a contarli. Fuori
+    da `collega_invito` apposta: il giudice degli inviti resta com'era.
+    Niente commit: e' del chiamante."""
+    if e["modo"] != "inviti":
+        return 0
+    nuovi = con.execute(
+        "SELECT i.invitato FROM inviti i JOIN utenti u ON u.tg_id = "
+        "i.invitato WHERE i.invitante=? AND i.creato>=? AND i.creato<? "
+        "AND i.invitato>0 AND i.invitato<? AND i.invitato NOT IN (SELECT "
+        "tg_id FROM estrazioni_partecipanti WHERE estrazione_id=?) "
+        "ORDER BY i.creato, i.invitato",
+        (e["venditore_id"], e["aperta_il"], e["chiude_il"],
+         _ESTRAZIONE_ID_MAX, e["id"])).fetchall()
+    for r in nuovi:
+        _iscrivi_estrazione(con, e["id"], r["invitato"])
+    return len(nuovi)
+
+
+def _contatto_telegram(con, tg_id: int) -> dict:
+    """Come raggiungere qualcuno fuori da Barattolo: il nome e, se c'e',
+    lo username (che apre la chat con t.me/<username>)."""
+    r = con.execute("SELECT nome, username FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    nome = (r["nome"] if r else "") or ""
+    user = (r["username"] if r else "") or ""
+    user = user if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{3,31}", user) else ""
+    return {"nome": nome[:60], "username": user,
+            "link": f"https://t.me/{user}" if user else ""}
+
+
+def _link_estrazione(con, e) -> str:
+    """Il link da condividere. 'link': l'annuncio col codice
+    dell'estrazione E col codice invito di chi regala (chi e' nuovo
+    diventa anche suo invitato). 'inviti': il link ref di sempre."""
+    ref = codice_invito(con, e["venditore_id"])
+    if e["modo"] == "link":
+        return (f"{URL_PUBBLICO}/annuncio/{e['annuncio_id']}?invito={ref}"
+                f"&estrazione={e['codice']}")
+    return f"{URL_PUBBLICO}/?invito={ref}" if ref else ""
+
+
+def _vista_estrazione(con, e, uid) -> dict:
+    """Quel che la scheda deve sapere, e NIENT'ALTRO: il conto dei
+    partecipanti e mai chi; il proprio biglietto a chi ce l'ha; il link
+    a chi regala; la lista dei biglietti e il blocco quando ci sono; il
+    contatto dell'altro SOLO al vincitore e a chi regala, a estrazione
+    fatta. Puo' scrivere (il codice invito nasce la prima volta): il
+    commit e' del chiamante."""
+    mia = uid is not None and uid == e["venditore_id"]
+    v = {"id": e["id"], "modo": e["modo"], "stato": e["stato"],
+         "aperta_il": e["aperta_il"], "chiude_il": e["chiude_il"],
+         "regolamento": e["regolamento"] or "", "mia": mia,
+         "partecipanti": con.execute(
+             "SELECT COUNT(*) FROM estrazioni_partecipanti WHERE "
+             "estrazione_id=?", (e["id"],)).fetchone()[0],
+         "solo_telegram": True}
+    if mia and e["stato"] == "aperta":
+        v["link"] = _link_estrazione(con, e)
+    if uid is not None:
+        r = con.execute("SELECT numero, biglietto FROM "
+                        "estrazioni_partecipanti WHERE estrazione_id=? AND "
+                        "tg_id=?", (e["id"], uid)).fetchone()
+        if r:
+            v["mio"] = {"numero": r["numero"], "biglietto": r["biglietto"]}
+    if e["stato"] in ("attesa_blocco", "estratta"):
+        v["impronta"] = e["impronta"]
+        v["blocco_altezza"] = e["blocco_altezza"]
+        v["biglietti"] = [f"{r['numero']}:{r['biglietto']}" for r in
+                          con.execute("SELECT numero, biglietto FROM "
+                                      "estrazioni_partecipanti WHERE "
+                                      "estrazione_id=? ORDER BY numero",
+                                      (e["id"],))]
+    if e["stato"] == "estratta":
+        v["blocco_hash"] = e["blocco_hash"]
+        v["vincitore_numero"] = e["vincitore_numero"]
+        v["simulato"] = bool(MODALITA_COLLAUDO)
+        if not MODALITA_COLLAUDO:
+            v["blocco_link"] = ESTRAZIONI_ESPLORATORE + e["blocco_hash"]
+        ho_vinto = uid is not None and uid == e["vincitore_id"]
+        v["ho_vinto"] = ho_vinto
+        if mia:
+            v["contatto"] = _contatto_telegram(con, e["vincitore_id"])
+        elif ho_vinto:
+            v["contatto"] = _contatto_telegram(con, e["venditore_id"])
+    return v
+
+
+@app.post("/api/listings/{annuncio_id}/estrazione")
+async def apri_estrazione(annuncio_id: int, req: Request,
+                          x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Chi vende apre l'estrazione sul SUO annuncio. Body: {"modo":
+    "inviti"|"link", "giorni": 1-60, "regolamento": "..."}.
+    SI METTE IN PALIO UN PEZZO SOLO, ATTIVO E NATO QUI, e ogni no ha il
+    suo perche': l'asta e' gia' una gara; l'importato ha lo stato alla
+    fonte; l'abbonamento e' un mese di canale, non un oggetto; con piu'
+    pezzi l'annuncio resterebbe da comprare e da vincere insieme (si
+    duplica con quantita' 1). Gli ordini in corso e le fatture in volo
+    fermano il gesto con le guardie del «Nascondi»."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    modo = str(d.get("modo") or "")
+    if modo not in ("inviti", "link"):
+        raise HTTPException(400, "Scegli chi partecipa: i tuoi invitati o "
+                                 "un link nuovo")
+    try:
+        giorni = int(d.get("giorni"))
+    except (TypeError, ValueError):
+        giorni = 0
+    if not ESTRAZIONE_GIORNI_MIN <= giorni <= ESTRAZIONE_GIORNI_MAX:
+        raise HTTPException(400, f"La durata va da {ESTRAZIONE_GIORNI_MIN} "
+                                 f"a {ESTRAZIONE_GIORNI_MAX} giorni")
+    regolamento = str(d.get("regolamento") or "").strip()
+    if len(regolamento) > ESTRAZIONE_REGOLAMENTO_MAX:
+        raise HTTPException(400, f"Il regolamento sta in "
+                                 f"{ESTRAZIONE_REGOLAMENTO_MAX} caratteri")
+    con = db()
+    a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
+                    "AND stato='attivo'",
+                    (annuncio_id, user["id"])).fetchone()
+    if not a:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    no = ""
+    if _asta(a):
+        no = "Un'asta è già una gara: non si mette anche in palio"
+    elif origine_annuncio(a) or dal_negozio_collegato(a):
+        no = "Questo annuncio arriva da fuori: non si mette in palio qui"
+    elif e_abbonamento(a):
+        no = "Un abbonamento non si mette in palio"
+    elif (a["quantita"] or 1) > 1:
+        no = ("Si mette in palio un pezzo solo: duplica l'annuncio con "
+              "quantità 1 e apri l'estrazione su quello")
+    elif _ordini_vivi_annuncio(con, annuncio_id,
+                               ("released", "refunded", "annullato",
+                                "creato"), esclusi=True):
+        no = ("C'è un ordine in corso su questo annuncio: potrai metterlo "
+              "in palio quando è concluso")
+    elif _riservati(con, annuncio_id):
+        no = "Qualcuno lo sta pagando proprio ora: riprova tra qualche minuto"
+    if no:
+        con.close()
+        raise HTTPException(400, no)
+    adesso = int(time.time())
+    try:
+        cur = con.execute(
+            "INSERT INTO estrazioni(annuncio_id, venditore_id, modo, codice, "
+            "regolamento, aperta_il, chiude_il) VALUES(?,?,?,?,?,?,?)",
+            (annuncio_id, user["id"], modo,
+             _codice_estrazione() if modo == "link" else None,
+             regolamento, adesso, adesso + giorni * 86400))
+    except sqlite3.IntegrityError:
+        con.close()
+        raise HTTPException(409, "C'è già un'estrazione aperta su questo "
+                                 "annuncio")
+    # le fatture mai pagate (e scadute: `_riservati` dice che di fresche
+    # non ce n'e') si chiudono, come nel «Nascondi»
+    con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
+                "WHERE stato='creato' AND (annuncio_id=? OR id IN "
+                "(SELECT ordine_id FROM ordine_righe WHERE annuncio_id=?))",
+                (adesso, annuncio_id, annuncio_id))
+    e = con.execute("SELECT * FROM estrazioni WHERE id=?",
+                    (cur.lastrowid,)).fetchone()
+    v = _vista_estrazione(con, e, user["id"])
+    con.commit()
+    con.close()
+    print(f"🎁 Estrazione #{e['id']} aperta sull'annuncio #{annuncio_id} "
+          f"({modo}, {giorni} giorni)", flush=True)
+    return {"ok": True, "estrazione": v}
+
+
+@app.get("/api/listings/{annuncio_id}/estrazione")
+def leggi_estrazione(annuncio_id: int, x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """L'ultima estrazione dell'annuncio (o null), per la scheda. Anche
+    a chi guarda senza essere entrato: il conto, la scadenza e, a
+    estrazione fatta, il blocco e i biglietti sono pubblici."""
+    user = utente_se_autenticato(x_tg_init_data, barattolo_sessione)
+    uid = user["id"] if user else None
+    con = db()
+    e = con.execute("SELECT * FROM estrazioni WHERE annuncio_id=? AND "
+                    "stato != 'annullata' ORDER BY id DESC LIMIT 1",
+                    (annuncio_id,)).fetchone()
+    if not e:
+        con.close()
+        return {"estrazione": None}
+    if e["stato"] == "aperta":
+        _raccogli_inviti(con, e)
+    v = _vista_estrazione(con, e, uid)
+    con.commit()
+    con.close()
+    return {"estrazione": v}
+
+
+@app.post("/api/estrazioni/partecipa")
+async def partecipa_estrazione(req: Request, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """Il «Partecipo» del modo 'link'. Body: {"codice": "..."} — quello
+    del link dedicato: senza, non si entra (e' il link a contare chi
+    arriva per quest'estrazione)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    codice = str(d.get("codice") or "").strip().upper()
+    if not _FORMA_CODICE_ESTRAZIONE.fullmatch(codice):
+        raise HTTPException(404, "Estrazione non trovata")
+    if not _estrazione_ammessa(user["id"]):
+        raise HTTPException(400, "Le estrazioni sono per chi entra con "
+                                 "Telegram: apri Barattolo dal bot e "
+                                 "riprova")
+    con = db()
+    e = con.execute("SELECT e.*, a.stato AS stato_annuncio FROM estrazioni "
+                    "e JOIN annunci a ON a.id = e.annuncio_id WHERE "
+                    "e.codice=? AND e.modo='link'", (codice,)).fetchone()
+    if not e:
+        con.close()
+        raise HTTPException(404, "Estrazione non trovata")
+    no = ""
+    if (e["stato"] != "aperta" or e["chiude_il"] <= time.time()
+            or e["stato_annuncio"] != "attivo"):
+        no = "Questa estrazione è chiusa"
+    elif e["venditore_id"] == user["id"]:
+        no = "È la tua estrazione 🙂 Condividi il link con chi vuoi"
+    if no:
+        con.close()
+        raise HTTPException(400, no)
+    # chi entra col tocco vede subito il suo numero: niente avviso del bot
+    _iscrivi_estrazione(con, e["id"], user["id"], avvisato=1)
+    v = _vista_estrazione(con, e, user["id"])
+    con.commit()
+    con.close()
+    return {"ok": True, "estrazione": v}
+
+
+@app.post("/api/estrazioni/{estrazione_id}/annulla")
+async def annulla_estrazione(estrazione_id: int,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """Chi regala ci ripensa: SOLO a lista vuota. Con anche un solo
+    biglietto dato, la promessa e' fatta — e un'estrazione che si
+    annulla quando non piace chi sta vincendo e' proprio quella che la
+    tombola col notaio esclude."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    e = con.execute("SELECT * FROM estrazioni WHERE id=? AND venditore_id=? "
+                    "AND stato='aperta'", (estrazione_id, user["id"])).fetchone()
+    if not e:
+        con.close()
+        raise HTTPException(400, "Operazione non permessa")
+    _raccogli_inviti(con, e)
+    n = con.execute("SELECT COUNT(*) FROM estrazioni_partecipanti WHERE "
+                    "estrazione_id=?", (estrazione_id,)).fetchone()[0]
+    if n:
+        con.commit()
+        con.close()
+        raise HTTPException(400, f"Ci sono già {n} partecipant"
+                                 f"{'e' if n == 1 else 'i'}: un'estrazione "
+                                 "con dei biglietti non si annulla. Se c'è "
+                                 "un problema scrivi all'assistenza")
+    con.execute("UPDATE estrazioni SET stato='annullata', estratta_il=? "
+                "WHERE id=? AND stato='aperta'",
+                (int(time.time()), estrazione_id))
+    con.commit()
+    con.close()
+    return {"ok": True}
+
+
+async def _estrazione_mempool(percorso: str) -> str | None:
+    """Una lettura pubblica dal mempool del mainnet: l'altezza della
+    cima o l'hash di un blocco. None = non risponde (si riprova al giro
+    dopo: l'estrazione aspetta, non sbaglia).
+    IN COLLAUDO NON SI ESCE DAL COMPUTER: la catena e' finta, un blocco
+    al minuto, e l'hash del blocco h e' sha256("collaudo-blocco:h") — la
+    scheda lo dice «simulato»."""
+    if MODALITA_COLLAUDO:
+        cima = int(time.time()) // 60
+        if percorso == "/blocks/tip/height":
+            return str(cima)
+        m = re.fullmatch(r"/block-height/(\d+)", percorso)
+        if m and int(m.group(1)) <= cima:
+            return hashlib.sha256(
+                f"collaudo-blocco:{m.group(1)}".encode()).hexdigest()
+        return None
+    base = str(ESTRAZIONI_MEMPOOL_API or "").rstrip("/")
+    if not base.startswith("https://"):
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"{base}{percorso}")
+        return r.text.strip() if r.status_code == 200 else None
+    except Exception as e:
+        print(f"⚠️ Estrazioni: il mempool non risponde ({type(e).__name__})",
+              flush=True)
+        return None
+
+
+def _congela_estrazione(estrazione_id: int, altezza: int):
+    """La chiusura, nella SUA transazione: l'ultima raccolta degli
+    inviti, poi la lista si ferma con la sua impronta e il blocco che la
+    estrarra' (il primo DOPO la cima di adesso). None = gia' fatto da un
+    altro giro. Torna quel che va raccontato (lista vuota, annuncio
+    sparito) o un dict senza racconto."""
+    con = db()
+    e = con.execute("SELECT e.*, a.titolo, a.stato AS stato_annuncio "
+                    "FROM estrazioni e LEFT JOIN annunci a ON a.id = "
+                    "e.annuncio_id WHERE e.id=? AND e.stato='aperta'",
+                    (estrazione_id,)).fetchone()
+    if not e:
+        con.close()
+        return None
+    adesso = int(time.time())
+    esito = {"id": e["id"], "annuncio_id": e["annuncio_id"],
+             "titolo": e["titolo"] or "", "venditore_id": e["venditore_id"]}
+    if e["stato_annuncio"] != "attivo":
+        # l'annuncio e' stato tolto (o venduto per altre vie) mentre era
+        # in palio: non c'e' piu' niente da vincere
+        esito["partecipanti"] = [r["tg_id"] for r in con.execute(
+            "SELECT tg_id FROM estrazioni_partecipanti WHERE "
+            "estrazione_id=?", (e["id"],))]
+        con.execute("UPDATE estrazioni SET stato='annullata', estratta_il=? "
+                    "WHERE id=? AND stato='aperta'", (adesso, e["id"]))
+        con.commit()
+        con.close()
+        esito["racconto"] = "sparito"
+        return esito
+    _raccogli_inviti(con, e)
+    righe = [(r["numero"], r["biglietto"]) for r in con.execute(
+        "SELECT numero, biglietto FROM estrazioni_partecipanti WHERE "
+        "estrazione_id=? ORDER BY numero", (e["id"],))]
+    if not righe:
+        con.execute("UPDATE estrazioni SET stato='vuota', estratta_il=? "
+                    "WHERE id=? AND stato='aperta'", (adesso, e["id"]))
+        esito["racconto"] = "vuota"
+    else:
+        con.execute("UPDATE estrazioni SET stato='attesa_blocco', impronta=?, "
+                    "n_partecipanti=?, blocco_altezza=? WHERE id=? AND "
+                    "stato='aperta'",
+                    (estrazione_impronta(righe), len(righe), altezza,
+                     e["id"]))
+    con.commit()
+    con.close()
+    return esito
+
+
+def _estrai(estrazione_id: int, blocco_hash: str):
+    """Il sorteggio, nella SUA transazione: il numero dal blocco, il
+    vincitore, l'annuncio esaurito. None = gia' fatto."""
+    con = db()
+    e = con.execute("SELECT e.*, a.titolo FROM estrazioni e LEFT JOIN "
+                    "annunci a ON a.id = e.annuncio_id WHERE e.id=? AND "
+                    "e.stato='attesa_blocco'", (estrazione_id,)).fetchone()
+    if not e or e["n_partecipanti"] <= 0:
+        con.close()
+        return None
+    numero = estrazione_vincitore(blocco_hash, e["n_partecipanti"])
+    r = con.execute("SELECT tg_id FROM estrazioni_partecipanti WHERE "
+                    "estrazione_id=? AND numero=?",
+                    (e["id"], numero)).fetchone()
+    if not r:
+        con.close()
+        print(f"⚠️ Estrazione #{e['id']}: il numero {numero} non ha un "
+              "biglietto (lista storta?)", flush=True)
+        return None
+    adesso = int(time.time())
+    cur = con.execute(
+        "UPDATE estrazioni SET stato='estratta', blocco_hash=?, "
+        "vincitore_id=?, vincitore_numero=?, estratta_il=? WHERE id=? AND "
+        "stato='attesa_blocco'",
+        (blocco_hash, r["tg_id"], numero, adesso, e["id"]))
+    if cur.rowcount == 0:
+        con.close()
+        return None
+    venduto = con.execute("UPDATE annunci SET stato='venduto' WHERE id=? AND "
+                          "stato='attivo'", (e["annuncio_id"],)).rowcount
+    partecipanti = [x["tg_id"] for x in con.execute(
+        "SELECT tg_id FROM estrazioni_partecipanti WHERE estrazione_id=?",
+        (e["id"],))]
+    vincitore = _contatto_telegram(con, r["tg_id"])
+    venditore = _contatto_telegram(con, e["venditore_id"])
+    con.commit()
+    con.close()
+    return {"id": e["id"], "annuncio_id": e["annuncio_id"],
+            "titolo": e["titolo"] or "", "venditore_id": e["venditore_id"],
+            "vincitore_id": r["tg_id"], "numero": numero,
+            "n": e["n_partecipanti"], "altezza": e["blocco_altezza"],
+            "hash": blocco_hash, "partecipanti": partecipanti,
+            "contatto_vincitore": vincitore, "contatto_venditore": venditore,
+            "venduto": bool(venduto), "racconto": "estratta"}
+
+
+def _chi_contattare(c: dict) -> str:
+    """La riga del contatto, nel testo HTML del bot."""
+    if c.get("username"):
+        return f"@{c['username']}"
+    return (f"<b>{html.escape(c.get('nome') or 'senza nome')}</b> (non ha "
+            "uno username Telegram: se non riuscite a trovarvi, scrivete "
+            "all'assistenza in app)")
+
+
+async def _racconta_estrazione(esito: dict):
+    """Gli avvisi DOPO il commit. Fail-open, uno per uno."""
+    titolo = html.escape((esito.get("titolo") or "")[:60])
+    bottone = ("🎁 Apri l'annuncio", link_telegram("annuncio",
+                                                   esito["annuncio_id"]))
+    quale = esito.get("racconto")
+    if quale == "vuota":
+        await notifica(esito["venditore_id"],
+                       f"🎁 L'estrazione di «{titolo}» si è chiusa senza "
+                       "partecipanti: l'annuncio torna in vendita come "
+                       "prima.", bottone)
+        return
+    if quale == "sparito":
+        for tg in esito.get("partecipanti") or []:
+            await notifica(tg, f"🎁 L'estrazione di «{titolo}» è stata "
+                               "annullata: l'annuncio non c'è più.")
+        return
+    if quale != "estratta":
+        return
+    blocco = (f"blocco {esito['altezza']}" + (" (simulato)"
+              if MODALITA_COLLAUDO else ""))
+    await notifica(esito["vincitore_id"],
+                   f"🎉 <b>Hai vinto!</b> Il tuo numero {esito['numero']} è "
+                   f"uscito all'estrazione di «{titolo}» (su {esito['n']} "
+                   f"partecipanti, estratto dal {blocco}).\n\nPer la "
+                   "consegna scrivi a chi lo regala: "
+                   f"{_chi_contattare(esito['contatto_venditore'])}",
+                   bottone)
+    await notifica(esito["venditore_id"],
+                   f"🎁 L'estrazione di «{titolo}» è fatta: ha vinto il "
+                   f"numero {esito['numero']} su {esito['n']} (dal {blocco})."
+                   "\n\nScrivigli per la consegna: "
+                   f"{_chi_contattare(esito['contatto_vincitore'])}",
+                   bottone)
+    for tg in esito.get("partecipanti") or []:
+        if tg == esito["vincitore_id"]:
+            continue
+        await notifica(tg, f"🎁 L'estrazione di «{titolo}» è fatta: ha vinto "
+                           f"il numero {esito['numero']}. Non era il tuo "
+                           "questa volta: grazie di aver partecipato!",
+                       bottone)
+    if esito.get("venduto"):
+        try:
+            asyncio.create_task(annuncio_su_nostr(
+                esito["annuncio_id"], "sold", solo_aggiornamento=True))
+            asyncio.create_task(promo_venduto(esito["annuncio_id"],
+                                              venduto=True))
+        except Exception as e:
+            print(f"⚠️ Estrazione #{esito['id']}: piazze non avvisate: {e}")
+
+
+async def giro_estrazioni():
+    """Il giro dell'orologio (dieci minuti): 1) i biglietti nuovi del
+    modo 'inviti' e il loro avviso; 2) la chiusura delle scadute, col
+    blocco che le estrarra'; 3) il sorteggio di quelle il cui blocco e'
+    stato minato. Ogni pezzo nella sua transazione, gli avvisi dopo."""
+    adesso = int(time.time())
+    con = db()
+    vive = con.execute("SELECT * FROM estrazioni WHERE stato='aperta'"
+                       ).fetchall()
+    for e in vive:
+        if e["chiude_il"] > adesso:
+            _raccogli_inviti(con, e)
+    avvisi = con.execute(
+        "SELECT p.estrazione_id, p.tg_id, p.numero, p.biglietto, "
+        "e.annuncio_id, e.chiude_il, a.titolo FROM estrazioni_partecipanti p "
+        "JOIN estrazioni e ON e.id = p.estrazione_id JOIN annunci a ON "
+        "a.id = e.annuncio_id WHERE p.avvisato=0 AND e.stato='aperta' "
+        "LIMIT ?", (ESTRAZIONE_AVVISI_PER_GIRO,)).fetchall()
+    for r in avvisi:
+        con.execute("UPDATE estrazioni_partecipanti SET avvisato=1 WHERE "
+                    "estrazione_id=? AND tg_id=?",
+                    (r["estrazione_id"], r["tg_id"]))
+    con.commit()
+    con.close()
+    for r in avvisi:
+        quando = time.strftime("%d/%m alle %H:%M",
+                               time.localtime(r["chiude_il"]))
+        await notifica(r["tg_id"],
+                       f"🎁 Sei dentro l'estrazione di "
+                       f"«{html.escape((r['titolo'] or '')[:60])}»: il tuo "
+                       f"numero è <b>{r['numero']}</b> (biglietto "
+                       f"<code>{r['biglietto']}</code>). Si chiude il "
+                       f"{quando}, e il vincitore lo sceglie il primo "
+                       "blocco Bitcoin dopo la chiusura.",
+                       ("🎁 Apri l'annuncio",
+                        link_telegram("annuncio", r["annuncio_id"])))
+    scadute = [e["id"] for e in vive if e["chiude_il"] <= adesso]
+    if scadute:
+        cima = await _estrazione_mempool("/blocks/tip/height")
+        if cima and cima.isdigit():
+            for eid in scadute:
+                esito = _congela_estrazione(eid, int(cima) + 1)
+                if esito and esito.get("racconto"):
+                    await _racconta_estrazione(esito)
+        else:
+            print("⚠️ Estrazioni: la cima della catena non si legge, la "
+                  "chiusura aspetta il giro dopo", flush=True)
+    con = db()
+    attese = con.execute("SELECT id, blocco_altezza FROM estrazioni WHERE "
+                         "stato='attesa_blocco'").fetchall()
+    con.close()
+    for e in attese:
+        h = await _estrazione_mempool(f"/block-height/{e['blocco_altezza']}")
+        if not h or not _FORMA_HASH_BLOCCO.fullmatch(h):
+            continue        # non ancora minato (o mempool muto): giro dopo
+        esito = _estrai(e["id"], h)
+        if esito:
+            print(f"🎁 Estrazione #{esito['id']}: vince il numero "
+                  f"{esito['numero']} su {esito['n']} (blocco "
+                  f"{esito['altezza']})", flush=True)
+            await _racconta_estrazione(esito)
+
+
 async def orologio():
     while True:
         # Il cambio NON si rinfresca qui: ha un giro suo da un minuto
@@ -111447,6 +112170,12 @@ async def orologio():
             await chiudi_aste()
         except Exception as e:
             print(f"⚠️ Chiusura aste saltata (riprovo tra 10 min): {e}")
+        try:
+            # le estrazioni (26 nov 2026): avvisi ai nuovi, chiusura,
+            # e il sorteggio quando il blocco della chiusura e' minato
+            await giro_estrazioni()
+        except Exception as e:
+            print(f"⚠️ Giro estrazioni saltato (riprovo tra 10 min): {e}")
         try:
             scadenze_lampo()
         except Exception as e:

@@ -1030,3 +1030,9 @@ frase: Nel negozio di chi scambia sul P2P compare «I suoi ordini P2P»: le card
 dove: Il negozio di un venditore, sopra «In vetrina in questo negozio».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-26 · estrazioni
+frase: Puoi mettere in palio un tuo annuncio con «🎁 Apri un'estrazione»: partecipa chi apre un link nuovo dedicato, oppure chi si iscrive col tuo link d'invito. Ognuno riceve un numero, e alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza: nessuno lo può truccare. Partecipano solo account Telegram.
+dove: La scheda di un tuo annuncio → «🎁 Apri un'estrazione»; in vetrina l'annuncio porta il nastro «🎁 In palio».
+leva: nessuna
+pubblico: no

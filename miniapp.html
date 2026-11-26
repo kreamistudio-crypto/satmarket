@@ -2243,6 +2243,19 @@
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
   .card.in-asta{outline:1.5px solid var(--asta);outline-offset:-1.5px}
+  /* LE ESTRAZIONI (26 nov 2026): il nastro della card e il riquadro
+     della scheda, coi colori dell'asta (anche lei e' una gara) */
+  .estrazione-box{margin-top:12px;padding:12px 14px;border-radius:14px;
+    border:1.5px solid var(--asta);background:var(--card);line-height:1.45;
+    font-size:14px}
+  .estrazione-box h4{margin:0 0 6px;font-size:15px}
+  .estrazione-box .mono{word-break:break-all}
+  .estrazione-box details{margin-top:8px;font-size:13px;color:var(--muted)}
+  .estrazione-box .btn{margin-top:10px}
+  .estr-modo{display:flex;gap:8px;margin:6px 0 10px}
+  .estr-modo button{flex:1;padding:10px;border-radius:12px;font-weight:800;
+    border:1.5px solid var(--line, #ccc);background:var(--card);color:inherit}
+  .estr-modo button.on{border-color:var(--asta);outline:1.5px solid var(--asta)}
   /* la targhetta prezzo di un'asta: quel numero e' la puntata in
      corso, non un prezzo — parla il blu FISSO del token tag (la
      carta del cartellino non cambia di notte) */
@@ -19636,6 +19649,28 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn orange" id="scortaInvia" style="margin-top:12px" onclick="aggiungiScorta(this)">🔑 Aggiungi i codici</button>
     <button class="btn ghost" id="scortaTogli" style="margin-top:8px" hidden onclick="togliScorta(this)">Togli i codici non consegnati</button>
   </div>
+  <!-- ============ SHEET: APRI UN'ESTRAZIONE (26 nov 2026) ============
+       Chi partecipa (i propri invitati o un link nuovo), quanti giorni,
+       e una riga di regolamento. Lo apre apriEstrazione(). -->
+  <div class="sheet" id="estrazioneSheet">
+    <div class="grab"></div>
+    <h3>🎁 Apri un'estrazione</h3>
+    <div class="hint" style="margin-bottom:8px">Metti in palio questo annuncio: finché l'estrazione è aperta non si compra. Alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza, e nessuno può truccarlo. Partecipano solo account Telegram.</div>
+    <b style="font-size:13.5px">Chi partecipa</b>
+    <div class="estr-modo" id="estrModo">
+      <button type="button" data-modo="link" class="on" onclick="estrScegliModo('link')">🔗 Link nuovo</button>
+      <button type="button" data-modo="inviti" onclick="estrScegliModo('inviti')">🎟 I miei invitati</button>
+    </div>
+    <div id="estrModoNota" style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:10px"></div>
+    <div class="qta-riga"><span class="qta-lab">Quanti giorni dura</span></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="estrGiorni" type="text" inputmode="numeric" autocomplete="off" value="30" style="flex:1">
+      <span style="font-weight:800;color:var(--muted)">giorni</span>
+    </div>
+    <div class="field"><textarea id="estrRegole" rows="3" maxlength="600" placeholder="Regolamento (facoltativo): per esempio «spedizione in Italia a mio carico»"></textarea></div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaEstrazione(this)">🎁 Apri l'estrazione</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
   <div class="sheet" id="rifornisciSheet">
     <div class="grab"></div>
     <!-- Titolo e verbo del bottone cambiano col numero: da un annuncio
@@ -21786,6 +21821,9 @@ function mapListing(a){
        scaffale degli esauriti in fondo al negozio: la vetrina serve
        comunque solo gli attivi */
     stato:a.stato||'attivo',
+    /* IN PALIO (26 nov 2026, cantiere estrazioni): c'e' un'estrazione
+       viva — nastro 🎁 sulla card e niente «Acquista» nella scheda */
+    inPalio:!!a.in_palio,
     /* i pezzi disponibili (cantiere stock): 1 per gli annunci di ieri */
     quantita:a.quantita||1,
     /* «ne resta uno e ne ha avuti piu' d'uno»: il flag arriva GIA'
@@ -29798,6 +29836,8 @@ const cardHTML = l => {
     : asta
     ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
                                                : 'conclusa'}</div>`
+    /* l'estrazione (26 nov 2026): come l'asta, una cosa che ACCADE */
+    : l.inPalio ? `<div class="card-asta card-palio">🎁 In palio</div>`
     : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>`
     /* il badge dello sconto: la forma della lampo SENZA il fulmine
        (decisione di Andrea) — ⚡ vuol dire «a tempo», e questo non
@@ -39391,6 +39431,10 @@ function openDetail(id){
                 il doppione che la deduplica esiste per togliere. E'
                 la stessa guardia del rifornimento, un rigo piu' giu'. -->
            ${l.nostr ? '' : `<button class="btn ghost" onclick="duplicaAnnuncio(${l.id})">📄 Duplica questo annuncio</button>`}
+           ${/* L'ESTRAZIONE (26 nov 2026): un pezzo solo, attivo, nato
+                qui e non all'asta — le stesse guardie del server, che
+                resta il giudice */''}${(!l.nostr && !asta && !esa && !l.inPalio && !l.abbonamento && (l.quantita||1) <= 1 && !DEMO)
+             ? `<button class="btn ghost" onclick="apriEstrazione(${l.id})">🎁 Apri un'estrazione</button>` : ''}
            <!-- LA PORTA DELLO STOCK SULL'ANNUNCIO ATTIVO (ago 2026), ed
                 e' obbligatoria: le tre strade che aprivano il foglio
                 erano tutte gatate sull'esaurito, quindi senza questa
@@ -39444,6 +39488,8 @@ function openDetail(id){
            venduti — ma se un domani servisse un 'rimosso' al link
            condiviso, senza questa riga la scheda gli disegnerebbe il
            bottone. Due righe contro un buco silenzioso. */
+        : l.inPalio
+            ? `<div class="trust-note">🎁 <span><b>Questo oggetto è in palio.</b> Non si compra: si vince con l'estrazione qui sotto.</span></div>`
         : (l.stato||'attivo') !== 'attivo'
             ? `<div class="trust-note">🔒 <span>Questo annuncio non è più disponibile.</span></div>`
         : `<div class="escrow-zone">
@@ -39494,6 +39540,7 @@ function openDetail(id){
            proprietario, l'altro di chi modera l'altrui) — ma due
            bottoni che fanno la stessa cosa non possono avere due
            forme, o la seconda diventa quella che si dimentica. -->
+      <div id="estrazioneBox"></div>
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn allarme" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
@@ -39501,6 +39548,8 @@ function openDetail(id){
   /* lo stato personale dell'asta arriva dopo, dal server: il recinto
      intanto esiste gia' col bottone generico */
   if (asta && !mio && !DEMO && !VETRINA) caricaAsta(l.id);
+  /* l'estrazione (26 nov 2026): il riquadro arriva dal server */
+  if (!DEMO) caricaEstrazione(l.id);
   /* La riga di onboarding appesa alla scheda dell'annuncio appena
      pubblicato: una volta sola, e solo su QUEL annuncio */
   if (hintPubblicazione) {
@@ -41547,6 +41596,10 @@ async function fatturaAnnullataAltrove(oid){
    chiave rimetterebbe «Telegram» davanti a chi su Telegram non ci
    puo' andare — meglio una frase piu' povera che una falsa. */
 const INVITO_ONION = {
+  /* l'estrazione (26 nov 2026): solo account del bot, che da Tor non
+     si raggiunge — il foglio lo dice invece di promettere una chiave */
+  estrazione:'Da qui, su Tor, alle estrazioni non si partecipa: si '
+         + 'entra dall\'app di Barattolo.',
   compra:  'Per comprare in sicurezza serve un account: i tuoi sats '
          + 'restano al sicuro fino alla consegna.',
   carrello:'Per riempire il carrello serve un account: i tuoi sats '
@@ -41734,6 +41787,7 @@ function closeSheet(){
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
+  el('estrazioneSheet').classList.remove('open');
   el('scortaSheet').classList.remove('open');
   el('spedStdSheet').classList.remove('open');
   el('mmSheet').classList.remove('open');
@@ -61496,6 +61550,198 @@ async function togliScorta(btn){
     nota.style.color = 'var(--danger)';
     nota.textContent = e.message || 'Rete assente: riprova';
   } finally { ripristina(); }
+}
+/* ══ LE ESTRAZIONI (26 nov 2026, cantiere estrazioni) ══════════════
+   Chi vende mette in palio il SUO annuncio («🎁 Apri un'estrazione»):
+   partecipano i suoi invitati della finestra o chi apre un link nuovo
+   e preme «Partecipo»; alla chiusura il primo blocco Bitcoin dopo la
+   scadenza sceglie il numero vincente. Il giudice e' il server (vedi
+   «LE ESTRAZIONI» in server.py): qui si disegna e si chiede.
+   IL CODICE DEL LINK si ricorda sul dispositivo, legato all'annuncio,
+   come quello d'invito: chi entra col widget di Telegram torna sulla
+   pagina senza la query, e il «Partecipo» deve esserci lo stesso. */
+const ESTRAZIONE_CHIAVE = 'barattolo_estrazione';
+(() => {
+  try {
+    const m = location.search.match(/[?&]estrazione=([A-Za-z0-9]{10})(?:&|$)/);
+    const a = location.pathname.match(/^\/annuncio\/(\d+)/);
+    if (m && a) localStorage.setItem(ESTRAZIONE_CHIAVE,
+      JSON.stringify({c: m[1].toUpperCase(), a: Number(a[1]), t: Date.now()}));
+  } catch(e){}
+})();
+function codiceEstrazionePer(id){
+  try {
+    const d = JSON.parse(localStorage.getItem(ESTRAZIONE_CHIAVE));
+    if (d && d.a === id && typeof d.c === 'string'
+        && Date.now() - (Number(d.t) || 0) < 60 * 86400000) return d.c;
+  } catch(e){}
+  return '';
+}
+let estrAnnuncio = 0, estrModo = 'link', estrCorrente = null;
+const ESTR_MODO_NOTA = {
+  link: 'Ti diamo un link solo per questa estrazione: partecipa chi lo apre e preme «Partecipo», già iscritto o nuovo. Chi è nuovo diventa anche tuo invitato.',
+  inviti: 'Partecipa chi si iscrive a Barattolo col tuo link d\'invito di sempre, da adesso alla chiusura. Gli iscritti di prima non contano.'
+};
+function estrScegliModo(m){
+  haptic();
+  estrModo = m === 'inviti' ? 'inviti' : 'link';
+  document.querySelectorAll('#estrModo button').forEach(b =>
+    b.classList.toggle('on', b.dataset.modo === estrModo));
+  el('estrModoNota').textContent = ESTR_MODO_NOTA[estrModo];
+}
+function apriEstrazione(id){
+  haptic();
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  estrAnnuncio = id;
+  estrScegliModo('link');
+  el('estrGiorni').value = '30';
+  el('estrRegole').value = '';
+  el('sheetBg').classList.add('open');
+  el('estrazioneSheet').classList.add('open');
+}
+async function inviaEstrazione(btn){
+  haptic();
+  const giorni = parseInt(el('estrGiorni').value, 10);
+  if (!(giorni >= 1 && giorni <= 60)) { toast('La durata va da 1 a 60 giorni'); return; }
+  const ripristina = bottoneInAttesa(btn, '🎁 Apro…');
+  try {
+    const r = await fetch(`${API_BASE}/listings/${estrAnnuncio}/estrazione`, {
+      method:'POST', headers:{'X-Tg-Init-Data':authHdr(), 'Content-Type':'application/json'},
+      body: JSON.stringify({modo: estrModo, giorni, regolamento: el('estrRegole').value.trim()})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { ripristina(); toast(d.detail || 'Operazione non riuscita'); return; }
+    ripristina();
+    navIndietro();
+    for (const lista of [listings, myListings])
+      (lista || []).forEach(x => { if (x.id === estrAnnuncio) x.inPalio = true; });
+    toast('🎁 Estrazione aperta: condividi il link');
+    openDetail(estrAnnuncio);
+  } catch(e) { ripristina(); toast('Rete assente: riprova'); }
+}
+function estrQuando(t){
+  try {
+    return new Date(t * 1000).toLocaleString('it-IT',
+      {day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'});
+  } catch(e) { return ''; }
+}
+function estrContatto(c){
+  if (!c) return '';
+  return c.username
+    ? `<a href="${esc(c.link)}" target="_blank" rel="noopener">@${esc(c.username)}</a>`
+    : `<b>${esc(c.nome || 'senza nome')}</b> (non ha uno username Telegram: se non riuscite a trovarvi, scrivete all'assistenza)`;
+}
+function htmlEstrazione(e, id){
+  const n = e.partecipanti || 0;
+  const chi = `${n} partecipant${n === 1 ? 'e' : 'i'}`;
+  const regole = e.regolamento
+    ? `<div style="margin-top:6px"><b>Regolamento:</b> ${esc(e.regolamento)}</div>` : '';
+  const mio = e.mio
+    ? `<div style="margin-top:8px">✅ <b>Sei dentro:</b> numero <b>${e.mio.numero}</b> · biglietto <span class="mono">${esc(e.mio.biglietto)}</span></div>` : '';
+  const prova = e.biglietti ? `<details><summary>Come si controlla</summary>
+      <div style="margin-top:6px">La lista dei biglietti si è fermata alla chiusura, con questa impronta (sha256 delle righe «numero:biglietto», una per riga): <span class="mono">${esc(e.impronta)}</span>.
+      Il numero vincente è l'hash del blocco ${e.blocco_altezza} letto come numero, diviso per ${e.biglietti.length}: il resto più uno.</div>
+      <div class="mono" style="margin-top:6px;max-height:160px;overflow:auto">${e.biglietti.map(esc).join('<br>')}</div></details>` : '';
+  if (e.stato === 'aperta') {
+    const come = e.modo === 'link'
+      ? 'Partecipa chi apre il link dell\'estrazione e preme «Partecipo».'
+      : 'Partecipa chi si iscrive a Barattolo col link d\'invito di chi lo regala, entro la chiusura.';
+    const codice = codiceEstrazionePer(id);
+    const partecipa = (!e.mia && !e.mio && e.modo === 'link' && codice)
+      ? `<div style="margin-top:8px;font-size:13px;color:var(--muted)">Partecipano solo account Telegram. Se vinci, chi regala riceve il tuo contatto Telegram per la consegna.</div>
+         <button class="btn orange" onclick="partecipaEstrazione(this, ${id})">🎟 Partecipo</button>` : '';
+    const mia = e.mia
+      ? `<div style="margin-top:8px;font-size:13px">${e.modo === 'link'
+            ? 'Il link di questa estrazione: chi lo apre e preme «Partecipo» riceve un numero.'
+            : 'Il tuo link d\'invito: chi si iscrive con questo entro la chiusura riceve un numero.'}</div>
+         <div class="mono" style="font-size:12px;margin-top:4px">${esc(e.link || '')}</div>
+         <button class="btn orange" onclick="condividiEstrazione()">📤 Condividi il link</button>
+         ${n === 0 ? `<button class="btn ghost" onclick="annullaEstrazione(${e.id}, ${id})">Annulla l'estrazione</button>` : ''}` : '';
+    return `<h4>🎁 In palio · si chiude il ${estrQuando(e.chiude_il)}</h4>
+      <div>${come} Finora: <b>${chi}</b>. Alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza.</div>
+      ${regole}${mio}${partecipa}${mia}`;
+  }
+  if (e.stato === 'attesa_blocco') {
+    return `<h4>🎁 Estrazione chiusa: si aspetta il blocco</h4>
+      <div>La lista si è fermata con <b>${chi}</b>. Il numero vincente lo sceglie il blocco Bitcoin <b>${e.blocco_altezza}</b>: appena è minato (di solito una decina di minuti) lo leggiamo e avvisiamo tutti.</div>
+      ${mio}${prova}`;
+  }
+  if (e.stato === 'estratta') {
+    const blocco = e.blocco_link
+      ? `<a href="${esc(e.blocco_link)}" target="_blank" rel="noopener">blocco ${e.blocco_altezza}</a>`
+      : `blocco ${e.blocco_altezza}${e.simulato ? ' (simulato)' : ''}`;
+    const tuo = e.ho_vinto
+      ? `<div style="margin-top:8px">🎉 <b>Hai vinto!</b> Per la consegna scrivi a chi lo regala: ${estrContatto(e.contatto)}</div>`
+      : e.mia ? `<div style="margin-top:8px">Scrivi al vincitore per la consegna: ${estrContatto(e.contatto)}</div>` : '';
+    return `<h4>🎉 Ha vinto il numero ${e.vincitore_numero}</h4>
+      <div>Su ${chi}, estratto dal ${blocco}.</div>
+      ${tuo}${mio}${prova}`;
+  }
+  if (e.stato === 'vuota') {
+    return `<h4>🎁 Estrazione chiusa senza partecipanti</h4>
+      <div>Nessuno ha preso un biglietto: l'annuncio è tornato in vendita.</div>`;
+  }
+  return '';
+}
+async function caricaEstrazione(id){
+  const box = el('estrazioneBox');
+  if (!box) return;
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(`${API_BASE}/listings/${id}/estrazione`, opz);
+    if (!r.ok) return;
+    const d = await r.json();
+    /* la scheda puo' essere cambiata mentre si aspettava */
+    if (!currentListing || currentListing.id !== id || el('estrazioneBox') !== box) return;
+    estrCorrente = d.estrazione;
+    if (!estrCorrente) { box.innerHTML = ''; box.className = ''; return; }
+    const html = htmlEstrazione(estrCorrente, id);
+    box.className = html ? 'estrazione-box' : '';
+    box.innerHTML = html;
+  } catch(e) {}
+}
+async function partecipaEstrazione(btn, id){
+  haptic();
+  /* chi guarda senza essere entrato: prima si entra (il codice resta
+     ricordato sul dispositivo, e al ritorno il bottone c'e' ancora) */
+  if (VETRINA) {
+    invitoTelegram('Per partecipare all\'estrazione entra con Telegram: '
+      + 'al ritorno trovi il bottone «Partecipo» qui.', 'estrazione');
+    return;
+  }
+  const ripristina = bottoneInAttesa(btn, '🎟 Un attimo…');
+  try {
+    const r = await fetch(`${API_BASE}/estrazioni/partecipa`, {
+      method:'POST', headers:{'X-Tg-Init-Data':authHdr(), 'Content-Type':'application/json'},
+      body: JSON.stringify({codice: codiceEstrazionePer(id)})});
+    const d = await r.json().catch(()=>({}));
+    ripristina();
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+    toast(`🎟 Sei dentro: numero ${d.estrazione.mio ? d.estrazione.mio.numero : ''}`);
+    caricaEstrazione(id);
+  } catch(e) { ripristina(); toast('Rete assente: riprova'); }
+}
+function condividiEstrazione(){
+  if (!estrCorrente || !estrCorrente.link || !currentListing) return;
+  condividiLink(estrCorrente.link,
+    `🎁 Metto in palio «${currentListing.title}» su Barattolo: partecipa da qui!`,
+    'Estrazione su Barattolo');
+}
+function annullaEstrazione(eid, id){
+  haptic();
+  chiediConferma({
+    titolo: 'Annullare l\'estrazione?',
+    corpo: 'Nessuno ha ancora un biglietto: l\'annuncio torna in vendita come prima.',
+    etichetta: 'Annulla l\'estrazione',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/estrazioni/${eid}/annulla`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+      for (const lista of [listings, myListings])
+        (lista || []).forEach(x => { if (x.id === id) x.inPalio = false; });
+      toast('Estrazione annullata');
+      openDetail(id);
+    }});
 }
 function apriRifornisci(id){
   haptic();

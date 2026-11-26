@@ -42231,7 +42231,8 @@ def prove_onion():
               and ", view)" not in c.split(");")[0]]
     prova("...e ogni chiamante porta la sua chiave", [], _senza)
     # (16 nov 2026, cantiere nav-nostr: l'undicesimo, la cella «Swap»)
-    prova("...e i chiamanti sono gli undici di sempre", 11, len(_ch))
+    # (26 nov 2026, cantiere estrazioni: il dodicesimo, «🎟 Partecipo»)
+    prova("...e i chiamanti sono i dodici di sempre", 12, len(_ch))
     # ⚠️ E LA CHIAVE DEV'ESSERE UNA DI QUELLE DICHIARATE, o un refuso
     # («carrelli» per «carrello») passa il censimento e su onion quel
     # gesto cade sul generico — perdendo IN SILENZIO il testo scritto
@@ -47975,7 +47976,7 @@ def prove_fogli_di_casa():
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
     # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
     # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
-    prova("i gesti che passano dalla domanda unica sono centoquarantasette (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoquarantotto (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -48004,8 +48005,9 @@ def prove_fogli_di_casa():
           "in Da scoprire; e il moderatore che rifiuta o toglie nome e "
           "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza; dal 24 nov "
           "«Mandi l'immagine incollata?» della chat; dal 26 nov la scelta "
-          "dell'annuncio da promuovere dal Profilo)",
-          147, solo_codice(mini).count("chiediConferma({"))
+          "dell'annuncio da promuovere dal Profilo, e «Annullare "
+          "l'estrazione?» di chi regala, a lista vuota)",
+          148, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.

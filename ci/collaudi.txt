@@ -229,3 +229,4 @@ collaudo_scorta_codici
 collaudo_quadro_servizi
 collaudo_richieste
 collaudo_categorie_una_volta
+collaudo_estrazioni
