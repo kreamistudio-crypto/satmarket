@@ -116124,7 +116124,11 @@ function haOrdiniViviP2P(){
    STA FUORI DAL MOTORE DELLO SCAMBIO, dopo il suo marcatore di chiusura:
    chiede al server la sagoma (una `fetch`), e il motore ne ha zero per
    regola. Il libro la chiama dietro un typeof. */
-const MAPPA_P2P_PROIEZIONE = { lon0: 6.5, lat1: 47.2, k: 100, cos: 0.7431, largo: 920, alto: 1180 };
+/* LA SVIZZERA (26 nov 2026, cantiere comuni-ticino): la sagoma ha anche
+   la Svizzera, e per farcela stare lon0 e lat1 si sono spostati a ovest e
+   a nord (5,8 e 47,9) e la scatola e' cresciuta (970 x 1250). Gli stessi
+   numeri del generatore: una prova li tiene uguali. */
+const MAPPA_P2P_PROIEZIONE = { lon0: 5.8, lat1: 47.9, k: 100, cos: 0.7431, largo: 970, alto: 1250 };
 const MAPPA_P2P_RAGGIO_PX = 18;      // il pallino di un'offerta sola, in pixel
 const MAPPA_P2P_ZOOM = 2.5;          // quanto si avvicina un tocco o il ＋
 const MAPPA_P2P_LARGO_MIN = 40;      // la vista piu' stretta: ~50 km
@@ -116133,13 +116137,14 @@ let p2pMappaAperta = false;
 let p2pMappaComune = '';             // il comune scelto: restringe l'elenco
 let p2pMappaVista = null;            // la vista: {x, y, w, h} del viewBox
 let p2pMappaGrappoli = [];           // l'ultimo disegno, per i tocchi
-/* PURA: un punto si tiene solo se sta in Italia (piu' un margine) e ha
-   un nome: e' testo che arriva da fuori, e un numero storto
-   disegnerebbe un pallino nel mare. */
+/* PURA: un punto si tiene solo se sta in Italia o in Svizzera (piu' un
+   margine) e ha un nome: e' testo che arriva da fuori, e un numero
+   storto disegnerebbe un pallino nel mare. Il bordo nord e ovest e'
+   quello della Svizzera dal 26 nov 2026 (il Ticino e' zona valida). */
 function postoPulitoP2P(p){
   if (!Array.isArray(p) || p.length < 3) return null;
   const lat = Number(p[0]), lon = Number(p[1]);
-  if (!(lat >= 35 && lat <= 47.5 && lon >= 6 && lon <= 19)) return null;
+  if (!(lat >= 35 && lat <= 48 && lon >= 5.5 && lon <= 19)) return null;
   const nome = typeof p[2] === 'string' ? zonaPulitaP2P(p[2].slice(0, 60)) : '';
   return nome ? [lat, lon, nome] : null;
 }

@@ -10464,7 +10464,10 @@
   riavvio o una modifica; purga a 30gg nell'orologio,
   `pulisci_avvisi`). GEOGRAFIA: `dati/comuni.csv` committato (~7.900
   comuni ISTAT con lat/lon del centro, 258KB; fonte opendatasicilia,
-  una tantum) letto in RAM da `carica_comuni()` — MAI Nominatim:
+  una tantum) letto in RAM da `carica_comuni()` — dal 26 nov 2026 anche
+  `dati/comuni-svizzera.csv` (tutti i ~2.170 comuni svizzeri, Wikidata,
+  per la sagoma della mappa; come ZONA entra il solo Ticino, sigla TI,
+  e sugli omonimi il nome nudo resta all'italiano) — MAI Nominatim:
   zero rete nel percorso caldo di pubblica(), file assente =
   funzione geografica spenta e tutto il resto vive. Chiavi via
   `normalizza()`; i ~7 nomi contesi d'Italia (Castro, Peglio...)
