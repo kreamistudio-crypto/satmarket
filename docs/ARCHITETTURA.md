@@ -38906,7 +38906,17 @@ mai il kind 0 di nessuno: regola ferrea 2).
   giro dopo i cinque dell'AI (`_iscritti_richiesta`: le categorie degli
   avvisi del mercatino, nessuna = tutte; fuori chi cerca, i «🔕», chi è
   già avvisato e chi ha i suoi 3 in 24 ore), conta fra gli avvisati e
-  riceve lo stesso messaggio con «Offri». Il
+  riceve lo stesso messaggio con «Offri». Sempre dal 26 nov la
+  CATEGORIA SI PROPONE DA SOLA: `categoria_per_richiesta(con, testo)`,
+  senza AI, conta le parole della richiesta (`_parole_richiesta`) che
+  aprono una parola del titolo degli annunci attivi (gli ultimi 5000)
+  e somma per categoria; vince la più votata, a pari merito la prima di
+  `CATEGORIE`; niente in comune = "" e il menu resta «Scegli la
+  categoria». Rotta `GET /api/richieste/categoria?testo=` (stessa porta
+  `richieste_per`). Il client (`cercoProponiCategoria`) chiede 600 ms
+  dopo l'ultimo tasto, butta le risposte vecchie (`cercoCatGiro`) e si
+  ferma per sempre, fino al prossimo invio, appena la persona sceglie a
+  mano (`cercoCatAMano`, dal `poi` del picker). Il
   gemello in `avvisi_ricerca` (se ci sono parole e c'è posto fra i 5
   avvisi dell'utente) fa il resto: un annuncio NUOVO che combacia avvisa
   chi cerca col giro di sempre; chiusa o scaduta la richiesta, il gemello

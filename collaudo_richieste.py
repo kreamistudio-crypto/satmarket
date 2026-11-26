@@ -129,6 +129,16 @@ def main():
           _errore(lambda: crea(CERCA, {"testo": "un buono", "categoria": CAT}))[0])
     S.RICHIESTE_SOLO_MODERATORI = False
 
+    print("\n[1b) la categoria proposta, senza AI]")
+    # (26 nov 2026) dagli annunci con le stesse parole nel titolo
+    def proponi(testo, chi=CERCA):
+        banco.come(chi)
+        return banco.chiama(S.proponi_categoria_richiesta, testo, "", "")["categoria"]
+    prova("«buono amazon» → la categoria dei buoni", CAT, proponi("Cerco un buono Amazon da 50 €"))
+    prova("«una sedia» → Casa e giardino", "Casa e giardino", proponi("vorrei una sedia"))
+    prova("parole che nessuno usa, o niente: nessuna proposta", ["", "", ""],
+          [proponi("xyzzy introvabile"), proponi(""), proponi("da 50")])
+
     print("\n[2) la nascita]")
     prova("testo troppo corto", (400, "Scrivi cosa cerchi"),
           _errore(lambda: crea(CERCA, {"testo": " ab ", "categoria": CAT})))

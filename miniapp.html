@@ -17115,7 +17115,7 @@ document.getElementById('cartello')?.remove();</script>
         <p class="occhiello">Scrivi cosa cerchi: avvisiamo i venditori che possono avercelo</p>
       </div>
       <div class="cerco-modulo">
-        <div class="field"><input id="cercoTesto" maxlength="140" autocomplete="off" placeholder="Es. un buono Amazon da 50 €"></div>
+        <div class="field"><input id="cercoTesto" maxlength="140" autocomplete="off" placeholder="Es. un buono Amazon da 50 €" oninput="cercoProponiCategoria()"></div>
         <div class="field"><select id="cercoCat" hidden><option value=""></option></select>
           <button type="button" class="campo-scelta" id="cercoCatBtn" onclick="cercoPrepara();apriPicker('cercoCat')" aria-haspopup="dialog"><span class="cs-val"><span class="cs-vuoto">Scegli la categoria</span></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
         <!-- il budget nella valuta che si sta guardando, col toggle di
@@ -44618,7 +44618,39 @@ PICKER.cercoCat = {titolo: 'Categoria',
   voci: () => [...el('sellCat').options].map(o => ({val: o.value,
     resa: `${icoCategoria(o.value)}<span><b>${esc(o.value)}</b></span>`})),
   campo: v => v ? `${icoCategoria(v)}<span>${esc(v)}</span>`
-                : '<span class="cs-vuoto">Scegli la categoria</span>'};
+                : '<span class="cs-vuoto">Scegli la categoria</span>',
+  poi: () => { cercoCatAMano = true; }};
+
+/* LA CATEGORIA PROPOSTA (26 nov 2026, Andrea: «forse ha senso che la
+   categoria venga proposta in automatico, se vuole la cambia»): quando
+   chi scrive si ferma, il server la indovina dagli annunci con le stesse
+   parole (senza AI) e il campo si compila; scelta a mano, non si tocca
+   piu' finche' la richiesta non parte. */
+let cercoCatAMano = false, cercoCatTimer = null, cercoCatGiro = 0;
+function cercoProponiCategoria(){
+  clearTimeout(cercoCatTimer);
+  if (cercoCatAMano) return;
+  cercoCatTimer = setTimeout(async () => {
+    const testo = (el('cercoTesto')?.value || '').trim();
+    const giro = ++cercoCatGiro;
+    let cat = '';
+    if (testo.length >= 3) {
+      try {
+        const r = await fetch(`${API_BASE}/richieste/categoria?testo=${encodeURIComponent(testo)}`,
+          {headers: {'X-Tg-Init-Data': authHdr()}});
+        cat = r.ok ? ((await r.json()).categoria || '') : '';
+      } catch(e) { return; }
+    }
+    // una risposta vecchia, o una scelta a mano arrivata nel frattempo, vincono
+    if (giro !== cercoCatGiro || cercoCatAMano) return;
+    cercoPrepara();
+    const sel = el('cercoCat');
+    if (!sel || sel.value === cat) return;
+    if (cat && ![...sel.options].some(o => o.value === cat)) return;
+    sel.value = cat;
+    aggiornaPicker('cercoCat');
+  }, 600);
+}
 
 /* LA PORTA: il riquadro, il bottone della ricerca vuota (che porta con
    se' la ricerca fatta), il tasto «Offri» dell'avviso del bot */
@@ -44632,10 +44664,13 @@ function apriCerco(testo){
   disegnaGiorniCerco();
   if (typeof testo === 'string' && el('cercoTesto')) {
     el('cercoTesto').value = testo.slice(0, 140);
+    cercoCatAMano = false;
     if (activeCat && activeCat !== 'Tutto' && el('cercoCat')) {
+      // la categoria della ricerca fatta vale come scelta a mano
       el('cercoCat').value = activeCat;
       aggiornaPicker('cercoCat');
-    }
+      cercoCatAMano = true;
+    } else cercoProponiCategoria();
   }
   caricaCerco();
 }
@@ -44763,6 +44798,7 @@ async function inviaRichiesta(){
     if (!r.ok) { const e = j.detail || 'Non ci sono riuscito, riprova'; toast(e, tempoLettura(e)); return; }
     el('cercoTesto').value = ''; el('cercoBudget').value = '';
     cercoGiorni = 0;   // la prossima riparte dalla durata di serie
+    cercoCatAMano = false;   // ...e la categoria torna a proporsi
     toast('📣 Richiesta inviata: avvisiamo i venditori adatti', 5000);
     caricaCerco();
   } finally { ripristina(); }
