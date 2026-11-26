@@ -96828,3 +96828,11 @@ massimi storti → 200 e solo il minimo), con controprova (rotta che
 ignora `euro_max` → rosso). Suite severa e collaudi.
 DA GUARDARE. Dopo la promozione, il prossimo ordine a intervallo nel
 canale. I post già usciti restano col minimo.
+
+
+## «Ti paga 85 €»: il budget di Cerco detto per intero (26 nov 2026, cantiere cerco-budget; Andrea: «la gente magari non capisce… ti invio fino a 85 € circa X satoshi, sempre aggiornati», poi la scritta sua: «Ti paga fino a 85 € X Satoshi», e «levare fino… nessuno farà mai un'offerta più bassa»)
+
+COSA. Nelle card degli altri il budget si legge «Ti paga 85,00 € · circa 96 591 sats» (in sats: «Ti paga N sats · circa N €»), con l'altra valuta al cambio di adesso (`eurPerSat`, lo stesso che il resto dell'app tiene aggiornato). Nelle proprie richieste la cifra sola con l'altra valuta accanto: «Ti paga» lo leggerebbe chi paga. Niente «fino a»: nessuno offre sotto il budget.
+SCARTATE. «Paga fino a» e «Offre fino a» (proposte, Andrea ha scritto la sua); «Ti invio fino a» (parla chi cerca, strano sulle proprie richieste).
+PROVATO. `prove_richieste` in node: senza cambio niente seconda valuta, col cambio «· circa N sats» e «· circa N €». Dal vivo in Playwright (foto 56). Suite severa e collaudi della CI.
+E IL TITOLO DI «OFFRI» È L'OGGETTO (stesso giro; Andrea: «cerco Mac M1… dovrebbe rimanere il titolo, non la domanda»). `titoloDaRichiesta` toglie il «Cerco» in testa (cercasi, cerchiamo, compro, vorrei, mi serve) e l'articolo che gli restava attaccato, e rimette la maiuscola: «Cerco un Mac M1» → «Mac M1». Se non resta niente, il testo com'era; «Cercopiteco» resta (parola intera). Provato in node in `prove_richieste`.

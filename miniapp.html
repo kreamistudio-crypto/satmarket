@@ -45055,9 +45055,22 @@ function cercoScade(sec){
   return g === 1 ? 'ancora 1 giorno' : 'scade oggi';
 }
 function cardRichiesta(r){
-  const budget = r.budget_eur
-    ? `<div class="cerco-budget">fino a <b class="mono">${fmtEur(Number(r.budget_eur))}</b> €</div>`
-    : r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
+  /* IL BUDGET DETTO PER INTERO (26 nov 2026, Andrea: «la gente magari
+     non capisce… ti invio fino a 85 € circa X satoshi, sempre
+     aggiornati», poi la scritta sua: «Ti paga fino a 85 € · X sats»).
+     Accanto alla cifra, l'altra valuta al cambio di adesso (`eurPerSat`,
+     quello che il resto dell'app tiene aggiornato); senza cambio la
+     seconda meta' tace. Niente «fino a» (Andrea: «nessuno fara' mai
+     un'offerta piu' bassa di quella»). «Ti paga» e' per chi vende:
+     sulle proprie richieste resta la cifra sola. */
+  const cambio = typeof eurPerSat === 'number' && eurPerSat > 0 ? eurPerSat : 0;
+  const eur = Number(r.budget_eur) || 0, sats = Number(r.budget_sats) || 0;
+  const apre = r.mia ? '' : 'Ti paga ';
+  const budget = eur
+    ? `<div class="cerco-budget">${apre}<b class="mono">${fmtEur(eur)}</b> €${cambio
+        ? ` · circa <b class="mono">${fmt(Math.round(eur / cambio))}</b> sats` : ''}</div>`
+    : sats ? `<div class="cerco-budget">${apre}<b class="mono">${fmt(sats)}</b> sats${cambio
+        ? ` · circa <b class="mono">${fmtEur(sats * cambio)}</b> €` : ''}</div>` : '';
   const conto = r.offerte ? ` · 📬 ${r.offerte} ${r.offerte === 1 ? 'offerta' : 'offerte'}` : '';
   let piede;
   if (r.mia) {
@@ -45161,7 +45174,7 @@ function offriPerRichiesta(id){
 const CATEGORIA_BUONI = 'Buoni ed esperienze';
 async function compilaOffertaRichiesta(r){
   const t = el('sellTitle');
-  if (t && !t.value.trim()) t.value = String(r.testo || '').slice(0, 120);
+  if (t && !t.value.trim()) t.value = titoloDaRichiesta(r.testo).slice(0, 120);
   const p = el('sellPrice');
   if (p && !p.value){
     const eur = Number(r.budget_eur) || 0, sats = Number(r.budget_sats) || 0;
@@ -45188,6 +45201,19 @@ async function compilaOffertaRichiesta(r){
   if (!offertaRichiesta || offertaRichiesta.id !== r.id || sellFoto.length) return;
   sellFoto.push(foto);
   renderFotoPreview();
+}
+/* IL TITOLO E' L'OGGETTO, NON LA DOMANDA (26 nov 2026, Andrea: «cerco
+   Mac M1… dovrebbe rimanere il titolo, non la domanda»). Via il «Cerco»
+   in testa (e i suoi parenti: cercasi, cerchiamo, compro, vorrei, mi
+   serve), poi l'articolo che gli restava attaccato («un Mac» → «Mac»), e
+   la prima lettera maiuscola. Se togliendo non resta niente, il testo
+   com'era. */
+function titoloDaRichiesta(testo){
+  const t = String(testo || '').trim();
+  const via = t.replace(/^(cerco|cercasi|cerchiamo|compro|vorrei|mi serve|mi servono)\b[\s:,.\-–]*/i, '')
+               .replace(/^(un|una|uno|dei|delle|degli)\s+|^un['’]\s*/i, '').trim();
+  const fuori = via || t;
+  return fuori.charAt(0).toUpperCase() + fuori.slice(1);
 }
 /* LA FOTO DI SERIE DEL BUONO: una tessera arancione su fondo bruno, col
    biglietto 🎟️ e le parole della richiesta. Niente marchi (un logo

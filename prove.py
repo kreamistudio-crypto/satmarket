@@ -206400,6 +206400,19 @@ def prove_richieste():
            "if (r.categoria !== CATEGORIA_BUONI) return;" in _co,
            "!consegne.some(c => c.checked)" in _co,
            "if (!foto || await jpegVuoto(foto)) return;" in _co])
+    # (26 nov 2026) il titolo e' l'oggetto, non la domanda
+    _tr = mini[mini.index("function titoloDaRichiesta("):]
+    _tr = _tr[:_tr.index("\n}\n") + 3]
+    _rt = _node_banco(_tr + "console.log(JSON.stringify(['Cerco Mac M1', "
+                      "'cerco un buono Amazon da 100€', \"Cerco un'auto\", "
+                      "'Cercasi: bici', 'Cerco', 'Cercopiteco di peluche', "
+                      "'Buono Amazon'].map(titoloDaRichiesta)));\n")
+    if _rt is None:
+        salta("il titolo dell'offerta in node", "node non c'e'")
+    else:
+        prova("«Offri»: il titolo senza «Cerco» e senza l'articolo",
+              ["Mac M1", "Buono Amazon da 100€", "Auto", "Bici", "Cerco",
+               "Cercopiteco di peluche", "Buono Amazon"], _rt)
     prova("la foto di serie e' un JPEG disegnato qui, senza marchi", [True, False],
           ["c.toDataURL('image/jpeg', 0.9)" in mini,
            "amazon" in mini[mini.index("function fotoDiSerieBuono("):][:4000].lower()
@@ -206454,6 +206467,12 @@ def prove_richieste():
           " annunci: [{id: 9, titolo: '<b>Buono</b>', prezzo_sats: 1000}]});\n"
           "f.euro = cardRichiesta({id: 6, testo: 'bici', categoria: 'Libri',"
           " budget_sats: 0, budget_eur: 50, scade: ora + 3*86400, mia: false});\n"
+          "eurPerSat = 0.001;\n"
+          "f.euroCambio = cardRichiesta({id: 7, testo: 'bici', categoria: 'Libri',"
+          " budget_sats: 0, budget_eur: 50, scade: ora + 3*86400, mia: false});\n"
+          "f.satsCambio = cardRichiesta({id: 8, testo: 'bici', categoria: 'Libri',"
+          " budget_sats: 50000, scade: ora + 3*86400, mia: false});\n"
+          "eurPerSat = 0;\n"
           "f.leggi = [cercoLeggiBudget('50,5','eur'), cercoLeggiBudget('50.5','eur'),"
           " cercoLeggiBudget('1.500','eur'), cercoLeggiBudget('1.500,25','eur'),"
           " cercoLeggiBudget('zero','eur'), cercoLeggiBudget('55.000','sats'),"
@@ -206475,9 +206494,12 @@ def prove_richieste():
               [True, False, True, False, True],
               ["openDetail(9)" in _m, "<b>Buono</b>" in _m, "chiudiRichiesta(5)" in _m,
                "offriPerRichiesta" in _m, "2 offerte" in _m])
-        prova("la card col budget in euro", [True, False],
-              ["fino a <b class=\"mono\">50,00</b> €" in r.get("euro", ""),
+        prova("la card col budget in euro, senza cambio: niente sats", [True, False],
+              ["Ti paga <b class=\"mono\">50,00</b> €" in r.get("euro", "") and "fino a" not in r.get("euro", ""),
                "sats" in r.get("euro", "")])
+        prova("...e col cambio: «· circa N sats»; in sats: «· circa N €»", [True, True],
+              ["€ · circa <b class=\"mono\">50 000</b> sats" in r.get("euroCambio", ""),
+               "sats · circa <b class=\"mono\">50,00</b> €" in r.get("satsCambio", "")])
         prova("il budget letto: la virgola, il punto, le migliaia, i sats",
               [50.5, 50.5, 1500, 1500.25, 0, 55000, 0], r.get("leggi"))
     # l'etichetta del megafono esce SOLO sopra «Sconti»: da sola andrebbe
