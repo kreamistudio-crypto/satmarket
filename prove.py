@@ -32464,6 +32464,8 @@ def prove_libro_mastro():
         CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT,
           motivo TEXT, riferimento TEXT DEFAULT '', importo_sats INT,
           stato TEXT DEFAULT 'creato', payout_stato TEXT DEFAULT '');
+        -- (26 nov 2026) il segno della porta del banner regalata
+        CREATE TABLE impostazioni(chiave TEXT PRIMARY KEY, valore TEXT);
         CREATE UNIQUE INDEX idx_rimborso_chiusura ON rimborsi_asta(puntata_id)
           WHERE motivo IN ('perdente','annullo_admin');
         CREATE UNIQUE INDEX idx_rimborso_tardivo ON rimborsi_asta(rilancio_id)

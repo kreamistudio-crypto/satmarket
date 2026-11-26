@@ -96430,3 +96430,35 @@ consegna.
 PROVATO. `prove_scorta_codici`: la riga della resa (controprova: senza
 la seconda porta, rosso) e in node bot + invito diventano link, il sito
 resta testo. `prove_link_invito_canale` invariata e verde.
+
+## Il banner regalato dal moderatore (26 nov 2026, cantiere regala-banner; Andrea sulla scheda: «Glielo regaliamo», per il negozio di BitcoinLabs)
+
+PERCHÉ. Andrea voleva caricare lui il banner del negozio di Carmrain. Non
+si può: il banner lo carica solo chi vende, e solo a porta sbloccata,
+cioè dopo aver pagato. Sulla scheda: «Glielo regaliamo».
+
+COSA. `/promossi banner <codice>` (il codice o il link del negozio, come
+nel collega dal pannello) apre la stessa porta della fattura, senza
+fattura. Il banner poi lo carica Carmrain e lo approva Andrea: il
+moderatore resta l'occhio prima della vetrina. A chi vende arriva
+`MSG_BANNER_REGALATO`, ai moderatori il solito «🚀 /promossi banner …».
+
+LE SCELTE. Il segno del regalo in `impostazioni` e non una riga in
+`pagamenti` con importo zero: `pagamenti` è il libro degli incassi, e
+una riga a zero sarebbe un incasso finto da spiegare a ogni ronda. Il
+libro mastro però lo deve sapere, sennò «porta del banner aperta senza
+pagamento» suonerebbe ogni giorno su un regalo deciso (la stessa storia
+delle porte regalate il 15 set, che hanno una data di comodo): il
+controllo e il suo gemello SQL saltano chi ha il segno. Una porta già
+aperta non si riscrive (la data è quella del primo sblocco).
+
+PROVATO. `collaudo_promozioni`, scena «la porta regalata»: chi non è
+admin non regala; dal link del negozio la porta si apre senza fattura;
+il messaggio a chi vende e il fatto ai moderatori; la porta si chiede
+davvero; il libro mastro non suona sul regalo e suona ancora su una
+porta aperta da sola; ridata non cambia la data né riavvisa; un codice
+che non c'è lo dice.
+
+DA GUARDARE. Il primo regalo vero (Carmrain) dopo la promozione: poi lui
+carica il banner (l'immagine è in /mnt/project-files/bitcoinlabs/corsi/)
+e Andrea lo approva.

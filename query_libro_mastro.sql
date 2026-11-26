@@ -437,7 +437,10 @@ SELECT u.tg_id, u.negozio,
        datetime(u.banner_sbloccato_il, 'unixepoch', 'localtime') AS aperta
   FROM utenti u WHERE COALESCE(u.banner_sbloccato_il, 0) >= 1789603200
    AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id = u.tg_id
-     AND p.motivo = 'banner' AND p.stato IN ('pagato','rimborsato'));
+     AND p.motivo = 'banner' AND p.stato IN ('pagato','rimborsato'))
+   -- (26 nov 2026) le porte regalate con /promossi banner non contano
+   AND NOT EXISTS (SELECT 1 FROM impostazioni i
+     WHERE i.chiave = 'banner_regalato:' || u.tg_id);
 -- 3) pagato due volte la stessa porta (le promozioni no: si
 --    ricomprano di diritto, 23 nov 2026)
 SELECT tg_id, motivo, COUNT(*) AS quanti, SUM(importo_sats) AS sats
