@@ -96678,3 +96678,22 @@ STRADE SCARTATE. Tutta la Svizzera come zona: le sigle dei cantoni BS, BL, SO, G
 PROVATO. Import CSV sul server vero (banco `collaudo_lnbits_muto` + TestClient): prima «Lugano» scartata, dopo 4 righe su 4 valide, una col ritiro a «Lugano (TI)» e una con «entrambe». `prove_autocomplete_comuni`: Lugano zona nuda e con sigla, la tendina col cantone, ~100 comuni TI, Zurigo e Ginevra non zone, omonimi all'italiano e ticinese con la sigla. CONTROPROVE: con ZH e GE fra i cantoni → rossa «Zurigo e Ginevra»; col nome nudo conteso → rossa «omonimi»; senza Ticino → 4 rosse. `prove_mappa_contanti`: proiezione uguale fra generatore, SVG e client, Milano a [252, 243], il generatore legge il file svizzero, i punti del Ticino tenuti. Suite severa e collaudi della CI nel venv senza coincurve: vedi il verbale del push.
 
 DA GUARDARE. Dopo la promozione: sul telefono la mappa dei puntini (la Svizzera si salda al nord Italia, senza confine disegnato) e un annuncio di prova con zona Lugano. NOTATO E NON FATTO: in `dati/comuni.csv` dieci righe italiane hanno una coordinata senza il punto decimale (Arzana, Carovilli, Dasà, Gazzo, Gombito, Lucignano, Montegridolfo, Olgiate Olona, Premia, Telese Terme): quei comuni non hanno un punto vero né in mappa né negli avvisi a distanza.
+## Il giroconto senza tetto tecnico (26 nov 2026)
+
+Andrea, alle 13:03: «leviamo il tetto tecnico, poi al massimo
+ricarichiamo il wallet». `GIROCONTO_TETTO_SATS` passa da 150.000 a 0 di
+serie, e 0 vuol dire nessun tetto: nel verdetto della rotta
+(`_verdetto_giroconto`), nella cintura della cassa (`compra`) e nel
+telefono (`via_euro_tetto_sats` 0 = non detto). Il limite vero resta il
+saldo della «Riserva giroconti»: un deposito che non ci sta si ferma
+come ogni pagamento della riserva che non parte (il pagamento fermo di
+«Non hai sats?»), e la riserva si ricarica a mano. Una riga nel config
+del VPS lo rimette. Il tetto in euro di «Non hai sats?»
+(`VIA_EURO_MAX_EURO`, 100) resta per gli euro; in franchi non c'e'.
+LO STESSO GIORNO, DECISO E GIA' COSI': il rimborso a chi ha pagato con
+«Non hai sats?» e' solo in sats (Andrea: «si dovra' creare un wallet»).
+`_rimborsa_compratore` lo fa gia': senza fattura ne' Lightning address
+l'ordine resta in `refund`, i sats al sicuro, e chi ha pagato e'
+invitato a darne uno nella Mini App.
+PROVATO: `prove_giroconto_interno` (il verdetto a tetto 0, la cintura
+della cassa), suite severa e collaudi.
