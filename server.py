@@ -40211,6 +40211,12 @@ def _leve_stato():
                   spento="la vedono tutti"),
             _leva("Il modello che sceglie i venditori",
                   "RICHIESTE_MODELLO", RICHIESTE_MODELLO),
+            _leva("L'avviso ai moderatori per ogni richiesta",
+                  "RICHIESTE_AVVISO_MODERATORI",
+                  bool(RICHIESTE_AVVISO_MODERATORI),
+                  acceso="ogni richiesta nuova arriva nella stanza "
+                         "«Moderazione» del gruppo degli admin",
+                  spento="le richieste nuove non avvisano i moderatori"),
         ]},
         {"gruppo": "🛡 Moderazione", "voci": [
             _leva("Terza via (il dubbio va in revisione)",
@@ -64965,6 +64971,15 @@ try:
     from config import RICHIESTE_MODELLO
 except ImportError:
     RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
+# L'AVVISO AI MODERATORI (26 nov 2026, Andrea: «voglio che veniamo
+# avvisati anche quando qualcuno pubblica nella sezione cerco», «magari
+# con un'icona caratteristica»): ogni richiesta nuova va nella stanza
+# «Moderazione» del gruppo degli admin, col megafono del riquadro. Accesa
+# di serie; `RICHIESTE_AVVISO_MODERATORI = False` nel config la spegne.
+try:
+    from config import RICHIESTE_AVVISO_MODERATORI
+except ImportError:
+    RICHIESTE_AVVISO_MODERATORI = True
 RICHIESTE_MAX_APERTE = 3
 # QUANTO RESTA APERTA LO SCEGLIE CHI CERCA (26 nov 2026, Andrea: «dai la
 # possibilità di decidere quanto tempo lasciarlo attivo, 14 giorni è troppo
@@ -65112,6 +65127,47 @@ async def _scegli_venditori(rich: dict, candidati: list) -> list:
         return primi
 
 
+def _riga_budget_richiesta(rich: dict) -> str:
+    """La riga del budget, nella valuta in cui e' scritto (vuota senza)."""
+    if rich.get("budget_eur"):
+        return f"\nBudget: fino a {_fmt_eur(rich['budget_eur'])} €"
+    if rich.get("budget_sats"):
+        return f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
+    return ""
+
+
+async def _avvisa_moderatori_richiesta(richiesta_id: int) -> None:
+    """La richiesta nuova ai moderatori (`RICHIESTE_AVVISO_MODERATORI`):
+    nella stanza «Moderazione» del gruppo, o in privato se il gruppo non
+    c'e' (la strada di `notifica_admin`). Solo un avviso, niente bottoni
+    di decisione: la richiesta e' gia' in bacheca. Fail-open."""
+    if not RICHIESTE_AVVISO_MODERATORI:
+        return
+    try:
+        con = db()
+        r = con.execute(
+            "SELECT r.*, u.nome AS chi FROM richieste r LEFT JOIN utenti u "
+            "ON u.tg_id=r.tg_id WHERE r.id=?", (richiesta_id,)).fetchone()
+        con.close()
+        if not r:
+            return
+        rich = dict(r)
+        giorni = max(1, round((rich["scade"] - rich["creato"]) / 86400))
+        testo = (f"📣 <b>Nuova richiesta in Cerco #{richiesta_id}</b>\n"
+                 f"«{html.escape(rich['testo'])}» · "
+                 f"{html.escape(rich['categoria'])}"
+                 f"{_riga_budget_richiesta(rich)}\n"
+                 f"Chi chiede: {html.escape(rich['chi'] or '')} "
+                 f"(id {rich['tg_id']})\n"
+                 f"Dura {giorni} giorni")
+        await notifica_admin(testo, bottone=(
+            "Apri la richiesta", link_telegram("cerco", richiesta_id)),
+            argomento="moderazione")
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori della richiesta {richiesta_id} "
+              f"saltato: {e}")
+
+
 async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
     """In sottofondo, dopo la nascita della richiesta: prefiltro, scelta,
     avviso. Fail-open totale: chi ha chiesto ha gia' la sua risposta."""
@@ -65138,12 +65194,7 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
                     (len(scelti), richiesta_id))
         con.commit()
         con.close()
-        if rich.get("budget_eur"):
-            budget = f"\nBudget: fino a {_fmt_eur(rich['budget_eur'])} €"
-        elif rich["budget_sats"]:
-            budget = f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
-        else:
-            budget = ""
+        budget = _riga_budget_richiesta(rich)
         testo = (f"🙋 Qualcuno cerca: <b>{html.escape(rich['testo'])}</b>"
                  f"{budget}\nSe ce l'hai, fagli un'offerta: la paga col "
                  f"deposito di garanzia, come ogni annuncio.")
@@ -65275,6 +65326,7 @@ async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     asyncio.create_task(_avvisa_venditori_richiesta(rid))
+    asyncio.create_task(_avvisa_moderatori_richiesta(rid))
     return {"ok": True, "id": rid}
 
 

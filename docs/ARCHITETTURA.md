@@ -38893,7 +38893,13 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `RICHIESTE_VENDITORI` = 5; senza chiave, con un errore o con una
   risposta storta prende i primi 5 del prefiltro: FAIL-OPEN, l'avviso
   parte comunque) e `_avvisa_venditori_richiesta` (`notifica` con il
-  bottone «Offri» → `link_telegram("cerco", id)` → `/?cerco=<id>`). Il
+  bottone «Offri» → `link_telegram("cerco", id)` → `/?cerco=<id>`).
+  Dal 26 nov anche `_avvisa_moderatori_richiesta`: ogni richiesta nuova
+  va ai moderatori con `notifica_admin(..., argomento="moderazione")` (la
+  stanza «🛡️ Moderazione» del gruppo degli admin, o in privato senza
+  gruppo), titolo col megafono «📣 Nuova richiesta in Cerco #N» e il
+  tasto «Apri la richiesta»; solo un avviso, niente decisione. Leva
+  `RICHIESTE_AVVISO_MODERATORI`, accesa di serie. Il
   gemello in `avvisi_ricerca` (se ci sono parole e c'è posto fra i 5
   avvisi dell'utente) fa il resto: un annuncio NUOVO che combacia avvisa
   chi cerca col giro di sempre; chiusa o scaduta la richiesta, il gemello

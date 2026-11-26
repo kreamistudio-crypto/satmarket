@@ -64,6 +64,11 @@ def main():
     async def notifica(chi, testo, bottone=None):
         DETTO.append((chi, testo, bottone))
     S.notifica = notifica
+    MODERATI = []
+
+    async def notifica_admin(testo, bottone=None, argomento=""):
+        MODERATI.append((testo, bottone, argomento))
+    S.notifica_admin = notifica_admin
 
     ora = int(time.time())
     con = S.db()
@@ -146,6 +151,19 @@ def main():
                  "WHERE id=?", rid)[0]
     prova("...aperta, col budget, per 30 giorni (la durata di serie)",
           ("aperta", 55000, 30 * 86400), riga[:3])
+    # (26 nov 2026) e i moderatori lo sanno, col megafono
+    m = MODERATI[0] if MODERATI else ("", None, "")
+    prova("l'avviso ai moderatori: uno, nella stanza «Moderazione»", (1, "moderazione"),
+          (len(MODERATI), m[2]))
+    prova("...col megafono, il numero, il testo, la categoria, il budget, chi e quanto dura",
+          [True, True, True, True, True],
+          [m[0].startswith(f"📣 <b>Nuova richiesta in Cerco #{rid}</b>"),
+           f"«Cerco un buono Amazon da 50 €» · {CAT}" in m[0],
+           "Budget: fino a 55.000 sats" in m[0],
+           f"Chi chiede: U{CERCA} (id {CERCA})" in m[0],
+           m[0].endswith("Dura 30 giorni")])
+    prova("...e il tasto che apre la richiesta", ("Apri la richiesta", f"cerco_{rid}"),
+          (m[1][0], m[1][1].rsplit("startapp=", 1)[-1]) if m[1] else None)
     prova("...e col suo avviso di ricerca gemello: le parole vere, la categoria, "
           "il budget", [("buono amazon", f"|{CAT}|", 55000)],
           righe("SELECT parole, categorie, prezzo_max_sats FROM avvisi_ricerca "
@@ -187,7 +205,14 @@ def main():
     # (26 nov 2026) il budget in euro e la durata a scelta
     r2 = crea(CERCA, {"testo": "un buono carburante", "categoria": CAT,
                       "budget_valuta": "eur", "budget_eur": "50.499", "giorni": 60})
+    prima = len(MODERATI)
+    S.RICHIESTE_AVVISO_MODERATORI = False
     r3 = crea(CERCA, {"testo": "un voucher Ryanair", "categoria": CAT, "giorni": 7})
+    S.RICHIESTE_AVVISO_MODERATORI = True
+    prova("a leva spenta i moderatori non sono avvisati", prima, len(MODERATI))
+    prova("...e il testo dell'utente arriva scappato, coi suoi giorni",
+          [True, True], [any("Dura 60 giorni" in t for t, _, _ in MODERATI),
+                         all("<b>Nuova" in t and t.count("<b>") == 1 for t, _, _ in MODERATI)])
     prova("in euro: i sats a zero, gli euro coi centesimi, 60 giorni come scelto",
           [(0, 50.5, 60 * 86400)],
           righe("SELECT budget_sats, budget_eur, scade - creato FROM richieste WHERE id=?",
