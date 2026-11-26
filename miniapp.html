@@ -11600,6 +11600,13 @@
   .via-euro-cifra{font-size:40px;font-weight:900;text-align:center;margin:8px 0 2px;color:var(--ink)}
   .via-euro-sotto{font-size:13px;font-weight:600;color:var(--muted);text-align:center;margin:0 0 14px}
   .via-euro-metodi{display:flex;gap:10px;margin:0 0 14px}
+  /* LA SPINTA ALL'INTERVALLO (26 nov 2026, Andrea: «mettila bene in
+     evidenza»): una scatola arancio sotto l'importo di chi vende sats, e
+     la stessa in cima al foglio dell'importo al primo tocco */
+  .p2p-spinta-intervallo{background:var(--sats-soft);border:1.5px solid var(--sats);
+    color:var(--ink);border-radius:12px;padding:10px 12px;margin:8px 0 4px;
+    font-size:14px;font-weight:800;line-height:1.35}
+  .p2p-spinta-intervallo.in-cima{margin:0 0 12px}
   .via-euro-metodi > .btn{flex:1;min-width:0}
   .via-euro-attesa{display:flex;align-items:center;justify-content:center;gap:10px;
     font-size:15px;font-weight:700;color:var(--ink);padding:24px 0}
@@ -18579,7 +18586,7 @@ document.getElementById('cartello')?.remove();</script>
     <div class="qr" id="payQr"></div>
     <!-- «Non hai sats?» (23 nov 2026, giroconto interno): subito sotto il
          codice, senza scorrere; lo accende payViaEuroVista -->
-    <button type="button" id="payViaEuro" class="btn orange via-euro-btn" style="display:none;margin:0 0 12px" onclick="apriViaEuro('qr')">Non hai sats? Compra da qui</button>
+    <button type="button" id="payViaEuro" class="btn orange via-euro-btn" style="display:none;margin:0 0 12px" onclick="apriViaEuro('qr')">Non hai sats? Paga in altri modi</button>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
     <div id="payQrNota" style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
     <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
@@ -38995,6 +39002,8 @@ function openDetail(id){
      la vista più forte che c'è. Sul proprio annuncio non si manda
      nemmeno — il server la scarterebbe comunque, ma perché chiedere. */
   if (!mio) registraVista(id);
+  /* «Non hai sats?»: il libro P2P si legge gia' qui, in silenzio (26 nov 2026) */
+  if (!mio && typeof viaEuroLibro === 'function') viaEuroLibro(viaEuroDopoLibro);
   /* l'offerta accettata dell'utente su QUESTO annuncio: banner e
      totali dei bottoni compra parlano la cifra pattuita */
   const offAcc = offertaAccettataPer(l.id);
@@ -86188,26 +86197,47 @@ function viaEuroOfferta(sats){
 /* il libro, se manca o e' vecchio, si legge in sottofondo e poi si
    ridisegna chi l'ha chiesto. Al piu' un tentativo al minuto: se i relay
    tacciono, la cassa non si ridisegna in tondo. */
+/* ...e se una lettura e' gia' in volo (l'ha aperta la scheda), chi chiede
+   si accoda a quella: il ridisegno arriva lo stesso (26 nov 2026) */
 function viaEuroLibro(poi){
   if (!viaEuroPerMe()) return;
   const fresco = p2pLibro && (Date.now() - p2pLibro.quando) < P2P_LIBRO_FRESCO_MS;
-  if (fresco || Date.now() - viaEuroLibroTentato < 60000) return;
+  if (fresco) return;
+  const dopo = () => { if (typeof poi === 'function') poi(); };
+  if (p2pLettura) { p2pLettura.then(dopo).catch(() => {}); return; }
+  if (Date.now() - viaEuroLibroTentato < 60000) return;
   viaEuroLibroTentato = Date.now();
-  caricaLibroP2P().then(() => { if (typeof poi === 'function') poi(); }).catch(() => {});
+  caricaLibroP2P().then(dopo).catch(() => {});
+}
+/* LA RICERCA IN SILENZIO (26 nov 2026, Andrea dalla prova con Sam: «uno
+   apre il prodotto e senza che se ne accorga gia' cerca dei match: se non
+   li trova non compare neanche il bottone, se li trova si sposta Paga e
+   compare Non hai sats?»). Il libro si legge APRENDO LA SCHEDA, non piu'
+   aprendo la cassa: prima arrivava dopo il primo «Paga», e il tasto
+   compariva solo chiudendo il QR. A libro letto si ridisegnano la cassa
+   e, se e' aperto, il foglio della fattura. */
+let viaEuroSatsQr = 0;       // il totale della fattura nel foglio del QR, 0 = spento
+function viaEuroDopoLibro(){
+  if (acqDati && el('acqCompra')) renderAcquisto();
+  const f = el('paySheet');
+  if (viaEuroSatsQr > 0 && f && f.classList.contains('open')) payViaEuroVista(viaEuroSatsQr);
 }
 function viaEuroTasto(sats, dove){
-  /* ...o chi vende a cifra fissa, a cui chiedere (24 nov 2026) */
-  if (!viaEuroOfferta(sats) && !viaEuroFissiOra(sats).length) return '';
+  /* SOLO CON UN MATCH VERO (26 nov 2026, Andrea: «se non li trova non
+     compare neanche il bottone»): chi vende a cifra fissa non lo accende
+     piu' — la richiesta a loro (24 nov) faceva aspettare minuti senza
+     sapere se arrivava */
+  if (!viaEuroOfferta(sats)) return '';
   viaEuroSats = sats;
   const qr = dove === 'qr';
   return '<button type="button" class="btn orange via-euro-btn" onclick="apriViaEuro(\''
-    + (qr ? 'qr' : 'cassa') + '\')">' + (qr ? 'Non hai sats? Compra da qui' : 'Non hai sats?') + '</button>';
+    + (qr ? 'qr' : 'cassa') + '\')">' + (qr ? 'Non hai sats? Paga in altri modi' : 'Non hai sats?') + '</button>';
 }
 /* accanto a «Paga», nella stessa fila: il bottone di sempre resta
    identico, e senza offerta la cassa e' quella di ieri */
 function viaEuroAccanto(paga, sats){
   const t = sats > 0 ? viaEuroTasto(sats, 'cassa') : '';
-  if (!t) { viaEuroLibro(() => { if (acqDati && el('acqCompra')) renderAcquisto(); }); return paga; }
+  if (!t) { viaEuroLibro(viaEuroDopoLibro); return paga; }
   return '<div class="via-euro-fila">' + paga + t + '</div>';
 }
 /* nel foglio del QR: si accende con la fattura di un ordine del mercatino,
@@ -86215,8 +86245,10 @@ function viaEuroAccanto(paga, sats){
 function payViaEuroVista(sats){
   const b = el('payViaEuro');
   if (!b) return;
-  const si = sats > 0 && (!!viaEuroOfferta(sats) || viaEuroFissiOra(sats).length > 0);
+  viaEuroSatsQr = sats > 0 ? sats : 0;
+  const si = sats > 0 && !!viaEuroOfferta(sats);
   if (si) viaEuroSats = sats;
+  else if (sats > 0) viaEuroLibro(viaEuroDopoLibro);
   b.style.display = si ? '' : 'none';
 }
 /* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
@@ -86228,25 +86260,9 @@ let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in mem
 async function apriViaEuro(dove){
   haptic();
   const o = viaEuroOfferta(viaEuroSats);
-  /* NESSUN MATCH, MA CHI VENDE A CIFRA FISSA (24 nov 2026): si chiede a
-     loro; se una ricerca per questo annuncio e' gia' viva, si riprende */
-  if (!o) {
-    const fissi = viaEuroFissiOra(viaEuroSats);
-    const l = currentListing;
-    if (!viaEuroCerca && l) {
-      const st = await viaEuroStato();
-      const mia = st && st.mia;
-      if (mia && mia.annuncio_id === l.id && (mia.stato === 'chiedo' || mia.stato === 'allargo'))
-        viaEuroCerca = mia;
-    }
-    if (!fissi.length && !viaEuroCerca) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
-    if (dove === 'qr') closeSheet();
-    if (viaEuroCerca) { viaEuroAspetta(); return; }
-    renderViaEuroChiedi(fissi);
-    el('sheetBg').classList.add('open');
-    el('viaEuroSheet').classList.add('open');
-    return;
-  }
+  /* il match e' sparito fra il disegno e il tocco: il tasto si spegne
+     (26 nov 2026: niente piu' richiesta a chi vende a cifra fissa) */
+  if (!o) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
   /* dal foglio del QR: il foglio della fattura si chiude (il suo ordine
      da 15 minuti lo sostituisce il server col deposito lungo) */
   if (dove === 'qr') closeSheet();
@@ -86445,7 +86461,9 @@ function renderViaEuroPasso(){
   const nome = nomeControparteP2P(o, 'chi vende i sats');
   if (passo === 'attesa') {
     if (tit) tit.textContent = '';
-    box.innerHTML = '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>';
+    /* «ORDINE PRESO» e basta (26 nov 2026, Andrea dalla prova con Sam: «dovrebbe
+       dire semplicemente ordine preso e fine») */
+    box.innerHTML = '<div class="via-euro-attesa">Ordine preso</div>';
     return;
   }
   if (passo === 'paga') {
@@ -86525,7 +86543,7 @@ function viaEuroPassoOrdine(p){
   const orma = passo + ':' + p.stato + ':' + (recapitoEuroArrivatoP2P(p) ? 1 : 0);
   const nome = nomeControparteP2P(p, 'chi vende i sats');
   if (passo === 'attesa')
-    return {orma, html: '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>'};
+    return {orma, html: '<div class="via-euro-attesa">Ordine preso</div>'};
   if (passo === 'paga')
     return {orma, html: '<h4>' + esc(viaEuroPasso1(p, nome)) + '</h4>'
       + viaEuroPassi(p, 'viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()')};
@@ -109417,6 +109435,10 @@ function renderNuovoOrdineP2P(){
           + (p2pNuovoFisso ? 'quelli che scrivi tu.' : 'al cambio di quel momento, col tuo premio.') + '</div>'
         : p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
+        /* chi vende sats: la spinta, sempre in vista, al posto del «solo se»
+           (26 nov 2026) — tiene l'id della nota, che il primo tocco svela */
+        : (typeof spintaIntervalloP2P === 'function' && spintaIntervalloP2P())
+        ? '<div class="p2p-spinta-intervallo" id="p2pNuovoNotaDue">' + esc(P2P_SPINTA_INTERVALLO) + '</div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
   });
@@ -111232,6 +111254,18 @@ function apriEuroTabP2P(modo){
   const box = el('p2pEuroCorpo');
   if (box) box.innerHTML = corpoEuroTabP2P(p2pEuroBozza,
     Object.assign(campiNuovoP2P(), {tettoTesto: maxTestoP2P()}), m.unita || segnoValutaTabP2P(), m.nome);
+  /* AL PRIMO TOCCO, IL BANNER (26 nov 2026, Andrea: «quando clicca li'
+     sopra la prima volta gli esce fuori un banner che lo informa»): una
+     volta per telefono, in cima al foglio */
+  if (box && m.nome === 'min' && spintaIntervalloP2P()) {
+    let visto = false;
+    try { visto = localStorage.getItem('p2pSpintaIntervallo') === '1'; } catch(e) {}
+    if (!visto) {
+      box.insertAdjacentHTML('afterbegin',
+        '<div class="p2p-spinta-intervallo in-cima">' + esc(P2P_SPINTA_INTERVALLO) + '</div>');
+      try { localStorage.setItem('p2pSpintaIntervallo', '1'); } catch(e) {}
+    }
+  }
   el('sheetBg').classList.add('open');
   el('p2pEuroSheet').classList.add('open');
 }
@@ -111560,6 +111594,19 @@ function scegliValutaP2P(cod){
    del primo, e una volta sola. Il tocco che la fa scattare e' lo
    stesso che apre la tastiera, quindi un render qui porterebbe via il
    fuoco al campo che si sta per riempire. */
+/* LA SPINTA ALL'INTERVALLO (26 nov 2026, Andrea dalla prova di «Non hai
+   sats?»: chi compra dal mercatino senza sats trova un venditore solo se
+   la sua cifra sta dentro un ordine, e un intervallo la prende quasi
+   sempre — una cifra fissa quasi mai). La vede chi VENDE sats in euro a
+   prezzo di mercato, dove l'intervallo si puo' fare: non a prezzo fisso,
+   non on-chain, non col tabacchino, non in una moneta. Scritta di Andrea. */
+const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.';
+function spintaIntervalloP2P(){
+  if (p2pLato === 'compro' || p2pNuovoFisso) return false;
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return false;
+  if (tabacchinoP2P(p2pNuovoMetodi)) return false;
+  return valutaFoglioP2P() === 'EUR';
+}
 function svelaSecondoImportoP2P(){
   /* a rete on-chain l'importo e' uno solo: il 2-di-3 blocca una cifra.
      Barattozon in «Compra BTC» no (17 nov 2026 sera): la fascia la stringe

@@ -96558,3 +96558,68 @@ IL PREZZO, detto ad Andrea prima: un annuncio col titolo generico («Logitech G9
 PROVATO. `prove_ricerca`: il caso vero (teleruttore con «generazione», «corrente», «di» in descrizione; un generatore nel titolo; un carrello che nomina il generatore in descrizione) → solo il generatore, nella stretta e nel giro largo; una parola solo in descrizione non basta; le paroline fuori dalla domanda, ma una domanda di sole paroline cerca; la regex delle domande ostili ammette il solo filtro `{titolo categoria} :`. CONTROPROVA col `_domanda_fts` di prima: 4 rosse (il teleruttore torna fuori: [21, 20]). `collaudo_ricerca` (server vero): la poltrona che ripete «tastiera» quattro volte in descrizione non esce più (era la prova dei pesi, riscritta), «tastiera meccanica di» trova la Keychron, prezzo e regione rifatti sui collezionabili; controprova rossa col server di prima.
 
 DA GUARDARE. Dopo la promozione, con Andrea: qualche ricerca vera sul telefono. Se un venditore lamenta che il suo annuncio non si trova, è quasi sempre un titolo che non nomina la cosa: si corregge il titolo (o un sinonimo nella sottocategoria).
+## «Non hai sats?» si accende da solo (26 nov 2026)
+
+Dalla prova dal vivo con Alan e Sam (soldi veri, solo moderatori),
+Andrea ha chiesto tre cose.
+- «ORDINE PRESO» E BASTA: dopo la presa, chi paga in euro vedeva
+  «Sto preparando il pagamento…» con l'anello, finche' chi vende non
+  bloccava i sats. Ora vede solo «Ordine preso» («dovrebbe dire
+  semplicemente ordine preso e fine»), nel foglio e nella pagina
+  dell'ordine.
+- IL TASTO ARRIVAVA TARDI: il libro P2P si leggeva aprendo la cassa, e
+  dai relay ci mette qualche secondo. Chi toccava «Paga» prima vedeva
+  «Non hai sats?» solo chiudendo il QR. Adesso il libro si legge
+  APRENDO LA SCHEDA, in silenzio (`openDetail` → `viaEuroLibro`).
+  Chi chiede il libro mentre una lettura e' in volo si accoda a quella.
+  A libro letto `viaEuroDopoLibro` ridisegna la cassa e, se e' aperto,
+  il foglio della fattura (`viaEuroSatsQr`). Mentre cerca si vede solo
+  «Paga»; con un match «Paga» si sposta e compare «Non hai sats?».
+- SOLO CON UN MATCH VERO («se non li trova non compare neanche il
+  bottone»): chi vende a cifra fissa non accende piu' il tasto, e la
+  cassa non chiede piu' a loro (la richiesta del 24 nov faceva
+  aspettare minuti senza sapere se arrivava). Il codice della richiesta
+  resta (server e fogli), ma dalla cassa non si raggiunge piu'.
+STRADA SCARTATA: il tasto sempre acceso con una ricerca di 5 secondi e
+«Non ci sono ordini disponibili» (provata in questo giro e buttata:
+Andrea vuole che il tasto non compaia proprio senza match).
+LE SCELTE DI ANDREA: il bottone resta «Non hai sats?», senza «euro»;
+nel foglio del QR «Non hai sats? Compra da qui» diventa «Non hai
+sats? Paga in altri modi» (testo suo: chi e' di Lugano pagherebbe in
+franchi, e «euro» confonderebbe);
+oggi paga solo gli ordini in euro, e gli USDT sono un cantiere a
+parte, se lo vorra'. Da proporre: spingere chi vende sats a pubblicare
+un INTERVALLO invece di una cifra fissa (testo e incentivo da decidere
+con lui).
+LA SPINTA ALL'INTERVALLO (stesso giorno, frase approvata da Andrea:
+«mettila bene in evidenza», e «quando clicca li' sopra la prima volta
+gli esce fuori un banner»): a chi VENDE sats in euro a prezzo di
+mercato (`spintaIntervalloP2P`: non a prezzo fisso, non on-chain, non
+col tabacchino, non in una moneta) sotto l'importo c'e' una scatola
+arancio, sempre in vista, con `P2P_SPINTA_INTERVALLO`. Prende il posto
+del «💡 Tocca il secondo campo solo se vuoi creare un ordine a
+intervallo», che diceva il contrario della spinta (per chi compra sats
+resta). Al primo tocco dell'importo la stessa frase sta in cima al
+foglio dell'importo, una volta per telefono (`localStorage`
+`p2pSpintaIntervallo`). Perche': chi paga dal mercatino senza sats
+trova un venditore solo se la sua cifra cade dentro un ordine, e un
+intervallo la prende quasi sempre. L'incentivo vero (sconto, premio)
+resta da decidere.
+«📦 APRI L'ORDINE» SU OGNI «HAI VENDUTO» (stesso giorno, Andrea dopo la
+prova, su uno scambio a mano: «non c'e' nessun tasto che mi porta
+sull'ordine»): dal 17 nov (spedisci-entro) il tasto stava solo sul ramo
+con la data «Spedisci entro…», e gli altri erano rimasti come prima per
+prudenza, non per una scelta. Ora `_incassa_ordine` lo manda sempre,
+tranne all'abbonamento, che ha i suoi avvisi. Stessa etichetta
+(`BOTTONE_ORDINE_VENDUTO`), nessuna scritta nuova.
+PROVATO: `prove_non_hai_sats` e `prove_chiedi_al_venditore` (il tasto
+solo col match, niente richiesta dalla cassa, la lettura dalla scheda
+e il ridisegno, la spinta, il tasto in «Hai venduto»); suite severa
+31806 verdi (2 saltate d'ambiente, nostr-tools); collaudi 175 verdi
+piu' `collaudo_spedisci_entro` emendato (aspettava NESSUN tasto sul
+ritiro e a leva 0: ora c'e') e rigirato verde da solo. Il giro dei
+collaudi e' partito prima della guardia `typeof spintaIntervalloP2P`
+nel foglio «Pubblica» (aggiunta per i banchi node, nel browser la
+funzione c'e' sempre).
+DA GUARDARE: dal telefono di Sam, che il tasto compaia aprendo la
+scheda senza passare dal QR.

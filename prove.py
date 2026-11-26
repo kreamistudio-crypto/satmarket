@@ -20333,7 +20333,8 @@ def prove_notifica_fail_open():
 
     tentativi = []
 
-    async def _trasporto_sempre_rotto(tg_id, testo):
+    # (26 nov 2026) col tasto: «Hai venduto» porta sempre «📦 Apri l'ordine»
+    async def _trasporto_sempre_rotto(tg_id, testo, *a, **k):
         tentativi.append(tg_id)
         raise Cascata("ConnectTimeout: api.telegram.org")
 
@@ -20371,6 +20372,9 @@ def prove_notifica_fail_open():
               # loro collaudo in `collaudo_scorta_codici`: qui tacciono
               "scorta_per_ordine": lambda o: False,
               "WEB_PUSH_ATTIVO": False,
+              # (26 nov 2026) «📦 Apri l'ordine» su ogni «Hai venduto»
+              "BOTTONE_ORDINE_VENDUTO": "📦 Apri l'ordine",
+              "URL_PUBBLICO": "https://barattolo.store",
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
     gruppo_admin_spento(catena)
@@ -41013,6 +41017,9 @@ def prove_ricevuta_compratore():
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
                # pezzo ne eredita le dipendenze
+               # (26 nov 2026) «📦 Apri l'ordine» su ogni «Hai venduto»
+               "BOTTONE_ORDINE_VENDUTO": "📦 Apri l'ordine",
+               "URL_PUBBLICO": "https://barattolo.store",
                **{k: _reg[k] for k in ("registra_uscita_negozio",
                                        "_coda_magazzino")}}
         exec("async " + pezzo("_incassa_ordine"), amb)
@@ -114773,7 +114780,7 @@ def prove_connettori_registro():
     prova("...e la coda arriva in fondo al messaggio del venditore",
           True,
           0 <= inc.find("_coda_magazzino(magazzino)")
-          < inc.find('notifica(o["venditore_id"], msg)'))
+          < inc.find('notifica(o["venditore_id"], msg,'))
     rim = codice(pezzo("_rimborsa_compratore"))
     # EMENDATA (13 ott 2026, cantiere annullata-pagata): il ramo della
     # fattura annullata e pagata ha un commit suo PRIMA — esce senza
@@ -215738,9 +215745,10 @@ def prove_non_hai_sats():
     prova("il telefono: solo senza Lightning address ne' wallet on-chain, con la "
           "leva", True,
           "!!myViaEuro && !myLnAddress && !myOnchainIncasso" in per_me)
-    prova("i due tasti: arancioni, «Non hai sats?» e «Non hai sats? Compra da "
-          "qui», mai «paga in euro»", True,
-          "'Non hai sats? Compra da qui' : 'Non hai sats?'" in mini
+    prova("i due tasti: arancioni, «Non hai sats?» e «Non hai sats? Paga in "
+          "altri modi» (26 nov 2026, Andrea: niente euro, chi e' di Lugano "
+          "paga in franchi), mai «paga in euro»", True,
+          "'Non hai sats? Paga in altri modi' : 'Non hai sats?'" in mini
           and 'id="payViaEuro" class="btn orange via-euro-btn"' in mini
           and "paga in euro" not in _fn_js(mini, "function viaEuroTasto(sats, dove){").lower())
     i_qr = mini.index('<div class="qr" id="payQr"></div>')
@@ -215776,7 +215784,7 @@ def prove_non_hai_sats():
           "controllo, la verifica), e niente annullo dell'ordine a meta'", True,
           "viaEuroScambioDellOrdine(o.id)" in pdp
           and "const v = viaEuroPassoOrdine(ve);" in pdp
-          and "Sto preparando il pagamento…" in pvo
+          and "'<div class=\"via-euro-attesa\">Ordine preso</div>'" in pvo
           and "viaEuroPassi(p, 'viaEuroSeguo=" in pvo and "viaEuroPasso1(p, nome)" in pvo
           and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
           and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
@@ -215861,10 +215869,10 @@ console.log(JSON.stringify(r));
 
     # --- i passi dopo «Continua» (secondo giro) ------------------------------
     rp = _fn_js(mini, "function renderViaEuroPasso(){")
-    prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
+    prova("le scritte approvate: «Ordine preso» (26 nov 2026), «Manda N € a "
           "…», «Ho inviato gli euro», «… sta controllando il pagamento», «Puoi chiudere "
           "l'app, ti avvisiamo noi.»", True,
-          "Sto preparando il pagamento…" in rp and "viaEuroPasso1(o, nome)" in rp
+          "'<div class=\"via-euro-attesa\">Ordine preso</div>'" in rp and "viaEuroPasso1(o, nome)" in rp
           and "viaEuroPassi(o, 'viaEuroHoPagato()')" in rp and "' sta controllando il pagamento'" in rp
           and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
     prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
@@ -216201,13 +216209,48 @@ def prove_chiedi_al_venditore():
           and "chiesto<?\",\n            (*VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)" in srv)
 
     # --- il telefono --------------------------------------------------------
-    prova("il tasto si accende anche con solo chi vende a cifra fissa", True,
-          "if (!viaEuroOfferta(sats) && !viaEuroFissiOra(sats).length) return '';" in mini
-          and "(!!viaEuroOfferta(sats) || viaEuroFissiOra(sats).length > 0)" in mini)
+    # 26 nov 2026 (Andrea dalla prova con Sam): il tasto SOLO con un match
+    # vero; chi vende a cifra fissa non lo accende piu', e la cassa non
+    # chiede piu' a loro
+    prova("il tasto si accende solo con un match vero, mai per chi vende "
+          "a cifra fissa (26 nov 2026)", True,
+          "  if (!viaEuroOfferta(sats)) return '';" in mini
+          and "const si = sats > 0 && !!viaEuroOfferta(sats);" in mini
+          and "viaEuroFissiOra(sats).length" not in mini)
     ap = _fn_js(mini, "async function apriViaEuro(dove){")
-    prova("...e il foglio chiede, o riprende la ricerca viva per l'annuncio",
-          True, "renderViaEuroChiedi(fissi);" in ap and "viaEuroAspetta(); return;" in ap
-          and "mia.annuncio_id === l.id" in ap)
+    prova("...e senza match al tocco il tasto si spegne, niente richiesta "
+          "ai venditori dalla cassa", True,
+          "if (!o) { payViaEuroVista(0);" in ap
+          and "renderViaEuroChiedi" not in ap)
+    od = _fn_js(mini, "function openDetail(id){")
+    lb = _fn_js(mini, "function viaEuroLibro(poi){")
+    dl = _fn_js(mini, "function viaEuroDopoLibro(){")
+    prova("la ricerca in silenzio: il libro si legge aprendo la scheda, chi "
+          "chiede si accoda alla lettura in volo, e a libro letto si "
+          "ridisegnano cassa e foglio del QR (26 nov 2026)", True,
+          "if (!mio && typeof viaEuroLibro === 'function') viaEuroLibro(viaEuroDopoLibro);" in od
+          and "if (p2pLettura) { p2pLettura.then(dopo).catch(() => {}); return; }" in lb
+          and "if (acqDati && el('acqCompra')) renderAcquisto();" in dl
+          and "payViaEuroVista(viaEuroSatsQr)" in dl
+          and "viaEuroSatsQr = sats > 0 ? sats : 0;" in mini)
+    inc_v = pezzo("_incassa_ordine")
+    prova("«Hai venduto» porta SEMPRE «📦 Apri l'ordine», anche a mano e "
+          "senza data (26 nov 2026); l'abbonamento no", True,
+          "if not canale_abbo:\n        await notifica(o[\"venditore_id\"], msg,\n"
+          "                       (BOTTONE_ORDINE_VENDUTO," in inc_v
+          and "elif entro:\n        await notifica(o[\"venditore_id\"]" not in inc_v)
+    sp = _fn_js(mini, "function spintaIntervalloP2P(){")
+    ae = _fn_js(mini, "function apriEuroTabP2P(modo){")
+    prova("la spinta all'intervallo: la frase di Andrea, solo a chi vende "
+          "sats in euro a prezzo di mercato, sempre in vista sotto "
+          "l'importo e in cima al foglio al primo tocco (26 nov 2026)", True,
+          "const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo "
+          "ordine viene preso molto più spesso.';" in mini
+          and "if (p2pLato === 'compro' || p2pNuovoFisso) return false;" in sp
+          and "return valutaFoglioP2P() === 'EUR';" in sp
+          and "'<div class=\"p2p-spinta-intervallo\" id=\"p2pNuovoNotaDue\">' + esc(P2P_SPINTA_INTERVALLO)" in mini
+          and "m.nome === 'min' && spintaIntervalloP2P()" in ae
+          and "localStorage.setItem('p2pSpintaIntervallo', '1')" in ae)
     asp = _fn_js(mini, "function viaEuroAspetta(){")
     prova("il foglio che aspetta va avanti da solo quando il match arriva nel "
           "libro", True, "if (viaEuroOfferta(viaEuroSats)) {" in asp
