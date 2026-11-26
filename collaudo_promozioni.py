@@ -665,6 +665,58 @@ def main():
                     [t for tg, t in AVVISI if tg == 3]))
     server.PROMO_EVIDENZA_POSTI = 8
 
+    # IL BANNER REGALATO (26 nov 2026, Andrea: «Glielo regaliamo», per
+    # BitcoinLabs): la porta della fattura, aperta dal moderatore, e il
+    # libro mastro che non suona
+    print("\n[/promossi banner, la porta regalata]")
+    utente(7, "dd77")
+    pagamenti = uno("SELECT COUNT(*) FROM pagamenti")[0]
+    AVVISI.clear(); ADMIN.clear()
+    asyncio.run(_regala(1, "/promossi banner dd77"))
+    prova("chi non e' admin non regala niente", (0, []),
+          (uno("SELECT banner_sbloccato_il FROM utenti WHERE tg_id=7")[0],
+           [t for tg, t in AVVISI if tg == 7]))
+    asyncio.run(_regala(999, "/promossi banner https://barattolo.store/"
+                             "negozio/dd77"))
+    porta = uno("SELECT banner_sbloccato_il FROM utenti WHERE tg_id=7")[0]
+    prova("dal link del negozio: porta aperta, senza fattura", (True, pagamenti),
+          (abs(porta - adesso) < 120, uno("SELECT COUNT(*) FROM pagamenti")[0]))
+    prova("...a chi vende arriva il regalo, e i moderatori lo sanno",
+          ([server.MSG_BANNER_REGALATO], True),
+          ([t for tg, t in AVVISI if tg == 7],
+           any("/promossi banner" in x[0] for x in ADMIN)))
+    prova("...la porta si chiede davvero", True,
+          server.banner_porta_aperta(porta))
+    con = db()
+    try:
+        suona = [nome for nome, _p, sql in server.CONTROLLI_LIBRO_MASTRO
+                 if nome == "porta del banner aperta senza pagamento"
+                 and any(r[0] == 7 for r in con.execute(sql).fetchall())]
+        con.execute("UPDATE utenti SET banner_sbloccato_il=? WHERE tg_id=3",
+                    (adesso,))
+        con.commit()
+        aperta_da_sola = [r[0] for nome, _p, sql in
+                          server.CONTROLLI_LIBRO_MASTRO
+                          if nome == "porta del banner aperta senza pagamento"
+                          for r in con.execute(sql).fetchall()]
+        con.execute("UPDATE utenti SET banner_sbloccato_il=0 WHERE tg_id=3")
+        con.commit()
+    finally:
+        con.close()
+    prova("il libro mastro non suona sulla porta regalata...", [], suona)
+    prova("...e suona ancora su una porta aperta da sola", True,
+          3 in aperta_da_sola and 7 not in aperta_da_sola)
+    AVVISI.clear()
+    asyncio.run(_regala(999, "/promossi banner dd77"))
+    prova("ridata: la data resta quella del primo regalo, nessun avviso",
+          (porta, [], True),
+          (uno("SELECT banner_sbloccato_il FROM utenti WHERE tg_id=7")[0],
+           [t for tg, t in AVVISI if tg == 7],
+           "già il banner sbloccato" in (AVVISI[-1][1] if AVVISI else "")))
+    asyncio.run(_regala(999, "/promossi banner zz99"))
+    prova("un codice che non c'e': lo dice", True,
+          "Nessun negozio" in (AVVISI[-1][1] if AVVISI else ""))
+
     print(f"\n=== {VERDI[0]} verdi, {ROSSE[0]} rotte ===")
     return 1 if ROSSE[0] else 0
 

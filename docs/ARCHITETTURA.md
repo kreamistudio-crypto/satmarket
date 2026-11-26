@@ -34545,6 +34545,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   premio non parte da solo. `/promossi premio` è `/promossi evidenza`
   a 7 giorni fissi, e a premio dato manda a chi vende `zap_testo_premio`.
   Fail-open: un intoppo è «⚠️ zap: grazie non partito» nel journal.
+- IL BANNER REGALATO (26 nov 2026, BitcoinLabs; Andrea sulla scheda:
+  «Glielo regaliamo»). `/promossi banner <codice o link del negozio>`
+  apre la porta del banner (`banner_sbloccato_il`, la stessa che apre la
+  fattura di `_incassa_sblocco`) senza fattura: `_regala_banner`. Si
+  regala la PORTA, non l'insegna: il banner lo carica chi vende e lo
+  approva un moderatore, come sempre. Il segno del regalo sta in
+  `impostazioni` (`banner_regalato:<tg_id>` = «data da admin»), nello
+  STESSO commit della porta, e il controllo del libro mastro «porta del
+  banner aperta senza pagamento» (e il suo gemello 17e.2 in
+  query_libro_mastro.sql) lo salta. Una porta già aperta non si
+  riscrive. A chi vende `MSG_BANNER_REGALATO`. LIMITE NOTO: il segno è
+  per tg_id, quindi in una fusione Nostr→Telegram la porta regalata
+  alla metà Nostr passa di là senza il segno, e il libro mastro suona:
+  si regala alla metà che resta (Telegram).
 - LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore; il
   perché in CANTIERI, «La mancia al venditore»). Un blocco suo in
   server.py, subito DOPO quello degli zap (ne usa `zap_leggi_bolt11`

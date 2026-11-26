@@ -25446,6 +25446,51 @@ def _id_annuncio(chi: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+MSG_BANNER_REGALATO = (
+    "🖼 <b>Un regalo per il tuo negozio!</b> Ti abbiamo sbloccato il "
+    "banner del negozio, gratis.\n\nOra puoi chiederlo dal Profilo, in "
+    "«🖼 Banner del negozio». Lo guarderà un moderatore prima che vada "
+    "in vetrina.")
+
+
+def _regala_banner(con, chi: str, admin_id: int, adesso: int):
+    """La porta del banner regalata dal moderatore (`/promossi banner`).
+    Torna (fatto, testo per il moderatore, tg_id da avvisare o 0).
+    Il negozio si cerca come nel collega dal pannello: col codice o col
+    nome a scelta. La porta GIA' aperta non si riscrive (la data e'
+    quella del primo sblocco, come in `_incassa_sblocco`), e il segno
+    del regalo e la porta vanno nello STESSO commit: una porta senza
+    il segno farebbe suonare il libro mastro."""
+    cod = _codice_da_link_negozio(chi)
+    u = con.execute(
+        "SELECT tg_id, nome, negozio, banner_sbloccato_il FROM utenti "
+        "WHERE negozio<>'' AND (negozio=? OR (negozio_slug=? COLLATE "
+        "NOCASE AND negozio_slug!='')) LIMIT 1", (cod, cod)).fetchone() \
+        if cod else None
+    if not u:
+        return 0, (f"Nessun negozio col codice <b>{html.escape(chi)}</b>."), 0
+    nome = html.escape(u["nome"] or "")
+    neg = html.escape(u["negozio"])
+    if int(u["banner_sbloccato_il"] or 0):
+        return 0, (f"Il negozio <b>{nome}</b> (<code>{neg}</code>) ha già "
+                   "il banner sbloccato."), 0
+    con.execute("INSERT INTO impostazioni(chiave, valore) VALUES(?,?) "
+                "ON CONFLICT(chiave) DO UPDATE SET valore=excluded.valore",
+                (f"banner_regalato:{int(u['tg_id'])}",
+                 f"{adesso} da {int(admin_id)}"))
+    cur = con.execute("UPDATE utenti SET banner_sbloccato_il=? "
+                      "WHERE tg_id=? AND banner_sbloccato_il=0",
+                      (adesso, u["tg_id"]))
+    if cur.rowcount != 1:
+        con.rollback()
+        return 0, (f"Il negozio <b>{nome}</b> (<code>{neg}</code>) ha già "
+                   "il banner sbloccato."), 0
+    con.commit()
+    return 1, (f"✅ Banner regalato a <b>{nome}</b> (<code>{neg}</code>): "
+               "ora può chiederlo dal Profilo. Quando lo carica, ti arriva "
+               "da approvare."), int(u["tg_id"])
+
+
 async def comando_promossi(mittente: dict, testo: str):
     """`/promossi` — le promozioni a pagamento viste dal moderatore (23
     nov 2026). Solo admin. Tre forme:
@@ -25459,6 +25504,16 @@ async def comando_promossi(mittente: dict, testo: str):
       `/promossi premio <id>`        il premio di uno zap generoso (25
                                      nov 2026): 7 giorni come sopra, e
                                      a chi vende arriva il grazie
+      `/promossi banner <codice>`    regala lo sblocco del banner a un
+                                     negozio (26 nov 2026, BitcoinLabs)
+    IL BANNER REGALATO (26 nov 2026, Andrea sulla scheda: «Glielo
+    regaliamo»): apre la stessa porta che apre la fattura
+    (`banner_sbloccato_il`), senza fattura. Il banner poi lo carica chi
+    vende e lo approva un moderatore, come sempre: si regala la PORTA,
+    non l'insegna. Il regalo si scrive in `impostazioni`
+    (`banner_regalato:<tg_id>`), e il libro mastro lo legge: senza, il
+    controllo «porta del banner aperta senza pagamento» suonerebbe ogni
+    giorno su un regalo deciso.
     L'EVIDENZA REGALATA (24 nov 2026, Andrea: «dobbiamo mettere anche
     delle card in evidenza, in maniera gratuita… decidiamo noi chi
     mettere»): e' la stessa di quella pagata — la data che si somma, il
@@ -25478,6 +25533,7 @@ async def comando_promossi(mittente: dict, testo: str):
     chi = pezzi[2].strip() if len(pezzi) > 2 else ""
     adesso = int(time.time())
     premiato = None
+    regalato = 0
     con = db()
     try:
         if cosa == "negozio" and chi:
@@ -25536,6 +25592,9 @@ async def comando_promossi(mittente: dict, testo: str):
                     if cosa == "premio":
                         premiato = (int(a["venditore_id"] or 0),
                                     a["titolo"] or "")
+        elif cosa == "banner" and chi:
+            fatto, testo_out, regalato = _regala_banner(con, chi, chat,
+                                                        adesso)
         elif cosa == "annuncio" and chi.isdigit():
             cur = con.execute("UPDATE annunci SET evidenza_fino=0 "
                               "WHERE id=? AND evidenza_fino>0", (int(chi),))
@@ -25580,7 +25639,9 @@ async def comando_promossi(mittente: dict, testo: str):
                       "link dell'annuncio)",
                       "<code>/promossi premio ID</code> — il premio di uno "
                       "zap generoso: 7 giorni In evidenza e il grazie a chi "
-                      "vende", "",
+                      "vende",
+                      "<code>/promossi banner CODICE</code> — regala lo "
+                      "sblocco del banner a un negozio", "",
                       "Togliere non rimborsa: i sats si restituiscono a mano "
                       "dal pannello, come per il banner."]
             testo_out = "\n".join(righe)
@@ -25591,6 +25652,8 @@ async def comando_promossi(mittente: dict, testo: str):
                              argomento="riepiloghi")
     if premiato and premiato[0]:
         await notifica(premiato[0], zap_testo_premio(premiato[1]))
+    if regalato:
+        await notifica(regalato, MSG_BANNER_REGALATO)
     return await bot_api("sendMessage", {"chat_id": chat, "text": testo_out,
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
@@ -112495,7 +112558,11 @@ CONTROLLI_LIBRO_MASTRO = (
      "SELECT u.tg_id FROM utenti u WHERE COALESCE(u.banner_sbloccato_il,0)"
      ">=1789603200 "
      "AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id=u.tg_id "
-     "AND p.motivo='banner' AND p.stato IN ('pagato','rimborsato'))"),
+     "AND p.motivo='banner' AND p.stato IN ('pagato','rimborsato')) "
+     # (26 nov 2026) ...ne' la porta regalata dal moderatore con
+     # `/promossi banner`: il segno sta in `impostazioni`
+     "AND NOT EXISTS (SELECT 1 FROM impostazioni i "
+     "WHERE i.chiave='banner_regalato:'||u.tg_id)"),
     ("sblocco pagato due volte",
      "due pagamenti riusciti per la stessa porta: qualcuno ha pagato "
      "due volte una cosa che si compra una volta sola",
