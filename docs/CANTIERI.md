@@ -96623,3 +96623,45 @@ nel foglio «Pubblica» (aggiunta per i banchi node, nel browser la
 funzione c'e' sempre).
 DA GUARDARE: dal telefono di Sam, che il tasto compaia aprendo la
 scheda senza passare dal QR.
+
+## «Non hai sats?» anche in franchi (26 nov 2026)
+
+Andrea, alle 12:05: «integriamo i franchi... se si capisce che sei in
+Svizzera dovrebbe proporti in automatico franchi, se sei in Italia
+euro. Non so se si può fare senza GPS». Poi: «Sì, perfetto. Ma non
+mettere il tetto comunque».
+- LA VALUTA DAL FUSO DEL TELEFONO (`viaEuroValuta`): Europe/Zurich o
+  Europe/Vaduz = franchi, il resto euro. Niente GPS, niente permessi:
+  e' lo stesso `Intl` che legge gia' la pausa degli ordini P2P. Vince la
+  scelta a mano nel profilo («💱 Paga senza sats»: Automatica / Euro /
+  Franchi), salvata SOLO su quel telefono (`localStorage`
+  `viaEuroValuta`): e' una comodita', non un dato da tenere sul server.
+  Scritte approvate da Andrea alle 12:34 («Ottimo, si', va bene»).
+  Senza il P2P in franchi per quella persona (`chfVistoP2P`) e' sempre
+  euro.
+- L'OFFERTA (`viaEuroScelta`, due parametri in piu' con l'euro di
+  serie): solo ordini con `fiat` CHF, solo TWINT e Revolut
+  (`VIA_EURO_METODI_CHF`). Il bonifico svizzero e' scartato perche' puo'
+  metterci ore, e il deposito dell'ordine non aspetta. Il cambio e'
+  `chfPerSat` (la stessa lettura del P2P in CHF).
+- NIENTE TETTO IN FRANCHI (Andrea): il tetto in euro (`VIA_EURO_MAX_EURO`)
+  vale solo per gli euro. Resta il tetto in sats del giroconto
+  (`GIROCONTO_TETTO_SATS`, 150.000 di serie): oltre quello la riserva
+  non salda, quindi il telefono (`via_euro_tetto_sats` in /api/me) non
+  propone quel che il server rifiuterebbe. Vale anche per gli euro.
+- LE PAROLE: quelle gia' approvate del P2P in CHF (`paroleUsdtP2P` nel
+  telefono, `p2p_chf_frase` nel bot). «Manda 43 CHF ad Alan», «Ho
+  inviato i franchi», «rischi di perdere i franchi». Nel telefono passano
+  solo i TESTI, mai l'HTML (`viaEuroDi`): il traduttore cambierebbe
+  «via-euro» nelle classi. Nel bot il recapito e gli avvisi degli eventi
+  si traducevano gia' dopo la frase di «Non hai sats?»; il promemoria
+  degli euro no, perche' il traduttore passava prima. Ora passa anche
+  dopo.
+STRADE SCARTATE: l'IP con una banca dati di paesi (un dato in piu' sul
+server, e l'IP di una VPN mente); la lingua di Telegram (dice «it», non
+il paese); la scelta salvata sul server.
+PROVATO: `prove_non_hai_sats` (la scelta in CHF in node, la valuta dal
+fuso e dalla scelta in node, le parole, il tetto, il profilo, il
+traduttore del promemoria), suite severa e collaudi.
+DA GUARDARE: la prova vera in franchi con Alan (TWINT o Revolut),
+col P2P in franchi acceso per i due account in produzione.

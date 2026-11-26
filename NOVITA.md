@@ -1012,3 +1012,9 @@ frase: Quando vendi sats nel P2P, sotto l'importo adesso trovi in evidenza: «Co
 dove: P2P → Vendi BTC → Pubblica ordine → l'importo (prezzo di mercato, in euro).
 leva: nessuna
 pubblico: no
+
+## 2026-11-26 · non-hai-sats-franchi
+frase: «Non hai sats?» funziona anche in franchi svizzeri: se il telefono è in Svizzera, l'app cerca chi vende sats in CHF e paghi con TWINT o Revolut. Nel profilo, in «💱 Paga senza sats», scegli Automatica, Euro o Franchi.
+dove: la cassa di un oggetto → «Non hai sats?»; Profilo → Incassi e pagamenti → «💱 Paga senza sats».
+leva: VIA_EURO_SOLO_ADMIN (oggi solo moderatori) e il P2P in franchi (P2P_CHF_ATTIVO)
+pubblico: no

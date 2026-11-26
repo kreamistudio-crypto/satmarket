@@ -17938,6 +17938,14 @@ document.getElementById('cartello')?.remove();</script>
         <button class="acc-h" onclick="toggleAcc('accLnAddress')"><span class="em">⚡</span>Lightning address<span class="fr">▾</span></button>
         <div class="acc-b"><div id="lnAddrBlocco"></div></div>
       </div>
+      <!-- 💱 PAGA SENZA SATS (26 nov 2026, i franchi): la valuta di «Non hai
+           sats?», automatica dal fuso del telefono o scelta a mano. Solo a
+           chi la porta la vede e il P2P in franchi pure
+           (`renderViaEuroValutaProfilo`) -->
+      <div class="acc" id="accViaEuroValuta" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accViaEuroValuta')"><span class="em">💱</span>Paga senza sats<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="viaEuroValutaBlocco"></div></div>
+      </div>
 
       <!-- 📥 COME RICEVI (9 nov 2026 sera, Andrea: «perché mi hai messo
            tutto nella sezione onchain?», scelta sulla carta «Voce nuova
@@ -47788,6 +47796,7 @@ function renderProfilo(){
   if (el('profiloTutorial')) el('profiloTutorial').style.display =
     hintAttivi() ? '' : 'none';
   renderLnAddress();
+  if (typeof renderViaEuroValutaProfilo === 'function') renderViaEuroValutaProfilo();
   renderLivello();
   renderInviti();
   renderDistintivi();
@@ -86114,6 +86123,7 @@ function apriGuidaWallet(scopo){
    riceve sempre sats, gli euro vanno a chi vende sats nel P2P. */
 let myViaEuro = false;      // il cancello, da /api/me
 let myViaEuroMax = 0;       // il tetto in euro, da /api/me (100)
+let myViaEuroTettoSats = 0; // il tetto in sats del giroconto, da /api/me (0 = non detto)
 let viaEuroSats = 0;        // il totale dell'ordine dell'ultima porta accesa
 let viaEuroLibroTentato = 0;
 /* i metodi di chi compra senza sats: i VELOCI in euro (25 nov 2026,
@@ -86123,6 +86133,60 @@ let viaEuroLibroTentato = 0;
    sera, Andrea: «leva PayPal»): chi paga puo' contestare settimane dopo
    e farsi ridare i soldi, coi sats gia' partiti. */
 const VIA_EURO_METODI = ['SEPA Instant', 'Satispay', 'Revolut'];
+/* I FRANCHI (26 nov 2026, Andrea: «chi e' di Lugano paga in franchi»):
+   chi ha il telefono in Svizzera compra da chi vende sats in CHF. Solo
+   TWINT e Revolut, istantanei (il bonifico svizzero puo' metterci ore, e
+   il deposito dell'ordine non aspetta). NIENTE TETTO IN FRANCHI (Andrea):
+   resta solo quello in sats del giroconto, sotto il quale la riserva paga.
+   LA VALUTA LA DICE IL FUSO DEL TELEFONO (Zurigo o Vaduz = franchi), senza
+   GPS ne' permessi, o la scelta a mano nel profilo (`viaEuroValutaScelta`,
+   solo su questo telefono). I franchi solo a chi il P2P in CHF lo vede. */
+const VIA_EURO_METODI_CHF = ['TWINT', 'Revolut'];
+const VIA_EURO_FUSI_CHF = ['Europe/Zurich', 'Europe/Vaduz'];
+function viaEuroValutaScelta(){
+  try { const v = localStorage.getItem('viaEuroValuta') || ''; return (v === 'EUR' || v === 'CHF') ? v : ''; }
+  catch(e) { return ''; }
+}
+function viaEuroValuta(){
+  if (!(typeof chfVistoP2P === 'function' && chfVistoP2P())) return 'EUR';
+  const scelta = viaEuroValutaScelta();
+  if (scelta) return scelta;
+  let fuso = '';
+  try { fuso = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e) {}
+  return VIA_EURO_FUSI_CHF.indexOf(fuso) >= 0 ? 'CHF' : 'EUR';
+}
+/* LA SCELTA NEL PROFILO: Automatica / Euro / Franchi, solo su questo
+   telefono (scritte da approvare con Andrea) */
+function renderViaEuroValutaProfilo(){
+  const acc = el('accViaEuroValuta'), box = el('viaEuroValutaBlocco');
+  if (!acc || !box) return;
+  const si = viaEuroPerMe() && typeof chfVistoP2P === 'function' && chfVistoP2P();
+  acc.style.display = si ? '' : 'none';
+  if (typeof aggiornaGruppiProfilo === 'function') aggiornaGruppiProfilo();
+  if (!si) return;
+  const scelta = viaEuroValutaScelta();
+  const tasto = (v, nome) => '<button type="button" class="btn ' + (scelta === v ? 'orange' : 'ghost')
+    + '" onclick="sceltaViaEuroValuta(\'' + v + '\')">' + nome + '</button>';
+  box.innerHTML = '<div class="via-euro-metodi">' + tasto('', 'Automatica') + tasto('EUR', 'Euro')
+    + tasto('CHF', 'Franchi') + '</div>'
+    + '<div class="hint">Automatica: franchi se il telefono è in Svizzera, altrimenti euro.</div>';
+}
+function sceltaViaEuroValuta(v){
+  haptic();
+  try { if (v) localStorage.setItem('viaEuroValuta', v); else localStorage.removeItem('viaEuroValuta'); } catch(e) {}
+  renderViaEuroValutaProfilo();
+}
+/* quanti euro (o franchi) vale un sat, per la valuta di «Non hai sats?» */
+function viaEuroPerSat(valuta){
+  if (valuta === 'CHF') return (typeof chfPerSat === 'number' && chfPerSat > 0) ? chfPerSat : 0;
+  return (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
+}
+/* le parole di un testo (mai HTML: «via-euro» nelle classi) nella valuta
+   dello scambio: in franchi, quelle gia' approvate del P2P in CHF */
+function viaEuroDi(o, testo){
+  return (o && String(o.fiat || '').toUpperCase() === 'CHF' && typeof paroleUsdtP2P === 'function')
+    ? paroleUsdtP2P(o, testo) : testo;
+}
 /* i metodi che chi compra ha detto di NON avere («Non ho Revolut»): solo
    in memoria, finche' l'app resta aperta */
 let viaEuroNonHo = [];
@@ -86143,17 +86207,20 @@ function viaEuroPerMe(){
    euro / perSat × (1 − premio)), all'indietro, con meta' commissione a
    chi compra (`nettoLatoP2P`). A parita' di cifra, il piu' recente: e'
    piu' probabile che sia al telefono. null = niente da proporre. */
-function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo){
+function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk){
   const no = Array.isArray(nonHo) ? nonHo : [];
+  /* (26 nov 2026) anche in franchi: la valuta dell'ordine e i suoi metodi */
+  const fiat = valuta || 'EUR';
+  const ok = Array.isArray(metodiOk) ? metodiOk : VIA_EURO_METODI;
   if (!(sats > 0) || !(perSat > 0) || !(fee >= 0) || fee >= 2 || !Array.isArray(ordini)) return null;
   const lordo = Math.ceil(sats / (1 - fee / 2)) + 1;
   let meglio = null;
   for (const o of ordini) {
-    if (!o || o.lato !== 'sell' || o.fiat !== 'EUR') continue;
+    if (!o || o.lato !== 'sell' || o.fiat !== fiat) continue;
     if (o.stato && o.stato !== 'pending') continue;
     if (o.sats > 0 || o.coin) continue;
     if (miei && miei[o.id]) continue;
-    const metodi = (o.metodi || []).filter(m => VIA_EURO_METODI.indexOf(m) >= 0 && no.indexOf(m) < 0);
+    const metodi = (o.metodi || []).filter(m => ok.indexOf(m) >= 0 && no.indexOf(m) < 0);
     if (!metodi.length) continue;
     const quota = 1 - (Number(o.premium) || 0) / 100;
     if (!(quota > 0)) continue;
@@ -86164,7 +86231,7 @@ function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo){
     const cifra = o.euroMax > 0 ? euro : o.euro;
     if (!meglio || cifra < meglio.euro
         || (cifra === meglio.euro && (o.creato || 0) > meglio.creato))
-      meglio = {id: o.id, euro: cifra, metodi: metodi,
+      meglio = {id: o.id, euro: cifra, metodi: metodi, fiat: fiat,
                 premium: Number(o.premium) || 0, creato: o.creato || 0,
                 intervallo: o.euroMax > 0};
   }
@@ -86187,11 +86254,17 @@ function viaEuroOrdiniPrendibili(){
 /* l'offerta di adesso per un ordine da `sats`, col libro che c'e' */
 function viaEuroOfferta(sats){
   if (!viaEuroPerMe() || !p2pLibro || !(sats > 0)) return null;
-  const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
+  /* oltre il tetto del giroconto la riserva non salda: non si propone */
+  if (myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats) return null;
+  const valuta = viaEuroValuta();
+  const perSat = viaEuroPerSat(valuta);
   const fee = commissioneVivaP2P();
   if (fee === null) return null;
-  const o = viaEuroScelta(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo);
-  if (!o || !(myViaEuroMax > 0) || o.euro > myViaEuroMax) return null;
+  const o = viaEuroScelta(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo,
+                          valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI);
+  if (!o) return null;
+  /* il tetto in euro vale per gli euro; in franchi non c'e' (Andrea) */
+  if (valuta === 'EUR' && (!(myViaEuroMax > 0) || o.euro > myViaEuroMax)) return null;
   return o;
 }
 /* il libro, se manca o e' vecchio, si legge in sottofondo e poi si
@@ -86254,7 +86327,7 @@ function payViaEuroVista(sats){
 /* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
    euro interi), e sotto in piccolo da cosa e' fatto. Il metodo si
    sceglie solo se l'offerta ne ha piu' d'uno fra quelli decisi. */
-const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut'};
+const VIA_EURO_NOMI = {'SEPA Instant': 'Bonifico istantaneo', 'Satispay': 'Satispay', 'Revolut': 'Revolut', 'TWINT': 'TWINT'};
 let viaEuroScelto = null;   // {id, euro, metodo} dell'offerta mostrata
 let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in memoria
 async function apriViaEuro(dove){
@@ -86282,17 +86355,18 @@ function renderViaEuro(){
   if (o.id !== viaEuroScelto.id || o.euro !== viaEuroScelto.euro)
     viaEuroScelto = {id: o.id, euro: o.euro, metodo: o.metodi[0]};
   if (o.metodi.indexOf(viaEuroScelto.metodo) < 0) viaEuroScelto.metodo = o.metodi[0];
-  const prezzo = viaEuroSats * eurPerSat;
+  const prezzo = viaEuroSats * viaEuroPerSat(o.fiat || 'EUR');
   const cambio = Math.max(0, o.euro - prezzo);
+  const segno = o.fiat === 'CHF' ? 'CHF' : '€';
   const metodi = o.metodi.length > 1
     ? '<div class="via-euro-metodi">' + o.metodi.map(m =>
         '<button type="button" class="btn ' + (m === viaEuroScelto.metodo ? 'orange' : 'ghost')
         + '" onclick="viaEuroMetodo(\'' + esc(m) + '\')">' + esc(VIA_EURO_NOMI[m] || m) + '</button>').join('')
       + '</div>'
     : '<div class="via-euro-sotto">' + esc(VIA_EURO_NOMI[o.metodi[0]] || o.metodi[0]) + '</div>';
-  box.innerHTML = '<div class="via-euro-cifra">' + o.euro + ' €</div>'
-    + '<div class="via-euro-sotto">prezzo ' + centesimiTestoP2P(prezzo) + ' € + '
-    + centesimiTestoP2P(cambio) + ' € di cambio</div>'
+  box.innerHTML = '<div class="via-euro-cifra">' + o.euro + ' ' + segno + '</div>'
+    + '<div class="via-euro-sotto">prezzo ' + centesimiTestoP2P(prezzo) + ' ' + segno + ' + '
+    + centesimiTestoP2P(cambio) + ' ' + segno + ' di cambio</div>'
     + metodi
     + '<button type="button" class="btn primary" onclick="viaEuroContinua()">Continua</button>'
     + '<button type="button" class="btn ghost" onclick="viaEuroNonHoMetodo()">Non ho '
@@ -86480,13 +86554,13 @@ function renderViaEuroPasso(){
    tasto. Con l'annullo chiesto da chi vende, anche «Annulla il pagamento». */
 function viaEuroPasso1(o, nome){
   const a = /^[aeiou]/i.test(String(nome || '')) ? 'ad ' : 'a ';
-  return '1. Manda ' + String(o.euro) + ' € ' + a + nome + ' con i dati qui sotto';
+  return viaEuroDi(o, '1. Manda ' + String(o.euro) + ' € ' + a + nome + ' con i dati qui sotto');
 }
 function viaEuroPassi(o, gesto){
   return recapitoCompratoreP2P(o)
     + (typeof rigaTempoPagareP2P === 'function' ? rigaTempoPagareP2P(o) : '')
-    + '<div class="via-euro-sotto">2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l\'acquisto salta e rischi di perdere gli euro che hai mandato.</div>'
-    + '<button type="button" class="btn primary" onclick="' + gesto + '">Ho inviato gli euro</button>'
+    + '<div class="via-euro-sotto">' + esc(viaEuroDi(o, '2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l\'acquisto salta e rischi di perdere gli euro che hai mandato.')) + '</div>'
+    + '<button type="button" class="btn primary" onclick="' + gesto + '">' + esc(viaEuroDi(o, 'Ho inviato gli euro')) + '</button>'
     + (o.stato === 'annullo_proposto'
        ? '<button type="button" class="btn ghost" onclick="viaEuroAnnulla(\'' + esc(o.id) + '\')">Annulla il pagamento</button>' : '');
 }
@@ -125999,6 +126073,7 @@ async function avvia(){
     /* ...e «Non hai sats?» alla cassa (23 nov 2026, giroconto interno) */
     myViaEuro = !!me.via_euro;
     myViaEuroMax = Math.max(0, Math.floor(Number(me.via_euro_max_euro) || 0));
+    myViaEuroTettoSats = Math.max(0, Math.floor(Number(me.via_euro_tetto_sats) || 0));
     if (!p2pFiltro && typeof noMoneteRicordateP2P === 'function' && bitcoinOnlyOffertoP2P()) {
       const ric = noMoneteRicordateP2P();
       if (ric.soloBtc || ric.noStable) p2pFiltro = Object.assign(filtroVuotoP2P(), ric);
