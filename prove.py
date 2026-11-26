@@ -124523,6 +124523,8 @@ def prove_avvisi_mercatino():
     js = (
         "let DEMO = false, myTgId = 222, myCanaleNotifiche = '', myNpubAccesso = '', myNpub = '', myNpubVerified = false;\n"
         "let VETRINA = false, negozioCorrente = null;\n"
+        # la riga di «Cerco» (26 nov 2026) qui resta fuori: la prova sta in prove_richieste
+        "const cercoAttivo = () => false;\n"
         "const CATS = ['Tutto', 'Elettronica', 'Motori', 'Bitcoin'];\n"
         "const voltoHTML = (p, cls) => '<i class=\"' + cls + '\" data-nome=\"' + p.nome + '\"></i>';\n"
         "const el = () => null, toast = () => {}, haptic = () => {};\n"
@@ -206080,6 +206082,17 @@ def prove_richieste():
            "if not RICHIESTE_AVVISO_MODERATORI:" in _am,
            'argomento="moderazione"' in _am,
            "RICHIESTE_AVVISO_MODERATORI = True" in srv])
+    # (26 nov 2026) le richieste a chi le ha chieste dal cassetto Avvisi
+    prova("«🙋 Avvisami delle nuove richieste di Cerco»: colonna spenta di serie, "
+          "rotta, /api/me, l'avviso che la legge, il cassetto",
+          [True, True, True, True, True, True],
+          ['"avvisi_richieste INTEGER DEFAULT 0"' in srv,
+           '@app.post("/api/me/avvisi-richieste")' in srv,
+           'profilo["avvisi_richieste"]' in srv,
+           "_iscritti_richiesta(con, rich, set(scelti))" in avv,
+           "🙋 Avvisami delle nuove richieste di Cerco" in mini
+           and "!cercoAttivo() ? ''" in mini,
+           "myAvvisiRichieste = me.avvisi_richieste === true;" in mini])
     prova("le durate sono tre, di serie la prima (30 giorni)", [True, True],
           ["RICHIESTE_DURATE = (30, 60, 90)" in srv,
            "RICHIESTE_GIORNI = RICHIESTE_DURATE[0]" in srv])

@@ -192,6 +192,41 @@ def main():
     prova("un secondo giro non riavvisa nessuno dei cinque", set(),
           set(chi) & {d[0] for d in DETTO})
 
+    print("\n[3b) chi le ha chieste dal cassetto Avvisi]")
+    # (26 nov 2026) «🙋 Avvisami delle nuove richieste di Cerco»: 401 tutte
+    # le categorie, 402 solo Libri, 403 tutte ma «🔕», 404 spento
+    con = S.db()
+    for tg, on, cat in ((401, 1, ""), (402, 1, "|Libri|"), (403, 1, ""), (404, 0, "")):
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id, nome, negozio, registrato, "
+                    "avvisi_richieste, avvisi_mercatino_categorie) VALUES(?,?,?,?,?,?)",
+                    (tg, f"U{tg}", f"neg{tg}", ora, on, cat))
+    con.execute("INSERT OR IGNORE INTO richieste_muti(tg_id, creato) VALUES(403, ?)", (ora,))
+    con.commit()
+    con.close()
+    def interruttore(chi, attivo):
+        banco.come(chi)
+
+        async def leggi(_req):
+            return {"attivo": attivo}
+        S.leggi_json = leggi
+        return banco.chiama(S.scegli_avvisi_richieste, None, "", "")
+    prova("l'interruttore si accende dalla sua rotta", {"ok": True, "avvisi_richieste": True},
+          interruttore(404, True))
+    interruttore(404, False)
+    prova("...e si spegne", [(0,)], righe("SELECT avvisi_richieste FROM utenti WHERE tg_id=404"))
+    DETTO.clear()
+    rb = crea(112, {"testo": "Cerco un buono Amazon da 20 €", "categoria": CAT})
+    a_chi = {d[0] for d in DETTO}
+    prova("l'avviso arriva a chi l'ha acceso con tutte le categorie, col tasto «Offri»",
+          (True, "Offri", f"cerco_{rb.get('id')}"),
+          next(((True, d[2][0], d[2][1].rsplit("startapp=", 1)[-1])
+                for d in DETTO if d[0] == 401), None))
+    prova("...mai a chi vuole un'altra categoria, a chi ha «🔕», a chi l'ha spento",
+          set(), a_chi & {402, 403, 404})
+    prova("...e conta fra gli avvisati, col tetto dei tre al giorno", True,
+          (401,) in righe("SELECT tg_id FROM richieste_avvisati WHERE richiesta_id=?",
+                          rb.get("id")))
+
     print("\n[4) i tetti]")
     for altro in (112, 113, 114):
         crea(altro, {"testo": f"buono Amazon numero {altro}", "categoria": CAT})
