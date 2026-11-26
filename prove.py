@@ -206093,6 +206093,17 @@ def prove_richieste():
            "🙋 Avvisami delle nuove richieste di Cerco" in mini
            and "!cercoAttivo() ? ''" in mini,
            "myAvvisiRichieste = me.avvisi_richieste === true;" in mini])
+    # (26 nov 2026) la categoria proposta mentre si scrive, senza AI
+    _cp = srv[srv.index("def categoria_per_richiesta("):]
+    _cp = _cp[:_cp.index("\n\n\n")]
+    prova("la categoria proposta: rotta sua, niente AI, il campo che la chiede, "
+          "e la scelta a mano che vince",
+          [True, False, True, True, True],
+          ['@app.get("/api/richieste/categoria")' in srv,
+           "ai." in _cp or "RICHIESTE_MODELLO" in _cp,
+           'oninput="cercoProponiCategoria()"' in mini,
+           "poi: () => { cercoCatAMano = true; }" in mini,
+           "if (giro !== cercoCatGiro || cercoCatAMano) return;" in mini])
     prova("le durate sono tre, di serie la prima (30 giorni)", [True, True],
           ["RICHIESTE_DURATE = (30, 60, 90)" in srv,
            "RICHIESTE_GIORNI = RICHIESTE_DURATE[0]" in srv])

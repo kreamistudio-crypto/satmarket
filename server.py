@@ -65029,6 +65029,30 @@ def _parole_richiesta(testo: str) -> list:
             and p not in _RICHIESTE_PAROLE_VUOTE]
 
 
+def categoria_per_richiesta(con, testo: str) -> str:
+    """LA CATEGORIA PROPOSTA (26 nov 2026, Andrea: «forse ha senso che la
+    categoria venga proposta in automatico, se vuole la cambia»), SENZA
+    AI: fra gli annunci attivi, quelli col titolo che ha le parole della
+    richiesta (un pezzo di parola che ne apre una del titolo, come il
+    prefiltro dei venditori), e vince la categoria che ne raccoglie di
+    piu', parola per parola. Nessuna parola, o nessun annuncio: ''."""
+    parole = _parole_richiesta(testo)
+    if not parole:
+        return ""
+    punti: dict = {}
+    for a in con.execute(
+            "SELECT titolo, categoria FROM annunci WHERE stato='attivo' "
+            "ORDER BY id DESC LIMIT 5000").fetchall():
+        token = normalizza(a["titolo"] or "").split()
+        p = sum(1 for w in parole if any(t.startswith(w) for t in token))
+        if p and a["categoria"] in CATEGORIE:
+            punti[a["categoria"]] = punti.get(a["categoria"], 0) + p
+    if not punti:
+        return ""
+    # a pari punti l'ordine del catalogo, mai il caso
+    return max(punti, key=lambda c: (punti[c], -CATEGORIE.index(c)))
+
+
 def _richiesta_pubblica(r, mio_id: int, offerte: int) -> dict:
     return {"id": r["id"], "testo": r["testo"], "categoria": r["categoria"],
             "budget_sats": r["budget_sats"] or 0,
@@ -65249,6 +65273,21 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
     except Exception as e:
         print(f"⚠️ Avviso ai venditori della richiesta {richiesta_id} "
               f"saltato: {e}")
+
+
+@app.get("/api/richieste/categoria")
+async def proponi_categoria_richiesta(testo: str = "",
+                                      x_tg_init_data: str = Header(""),
+                                      barattolo_sessione: str = Cookie("")):
+    """La categoria proposta mentre si scrive (`categoria_per_richiesta`)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not richieste_per(user["id"]):
+        raise HTTPException(404, "Non disponibile")
+    con = db()
+    try:
+        return {"categoria": categoria_per_richiesta(con, str(testo)[:140])}
+    finally:
+        con.close()
 
 
 @app.get("/api/richieste")
