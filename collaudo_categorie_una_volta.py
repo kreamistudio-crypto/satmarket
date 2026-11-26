@@ -95,16 +95,19 @@ def avvio():
     return db
 
 
-def semina(titolo, categoria):
-    """Un annuncio IMPORTATO (fonte valorizzata): e' chi il giro guarda."""
+def semina(titolo, categoria, fonte=""):
+    """Un annuncio IMPORTATO: da Nostr di serie (chi il giro guarda in
+    ogni categoria), da un negozio collegato con `fonte` (guardato solo
+    in «Altro», dal 26 nov 2026)."""
     con = SRV.db()
     con.execute("INSERT OR IGNORE INTO utenti(tg_id,nome,username,"
                 "registrato) VALUES(222,'La Bottega','labottega',1)")
     cur = con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
         "categoria,zona,stato,creato,consegna,quantita,valuta,condizione,"
-        "fonte) VALUES(222,?,'',1000,?,'Milano (MI)','attivo',1,'ritiro',"
-        "1,'sats','buono','negozio')", (titolo, categoria))
+        "fonte,contatto_nostr) VALUES(222,?,'',1000,?,'Milano (MI)',"
+        "'attivo',1,'ritiro',1,'sats','buono',?,?)",
+        (titolo, categoria, fonte, "" if fonte else "npub1collaudo"))
     con.commit()
     i = cur.lastrowid
     con.close()
@@ -193,6 +196,31 @@ def main():
           "categoria", [], giro())
     prova("...e la sua riga resta quella del moderatore",
           ("Bitcoin", "Abbigliamento", "scartata"), riga(a))
+
+    print("\n[i negozi collegati: solo da «Altro» (26 nov 2026)]")
+    e = semina("Maglietta nera girocollo", "Bitcoin", fonte="woo")
+    f = semina("Tazza smaltata", "Altro", fonte="woo")
+    RISPOSTA.update({e: "Abbigliamento", f: "Casa e giardino"})
+    prova("il prodotto del negozio in «Bitcoin» non si chiede, quello "
+          "in «Altro» si'", [f], giro())
+    prova("...e il primo non ha nessuna riga", None, riga(e))
+
+    print("\n[approvare rifa' la sottocategoria (26 nov 2026)]")
+    g = semina("Maglietta Bitcoin bianca", "Bitcoin")
+    con = SRV.db()
+    con.execute("UPDATE annunci SET sottocategoria='merch' WHERE id=?", (g,))
+    con.execute("INSERT INTO categoria_proposta(annuncio_id, categoria_ora,"
+                " categoria_nuova, creato, stato) VALUES(?, 'Bitcoin', "
+                "'Abbigliamento', 1, 'proposta')", (g,))
+    fatto = SRV._sposta_categoria(con, g, "Bitcoin", "Abbigliamento", 999)
+    con.commit()
+    cat, sotto = con.execute("SELECT categoria, sottocategoria FROM annunci "
+                             "WHERE id=?", (g,)).fetchone()
+    con.close()
+    valide = {v[0] for v in SRV.SOTTOCATEGORIE.get("Abbigliamento", ())}
+    prova("spostato in «Abbigliamento»", (True, "Abbigliamento"), (fatto, cat))
+    prova("...senza la «merch» di Bitcoin: una casella di Abbigliamento "
+          "o nessuna", True, sotto == "" or sotto in valide)
 
     print(f"\n{'✅' if not FALLITE else '❌'} {PASSATE} passate, "
           f"{FALLITE} fallite")

@@ -28572,6 +28572,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   offerta ad Andrea, scartata da lui: i nuovi importati in «Altro»
   meritano una proposta. Provato da `collaudo_categorie_una_volta`
   (la funzione vera con l'AI finta) e `prove_categorie_una_volta`.
+  I NEGOZI COLLEGATI SOLO DA «ALTRO» (26 nov 2026, cantiere
+  categorie-negozi): un prodotto con `fonte` (WooCommerce, Shopify…)
+  entra nel giro solo se sta in «Altro» (`a.fonte='' OR
+  a.categoria='Altro'`): la sua categoria viene dal cassetto, dal
+  negozio o dal nome, e la macchina non la corregge, come per chi
+  pubblica dal form. Gli importati da Nostr nascono in «Altro» e restano
+  guardati in ogni categoria. E APPROVARE RIFÀ LA SOTTOCATEGORIA:
+  `_sposta_categoria` la ricalcola con `sottocategoria_indovina` sulla
+  categoria nuova (nel dubbio ''), perché quella vecchia è una casella
+  dell'altra categoria e l'annuncio spariva da tutte e due.
   LA REGOLA «BITCOIN» È TEMATICA (ago 2026, dal campo: 19 proposte, e
   UNDICI tiravano fuori da «Bitcoin» sacche, poster cypherpunk e
   magliette — Andrea le scartava a mano). Non era il modello a

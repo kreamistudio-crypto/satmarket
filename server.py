@@ -38833,9 +38833,19 @@ def _sposta_categoria(con, annuncio_id: int, da: str, a: str,
     chiamante. L'UPDATE e' condizionato sulla categoria di partenza:
     il secondo moderatore che tocca lo stesso gruppo trova il fatto
     compiuto, come per la revisione."""
+    # LA SOTTOCATEGORIA NON SI PORTA DIETRO (26 nov 2026): quella di
+    # partenza e' una casella dell'ALTRA categoria (la «merch» di
+    # Bitcoin finita sotto «Abbigliamento» non si vedeva in nessuna
+    # delle due). Si rifa' col giudice della categoria nuova, e nel
+    # dubbio resta '' — come alla nascita.
+    r = con.execute("SELECT titolo, descrizione FROM annunci WHERE id=?",
+                    (annuncio_id,)).fetchone()
+    sotto = sottocategoria_indovina(a, r["titolo"] or "",
+                                    r["descrizione"] or "") if r else ""
     fatto = con.execute(
-        "UPDATE annunci SET categoria=? WHERE id=? AND stato='attivo' "
-        "AND categoria=?", (a, annuncio_id, da)).rowcount == 1
+        "UPDATE annunci SET categoria=?, sottocategoria=? WHERE id=? "
+        "AND stato='attivo' AND categoria=?",
+        (a, sotto, annuncio_id, da)).rowcount == 1
     con.execute("UPDATE categoria_proposta SET stato=?, deciso_da=?, "
                 "deciso_il=? WHERE annuncio_id=?",
                 ("applicata" if fatto else "scartata", admin_id,
@@ -107719,6 +107729,15 @@ async def ricategorizza_automatico():
             # in «Altro» per la stessa ragione — la categoria del suo
             # e-commerce non e' la nostra.
             f"  AND ({SQL_ORIGINE_ESTERNA} OR a.categoria='Altro') "
+            # I NEGOZI COLLEGATI SOLO DA «ALTRO» (26 nov 2026, visto da
+            # Andrea: 875 magliette di un WooCommerce, messe in «Bitcoin»
+            # dal negozio, chieste all'AI cento all'ora e spostate in
+            # «Abbigliamento» a gruppi). La loro categoria l'ha scelta
+            # qualcuno — il cassetto, il negozio, al piu' il nome — come
+            # per chi pubblica dal form: la macchina guarda solo chi e'
+            # rimasto in «Altro». Gli importati da Nostr nascono in
+            # «Altro» e restano guardati come prima.
+            "  AND (a.fonte='' OR a.categoria='Altro') "
             # deciso e' deciso (qualunque categoria abbia adesso), e
             # cio' che e' gia' in coda non si richiede
             "  AND NOT EXISTS(SELECT 1 FROM categoria_proposta p "
