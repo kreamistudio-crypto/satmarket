@@ -177388,6 +177388,29 @@ console.log(JSON.stringify(['https://t.me/corsibot?start=xy', 'https://t.me/cana
           '"","","","","","","","",""]', righe[0] if righe else "")
     prova("e il tocco riapre solo la stessa forma", "[true,false,false]",
           righe[1] if len(righe) > 1 else "")
+    # (26 nov 2026) e l'invito a un gruppo, dopo il bot: le due porte in fila
+    prova("dalla scorta si tocca anche l'invito t.me/+, e niente altro",
+          True, "op.linkBot ? linkCanaleToccabile(linkBotToccabile(scappato))"
+          in mini)
+    prog2 = (r"""
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tg = null;
+""" + mini[mini.index("const RE_LINK_BOT ="):mini.index("\n", mini.index("const RE_LINK_BOT ="))]
+          + "\n" + mini[mini.index("const RE_INVITO_CANALE ="):mini.index("\n", mini.index("const RE_INVITO_CANALE ="))]
+          + fn("function linkBotToccabile(testoEsc){")
+          + fn("function linkCanaleToccabile(testoEsc){") + r"""
+const t = 'Bot: https://t.me/corsibot?start=x1\nAula: https://t.me/+AbCdEf123456_x\nSito: https://evil.example/a';
+const h = linkCanaleToccabile(linkBotToccabile(esc(t)));
+console.log(JSON.stringify([(h.match(/href="([^"]*)"/g) || []), h.endsWith('Sito: https://evil.example/a'), h.includes('apriInvitoCanale'), h.includes('apriLinkBot')]));
+""")
+    out2 = subprocess.run(["node", "-e", prog2], capture_output=True,
+                          text=True, timeout=30)
+    prova("...il bot e l'invito diventano link, il sito resta testo",
+          '[["href=\\"https://t.me/corsibot?start=x1\\"",'
+          '"href=\\"https://t.me/+AbCdEf123456_x\\""],true,true,true]',
+          out2.stdout.strip())
+    if out2.returncode:
+        print(out2.stderr[:400])
     if out.returncode:
         print(out.stderr[:400])
     tog = fn("async function togliScorta(btn){")
