@@ -133611,6 +133611,11 @@ def prove_categorie_una_volta():
                      "('proposta','tenuta')"))
     prova("una tenuta non si richiede finche' la categoria e' quella",
           True, "p.categoria_ora=a.categoria" in giro)
+    prova("i negozi collegati entrano nel giro solo da «Altro» (26 nov 2026)",
+          True, "AND (a.fonte='' OR a.categoria='Altro')" in giro)
+    prova("approvare rifa' la sottocategoria sulla categoria nuova", True,
+          "sottocategoria_indovina(a, " in pezzo("_sposta_categoria")
+          and "SET categoria=?, sottocategoria=?" in pezzo("_sposta_categoria"))
     prova("la coda dei moderatori mostra solo le proposte", True,
           "p.stato='proposta'" in _SORGENTE[
               _SORGENTE.index("_SQL_PROPOSTE = "):][:600])
