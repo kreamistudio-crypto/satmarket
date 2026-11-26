@@ -1193,6 +1193,7 @@ Quando compri▾
 📍I tuoi punti di ritiro ▾
 Wallet e incassi▾
 ⚡Lightning address▾
+💱Paga senza sats▾
 📥Come ricevi▾
 On-chain▾
 👛Wallet NWC (facoltativo)▾
