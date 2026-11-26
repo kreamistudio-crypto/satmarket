@@ -215535,6 +215535,8 @@ def prove_giroconto_interno():
            bool(vg({**buono, "prezzo_sats": 999}, dom, 150000)),
            bool(vg({**buono, "invoice": "inv999"}, dom, 150000)),
            bool(vg(buono, dom, 999))])
+    prova("...e a tetto 0 (di serie dal 26 nov 2026) nessun tetto", "",
+          vg(buono, dom, 0))
 
     # --- LA PORTA -------------------------------------------------------
     class _HTTPExc(Exception):
@@ -215725,9 +215727,14 @@ def prove_giroconto_interno():
     prova("la cassa: metodo «giroconto» solo a porta aperta e per un oggetto",
           True, 'giroconto = d.get("metodo") == "giroconto"' in cmp
           and 'if giroconto and (not giroconto_attivo() or not d.get("annuncio_id")):' in cmp)
-    prova("...solo sulla cassaforte nodo e sotto il tetto, PRIMA della fattura",
-          True, cmp.index("cf != CASSAFORTE_NODO\n                      or sats_giroconto > GIROCONTO_TETTO_SATS")
+    prova("...solo sulla cassaforte nodo e sotto il tetto (se c'e'), PRIMA "
+          "della fattura", True,
+          cmp.index("cf != CASSAFORTE_NODO\n                      or 0 < GIROCONTO_TETTO_SATS < sats_giroconto")
           < cmp.index("inv = await crea_invoice_escrow("))
+    prova("il tetto tecnico tolto di serie (26 nov 2026, Andrea): 0 = nessun "
+          "tetto, e una riga nel config lo rimette", True,
+          "    GIROCONTO_TETTO_SATS = 0\n" in _SORGENTE
+          and 'if int(tetto or 0) > 0 and domanda["sats"] > int(tetto):' in pezzo("_verdetto_giroconto"))
     amb3 = {"GIROCONTO_AVANZO_PERCENTO": 3, "GIROCONTO_AVANZO_EURO": 1.5}
     exec(pezzo("giroconto_cifra_giusta"), amb3)
     cg = amb3["giroconto_cifra_giusta"]

@@ -17891,10 +17891,14 @@ except ImportError:
 # Il tetto di un giroconto, in sats: una rete di sicurezza sotto il tetto
 # in euro che vede chi compra (100 € decisi da Andrea il 23 nov 2026). Un
 # deposito piu' grande non si salda da qui: Mostro fa come upstream.
+# TOLTO DI SERIE (26 nov 2026, Andrea: «leviamo il tetto tecnico, poi al
+# massimo ricarichiamo il wallet»): 0 = nessun tetto, e il limite vero e'
+# il saldo della riserva — un deposito che non ci sta si ferma come ogni
+# pagamento della riserva che non parte. Una riga nel config lo rimette.
 try:
     from config import GIROCONTO_TETTO_SATS
 except ImportError:
-    GIROCONTO_TETTO_SATS = 150_000
+    GIROCONTO_TETTO_SATS = 0
 # LA FATTURA LUNGA del deposito che si salda col giroconto: Mostro vuole
 # da chi compra sats una fattura con almeno un'ora di vita davanti (il
 # suo `invoice_expiration_window`, 3600 sul nodo), e fra la presa e il
@@ -18165,7 +18169,7 @@ def _verdetto_giroconto(o, domanda: dict, tetto: int) -> str:
         return "importo diverso dal deposito"
     if importo_bolt11(o["invoice"] or "") != domanda["sats"]:
         return "la fattura del deposito dice un altro importo"
-    if domanda["sats"] > int(tetto or 0):
+    if int(tetto or 0) > 0 and domanda["sats"] > int(tetto):
         return "sopra il tetto del giroconto"
     return ""
 
@@ -51648,7 +51652,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # IL GIROCONTO vive solo sulla cassaforte nodo (la riserva sta li') e
     # sotto il suo tetto in sats: fuori, la cintura del body a mano
     if giroconto and (cf != CASSAFORTE_NODO
-                      or sats_giroconto > GIROCONTO_TETTO_SATS):
+                      or 0 < GIROCONTO_TETTO_SATS < sats_giroconto):
         con.close()
         raise HTTPException(400, "Giroconto non disponibile")
     # ...e il deposito nasce per la cifra di Mostro, se copra l'ordine:
