@@ -116794,7 +116794,15 @@ function haOrdiniViviP2P(){
    a nord (5,8 e 47,9) e la scatola e' cresciuta (970 x 1250). Gli stessi
    numeri del generatore: una prova li tiene uguali. */
 const MAPPA_P2P_PROIEZIONE = { lon0: 5.8, lat1: 47.9, k: 100, cos: 0.7431, largo: 970, alto: 1250 };
-const MAPPA_P2P_RAGGIO_PX = 18;      // il pallino di un'offerta sola, in pixel
+/* I PALLINI PIU' PICCOLI (26 nov 2026, cantiere pallini-mappa, Andrea:
+   «i pallini arancioni troppo giganti, non si vede piu' la mappa»): con
+   la Svizzera la sagoma sta nella stessa scatola ma piu' piccola, e i
+   pallini da 18 px (fino a 30 coi grappoli) coprivano il Nord intero.
+   Ora 10 px, e un grappolo cresce di 0,75 px per annuncio in piu' fino
+   a 16: il numero ci sta ancora, la mappa si vede. Valgono per il libro
+   P2P e per il mercatino (stesso disegno). */
+const MAPPA_P2P_RAGGIO_PX = 10;      // il pallino di un'offerta sola, in pixel
+const MAPPA_P2P_CRESCITA_PX = 0.75;  // quanto cresce per ogni offerta in piu' (al piu' 8)
 const MAPPA_P2P_ZOOM = 2.5;          // quanto si avvicina un tocco o il ＋
 const MAPPA_P2P_LARGO_MIN = 40;      // la vista piu' stretta: ~50 km
 let p2pPosti = {};                   // ordine -> [lat, lon, «Nome (SIGLA)»], dal server
@@ -117088,7 +117096,7 @@ function disegnaMappaP2P(mostrati){
     + Math.min(6, 6 * upp).toFixed(2) + '" d="' + sagoma + '"/>' : '';
   p2pMappaGrappoli.forEach((g, i) => {
     const n = g.ids.length;
-    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * 1.5) * upp;
+    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * MAPPA_P2P_CRESCITA_PX) * upp;
     const scelto = g.comuni.length === 1 && g.comuni[0] === p2pMappaComune;
     const titolo = g.comuni.length === 1
       ? g.comuni[0] + ': ' + n + (n === 1 ? ' offerta' : ' offerte')
@@ -117096,11 +117104,11 @@ function disegnaMappaP2P(mostrati){
     dentro += '<g class="p2p-mappa-pin' + (scelto ? ' scelto' : '') + (g.comuni.length > 1 ? ' grappolo' : '')
       + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + esc(titolo) + '">'
       + '<circle cx="' + g.x.toFixed(1) + '" cy="' + g.y.toFixed(1) + '" r="' + rg.toFixed(2)
-      + '" stroke-width="' + (2.5 * upp).toFixed(2) + '"/>'
-      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (13 * upp).toFixed(2)
+      + '" stroke-width="' + (1.5 * upp).toFixed(2) + '"/>'
+      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (10 * upp).toFixed(2)
       + '" dy=".35em">' + n + '</text>'
       + ((vicino || g.comuni.length === 1 && p2pMappaGrappoli.length <= 6)
-        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 13 * upp).toFixed(1)
+        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 11 * upp).toFixed(1)
           + '" font-size="' + (12 * upp).toFixed(2) + '" stroke-width="' + (3 * upp).toFixed(2) + '">'
           + esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])
                 : nomeCortoMappaP2P(g.comuni[0]) + ' e ' + (g.comuni.length - 1) + ' vicin' + (g.comuni.length === 2 ? 'o' : 'i'))
@@ -117443,7 +117451,7 @@ function disegnaMappaMerc(){
     + Math.min(6, 6 * upp).toFixed(2) + '" d="' + sagoma + '"/>' : '';
   mercMappaGrappoli.forEach((g, i) => {
     const n = g.ids.length;
-    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * 1.5) * upp;
+    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * MAPPA_P2P_CRESCITA_PX) * upp;
     const scelto = g.comuni.length === 1 && g.comuni[0] === mercMappaComune;
     const titolo = g.comuni.length === 1
       ? g.comuni[0] + ': ' + n + (n === 1 ? ' annuncio' : ' annunci')
@@ -117451,11 +117459,11 @@ function disegnaMappaMerc(){
     dentro += '<g class="p2p-mappa-pin' + (scelto ? ' scelto' : '') + (g.comuni.length > 1 ? ' grappolo' : '')
       + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + esc(titolo) + '">'
       + '<circle cx="' + g.x.toFixed(1) + '" cy="' + g.y.toFixed(1) + '" r="' + rg.toFixed(2)
-      + '" stroke-width="' + (2.5 * upp).toFixed(2) + '"/>'
-      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (13 * upp).toFixed(2)
+      + '" stroke-width="' + (1.5 * upp).toFixed(2) + '"/>'
+      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (10 * upp).toFixed(2)
       + '" dy=".35em">' + n + '</text>'
       + ((vicino || g.comuni.length === 1 && mercMappaGrappoli.length <= 6)
-        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 13 * upp).toFixed(1)
+        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 11 * upp).toFixed(1)
           + '" font-size="' + (12 * upp).toFixed(2) + '" stroke-width="' + (3 * upp).toFixed(2) + '">'
           + esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])
                 : nomeCortoMappaP2P(g.comuni[0]) + ' e ' + (g.comuni.length - 1) + ' vicin' + (g.comuni.length === 2 ? 'o' : 'i'))

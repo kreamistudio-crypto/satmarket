@@ -176577,7 +176577,7 @@ const comuni = comuniMappaP2P(libro);
 out.comuni = comuni.map(c => [c.nome, c.ids.length]);
 out.milano = proiettaMappaP2P(45.47, 9.19).map(n => Math.round(n));
 out.lontani = grappoliMappaP2P(comuni, 1).length;
-out.vicini = grappoliMappaP2P(comuni, 20).map(g => [g.comuni.length, g.ids.length]);
+out.vicini = grappoliMappaP2P(comuni, 30).map(g => [g.comuni.length, g.ids.length]);
 out.zoom = zoomVistaMappaP2P({x:0,y:0,w:920,h:1180}, 100, 100, 2.5);
 out.zoomFondo = zoomVistaMappaP2P({x:0,y:0,w:50,h:60}, 0, 0, 2.5).w;
 out.zoomFuori = zoomVistaMappaP2P({x:0,y:0,w:920,h:1180}, 460, 590, 1/2.5);
@@ -176978,6 +176978,21 @@ def prove_mappa_ritocchi():
           [True, False],
           ["rigaNumerinoMappa('mercatino', 'Notifiche nuovi annunci col ritiro a mano'," in mini,
            "Numerino sul tondo per i nuovi annunci col ritiro a mano" in mini])
+
+    # --- 2b) I PALLINI PICCOLI (26 nov 2026, cantiere pallini-mappa) ---------
+    # Andrea: «i pallini arancioni troppo giganti, non si vede piu' la
+    # mappa». Si rompe in silenzio se qualcuno rialza il raggio o rimette
+    # il vecchio 1,5 px per offerta in uno dei due disegni.
+    m_r = re.search(r"const MAPPA_P2P_RAGGIO_PX = ([\d.]+);", mini)
+    m_c = re.search(r"const MAPPA_P2P_CRESCITA_PX = ([\d.]+);", mini)
+    raggio = float(m_r.group(1)) if m_r else 99
+    crescita = float(m_c.group(1)) if m_c else 99
+    prova("il pallino di un comune solo e' piccolo (al piu' 10 px)", True, raggio <= 10)
+    prova("...e il grappolo piu' grosso non passa i 16 px", True, raggio + 8 * crescita <= 16)
+    prova("tutt'e due i disegni (P2P e mercatino) usano raggio e crescita, il vecchio 1,5 no",
+          [2, 0],
+          [mini.count("const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * MAPPA_P2P_CRESCITA_PX) * upp;"),
+           mini.count("Math.min(n - 1, 8) * 1.5) * upp")])
 
     # --- 3) LO SCORRIMENTO ---------------------------------------------------
     banco = (r"""
