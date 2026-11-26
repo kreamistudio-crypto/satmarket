@@ -2085,7 +2085,19 @@
        sezioni intorno */
     #scoprireSez{margin-bottom:-12px}
     #catSez{margin-top:-10px}
+    /* +10px PER LATO (26 nov 2026, Andrea dal telefono: «la card in alto
+       non è centrata rispetto al telefono»): le card hanno `margin:0
+       -10px`, e la PRIMA, a fila ferma all'inizio, stava 10px a sinistra
+       del centro — lo scatto non la poteva riportare, che sotto lo zero
+       non si scorre. Con una card sola (To The Mooon spenta) si vedeva
+       sempre; con due solo prima di toccare la fila.
+       ...MA SOLO CON UNA CARD SOLA (stessa sera, Andrea: «se c'è più di
+       una card, la prima lasciamela così, cioè tutta a sinistra. Così si
+       vede anche una porzione a destra […] centrata solamente quando c'è
+       solo una card»): con due o piu' la fila resta com'era, e la classe
+       `sc-sola` (renderScoprire) accende il +10px e la chiude simmetrica */
     #scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}
+    #scoprireStrip.sc-sola{padding-left:calc((100vw - 240px) / 2 + 10px);padding-right:calc((100vw - 240px) / 2 + 10px)}
     #scoprireStrip .scoprire-card{width:240px}
     #scoprireStrip .sc-titolo{left:12.4px;width:84.7px;font-size:15px}
     #scoprireStrip .sc-lancio{font-size:14.1px}
@@ -2114,6 +2126,8 @@
     #scoprireStrip{--sc-larga:min(345px, calc((100vw - 14px) / 1.1));
       padding-left:calc((100vw - var(--sc-larga)) / 2);
       padding-right:calc((100vw - var(--sc-larga) * .4778) / 2)}
+    #scoprireStrip.sc-sola{padding-left:calc((100vw - var(--sc-larga)) / 2 + 10px);
+      padding-right:calc((100vw - var(--sc-larga)) / 2 + 10px)}
     #scoprireStrip .scoprire-card{width:var(--sc-larga)}
     #scoprireStrip .sc-titolo{left:calc(var(--sc-larga) * .0516);width:calc(var(--sc-larga) * .3528);
       font-size:calc(var(--sc-larga) * .0627)}
@@ -11289,17 +11303,6 @@
     box-shadow:0 6px 18px -6px rgba(160,30,15,.7)}
   /* nella scheda dell'annuncio sta in cima, fra la foto e il titolo */
   .entra-scheda{display:flex;margin:0 0 14px}
-  /* ...e sulla card grande di «Da scoprire», piccolo nell'angolo
-     (rettangolare come gli altri, Andrea: «leggermente più piccolo») */
-  .scoprire-card .sc-entra{position:absolute;right:8px;bottom:8px;z-index:3}
-  .scoprire-card .sc-entra .btn.rac-entra{width:auto;min-height:0;padding:5px 10px;
-    font-size:10px;line-height:1.1;border-radius:7px;
-    /* qui, dove «Acquista» non c'e', i colori di «Promuovi» (Andrea: «vai
-       col colore 1») */
-    background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
-      linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%),#E1251B;
-    background-origin:border-box;border:1px solid rgba(255,255,255,.28);
-    text-shadow:0 1px 2px rgba(110,18,0,.6);box-shadow:0 6px 18px -6px rgba(225,37,27,.65)}
   /* ...e sotto la foto la scritta diventa lo stesso bottone pieno */
   .rac-video .rac-video-eti.rac-bottone{width:max-content;max-width:100%;
     margin:14px auto 0;padding:12px 24px;border-radius:14px;
@@ -20850,6 +20853,19 @@ const guscioVetrina = new Promise(sciogli => { vetrinaDisegnata = sciogli; });
 let arrivoP2PFatto = () => {};
 const guscioArrivoP2P = /^\/p2p\/?$/.test(location.pathname)
   ? new Promise(sciogli => { arrivoP2PFatto = sciogli; }) : Promise.resolve();
+/* ...E L'ANNUNCIO DEL LINK, uguale (26 nov 2026, Andrea dal telefono, il
+   «🛒 Acquista» del post nel canale: «per un attimo si vede la home e poi
+   si va nella card»). `annuncio_<id>` diventa `/annuncio/<id>` piu' in
+   alto (`arrivoDaStartapp`), e `apriAnnuncioDaUrl` gira dopo la vetrina
+   disegnata, chiedendo l'annuncio al server se non e' fra le pagine
+   caricate: in mezzo, a velo sceso, c'era la home. Il velo aspetta anche
+   lui; lo scioglie `apriAnnuncioDaUrl` a dettaglio aperto (o col toast
+   «non c'e' piu'»), e `spegniLinkDaUrl` sulla ricarica. Le reti sono le
+   stesse del P2P: il tetto dei due secondi alza il velo comunque. */
+let arrivoAnnuncioFatto = () => {};
+const guscioArrivoAnnuncio = /^\/annuncio\/\d+/.test(location.pathname)
+  ? new Promise(sciogli => { arrivoAnnuncioFatto = sciogli; }) : Promise.resolve();
+const guscioArrivo = Promise.all([guscioArrivoP2P, guscioArrivoAnnuncio]);
 let guscioVia = false;
 /* IL GUSCIO E' IN VISTA? (set 2026) Lo chiede `applicaTema`, che
    finche' c'e' il guscio lascia la barra di stato del suo arancio (il
@@ -27772,9 +27788,10 @@ function vociSponsor(){
          dei quadratini di AndreAI e To The Moon) */
       quadro: quadroSponsor(slug, casa && casa.quadro != null ? casa.quadro : s.quadro),
       testo: String((casa ? casa.titolo : s.titolo) || ''),
-      /* il bottone «Entra» della pagina, dal server (solo pagina
-         pubblicata col bottone): lo disegna la card grande */
-      entra: (!casa && s.entra && typeof s.entra === 'object') ? s.entra : null,
+      /* (il bottone «Entra» sulla card grande e' stato TOLTO la sera
+         stessa, 26 nov 2026, AndreAI: «è troppo invasivo». Il server
+         manda ancora il suo «entra»: qui non si legge piu'; il bottone resta
+         sulla pagina e nelle schede dei corsi) */
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
       tocca: () => apriNegozioDaScoprire(negozio, true, 'sponsor:' + slug)});
@@ -27962,14 +27979,6 @@ function renderScoprire(){
        sul velo in basso, il nome e lo stato della leva. */
     const quadra = !v.quadra ? '' : `<span class="sc-quadra-eti" aria-hidden="true"
       ><span class="sc-q-pre">Aste</span><span class="sc-q-riga">${esc(v.riga())}</span></span>`;
-    /* IL BOTTONE «ENTRA» SULLA CARD GRANDE (26 nov 2026, AndreAI: «è
-       possibile fare il tasto direttamente sulla card grossa?»): lo
-       stesso della pagina, piccolo nell'angolo in basso a destra. Il suo
-       tocco apre il gruppo e si ferma li' (stopPropagation): il resto
-       della card porta alla pagina come sempre. */
-    const eb = v.entra ? bottoneEntra(v.entra.link, v.entra.testo, v.slug) : '';
-    const entra = !eb ? '' : `<span class="sc-entra" onclick="event.stopPropagation()"
-      onkeydown="event.stopPropagation()">${eb}</span>`;
     return `
     <div class="scoprire-card${v.quadra ? ' sc-quadra' : ''}${v.accesa() ? ' attiva' : ''}" role="button"
          tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
@@ -27978,9 +27987,12 @@ function renderScoprire(){
       <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${entra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
+      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
     </div>`;
   }).join('');
+  /* una card sola sta al centro; con due o piu' la prima resta a
+     sinistra e si vede un pezzo della seconda (26 nov 2026, Andrea) */
+  el('scoprireStrip').classList.toggle('sc-sola', vive.length === 1);
   aggiornaFrecce('scoprireStrip');
   armaScorriScoprire();
 }
@@ -30564,8 +30576,10 @@ function apriNegozioDaScoprire(chi, aperto, da){
    la testata resta spenta. `negozioInVolo` tiene la testata per il giro
    sincrono della chiamata, come nel volo (vedi apriNegozio). */
 function conTestata(chi, id, apri){
+  /* ...e anche col banner (26 nov 2026 sera, vedi IL NEGOZIO CHE HA GIA'
+     L'INSEGNA in voloNegozio): la card prende il suo posto */
   const pronto = negozioPronto(chi);
-  const img = id && pronto && !bannerNegozio(pronto.venditore)
+  const img = id && pronto
     ? document.querySelector(`#scoprireStrip .scoprire-card[data-id="${CSS.escape(id)}"] img`) : null;
   const src = img ? (img.currentSrc || img.src) : '';
   if (!src) return apri();
@@ -30640,7 +30654,15 @@ function preparaNegoziScoprire(codici){
    SUL BANNER — che resta com'era, col suo link e il dominio sotto. Il
    posto vero si misura quando la pagina c'e' (a VOLO_APRI_MS), e la copia
    ci scivola negli ultimi 160 ms; si toglie quando la foto del banner e'
-   pronta (al piu' 400 ms dopo), mai su un riquadro vuoto. */
+   pronta (al piu' 400 ms dopo), mai su un riquadro vuoto.
+   ...ROVESCIATO (26 nov 2026 sera, Andrea dal telefono sulla card di una pagina:
+   «va sopra all'altro banner e poi sparisce […] la card della home va a
+   sostituire il banner quando schiaccio lì dentro»): il banner di
+   quel negozio e' un'altra immagine, e la card che atterrava sopra e poi
+   spariva sembrava un errore. Ora dal volo la testata c'e' SEMPRE, e il
+   banner del negozio non si disegna (`renderNegozio`): la stessa foto due
+   volte non torna, perche' di foto in cima ce n'e' una sola. Il banner
+   resta per ogni altra strada nel negozio (il link, il nome del venditore). */
 let cardToccata = '', scopertaToccata = '', negozioInVolo = false;
 let negozioTestataDi = {chi: '', src: ''};
 function testataNegozio(chi){
@@ -30652,7 +30674,6 @@ function testataNegozio(chi){
     onerror="this.parentNode.hidden=true">` : '';
 }
 const VOLO_MS = 420, VOLO_APRI_MS = 260, VOLO_ATTESA_MS = 1500;
-let scartoInsegna = 48;
 function voloNegozio(card, chi, aperto, da){
   const img = card.querySelector('img');
   const src = img && (img.currentSrc || img.src);
@@ -30663,18 +30684,14 @@ function voloNegozio(card, chi, aperto, da){
   const vw = document.documentElement.clientWidth;
   /* una card fuori dallo schermo non vola: si vedrebbe partire dal nulla */
   if (r.right <= 0 || r.left >= vw || !r.width) return false;
-  const pronto = negozioPronto(chi);
-  const insegna = !!bannerNegozio(pronto && pronto.venditore);
   const pad = parseFloat(getComputedStyle(document.documentElement)
     .getPropertyValue('--pad')) || 16;
   /* l'arrivo: dove la testata stara' a pagina in cima — la cima delle
-     viste (sono sorelle) piu' il suo margine. Col banner si mira gia' al
-     suo posto (3:1, sotto «← Torna»): lo scarto e' quello misurato
-     all'ultimo volo, e la prima volta quello del telefono di prova */
-  const w = vw - 2 * pad, h = insegna ? w / 3 : w * 130 / 272;
+     viste (sono sorelle) piu' il suo margine */
+  const w = vw - 2 * pad, h = w * 130 / 272;
   const cima = casa.getBoundingClientRect().top + window.scrollY
     + (parseFloat(getComputedStyle(v).paddingTop) || 0);
-  const top = cima + (insegna ? scartoInsegna : 10);
+  const top = cima + 10;
   const nav = document.querySelector('nav');
   const velo = document.createElement('div');
   velo.className = 'negozio-velo';
@@ -30693,7 +30710,7 @@ function voloNegozio(card, chi, aperto, da){
     {duration: VOLO_MS, easing: curva, fill: 'forwards'});
   setTimeout(() => {
     /* il negozio si apre sotto la copia, che finisce la sua corsa */
-    negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};
+    negozioTestataDi = {chi, src};
     negozioInVolo = true;
     let disegno;
     try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
@@ -30726,12 +30743,11 @@ function voloNegozio(card, chi, aperto, da){
     velo.remove();
     card.style.visibility = '';
     const t = el('negozioTestata');
-    /* dove atterra: la testata, o il banner del negozio */
-    const meta = insegna ? v.querySelector('.negozio-banner') : t;
+    /* dove atterra: la testata */
+    const meta = t;
     const fine = meta && meta.getBoundingClientRect();
     if (meta) meta.style.visibility = 'hidden';
     if (fine && fine.width) {
-      if (insegna) scartoInsegna = fine.top - cima;
       const ora = vola.getBoundingClientRect();
       const ombra = getComputedStyle(vola).boxShadow;
       corsa.cancel();
@@ -31671,8 +31687,11 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   const tondi = !segui ? ponti
     : ponti ? ponti.replace('<div class="tondi">', '<div class="tondi">' + segui)
     : `<div class="tondi">${segui}</div>`;
+  /* sotto la testata del volo il banner non si disegna: la card ne ha
+     preso il posto (26 nov 2026 sera, vedi voloNegozio) */
+  const testataSu = !!negozioTestataDi.src && negozioTestataDi.chi === v.negozio;
   el('negozioHeader').innerHTML = `
-    ${bannerNegozio(v)}
+    ${testataSu ? '' : bannerNegozio(v)}
     ${raccontoNegozio(v)}
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       ${voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio,
@@ -126010,7 +126029,9 @@ async function apriAnnuncioDaUrl(){
       if (r.ok) inCatalogo([mapListing(await r.json())]);
     } catch(e) {}
   }
-  openDetail(id);
+  /* il velo d'apertura scende a dettaglio aperto, mai prima (vedi
+     guscioArrivoAnnuncio): `finally`, che un guasto non lo tenga su */
+  try { openDetail(id); } finally { arrivoAnnuncioFatto(); }
 }
 
 /* /sicurezza — il link condivisibile della pagina «Il pagamento
@@ -126608,6 +126629,7 @@ function spegniLinkDaUrl(){
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
+  arrivoAnnuncioFatto();   /* ...ne' l'annuncio del link */
 }
 
 const BOZZA_URL = (location.search.match(/[?&]bozza=([a-z0-9-]{2,40})(?:&|$)/) || [])[1] || '';
@@ -127637,8 +127659,8 @@ tinteVociP2P();   /* le voci della barra P2P si accendono con uno strato */
    aspetta lei (un ordine condiviso si apre un attimo dopo la fine
    dell'avvio). Su ogni altro indirizzo `guscioArrivoP2P` e' gia'
    sciolta e la catena e' quella di ieri. */
-Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),
-                                  avvia().then(() => guscioArrivoP2P)]),
+Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivo]),
+                                  avvia().then(() => guscioArrivo)]),
                     document.fonts?.ready])
   .then(() => immaginiPronte())
   .finally(() => togliGuscio());

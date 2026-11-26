@@ -52629,7 +52629,7 @@ def prove_scoprire():
     prova("...la testata tiene margini e angoli tondi, come l'arrivo del volo",
           (True, True),
           (re.search(r"\.negozio-testata\{margin:10px var\(--pad\) 0;aspect-ratio:272/130;\s*border-radius:14px;", mini) is not None,
-           "const w = vw - 2 * pad, h = insegna ? w / 3 : w * 130 / 272;" in _vo))
+           "const w = vw - 2 * pad, h = w * 130 / 272;" in _vo))
     prova("...la card toccata si dimentica a ogni tocco, e la testata e' solo del volo",
           (True, True, True),
           ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; scopertaToccata = ''; return; }" in mini,
@@ -52715,15 +52715,30 @@ console.log(JSON.stringify(r));
     if _esito is None:
         salta("la testata dal tondo", "serve node")
     else:
-        prova("in node: senza banner la testata e' l'immagine della card, col banner "
-              "o senza pronto niente testata, e il flag torna giu'",
-              {"senza_banner": "/assets/racconti/ai-cop.webp", "col_banner": "-",
+        # (26 nov 2026 sera, Andrea: «la card della home va a sostituire il
+        # banner») anche col banner la testata e' la card
+        prova("in node: la testata e' l'immagine della card, col banner o senza; "
+              "senza pronto niente testata, e il flag torna giu'",
+              {"senza_banner": "/assets/racconti/ai-cop.webp",
+               "col_banner": "/assets/racconti/ai-cop.webp",
                "non_pronto": "-", "senza_voce": "-", "flag": False}, _esito)
     prova("...e passano di li' le due strade del tocco", 2,
           _ds.count("conTestata(chi, daId, () => apriNegozio("))
     # (Andrea, sul video: «appena tocchi la card sembra che prima di
     # allargarsi si rimpicciolisca per un attimo») il `:active` di tutte le
     # card toglieva lo scale della fila: premuta, ogni card tiene la misura
+    # (26 nov 2026 sera, Andrea: «la card in alto non è centrata») le card
+    # hanno margin 0 -10px: il margine della fila li rimette, per lato
+    # ...ma solo con UNA card: con due o piu' la prima resta a sinistra e
+    # si vede un pezzo della seconda (Andrea, stessa sera)
+    prova("una card SOLA sta al centro del telefono (il margine di -10px "
+          "rimesso nel padding, simmetrico); con piu' card la fila di prima",
+          (True, True, True, True, True),
+          ("#scoprireStrip.sc-sola{padding-left:calc((100vw - 240px) / 2 + 10px);padding-right:calc((100vw - 240px) / 2 + 10px)}" in mini,
+           "#scoprireStrip.sc-sola{padding-left:calc((100vw - var(--sc-larga)) / 2 + 10px);\n      padding-right:calc((100vw - var(--sc-larga)) / 2 + 10px)}" in mini,
+           "#scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}" in mini,
+           "padding-left:calc((100vw - var(--sc-larga)) / 2);\n      padding-right:calc((100vw - var(--sc-larga) * .4778) / 2)}" in mini,
+           "el('scoprireStrip').classList.toggle('sc-sola', vive.length === 1);" in mini))
     prova("...la card premuta non cambia misura prima del volo",
           (True, True),
           ("#scoprireStrip .scoprire-card:active{transform:scale(.82) translateY(1px)}" in mini,
@@ -52733,11 +52748,18 @@ console.log(JSON.stringify(r));
     # negozio: col banner la testata non si accende e la copia atterra sul
     # banner (stesso giudice che lo disegna); 2) il quadratino faceva
     # volare la card GRANDE, da dove stava nella fila (mezza fuori)
-    prova("col banner del negozio il volo atterra sul banner, senza testata",
-          (True, True, True),
-          ("const insegna = !!bannerNegozio(pronto && pronto.venditore);" in _vo,
-           "negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};" in _vo,
-           "const meta = insegna ? v.querySelector('.negozio-banner') : t;" in _vo))
+    # ...ROVESCIATO (26 nov 2026 sera, Andrea su BitcoinLabs: la card
+    # atterrava sul banner, che e' un'altra immagine, e spariva): dal volo
+    # la testata c'e' sempre e il banner sotto non si disegna
+    _rn_neg = pezzo_js(mini, "function renderNegozio(v, annunci, feedback=[], esauriti=[]){", "\n}\n")
+    prova("il volo atterra sempre sulla testata, e sotto la testata il banner "
+          "del negozio non c'e'",
+          (False, True, True, True, True),
+          ("insegna" in _vo,
+           "negozioTestataDi = {chi, src};" in _vo,
+           "const meta = t;" in _vo,
+           "const testataSu = !!negozioTestataDi.src && negozioTestataDi.chi === v.negozio;" in _rn_neg,
+           "${testataSu ? '' : bannerNegozio(v)}" in _rn_neg))
     prova("...e la copia si toglie solo a foto pronta, mai su un riquadro vuoto",
           (True, True),
           ("Promise.race([foto.decode().catch(() => {})," in _vo,
@@ -56112,13 +56134,14 @@ def prove_racconti_bozza():
           (True, True),
           ("link = entra_della_pagina(s)" in _spp,
            'voce["entra"] = {"link": link, "testo": b["link_testo"]}' in _spp))
-    prova("...la card lo disegna col bottone di sempre (contato), e il "
-          "suo tocco non apre la pagina",
-          (True, True, True, True),
-          ("entra: (!casa && s.entra && typeof s.entra === 'object') ? s.entra : null," in mini,
-           "bottoneEntra(v.entra.link, v.entra.testo, v.slug)" in mini,
-           '<span class="sc-entra" onclick="event.stopPropagation()"' in mini,
-           "${quadra}${entra}${v.logo ?" in mini))
+    # ...TOLTO la sera stessa (AndreAI: «è troppo invasivo»): la card
+    # grande torna pulita, il bottone resta su pagina e schede dei corsi
+    prova("...la card grande NON disegna piu' il bottone (troppo invasivo)",
+          (False, False, False, True),
+          ("s.entra" in mini,
+           "bottoneEntra(v.entra.link" in mini,
+           'class="sc-entra"' in mini,
+           "${quadra}${v.logo ?" in mini))
     try:
         os.remove(_db_en)
     except OSError:
@@ -62213,11 +62236,12 @@ async function giro(pathname, copione){
   async function immaginiPronte(){}
   function togliGuscio(){ tolto++; }
   function avvia(){ return new Promise((si, no) => { fineAvvia = si; rompiAvvia = no; }); }
-  eval(GUSCIO + '\n' + CATENA + '\n;esponi = {vetrina: () => vetrinaDisegnata(), porta: () => arrivoP2PFatto()};');
+  eval(GUSCIO + '\n' + CATENA + '\n;esponi = {vetrina: () => vetrinaDisegnata(), porta: () => arrivoP2PFatto(), annuncio: () => arrivoAnnuncioFatto()};');
   const passi = [];
   for (const mossa of copione) {
     if (mossa === 'vetrina') esponi.vetrina();
     if (mossa === 'porta') esponi.porta();
+    if (mossa === 'annuncio') esponi.annuncio();
     if (mossa === 'avvio') fineAvvia();
     if (mossa === 'avvioRotto') rompiAvvia(new Error('x'));
     await respiro();
@@ -62228,7 +62252,9 @@ async function giro(pathname, copione){
 (async () => {
   const R = {};
   R.home = await giro('/', ['vetrina']);
-  R.annuncio = await giro('/annuncio/7', ['vetrina']);
+  R.annuncio = await giro('/annuncio/7', ['vetrina', 'annuncio']);
+  R.annuncioPrima = await giro('/annuncio/7-poster', ['annuncio', 'vetrina']);
+  R.annuncioRotto = await giro('/annuncio/7', ['avvioRotto']);
   R.p2p = await giro('/p2p', ['vetrina', 'avvio', 'porta']);
   R.p2pBarra = await giro('/p2p/', ['vetrina', 'porta']);
   R.p2pPortaPrima = await giro('/p2p', ['porta', 'vetrina']);
@@ -62239,8 +62265,18 @@ async function giro(pathname, copione){
 })().catch(e => { console.error(e); process.exit(1); });
 """)
     V = _node_banco(prog_velo) or {}
-    prova("IL VELO: sulla home e su un annuncio scende alla vetrina disegnata, come ieri",
-          [[1], [1]], [V.get("home"), V.get("annuncio")])
+    prova("IL VELO: sulla home scende alla vetrina disegnata, come ieri",
+          [1], V.get("home"))
+    # (26 nov 2026, Andrea: il «🛒 Acquista» del post nel canale faceva
+    # vedere la home per un attimo) sul link di un annuncio aspetta anche
+    # il dettaglio aperto, in qualunque ordine; e un guasto non lo tiene su
+    prova("...lo scioglie apriAnnuncioDaUrl a dettaglio aperto, e la ricarica",
+          (True, True),
+          ("try { openDetail(id); } finally { arrivoAnnuncioFatto(); }" in mini,
+           "arrivoP2PFatto();\n  arrivoAnnuncioFatto();" in pezzo_js(mini, "function spegniLinkDaUrl(){", "\n}")))
+    prova("...sul link di un annuncio aspetta anche il dettaglio aperto",
+          [[0, 1], [0, 1], [1]],
+          [V.get("annuncio"), V.get("annuncioPrima"), V.get("annuncioRotto")])
     prova("...sul link del P2P la vetrina non basta e la fine dell'avvio nemmeno: scende "
           "quando la porta e' aperta", [[0, 0, 1], [0, 1]], [V.get("p2p"), V.get("p2pBarra")])
     prova("...in qualunque ordine arrivino", [[0, 1], [0, 1]],
@@ -62261,6 +62297,7 @@ async function giro(pathname, copione){
         "function vaiP2P(){ visto.push('vai'); }\n"
         "function apriOrdineP2P(id){ visto.push('scambio'); }\n"
         "function arrivoP2PFatto(){ visto.push('velo'); }\n"
+        "function arrivoAnnuncioFatto(){}\n"
         "async function apriOrdineCondivisoP2P(id){ visto.push('ordine');"
         " await new Promise(r => setTimeout(r, 5));"
         " if (esitoOrdine !== 'ok') throw new Error('x'); visto.push('aperto'); }\n"
@@ -100559,10 +100596,13 @@ _ATTESI_RICARICA = {
         'pacco - |tutti Tutto [esplora pacco] visto:esplora>pacco',
         'esplora Tutto |tutti Tutto [esplora] toast:Il carrello è vuoto: ti riporto al mercatino visto:esplora',
     ],
+    # (26 nov 2026) il terzo passo diceva `visto:esplora>dettaglio`: dal
+    # link di un annuncio si VEDEVA la home e poi la scheda (Andrea, il
+    # «🛒 Acquista» del post nel canale). Ora il velo aspetta il dettaglio.
     'link esterno': [
         'p2p - |tutti Tutto [esplora p2p] visto:esplora>p2p',
         'p2pmiei - |tutti Tutto [esplora p2p p2pmiei] visto:esplora>p2p>p2pmiei',
-        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta visto:esplora>dettaglio',
+        'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta visto:dettaglio',
         'dettaglio 7 |tutti Tutto [esplora p2p p2pmiei esplora dettaglio] registro-a-meta visto:dettaglio',
         'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta visto:dettaglio>p2p',
         'p2p - |tutti Tutto [esplora p2p p2pmiei esplora p2p] registro-a-meta visto:p2p',
@@ -100696,9 +100736,11 @@ _ATTESI_RICARICA = {
         'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
         'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
     ],
+    # (26 nov 2026) ...e sul link lento, a vetrina disegnata e annuncio non
+    # ancora aperto, si vede il velo; poi il tetto dei due secondi lo alza
     'link lento': [
         'esplora Tutto |tutti Tutto [esplora] visto:esplora',
-        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
+        'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:|velo',
         'esplora Tutto |tutti Tutto [esplora esplora] registro-a-meta visto:esplora',
         'dettaglio 7 |tutti Tutto [esplora esplora dettaglio] registro-a-meta visto:esplora>dettaglio',
     ],
@@ -100926,7 +100968,7 @@ def prove_ricarica_resta():
     # ricarica mette da parte e' sempre lo stesso, `guscioVetrina`.
     prova("...e la catena dell'ultima riga aspetta lo stesso segnale (e, sul link del "
           "P2P, anche la sua porta)", 1,
-          mini.count("Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),\n                                  avvia().then(() => guscioArrivoP2P)]),"))
+          mini.count("Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivo]),\n                                  avvia().then(() => guscioArrivo)]),"))
     prova("la pagina pronta scioglie il velo; arrivata tardi non fa niente", True,
           apr.rstrip().endswith("sciogliPaginaRicordata();")
           and _in_ordine(apr, "if (navRicordataTarda) return;", "navRicordata = null;"))
@@ -139878,8 +139920,8 @@ def prove_guscio_apertura():
     # indirizzo nasce sciolta, e la regola resta quella qui sopra.
     prova("scende alla vetrina DISEGNATA, non alla fine della coda di "
           "avvia() — e sul link del P2P alla sua porta aperta", 1,
-          js.count("Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),\n"
-                   "                                  avvia().then(() => guscioArrivoP2P)])"))
+          js.count("Promise.race([Promise.all([guscioVetrina, guscioArrivo]),\n"
+                   "                                  avvia().then(() => guscioArrivo)])"))
     prova("...e i font corrono insieme a lei", 1,
           js.count("document.fonts?.ready])"))
     prova("...con allSettled e non all: se una delle due si rompe, il "
@@ -185246,6 +185288,7 @@ console.log(JSON.stringify(c));
         "function vaiP2P(){ visto.push('vai'); }\n"
         "function apriOrdineP2P(id){ visto.push('scambio'); }\n"
         "function arrivoP2PFatto(){ visto.push('velo'); }\n"
+        "function arrivoAnnuncioFatto(){}\n"
         "function apriPausaP2P(){ visto.push('pausa'); }\n"
         "async function apriOrdineCondivisoP2P(id){ visto.push('ordine'); }\n"
         + _fn_js(m, "function apriP2PDaUrl(){") + r"""
@@ -197152,6 +197195,7 @@ def prove_notifica_porta_allo_scambio():
         "let CHAT_DA_AVVISO = false;\n"
         "function chatDaAvvisoP2P(id){ visto.push('chat:' + id); }\n"
         "function arrivoP2PFatto(){ visto.push('velo'); }\n"
+        "function arrivoAnnuncioFatto(){}\n"
         "function renderP2P(){ visto.push('render'); }\n"
         # la porta di sempre, com'e' in pagina: senza riga porta ai miei scambi
         "function apriOrdineP2P(id){ if (!ordini[id]) { vista = 'view-p2pmiei'; visto.push('miei'); return; }\n"
