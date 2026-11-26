@@ -4594,10 +4594,13 @@
     .chatmod-msg small{display:block;font-size:12px}
     /* LE SPUNTE (26 nov 2026, Andrea: «Le voglio arancioni»): grigie
        come la riga dell'ora finche' l'altra parte non ha visto, poi
-       arancioni. --sats-text e non --sats: sul fondo dei miei messaggi
-       (--sats-soft) il --sats di giorno non si vedrebbe */
+       arancioni. PIU' VIVE (26 nov 2026, Andrea: «fallo un po' più
+       vivo»): di giorno --sats-deep (il --sats-text di prima era
+       spento; il --sats pieno sul fondo dei miei messaggi, --sats-soft,
+       quasi spariva), di sera il --sats pieno, che sul fondo scuro si vede */
     .chatsc-spunte{letter-spacing:-.18em;margin-left:2px;white-space:nowrap}
-    .chatsc-spunte.vista{color:var(--sats-text)}
+    .chatsc-spunte.vista{color:var(--sats-deep)}
+    html[data-tema="scuro"] .chatsc-spunte.vista{color:var(--sats)}
     /* L'ASSISTENZA IN APP (3 nov 2026): il vestito della chat col
        moderatore, con la lista piu' alta (e' la pagina intera) e le
        righe dell'elenco degli admin, una per utente */
@@ -15149,7 +15152,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'cf026dc000';
+const LINGUA_VER = '59968a77ec';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -124143,7 +124146,11 @@ function chatScMessaggiHTML(c, altro, o){
    dell'altra parte l'ha ritirata; ✓✓ arancioni l'altra parte ha avuto
    la chat davanti agli occhi. Le cifre (numeri di busta) le dice il
    server col ritiro, e solo a leva `CHAT_SPUNTE` accesa: senza cifre,
-   nessuna spunta. Solo segni, nessuna parola. */
+   nessuna spunta. Sullo schermo solo segni; IL LETTORE DELLO SCHERMO
+   (26 nov 2026, cantiere spunte-etichette, Andrea: «Per chi usa il
+   lettore dello schermo sì, va bene la tua soluzione») legge una parola
+   al posto del segno: «Inviato», «Consegnato», «Letto» (`role="img"`
+   con l'`aria-label`, che il traduttore porta in inglese). */
 /* PURA: le cifre del server, pulite — o null */
 function spunteDalServerChatScP2P(sp){
   if (!sp || typeof sp !== 'object') return null;
@@ -124158,7 +124165,8 @@ function spuntaChatScP2P(m, sp){
   if (n <= 0) return '';
   const vista = n <= (sp.visto | 0);
   const doppia = vista || n <= (sp.arrivato | 0);
-  return ' <span class="chatsc-spunte' + (vista ? ' vista' : '') + '" aria-hidden="true">'
+  return ' <span class="chatsc-spunte' + (vista ? ' vista' : '') + '" role="img" aria-label="'
+    + (vista ? 'Letto' : doppia ? 'Consegnato' : 'Inviato') + '">'
     + (doppia ? '✓✓' : '✓') + '</span>';
 }
 function oraBreveChatScP2P(ts){
