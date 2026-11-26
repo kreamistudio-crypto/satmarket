@@ -2888,6 +2888,7 @@ pubblico: no
 frase: In «Cerco» il budget si scrive anche in euro, e scegli per quanto tenere aperta la richiesta: 30, 60 o 90 giorni. E se vuoi sapere quando qualcuno cerca qualcosa, nel Profilo c'è «🙋 Avvisami delle nuove richieste di Cerco»: ti arriva un messaggio col tasto «Offri», per le categorie scelte negli avvisi, al massimo 3 al giorno.
 dove: Esplora → «Cerco»; Profilo → Impostazioni → Avvisi → blocco «Mercatino».
 leva: RICHIESTE (accesa di serie); l'interruttore resta spento finché non lo accendi
+pubblico: no
 
 <!-- pezzo novita-161 | novita -->
 ## Novità · 2026-11-26 · chat-spunte
