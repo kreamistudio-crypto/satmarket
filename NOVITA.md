@@ -1024,3 +1024,9 @@ frase: Nella scheda di un annuncio compaiono due tendine: «Info di spedizione»
 dove: La scheda di un annuncio, sotto la descrizione («Info di spedizione») e in fondo («Altri articoli del negozio»); P2P → Libro ordini → un ordine → «Metodi di pagamento accettati».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-26 · negozio-ordini-p2p
+frase: Nel negozio di chi scambia sul P2P compare «I suoi ordini P2P»: le card dei suoi ordini aperti, come nella fila della home. Un ordine scaduto o preso sparisce da solo. Il primo è JJ, che porta su Barattolo gli scambi in contanti del suo gruppo Telegram.
+dove: Il negozio di un venditore, sopra «In vetrina in questo negozio».
+leva: nessuna
+pubblico: sì

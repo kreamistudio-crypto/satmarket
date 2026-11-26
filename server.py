@@ -4832,10 +4832,18 @@ async def _collega_negozio_racconto(slug: str, r: dict, testo, admin_id,
         raise HTTPException(400, "Incolla il link del negozio o il suo codice")
     con = db()
     try:
+        # ...E LO USERNAME (26 nov 2026, cantiere jj-p2p): il link del
+        # negozio di JJ era /negozio/Nojobact, lo username, e non si
+        # collegava. Stessa precedenza di /api/negozio: prima il codice,
+        # poi il nome a scelta, per ultimo lo username (uno username
+        # uguale al codice di un altro negozio non se lo prende)
         v = con.execute(
             "SELECT negozio, nome FROM utenti WHERE negozio=? OR "
-            "(negozio_slug=? COLLATE NOCASE AND negozio_slug!='') LIMIT 1",
-            (cod, cod)).fetchone()
+            "(negozio_slug=? COLLATE NOCASE AND negozio_slug!='') OR "
+            "(username=? COLLATE NOCASE AND username!='') "
+            "ORDER BY CASE WHEN negozio=? THEN 0 WHEN negozio_slug=? "
+            "COLLATE NOCASE THEN 1 ELSE 2 END LIMIT 1",
+            (cod, cod, cod, cod, cod)).fetchone()
     finally:
         con.close()
     if not (v and v["negozio"]):

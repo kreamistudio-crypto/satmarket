@@ -15748,6 +15748,14 @@ document.getElementById('cartello')?.remove();</script>
          schermata. Le porte verso «Il pagamento protetto» scendono a
          DUE — la riga di Esplora (che e' anche la tappa del tour) e il
          bottone in fondo al Profilo — e nessuna delle due era questa. -->
+    <!-- GLI ORDINI P2P DEL NEGOZIO (26 nov 2026, cantiere jj-p2p): una
+         fila come quella di Esplora, con i soli ordini aperti di chi
+         vende qui. Nasce nascosta e la accende `negozioOrdiniP2P` solo
+         se trova almeno una card: un ordine scaduto o preso non c'e'. -->
+    <div id="negozioP2P" class="negozio-p2p" style="display:none">
+      <div class="section-label">I suoi ordini P2P</div>
+      <div class="p2p-vt-fila" id="negozioP2PFila"></div>
+    </div>
     <div class="section-label" id="negozioVetrinaTit">In vetrina in questo negozio</div>
     <!-- LE DUE PROMESSE DEL NEGOZIO stanno QUI dall'ago 2026
          (decisione di Andrea): erano in testata, sopra il nome del
@@ -30388,8 +30396,10 @@ function negozioInAttesa(chi){
   negozioBozzaMod = false;
   el('negozioHeader').innerHTML = '<div class="negozio-attesa" role="status"'
     + ' aria-label="Carico il negozio"><span class="attesa-anello"></span></div>';
-  ['negozioFeedback', 'negozioPromesse', 'negozioGrid', 'negozioEsauriti']
+  ['negozioFeedback', 'negozioPromesse', 'negozioGrid', 'negozioEsauriti', 'negozioP2PFila']
     .forEach(id => { const n = el(id); if (n) n.innerHTML = ''; });
+  const p2p = el('negozioP2P');
+  if (p2p) p2p.style.display = 'none';
   const tit = el('negozioVetrinaTit');
   if (tit) tit.style.display = 'none';
 }
@@ -31086,7 +31096,12 @@ function linkVideoRacconto(u){
   if (m) return `https://www.youtube.com/watch?v=${m[1]}`;
   const t = /^https:\/\/t\.me\/([A-Za-z][A-Za-z0-9_]{4,31})(\?start=[A-Za-z0-9_-]{1,64})?$/
     .exec(String(u || ''));
-  return t ? `https://t.me/${t[1]}${t[2] || ''}` : '';
+  if (t) return `https://t.me/${t[1]}${t[2] || ''}`;
+  /* E L'INVITO A UN GRUPPO (26 nov 2026, cantiere jj-p2p, Andrea per la
+     pagina di JJ: il link al suo gruppo privato). La forma e' quella di
+     `linkCanaleToccabile`: `+` e 8-64 caratteri, niente dopo */
+  const g = /^https:\/\/t\.me\/\+([A-Za-z0-9_-]{8,64})$/.exec(String(u || ''));
+  return g ? `https://t.me/+${g[1]}` : '';
 }
 /* dentro Telegram il link esce dalla Mini App col suo openLink (come i
    link dei banner), e quello di Telegram con openTelegramLink, che apre
@@ -31169,7 +31184,11 @@ function annuncioAbbonamentoNegozio(){
 function acquistaDalRacconto(){
   const abbo = annuncioAbbonamentoNegozio();
   if (abbo) { openDetail(abbo); return; }
-  const t = el('negozioVetrinaTit');
+  /* un negozio di soli scambi P2P (26 nov 2026, cantiere jj-p2p): si
+     scende ai suoi ordini, perche' la vetrina degli oggetti e' vuota */
+  const p2p = el('negozioP2P');
+  const t = p2p && p2p.style.display !== 'none'
+    && !document.querySelector('#negozioGrid .card') ? p2p : el('negozioVetrinaTit');
   if (t) t.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth',
                            block: 'start'});
 }
@@ -31557,6 +31576,9 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       <div class="section-label" style="margin-top:16px">Esauriti di recente</div>
       <div class="grid" style="margin-top:12px">${fin.map(cardHTML).join('')}</div>`;
   }
+  /* gli ordini P2P di chi vende qui (26 nov 2026, cantiere jj-p2p):
+     arrivano dopo, dalla fotografia del libro */
+  negozioOrdiniP2P(v);
   armaViste();
   go('negozio');
 }
@@ -118318,6 +118340,60 @@ function renderVetrinaP2P(){
   if (firma === p2pVetrinaFirma) return;
   p2pVetrinaFirma = firma;
   filaCardP2P(html, via, attesa);
+}
+/* GLI ORDINI P2P NEL NEGOZIO (26 nov 2026, cantiere jj-p2p, Andrea per
+   la pagina di JJ: «possiamo mettere una card sua che ha pubblicato nel
+   peer to peer o più card», e «quando scade l'annuncio peer to peer
+   potrebbe essere un problema»). Le card sono quelle della fila di
+   Esplora, dalla STESSA fotografia (`chiediFotoVetrinaP2P`) e con le
+   STESSE regole (`ordiniVetrinaP2P`: vivi, non scaduti, non in pausa),
+   quindi un ordine scaduto o preso sparisce da solo, e senza card il
+   riquadro non c'e'. Di chi e' un ordine lo dice il volto che il server
+   gli attacca (`negozio`: il codice, o lo username), che arriva solo a
+   chi ha una sessione, come nella fila: nessuna rotta nuova.
+   PURA: legge solo i volti in memoria. Sul proprio negozio si vedono
+   anche i propri, a differenza della fila (li' sono tolti perche' non si
+   possono prendere): qui il negozio si guarda com'e'. */
+function ordiniP2PNegozio(v, foto, lib, adesso){
+  const chi = String((v && (v.negozio || v.username)) || '');
+  if (!chi) return [];
+  const suo = f => !!f && String(f.negozio || '') === chi;
+  const ln = ordiniVetrinaP2P(foto, adesso, id => !suo(p2pFacce[id]))
+    .map(o => [Number(o.creato) || 0, cardVetrinaP2P(o)]);
+  const oc = (lib && typeof ordiniOnchainVetrinaP2P === 'function'
+      ? ordiniOnchainVetrinaP2P(Object.assign({}, lib, {miei: []}), adesso) : [])
+    .filter(o => suo(o))
+    .map(o => [Number(o.creato) || 0, cardVetrinaOnchainP2P(o)]);
+  return ln.concat(oc).sort((a, b) => b[0] - a[0])
+    .slice(0, P2P_VETRINA_MAX).map(x => x[1]);
+}
+async function negozioOrdiniP2P(v){
+  const box = el('negozioP2P'), fila = el('negozioP2PFila');
+  if (!box || !fila) return;
+  box.style.display = 'none';
+  fila.innerHTML = '';
+  const titV = el('negozioVetrinaTit');
+  if (titV) titV.style.display = '';
+  if (DEMO || !v || !(v.negozio || v.username)) return;
+  try { await chiediFotoVetrinaP2P(); } catch(e) { return; }
+  /* nel frattempo si e' aperto un altro negozio: il suo disegno e' suo */
+  if (negozioCorrente !== v) return;
+  const foto = p2pVetrinaFoto && Array.isArray(p2pVetrinaFoto.eventi) && p2pVetrinaFoto.eventi.length
+    ? Object.assign({}, p2pVetrinaFoto, {ordini: libroDaEventi(p2pVetrinaFoto.eventi).ordini})
+    : p2pVetrinaFoto;
+  const html = ordiniP2PNegozio(v, foto,
+    typeof p2pOnchainLibro !== 'undefined' ? p2pOnchainLibro : null);
+  if (!html.length) return;
+  fila.innerHTML = html.join('');
+  box.style.display = '';
+  /* SENZA OGGETTI IN VETRINA, niente «Il barattolo qui è vuoto» sotto le
+     card: il negozio non e' vuoto, vende sats. Titolo e griglia tornano a
+     ogni apertura (`apriNegozio`, `renderNegozio`) */
+  if (!document.querySelector('#negozioGrid .card')) {
+    const tit = el('negozioVetrinaTit'), grid = el('negozioGrid');
+    if (tit) tit.style.display = 'none';
+    if (grid) grid.innerHTML = '';
+  }
 }
 /* LA FOTOGRAFIA PER LA FILA: una GET leggera, che il server serve dalla
    memoria (cache privata di 30 s: un rientro in Esplora subito dopo non

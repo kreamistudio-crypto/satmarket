@@ -55913,23 +55913,27 @@ def prove_racconti_bozza():
              # E UN BOT O UN CANALE DI TELEGRAM (24 nov 2026)
              "https://t.me/ilragiondomobot",
              "https://t.me/ilragiondomobot?start=ref_Ab-12",
-             "http://t.me/ilragiondomobot", "https://t.me/+NFNHpWpBvbc5ZWNk",
+             "http://t.me/ilragiondomobot", "https://t.me/+NFNHpWpBvbc5ZWNk/x",
              "https://t.me/abc", "https://t.me/ilragiondomobot?start=a b",
              'https://t.me/ilragiondomobot?start=a"b',
              "https://t.me/ilragiondomobot/../x",
              "https://t.me.evil.example/ilragiondomobot",
-             "https://t.me/ilragiondomobot?start=ok&x=1"]
+             "https://t.me/ilragiondomobot?start=ok&x=1",
+             # E L'INVITO A UN GRUPPO (26 nov 2026, cantiere jj-p2p)
+             "https://t.me/+NFNHpWpBvbc5ZWNk", "https://t.me/+abc",
+             "https://t.me/+NFNHpWpBvbc5ZWNk?x=1", "http://t.me/+NFNHpWpBvbc5ZWNk"]
     _out = subprocess.run(["node", "-e", _lv + "for (const u of "
                            + json.dumps(_casi) + ") console.log("
                            "JSON.stringify(linkVideoRacconto(u)))"],
                           capture_output=True, text=True, timeout=30)
-    prova("...che accetta solo le due forme del link di YouTube e il "
-          "link nudo di un bot o canale di Telegram",
+    prova("...che accetta solo le due forme del link di YouTube, il "
+          "link nudo di un bot o canale di Telegram e l'invito a un gruppo",
           ['"https://www.youtube.com/watch?v=5Y2g7uexfXA"'] * 2
           + ['""'] * 5
           + ['"https://t.me/ilragiondomobot"',
              '"https://t.me/ilragiondomobot?start=ref_Ab-12"']
-          + ['""'] * 8, _out.stdout.split())
+          + ['""'] * 8
+          + ['"https://t.me/+NFNHpWpBvbc5ZWNk"'] + ['""'] * 3, _out.stdout.split())
     # ---- 2. LA FORMA DEL CATALOGO ----------------------------------
     _f = re.search(r'FORMA_RACCONTO = re\.compile\(r"([^"]+)"\)', src)
     FORMA = re.compile(_f.group(1)) if _f else re.compile("$^")
@@ -55957,14 +55961,18 @@ def prove_racconti_bozza():
         # LA FOTO CHE APRE UN VIDEO (20 nov 2026): solo un link di
         # YouTube nelle due forme di condivisione, e con la sua scritta
         # E UN BOT O UN CANALE DI TELEGRAM (24 nov 2026)
-        prova("...e una foto con un link porta solo a un video di YouTube "
-              "o a un bot di Telegram, con la sua scritta", [],
+        # E L'INVITO A UN GRUPPO (26 nov 2026, cantiere jj-p2p)
+        prova("...e una foto con un link porta solo a un video di YouTube, "
+              "a un bot di Telegram o all'invito di un gruppo, con la sua "
+              "scritta", [],
               [b.get("n") for b in foto if "link" in b and not (
                   (re.fullmatch(r"https://(?:youtu\.be/|www\.youtube\.com/"
                                 r"watch\?v=)[A-Za-z0-9_-]{11}",
                                 str(b["link"]))
                    or re.fullmatch(r"https://t\.me/[A-Za-z][A-Za-z0-9_]{4,31}"
                                    r"(?:\?start=[A-Za-z0-9_-]{1,64})?",
+                                   str(b["link"]))
+                   or re.fullmatch(r"https://t\.me/\+[A-Za-z0-9_-]{8,64}",
                                    str(b["link"])))
                   and isinstance(b.get("link_testo"), str)
                   and b["link_testo"])])

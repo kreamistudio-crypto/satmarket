@@ -38915,6 +38915,25 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `apriVideoRacconto` dentro Telegram apre i t.me con
   `openTelegramLink`, gli altri con `openLink`. Il catalogo lo guarda
   `prove_racconti_bozza` con la stessa forma.
+  E L'INVITO A UN GRUPPO (26 nov 2026, JJ): anche `https://t.me/+<8-64
+  lettere, cifre, _ e ->` e niente dopo, la forma di
+  `linkCanaleToccabile`. Il 24 nov era scartato perche' non serviva;
+  adesso la pagina di JJ porta al suo gruppo privato.
+  GLI ORDINI P2P NEL NEGOZIO (26 nov 2026, JJ): `#negozioP2P`, sopra
+  «In vetrina in questo negozio», con le card della fila di Esplora
+  (`cardVetrinaP2P`, `cardVetrinaOnchainP2P`) dei soli ordini di chi
+  vende li'. `negozioOrdiniP2P` chiede la stessa fotografia
+  (`chiediFotoVetrinaP2P`) e la filtra con `ordiniVetrinaP2P` (vivi, non
+  scaduti, non in pausa) e col volto: `negozio` del volto (codice, o
+  username) uguale a quello del negozio. Nessuna rotta nuova e nessun
+  tg_id: i volti arrivano solo a chi ha una sessione, quindi chi guarda
+  da anonimo non vede il riquadro (salvo gli on-chain, che portano il
+  `negozio` nella riga). Senza card il riquadro resta nascosto; con le
+  card e nessun oggetto in vetrina, titolo e «Il barattolo qui è vuoto»
+  spariscono, e «Acquista» del racconto scende alle card. Sul proprio
+  negozio si vedono anche i propri ordini. Non guarda `P2P_IN_VETRINA`:
+  quella leva decide la fila della home; qui decide il server con la
+  leva del P2P (fotografia vuota a P2P spento).
   LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
   `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
   Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);
