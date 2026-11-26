@@ -127302,7 +127302,8 @@ def prove_profilo_elegante():
         "grpSpedizioni": ["accSpedizioniere", "accSpedGratis", "accScontoPacco",
                           "accCodici", "accPremiFedelta"],
         "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro"],
-        "grpIncassi": ["accLnAddress", "accComeRicevi", "accOnchainIncasso", "accNwc"],
+        # (26 nov 2026) la valuta di «Non hai sats?», sotto la Lightning address
+        "grpIncassi": ["accLnAddress", "accViaEuroValuta", "accComeRicevi", "accOnchainIncasso", "accNwc"],
         # (14 nov 2026) le recensioni ricevute, prima del livello
         # (17 nov 2026) ...e la porta della stradina degli obiettivi, poi quella
         # della Caccia a Tappo
@@ -143001,6 +143002,9 @@ def prove_cambio_converte():
         "toggleValutaSoglia": "conserva",
         # P2P: si sceglie la valuta FIAT dell'ordine, non sats ⇄ €
         "apriValutaP2P": "fiat", "scegliValutaP2P": "fiat",
+        # «Non hai sats?» (26 nov 2026): la valuta in cui si paga senza
+        # sats, euro o franchi; nessun numero scritto da convertire
+        "sceltaViaEuroValuta": "fiat",
         # la modifica di piu' annunci insieme (16 ott 2026): il prezzo
         # FISSO in blocco. Il bottone dice su QUALI listini vale (sats o
         # euro: gli altri restano fuori, «valuta»), quindi il numero
@@ -215814,7 +215818,7 @@ console.log(JSON.stringify([7, 8, 9, 10, 0, 11].map(n => (viaEuroScambioDellOrdi
     # --- la scelta, in node ------------------------------------------------
     prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
             + _riga_js(mini, "const VIA_EURO_MARGINE = ")
-            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo){")
+            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk){")
             + r"""
 const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
   euro: 10, euroMax: 100, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
@@ -215834,6 +215838,11 @@ r.scartati = viaEuroScelta([O('a', {lato: 'buy'}), O('b', {fiat: 'USD'}), O('c',
 r.pari = viaEuroScelta([O('a', {creato: 5}), O('b', {creato: 9})], 40000, per, 0.02, {});
 r.storti = [viaEuroScelta([O('a')], 0, per, 0.02, {}), viaEuroScelta([O('a')], 100, 0, 0.02, {}),
             viaEuroScelta(null, 100, per, 0.02, {})];
+// (26 nov 2026) i franchi: solo ordini in CHF, solo TWINT e Revolut
+const CHF = ['TWINT', 'Revolut'];
+r.chf = viaEuroScelta([O('a', {metodi: ['TWINT']}), O('b', {fiat: 'CHF', metodi: ['Bonifico CH', 'Wise']}),
+  O('c', {fiat: 'CHF', metodi: ['Bonifico CH', 'TWINT', 'Revolut'], premium: 3})], 40000, per, 0.02, {}, [], 'CHF', CHF);
+r.chfNoEuro = viaEuroScelta([O('a', {metodi: ['SEPA Instant']})], 40000, per, 0.02, {}, [], 'CHF', CHF);
 console.log(JSON.stringify(r));
 """)
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
@@ -215866,6 +215875,92 @@ console.log(JSON.stringify(r));
           None, r["scartati"])
     prova("...a parita' di cifra il piu' recente", "b", r["pari"]["id"])
     prova("...e senza sats, cambio o libro: niente", [None, None, None], r["storti"])
+    prova("in franchi (26 nov 2026): solo ordini in CHF, solo TWINT e "
+          "Revolut (il bonifico svizzero no), e la valuta nell'offerta",
+          ["c", ["TWINT", "Revolut"], "CHF", None],
+          [r["chf"]["id"], r["chf"]["metodi"], r["chf"]["fiat"], r["chfNoEuro"]])
+    prova("...e in euro l'offerta lo dice", "EUR", r["base"]["fiat"])
+
+    # --- i franchi: la valuta dal fuso, la scelta a mano, le parole ---------
+    prog_chf = ("let _ls = {}; const localStorage = {getItem: k => _ls[k] || null, "
+                "setItem: (k, v) => { _ls[k] = String(v); }, removeItem: k => { delete _ls[k]; }};\n"
+                "let _fuso = 'Europe/Rome', _visto = true;\n"
+                "const Intl = {DateTimeFormat: () => ({resolvedOptions: () => ({timeZone: _fuso})})};\n"
+                "function chfVistoP2P(){ return _visto; }\n"
+                + _riga_js(mini, "const VIA_EURO_FUSI_CHF = ")
+                + mini[mini.index("const P2P_CHF_PAROLE = ["):
+                       mini.index("];", mini.index("const P2P_CHF_PAROLE = [")) + 2] + "\n"
+                + _fn_js(mini, "function viaEuroValutaScelta(){")
+                + _fn_js(mini, "function viaEuroValuta(){")
+                + _fn_js(mini, "function viaEuroDi(o, testo){")
+                + "function chfP2P(o){ return String(o.fiat).toUpperCase() === 'CHF'; }\n"
+                + "function usdtP2P(){ return false; }\n"
+                + _fn_js(mini, "function paroleUsdtP2P(o, testo){")
+                + r"""
+const r = {};
+r.roma = viaEuroValuta();
+_fuso = 'Europe/Zurich'; r.zurigo = viaEuroValuta();
+_fuso = 'Europe/Vaduz'; r.vaduz = viaEuroValuta();
+localStorage.setItem('viaEuroValuta', 'EUR'); r.sceltaEuro = viaEuroValuta();
+_fuso = 'Europe/Rome'; localStorage.setItem('viaEuroValuta', 'CHF'); r.sceltaChf = viaEuroValuta();
+localStorage.setItem('viaEuroValuta', 'XYZ'); r.storta = viaEuroValuta();
+_visto = false; _fuso = 'Europe/Zurich'; localStorage.setItem('viaEuroValuta', 'CHF'); r.nonVisto = viaEuroValuta();
+const chf = {fiat: 'CHF'}, eur = {fiat: 'EUR'};
+r.manda = viaEuroDi(chf, '1. Manda 43 € a Alan con i dati qui sotto');
+r.tasto = viaEuroDi(chf, 'Ho inviato gli euro');
+r.passo2 = viaEuroDi(chf, '2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l\'acquisto salta e rischi di perdere gli euro che hai mandato.');
+r.euro = viaEuroDi(eur, 'Ho inviato gli euro');
+console.log(JSON.stringify(r));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog_chf)
+        nome_chf = f.name
+    try:
+        out_chf = _sp.run(["node", nome_chf], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome_chf)
+    if out_chf.returncode != 0:
+        prova("i franchi girano in node", "", out_chf.stderr[-300:])
+    else:
+        rc = _js.loads(out_chf.stdout)
+        prova("la valuta dal fuso del telefono: Zurigo e Vaduz franchi, il "
+              "resto euro (26 nov 2026)", ["EUR", "CHF", "CHF"],
+              [rc["roma"], rc["zurigo"], rc["vaduz"]])
+        prova("...la scelta a mano vince sul fuso, una scelta storta no, e "
+              "senza il P2P in franchi e' sempre euro", ["EUR", "CHF", "EUR", "EUR"],
+              [rc["sceltaEuro"], rc["sceltaChf"], rc["storta"], rc["nonVisto"]])
+        prova("...e le parole dei franchi gia' approvate per il P2P in CHF: "
+              "«Manda 43 CHF», «Ho inviato i franchi»; in euro restano",
+              ["1. Manda 43 CHF a Alan con i dati qui sotto", "Ho inviato i franchi",
+               "2. Poi torna qui e tocca «Ho inviato i franchi»: se non lo tocchi in "
+               "tempo, l'acquisto salta e rischi di perdere i franchi che hai mandato.",
+               "Ho inviato gli euro"],
+              [rc["manda"], rc["tasto"], rc["passo2"], rc["euro"]])
+    off = _fn_js(mini, "function viaEuroOfferta(sats){")
+    prova("...l'offerta: in franchi i soli TWINT e Revolut, il tetto in euro "
+          "solo per gli euro, e sopra il tetto del giroconto niente", True,
+          "valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI" in off
+          and "if (valuta === 'EUR' && (!(myViaEuroMax > 0) || o.euro > myViaEuroMax)) return null;" in off
+          and "if (myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats) return null;" in off
+          and "const VIA_EURO_METODI_CHF = ['TWINT', 'Revolut'];" in mini
+          and 'profilo["via_euro_tetto_sats"] = int(GIROCONTO_TETTO_SATS or 0)' in srv
+          and "myViaEuroTettoSats = Math.max(0, Math.floor(Number(me.via_euro_tetto_sats) || 0));" in mini)
+    rv = _fn_js(mini, "function renderViaEuro(){")
+    prova("...il foglio del prezzo col segno della valuta e il cambio della "
+          "sua moneta", True,
+          "const segno = o.fiat === 'CHF' ? 'CHF' : '€';" in rv
+          and "viaEuroSats * viaEuroPerSat(o.fiat || 'EUR')" in rv
+          and "' €</div>'" not in rv)
+    prova("...nel profilo la scelta, solo a chi ha la porta e il P2P in "
+          "franchi, chiamata da renderProfilo", True,
+          'id="accViaEuroValuta" style="display:none"' in mini
+          and "const si = viaEuroPerMe() && typeof chfVistoP2P === 'function' && chfVistoP2P();"
+              in _fn_js(mini, "function renderViaEuroValutaProfilo(){")
+          and "renderViaEuroValutaProfilo();" in _fn_js(mini, "function renderProfilo(){"))
+    prova("...e il promemoria degli euro, in franchi, passa dal traduttore "
+          "DOPO la frase di «Non hai sats?»", True,
+          "resto_s) or testo\n                # ...in franchi con le parole dei franchi" in srv
+          and "testo = _chf_fr(testo)" in srv)
 
     # --- i passi dopo «Continua» (secondo giro) ------------------------------
     rp = _fn_js(mini, "function renderViaEuroPasso(){")

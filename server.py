@@ -57619,6 +57619,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # un wallet nel profilo e con un venditore di sats pronto nel libro
     profilo["via_euro"] = via_euro_ammesso(user["id"])
     profilo["via_euro_max_euro"] = int(VIA_EURO_MAX_EURO or 0)
+    # ...e il tetto in sats del giroconto (26 nov 2026, i franchi): in CHF
+    # il tetto in euro non c'e' (Andrea), ma oltre questo la riserva non
+    # salda — il telefono non propone quel che il server rifiuterebbe
+    profilo["via_euro_tetto_sats"] = int(GIROCONTO_TETTO_SATS or 0)
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -79593,6 +79597,12 @@ def _scarica_attese_p2p(con, adesso: int, bottoni: dict = None) -> tuple:
                 testo = _sollecito_via_euro(
                     str(r["momento"]), _nome_altro_p2p(con, r["ordine"], r["tg_id"], adesso),
                     resto_s) or testo
+                # ...in franchi con le parole dei franchi (26 nov 2026): il
+                # traduttore qui sopra e' passato prima di questa frase
+                _chf_ve = globals().get("p2p_chf_ordine")
+                _chf_fr = globals().get("p2p_chf_frase")
+                if _chf_ve and _chf_fr and _chf_ve(con, r["ordine"]):
+                    testo = _chf_fr(testo)
         except Exception as e:
             print(f"⚠️ Attese P2P: {corto} il promemoria di «Non hai sats?» non "
                   f"si fa ({type(e).__name__}: {e}): resta quello di sempre", flush=True)
