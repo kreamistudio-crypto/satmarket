@@ -188700,8 +188700,10 @@ def prove_canale_admin():
           # il certificato vicino alla scadenza: negli errori
           # (25 nov 2026, grazie-zap) lo zap generoso col comando del
           # premio pronto: nei riepiloghi, come la quota di swap@
+          # (26 nov 2026, cerco-moderazione) la richiesta nuova di «Cerco»:
+          # nella moderazione
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 41,
-           "liquidita": 5, "moderazione": 28, "riepiloghi": 31}, per_stanza)
+           "liquidita": 5, "moderazione": 29, "riepiloghi": 31}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -188739,7 +188741,7 @@ def prove_canale_admin():
                                               "avvisa_profilo_mio",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "128 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "129 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -188771,7 +188773,8 @@ def prove_canale_admin():
           "nome e la foto scelti da approvare; e la pagina collegata a un "
           "negozio dal pannello; dal 25 nov il servizio del quadro che tace "
           "o torna, e il certificato vicino alla scadenza; e lo zap "
-          "generoso col comando del premio)", 128,
+          "generoso col comando del premio; dal 26 nov la richiesta nuova "
+          "di «Cerco»)", 129,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -206061,10 +206064,22 @@ def prove_richieste():
           "che apre la richiesta, la cifra coi puntini", [True, True, True],
           ["deposito di garanzia" in avv,
            '"Offri", link_telegram("cerco", richiesta_id)' in avv,
-           "_fmt_sats(rich['budget_sats'])" in avv])
+           "budget = _riga_budget_richiesta(rich)" in avv])
+    _rb = srv[srv.index("def _riga_budget_richiesta("):]
+    _rb = _rb[:_rb.index("\n\n\n")]
     # (26 nov 2026) il budget anche in euro, e la durata a scelta
     prova("l'avviso dice il budget in euro quando e' in euro", True,
-          '_fmt_eur(rich["budget_eur"])' in avv or "_fmt_eur(rich['budget_eur'])" in avv)
+          "_fmt_eur(rich['budget_eur'])" in _rb and "_fmt_sats(rich['budget_sats'])" in _rb)
+    # (26 nov 2026) l'avviso ai moderatori: nella stanza «Moderazione», con
+    # la sua leva, lanciato dalla nascita della richiesta
+    _am = srv[srv.index("async def _avvisa_moderatori_richiesta("):]
+    _am = _am[:_am.index("\n\n\n")]
+    prova("ogni richiesta nuova avvisa i moderatori, con la sua leva accesa di serie",
+          [True, True, True, True],
+          ["asyncio.create_task(_avvisa_moderatori_richiesta(rid))" in srv,
+           "if not RICHIESTE_AVVISO_MODERATORI:" in _am,
+           'argomento="moderazione"' in _am,
+           "RICHIESTE_AVVISO_MODERATORI = True" in srv])
     prova("le durate sono tre, di serie la prima (30 giorni)", [True, True],
           ["RICHIESTE_DURATE = (30, 60, 90)" in srv,
            "RICHIESTE_GIORNI = RICHIESTE_DURATE[0]" in srv])
@@ -206073,7 +206088,8 @@ def prove_richieste():
     _testi = codice(_blocco).lower() if "codice" in globals() else _blocco.lower()
     prova("lessico: mai «assicurat» ne' «escrow» nei testi di «Cerco»", True,
           "assicurat" not in _testi and "escrow" not in _testi)
-    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 3,
+    # tre nell'avviso ai moderatori (26 nov 2026): testo, categoria, nome
+    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 6,
           _blocco.count("html.escape("))
     _pub = srv[srv.index("async def pubblica("):]
     _pub = _pub[:_pub.index("\n@app.")]

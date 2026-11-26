@@ -105,6 +105,9 @@ MODERAZIONE_AI = False
 RICHIESTE = True
 RICHIESTE_SOLO_MODERATORI = False
 RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
+# Ogni richiesta nuova avvisa i moderatori nella stanza «Moderazione»
+# del gruppo degli admin (26 nov 2026); False la spegne.
+RICHIESTE_AVVISO_MODERATORI = True
 
 # --- L'assistente del bot (28 ott 2026, cantiere bot-assistente) -----
 # Chi scrive una domanda al bot riceve la risposta di Claude, che si
