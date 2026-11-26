@@ -77461,7 +77461,7 @@ def _premio_canale_p2p(lato: str, premio: int) -> str:
 
 def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
                         premio=None, zona: str = "", valuta: str = "EUR",
-                        cifra_coin: str = "") -> str:
+                        cifra_coin: str = "", euro_max: float = 0) -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -77481,16 +77481,24 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     annunci normali, e ora anche qui."""
     verbo = "Compra" if lato == "compro" else "Vende"
     testo = f"🔁 <b>{verbo} BTC su Barattolo</b>"
+    # L'INTERVALLO, «da 20 a 100 €» (26 nov 2026, un utente via Tappo: «gli
+    # annunci p2p in barattolo vetrina segnano solo l'importo minimo
+    # nonostante sia un intervallo»). Le stesse parole del testo condiviso
+    # dell'app, `testoOrdineCondivisoP2P`, sulla STESSA riga: il post non
+    # si allunga (Andrea: «non ingrandire la card»). Senza un massimo
+    # sopra il minimo la cifra e' quella di ieri, byte per byte.
+    cifra = (f"da {_fmt_eur(euro)} a {_fmt_eur(euro_max)}"
+             if euro_max and euro_max > euro else _fmt_eur(euro))
     # IN FRANCHI (14 nov 2026, cantiere p2p-chf): la cifra col suo segno;
     # ogni altra valuta resta la riga di ieri, byte per byte
     if valuta == "CHF":
-        testo += f"\n🇨🇭 {_fmt_eur(euro)} CHF"
+        testo += f"\n🇨🇭 {cifra} CHF"
     # ...e in moneta la cifra nella moneta, «🪙 0,0153 ETH» (16 nov 2026,
     # p2p-monete-valute): l'euro e' solo il controvalore per il nodo
     elif cifra_coin:
         testo += f"\n🪙 {html.escape(cifra_coin)}"
     else:
-        testo += f"\n💶 {_fmt_eur(euro)} €"
+        testo += f"\n💶 {cifra} €"
     # IL PREMIO DI BARATTOZON (26 set 2026): a prezzo fisso non sta in
     # nessun campo del libro, e chi legge il canale e' lo stesso che
     # legge la card — le stesse parole. Per gli altri ordini `None`, e
@@ -77563,6 +77571,19 @@ async def annuncia_ordine_p2p_canale(req: Request,
         raise HTTPException(400, "Importo storto")
     if not (0 < euro <= MAX_EURO_P2P_CANALE):
         raise HTTPException(400, "Importo fuori misura")
+    # IL CAPO ALTO DI UN INTERVALLO (26 nov 2026): facoltativo, e uno
+    # storto NON e' un 400 — un client di ieri non lo manda e la vetrina
+    # non deve fermare nessuno: si ignora e il post dice il minimo, come
+    # ieri. Buono solo sopra il minimo e dentro lo stesso argine.
+    euro_max = 0
+    try:
+        em = d.get("euro_max")
+        if em is not None and not isinstance(em, bool):
+            em = round(float(em), 2)
+            if euro < em <= MAX_EURO_P2P_CANALE:
+                euro_max = em
+    except (TypeError, ValueError):
+        euro_max = 0
     metodo = str(d.get("metodo") or "").strip()
     if not metodo or len(metodo) > MAX_METODO_P2P_CANALE:
         raise HTTPException(400, "Metodo di pagamento storto")
@@ -77714,7 +77735,7 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 "venditore_negozio": (riga["negozio"] if riga else "") or "",
             }
             caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,
-                                          valuta, cifra_coin)
+                                          valuta, cifra_coin, euro_max)
             # i post usciti, per toglierli quando l'ordine esce dal libro
             # (LA VETRINA CHE SI PULISCE, 18 nov 2026)
             usciti = []

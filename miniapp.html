@@ -112509,7 +112509,9 @@ async function inviaNuovoOrdineP2P(confermato){
      ⚠️ SU UN INTERVALLO IL POST DICE IL MINIMO, ed e' un mezzo vero
      DICHIARATO: la rotta vuole un intero e «20–100» non ci passa. Il
      capo basso e' il prezzo d'ingresso, quindi non e' una bugia — ma
-     racconta meno dell'ordine. Chi tocca quella rotta lo sistemi la'. */
+     racconta meno dell'ordine. Chi tocca quella rotta lo sistemi la'.
+     SISTEMATO IL 26 NOV 2026 (un utente via Tappo): il capo alto viaggia
+     a parte, `euro_max`, e il post dice «💶 da 20 a 100 €». */
   /* IN MONETA (16 nov 2026, p2p-monete-valute) la rotta vuole lo stesso
      un intero in euro — il controvalore del filo — e la cifra viaggia a
      parte; le cinque reti di USDe si dicono in breve, che il metodo del
@@ -112569,7 +112571,10 @@ async function inviaNuovoOrdineP2P(confermato){
                       /* la valuta dei franchi (14 nov 2026, cantiere p2p-chf) */
                       coinOrd ? coinOrd.cod : typeof chfP2P === 'function' && chfP2P(agg) ? 'CHF' : '',
                       /* ...e la cifra della moneta (16 nov 2026) */
-                      coinOrd ? testoQuantoCoinP2P(ord.euro, coinOrd.cod) : '');
+                      coinOrd ? testoQuantoCoinP2P(ord.euro, coinOrd.cod) : '',
+                      /* ...e il capo alto dell'intervallo (26 nov 2026): in
+                         moneta no, la' il post dice la cifra della moneta */
+                      coinOrd ? 0 : ord.euroMax);
     /* LA SPUNTA: il coordinatore ha risposto, l'ordine e' nel libro.
        Si ridisegna PRIMA la pagina sotto, cosi' quando il velo scende
        dice gia' «Ordine pubblicato» anche lei. */
@@ -122811,13 +122816,17 @@ function convenienzaCanaleP2P(ord){
   const p = Number(ord.premium);
   return Number.isFinite(p) ? Math.round(p) : null;
 }
-async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra){
+async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra, euroMax){
   if (DEMO || VETRINA || !myTgId) return;
   /* `premio`: per Barattozon il premio scelto (26 set 2026), che a
      prezzo fisso non sta in nessun campo del libro; dal 10 nov 2026
      anche la convenienza di ogni altro ordine (`convenienzaCanaleP2P`).
      Quando non si sa la chiave non c'e' e il post tace */
   const corpo = {lato: lato, euro: euro, metodo: metodo};
+  /* IL CAPO ALTO DI UN INTERVALLO (26 nov 2026, un utente via Tappo: la
+     vetrina diceva solo il minimo): il post scrive «💶 da 20 a 100 €»,
+     sulla stessa riga. Senza intervallo la chiave non c'e' */
+  if (Number(euroMax) > Number(euro)) corpo.euro_max = Number(euroMax);
   if (Number.isInteger(premio)) corpo.premio = premio;
   /* la valuta, solo per i franchi (14 nov 2026, cantiere p2p-chf): il
      server scrive «CHF» invece di «€», e senza resta l'euro di sempre */

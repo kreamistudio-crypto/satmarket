@@ -96799,3 +96799,32 @@ COSA. La foto 3 della pagina «bitcoinlabs» in racconti.py porta a `https://t.m
 PERCHÉ. Il 24 nov si aspettava un `?start=` sul bot, e l'invito era fra i casi rifiutati dalle prove. Il bot invece dà un invito al gruppo, e per le sue regole (/rules) conta solo chi entra DAL link, e il primo link usato. Nessuna scritta nuova: resta «Entra in BitcoinLabs».
 PROVATO. Le sentinelle del giudice sono quelle di jj-p2p (`prove_racconti_bozza`); il catalogo con l'invito di Andrea passa il controllo della forma. Suite severa e collaudi. Carmrain ha confermato ad Andrea che il 10% vale anche sui corsi venduti su Barattolo, dove si entra col link usa e getta e non col referral.
 LA CARD, RITOCCATA. `assets/scoprire/bitcoinlabs.webp`, stessa card 1 della maschera (scelta definitiva di Andrea dopo le prove 3-7), ma le due pillole «Corsi in sats» e «Podcast e contenuti liberi» col contorno grigio scuro (#3a4652, 1,5 px, fondo #141f2a) al posto dell'arancio pieno: «troppo arancioni». Scelta fra tre (bianco velato, arancio tenue, grigio). 1040x498, WebP 82. Il file si ridisegna sotto lo stesso nome: la rotta è no-cache con ETag, nessun timbro da cambiare.
+
+
+## Il massimo degli ordini P2P a intervallo nel post della vetrina (26 nov 2026, cantiere vetrina-p2p-massimo; un utente via Tappo: «gli annunci p2p in barattolo vetrina segnano solo l'importo minimo nonostante sia un intervallo»)
+
+IL CASO. Il post che `/api/p2p/canale` scrive nei canali (Barattolo
+Vetrina, Subito Crypto, BitcoinPodcast) diceva «💶 20,00 €» anche per un
+ordine da 20 a 100 €. Non l'avevamo tolto per spazio: era un mezzo vero
+DICHIARATO da set 2026 nel client (la rotta voleva un numero solo, e il
+ridisegno del foglio le passava il minimo). Le card dell'app il massimo
+lo mostravano già («da 20 a 100 €», sotto «scegli tu»).
+LA CURA. Il client manda a parte il capo alto, `euro_max`, solo se sta
+sopra il minimo e mai in moneta (là il post dice la cifra della moneta).
+La rotta lo legge facoltativo: uno storto, sotto o pari al minimo, o
+oltre `MAX_EURO_P2P_CANALE` non è un 400, si ignora e il post dice il
+minimo come ieri (un client vecchio non lo manda). `_caption_canale_p2p`
+scrive «💶 da 20,00 a 100,00 €» (in franchi «🇨🇭 da 20,00 a 100,00 CHF»)
+SULLA STESSA RIGA: il post non si allunga (Andrea: «non ingrandire la
+card»). Le parole sono quelle già dell'app (`testoOrdineCondivisoP2P`,
+`capiP2P`): nessuna scritta nuova.
+STRADE SCARTATE. Una seconda riga col massimo o coi sats (allunga il
+post); i sats dell'intervallo (la cifra la sceglie chi prende, come
+dice la card).
+PROVATO. `prove_p2p_canale` (la caption con intervallo in euro e
+franchi, stessa riga, senza massimo identica a ieri, la rotta e il
+client), `collaudo_freni` sulla rotta vera (intervallo nel post; sei
+massimi storti → 200 e solo il minimo), con controprova (rotta che
+ignora `euro_max` → rosso). Suite severa e collaudi.
+DA GUARDARE. Dopo la promozione, il prossimo ordine a intervallo nel
+canale. I post già usciti restano col minimo.

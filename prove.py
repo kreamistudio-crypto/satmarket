@@ -87644,6 +87644,27 @@ def prove_p2p_canale():
     prova("...mentre senza premio la caption e' quella di ieri, riga per riga", True,
           cap("vendo", 100, "Revolut", gino) == vende and "🏷️" not in vende
           and "🏷️" not in cap("vendo", 23.47, tab, gino))
+    # L'INTERVALLO (26 nov 2026, un utente via Tappo: la vetrina diceva il
+    # solo minimo). Le parole del testo condiviso dell'app, sulla stessa
+    # riga dell'euro (il post non si allunga), in euro e in franchi; un
+    # massimo assente, zero o non sopra il minimo lascia il post di ieri
+    _rg = cap("vendo", 20, "Revolut", gino, None, "", "EUR", "", 100)
+    prova("l'intervallo nel post: «💶 da 20,00 a 100,00 €», anche in franchi, stessa riga",
+          [True, True, True],
+          ["\n💶 da 20,00 a 100,00 €\n" in _rg,
+           "\n🇨🇭 da 20,00 a 100,00 CHF\n" in cap("vendo", 20, "Revolut", gino, None, "", "CHF", "", 100),
+           _rg.count("\n") == cap("vendo", 20, "Revolut", gino).count("\n")])
+    prova("...senza massimo, a zero o non sopra il minimo, il post e' quello di ieri",
+          [True, True, True],
+          [cap("vendo", 100, "Revolut", gino, None, "", "EUR", "", 0) == vende,
+           cap("vendo", 100, "Revolut", gino, None, "", "EUR", "", 100) == vende,
+           cap("vendo", 100, "Revolut", gino, None, "", "EUR", "", 50) == vende])
+    _rt = pezzo("annuncia_ordine_p2p_canale")
+    prova("...la rotta legge `euro_max` sopra il minimo e dentro l'argine, e uno storto non e' un 400",
+          [True, True, False],
+          ['em = d.get("euro_max")' in _rt,
+           "if euro < em <= MAX_EURO_P2P_CANALE:" in _rt,
+           "HTTPException" in _rt[_rt.index("euro_max = 0"):_rt.index('metodo = str(d.get("metodo")')]])
 
     # --- 2) LA ROTTA: STESSO GATE DELLE SORELLE P2P, E LEGGE IL VENDITORE
     rotta = pezzo("annuncia_ordine_p2p_canale")
@@ -87676,7 +87697,7 @@ def prove_p2p_canale():
           and "abs(premio) > P2P_PREMIO_CANALE_MAX" in rotta
           and 'raise HTTPException(400, "Premio storto")' in rotta
           # (10 ott 2026) ...e in coda la zona di scambio del contanti
-          and "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,\n                                          valuta, cifra_coin)" in rotta)
+          and "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,\n                                          valuta, cifra_coin, euro_max)" in rotta)
     prova("...e la scala e' quella del cursore del client", True,
           "P2P_PREMIO_CANALE_MAX = 20\n" in _SORGENTE
           and "const P2P_PREMIO_TAB_MAX = 20;" in open("miniapp.html", encoding="utf-8").read())
@@ -87692,7 +87713,7 @@ def prove_p2p_canale():
 
     # --- 4) IL CLIENT: CHI CHIAMA, E CON COSA -------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
-    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra){",
+    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra, euroMax){",
                    "\n}\n")
     # (26 set 2026) piu' il premio di Barattozon, e solo se e' un intero:
     # per gli altri ordini la chiave non c'e' e il corpo e' quello di ieri
@@ -87704,6 +87725,10 @@ def prove_p2p_canale():
           # quale aspettare nella fotografia: e' gia' pubblico nel libro
           and "if (ordine) corpo.ordine = String(ordine);" in ann
           and "body: JSON.stringify(corpo)" in ann)
+    prova("...e il capo alto dell'intervallo solo se sta sopra il minimo, e mai in moneta", [True, True],
+          ["if (Number(euroMax) > Number(euro)) corpo.euro_max = Number(euroMax);" in ann,
+           "coinOrd ? 0 : ord.euroMax);" in pezzo_js(
+               mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")])
     prova("sta fuori dal motore dello scambio", True,
           mini.index("async function annunciaCanaleP2P")
           > mini.index("/* ============ fine del motore dello scambio"))
@@ -97826,7 +97851,7 @@ DOM = null;
     # (26 set 2026) la firma ha il premio di Barattozon in piu': un
     # intero, che dal libro si ricava comunque — non un dato Amazon
     # (27 set 2026) e l'id dell'ordine, gia' pubblico nel libro
-    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra){", "\n}\n")
+    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra, euroMax){", "\n}\n")
     prova("il canale riceve importo e metodo per nome: niente PayCode, niente scadenza", True,
           "PayCode" not in _can and "tab" not in re.sub(r"/\*[\s\S]*?\*/", "", _can).lower()
           .replace("tabacchino", "").replace("metabase", ""))
@@ -178561,7 +178586,7 @@ def prove_contanti_zona():
           [True, True, False],
           # il terzo: fra la lettura della zona e il post non c'e' nessun 400 che la nomini
           ['zona = _zona_pulita_p2p(d.get("zona")) \\\n        if "Contanti" in _metodi_lista_p2p(metodo) else ""' in rc,
-           "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,\n                                          valuta, cifra_coin)" in rc,
+           "_caption_canale_p2p(lato, euro, metodo, venditore, premio, zona,\n                                          valuta, cifra_coin, euro_max)" in rc,
            "HTTPException" in rc[rc.index("zona = _zona_pulita_p2p"):rc.index("postato = False")]])
 
     def _zona_rotta(metodo, zona):
@@ -178571,7 +178596,7 @@ def prove_contanti_zona():
           [_zona_rotta("Contanti", " Milano  centro "), _zona_rotta("SEPA, Contanti", "Milano centro"),
            _zona_rotta("SEPA", "Milano centro"), _zona_rotta("Contanti al tabacchino", "Milano centro"),
            _zona_rotta("contanti", "Milano centro"), _zona_rotta("Contanti", QQ)])
-    ann = fn("async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra){")
+    ann = fn("async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra, euroMax){")
     prova("il client la mette nel corpo dalla riga del suo ordine, e solo se c'e'; la firma non e' cambiata", True,
           "const zona = typeof zonaCanaleP2P === 'function' ? zonaCanaleP2P(ordine) : '';" in ann
           and "if (zona) corpo.zona = zona;" in ann
