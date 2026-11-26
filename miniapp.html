@@ -11279,23 +11279,35 @@
      riflesso fermo in alto. Niente luccichio che passa: provato e
      tolto (Andrea, 26 nov: «il colore va bene», l'effetto no) */
   .btn.rac-entra{flex-basis:100%;margin:0;text-align:center;text-decoration:none;
-    background:linear-gradient(180deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%),
-      linear-gradient(100deg,#B04BFF 0%,#6A5CFF 50%,#2F8BFF 100%),#6A5CFF;
-    background-origin:border-box;border:1.5px solid rgba(255,255,255,.55);
-    color:#FFFFFF;text-shadow:0 1px 3px rgba(30,10,90,.7);font-weight:800;letter-spacing:.3px;
-    box-shadow:0 0 0 3px rgba(150,110,255,.25),0 0 22px rgba(140,100,255,.75),
-      0 0 46px rgba(60,140,255,.45),inset 0 -3px 8px rgba(20,10,90,.35)}
+    /* ROSSO MATTONE (26 nov 2026 sera, Andrea): prima viola-blu, poi i
+       colori di «Promuovi» («ci stava bene col marrone»), ma accanto ad
+       «Acquista» si confondeva («troppo simile») — e la scelta e' la 3 */
+    background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(100deg,#D2381F 0%,#8E1C10 100%),#8E1C10;
+    background-origin:border-box;border:1px solid rgba(255,255,255,.22);
+    color:#FFFFFF;text-shadow:0 1px 2px rgba(60,8,0,.6);font-weight:800;letter-spacing:.3px;
+    box-shadow:0 6px 18px -6px rgba(160,30,15,.7)}
   /* nella scheda dell'annuncio sta in cima, fra la foto e il titolo */
   .entra-scheda{display:flex;margin:0 0 14px}
+  /* ...e sulla card grande di «Da scoprire», piccolo nell'angolo
+     (rettangolare come gli altri, Andrea: «leggermente più piccolo») */
+  .scoprire-card .sc-entra{position:absolute;right:8px;bottom:8px;z-index:3}
+  .scoprire-card .sc-entra .btn.rac-entra{width:auto;min-height:0;padding:5px 10px;
+    font-size:10px;line-height:1.1;border-radius:7px;
+    /* qui, dove «Acquista» non c'e', i colori di «Promuovi» (Andrea: «vai
+       col colore 1») */
+    background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%),#E1251B;
+    background-origin:border-box;border:1px solid rgba(255,255,255,.28);
+    text-shadow:0 1px 2px rgba(110,18,0,.6);box-shadow:0 6px 18px -6px rgba(225,37,27,.65)}
   /* ...e sotto la foto la scritta diventa lo stesso bottone pieno */
   .rac-video .rac-video-eti.rac-bottone{width:max-content;max-width:100%;
     margin:14px auto 0;padding:12px 24px;border-radius:14px;
-    background:linear-gradient(180deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%),
-      linear-gradient(100deg,#B04BFF 0%,#6A5CFF 50%,#2F8BFF 100%),#6A5CFF;
-    background-origin:border-box;border:1.5px solid rgba(255,255,255,.55);
-    color:#FFFFFF;text-shadow:0 1px 3px rgba(30,10,90,.7);font-size:16px;font-weight:800;letter-spacing:.3px;
-    box-shadow:0 0 0 3px rgba(150,110,255,.25),0 0 22px rgba(140,100,255,.75),
-      0 0 46px rgba(60,140,255,.45),inset 0 -3px 8px rgba(20,10,90,.35)}
+    background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(100deg,#D2381F 0%,#8E1C10 100%),#8E1C10;
+    background-origin:border-box;border:1px solid rgba(255,255,255,.22);
+    color:#FFFFFF;text-shadow:0 1px 2px rgba(60,8,0,.6);font-size:16px;font-weight:800;letter-spacing:.3px;
+    box-shadow:0 6px 18px -6px rgba(160,30,15,.7)}
   /* IL CASSETTO: chiuso non occupa un pixel, e non e' una max-height
      da indovinare — `display:none` e basta. Qui dentro non c'e'
      niente che debba transizionare: la storia si legge, non si
@@ -21966,7 +21978,8 @@ function mapListing(a){
     entra:(a.venditore_entra && typeof a.venditore_entra === 'object'
            && typeof a.venditore_entra.link === 'string'
            && typeof a.venditore_entra.testo === 'string')
-          ? {link: a.venditore_entra.link, testo: a.venditore_entra.testo} : null,
+          ? {link: a.venditore_entra.link, testo: a.venditore_entra.testo,
+             slug: typeof a.venditore_entra.slug === 'string' ? a.venditore_entra.slug : ''} : null,
     fotoNomi};
 }
 function mapOrder(o){
@@ -27759,6 +27772,9 @@ function vociSponsor(){
          dei quadratini di AndreAI e To The Moon) */
       quadro: quadroSponsor(slug, casa && casa.quadro != null ? casa.quadro : s.quadro),
       testo: String((casa ? casa.titolo : s.titolo) || ''),
+      /* il bottone «Entra» della pagina, dal server (solo pagina
+         pubblicata col bottone): lo disegna la card grande */
+      entra: (!casa && s.entra && typeof s.entra === 'object') ? s.entra : null,
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
       tocca: () => apriNegozioDaScoprire(negozio, true, 'sponsor:' + slug)});
@@ -27946,6 +27962,14 @@ function renderScoprire(){
        sul velo in basso, il nome e lo stato della leva. */
     const quadra = !v.quadra ? '' : `<span class="sc-quadra-eti" aria-hidden="true"
       ><span class="sc-q-pre">Aste</span><span class="sc-q-riga">${esc(v.riga())}</span></span>`;
+    /* IL BOTTONE «ENTRA» SULLA CARD GRANDE (26 nov 2026, AndreAI: «è
+       possibile fare il tasto direttamente sulla card grossa?»): lo
+       stesso della pagina, piccolo nell'angolo in basso a destra. Il suo
+       tocco apre il gruppo e si ferma li' (stopPropagation): il resto
+       della card porta alla pagina come sempre. */
+    const eb = v.entra ? bottoneEntra(v.entra.link, v.entra.testo, v.slug) : '';
+    const entra = !eb ? '' : `<span class="sc-entra" onclick="event.stopPropagation()"
+      onkeydown="event.stopPropagation()">${eb}</span>`;
     return `
     <div class="scoprire-card${v.quadra ? ' sc-quadra' : ''}${v.accesa() ? ' attiva' : ''}" role="button"
          tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
@@ -27954,7 +27978,7 @@ function renderScoprire(){
       <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
+      >${titolo}${lancio}${quadra}${entra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');
@@ -31072,9 +31096,13 @@ function raccontoNegozio(v){
          scritta sotto viene dal catalogo, come ogni testo della pagina. */
       const video = linkVideoRacconto(x.link);
       if (!video) return guscio;
+      /* la foto col bottone (`bottone: true`) conta il tocco come il
+         bottone in alto (contaEntra), lo slug ripassa dalla sua forma */
+      const conta = x.bottone === true && /^[a-z0-9][a-z0-9-]{0,39}$/.test(r.slug || '')
+        ? `contaEntra('${r.slug}');` : '';
       return `<a class="rac-video" href="${video}" target="_blank" ` +
              `rel="noopener noreferrer" ` +
-             `onclick="return apriVideoRacconto(this.href)">${guscio}` +
+             `onclick="${conta}return apriVideoRacconto(this.href)">${guscio}` +
              (x.link_testo ? `<span class="rac-video-eti${x.bottone === true ? ' rac-bottone' : ''}">${esc(x.link_testo)}</span>` : '') +
              (x.link_sotto ? `<span class="rac-video-sotto">${esc(x.link_sotto)}</span>` : '') +
              `</a>`;
@@ -31145,16 +31173,29 @@ function raccontoNegozio(v){
    link o niente scritta, niente bottone. */
 function entraInAlto(r){
   const x = ((r && r.blocchi) || []).find(b => b && b.t === 'foto' && b.bottone === true);
-  return x ? bottoneEntra(x.link, x.link_testo) : '';
+  return x ? bottoneEntra(x.link, x.link_testo, r.slug) : '';
 }
 /* lo stesso bottone, dal link e dalla scritta: lo usano la pagina
-   (entraInAlto) e la scheda degli annunci del negozio (entraScheda) */
-function bottoneEntra(link0, testo){
+   (entraInAlto) e la scheda degli annunci del negozio (entraScheda).
+   Con lo slug della pagina il tocco si CONTA (contaEntra), e il gruppo
+   si apre lo stesso, subito */
+function bottoneEntra(link0, testo, slug){
   const link = linkVideoRacconto(link0);
   if (!link || !testo || typeof testo !== 'string') return '';
+  const s = (typeof slug === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(slug)) ? slug : '';
   return `<a class="btn rac-entra" href="${link}" target="_blank" ` +
          `rel="noopener noreferrer" ` +
-         `onclick="return apriVideoRacconto(this.href)">${esc(testo)}</a>`;
+         `onclick="${s ? `contaEntra('${s}');` : ''}return apriVideoRacconto(this.href)">${esc(testo)}</a>`;
+}
+/* IL CONTATORE DEI CLIC (26 nov 2026, AndreAI: «c'è un modo per sapere
+   in quanti cliccano?»): un colpo al server, senza aspettare e senza
+   dire chi (niente initData): il server conta per pagina e per giorno,
+   e i numeri escono in /admin, sezione Zap, e in /sponsor. Un errore
+   non si vede: il gruppo si apre comunque. */
+function contaEntra(slug){
+  if (DEMO) return;
+  try { fetch(`${API_BASE}/entra/${encodeURIComponent(slug)}`,
+              {method: 'POST', keepalive: true}).catch(() => {}); } catch(e) {}
 }
 /* ...E NELLA SCHEDA DI OGNI ANNUNCIO DEL NEGOZIO (26 nov 2026, AndreAI:
    «sì, fallo»): chi compra dalla card non passa dalla pagina, e nel
@@ -31165,7 +31206,7 @@ function bottoneEntra(link0, testo){
    del titolo»). */
 function entraScheda(l){
   const e = l && l.entra;
-  const b = e ? bottoneEntra(e.link, e.testo) : '';
+  const b = e ? bottoneEntra(e.link, e.testo, e.slug) : '';
   return b ? `<div class="entra-scheda">${b}</div>` : '';
 }
 

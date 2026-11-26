@@ -478,8 +478,9 @@ function disegna(){
 
   ${cardRelayDeploy(D.salute)}
 
-  ${D.zap ? `<details class="grp" id="altroZap"><summary>⚡ Zap</summary><div class="grp-b">
+  ${D.zap || D.entrate ? `<details class="grp" id="altroZap"><summary>⚡ Zap</summary><div class="grp-b">
   ${cardZap(D.zap)}
+  ${cardEntrate(D.entrate)}
   </div></details>` : ''}
 
   ${D.swap ? `<details class="grp" id="altroSwap"><summary>🔄 Quota SATS Routing</summary><div class="grp-b">
@@ -788,6 +789,28 @@ function cardAnnulli(A, L){
     </div>
     ${r ? '' : '<div class="nota">Le fee dei rimborsi le sa il nodo: compaiono quando risponde.</div>'}
   </div>`;
+}
+
+/* ---- I CLIC SU «ENTRA» (26 nov 2026, AndreAI: «mettilo anche nella
+   sezione zap, così riusciamo a capire anche da lì qualcosa»): quante
+   volte si tocca il bottone «Entra in …» delle pagine consigliate (il
+   link referral, che paga sull'indirizzo degli zap). «Nell'app» = il
+   bottone della Mini App, «Dal link» = l'indirizzo corto /vai/… dei
+   post. Solo numeri, mai chi: la tabella un nome non ce l'ha. */
+function cardEntrate(E){
+  if (!Array.isArray(E) || !E.length) return '';
+  /* il titolo NON e' un h2 in testa: dentro un gruppo quello si nasconde
+     (lo fa gia' il summary), e sotto la card degli zap i numeri
+     resterebbero senza nome */
+  return E.map(e => `<div class="card"><div style="font-weight:700;margin:14px 0 8px">🔗 Clic su «Entra» · ${esc(e.titolo)}</div>
+    <div class="tiles">
+      <div class="tile"><div class="k">Oggi</div><div class="v">${fmt(e.oggi)}</div><div class="d">clic</div></div>
+      <div class="tile"><div class="k">Ultimi 7 giorni</div><div class="v">${fmt(e.sette)}</div><div class="d">clic</div></div>
+      <div class="tile"><div class="k">Ultimi 30 giorni</div><div class="v">${fmt(e.trenta)}</div><div class="d">clic</div></div>
+      <div class="tile"><div class="k">Da sempre</div><div class="v">${fmt(e.totale)}</div><div class="d">${fmt(e.app)} nell'app · ${fmt(e.link)} dal link</div></div>
+    </div>
+    <div class="nota">Il link per i post: <span class="mono">barattolo.store${esc(e.indirizzo)}</span>. Conta i clic, non chi entra davvero: quello lo dice il bot di chi paga il referral.</div>
+  </div>`).join('');
 }
 
 /* ---- GLI ZAP (10 ott 2026): l'indirizzo Lightning di casa ----

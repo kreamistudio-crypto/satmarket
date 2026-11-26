@@ -54061,8 +54061,11 @@ def prove_sponsor():
                  "sponsor_fino", "sponsor_accesi", "sponsorizzati_pubblici",
                  "imposta_sponsor", "imposta_ordine_sponsor",
                  "racconto_stato", "_banner_consigliato",
-                 "_venditore_racconto"):
+                 "_venditore_racconto", "entra_della_pagina"):
         exec(pezzo(nome), amb)
+    # il giudice del bottone «Entra» sulla card (26 nov 2026, clic-entra)
+    amb.setdefault("re", re)
+    exec(re.search(r"^_RE_LINK_ENTRA = re\.compile\(\n.*?\)\n", src, re.M | re.S).group(), amb)
     slug_vero = amb["SLUG_SPONSOR"][0]
     voc = amb["slug_sponsorizzabili"]()
     # IL VOCABOLARIO: le pagine del server col banner, poi il catalogo di
@@ -55736,7 +55739,7 @@ def prove_racconto_girato():
              + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
             + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
             + _fetta("function entraInAlto(r){", "\n}") + "\n"
-            + _fetta("function bottoneEntra(link0, testo){", "\n}") + "\n"
+            + _fetta("function bottoneEntra(link0, testo, slug){", "\n}") + "\n"
              + _fetta("function toggleRacconto(btn){", "\n}"))
     js = pezzi + _BANCO_RACCONTO
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -55943,7 +55946,7 @@ def prove_racconti_bozza():
     # scritta, e la scritta passa da esc()
     _ea = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n" + _lv
            + pezzo_js(mini, "function entraInAlto(r){", "\n}\n") + "\n}\n"
-           + pezzo_js(mini, "function bottoneEntra(link0, testo){", "\n}\n") + "\n}\n"
+           + pezzo_js(mini, "function bottoneEntra(link0, testo, slug){", "\n}\n") + "\n}\n"
            + pezzo_js(mini, "function entraScheda(l){", "\n}\n") + "\n}\n")
     _casi_ea = [
         {"blocchi": [{"t": "foto", "bottone": True, "link_testo": "Entra",
@@ -56017,7 +56020,7 @@ def prove_racconti_bozza():
     _tav_en["racconto_pubblicato:senza"] = "1790000000"
     prova("il server da' il bottone solo a pagina pubblicata, solo al "
           "negozio suo e solo con `bottone: True`",
-          [None, {"link": "https://t.me/+SL62AOghIotkNjE8", "testo": "Entra"},
+          [None, {"link": "https://t.me/+SL62AOghIotkNjE8", "testo": "Entra", "slug": "con"},
            None, None, None],
           [_bozza, _en("ab12cd34"), _en("ff99ee88"), _en(""), _en("ee55ff66")])
     _righe_en = [{"venditore_negozio": "ab12cd34"},
@@ -56027,6 +56030,99 @@ def prove_racconti_bozza():
           [True, False, False], ["venditore_entra" in r for r in _righe_en])
     prova("...e ogni riga d'annuncio passa da lui", True,
           "_segna_entra_venditori(righe)" in pezzo("arricchisci_righe_vetrina"))
+    # IL CONTATORE DEI CLIC (26 nov 2026, cantiere clic-entra): il giudice
+    # del link per il redirect, il contatore su un database di cartone,
+    # le due rotte, il client e la card dell'admin
+    import sqlite3 as _sq3
+    _db_en = _tf.mktemp(suffix=".db")
+    def _apri_en():
+        c = _sq3.connect(_db_en)
+        c.row_factory = _sq3.Row
+        return c
+    _c0 = _apri_en()
+    _ddl = re.search(r"CREATE TABLE IF NOT EXISTS sponsor_entrate\(.*?\n    \);", src, re.S).group()
+    _c0.execute(re.sub(r"--[^\n]*", "", _ddl)); _c0.commit(); _c0.close()
+    _tav_en.pop("racconto_pubblicato:senza", None)
+    _amb_en.update({"db": _apri_en, "time": time, "re": re, "_SECCHI": {},
+                    "print": lambda *a, **k: None})
+    _amb_en["RACCONTI_NEGOZI"]["strano"] = {"negozio": "x", "blocchi": [
+        dict(_foto_b, link="https://evil.example/x")]}
+    _tav_en["racconto_pubblicato:strano"] = "1790000000"
+    exec(re.search(r"^_RE_LINK_ENTRA = re\.compile\(\n.*?\)\n", src, re.M | re.S).group(), _amb_en)
+    for _nome in ("_secchio_passa", "entra_della_pagina", "conta_entrata",
+                  "entrate_sponsor"):
+        exec(pezzo(_nome), _amb_en)
+    _edp = _amb_en["entra_della_pagina"]
+    prova("il link del redirect esce solo da una pagina pubblicata col "
+          "bottone e con la forma di Telegram",
+          ["https://t.me/+SL62AOghIotkNjE8", "", "", "", ""],
+          [_edp("con"), _edp("senza"), _edp("strano"), _edp("nessuna"), _edp(None)])
+    _ce = _amb_en["conta_entrata"]
+    _esiti = [_ce("con", "app"), _ce("con", "link", "1.2.3.4"), _ce("con", "boh"),
+              _ce("strano", "app"), _ce("senza", "link")]
+    for _ in range(25):
+        _ce("con", "app", "9.9.9.9")
+    _num = _amb_en["entrate_sponsor"]("con")
+    prova("il contatore conta solo pagine col bottone e le due fonti, con "
+          "al piu' 20 clic all'ora per IP",
+          ([True, True, False, False, False], 21, 1, 22, 22),
+          (_esiti, _num["app"], _num["link"], _num["totale"], _num["oggi"]))
+    _ddl_n = re.sub(r"--[^\n]*", "", _ddl)
+    prova("...e la tabella non sa chi ha cliccato: niente tg_id, niente IP",
+          (False, False, False), ("tg_id" in _ddl_n, " ip " in _ddl_n.lower(), "utente" in _ddl_n))
+    _vai = pezzo("vai_entra")
+    prova("/vai/{slug} rimanda solo al link giudicato, e senza cache; "
+          "il resto torna a casa", (True, True, True, True),
+          ('@app.get("/vai/{slug}")' in src,
+           "link = entra_della_pagina(slug) if _RE_SLUG_ENTRA.fullmatch(slug or \"\") else \"\"" in _vai,
+           'RedirectResponse("/", status_code=302' in _vai,
+           _vai.count('"Cache-Control": "no-store"') == 2))
+    prova("/api/entra/{slug} conta la fonte «app» e non legge sessioni",
+          (True, True, False),
+          ('@app.post("/api/entra/{slug}")' in src,
+           'conta_entrata(slug, "app", _ip_di(request))' in pezzo("tocco_entra"),
+           "verifica_utente" in pezzo("tocco_entra")))
+    _ea2 = _ea + "\nfor (const s of ['bitcoinlabs', \"x');alert(1)//\", '']) console.log(JSON.stringify(bottoneEntra('https://t.me/+SL62AOghIotkNjE8', 'Entra', s)))"
+    _out_c = subprocess.run(["node", "-e", _ea2], capture_output=True, text=True, timeout=30)
+    _c_r = [json.loads(x) for x in _out_c.stdout.split("\n") if x]
+    prova("il bottone conta il tocco solo con uno slug in forma, e apre il "
+          "gruppo comunque",
+          [True, False, False],
+          ["contaEntra('bitcoinlabs');return apriVideoRacconto" in x for x in _c_r]
+          if len(_c_r) == 3 else _out_c.stderr[-300:])
+    prova("...anche la foto col bottone e la scheda dei corsi passano lo "
+          "slug, e il colpo al server non aspetta e non dice chi",
+          (True, True, True, True),
+          ("bottoneEntra(e.link, e.testo, e.slug)" in mini,
+           "contaEntra('${r.slug}');" in mini,
+           "{method: 'POST', keepalive: true}" in pezzo_js(mini, "function contaEntra(slug){", "\n}\n"),
+           "authHdr" not in pezzo_js(mini, "function contaEntra(slug){", "\n}\n")))
+    _adm = open("admin.html", encoding="utf-8").read()
+    prova("i numeri escono in /admin, nella sezione Zap, e in /sponsor",
+          (True, True, True, True),
+          ("${cardEntrate(D.entrate)}" in _adm,
+           "${D.zap || D.entrate ?" in _adm,
+           '"entrate": dati_entrate_cruscotto()' in src,
+           "entrate_sponsor(s)['trenta']" in src))
+    # IL BOTTONE SULLA CARD GRANDE (stesso giro, AndreAI: «è possibile
+    # fare il tasto direttamente sulla card grossa?»)
+    _spp = pezzo("sponsorizzati_pubblici")
+    prova("la card dello spazio porta il bottone solo dal giudice del "
+          "redirect (pagina pubblicata, link di Telegram)",
+          (True, True),
+          ("link = entra_della_pagina(s)" in _spp,
+           'voce["entra"] = {"link": link, "testo": b["link_testo"]}' in _spp))
+    prova("...la card lo disegna col bottone di sempre (contato), e il "
+          "suo tocco non apre la pagina",
+          (True, True, True, True),
+          ("entra: (!casa && s.entra && typeof s.entra === 'object') ? s.entra : null," in mini,
+           "bottoneEntra(v.entra.link, v.entra.testo, v.slug)" in mini,
+           '<span class="sc-entra" onclick="event.stopPropagation()"' in mini,
+           "${quadra}${entra}${v.logo ?" in mini))
+    try:
+        os.remove(_db_en)
+    except OSError:
+        pass
     # ---- 2. LA FORMA DEL CATALOGO ----------------------------------
     _f = re.search(r'FORMA_RACCONTO = re\.compile\(r"([^"]+)"\)', src)
     FORMA = re.compile(_f.group(1)) if _f else re.compile("$^")
@@ -56391,7 +56487,7 @@ def prove_racconti_bozza():
           + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
             + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
             + _fetta("function entraInAlto(r){", "\n}") + "\n"
-            + _fetta("function bottoneEntra(link0, testo){", "\n}") + "\n"
+            + _fetta("function bottoneEntra(link0, testo, slug){", "\n}") + "\n"
           + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
           + _fetta("function copiaMessaggioVenditore(slug){", "\n}") + "\n"
           + "const CAT = " + _json.dumps(CAT, ensure_ascii=False) + ";\n"
@@ -143961,7 +144057,7 @@ let location = {pathname: '/negozio/casa-to-the-mooon'};
             + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
             + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
             + _fetta("function entraInAlto(r){", "\n}") + "\n"
-            + _fetta("function bottoneEntra(link0, testo){", "\n}") + "\n"
+            + _fetta("function bottoneEntra(link0, testo, slug){", "\n}") + "\n"
             # l'avviso della bozza: il renderer lo chiama in anteprima
             + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
             + pezzo_js(mini, "async function apriNegozio(chi, aperto, "

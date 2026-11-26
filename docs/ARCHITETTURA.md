@@ -32411,6 +32411,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    whitelist di tre forme; senza login, noindex, no-store,
    no-referrer, fuori da sitemap e menu; vedi «LA STRADA CHIUSA» e
    CANTIERI, «Il wallet si apre davvero da Telegram per Android»),
+   `/vai/{slug}` (26 nov 2026, cantiere clic-entra: l'indirizzo corto
+   del bottone «Entra in …» di una pagina consigliata, per i post; conta
+   il clic in `sponsor_entrate` — quanti, mai chi — e rimanda con un 302
+   no-store al link del catalogo, SOLO a pagina pubblicata e SOLO se è
+   un invito o un bot di Telegram (`entra_della_pagina`: niente open
+   redirect); slug fuori forma o pagina senza bottone tornano a `/`;
+   vedi CANTIERI, «Quanti toccano "Entra in BitcoinLabs"»),
    `/.well-known/nostr.json` (ott 2026, il NIP-05 di casa: i nomi di
    `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti

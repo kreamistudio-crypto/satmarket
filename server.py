@@ -4341,6 +4341,17 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
                 voce["quadro"] = q
             elif q == "logo" and r.get("logo") is True:
                 voce["quadro"] = "logo"
+            # IL BOTTONE «ENTRA» ANCHE SULLA CARD GRANDE (26 nov 2026,
+            # AndreAI: «è possibile fare il tasto direttamente sulla card
+            # grossa?»): link e scritta della foto col `bottone: True`,
+            # dallo stesso giudice del redirect `/vai/` (pagina
+            # pubblicata, link di Telegram). Senza, la card resta com'era.
+            link = entra_della_pagina(s)
+            b = next((x for x in (r.get("blocchi") or [])
+                      if isinstance(x, dict) and x.get("t") == "foto"
+                      and x.get("bottone") is True), None) if link else None
+            if b and isinstance(b.get("link_testo"), str) and b["link_testo"]:
+                voce["entra"] = {"link": link, "testo": b["link_testo"]}
             fuori.append(voce)
     except Exception as e:
         print(f"⚠️ [sponsor] la fila non si legge: {e}")
@@ -4596,8 +4607,135 @@ def entra_del_negozio(codice: str, tg_id=None) -> dict | None:
             return None
         if racconto_stato(slug) != "pubblicato":
             return None
-        return {"link": b["link"], "testo": b["link_testo"]}
+        # lo slug serve al contatore dei clic (`/api/entra/{slug}`)
+        return {"link": b["link"], "testo": b["link_testo"], "slug": slug}
     return None
+
+
+def entra_della_pagina(slug: str) -> str:
+    """Il link del bottone «Entra» della pagina `slug`, o '' — per il
+    contatore dei clic e per l'indirizzo corto `/vai/{slug}` (26 nov
+    2026, AndreAI: «c'è un modo per sapere in quanti cliccano?»). Stessi
+    patti di `entra_del_negozio`: solo pagina PUBBLICATA, solo una foto
+    con `bottone: True`, e solo un link che abbia la forma di un invito o
+    di un bot di Telegram — da qui si fa un redirect, e un redirect verso
+    un indirizzo qualunque sarebbe una porta aperta."""
+    r = RACCONTI_NEGOZI.get(slug) if isinstance(slug, str) else None
+    if not r:
+        return ""
+    b = next((x for x in (r.get("blocchi") or [])
+              if isinstance(x, dict) and x.get("t") == "foto"
+              and x.get("bottone") is True), None)
+    link = b.get("link") if b else None
+    if not isinstance(link, str) or not _RE_LINK_ENTRA.fullmatch(link):
+        return ""
+    return link if racconto_stato(slug) == "pubblicato" else ""
+
+
+# la forma del link di un bottone «Entra»: un invito a un gruppo o un bot
+# di Telegram, la stessa famiglia che il client accetta (linkVideoRacconto)
+_RE_LINK_ENTRA = re.compile(
+    r"https://t\.me/(\+[A-Za-z0-9_-]{8,64}|[A-Za-z][A-Za-z0-9_]{4,31}(\?start=[A-Za-z0-9_-]{1,64})?)")
+
+
+def conta_entrata(slug: str, fonte: str, ip: str = "") -> bool:
+    """+1 ai clic su «Entra» della pagina `slug`, per giorno e per FONTE
+    («app» = il bottone nella Mini App, «link» = l'indirizzo corto
+    `/vai/{slug}`, quello del post). QUANTI e mai CHI, come
+    `sponsor_aperture`: la tabella non ha tg_id ne' IP per costruzione.
+    L'IP serve solo al freno in memoria — al piu' 20 clic contati
+    all'ora per IP: oltre si apre lo stesso, ma non si conta (e' un
+    termometro, non denaro). Fail-open: un contatore non rompe un clic."""
+    if fonte not in ("app", "link") or not entra_della_pagina(slug):
+        return False
+    if ip and not _secchio_passa(f"entra:{ip}", 20, 3600, time.time()):
+        return False
+    try:
+        con = db()
+        con.execute(
+            "INSERT INTO sponsor_entrate(slug, giorno, fonte, quante) "
+            "VALUES(?,?,?,1) ON CONFLICT(slug, giorno, fonte) DO UPDATE "
+            "SET quante=quante+1", (slug, time.strftime("%Y-%m-%d"), fonte))
+        con.commit()
+        con.close()
+        return True
+    except Exception as e:
+        print(f"[!] Clic su «Entra»: {e}")
+        return False
+
+
+def entrate_sponsor(slug: str) -> dict:
+    """I clic su «Entra» di una pagina: oggi, 7 e 30 giorni e da sempre,
+    in tutto e divisi per fonte. LEGGE E BASTA. Fail-open: zeri."""
+    zero = {"oggi": 0, "sette": 0, "trenta": 0, "totale": 0,
+            "app": 0, "link": 0}
+    try:
+        con = db()
+        d = dict(zero)
+        for chiave, giorni in (("oggi", 0), ("sette", 6), ("trenta", 29)):
+            d[chiave] = int(con.execute(
+                "SELECT COALESCE(SUM(quante), 0) AS n FROM sponsor_entrate "
+                "WHERE slug=? AND giorno >= date('now', 'localtime', ?)",
+                (slug, f"-{giorni} days")).fetchone()["n"])
+        for r in con.execute(
+                "SELECT fonte, COALESCE(SUM(quante), 0) AS n FROM sponsor_entrate "
+                "WHERE slug=? GROUP BY fonte", (slug,)):
+            if r["fonte"] in ("app", "link"):
+                d[r["fonte"]] = int(r["n"])
+        d["totale"] = d["app"] + d["link"]
+        con.close()
+        return d
+    except Exception:
+        return zero
+
+
+def dati_entrate_cruscotto():
+    """La card «Clic su Entra» della pagina /admin, nella sezione Zap
+    (Andrea: «così riusciamo a capire anche da lì qualcosa» — il
+    referral si incassa sull'indirizzo degli zap). Una riga per ogni
+    pagina del catalogo che ha un bottone «Entra», pubblicata o no (in
+    bozza i numeri restano a zero). None = nessuna pagina col bottone."""
+    righe = []
+    for slug, r in RACCONTI_NEGOZI.items():
+        if not any(isinstance(x, dict) and x.get("t") == "foto"
+                   and x.get("bottone") is True for x in (r.get("blocchi") or [])):
+            continue
+        righe.append({"slug": slug, "titolo": str(r.get("titolo") or slug),
+                      "indirizzo": f"/vai/{slug}", **entrate_sponsor(slug)})
+    return righe or None
+
+
+# lo slug che arriva dal client o dall'indirizzo: la forma delle chiavi
+# del catalogo, e nient'altro (poi deve anche esistere, vedi sopra)
+_RE_SLUG_ENTRA = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+
+
+@app.post("/api/entra/{slug}")
+def tocco_entra(slug: str, request: Request):
+    """Il bottone «Entra in …» toccato nella Mini App: +1, e basta. Il
+    client non aspetta la risposta (apre il gruppo subito) e non dice chi
+    e': qui non si legge nessuna sessione. Sempre 200 — un clic non
+    contato non e' un errore da mostrare a nessuno."""
+    if _RE_SLUG_ENTRA.fullmatch(slug or ""):
+        conta_entrata(slug, "app", _ip_di(request))
+    return {"ok": True}
+
+
+@app.get("/vai/{slug}")
+def vai_entra(slug: str, request: Request):
+    """L'INDIRIZZO CORTO DEL BOTTONE, per i post (26 nov 2026): conta il
+    clic e rimanda al link della pagina con un 302. Solo verso il link
+    del catalogo, solo a pagina pubblicata e solo se ha la forma di un
+    invito o di un bot di Telegram (`entra_della_pagina`): un redirect a
+    un indirizzo scelto da chi chiama sarebbe un open redirect. Tutto il
+    resto torna a casa. Mai in cache: ogni clic deve arrivare qui."""
+    link = entra_della_pagina(slug) if _RE_SLUG_ENTRA.fullmatch(slug or "") else ""
+    if not link:
+        return RedirectResponse("/", status_code=302,
+                                headers={"Cache-Control": "no-store"})
+    conta_entrata(slug, "link", _ip_di(request))
+    return RedirectResponse(link, status_code=302,
+                            headers={"Cache-Control": "no-store"})
 
 
 def _segna_entra_venditori(righe):
@@ -9560,6 +9698,19 @@ def init_db():
         giorno TEXT NOT NULL,            -- 'AAAA-MM-GG' locale
         quante INTEGER DEFAULT 0,
         PRIMARY KEY (slug, giorno)
+    );
+    CREATE TABLE IF NOT EXISTS sponsor_entrate(
+        -- QUANTE volte si tocca «Entra in …» di una pagina consigliata
+        -- (26 nov 2026, BitcoinLabs: il bottone porta il link referral),
+        -- MAI CHI: la sorella di sponsor_aperture, con la stessa regola —
+        -- niente tg_id, niente IP, le colonne non ci sono. Per giorno e
+        -- per FONTE: «app» il bottone nella Mini App, «link» l'indirizzo
+        -- corto /vai/<slug> che va nei post.
+        slug TEXT NOT NULL,
+        giorno TEXT NOT NULL,            -- 'AAAA-MM-GG' locale
+        fonte TEXT NOT NULL,             -- 'app' | 'link'
+        quante INTEGER DEFAULT 0,
+        PRIMARY KEY (slug, giorno, fonte)
     );
     CREATE TABLE IF NOT EXISTS negozio_visite(
         -- QUANTE volte si apre la pagina di un negozio, MAI CHI (24 set
@@ -25470,6 +25621,11 @@ async def comando_sponsor(mittente: dict, testo: str):
                 riga = f"{k}. <b>{s}</b> — spento"
             if in_bozza(s):
                 riga += "\n    ⚠️ pagina in bozza: la card non si vede"
+            # i clic su «Entra in …» (26 nov 2026), solo per le pagine
+            # che il bottone ce l'hanno e sono pubblicate
+            if entra_della_pagina(s):
+                riga += ("\n    🔗 clic su «Entra» negli ultimi 30 giorni: "
+                         f"<b>{entrate_sponsor(s)['trenta']}</b>")
             righe.append(riga)
         primo = voc[0] if voc else "slug"
         return await bot_api("sendMessage", {"chat_id": chat,
@@ -39579,6 +39735,9 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
     # ronde dei relay — tutto dalla memoria del server, nella COPIA
     return {**dati, "p2p_statistiche": vede_statistiche_p2p(user["id"]),
             "zap": await dati_zap_cruscotto(),
+            # i clic su «Entra in …» delle pagine consigliate (26 nov
+            # 2026), che la pagina mette nella sezione Zap
+            "entrate": dati_entrate_cruscotto(),
             "swap": await dati_swap_cruscotto(),
             # il volume della pagina Cambio (11 nov 2026, volume-cambio)
             "cambi": dati_cambi_cruscotto(), "salute": dati_salute()}
