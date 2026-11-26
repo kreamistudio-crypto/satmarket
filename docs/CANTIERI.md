@@ -96793,3 +96793,9 @@ ritocco a parte. 3) Il proprio numero si legge nella scheda e
 nell'avviso del bot: un elenco «Le mie estrazioni» nel Profilo non c'e'.
 4) Dal vivo sulla vm-2050: aprire, partecipare da due account, chiudere
 e vedere il blocco vero.
+## Il link referral di BitcoinLabs è un invito al gruppo (26 nov 2026, cantiere referral-bitcoinlabs; AndreAI incolla il link che il bot del partner gli ha dato con /link)
+
+COSA. La foto 3 della pagina «bitcoinlabs» in racconti.py porta a `https://t.me/+SL62AOghIotkNjE8`, il link personale di Andrea, al posto del bot nudo. Il giudice della forma `linkVideoRacconto` accettava già l'invito a un gruppo (cantiere jj-p2p, stesso giorno, per la pagina di JJ): avevo fatto lo stesso allargamento in parallelo, e al rebase ho tenuto il loro, identico nella forma.
+PERCHÉ. Il 24 nov si aspettava un `?start=` sul bot, e l'invito era fra i casi rifiutati dalle prove. Il bot invece dà un invito al gruppo, e per le sue regole (/rules) conta solo chi entra DAL link, e il primo link usato. Nessuna scritta nuova: resta «Entra in BitcoinLabs».
+PROVATO. Le sentinelle del giudice sono quelle di jj-p2p (`prove_racconti_bozza`); il catalogo con l'invito di Andrea passa il controllo della forma. Suite severa e collaudi. Carmrain ha confermato ad Andrea che il 10% vale anche sui corsi venduti su Barattolo, dove si entra col link usa e getta e non col referral.
+LA CARD, RITOCCATA. `assets/scoprire/bitcoinlabs.webp`, stessa card 1 della maschera (scelta definitiva di Andrea dopo le prove 3-7), ma le due pillole «Corsi in sats» e «Podcast e contenuti liberi» col contorno grigio scuro (#3a4652, 1,5 px, fondo #141f2a) al posto dell'arancio pieno: «troppo arancioni». Scelta fra tre (bianco velato, arancio tenue, grigio). 1040x498, WebP 82. Il file si ridisegna sotto lo stesso nome: la rotta è no-cache con ETag, nessun timbro da cambiare.

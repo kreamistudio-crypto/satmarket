@@ -631,8 +631,9 @@ RACCONTI_NEGOZI = {
     # Bitcoin, sicurezza e privacy, coi suoi corsi in sats. I testi sono
     # quelli che ha mandato Carmrain, approvati da Andrea. Il negozio lo
     # apre Carmrain col suo account, e il moderatore lo collega dal
-    # pannello come Piano B. L'ultima foto porta al suo bot
-    # (@ilragiondomobot), col link referral di Barattolo quando c'e'.
+    # pannello come Piano B. L'ultima foto porta al gruppo di
+    # BitcoinLabs col link referral di Barattolo (26 nov 2026: l'invito
+    # che il bot @ilragiondomobot ha dato ad Andrea con /link).
     #   bitcoinlabs-cop.webp  lo scudo col bitcoin, 1360x583
     #   bitcoinlabs-1.webp    Carmrain con la maschera, il quadrato in home
     #   bitcoinlabs-2.webp    Bitcoin, Linux e sicurezza
@@ -690,11 +691,11 @@ RACCONTI_NEGOZI = {
                    "in privato, è un truffatore con un profilo simile a "
                    "Carmrain o a uno degli admin: segnala e blocca senza "
                    "pensarci due volte.")},
-            # la foto che apre il bot di BitcoinLabs: il link nudo finche'
-            # Andrea non incolla il suo link referral (`?start=...`)
+            # la foto che apre il gruppo di BitcoinLabs col link referral
+            # di Barattolo: conta solo chi entra da QUI (regole del bot)
             {"t": "foto", "n": 3, "etichetta": "la comunità",
              "alt": "La comunità di BitcoinLabs intorno allo scudo col bitcoin",
-             "link": "https://t.me/ilragiondomobot",
+             "link": "https://t.me/+SL62AOghIotkNjE8",
              "link_testo": "Entra in BitcoinLabs"},
             {"t": "firma", "h": "Bitcoin è accessibile a tutti.",
              "p": "Carmrain, BitcoinLabs"},
