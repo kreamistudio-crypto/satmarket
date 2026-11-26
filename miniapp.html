@@ -11303,6 +11303,14 @@
     box-shadow:0 6px 18px -6px rgba(160,30,15,.7)}
   /* nella scheda dell'annuncio sta in cima, fra la foto e il titolo */
   .entra-scheda{display:flex;margin:0 0 14px}
+  /* ...e sulla card grande di «Da scoprire», piccolo, IN FONDO A SINISTRA
+     sotto le scritte e allineato con loro (26 nov 2026 sera: tolto perche'
+     «troppo invasivo» a destra, poi rimesso da Andrea con la card nuova di
+     Flow, «il tasto entra […] in fondo», fra sei colori «rosso mattone»:
+     quello della pagina, che qui eredita) */
+  .scoprire-card .sc-entra{position:absolute;left:5.4%;bottom:7px;z-index:3}
+  .scoprire-card .sc-entra .btn.rac-entra{width:auto;min-height:0;padding:5px 10px;
+    font-size:10px;line-height:1.1;border-radius:7px}
   /* ...e sotto la foto la scritta diventa lo stesso bottone pieno */
   .rac-video .rac-video-eti.rac-bottone{width:max-content;max-width:100%;
     margin:14px auto 0;padding:12px 24px;border-radius:14px;
@@ -27788,10 +27796,10 @@ function vociSponsor(){
          dei quadratini di AndreAI e To The Moon) */
       quadro: quadroSponsor(slug, casa && casa.quadro != null ? casa.quadro : s.quadro),
       testo: String((casa ? casa.titolo : s.titolo) || ''),
-      /* (il bottone «Entra» sulla card grande e' stato TOLTO la sera
-         stessa, 26 nov 2026, AndreAI: «è troppo invasivo». Il server
-         manda ancora il suo «entra»: qui non si legge piu'; il bottone resta
-         sulla pagina e nelle schede dei corsi) */
+      /* il bottone «Entra» della pagina, dal server (solo pagina
+         pubblicata col bottone): lo disegna la card grande, in fondo a
+         sinistra (tolto e rimesso la stessa sera, 26 nov 2026) */
+      entra: (!casa && s.entra && typeof s.entra === 'object') ? s.entra : null,
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
       tocca: () => apriNegozioDaScoprire(negozio, true, 'sponsor:' + slug)});
@@ -27979,6 +27987,14 @@ function renderScoprire(){
        sul velo in basso, il nome e lo stato della leva. */
     const quadra = !v.quadra ? '' : `<span class="sc-quadra-eti" aria-hidden="true"
       ><span class="sc-q-pre">Aste</span><span class="sc-q-riga">${esc(v.riga())}</span></span>`;
+    /* IL BOTTONE «ENTRA» SULLA CARD GRANDE (26 nov 2026, AndreAI: «è
+       possibile fare il tasto direttamente sulla card grossa?»): lo
+       stesso della pagina, piccolo in fondo a sinistra. Il suo tocco apre
+       il gruppo e si ferma li' (stopPropagation): il resto della card
+       porta alla pagina come sempre. */
+    const eb = v.entra ? bottoneEntra(v.entra.link, v.entra.testo, v.slug) : '';
+    const entra = !eb ? '' : `<span class="sc-entra" onclick="event.stopPropagation()"
+      onkeydown="event.stopPropagation()">${eb}</span>`;
     return `
     <div class="scoprire-card${v.quadra ? ' sc-quadra' : ''}${v.accesa() ? ' attiva' : ''}" role="button"
          tabindex="0" data-id="${v.id}" aria-label="${testo}"${premuto}
@@ -27987,7 +28003,7 @@ function renderScoprire(){
       <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
+      >${titolo}${lancio}${quadra}${entra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
     </div>`;
   }).join('');
   /* una card sola sta al centro; con due o piu' la prima resta a
