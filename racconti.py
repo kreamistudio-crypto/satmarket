@@ -696,7 +696,9 @@ RACCONTI_NEGOZI = {
             {"t": "foto", "n": 3, "etichetta": "la comunità",
              "alt": "La comunità di BitcoinLabs intorno allo scudo col bitcoin",
              "link": "https://t.me/+SL62AOghIotkNjE8",
-             "link_testo": "Entra in BitcoinLabs"},
+             "link_testo": "Entra in BitcoinLabs",
+             # il bottone vero, anche in alto accanto ad Acquista (26 nov)
+             "bottone": True},
             {"t": "firma", "h": "Bitcoin è accessibile a tutti.",
              "p": "Carmrain, BitcoinLabs"},
         ],

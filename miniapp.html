@@ -11273,6 +11273,29 @@
      l'arancio si prenderebbe la riga e il link scenderebbe sotto. */
   .rac-acquista{width:auto;padding:9px 18px;font-size:14px;
     margin:0}
+  /* il bottone della foto in alto (entraInAlto): una riga sua, sotto
+     Acquista, pieno e luminoso in DUE colori presi dalle copertine dei
+     corsi, viola e blu (tre erano troppi), con l'alone intorno e il
+     riflesso fermo in alto. Niente luccichio che passa: provato e
+     tolto (Andrea, 26 nov: «il colore va bene», l'effetto no) */
+  .btn.rac-entra{flex-basis:100%;margin:0;text-align:center;text-decoration:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%),
+      linear-gradient(100deg,#B04BFF 0%,#6A5CFF 50%,#2F8BFF 100%),#6A5CFF;
+    background-origin:border-box;border:1.5px solid rgba(255,255,255,.55);
+    color:#FFFFFF;text-shadow:0 1px 3px rgba(30,10,90,.7);font-weight:800;letter-spacing:.3px;
+    box-shadow:0 0 0 3px rgba(150,110,255,.25),0 0 22px rgba(140,100,255,.75),
+      0 0 46px rgba(60,140,255,.45),inset 0 -3px 8px rgba(20,10,90,.35)}
+  /* nella scheda dell'annuncio sta in cima, fra la foto e il titolo */
+  .entra-scheda{display:flex;margin:0 0 14px}
+  /* ...e sotto la foto la scritta diventa lo stesso bottone pieno */
+  .rac-video .rac-video-eti.rac-bottone{width:max-content;max-width:100%;
+    margin:14px auto 0;padding:12px 24px;border-radius:14px;
+    background:linear-gradient(180deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%),
+      linear-gradient(100deg,#B04BFF 0%,#6A5CFF 50%,#2F8BFF 100%),#6A5CFF;
+    background-origin:border-box;border:1.5px solid rgba(255,255,255,.55);
+    color:#FFFFFF;text-shadow:0 1px 3px rgba(30,10,90,.7);font-size:16px;font-weight:800;letter-spacing:.3px;
+    box-shadow:0 0 0 3px rgba(150,110,255,.25),0 0 22px rgba(140,100,255,.75),
+      0 0 46px rgba(60,140,255,.45),inset 0 -3px 8px rgba(20,10,90,.35)}
   /* IL CASSETTO: chiuso non occupa un pixel, e non e' una max-height
      da indovinare — `display:none` e basta. Qui dentro non c'e'
      niente che debba transizionare: la storia si legge, non si
@@ -21938,6 +21961,12 @@ function mapListing(a){
        conosce il server: la modifica li rimanda per dire «questa resta,
        qui» (vedi salvaModifica). */
     didascalie:(Array.isArray(a.didascalie) && a.didascalie) || [],
+    /* il bottone della pagina del negozio anche qui (26 nov 2026,
+       vedi entraScheda): {link, testo} dal server, o null */
+    entra:(a.venditore_entra && typeof a.venditore_entra === 'object'
+           && typeof a.venditore_entra.link === 'string'
+           && typeof a.venditore_entra.testo === 'string')
+          ? {link: a.venditore_entra.link, testo: a.venditore_entra.testo} : null,
     fotoNomi};
 }
 function mapOrder(o){
@@ -31046,7 +31075,7 @@ function raccontoNegozio(v){
       return `<a class="rac-video" href="${video}" target="_blank" ` +
              `rel="noopener noreferrer" ` +
              `onclick="return apriVideoRacconto(this.href)">${guscio}` +
-             (x.link_testo ? `<span class="rac-video-eti">${esc(x.link_testo)}</span>` : '') +
+             (x.link_testo ? `<span class="rac-video-eti${x.bottone === true ? ' rac-bottone' : ''}">${esc(x.link_testo)}</span>` : '') +
              (x.link_sotto ? `<span class="rac-video-sotto">${esc(x.link_sotto)}</span>` : '') +
              `</a>`;
     }
@@ -31095,6 +31124,7 @@ function raccontoNegozio(v){
             raccontoAperto ? 'Chiudi' : 'Leggi la storia ›'}</button>
           <button class="btn orange rac-acquista"
                   onclick="acquistaDalRacconto()">Acquista</button>
+          ${entraInAlto(r)}
         </div>
       </div>
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">${
@@ -31105,6 +31135,38 @@ function raccontoNegozio(v){
         ${blocchi}
       </div>
     </div>`;
+}
+
+/* IL BOTTONE DELLA FOTO, ANCHE IN ALTO (26 nov 2026, AndreAI: «mettilo
+   anche sopra, vicino ad Acquista»): una foto del catalogo con
+   `bottone: true` mostra la sua scritta come un bottone vero, sotto la
+   foto e accanto ad Acquista. Il link passa dallo stesso giudice della
+   foto (linkVideoRacconto) e la scritta e' quella del catalogo: niente
+   link o niente scritta, niente bottone. */
+function entraInAlto(r){
+  const x = ((r && r.blocchi) || []).find(b => b && b.t === 'foto' && b.bottone === true);
+  return x ? bottoneEntra(x.link, x.link_testo) : '';
+}
+/* lo stesso bottone, dal link e dalla scritta: lo usano la pagina
+   (entraInAlto) e la scheda degli annunci del negozio (entraScheda) */
+function bottoneEntra(link0, testo){
+  const link = linkVideoRacconto(link0);
+  if (!link || !testo || typeof testo !== 'string') return '';
+  return `<a class="btn rac-entra" href="${link}" target="_blank" ` +
+         `rel="noopener noreferrer" ` +
+         `onclick="return apriVideoRacconto(this.href)">${esc(testo)}</a>`;
+}
+/* ...E NELLA SCHEDA DI OGNI ANNUNCIO DEL NEGOZIO (26 nov 2026, AndreAI:
+   «sì, fallo»): chi compra dalla card non passa dalla pagina, e nel
+   gruppo del negozio non entra da solo. `l.entra` lo manda il server
+   (`venditore_entra`, solo pagina pubblicata e solo sul negozio suo);
+   qui il link ripassa dal giudice di sempre. In cima, fra la foto e
+   il titolo, dove sta «Promuovi» (Andrea: «proprio sotto la foto prima
+   del titolo»). */
+function entraScheda(l){
+  const e = l && l.entra;
+  const b = e ? bottoneEntra(e.link, e.testo) : '';
+  return b ? `<div class="entra-scheda">${b}</div>` : '';
 }
 
 /* L'AVVISO DELL'ANTEPRIMA (set 2026): dice lo STATO, cosa manca e porta
@@ -39310,6 +39372,7 @@ function openDetail(id){
            si compra) e solo a cassa aperta, che un bottone verso un muro
            e' peggio di nessun bottone. */''}${mio && !asta && !esa && promoAttive && !inFerie(l) && !DEMO && !VETRINA
         ? `<button class="btn promo-porta in-cima" onclick="apriPromuovi(${l.id})">${ICONA_PROMO.porta}Promuovi</button>` : ''}
+      ${entraScheda(l)}
       ${dataRiga(l)}
       <h2>${titoloConCondizione(l)}</h2>
       ${luogoRiga(l)}

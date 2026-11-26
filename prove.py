@@ -55735,6 +55735,8 @@ def prove_racconto_girato():
              + _fetta("function raccontoDi(v){", "\n}") + "\n"
              + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
             + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
+            + _fetta("function entraInAlto(r){", "\n}") + "\n"
+            + _fetta("function bottoneEntra(link0, testo){", "\n}") + "\n"
              + _fetta("function toggleRacconto(btn){", "\n}"))
     js = pezzi + _BANCO_RACCONTO
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -55936,6 +55938,95 @@ def prove_racconti_bozza():
              '"https://t.me/ilragiondomobot?start=ref_Ab-12"']
           + ['""'] * 8
           + ['"https://t.me/+NFNHpWpBvbc5ZWNk"'] + ['""'] * 3, _out.stdout.split())
+    # IL BOTTONE DELLA FOTO, ANCHE IN ALTO (26 nov 2026): solo con
+    # `bottone: true`, solo col link che il giudice accetta e con la sua
+    # scritta, e la scritta passa da esc()
+    _ea = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n" + _lv
+           + pezzo_js(mini, "function entraInAlto(r){", "\n}\n") + "\n}\n"
+           + pezzo_js(mini, "function bottoneEntra(link0, testo){", "\n}\n") + "\n}\n"
+           + pezzo_js(mini, "function entraScheda(l){", "\n}\n") + "\n}\n")
+    _casi_ea = [
+        {"blocchi": [{"t": "foto", "bottone": True, "link_testo": "Entra",
+                      "link": "https://t.me/+SL62AOghIotkNjE8"}]},
+        {"blocchi": [{"t": "foto", "link_testo": "Entra",
+                      "link": "https://t.me/+SL62AOghIotkNjE8"}]},
+        {"blocchi": [{"t": "foto", "bottone": True, "link_testo": "Entra",
+                      "link": "https://evil.example/x"}]},
+        {"blocchi": [{"t": "foto", "bottone": True,
+                      "link": "https://t.me/+SL62AOghIotkNjE8"}]},
+        {"blocchi": [{"t": "foto", "bottone": "si", "link_testo": "Entra",
+                      "link": "https://t.me/+SL62AOghIotkNjE8"}]},
+        {"blocchi": [{"t": "foto", "bottone": True, "link_testo": "<b>x</b>",
+                      "link": "https://t.me/+SL62AOghIotkNjE8"}]},
+        {}]
+    _out_ea = subprocess.run(["node", "-e", _ea + "for (const r of "
+                              + json.dumps(_casi_ea) + ") console.log("
+                              "JSON.stringify(entraInAlto(r)))"],
+                             capture_output=True, text=True, timeout=30)
+    _ea_r = [json.loads(x) for x in _out_ea.stdout.split("\n") if x]
+    prova("il bottone in alto nasce solo da una foto con `bottone: true`, "
+          "col link giusto e la sua scritta, scappata",
+          [True, False, False, False, False, True, False],
+          [bool(x) and 'href="https://t.me/+SL62AOghIotkNjE8"' in x
+           and "apriVideoRacconto(this.href)" in x for x in _ea_r]
+          if len(_ea_r) == 7 else _out_ea.stderr[-300:])
+    prova("...e la scritta del catalogo passa da esc()", True,
+          len(_ea_r) == 7 and "&lt;b&gt;x&lt;/b&gt;" in _ea_r[5]
+          and "<b>" not in _ea_r[5])
+    prova("il renderer mette il bottone accanto ad Acquista", True,
+          "${entraInAlto(r)}" in mini)
+    # ...E NELLA SCHEDA DEI SUOI ANNUNCI (26 nov 2026): `l.entra` dal
+    # server, il link ripassa dal giudice, la scritta da esc()
+    _casi_es = [{"entra": {"link": "https://t.me/+SL62AOghIotkNjE8", "testo": "Entra"}},
+                {"entra": {"link": "https://evil.example/x", "testo": "Entra"}},
+                {"entra": {"link": "https://t.me/+SL62AOghIotkNjE8", "testo": ""}},
+                {"entra": {"link": "https://t.me/+SL62AOghIotkNjE8", "testo": "<i>y</i>"}},
+                {"entra": None}, {}]
+    _out_es = subprocess.run(["node", "-e", _ea + "for (const l of "
+                              + json.dumps(_casi_es) + ") console.log("
+                              "JSON.stringify(entraScheda(l)))"],
+                             capture_output=True, text=True, timeout=30)
+    _es_r = [json.loads(x) for x in _out_es.stdout.split("\n") if x]
+    prova("nella scheda dell'annuncio il bottone nasce solo da `l.entra` "
+          "col link giusto e una scritta",
+          [True, False, False, True, False, False],
+          [bool(x) and 'class="entra-scheda"' in x
+           and 'href="https://t.me/+SL62AOghIotkNjE8"' in x for x in _es_r]
+          if len(_es_r) == 6 else _out_es.stderr[-300:])
+    prova("...con la scritta scappata", True,
+          len(_es_r) == 6 and "&lt;i&gt;y&lt;/i&gt;" in _es_r[3] and "<i>" not in _es_r[3])
+    prova("la scheda lo disegna in cima, fra la foto e il titolo, e "
+          "mapListing legge `venditore_entra`", True,
+          "${entraScheda(l)}\n      ${dataRiga(l)}" in mini
+          and "a.venditore_entra" in mini)
+    # il giudice del server, GIRATO su un catalogo e un'impostazione di
+    # cartone: solo pagina PUBBLICATA, solo sul negozio suo
+    _tav_en = {}
+    _foto_b = {"t": "foto", "n": 3, "bottone": True,
+               "link": "https://t.me/+SL62AOghIotkNjE8", "link_testo": "Entra"}
+    _amb_en = {"impostazione": lambda k, d="": _tav_en.get(k, d),
+               "RACCONTI_NEGOZI": {
+                   "con": {"negozio": "ab12cd34", "blocchi": [{"t": "testo"}, _foto_b]},
+                   "senza": {"negozio": "ee55ff66", "blocchi": [dict(_foto_b, bottone="si")]}}}
+    for _nome in ("racconto_stato", "_e_suo", "entra_del_negozio",
+                  "_segna_entra_venditori"):
+        exec(pezzo(_nome), _amb_en)
+    _en = _amb_en["entra_del_negozio"]
+    _bozza = _en("ab12cd34")
+    _tav_en["racconto_pubblicato:con"] = "1790000000"
+    _tav_en["racconto_pubblicato:senza"] = "1790000000"
+    prova("il server da' il bottone solo a pagina pubblicata, solo al "
+          "negozio suo e solo con `bottone: True`",
+          [None, {"link": "https://t.me/+SL62AOghIotkNjE8", "testo": "Entra"},
+           None, None, None],
+          [_bozza, _en("ab12cd34"), _en("ff99ee88"), _en(""), _en("ee55ff66")])
+    _righe_en = [{"venditore_negozio": "ab12cd34"},
+                 {"venditore_negozio": "ff99ee88"}, {}]
+    _amb_en["_segna_entra_venditori"](_righe_en)
+    prova("...e sulle righe la chiave c'e' solo per quel negozio",
+          [True, False, False], ["venditore_entra" in r for r in _righe_en])
+    prova("...e ogni riga d'annuncio passa da lui", True,
+          "_segna_entra_venditori(righe)" in pezzo("arricchisci_righe_vetrina"))
     # ---- 2. LA FORMA DEL CATALOGO ----------------------------------
     _f = re.search(r'FORMA_RACCONTO = re\.compile\(r"([^"]+)"\)', src)
     FORMA = re.compile(_f.group(1)) if _f else re.compile("$^")
@@ -56299,6 +56390,8 @@ def prove_racconti_bozza():
           + _fetta("function raccontoDi(v){", "\n}") + "\n"
           + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
             + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
+            + _fetta("function entraInAlto(r){", "\n}") + "\n"
+            + _fetta("function bottoneEntra(link0, testo){", "\n}") + "\n"
           + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
           + _fetta("function copiaMessaggioVenditore(slug){", "\n}") + "\n"
           + "const CAT = " + _json.dumps(CAT, ensure_ascii=False) + ";\n"
@@ -143867,6 +143960,8 @@ let location = {pathname: '/negozio/casa-to-the-mooon'};
             + _fetta("function raccontoDi(v){", "\n}") + "\n"
             + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
             + _fetta("function linkVideoRacconto(u){", "\n}") + "\n"
+            + _fetta("function entraInAlto(r){", "\n}") + "\n"
+            + _fetta("function bottoneEntra(link0, testo){", "\n}") + "\n"
             # l'avviso della bozza: il renderer lo chiama in anteprima
             + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
             + pezzo_js(mini, "async function apriNegozio(chi, aperto, "

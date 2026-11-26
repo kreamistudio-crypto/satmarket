@@ -4571,6 +4571,55 @@ def racconto_pubblico(codice: str, tg_id=None) -> dict | None:
     return None
 
 
+def entra_del_negozio(codice: str, tg_id=None) -> dict | None:
+    """IL BOTTONE DELLA PAGINA, ANCHE SULLE CARD DEL NEGOZIO (26 nov
+    2026, BitcoinLabs; Andrea: «sì, fallo»): chi compra un corso dalla
+    card non passa dalla pagina, e nel gruppo del negozio non entra da
+    solo — il link referral della pagina serve anche a lui. Esce
+    {link, testo} della PRIMA foto con `bottone: True`, oppure None.
+    Stessi patti di `racconto_pubblico`, di cui e' una fetta: solo
+    pagina PUBBLICATA e solo sul negozio suo (`_e_suo`); la bozza non
+    accende niente. Il controllo del bottone viene PRIMA dello stato,
+    cosi' per tutti i negozi senza bottone e' una scorsa del dizionario,
+    nessuna query. Il link lo rigiudica il client (`linkVideoRacconto`):
+    qui si passa solo quel che il catalogo ha scritto."""
+    if not codice:
+        return None
+    for slug, r in RACCONTI_NEGOZI.items():
+        if not _e_suo(r, codice, tg_id):
+            continue
+        b = next((x for x in (r.get("blocchi") or [])
+                  if isinstance(x, dict) and x.get("t") == "foto"
+                  and x.get("bottone") is True), None)
+        if not b or not isinstance(b.get("link"), str) \
+                or not isinstance(b.get("link_testo"), str):
+            return None
+        if racconto_stato(slug) != "pubblicato":
+            return None
+        return {"link": b["link"], "testo": b["link_testo"]}
+    return None
+
+
+def _segna_entra_venditori(righe):
+    """`venditore_entra` sulle righe dei negozi che ce l'hanno (vedi
+    `entra_del_negozio`), con la chiave ASSENTE per tutti gli altri: la
+    vetrina non si appesantisce di un campo vuoto per riga. Un giudizio
+    per negozio per pagina. Fail-open: un errore non rompe la vetrina,
+    il bottone semplicemente non c'e'."""
+    visti = {}
+    for r in righe:
+        cod = r.get("venditore_negozio") or ""
+        if not cod:
+            continue
+        if cod not in visti:
+            try:
+                visti[cod] = entra_del_negozio(cod, r.get("venditore_id"))
+            except Exception:
+                visti[cod] = None
+        if visti[cod]:
+            r["venditore_entra"] = visti[cod]
+
+
 def _logo_giu_consigliato(g) -> float:
     """QUANTO SCENDE UN LOGO nella card «Consigliati» (set 2026), in
     pixel della card del telefono, negativo per salire: un numero fra
@@ -32017,6 +32066,10 @@ def arricchisci_righe_vetrina(righe):
     # ricevere on-chain piuttosto che Lightning»): dalla sua scelta nel
     # Profilo, e solo dove lo swap automatico c'e' per lui.
     _segna_incasso_venditori(righe)
+    # 7-bis) IL BOTTONE DELLA PAGINA DEL NEGOZIO (26 nov 2026): il link
+    # «Entra in …» della pagina consigliata anche nella scheda dei suoi
+    # annunci (vedi `entra_del_negozio`)
+    _segna_entra_venditori(righe)
     # 8) IN PALIO (26 nov 2026, cantiere estrazioni): il nastro 🎁 della
     # card e la scheda senza «Acquista». UNA query per pagina, e
     # fail-open: un nastro che manca non deve rompere la vetrina.
