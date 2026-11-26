@@ -52728,17 +52728,16 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     if magazzino:
         msg += "\n\n" + _coda_magazzino(magazzino)
     # ...e sotto, il tasto che apre l'ordine (dove stanno la data e la
-    # guida): solo dove c'e' la data, gli altri avvisi restano quelli di ieri
+    # guida). Dal 17 nov stava solo dove c'era la data; dal 26 nov 2026
+    # SU OGNI «Hai venduto» (Andrea, dalla prova di «Non hai sats?»: «non
+    # c'e' nessun tasto che mi porta sull'ordine») — il messaggio dice
+    # «segna l'ordine come spedito», e l'ordine dev'essere a un tocco.
     # L'ABBONAMENTO (20 nov 2026) ha i suoi avvisi, nel giro del link:
     # «spedisci» e «il deposito aspetta il pacco» qui direbbero il falso
-    if canale_abbo:
-        pass
-    elif entro:
+    if not canale_abbo:
         await notifica(o["venditore_id"], msg,
                        (BOTTONE_ORDINE_VENDUTO,
                         f"{URL_PUBBLICO}/?ordine={int(ordine_id)}"))
-    else:
-        await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
     # ci passano il poll della Mini App e le due funzioni dell'orologio,
     # e proprio in quelle lui non e' davanti allo schermo. Il titolo e'

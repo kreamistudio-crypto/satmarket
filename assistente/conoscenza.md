@@ -1269,7 +1269,7 @@ Info P2P
 🌙
 ## Blocca sats a garanzia
  Paga con qualsiasi wallet Lightning. I sats restano bloccati e al sicuro finché non confermi di aver ricevuto l'oggetto.
-Non hai sats? Compra da qui
+Non hai sats? Paga in altri modi
 lnbc…
 inquadra il QR col wallet, o tocca la invoice per copiarla
 👛 Non hai un wallet? Ti spieghiamo come fare
@@ -2896,4 +2896,12 @@ pubblico: no
 frase: Nella chat degli scambi e degli ordini adesso sotto i tuoi messaggi ci sono le spunte: una ✓ quando il messaggio è partito, due ✓✓ quando è arrivato sul telefono dell'altra persona, e le due ✓✓ diventano arancioni quando l'ha letto. E se hai messo la pausa ai tuoi ordini P2P e poi parti, la pausa segue da sola il fuso orario del tuo telefono, con le stesse ore.
 dove: La chat di uno scambio P2P, di un ordine o di uno scambio on-chain → accanto all'ora dei tuoi messaggi; «I miei scambi» → «⏸ Pausa degli ordini».
 leva: CHAT_SPUNTE (le spunte; accesa di serie)
+pubblico: no
+
+<!-- pezzo novita-162 | novita -->
+## Novità · 2026-11-26 · spinta-intervallo
+
+frase: Quando vendi sats nel P2P, sotto l'importo adesso trovi in evidenza: «Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.» La prima volta che tocchi l'importo te lo dice anche in cima al foglio.
+dove: P2P → Vendi BTC → Pubblica ordine → l'importo (prezzo di mercato, in euro).
+leva: nessuna
 pubblico: no

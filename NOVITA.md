@@ -1006,3 +1006,9 @@ frase: Nella chat degli scambi e degli ordini adesso sotto i tuoi messaggi ci so
 dove: La chat di uno scambio P2P, di un ordine o di uno scambio on-chain → accanto all'ora dei tuoi messaggi; «I miei scambi» → «⏸ Pausa degli ordini».
 leva: CHAT_SPUNTE (le spunte; accesa di serie)
 pubblico: no
+
+## 2026-11-26 · spinta-intervallo
+frase: Quando vendi sats nel P2P, sotto l'importo adesso trovi in evidenza: «Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.» La prima volta che tocchi l'importo te lo dice anche in cima al foglio.
+dove: P2P → Vendi BTC → Pubblica ordine → l'importo (prezzo di mercato, in euro).
+leva: nessuna
+pubblico: no

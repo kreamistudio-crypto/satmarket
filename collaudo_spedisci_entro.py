@@ -293,7 +293,10 @@ def main():
         "annuncio_id": ann[7], "consegna": "ritiro"})["ordine_id"]
     detti = paga(o3)
     t3, b3 = detti[0] if detti else ("", "?")
-    prova("il ritiro in zona non promette nessun giorno", (False, None),
+    # (26 nov 2026) il tasto «📦 Apri l'ordine» ora sta su OGNI «Hai
+    # venduto», anche senza data: la data tace, il tasto c'e'
+    prova("il ritiro in zona non promette nessun giorno, ma porta il tasto "
+          "dell'ordine", (False, (SRV.BOTTONE_ORDINE_VENDUTO, f"{SRV.URL_PUBBLICO}/?ordine={o3}")),
           ("Spedisci entro" in t3, b3))
     prova("...il testo resta quello di ieri", True,
           "Spedisci l'oggetto e segna l'ordine come spedito" in t3)
@@ -311,7 +314,8 @@ def main():
     o5 = ordine_a_casa(ann[3])
     detti = paga(o5)
     t5, b5 = detti[0] if detti else ("", "?")
-    prova("con la leva a 0 la data tace", (False, None, 0),
+    prova("con la leva a 0 la data tace (il tasto dell'ordine resta)",
+          (False, (SRV.BOTTONE_ORDINE_VENDUTO, f"{SRV.URL_PUBBLICO}/?ordine={o5}"), 0),
           ("Spedisci entro" in t5, b5, vista(o5, 222)["spedire_entro"]))
     prova("...e «Hai venduto» torna quello di prima", True,
           "Spedisci l'oggetto e segna l'ordine come spedito nella "
