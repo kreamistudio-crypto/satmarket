@@ -11002,6 +11002,18 @@
      lezione della striscia delle categorie). L'aria attorno c'e'
      gia': il .seller ha 14px di margine sopra e sotto. */
   .seller.attivo{outline:2.5px solid var(--sats);outline-offset:2px}
+  /* IL TONDINO DEGLI ALTRI ACCOUNT (26 nov 2026, dal campo: Luca col
+     negozio e due account): sulla foto di un account che NON e' quello
+     in uso, il numero delle cose che lo aspettano — lo stesso
+     `aspetta` del «⚡ N ti aspetta» scritto accanto, che resta e lo
+     dice a parole. Il volto ha overflow:hidden (la foto tonda), quindi
+     il tondino vive in un involucro suo e sborda dall'angolo, come il
+     pallino sul tappo. Per gli screen reader parla la riga di testo. */
+  .conto-volto{position:relative;flex:0 0 auto}
+  .conto-bolla{position:absolute;top:-4px;right:-6px;min-width:20px;height:20px;
+    padding:0 5px;box-sizing:border-box;border-radius:10px;background:var(--sats);
+    color:#2a2318;font-weight:800;font-size:12px;line-height:20px;text-align:center;
+    box-shadow:0 0 0 2px var(--card);pointer-events:none}
   /* LA CLASSIFICA: la riga e' un `.seller` con due pezzi in piu' —
      la posizione a sinistra e la freccia a destra, come il
      riquadro venditore del dettaglio. Nessun colore nuovo: le
@@ -73303,15 +73315,20 @@ function renderAccountSheet(){
         if (!/^-?\d{1,20}$/.test(id)) return '';
         const attivo = id === accountAttivoId;
         const nome = c.nome || c.username || 'Account';
-        const aspetta = piuAccount && !attivo && Number(c.aspetta) > 0
-          ? ` · ⚡ ${Number(c.aspetta)} ${Number(c.aspetta) === 1 ? 'ti aspetta' : 'ti aspettano'}` : '';
+        const quanti = piuAccount && !attivo && Number(c.aspetta) > 0
+          ? Math.min(99, Math.floor(Number(c.aspetta))) : 0;
+        const aspetta = quanti
+          ? ` · ⚡ ${quanti} ${quanti === 1 ? 'ti aspetta' : 'ti aspettano'}` : '';
         return `<div class="seller${attivo?' attivo':''}"`
           + (attivo ? '' : ` role="button" tabindex="0"`
               + ` onclick="cambiaAccount('${id}')"`
               + ` onkeydown="if(event.key==='Enter'||event.key===' ')`
               + `{event.preventDefault();cambiaAccount('${id}')}"`)
           + ` style="margin-top:8px${attivo?'':';cursor:pointer'}">`
-          + voltoConto(c)
+          + (quanti
+              ? `<div class="conto-volto">${voltoConto(c)}`
+                + `<span class="conto-bolla" aria-hidden="true">${quanti}</span></div>`
+              : voltoConto(c))
           + `<div class="who"><b>${esc(nome)}</b>`
           + `<div class="rep">${c.telegram?'Telegram · ':''}`
           + `${c.username?'@'+esc(c.username)+' · ':''}`
