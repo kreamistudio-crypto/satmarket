@@ -1767,9 +1767,18 @@
       linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%),#E1251B;
     border:1px solid rgba(255,255,255,.28);color:#FFFFFF;
     text-shadow:0 1px 2px rgba(110,18,0,.6);box-shadow:0 6px 18px -6px rgba(225,37,27,.65);
-    display:flex;align-items:center;justify-content:center;gap:8px}
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    /* LA LINEA ROSSA A SINISTRA (26 nov 2026, Andrea: «fatta male,
+       sembra un bug»): le sfumature partono dal padding e si RIPETONO
+       sotto il bordo di 1px, che a sinistra mostrava la coda rossa
+       della sfumatura. Partono dal bordo, e la linea non c'e' piu'. */
+    background-origin:border-box}
   .btn.promo-porta svg{width:18px;height:18px;flex:none;filter:drop-shadow(0 1px 1.5px rgba(110,18,0,.6))}
   .btn.promo-porta.in-cima{margin:0 0 14px}
+  /* dentro il riquadro di «Annunci» del Profilo, sotto il titolo: i
+     margini sono quelli del corpo del gruppo (12px ai lati) */
+  #promuoviProfilo{padding:0 12px 12px}
+  .btn.promo-porta.promo-profilo{width:100%;margin:0}
   /* IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea, che
      ROVESCIA il dondolio alla mascotte vissuto un'ora: il bottone
      resta FERMO — e con lui bersaglio, anello e :active — quindi il
@@ -17627,6 +17636,16 @@ document.getElementById('cartello')?.remove();</script>
       <div class="grp" id="grpCatalogo">
         <button type="button" class="grp-h" onclick="toggleGrp('grpCatalogo')"
                 aria-expanded="false">Annunci<span class="fr">▾</span></button>
+        <!-- «PROMUOVI» DAL PROFILO (26 nov 2026, Andrea: «inglobare il tasto
+             sotto il tasto annunci nella sezione profilo, così si capisce
+             che serve per promuovere appunto gli annunci», poi «tipo
+             agganciato al tasto annunci»): lo stesso razzo della scheda
+             dell'annuncio, DENTRO il riquadro di «Annunci», subito sotto
+             il titolo — si vede anche a gruppo chiuso. Solo a cassa aperta
+             (aggiornaPromuoviProfilo); il disegno e la parola li mette il
+             JS, dalla stessa ICONA_PROMO. -->
+        <div id="promuoviProfilo" hidden><button type="button" class="btn promo-porta promo-profilo"
+             onclick="promuoviDalProfilo()"></button></div>
         <div class="grp-b">
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
@@ -22649,6 +22668,7 @@ async function loadListings(anonimo){
   negoziPromossi = Array.isArray(j.negozi_promossi) ? j.negozi_promossi : [];
   inEvidenzaServer = Array.isArray(j.in_evidenza) ? j.in_evidenza.map(mapListing) : [];
   if (j.promozioni_attive !== undefined) promoAttive = j.promozioni_attive === true;
+  aggiornaPromuoviProfilo();
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   /* i totali del like: arrivano di qui perche' e' l'unico canale che
      tocca anche gli anonimi. Si ridisegna subito — la pagina puo'
@@ -55042,6 +55062,9 @@ const PROMO_SCALINI = 'Il prezzo sale man mano che i posti si riempiono.';
    tappo e Promosso: «In vetrina», con lo stile 6 (la card tinta col
    bollino sopra il titolo). */
 const PROMO_ETICHETTA = 'In vetrina';
+/* la scritta della voce del negozio quando non si compra (26 nov 2026):
+   un posto solo, la leggono il foglio Promuovi e il cassetto del banner */
+const SCOPRIRE_IN_ARRIVO = 'In arrivo';
 const scoprireSempre = giorni =>
   `Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`;
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
@@ -55172,8 +55195,16 @@ async function apriPromuovi(aid){
      allora la voce resta spenta come prima, con la stessa frase. */
   const sc = n.scoprire || {};
   const cassettoBanner = !!(bannerLeve && bannerLeve.attivo);
-  promoServeBanner = sc.sats > 0 && !sc.banner && cassettoBanner;
-  if (sc.sats > 0)
+  /* IN ARRIVO (26 nov 2026, Andrea: «lascialo nel foglio, però mettilo
+     grigio»): la voce c'e', spenta, col solo nome e la scritta; niente
+     prezzo ne' banner da chiedere, che non si compra (la leva
+     PROMO_SCOPRIRE_IN_ARRIVO del server, che la cassa rifiuta anche). */
+  if (sc.in_arrivo) promoServeBanner = false;
+  else promoServeBanner = sc.sats > 0 && !sc.banner && cassettoBanner;
+  if (sc.in_arrivo)
+    voci.push({tipo: 'scoprire', titolo: 'Il negozio nella home', testo: '',
+      no: SCOPRIRE_IN_ARRIVO});
+  else if (sc.sats > 0)
     voci.push({tipo: 'scoprire',
       titolo: `Il negozio nella home, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
       testo: (sc.fino ? `È già nella home fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
@@ -55201,6 +55232,40 @@ async function apriPromuovi(aid){
       if (promoScelta === 'evidenza') return pagaPromo('evidenza:' + promoGiorni, aid);
       return pagaPromo(promoScelta, aid);
     }});
+}
+/* «PROMUOVI» DAL PROFILO (26 nov 2026, Andrea: «quando qualcuno lo
+   apre, decide quale annuncio suo promuovere»). Si puo' promuovere quel
+   che nella scheda ha il tasto: attivo, non un'asta, non esaurito, non
+   in ferie (le guardie di openDetail). Uno solo: si va dritti al foglio
+   Promuovi. Piu' d'uno: prima la scelta, poi lo stesso foglio di
+   sempre. Il foglio Promuovi si apre DOPO che eseguiConferma ha rimesso
+   il suo bottone (setTimeout): aperto dentro `poi`, il ripristino di
+   «Avanti» gli scriverebbe sopra l'etichetta del pagamento. */
+const promuovibile = l => l.stato === 'attivo' && !astaE(l) && !esaurito(l) && !inFerie(l);
+let promoAnnuncioScelto = 0;
+function aggiornaPromuoviProfilo(){
+  const box = el('promuoviProfilo');
+  if (!box) return;
+  box.hidden = !promoAttive || DEMO || VETRINA;
+  const b = box.firstElementChild;
+  if (!box.hidden && b && !b.innerHTML) b.innerHTML = ICONA_PROMO.porta + 'Promuovi';
+}
+function promuoviDalProfilo(){
+  const lista = myListings.filter(promuovibile);
+  if (!lista.length) { toast('Non hai annunci da promuovere: pubblicane uno dalla scheda Vendi', 5000); return; }
+  if (lista.length === 1) return apriPromuovi(lista[0].id);
+  promoAnnuncioScelto = lista[0].id;
+  chiediConferma({
+    titolo: 'Promuovi',
+    testata: `<div class="promo-scelte">${lista.map((l, i) => `<div class="promo-voce"><label class="promo-riga">
+      <input type="radio" name="promoAnnuncio" value="${l.id}"${i ? '' : ' checked'}
+             onchange="promoAnnuncioScelto = +this.value">
+      ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44, '')}
+      <span class="promo-testo"><b>${esc(l.title)}</b><small class="mono">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</small></span>
+    </label></div>`).join('')}</div>`,
+    corpo: 'Scegli quale annuncio promuovere.',
+    etichetta: 'Avanti',
+    poi: () => { const aid = promoAnnuncioScelto; setTimeout(() => apriPromuovi(aid), 0); }});
 }
 /* LA FATTURA DI UNA PROMOZIONE: il calco di pagaSlugNegozio, e la regola
    e' la sua — le altre modalita' del paySheet si spengono qui, o il suo
@@ -55278,6 +55343,7 @@ async function chiediPromoScoprire(){
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   } catch(e) { toast('Rete assente: riprova'); return; }
   const sc = d.scoprire || {};
+  if (sc.in_arrivo) { toast('Il negozio nella home: ' + SCOPRIRE_IN_ARRIVO.toLowerCase(), 5000); return; }
   if (!d.attive || !(sc.sats > 0)) { toast('Le promozioni non sono attive al momento', 5000); return; }
   if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
   if (sc.libero_da && !sc.fino) { toast(`I negozi nella home sono al completo: il prossimo posto si libera il ${dataPromo(sc.libero_da)}`, 7000); return; }

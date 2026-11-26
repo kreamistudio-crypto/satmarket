@@ -96462,3 +96462,55 @@ che non c'è lo dice.
 DA GUARDARE. Il primo regalo vero (Carmrain) dopo la promozione: poi lui
 carica il banner (l'immagine è in /mnt/project-files/bitcoinlabs/corsi/)
 e Andrea lo approva.
+
+## «Promuovi» anche nel Profilo, sotto «Annunci» (26 nov 2026, cantiere promuovi-profilo)
+
+Andrea: il tasto «Promuovi» che sta in cima alla scheda di ogni annuncio
+va anche nel Profilo; prima «sotto la classifica streak e il podio», poi
+«inglobare il tasto sotto il tasto annunci nella sezione profilo, così si
+capisce che serve per promuovere appunto gli annunci», e chi lo apre
+«decide quale annuncio suo promuovere», e visto l'anteprima «tipo
+agganciato al tasto annunci». DECISO: lo stesso razzo (`promo-porta`,
+`ICONA_PROMO.porta`), DENTRO il riquadro del gruppo «Annunci», subito
+sotto il titolo (si vede anche a gruppo chiuso); si vede solo a cassa
+aperta (`aggiornaPromuoviProfilo`, chiamata dove arriva
+`promozioni_attive`). Gli annunci proposti sono quelli che nella scheda
+hanno il tasto (`promuovibile`: attivo, non asta, non esaurito, non in
+ferie). Uno solo: dritto al foglio Promuovi. Piu' d'uno: il foglio di
+conferma con le righe a radio (foto piccola, nome, prezzo, lo stesso
+vestito delle voci promo), «Avanti», poi il foglio di sempre. Testi
+nuovi approvati da Andrea prima del codice: «Scegli quale annuncio
+promuovere.», «Avanti», «Non hai annunci da promuovere: pubblicane uno
+dalla scheda Vendi».
+LA TRAPPOLA EVITATA: `eseguiConferma` rimette il suo bottone DOPO
+l'azione (`bottoneInAttesa`): aprire il foglio Promuovi dentro `poi`
+avrebbe riscritto «Avanti» sopra l'etichetta del pagamento. Si apre in
+un setTimeout, a ripristino fatto (provato in node e a schermo: dopo
+«Avanti» il bottone dice «Paga»).
+SCARTATO: una lista nuova in un foglio suo (il foglio di conferma basta
+e porta gia' il volto dell'account); filtrare i soli annunci senza
+promozione in corso (il listino lo dice gia' dentro il foglio, con le
+date).
+PROVATO: `collaudo_promozioni` (in arrivo nel listino e il 409 prima
+del banner, poi il resto a leva spenta); `prove_promozioni` (posto del
+tasto dentro il gruppo, la leva, la linea rossa, in arrivo,
+il banco node: spento, nessuno, uno, piu' d'uno con le esclusioni, il
+foglio dopo), suite severa e collaudi; schermate a 360px chiaro e scuro.
+NELLO STESSO GIRO, chieste da Andrea guardando l'anteprima:
+- LA LINEA ROSSA A SINISTRA del tasto Promuovi («sembra un bug»): lo
+  era. Le sfumature di `.btn.promo-porta` partivano dal padding e si
+  ripetevano sotto il bordo di 1px, che a sinistra mostrava la coda
+  rossa. `background-origin:border-box`, e vale anche per il tasto
+  della scheda e del cassetto del banner.
+- IL NEGOZIO NELLA HOME, IN ARRIVO («stiamo per implementare delle
+  collaborazioni, quindi quella parte lì ci serve... lascialo nel
+  foglio, però mettilo grigio»): leva `PROMO_SCOPRIRE_IN_ARRIVO`, True
+  di serie (cosi' in produzione non serve una riga nel config del
+  VPS). Il listino porta `in_arrivo`; la voce resta nel foglio, spenta,
+  col solo nome e la scritta (`SCOPRIRE_IN_ARRIVO`, scelta da Andrea);
+  il cassetto del banner lo dice in un toast; la cassa rifiuta con un
+  409 PRIMA di guardare negozio e banner, anche chiesta a mano. I
+  negozi li mette lo staff con `/promossi`, che non passa dalla cassa.
+  Si riaccende dal pannello.
+DA GUARDARE: chi ha piu' di 100 annunci vede nella scelta solo i primi
+caricati (`myListings` si allunga scorrendo «I tuoi annunci»).

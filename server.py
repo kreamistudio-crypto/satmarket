@@ -1980,6 +1980,16 @@ try:
     from config import PROMO_SCOPRIRE_POSTI
 except ImportError:
     PROMO_SCOPRIRE_POSTI = 10
+# IL NEGOZIO NELLA HOME, IN ARRIVO (26 nov 2026, Andrea: «il negozio al
+# momento rimane disabilitato perché stiamo per implementare delle
+# collaborazioni... lascialo nel foglio, però mettilo grigio»). True: la
+# voce c'e' ma grigia, e la cassa la rifiuta anche chiesta a mano; i
+# negozi nella home li mette lo staff (`/promossi`, che non passa di
+# qui). False: si compra come prima, coi posti e gli scalini di sopra.
+try:
+    from config import PROMO_SCOPRIRE_IN_ARRIVO
+except ImportError:
+    PROMO_SCOPRIRE_IN_ARRIVO = True
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -40223,6 +40233,11 @@ def _leve_stato():
                   int(PROMO_SCOPRIRE_GIORNI or 0)),
             _leva("Negozio nella home: posti (0 = senza limite)",
                   "PROMO_SCOPRIRE_POSTI", int(PROMO_SCOPRIRE_POSTI or 0)),
+            _leva("Negozio nella home: in arrivo (grigio, non si compra)",
+                  "PROMO_SCOPRIRE_IN_ARRIVO", bool(PROMO_SCOPRIRE_IN_ARRIVO),
+                  acceso="nel foglio Promuovi la voce e' grigia, la "
+                         "mettono solo i moderatori (/promossi)",
+                  spento="il negozio nella home si compra dal foglio"),
             _leva("Link toccabili in descrizione",
                   "LINK_DESCRIZIONE_AMMESSI",
                   _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
@@ -63505,7 +63520,8 @@ async def listino_promo(annuncio: int = 0,
                 "giorni": int(PROMO_SCOPRIRE_GIORNI or 0),
                 "banner": _banner_vivo(u),
                 "fino": fino if fino > adesso else 0,
-                "consigliato": bool(u and u["promo_consigliato"])}
+                "consigliato": bool(u and u["promo_consigliato"]),
+                "in_arrivo": bool(PROMO_SCOPRIRE_IN_ARRIVO)}
     finally:
         con.close()
     return fuori
@@ -63566,6 +63582,10 @@ async def compra_promo(req: Request,
                    else f"in evidenza {giorni} giorni")
                 + f", annuncio {aid}")
     else:
+        # in arrivo: la prima guardia del negozio, prima di ogni altra
+        if PROMO_SCOPRIRE_IN_ARRIVO:
+            con.close()
+            raise HTTPException(409, "Il negozio nella home è in arrivo")
         u = con.execute("SELECT negozio, banner_stato, banner_foto "
                         "FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()

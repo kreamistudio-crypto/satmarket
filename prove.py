@@ -47867,7 +47867,7 @@ def prove_fogli_di_casa():
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
     # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
     # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
-    prova("i gesti che passano dalla domanda unica sono centoquarantasei (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoquarantasette (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47895,8 +47895,9 @@ def prove_fogli_di_casa():
           "comprare da un annuncio; dal 23 nov «🚀 Promuovi» e il negozio "
           "in Da scoprire; e il moderatore che rifiuta o toglie nome e "
           "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza; dal 24 nov "
-          "«Mandi l'immagine incollata?» della chat)",
-          146, solo_codice(mini).count("chiediConferma({"))
+          "«Mandi l'immagine incollata?» della chat; dal 26 nov la scelta "
+          "dell'annuncio da promuovere dal Profilo)",
+          147, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -203802,7 +203803,7 @@ def prove_miniature_leggere():
 
     # --- 3) il riquadro delle liste piccole ---------------------------
     prova("nessun 💰 al posto della foto, nessuna foto piena nelle "
-          "liste piccole", (0, 8),   # l'ottava: la testata dei codici pronti (24 nov 2026)
+          "liste piccole", (0, 9),   # l'ottava: la testata dei codici pronti (24 nov 2026); la nona: la scelta dell'annuncio da promuovere dal Profilo (26 nov 2026)
           (mini.count("replaceWith('💰')"), mini.count("riquadroMini(")
            - 1))
     # fino alla funzione dopo: dentro ci sono funzioni annidate
@@ -223928,6 +223929,7 @@ def prove_promozioni():
     for riga in ("PROMOZIONI_ATTIVE = True",
                  "PROMO_IN_CIMA_ORE = 24",
                  "PROMO_SCOPRIRE_POSTI = 10",
+                 "PROMO_SCOPRIRE_IN_ARRIVO = True",
                  "PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}",
                  "PROMO_EVIDENZA_POSTI = 8",
                  "PROMO_SCOPRIRE_GIORNI = 30"):
@@ -224229,8 +224231,9 @@ console.log(JSON.stringify([a, b, c]));""")
     # Il tasto «Promuovi» ha la carta lucida della porta della Classifica
     # Streak, nei colori del razzo, e sta in cima alla scheda.
     ap = pezzo_js(mini, "async function apriPromuovi(aid){", "\n}\n")
-    prova("il foglio ha tre voci: In cima, In evidenza, il negozio",
-          (1, 1, 1, 0),
+    prova("il foglio ha tre voci: In cima, In evidenza, il negozio (che "
+          "dal 26 nov ha due vesti: in arrivo, o in vendita)",
+          (1, 1, 2, 0),
           (ap.count("tipo: 'cima'"), ap.count("tipo: 'evidenza'"),
            ap.count("tipo: 'scoprire'"), ap.count("tipo: 'evidenza:'")))
     prova("...e «Paga» compra la durata scelta, o il negozio", (True, True),
@@ -224240,9 +224243,12 @@ console.log(JSON.stringify([a, b, c]));""")
     prova("nel foglio nessuna emoji: le icone sono disegnate", [],
           _emoji.findall(_senza_commenti_js(
               ap + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n"))))
-    prova("...e il tasto Promuovi, nella scheda e nel cassetto, porta il "
-          "razzo disegnato e la carta lucida", (2, 0),
+    prova("...e il tasto Promuovi, nella scheda, nel cassetto e sotto "
+          "«Annunci» del Profilo, porta il razzo disegnato e la carta lucida", (3, 0),
           (mini.count('class="btn promo-porta'), mini.count("🚀 Promuovi</button>")))
+    prova("...le sfumature partono dal bordo: niente coda rossa sotto il "
+          "bordo di sinistra", True,
+          "gap:8px;" in mini and "    background-origin:border-box}\n  .btn.promo-porta svg{" in mini)
     prova("...la carta lucida e' la ricetta della porta Streak", True,
           ".btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,"
           "rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%)," in mini)
@@ -224885,6 +224891,73 @@ INSERT INTO utenti VALUES(1, 500),(2, 300),(3, 0),(4, 50),(5, 900);""")
     prova("...anche dal cassetto del negozio", (True, 0, True),
           ("titolo: `Il negozio nella home," in _cs, _cs.count("Da scoprire"),
            "sc.libero_da && !sc.fino" in _cs))
+
+    # IL NEGOZIO NELLA HOME, IN ARRIVO (26 nov 2026, Andrea: «lascialo nel
+    # foglio, però mettilo grigio»): la leva, il listino, la cassa che
+    # rifiuta PRIMA del banner, il foglio e il cassetto del banner
+    _cp = pezzo("compra_promo")
+    prova("in arrivo: il listino lo dice, la cassa rifiuta per prima, la "
+          "leva e' sul pannello", (True, True, True),
+          ('"in_arrivo": bool(PROMO_SCOPRIRE_IN_ARRIVO)}' in pezzo("listino_promo"),
+           _cp.index("if PROMO_SCOPRIRE_IN_ARRIVO:") < _cp.index('SELECT negozio, banner_stato, banner_foto "\n                        "FROM utenti') < _cp.rindex("crea_invoice"),
+           '"PROMO_SCOPRIRE_IN_ARRIVO", bool(PROMO_SCOPRIRE_IN_ARRIVO),' in src))
+    _apc = _senza_commenti_js(ap)
+    prova("...nel foglio la voce resta, grigia, col solo nome e la scritta "
+          "(e niente banner da chiedere); nel cassetto, la scritta", (True, True, True, True),
+          ("const SCOPRIRE_IN_ARRIVO = 'In arrivo';" in mini,
+           "voci.push({tipo: 'scoprire', titolo: 'Il negozio nella home', testo: '',\n      no: SCOPRIRE_IN_ARRIVO});" in _apc,
+           "if (sc.in_arrivo) promoServeBanner = false;" in _apc,
+           "if (sc.in_arrivo) { toast('Il negozio nella home: ' + SCOPRIRE_IN_ARRIVO.toLowerCase(), 5000); return; }"
+           in pezzo_js(mini, "async function chiediPromoScoprire(){", "\n}\n")))
+
+    # «PROMUOVI» DAL PROFILO (26 nov 2026, Andrea: il tasto «inglobato
+    # sotto il tasto annunci nella sezione profilo», e chi lo apre
+    # «decide quale annuncio suo promuovere»)
+    _cat = mini.index('<div class="grp" id="grpCatalogo">')
+    _neg = mini.index('<div class="grp" id="grpNegozio">')
+    _pp = mini.find('<div id="promuoviProfilo" hidden>')
+    prova("il tasto sta DENTRO «Annunci», sotto il titolo e prima del corpo, "
+          "spento di serie, e si accende con la leva delle promozioni", (True, True, True),
+          (_cat < mini.index("Annunci<span", _cat) < _pp < mini.index('<div class="grp-b">', _cat) < _neg,
+           'onclick="promuoviDalProfilo()"' in mini[_pp:_neg],
+           "promoAttive = j.promozioni_attive === true;\n  aggiornaPromuoviProfilo();" in mini))
+    _pd = pezzo_js(mini, "const promuovibile = l =>", "\n/* LA FATTURA DI UNA PROMOZIONE")
+    r = _node_banco("""
+const esc = s => String(s), fmt = n => String(n), fmtEur = n => String(n);
+const riquadroMini = () => '<i></i>';
+const astaE = l => !!l.asta, esaurito = l => !!l.esa, inFerie = l => !!l.ferie;
+const ICONA_PROMO = {porta: '<svg></svg>'};
+let DEMO = false, VETRINA = false, promoAttive = true, myListings = [];
+const box = {hidden: true, firstElementChild: {innerHTML: ''}};
+const el = id => id === 'promuoviProfilo' ? box : null;
+const log = [];
+const toast = t => log.push('toast:' + t);
+const apriPromuovi = id => log.push('apri:' + id);
+let conf = null; const chiediConferma = c => { conf = c; };
+""" + _pd + """
+aggiornaPromuoviProfilo();
+const acceso = [box.hidden, box.firstElementChild.innerHTML];
+promoAttive = false; aggiornaPromuoviProfilo(); const spento = box.hidden;
+promuoviDalProfilo();
+myListings = [{id: 1, stato: 'attivo', asta: true}, {id: 2, stato: 'attivo', esa: true},
+  {id: 3, stato: 'attivo', ferie: true}, {id: 4, stato: 'revisione'}, {id: 5, stato: 'attivo', title: 'x', price: 7}];
+promuoviDalProfilo();
+myListings.push({id: 6, stato: 'attivo', title: 'y', price: 9});
+promuoviDalProfilo();
+const scelta = [conf.titolo, conf.etichetta, conf.corpo,
+  (conf.testata.match(/name="promoAnnuncio"/g) || []).length, conf.testata.includes('value="5" checked')];
+promoAnnuncioScelto = 6; conf.poi();
+setTimeout(() => console.log(JSON.stringify([acceso, spento, log, scelta])), 5);""")
+    if r is None:
+        salta("il Promuovi del Profilo, girato in node", "node non c'e'")
+    else:
+        prova("in node: acceso solo a cassa aperta; nessun annuncio = la frase; "
+              "uno solo = dritto al foglio; piu' d'uno = la scelta (aste, "
+              "esauriti, in ferie e in revisione fuori), poi il foglio DOPO",
+              [[False, "<svg></svg>Promuovi"], True,
+               ["toast:Non hai annunci da promuovere: pubblicane uno dalla scheda Vendi",
+                "apri:5", "apri:6"],
+               ["Promuovi", "Avanti", "Scegli quale annuncio promuovere.", 2, True]], r)
 
     # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
     prova("collaudo_promozioni e' fra i collaudi della CI", True,

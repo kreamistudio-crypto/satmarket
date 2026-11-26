@@ -277,7 +277,17 @@ def main():
     r, no = compra({"tipo": "cima", "annuncio_id": recente})
     prova("un annuncio di un'ora fa e' gia' fra i primi: In cima no",
           True, bool(no) and "già fra i primi" in no[1])
+    # IN ARRIVO (26 nov 2026): di serie il negozio nella home non si
+    # compra — il listino lo dice, la cassa rifiuta prima di guardare il
+    # banner. Il resto del collaudo lo prova a leva spenta.
     come(3)
+    prova("di serie il negozio nella home e' in arrivo, anche nel listino",
+          (True, True), (server.PROMO_SCOPRIRE_IN_ARRIVO,
+                         asyncio.run(server.listino_promo(0, "", ""))["scoprire"]["in_arrivo"]))
+    r, no = compra({"tipo": "scoprire"})
+    prova("...e la cassa lo rifiuta prima del banner, con un 409",
+          (409, "Il negozio nella home è in arrivo"), no)
+    server.PROMO_SCOPRIRE_IN_ARRIVO = False
     r, no = compra({"tipo": "scoprire"})
     prova("il negozio senza banner approvato non si mette in Da scoprire",
           True, bool(no) and "banner" in no[1])

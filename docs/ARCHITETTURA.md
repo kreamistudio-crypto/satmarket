@@ -38766,7 +38766,15 @@ mai il kind 0 di nessuno: regola ferrea 2).
   restano `evidenza`. Dalla sera del 25 nov anche «In cima» per l'utente
   si chiama «In vetrina» (la parola sta in UN posto, `PROMO_ETICHETTA`
   nell'app) e «Da scoprire» si chiama «Il negozio nella home»; id,
-  motivi e colonne restano `cima` e `scoprire`. LA CARD IN VETRINA SI
+  motivi e colonne restano `cima` e `scoprire`. «PROMUOVI» ANCHE DAL
+  PROFILO (26 nov): `#promuoviProfilo` dentro il gruppo «Annunci»,
+  acceso da `aggiornaPromuoviProfilo` con `promoAttive`; `promuovibile`
+  ha le guardie del tasto della scheda, e con piu' annunci la scelta
+  passa da `chiediConferma` prima di `apriPromuovi`. IL NEGOZIO NELLA
+  HOME IN ARRIVO (26 nov): `PROMO_SCOPRIRE_IN_ARRIVO` (True di serie) =
+  voce grigia nel foglio, `in_arrivo` nel listino, 409 in
+  `compra_promo` prima di ogni altra guardia del negozio; `/promossi`
+  resta la strada dello staff. LA CARD IN VETRINA SI
   VEDE: `annunci.sponsor_fino` (additiva, la scrive solo l'incasso, il
   rimborso la azzera, gate in lettura) viaggia in `CAMPI_VETRINA`, e
   per `PROMO_IN_CIMA_ORE` `cardHTML` accende la cornice arancio,
