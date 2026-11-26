@@ -45235,27 +45235,52 @@ function offriPerRichiesta(id){
    qualcosa nel form non se lo vede ricoprire, e tutto resta da
    ritoccare prima di «Pubblica». */
 const CATEGORIA_BUONI = 'Buoni ed esperienze';
+/* LA MEMORIA DI QUEL CHE HO MESSO IO (26 nov 2026, Andrea: «Offri» su
+   «Buono Amazon» dopo «Cerco Mac M1» teneva il titolo «Mac M1»). «Solo
+   le caselle vuote» non bastava: la casella piena l'avevo riempita io,
+   con la richiesta di prima. Qui il form ricorda cosa ci ha scritto, e
+   una casella che dice ancora quello si riscrive (o si svuota) per la
+   richiesta nuova; quel che ha toccato la persona resta suo. */
+let offertaPosata = {titolo: '', prezzo: '', foto: '', dig: false};
 async function compilaOffertaRichiesta(r){
+  const prima = offertaPosata;
+  offertaPosata = {titolo: '', prezzo: '', foto: '', dig: false};
+  const mia = (v, posato) => !String(v || '').trim() || (posato && v === posato);
   const t = el('sellTitle');
-  if (t && !t.value.trim()) t.value = titoloDaRichiesta(r.testo).slice(0, 120);
+  if (t && mia(t.value, prima.titolo)){
+    t.value = titoloDaRichiesta(r.testo).slice(0, 120);
+    offertaPosata.titolo = t.value;
+  }
   const p = el('sellPrice');
-  if (p && !p.value){
+  if (p && mia(p.value, prima.prezzo)){
+    p.value = '';
     const eur = Number(r.budget_eur) || 0, sats = Number(r.budget_sats) || 0;
     if (eur > 0 || sats > 0){
       const v = eur > 0 ? 'eur' : 'sats';
       if (sellValuta !== v && !astaAccesa()) impostaSellValuta(v);
       if (sellValuta === v){
         p.value = String(eur > 0 ? eur : sats);
-        p.dispatchEvent(new Event('input'));
+        offertaPosata.prezzo = p.value;
       }
     }
+    p.dispatchEvent(new Event('input'));
+  }
+  // la consegna e la foto della richiesta di prima, se nessuno le ha toccate
+  if (prima.dig && el('sellConsDig')?.checked && r.categoria !== CATEGORIA_BUONI){
+    el('sellConsDig').checked = false;
+    aggiornaConsegnaForm();
+  }
+  if (prima.foto && sellFoto.length === 1 && sellFoto[0] === prima.foto){
+    sellFoto = [];
+    renderFotoPreview();
   }
   if (r.categoria !== CATEGORIA_BUONI) return;
   const consegne = ['sellConsSped', 'sellConsRitiro', 'sellConsDig'].map(el).filter(Boolean);
   if (el('sellConsDig') && !consegne.some(c => c.checked)){
     el('sellConsDig').checked = true;
     aggiornaConsegnaForm();
-  }
+    offertaPosata.dig = true;
+  } else if (prima.dig && el('sellConsDig')?.checked) offertaPosata.dig = true;
   if (sellFoto.length || (fotoAttuali && fotoAttuali.length)) return;
   const foto = fotoDiSerieBuono(r.testo);
   /* un telefono che non sa disegnare nella tela da' un JPEG piatto: meglio
@@ -45263,6 +45288,7 @@ async function compilaOffertaRichiesta(r){
   if (!foto || await jpegVuoto(foto)) return;
   if (!offertaRichiesta || offertaRichiesta.id !== r.id || sellFoto.length) return;
   sellFoto.push(foto);
+  offertaPosata.foto = foto;
   renderFotoPreview();
 }
 /* IL TITOLO E' L'OGGETTO, NON LA DOMANDA (26 nov 2026, Andrea: «cerco

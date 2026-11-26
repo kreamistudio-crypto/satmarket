@@ -206490,7 +206490,11 @@ def prove_richieste():
           "vuote, il budget nella sua valuta, consegna e foto solo per i buoni",
           [True, True, True, True, True, True],
           ["  vestiOffertaRichiesta();\n  compilaOffertaRichiesta(r);\n}" in mini,
-           "if (t && !t.value.trim())" in _co and "if (p && !p.value)" in _co,
+           "if (t && mia(t.value, prima.titolo))" in _co
+           and "if (p && mia(p.value, prima.prezzo))" in _co
+           # (26 nov 2026) quel che ho messo io per la richiesta di prima si
+           # riscrive: titolo, prezzo, consegna e foto di serie
+           and "sellFoto[0] === prima.foto" in _co and "prima.dig &&" in _co,
            "const v = eur > 0 ? 'eur' : 'sats';" in _co,
            "if (r.categoria !== CATEGORIA_BUONI) return;" in _co,
            "!consegne.some(c => c.checked)" in _co,
