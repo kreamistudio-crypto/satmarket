@@ -40921,6 +40921,13 @@ def _leve_stato():
                   spento="la chat non compare e il server non accetta "
                          "buste nuove; quelle che ci sono si cancellano "
                          "come sempre, a scambio finito"),
+            # LE SPUNTE NELLA CHAT (26 nov 2026): accesa di serie
+            _leva("Spunte nella chat", "CHAT_SPUNTE", CHAT_SPUNTE,
+                  acceso="sotto i propri messaggi ✓ arrivato al server, ✓✓ "
+                         "arrivato al telefono dell'altra parte, ✓✓ arancioni "
+                         "visto; nelle chat di scambi, ordini e on-chain",
+                  spento="niente spunte, e il server non scrive fin dove "
+                         "ognuno ha visto"),
             # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): la leva globale e la
             # finestra del raggruppamento; la preferenza resta per persona
             _leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",
@@ -69770,6 +69777,31 @@ def _salta_pausa_p2p(con, tg_id, adesso: int) -> dict:
     return _mia_pausa_p2p(con, tg, adesso)
 
 
+def _fuso_pausa_p2p(con, tg_id, d, adesso: int) -> dict:
+    """IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026, cantiere chat-spunte;
+    la domanda di un utente all'estero, Andrea: «Ok, perfetto»). La pausa
+    si scrive nell'ora di chi la salva, col fuso che il telefono aveva in
+    quel momento: chi parte DOPO averla salvata restava in pausa con
+    l'ora di casa. Il telefono che vede un fuso diverso da quello salvato
+    manda `{"solo_fuso": true, "fuso", "scarto"}`, e qui cambiano SOLO
+    fuso e scarto: le fasce restano le stesse ore («dormo dalle 22 alle
+    7» vale dove sono), la una tantum (un epoch) non c'entra, e anche
+    `salta_fino` resta — non e' un'intenzione nuova, e' la stessa pausa
+    in un altro posto. Un fuso in una forma strana, uno scarto fuori
+    dalle 14 ore o nessuna pausa salvata: non si scrive niente. Torna
+    quel che `_mia_pausa_p2p` direbbe subito dopo. Pura sulla
+    connessione; COMMITTA."""
+    tg = int(tg_id or 0)
+    fuso = str((d or {}).get("fuso") or "")
+    scarto = (d or {}).get("scarto")
+    if (FORMA_FUSO_P2P.fullmatch(fuso) and isinstance(scarto, int)
+            and not isinstance(scarto, bool) and -840 <= scarto <= 840):
+        con.execute("UPDATE p2p_pause SET fuso=?, scarto=?, aggiornato=? WHERE tg_id=?",
+                    (fuso, int(scarto), int(adesso), tg))
+        con.commit()
+    return _mia_pausa_p2p(con, tg, adesso)
+
+
 def _scrivi_pausa_p2p(con, tg_id, pausa: dict, adesso: int) -> dict:
     """Scrive la pausa di una persona (gia' pulita: `_pausa_pulita_p2p`)
     e torna quel che `_mia_pausa_p2p` direbbe subito dopo. Una pausa senza
@@ -73185,6 +73217,10 @@ async def scrivi_pausa_p2p(req: Request, x_tg_init_data: str = Header(""),
         # fasce — le tiene, e salta solo la pausa aperta adesso
         if isinstance(d, dict) and d.get("salta") is True:
             fuori = _salta_pausa_p2p(con, user["id"], adesso)
+        # IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026): `{"solo_fuso":
+        # true, ...}` cambia fuso e scarto, e nient'altro
+        elif isinstance(d, dict) and d.get("solo_fuso") is True:
+            fuori = _fuso_pausa_p2p(con, user["id"], d, adesso)
         else:
             fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)
     except ValueError as e:
@@ -74567,6 +74603,22 @@ try:
     P2P_CHAT_SCAMBIO = P2P_CHAT_SCAMBIO is not False
 except ImportError:
     P2P_CHAT_SCAMBIO = True
+# LE SPUNTE (26 nov 2026, cantiere chat-spunte; l'idea e' di un utente,
+# Andrea: «Ok, perfetto. Le voglio arancioni»): sotto i MIEI messaggi
+# ✓ = la busta e' sul server, ✓✓ = il telefono dell'altra parte l'ha
+# ritirata, ✓✓ arancioni = l'altra parte ha avuto la chat davanti agli
+# occhi. Valgono per le tre chat del cassetto (P2P, mercatino, on-chain).
+# Il server sa gia' il ritiro (`letture.letto_fino`); il «visto» lo dice
+# il telefono di chi guarda, col ritiro dopo (`visto_fino`). ACCESA di
+# serie: spenta, il ritiro non porta le cifre e non scrive il visto, e le
+# spunte spariscono. Solo un False scritto la spegne.
+try:
+    from config import CHAT_SPUNTE
+    if not isinstance(CHAT_SPUNTE, bool):
+        print("[p2p] CHAT_SPUNTE non e' True/False: le spunte restano accese")
+    CHAT_SPUNTE = CHAT_SPUNTE is not False
+except ImportError:
+    CHAT_SPUNTE = True
 P2P_CHAT_BUSTA_MAX = 4096         # 500 caratteri, chiusi e in base64, stanno sotto
 P2P_CHAT_BUSTA_MOD_MAX = 16384    # la busta per un moderatore porta piu' chiavi
 P2P_CHAT_MSG_MAX = 200            # messaggi per scambio E PER CHI SCRIVE (14 nov 2026): ~1,2 MB nel caso peggiore
@@ -75137,6 +75189,7 @@ def db_chat():
                 visto_il INTEGER NOT NULL DEFAULT 0,
                 avvisato_fino INTEGER NOT NULL DEFAULT 0,
                 avvisi INTEGER NOT NULL DEFAULT 0,
+                visto_fino INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(ordine, giro, tg_id)
             );
             -- LE CHIAVI D'ORDINE DEL MERCATINO (16 ott 2026): la sola
@@ -75185,6 +75238,13 @@ def db_chat():
                 PRIMARY KEY(ordine, giro, da)
             );
         """)
+        # LE SPUNTE (26 nov 2026): fin dove ognuno ha avuto la chat davanti
+        # agli occhi. Il cassetto di ieri la colonna non ce l'ha: si
+        # aggiunge, una volta (sqlite dice «duplicate column» le altre)
+        try:
+            con.execute("ALTER TABLE letture ADD COLUMN visto_fino INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         con.commit()
         try:
             os.chmod(DB_CHAT, 0o600)      # lo legge solo chi fa girare il server
@@ -75285,6 +75345,34 @@ def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
                        "mia": int(r["da"]) == int(io), "busta": r["busta"],
                        "quando": int(r["quando"])} for r in righe],
             "fino": fino, "perso": perso}
+
+
+def _chat_spunte(cc, ordine: str, giro: int, io: int, altro: int,
+                 visto) -> dict:
+    """LE SPUNTE (26 nov 2026, cantiere chat-spunte). Pura sulla
+    connessione del cassetto; va chiamata DOPO il ritiro, che ha gia'
+    scritto la riga di chi chiede. Due gesti:
+    • scrive fin dove CHI CHIEDE ha avuto la chat davanti (`visto`, il
+      numero di busta che dice il suo telefono), mai oltre quel che ha
+      ritirato davvero e mai all'indietro: un telefono che riparte da
+      zero, o che mente in avanti, non sposta niente;
+    • torna fin dove l'ALTRA parte ha ritirato (`arrivato`) e fin dove ha
+      visto (`visto`). Sono numeri di busta: il telefono li confronta coi
+      numeri dei suoi messaggi.
+    Il moderatore non passa di qui: leggere una disputa non accende
+    nessuna spunta."""
+    try:
+        visto = max(0, int(visto or 0))
+    except (TypeError, ValueError):
+        visto = 0
+    if visto:
+        cc.execute("UPDATE letture SET visto_fino=MAX(visto_fino, MIN(?, letto_fino)) "
+                   "WHERE ordine=? AND giro=? AND tg_id=?", (visto, ordine, giro, int(io)))
+        cc.commit()
+    r = cc.execute("SELECT letto_fino, visto_fino FROM letture WHERE ordine=? AND giro=? "
+                   "AND tg_id=?", (ordine, giro, int(altro or 0))).fetchone()
+    return {"arrivato": int(r["letto_fino"]) if r else 0,
+            "visto": int(r["visto_fino"]) if r else 0}
 
 
 def _chat_p2p_posa(cc, ordine: str, giro: int, io: int, tipo: str,
@@ -75625,6 +75713,11 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
         corpo = _chat_p2p_ritira(cc, ordine, st["giro"], user["id"], dopo,
                                  int(time.time()))
+        # LE SPUNTE (26 nov 2026): il mio «visto» entra, le cifre
+        # dell'altra parte escono. A leva spenta niente delle due
+        if CHAT_SPUNTE:
+            corpo["spunte"] = _chat_spunte(cc, ordine, st["giro"], user["id"],
+                                           st["altro"], d.get("visto"))
         # il segno di nascita del cassetto (19 ott 2026): il telefono vede
         # se il file e' rinato anche quando `perso` non lo vede
         corpo["cassetto"] = _chat_nascita(cc)

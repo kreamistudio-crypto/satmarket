@@ -305,7 +305,7 @@ Il paracadute degli ordini P2P: nel foglio «Pubblica», dopo la pausa, la sezio
 <!-- pezzo libro-035 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (7/24)
 
-La pausa degli ordini P2P: chi pubblica può mettere in pausa i suoi ordini quando non c'è. Si imposta da «I miei scambi» col tasto «⏸ Pausa degli ordini», oppure nel foglio «Pubblica» al passo «3. Regole» con «⏸ Imposta la pausa». Due modi: una volta sola, fino a 7 giorni, o ricorrente, a giorni e orari fissi (per esempio tutte le notti dalle 22 alle 6). In pausa gli ordini restano nel libro, in grigio con «⏸ Puoi prenderlo tra…», e dentro Barattolo nessuno li può prendere; chi li ha pubblicati vede «⏸ In pausa fino alle …». Vale solo dentro Barattolo: le altre app che usano lo stesso coordinatore Mostro li vedono e li possono prendere lo stesso. Bozze degli ordini non ce ne sono: il foglio fa rileggere tutto al passo «4. Rileggi» prima di pubblicare, e chi vuole un ordine nel libro che ancora non si possa prendere imposta la pausa prima di pubblicarlo. Per togliere un ordine del tutto lo si annulla, e poi lo si ripubblica.
+La pausa degli ordini P2P: chi pubblica può mettere in pausa i suoi ordini quando non c'è. Si imposta da «I miei scambi» col tasto «⏸ Pausa degli ordini», oppure nel foglio «Pubblica» al passo «3. Regole» con «⏸ Imposta la pausa». Due modi: una volta sola, fino a 7 giorni, o ricorrente, a giorni e orari fissi (per esempio tutte le notti dalle 22 alle 6). Le ore valgono nel fuso orario del telefono: se dopo averla impostata si parte per un altro paese, la pausa segue da sola il fuso nuovo appena si apre Barattolo, con le stesse ore (per esempio «dalle 22 alle 6» resta dalle 22 alle 6 dove si è). In pausa gli ordini restano nel libro, in grigio con «⏸ Puoi prenderlo tra…», e dentro Barattolo nessuno li può prendere; chi li ha pubblicati vede «⏸ In pausa fino alle …». Vale solo dentro Barattolo: le altre app che usano lo stesso coordinatore Mostro li vedono e li possono prendere lo stesso. Bozze degli ordini non ce ne sono: il foglio fa rileggere tutto al passo «4. Rileggi» prima di pubblicare, e chi vuole un ordine nel libro che ancora non si possa prendere imposta la pausa prima di pubblicarlo. Per togliere un ordine del tutto lo si annulla, e poi lo si ripubblica.
 
 <!-- pezzo libro-036 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (8/24)
@@ -317,7 +317,7 @@ La disputa nel P2P: si apre solo coi sats già in garanzia, col bottone «⚠️
 <!-- pezzo libro-037 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (9/24)
 
-La chat dello scambio: da quando l'ordine è preso a quando lo scambio finisce c'è una chat fra voi due, cifrata, con foto e PDF (sul computer anche uno screenshot incollato con Ctrl+V: prima di mandarlo l'app chiede «Mandi l'immagine incollata?»). A fine scambio si cancella. Barattolo non ti scrive mai nella chat dello scambio: chi lì si presenta come «assistenza» è l'altra persona.
+La chat dello scambio: da quando l'ordine è preso a quando lo scambio finisce c'è una chat fra voi due, cifrata, con foto e PDF (sul computer anche uno screenshot incollato con Ctrl+V: prima di mandarlo l'app chiede «Mandi l'immagine incollata?»). A fine scambio si cancella. Dal 26 novembre 2026 sotto i propri messaggi ci sono le spunte (nella chat degli scambi P2P, degli ordini del mercatino e degli scambi on-chain): una ✓ grigia = il messaggio è arrivato a Barattolo; due ✓✓ grigie = è arrivato sul telefono dell'altra persona (succede quando apre lo scambio o l'ordine); due ✓✓ arancioni = l'altra persona ha avuto la chat davanti e l'ha visto. Il moderatore che legge una disputa non accende le spunte. Barattolo non ti scrive mai nella chat dello scambio: chi lì si presenta come «assistenza» è l'altra persona.
 
 Contanti di persona (metodo «Contanti»): ci si incontra, chi compra sats porta le banconote, chi vende le conta e libera i sats lì, davanti all'altro. Le regole:
 - i contanti si consegnano solo quando chi vende preme «Libera i sats» davanti a te, e si va via solo con lo scambio concluso;
@@ -2888,4 +2888,11 @@ pubblico: no
 frase: In «Cerco» il budget si scrive anche in euro, e scegli per quanto tenere aperta la richiesta: 30, 60 o 90 giorni. E se vuoi sapere quando qualcuno cerca qualcosa, nel Profilo c'è «🙋 Avvisami delle nuove richieste di Cerco»: ti arriva un messaggio col tasto «Offri», per le categorie scelte negli avvisi, al massimo 3 al giorno.
 dove: Esplora → «Cerco»; Profilo → Impostazioni → Avvisi → blocco «Mercatino».
 leva: RICHIESTE (accesa di serie); l'interruttore resta spento finché non lo accendi
+
+<!-- pezzo novita-161 | novita -->
+## Novità · 2026-11-26 · chat-spunte
+
+frase: Nella chat degli scambi e degli ordini adesso sotto i tuoi messaggi ci sono le spunte: una ✓ quando il messaggio è partito, due ✓✓ quando è arrivato sul telefono dell'altra persona, e le due ✓✓ diventano arancioni quando l'ha letto. E se hai messo la pausa ai tuoi ordini P2P e poi parti, la pausa segue da sola il fuso orario del tuo telefono, con le stesse ore.
+dove: La chat di uno scambio P2P, di un ordine o di uno scambio on-chain → accanto all'ora dei tuoi messaggi; «I miei scambi» → «⏸ Pausa degli ordini».
+leva: CHAT_SPUNTE (le spunte; accesa di serie)
 pubblico: no

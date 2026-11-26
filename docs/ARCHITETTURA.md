@@ -33593,7 +33593,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scrive sugli ordini e niente esce verso i relay: la pausa si CHIEDE
   all'orologio. LE ROTTE: `GET /api/p2p/pausa` (la propria, senza
   parametri; a leva spenta `attiva: false`) e `POST /api/p2p/pausa` (il
-  corpo intero sostituisce; vuoto = toglie; 409 a leva spenta);
+  corpo intero sostituisce; vuoto = toglie; 409 a leva spenta;
+  `{salta: true}` toglie la pausa per stanotte; `{solo_fuso: true, fuso,
+  scarto}` — 26 nov 2026, `_fuso_pausa_p2p` — cambia SOLO fuso, scarto e
+  `aggiornato`: lo manda `seguiFusoPausaP2P` quando il telefono è in un
+  fuso diverso da quello salvato, una volta per fuso e per apertura);
   `/api/p2p/facce` e `/api/p2p/libro` servono `pause`;
   `_posso_prendere_p2p` ferma col motivo `pausa` e il `fino` (mai sul
   proprio ordine). «Dimentica il profilo» la toglie, la fusione degli
@@ -35333,6 +35337,30 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   resta fino alla fine dello scambio. `chatScCeP2P(o)` è il giudice «in
   questo scambio la chat c'è»: la leva, `chatScServeP2P`, e il server
   che non ha detto né «finita» né «senza l'altra parte».
+  LE SPUNTE (26 nov 2026, cantiere chat-spunte; perché in CANTIERI,
+  «Le spunte nella chat»). Sotto i MIEI messaggi, accanto all'ora: ✓ la
+  busta è sul server, ✓✓ il telefono dell'altra parte l'ha ritirata
+  (`letture.letto_fino`, che il server scriveva già), ✓✓ arancioni
+  (`--sats-text`) l'altra parte ha avuto la chat davanti
+  (`letture.visto_fino`, colonna nuova: nel CREATE e nell'ALTER di
+  `db_chat`). Il «visto» lo dice il telefono di chi guarda: `vistoFino`
+  del cassetto (lo stesso del pallino) viaggia nel corpo del ritiro,
+  `{ordine, dopo, visto}`; `_chat_spunte` (dopo `_chat_p2p_ritira`) lo
+  scrive con `MAX(visto_fino, MIN(visto, letto_fino))` — mai oltre il
+  ritirato, mai indietro — e torna `spunte: {arrivato, visto}` dell'ALTRA
+  parte, numeri di busta. Sul client `esito.c.spunte` sta nella voce
+  della chat, `spuntaChatScP2P` disegna (pura, solo segni, niente
+  parole); `chatScInviaP2P` prende subito il numero che `invia` ha dato
+  alla busta; `chatScVistoP2P`, quando il visto avanza e le spunte ci
+  sono, segna `p2pChatScRidire` e fa partire un ritiro (o lo lascia alla
+  coda di quello in volo): chi chiude l'app subito non lascia le ✓✓
+  grigie. Il moderatore legge da `/moderazione/chat`, che non passa di
+  lì: la sua lettura non accende niente. LA LEVA `CHAT_SPUNTE`, ACCESA
+  di serie (solo un False la spegne), in `config_esempio.py` e nel
+  pannello; spenta, il ritiro non porta `spunte` e non scrive il visto,
+  e il client non disegna niente. Vale per le tre chat del cassetto:
+  scambi P2P, ordini del mercatino, scambi on-chain. Le prove:
+  `prove_chat_spunte`, `collaudo_chat_mercatino` (sezione 14).
   IL PALLINO DEI NON LETTI (12 ott 2026, sera): `POST
   /api/p2p/chat/novita` `{ordini: [...]}` (al più
   `P2P_CHAT_NOVITA_MAX`) → `{ultimi: {ordine: n}}`, il numero
