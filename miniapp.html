@@ -59489,7 +59489,8 @@ function resaCodice(testo, o){
         onclick="${copia}"><span class="mono codice-cifre">${esc(testo)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
   const scappato = esc(testo);
   const corpo = op.linkCanale ? linkCanaleToccabile(scappato)
-              : op.linkBot ? linkBotToccabile(scappato) : scappato;
+              : op.linkBot ? linkCanaleToccabile(linkBotToccabile(scappato))
+              : scappato;
   return `
       <div class="codice-blocco">${corpo}</div>
       <button class="btn ghost" style="margin-top:8px"
@@ -59528,7 +59529,14 @@ function apriInvitoCanale(url){
    bot Telegram finisce per «bot» per regola di Telegram, quindi un
    canale, un gruppo o un sito restano testo da copiare, come ogni
    altro digitale. Come l'invito: la forma non ha caratteri che esc()
-   cambi, si lavora sul testo gia' passato da esc(). */
+   cambi, si lavora sul testo gia' passato da esc().
+   E L'INVITO A UN GRUPPO, https://t.me/+…, si tocca anche lui dalla
+   scorta (26 nov 2026, seconda scelta di Andrea: «Sì, anche gli inviti
+   t.me/+»; BitcoinLabs consegna i corsi con un invito monouso al gruppo
+   che fa da aula): `resaCodice` passa il testo da `linkBotToccabile` e
+   poi da `linkCanaleToccabile`, la stessa porta dell'abbonamento. Le
+   due forme non si pestano: un nome di bot comincia per lettera, un
+   invito per «+». Un sito resta testo da copiare. */
 const RE_LINK_BOT = /(?<![\w\/.:=?&+-])https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{1,28}bot(?:\?start=[A-Za-z0-9_-]{1,64})?(?![\w\/?&=+.%#-])/gi;
 function linkBotToccabile(testoEsc){
   return String(testoEsc || '').replace(RE_LINK_BOT, u =>

@@ -12564,6 +12564,11 @@
   (la regola dell'abbonamento, `linkCanaleToccabile`, resta com'è).
   Il tocco passa da `apriLinkBot`, che riprova la forma e dentro
   Telegram usa openTelegramLink.
+  E L'INVITO A UN GRUPPO (26 nov 2026, seconda scelta di Andrea: «Sì,
+  anche gli inviti t.me/+»): dalla scorta il testo passa poi da
+  `linkCanaleToccabile`, la porta dell'abbonamento, così l'invito
+  monouso al gruppo-aula di un corso si apre con un tocco. Le due forme
+  non si pestano (un bot comincia per lettera, un invito per «+»).
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il

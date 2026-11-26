@@ -96411,3 +96411,22 @@ DA SAPERE. Il telefono ritira la chat solo con la pagina dello scambio (o dell'o
 PROVATO. `prove_chat_spunte` (nuova, categoria p2p): leva e colonna (CREATE e ALTER), la rotta che chiede le spunte DOPO il ritiro e solo a leva accesa, il moderatore che non passa di lì; il giudice vero su sqlite (✓, ✓✓, ✓✓ arancioni, il telefono che mente in avanti, quello che riparte da zero, il visto storto, le cifre dell'altra parte, un altro giro, il cassetto di ieri che riceve la colonna); in node i pezzi veri del telefono (i tre segni, le spunte mute, le cifre storte, il visto che fa partire il ritiro, quello in volo, la leva spenta, il fuso: quando serve, una domanda per fuso col corpo giusto, la risposta rifiutata); il giudice del fuso su sqlite (salvata a Roma e partito per New York, in pausa fino alle 07:00 di là, «per stanotte» che resta, fuso storto, scarto fuori, True al posto dello scarto, chi non ha pausa). CONTROPROVE, sette rotture una per una e tutte rosse: il visto senza il tetto del ritirato, senza il MAX, lo scarto senza il controllo, la ✓✓ arancione letta dall'arrivato, il ritiro che parte anche a leva spenta, la domanda del fuso ripetuta, la coda del ritiro tolta. Aggiornate le sentinelle che contano corpi e fetch: `prove_chat_scambio` (il ritiro porta `visto`), `prove_tempo_pubblica_app` (quattro fetch sulla pausa, non tre), `prove_ordine_in_pausa` (la rotta col ramo `solo_fuso`). Sulle rotte vere: `collaudo_chat_mercatino` sezione 14 (✓, ✓✓, arancioni, il visto oltre il ritirato, l'estraneo 403, la leva spenta che non porta cifre e non scrive) e `collaudo_ordine_in_pausa` passo 7b (New York, le 07:00 di là, il fuso storto). Suite severa e collaudi della CI in un venv senza coincurve.
 
 RESTA DA GUARDARE. Sul telefono vero, con due account: le ✓✓ arancioni che arrivano a chi scrive pochi secondi dopo che l'altro apre la chat, e il colore sul fondo dei propri messaggi nei due temi. Per la pausa: un telefono con «fuso automatico» spento dice il fuso che ha scritto a mano, e quello vale.
+
+## Dai codici pronti si tocca anche l'invito al gruppo (26 nov 2026, cantiere inviti-scorta; scelta di Andrea sulla scheda: «Sì, anche gli inviti t.me/+»)
+
+PERCHÉ. Carmrain ha mandato i corsi di BitcoinLabs: tutti e tre si
+consegnano con un link d'invito monouso a un gruppo Telegram che fa da
+aula (https://t.me/+…), non col bot. Con la regola del 24 nov quel link
+arrivava come testo da copiare.
+
+COSA. In `resaCodice`, sugli ordini della scorta, il testo passa da
+`linkBotToccabile` e poi da `linkCanaleToccabile`, la stessa porta
+dell'invito dell'abbonamento (con `apriInvitoCanale`). I siti esterni
+restano testo. Per la scorta Carmrain deve creare gli inviti SENZA
+scadenza e con limite di una persona: un invito a sette giorni scadrebbe
+mentre aspetta il suo compratore; i sette giorni li conta lui dalla
+consegna.
+
+PROVATO. `prove_scorta_codici`: la riga della resa (controprova: senza
+la seconda porta, rosso) e in node bot + invito diventano link, il sito
+resta testo. `prove_link_invito_canale` invariata e verde.
