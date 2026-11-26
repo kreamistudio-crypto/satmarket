@@ -119035,6 +119035,54 @@ const spento = () => dots.every(d => !d.on);
         + pezzo_js(mini, "function quantiAspettanoAltri(){", "\n}\n")
     prova("il pallino non fa domande sue: niente fetch, niente orologi", True,
           all(x not in corpo for x in ("fetch(", "setInterval", "setTimeout")))
+    # --- IL TONDINO SULLA FOTO (26 nov 2026, dal campo: Luca col negozio
+    # e due account) — il numero sulla foto di un account NON in uso, lo
+    # stesso `aspetta` della riga «⚡ N ti aspetta». Si ESEGUE la vera
+    # renderAccountSheet su un DOM di cartone. ---
+    banco2 = r"""
+let piuAccount = true, accountAperti = [], accountAttivoId = '710', accountMax = 5;
+const box = {innerHTML: ''}, sub = {textContent: ''};
+function el(id){ return id === 'accountLista' ? box : id === 'accountSub' ? sub : null; }
+function miniAccount(){ return false; }
+function montaPorteAccount(){}
+function esc(t){ return String(t).replace(/[<>&"']/g, ''); }
+function voltoConto(c){ return '<div class="avatar">' + esc(c.nome) + '</div>'; }
+""" + pezzo_js(mini, "function idConto(c){", "\n}\n") + "\n}\n" \
+      + pezzo_js(mini, "function renderAccountSheet(){", "\n}\n") + "\n}\n" + r"""
+const bolle = () => (box.innerHTML.match(/class="conto-bolla"[^>]*>([^<]*)</g) || [])
+  .map(x => x.replace(/.*>/, '').replace('<', ''));
+const out = {};
+accountAperti = [{id: '710', nome: 'Io', aspetta: 3}, {id: '711', nome: 'Negozio', aspetta: 2},
+                 {id: '712', nome: 'Altro', aspetta: 0}];
+renderAccountSheet();
+out.solo_altro = bolle();
+out.testo = box.innerHTML.includes('⚡ 2 ti aspettano');
+out.dentro = box.innerHTML.includes('<div class="conto-volto"><div class="avatar">Negozio</div><span class="conto-bolla"');
+accountAperti[1].aspetta = 250;
+renderAccountSheet();
+out.tetto = bolle();
+accountAperti[1].aspetta = 'x<b>';
+renderAccountSheet();
+out.storto = bolle();
+accountAperti[1].aspetta = 1;
+piuAccount = false;
+renderAccountSheet();
+out.leva_spenta = bolle();
+console.log(JSON.stringify(out));
+"""
+    v2 = _node_banco(banco2)
+    if v2 is None:
+        salta("il tondino sulla foto, girato per davvero", "node non installato")
+    else:
+        prova("il tondino sta solo sulla foto di un account NON in uso che aspetta",
+              ["2"], v2.get("solo_altro"))
+        prova("...e la riga lo dice ancora a parole", True, v2.get("testo"))
+        prova("...nell'involucro suo, accanto al volto (che taglia tondo)",
+              True, v2.get("dentro"))
+        prova("oltre 99 resta 99: il tondino non si allarga a dismisura",
+              ["99"], v2.get("tetto"))
+        prova("un numero storto dal server non disegna niente", [], v2.get("storto"))
+        prova("a leva spenta niente tondino", [], v2.get("leva_spenta"))
 
 
 def prove_piu_account_ovunque():
