@@ -216671,8 +216671,10 @@ def prove_chat_spunte():
     prova("la spunta sta accanto all'ora, dentro la riga «Tu · 09:15»", True,
           "(m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + spuntaChatScP2P(m, c && c.spunte) + '</small>'"
           in msg)
-    prova("arancioni col token del testo arancio (sul fondo dei miei messaggi il --sats non si vede)",
-          True, ".chatsc-spunte.vista{color:var(--sats-text)}" in mini)
+    # (26 nov 2026, spunte-etichette, Andrea: «fallo un po' più vivo»)
+    prova("arancioni VIVE: --sats-deep di giorno, il --sats pieno di sera", (True, True),
+          (".chatsc-spunte.vista{color:var(--sats-deep)}" in mini,
+           'html[data-tema="scuro"] .chatsc-spunte.vista{color:var(--sats)}' in mini))
     inv = pezzo_js(mini, "async function chatScInviaP2P(id, testo, f){", "\n}\n")
     prova("il messaggio appena partito prende subito il numero del server: la ✓ senza aspettare", True,
           "nServer ? {n: nServer} : {}" in inv)
@@ -216755,9 +216757,16 @@ console.log(JSON.stringify(out));
         prova("le spunte girano in node", "", (r.stdout or "") + (r.stderr or ""))
         return
     o = _json.loads(r.stdout.strip().splitlines()[-1])
-    S = '<span class="chatsc-spunte%s" aria-hidden="true">%s</span>'
-    prova("✓✓ arancioni fin dove ha visto, ✓✓ grigie fin dove e' arrivato, ✓ oltre — solo segni",
-          [" " + S % (" vista", "✓✓"), " " + S % ("", "✓✓"), " " + S % ("", "✓")], o["segni"])
+    # (26 nov 2026, spunte-etichette) sullo schermo i segni, al lettore dello
+    # schermo la parola: «Letto», «Consegnato», «Inviato»
+    S = '<span class="chatsc-spunte%s" role="img" aria-label="%s">%s</span>'
+    prova("✓✓ arancioni fin dove ha visto, ✓✓ grigie fin dove e' arrivato, ✓ oltre — e il lettore "
+          "dello schermo dice «Letto», «Consegnato», «Inviato»",
+          [" " + S % (" vista", "Letto", "✓✓"), " " + S % ("", "Consegnato", "✓✓"),
+           " " + S % ("", "Inviato", "✓")], o["segni"])
+    en = open("lingua/en.js", encoding="utf-8").read()
+    prova("...e le tre parole hanno l'inglese (l'aria-label lo traduce il traduttore)", [],
+          [p for p in ('"Letto": "Read"', '"Consegnato": "Delivered"', '"Inviato": "Sent"') if p not in en])
     prova("niente spunte senza cifre (leva spenta), sui suoi messaggi, sulle righe di sistema, "
           "o su un mio messaggio che il server non ha ancora numerato", ["", "", "", ""], o["mute"])
     prova("le cifre storte del server: niente spunte, o zeri", [None, None, {"arrivato": 0, "visto": 0}],

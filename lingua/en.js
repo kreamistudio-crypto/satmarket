@@ -10138,5 +10138,6 @@
   "🫙 Primi passi": "🫙 First steps",
   "🫙 Raccogli i bitcoin di quest'era": "🫙 Collect this era's bitcoin",
   "🫙 Tappo (il bot del canale, su n8n)": "🫙 Tappo (the channel bot, on n8n)",
+  "Inviato": "Sent",
 };
 if (typeof registraTraduzioni === 'function') registraTraduzioni('en');

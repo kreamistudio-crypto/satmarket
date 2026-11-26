@@ -96514,3 +96514,12 @@ NELLO STESSO GIRO, chieste da Andrea guardando l'anteprima:
   Si riaccende dal pannello.
 DA GUARDARE: chi ha piu' di 100 annunci vede nella scelta solo i primi
 caricati (`myListings` si allunga scorrendo «I tuoi annunci»).
+
+## Le spunte, secondo giro: la parola per il lettore dello schermo e l'arancio più vivo (26 nov 2026, cantiere spunte-etichette; Andrea: «Per chi usa il lettore dello schermo sì, va bene la tua soluzione. Non c'è bisogno di mostrarmi la scritta prima», e «Il colore arancione delle spunte, fallo più vivo… fallo solo il colore»)
+
+LA PAROLA. Il segno aveva `aria-hidden` (la regola delle scritte nuove, nella voce di ieri «Le spunte nella chat»): chi usa il lettore dello schermo non sapeva niente. Adesso `spuntaChatScP2P` dà al segno `role="img"` e l'`aria-label` «Inviato» (✓), «Consegnato» (✓✓ grigie), «Letto» (✓✓ arancioni): il lettore legge la parola al posto di «segno di spunta». Sullo schermo non cambia niente. L'inglese lo fa il traduttore, che gli `aria-label` li traduce già (`T_ATTRIBUTI`): «Consegnato» e «Letto» erano già nel dizionario, «Inviato» → «Sent» è nuovo, e `LINGUA_VER` va con l'impronta nuova del file. SCARTATO: un testo nascosto dentro lo span (la classe che si legge solo col lettore): lo leggerebbe insieme al segno, «segno di spunta Letto».
+
+L'ARANCIO. Di giorno `--sats-deep` (#D97706) al posto di `--sats-text` (#B45309, spento); il `--sats` pieno di giorno resta scartato perché sul fondo dei miei messaggi (`--sats-soft`) quasi spariva. Di sera il `--sats` pieno (#F7931A) al posto del `--sats-text` serale (#FFB25C, pastello): sul fondo scuro si vede bene. È un segno e non un testo, quindi la soglia è quella dei segni.
+
+PROVATO. `prove_chat_spunte`: le tre etichette sui tre segni, le tre parole nel dizionario inglese, i due colori nei due temi; `prove_lingua_inglese` (l'impronta del dizionario), `prove_barre_paycode` e `prove_chat_scambio` (che fanno girare la resa dei messaggi). Controprova: l'etichetta di «Letto» scambiata con «Consegnato» fa rossa la prova. Suite severa e collaudi della CI nel venv senza coincurve.
+

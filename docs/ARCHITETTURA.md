@@ -35360,7 +35360,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «Le spunte nella chat»). Sotto i MIEI messaggi, accanto all'ora: ✓ la
   busta è sul server, ✓✓ il telefono dell'altra parte l'ha ritirata
   (`letture.letto_fino`, che il server scriveva già), ✓✓ arancioni
-  (`--sats-text`) l'altra parte ha avuto la chat davanti
+  (`--sats-deep` di giorno, `--sats` di sera: «più vivo», 26 nov) l'altra
+  parte ha avuto la chat davanti
   (`letture.visto_fino`, colonna nuova: nel CREATE e nell'ALTER di
   `db_chat`). Il «visto» lo dice il telefono di chi guarda: `vistoFino`
   del cassetto (lo stesso del pallino) viaggia nel corpo del ritiro,
@@ -35368,8 +35369,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scrive con `MAX(visto_fino, MIN(visto, letto_fino))` — mai oltre il
   ritirato, mai indietro — e torna `spunte: {arrivato, visto}` dell'ALTRA
   parte, numeri di busta. Sul client `esito.c.spunte` sta nella voce
-  della chat, `spuntaChatScP2P` disegna (pura, solo segni, niente
-  parole); `chatScInviaP2P` prende subito il numero che `invia` ha dato
+  della chat, `spuntaChatScP2P` disegna (pura, solo segni sullo schermo;
+  al lettore dello schermo `role="img"` con l'`aria-label` «Inviato»,
+  «Consegnato», «Letto», tradotto dal traduttore); `chatScInviaP2P` prende subito il numero che `invia` ha dato
   alla busta; `chatScVistoP2P`, quando il visto avanza e le spunte ci
   sono, segna `p2pChatScRidire` e fa partire un ritiro (o lo lascia alla
   coda di quello in volo): chi chiude l'app subito non lascia le ✓✓
