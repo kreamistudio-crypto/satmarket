@@ -29095,6 +29095,45 @@ def carica_comuni():
                 if corto and corto != chiave:
                     alias[corto] = None if corto in alias else coord
                 lista.append({"nome": nome, "provincia": prov})
+        # I COMUNI DEL TICINO (26 nov 2026, cantiere comuni-ticino, per
+        # la collaborazione con Plan B Lugano: «loro faranno da punto di
+        # ritiro»). `dati/comuni-svizzera.csv` ha TUTTI i comuni
+        # svizzeri, perche' la sagoma della mappa li vuole tutti
+        # (genera_mappa_italia.py); come ZONA ne entra il solo Ticino,
+        # che parla italiano. La sigla e' quella del cantone, «Lugano
+        # (TI)»: nessuna provincia italiana si chiama TI, mentre BS, BL,
+        # SO, GE, LU, FR e AG si' — un altro cantone si aggiunge qui
+        # solo dopo aver deciso come distinguere la sua sigla.
+        # I NOMI ITALIANI VINCONO: Comano, Muggio, Muzzano e Vernate
+        # esistono anche in Italia, e se il nome nudo diventasse
+        # conteso l'italiano che scrive «Muggio» da anni smetterebbe di
+        # essere riconosciuto. Il ticinese omonimo entra SOLO con la
+        # sigla («Muggio TI»), che l'autocomplete propone comunque.
+        # Fail-open per conto suo: senza il file svizzero l'Italia
+        # resta intera. Tutto QUI DENTRO e non in una funzione a parte:
+        # le prove eseguono carica_comuni da sola.
+        cantoni_zona = ("TI",)
+        try:
+            with open(os.path.join("dati", "comuni-svizzera.csv"),
+                      encoding="utf-8") as f:
+                svizzeri = [r for r in csv.DictReader(f, delimiter=";")
+                            if r["cantone"].strip() in cantoni_zona]
+        except Exception as e:
+            svizzeri = []
+            print(f"🗺️ Comuni svizzeri non caricati ({e}): solo l'Italia")
+        for r in svizzeri:
+            nome, cant = r["nome"].strip(), r["cantone"].strip()
+            coord = (float(r["lat"]), float(r["lon"]))
+            chiave = normalizza(nome)
+            visti[normalizza(f"{nome} {cant}")] = coord
+            if chiave not in visti and chiave not in alias:
+                visti[chiave] = coord
+            corto = " ".join(p for p in chiave.split()
+                             if p not in PREPOSIZIONI_COMUNI)
+            if corto and corto != chiave and corto not in visti \
+                    and corto not in alias:
+                alias[corto] = coord
+            lista.append({"nome": nome, "provincia": cant})
         COMUNI = {k: v for k, v in visti.items() if v is not None}
         # i nomi veri vincono sempre: un alias non li tocca ne' li
         # resuscita (se 'castro' e' conteso, resta fuori e basta)
