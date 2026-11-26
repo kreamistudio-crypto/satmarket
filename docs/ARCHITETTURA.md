@@ -5585,7 +5585,19 @@
   una): «tastiera meccanica» deve dare le tastiere meccaniche e non
   tutte le tastiere, ma su un catalogo piccolo l'intersezione è spesso
   vuota — e una vetrina vuota, quando qualcosa da mostrare c'era, è
-  peggio di una imprecisa. Ogni parola è un GRUPPO (radice «o»
+  peggio di una imprecisa. ALMENO UNA PAROLA NEL TITOLO O NELLA
+  CATEGORIA (26 nov 2026, Andrea: «generatore di corrente» pescava un
+  teleruttore ABB perché «corrente», «generazione» — stessa radice
+  «gener» di «generatore» — e «di» stavano nella sua descrizione
+  lunga): la STRETTA vuole tutte le parole dovunque PIÙ una di loro in
+  `{titolo categoria}`, la LARGA una sola ma lì. Una parola persa in
+  descrizione non fa più uscire un annuncio: la descrizione conferma e
+  pesa in BM25, non apre. Prezzo dichiarato: un titolo generico
+  («Logitech G915») si trova con «tastiera» solo se la parola sta nella
+  categoria o sottocategoria (coi sinonimi). Le PAROLINE VUOTE
+  (`_PAROLE_VUOTE_RICERCA`: articoli, preposizioni, congiunzioni) si
+  tolgono dalla domanda e non dall'indice, e una domanda di sole
+  paroline le tiene. Ogni parola è un GRUPPO (radice «o»
   troncamento) e sono i gruppi a legarsi in «e»; l'ULTIMA parola è un
   prefisso, perché chi digita ce l'ha quasi sempre a metà. I termini
   escono da `normalizza` — il setaccio di casa, lo STESSO del filtro

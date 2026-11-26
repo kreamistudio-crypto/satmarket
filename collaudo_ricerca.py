@@ -106,9 +106,11 @@ CATALOGO = [
     # farebbe fallire niente (successo davvero, torturando).
     ("Soldatini di piombo", "dipinti a mano, scatola originale",
      "Collezionismo", "attivo", 120_000, "Torino (TO)"),
-    # E IL CASO DEI PESI: il titolo non nomina la tastiera, la
-    # descrizione la ripete quattro volte. Con i pesi appiattiti
-    # salirebbe in cima; col titolo che pesa dieci, no.
+    # E IL CASO DELLA DESCRIZIONE SOLA: il titolo non nomina la
+    # tastiera, la descrizione la ripete quattro volte. Nato (ago 2026)
+    # per i pesi — col titolo che pesa dieci non saliva in cima —, dal
+    # 26 nov 2026 non esce proprio: una parola che sta SOLO in
+    # descrizione non basta (Andrea, «generatore di corrente»).
     ("Poltrona relax", "comoda per usare la tastiera: tastiera a "
      "portata, tastiera sulle ginocchia, tastiera ovunque",
      "Casa e giardino", "attivo", 150_000, "Torino (TO)"),
@@ -204,12 +206,17 @@ def main():
     prova("...«hifi» trova l'audio e video", [],
           titoli(cerca("hifi")))   # nessun annuncio in quella categoria
 
-    # I PESI: la poltrona ripete «tastiera» quattro volte in
-    # descrizione e non deve battere chi ce l'ha nel titolo.
+    # LA DESCRIZIONE NON BASTA (26 nov 2026): la poltrona ripete
+    # «tastiera» quattro volte in descrizione, la sedia una — e nessuna
+    # delle due la ha nel titolo o nella categoria. Prima uscivano in
+    # fondo (i pesi); adesso non escono, e restano le tastiere vere.
     ordine = titoli(cerca("tastiera"))
-    prova("il titolo batte una descrizione che ripete la parola", True,
-          ordine.index("Tastiera meccanica Keychron")
-          < ordine.index("Poltrona relax"))
+    prova("una parola solo in descrizione non fa uscire l'annuncio",
+          ["Set di tastiere vintage", "Tastiera meccanica Keychron"],
+          sorted(ordine))
+    prova("le paroline vuote non contano: «tastiera meccanica di»", True,
+          "Tastiera meccanica Keychron" in titoli(
+              cerca("tastiera meccanica di")))
 
     print("\n[quel che non è in vetrina non esce mai]")
     for stato, tit in (("venduto", "Album di francobolli"),
@@ -225,10 +232,12 @@ def main():
     prova("ricerca + categoria",
           ["Set di tastiere vintage", "Tastiera meccanica Keychron"],
           sorted(titoli(cerca("tastiera", cat="Informatica"))))
-    prova("ricerca + prezzo", ["Sedia da ufficio"],
-          titoli(cerca("tastiera", prezzo_max=100_000)))
-    prova("ricerca + regione", ["Sedia da ufficio"],
-          titoli(cerca("tastiera", regione="Lombardia")))
+    # (sui collezionabili e non piu' sulla tastiera: la sedia, che la
+    # nomina solo in descrizione, dal 26 nov 2026 non esce piu')
+    prova("ricerca + prezzo", ["Album di figurine Panini"],
+          titoli(cerca("collezione", prezzo_max=100_000)))
+    prova("ricerca + regione", ["Monete antiche romane"],
+          titoli(cerca("collezione", regione="Lombardia")))
     prova("un filtro che svuota la rosa non esplode", [],
           titoli(cerca("tastiera", cat="Motori")))
 

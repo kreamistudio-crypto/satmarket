@@ -42944,9 +42944,36 @@ def riallinea_ricerca(con, tetto: int = 0) -> int:
         return 0
 
 
+# LE PAROLINE VUOTE DELLA RICERCA (26 nov 2026): articoli, preposizioni
+# e congiunzioni — non dicono COSA si cerca. Prima contavano come parole
+# vere: in «generatore di corrente» il «di» stava in quasi ogni
+# descrizione. Fuori dalla DOMANDA e non dall'indice: nell'indice non
+# pesano, e una ricerca fatta SOLO di paroline le tiene (vedi sotto).
+# Le forme apostrofate arrivano da `normalizza` gia' spezzate
+# («dell'auto» -> «dell auto»), per questo ci sono «dell», «nell»...
+_PAROLE_VUOTE_RICERCA = frozenset(
+    "il lo la gli le un una uno di da del dello della dei degli delle "
+    "dell dal dallo dalla dai dagli dalle dall in nel nello nella nei "
+    "negli nelle nell su sul sullo sulla sui sugli sulle sull per con "
+    "col tra fra al allo alla ai agli alle all ed od che".split()
+)
+
+
 def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
     """La domanda dell'utente tradotta in due query FTS5: la STRETTA
     (tutte le parole) e la LARGA (almeno una).
+
+    ALMENO UNA PAROLA NEL TITOLO O NELLA CATEGORIA (26 nov 2026, Andrea
+    col caso «generatore di corrente» che pescava un teleruttore ABB:
+    «corrente», «generazione» e «di» stavano tutti nella sua
+    descrizione lunga, e nessuno nel titolo). Vale per tutt'e due i
+    giri: la STRETTA vuole tutte le parole dovunque PIU' una di loro
+    nel titolo o nella categoria; la LARGA vuole una parola sola, ma
+    li'. Una parola persa in descrizione non basta piu' a far uscire un
+    annuncio; la descrizione resta a confermare, e a pesare in BM25.
+    Il prezzo dichiarato: un titolo generico («Logitech G915») si trova
+    con «tastiera» solo se la parola sta nella sua categoria o
+    sottocategoria (coi sinonimi, vedi `_campi_indice`).
 
     SI PROVA PRIMA LA STRETTA E POI LA LARGA, ed e' il compromesso che
     regge a tutti i volumi: «tastiera meccanica» deve dare le tastiere
@@ -42965,8 +42992,13 @@ def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
     termini escono da `normalizza`, quindi sono solo lettere e cifre e
     non possono contenere la virgoletta che chiuderebbe la stringa —
     si virgoletta lo stesso, che una guardia che oggi non serve e' la
-    guardia che regge domani."""
-    parole = [p for p in normalizza(q).split() if len(p) >= 2]
+    guardia che regge domani.
+
+    Le PAROLINE VUOTE si tolgono, ma solo se resta qualcosa: chi cerca
+    proprio «la» o «di» fa la ricerca di ieri invece di una vetrina
+    vuota senza motivo."""
+    tutte = [p for p in normalizza(q).split() if len(p) >= 2]
+    parole = [p for p in tutte if p not in _PAROLE_VUOTE_RICERCA] or tutte
     if not parole:
         return ("", "")
     gruppi = []
@@ -42975,7 +43007,11 @@ def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
         voci = [f'"{t}"{coda}' for t in termini(p)]
         gruppi.append(voci[0] if len(voci) == 1
                       else "(" + " OR ".join(voci) + ")")
-    return (" AND ".join(gruppi), " OR ".join(gruppi))
+    almeno_una = " OR ".join(gruppi)
+    nel_titolo = "{titolo categoria} : (" + almeno_una + ")"
+    if len(gruppi) == 1:
+        return (nel_titolo, nel_titolo)
+    return (" AND ".join(gruppi) + " AND " + nel_titolo, nel_titolo)
 
 
 def cerca_ids(con, q: str, tetto: int = TETTO_RICERCA,
