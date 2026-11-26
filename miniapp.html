@@ -45071,6 +45071,103 @@ function offriPerRichiesta(id){
     PICKER.sellCat.poi();
   }
   vestiOffertaRichiesta();
+  compilaOffertaRichiesta(r);
+}
+/* «OFFRI» GIA' COMPILATO (26 nov 2026, Andrea: «alcune opzioni si
+   dovrebbero compilare in automatico… deve essere facilitata la
+   cosa»). Dalla richiesta: il titolo e' quel che si cerca, il prezzo e'
+   il budget nella SUA valuta (85 € resta 85 €, i sats restano sats). Per
+   i buoni anche la consegna «Invio del codice online» e una foto di
+   serie disegnata qui (`fotoDiSerieBuono`): per un codice non c'e'
+   niente da fotografare. SOLO LE CASELLE VUOTE: chi aveva gia' scritto
+   qualcosa nel form non se lo vede ricoprire, e tutto resta da
+   ritoccare prima di «Pubblica». */
+const CATEGORIA_BUONI = 'Buoni ed esperienze';
+async function compilaOffertaRichiesta(r){
+  const t = el('sellTitle');
+  if (t && !t.value.trim()) t.value = String(r.testo || '').slice(0, 120);
+  const p = el('sellPrice');
+  if (p && !p.value){
+    const eur = Number(r.budget_eur) || 0, sats = Number(r.budget_sats) || 0;
+    if (eur > 0 || sats > 0){
+      const v = eur > 0 ? 'eur' : 'sats';
+      if (sellValuta !== v && !astaAccesa()) impostaSellValuta(v);
+      if (sellValuta === v){
+        p.value = String(eur > 0 ? eur : sats);
+        p.dispatchEvent(new Event('input'));
+      }
+    }
+  }
+  if (r.categoria !== CATEGORIA_BUONI) return;
+  const consegne = ['sellConsSped', 'sellConsRitiro', 'sellConsDig'].map(el).filter(Boolean);
+  if (el('sellConsDig') && !consegne.some(c => c.checked)){
+    el('sellConsDig').checked = true;
+    aggiornaConsegnaForm();
+  }
+  if (sellFoto.length || (fotoAttuali && fotoAttuali.length)) return;
+  const foto = fotoDiSerieBuono(r.testo);
+  /* un telefono che non sa disegnare nella tela da' un JPEG piatto: meglio
+     niente foto (resta il riquadro «aggiungi») che un rettangolo nero */
+  if (!foto || await jpegVuoto(foto)) return;
+  if (!offertaRichiesta || offertaRichiesta.id !== r.id || sellFoto.length) return;
+  sellFoto.push(foto);
+  renderFotoPreview();
+}
+/* LA FOTO DI SERIE DEL BUONO: una tessera arancione su fondo bruno, col
+   biglietto 🎟️ e le parole della richiesta. Niente marchi (un logo
+   Amazon non e' nostro da disegnare): il nome del buono lo dice il testo
+   di chi cerca. Un JPEG come quelli che escono da `ridimensiona`. */
+function fotoDiSerieBuono(testo){
+  try {
+    const W = 1200, H = 900;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    if (!g) return '';
+    const fondo = g.createRadialGradient(W / 2, H * 0.4, 80, W / 2, H / 2, W * 0.75);
+    fondo.addColorStop(0, '#4a3020'); fondo.addColorStop(1, '#1c120b');
+    g.fillStyle = fondo; g.fillRect(0, 0, W, H);
+    // la tessera
+    const x = 190, y = 170, w = W - 380, h = 470, rr = 38;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 50; g.shadowOffsetY = 18;
+    const tess = g.createLinearGradient(x, y, x + w, y + h);
+    tess.addColorStop(0, '#ffb547'); tess.addColorStop(1, '#f7931a');
+    g.fillStyle = tess;
+    g.beginPath();
+    g.moveTo(x + rr, y); g.arcTo(x + w, y, x + w, y + h, rr); g.arcTo(x + w, y + h, x, y + h, rr);
+    g.arcTo(x, y + h, x, y, rr); g.arcTo(x, y, x + w, y, rr); g.closePath(); g.fill();
+    g.restore();
+    // i due tagli del biglietto, del colore del fondo
+    g.fillStyle = '#2b1c12';
+    for (const cx of [x, x + w]) { g.beginPath(); g.arc(cx, y + h / 2, 34, 0, Math.PI * 2); g.fill(); }
+    // la riga tratteggiata
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 5; g.setLineDash([18, 14]);
+    g.beginPath(); g.moveTo(x + 300, y + 40); g.lineTo(x + 300, y + h - 40); g.stroke();
+    g.setLineDash([]);
+    g.font = '170px system-ui, "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('🎟️', x + 150, y + h / 2 + 6);
+    // le parole, su piu' righe se servono, piu' piccole se sono tante
+    const parole = String(testo || '').trim().split(/\s+/).filter(Boolean);
+    const larg = w - 300 - 90, cx = x + 300 + (w - 300) / 2;
+    let corpo = 64, righe = [];
+    for (; corpo >= 34; corpo -= 4){
+      g.font = `800 ${corpo}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+      righe = []; let r = '';
+      for (const p of parole){
+        const prova = r ? r + ' ' + p : p;
+        if (g.measureText(prova).width > larg && r) { righe.push(r); r = p; } else r = prova;
+      }
+      if (r) righe.push(r);
+      if (righe.length * corpo * 1.18 <= h - 90 && righe.every(x => g.measureText(x).width <= larg)) break;
+    }
+    righe = righe.slice(0, 5);
+    g.fillStyle = '#2b1505';
+    const alto = righe.length * corpo * 1.18;
+    righe.forEach((riga, i) => g.fillText(riga, cx, y + h / 2 - alto / 2 + corpo * 0.59 + i * corpo * 1.18));
+    return c.toDataURL('image/jpeg', 0.9);
+  } catch (e) { return ''; }
 }
 function vestiOffertaRichiesta(){
   const n = el('cercoNotaVendi');

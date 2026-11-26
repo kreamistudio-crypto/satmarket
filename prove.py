@@ -206353,6 +206353,22 @@ def prove_richieste():
            'oninput="cercoProponiCategoria()"' in mini,
            "poi: () => { cercoCatAMano = true; }" in mini,
            "if (giro !== cercoCatGiro || cercoCatAMano) return;" in mini])
+    # (26 nov 2026) «Offri» gia' compilato: solo le caselle vuote
+    _co = mini[mini.index("async function compilaOffertaRichiesta(r){"):]
+    _co = _co[:_co.index("\nfunction fotoDiSerieBuono(")]
+    prova("«Offri» compila il form: lanciato da offriPerRichiesta, solo caselle "
+          "vuote, il budget nella sua valuta, consegna e foto solo per i buoni",
+          [True, True, True, True, True, True],
+          ["  vestiOffertaRichiesta();\n  compilaOffertaRichiesta(r);\n}" in mini,
+           "if (t && !t.value.trim())" in _co and "if (p && !p.value)" in _co,
+           "const v = eur > 0 ? 'eur' : 'sats';" in _co,
+           "if (r.categoria !== CATEGORIA_BUONI) return;" in _co,
+           "!consegne.some(c => c.checked)" in _co,
+           "if (!foto || await jpegVuoto(foto)) return;" in _co])
+    prova("la foto di serie e' un JPEG disegnato qui, senza marchi", [True, False],
+          ["c.toDataURL('image/jpeg', 0.9)" in mini,
+           "amazon" in mini[mini.index("function fotoDiSerieBuono("):][:4000].lower()
+           .split("niente marchi")[-1].split("*/", 1)[-1]])
     prova("le durate sono tre, di serie la prima (30 giorni)", [True, True],
           ["RICHIESTE_DURATE = (30, 60, 90)" in srv,
            "RICHIESTE_GIORNI = RICHIESTE_DURATE[0]" in srv])

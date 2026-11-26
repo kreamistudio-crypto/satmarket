@@ -39018,4 +39018,10 @@ mai il kind 0 di nessuno: regola ferrea 2).
   riquadro «Cerco» sotto «Offerte» e «Sconti» (`CERCO_RIQUADRO`, la sua
   etichetta esce dal banner solo se «Sconti» c'è), la vista `cerco`, il
   bottone nella ricerca vuota (`chiediloATutti`), la nota in Vendi
-  (`offertaRichiesta`).
+  (`offertaRichiesta`). Dal 26 nov «Offri» compila il form
+  (`compilaOffertaRichiesta`, solo le caselle vuote): titolo = testo
+  della richiesta, prezzo = budget nella sua valuta (`impostaSellValuta`),
+  e per «Buoni ed esperienze» la consegna digitale e una foto di serie
+  (`fotoDiSerieBuono`: tessera disegnata nella tela col testo, JPEG come
+  quelli di `ridimensiona`, scartata se `jpegVuoto`). Il server non
+  sa niente: riceve un annuncio normale.
