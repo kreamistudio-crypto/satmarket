@@ -16776,7 +16776,7 @@ document.getElementById('cartello')?.remove();</script>
         <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
              venditori seguiti restano da noi, quindi si dice — e si dice
              anche cosa il venditore NON vede. -->
-        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🛒 Avvisami dei nuovi annunci</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
+        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🛒 Avvisami dei nuovi annunci</b>», se hai acceso «<b>🙋 Avvisami delle nuove richieste di Cerco</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
         <!-- IL CARRELLO SALVATO (6 ott 2026): un dato nuovo che resta da
              noi, quindi si dice — cosa c'e' dentro, cosa NON c'e', chi
              non lo vede. La durata sta qui sotto, fra le altre. -->
@@ -51016,6 +51016,7 @@ function normalizzaAvvisiMercatino(p){
 }
 let myAvvisiMercatino = normalizzaAvvisiMercatino(null);   // spento di serie
 let mySeguiti = [];                 // [{nome, negozio, username, avatar, creato}]
+let myAvvisiRichieste = false;      // «🙋 Avvisami delle nuove richieste di Cerco», spento di serie
 let avvisiMercatinoLeve = null;     // {attivi, minuti, seguiMinuti} da /api/me
 function avvisiMercatinoInCasa(){
   return !!(avvisiMercatinoLeve && avvisiMercatinoLeve.attivi) && !DEMO && !!myTgId;
@@ -51057,7 +51058,14 @@ function contenutoAvvisiMercatino(){
   /* in fondo la riga sola, la STESSA del blocco P2P: «Arriva nella chat
      del bot Telegram» o «Arriva come messaggio Nostr», senza frequenza.
      Vale per le due cose del blocco, quindi sta fuori da tutt'e due */
-  return seguitiAvvisiMercatino() + '<div class="avm-tutti">' + h + '</div>'
+  /* LE RICHIESTE DI «CERCO» (26 nov 2026, Andrea: «vieni notificato
+     anche nel caso in cui qualcuno pubblica nella sezione cerco?»): un
+     interruttore suo, spento di serie, con le categorie scelte qui sopra */
+  const r = !cercoAttivo() ? '' : '<div class="avm-tutti avm-richieste"><div class="avn-testa">'
+    + '<div class="avn-titolo">🙋 Avvisami delle nuove richieste di Cerco</div>'
+    + interruttoreAvm(myAvvisiRichieste, 'setAvvisiRichieste(' + (myAvvisiRichieste ? 'false' : 'true') + ')')
+    + '</div></div>';
+  return seguitiAvvisiMercatino() + '<div class="avm-tutti">' + h + '</div>' + r
     + '<div class="avn-dove">' + esc(doveArrivanoAvvisi()) + '</div>';
 }
 /* I VENDITORI CHE SEGUI, IN CIMA AL BLOCCO (9 ott 2026, sera, ritocco di
@@ -51107,6 +51115,19 @@ async function setAvvisiMercatino(patch){
   if ('attivo' in patch)
     toast(myAvvisiMercatino.attivo ? '🆕 Ti avviso dei nuovi annunci'
                                    : 'Avvisi dei nuovi annunci spenti');
+}
+async function setAvvisiRichieste(attivo){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/avvisi-richieste`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivo: !!attivo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myAvvisiRichieste = d.avvisi_richieste === true;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
 }
 function scegliCategoriaAvvisiMercatino(c){
   if (!myAvvisiMercatino.attivo) return;   // spento: le chip sono `disabled`
@@ -125737,6 +125758,7 @@ async function avvia(){
     myAvvisiMercatino = normalizzaAvvisiMercatino(me.avvisi_mercatino);
     mySeguiti = Array.isArray(me.seguiti) ? me.seguiti : [];
     avvisiMercatinoLeve = me.avvisi_mercatino_leve || null;
+    myAvvisiRichieste = me.avvisi_richieste === true;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»

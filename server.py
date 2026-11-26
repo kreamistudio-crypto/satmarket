@@ -10428,6 +10428,11 @@ def init_db():
                     "avvisi_mercatino_categorie TEXT DEFAULT ''",
                     "avvisi_mercatino_prezzo REAL DEFAULT 0",
                     "avvisi_mercatino_valuta TEXT DEFAULT ''",
+                    # LE RICHIESTE DI «CERCO» A CHI LE VUOLE (26 nov 2026,
+                    # Andrea): «🙋 Avvisami delle nuove richieste di Cerco»
+                    # nel cassetto Avvisi, 0 = SPENTO di serie; le
+                    # categorie sono quelle degli annunci qui sopra
+                    "avvisi_richieste INTEGER DEFAULT 0",
                     # LE OFFERTE DEI NEGOZI (14 nov 2026, cantiere
                     # invito-codice-sconto): 1 = ricevo i codici sconto
                     # che mi mandano i negozi da cui ho comprato. ACCESO
@@ -57909,6 +57914,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["avvisi_mercatino"] = _pref_avvisi_mercatino(u)
     profilo["seguiti"] = _seguiti_di(user["id"])
     profilo["avvisi_mercatino_leve"] = _leve_avvisi_mercatino()
+    # ...e le richieste di «Cerco» a chi le vuole (26 nov 2026)
+    profilo["avvisi_richieste"] = bool(_campo_riga(u, "avvisi_richieste", 0)) if u else False
     # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
     # all'apertura lo legge da qui, senza aprire i relay
     profilo["p2p_tocca"] = p2p_tocca
@@ -64987,6 +64994,7 @@ RICHIESTE_MAX_APERTE = 3
 RICHIESTE_DURATE = (30, 60, 90)
 RICHIESTE_GIORNI = RICHIESTE_DURATE[0]
 RICHIESTE_VENDITORI = 5
+RICHIESTE_ISCRITTI_MAX = 2000   # chi ha acceso l'interruttore: un tetto di buon senso
 RICHIESTE_PREFILTRO = 20
 RICHIESTE_TETTO_GIORNO = 3
 RICHIESTE_TESTO_MAX = 140
@@ -65083,6 +65091,38 @@ def _candidati_richiesta(con, rich: dict) -> list:
     ordine = sorted((v for v in punti if v not in gia),
                     key=lambda v: (-punti[v], v))[:RICHIESTE_PREFILTRO]
     return [{"tg_id": v, "titoli": titoli[v]} for v in ordine]
+
+
+def _iscritti_richiesta(con, rich: dict, fuori: set) -> list:
+    """CHI HA CHIESTO LE RICHIESTE (26 nov 2026, Andrea: le notifiche del
+    mercatino anche per «Cerco»): chi ha acceso «🙋 Avvisami delle nuove
+    richieste di Cerco», con le categorie che ha scelto per gli annunci
+    (nessuna = tutte). Tolti come per i venditori: chi cerca, i «🔕», chi
+    e' gia' stato avvisato di questa (o sta in `fuori`, i cinque appena
+    scelti) e chi ha gia' i suoi RICHIESTE_TETTO_GIORNO avvisi in 24 ore."""
+    adesso = int(time.time())
+    muti = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_muti").fetchall()}
+    pieni = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_avvisati WHERE creato>? "
+        "GROUP BY tg_id HAVING COUNT(*)>=?",
+        (adesso - 86400, RICHIESTE_TETTO_GIORNO)).fetchall()}
+    gia = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_avvisati WHERE richiesta_id=?",
+        (rich["id"],)).fetchall()}
+    via = muti | pieni | gia | set(fuori) | {rich["tg_id"]}
+    chi = []
+    for u in con.execute(
+            "SELECT tg_id, avvisi_mercatino_categorie AS cat FROM utenti "
+            "WHERE avvisi_richieste=1 ORDER BY tg_id LIMIT ?",
+            (RICHIESTE_ISCRITTI_MAX,)).fetchall():
+        if u["tg_id"] in via or not richieste_per(u["tg_id"]):
+            continue
+        cat = str(u["cat"] or "")
+        if cat and f"|{rich['categoria']}|" not in cat:
+            continue
+        chi.append(u["tg_id"])
+    return chi
 
 
 PROMPT_RICHIESTE = (
@@ -65182,6 +65222,10 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
         candidati = _candidati_richiesta(con, rich)
         con.close()
         scelti = await _scegli_venditori(rich, candidati)
+        # ...e chi le ha chieste dal cassetto Avvisi (26 nov 2026)
+        con = db()
+        scelti = list(scelti) + _iscritti_richiesta(con, rich, set(scelti))
+        con.close()
         if not scelti:
             return
         adesso = int(time.time())
@@ -65404,6 +65448,24 @@ async def collega_offerta_richiesta(richiesta_id, annuncio_id: int,
                                                           annuncio_id)))
     except Exception as e:
         print(f"⚠️ Offerta alla richiesta {richiesta_id} non collegata: {e}")
+
+
+@app.post("/api/me/avvisi-richieste")
+async def scegli_avvisi_richieste(req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """«🙋 Avvisami delle nuove richieste di Cerco» (26 nov 2026): {attivo}.
+    Solo a chi «Cerco» la vede (`richieste_per`)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not richieste_per(user["id"]):
+        raise HTTPException(404, "Non disponibile")
+    d = await leggi_json(req)
+    attivo = 1 if d.get("attivo") else 0
+    con = db()
+    con.execute("UPDATE utenti SET avvisi_richieste=? WHERE tg_id=?",
+                (attivo, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "avvisi_richieste": bool(attivo)}
 
 
 @app.post("/api/me/avvisi-mercatino")

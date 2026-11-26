@@ -38899,7 +38899,14 @@ mai il kind 0 di nessuno: regola ferrea 2).
   stanza «🛡️ Moderazione» del gruppo degli admin, o in privato senza
   gruppo), titolo col megafono «📣 Nuova richiesta in Cerco #N» e il
   tasto «Apri la richiesta»; solo un avviso, niente decisione. Leva
-  `RICHIESTE_AVVISO_MODERATORI`, accesa di serie. Il
+  `RICHIESTE_AVVISO_MODERATORI`, accesa di serie. E chi ha acceso
+  «🙋 Avvisami delle nuove richieste di Cerco» (colonna
+  `utenti.avvisi_richieste`, spenta di serie, rotta
+  `POST /api/me/avvisi-richieste`, letta da /api/me) entra nello stesso
+  giro dopo i cinque dell'AI (`_iscritti_richiesta`: le categorie degli
+  avvisi del mercatino, nessuna = tutte; fuori chi cerca, i «🔕», chi è
+  già avvisato e chi ha i suoi 3 in 24 ore), conta fra gli avvisati e
+  riceve lo stesso messaggio con «Offri». Il
   gemello in `avvisi_ricerca` (se ci sono parole e c'è posto fra i 5
   avvisi dell'utente) fa il resto: un annuncio NUOVO che combacia avvisa
   chi cerca col giro di sempre; chiusa o scaduta la richiesta, il gemello

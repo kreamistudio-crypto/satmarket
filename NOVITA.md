@@ -990,7 +990,13 @@ leva: nessuna
 pubblico: sì
 
 ## 2026-11-25 · cerco-richieste
-frase: Se nel mercatino non trovi quello che cerchi, adesso puoi chiederlo: scrivi cosa ti serve (un buono, un voucher, buoni carburante…), la categoria e, se vuoi, il budget massimo in sats. Barattolo sceglie i venditori più adatti e il bot li avvisa: chi ce l'ha ti fa un'offerta, che compri col deposito di garanzia come ogni annuncio. In home i riquadri nuovi: «Offerte», «Sconti» e «Cerco».
+frase: Se nel mercatino non trovi quello che cerchi, adesso puoi chiederlo: scrivi cosa ti serve (un buono, un voucher, buoni carburante…), la categoria e, se vuoi, il budget massimo in euro o in sats. Barattolo sceglie i venditori più adatti e il bot li avvisa: chi ce l'ha ti fa un'offerta, che compri col deposito di garanzia come ogni annuncio. In home i riquadri nuovi: «Offerte», «Sconti» e «Cerco».
 dove: Esplora → il riquadro «Cerco» sotto «Offerte» e «Sconti»; oppure una ricerca senza risultati → «🙋 Chiedilo a tutti».
 leva: RICHIESTE (accesa di serie, aperta a tutti)
+pubblico: no
+
+## 2026-11-26 · cerco-avvisi
+frase: In «Cerco» il budget si scrive anche in euro, e scegli per quanto tenere aperta la richiesta: 30, 60 o 90 giorni. E se vuoi sapere quando qualcuno cerca qualcosa, nel Profilo c'è «🙋 Avvisami delle nuove richieste di Cerco»: ti arriva un messaggio col tasto «Offri», per le categorie scelte negli avvisi, al massimo 3 al giorno.
+dove: Esplora → «Cerco»; Profilo → Impostazioni → Avvisi → blocco «Mercatino».
+leva: RICHIESTE (accesa di serie); l'interruttore resta spento finché non lo accendi
 pubblico: no
