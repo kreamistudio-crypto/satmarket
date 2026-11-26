@@ -56134,17 +56134,15 @@ def prove_racconti_bozza():
           (True, True),
           ("link = entra_della_pagina(s)" in _spp,
            'voce["entra"] = {"link": link, "testo": b["link_testo"]}' in _spp))
-    # (tolto la sera stessa a destra, «troppo invasivo», e rimesso IN FONDO
-    # A SINISTRA con la card nuova di Flow, rosso mattone come la pagina)
-    prova("...la card lo disegna col bottone di sempre (contato), in fondo "
-          "a sinistra, rosso mattone, e il suo tocco non apre la pagina",
-          (True, True, True, True, True, False),
-          ("entra: (!casa && s.entra && typeof s.entra === 'object') ? s.entra : null," in mini,
-           "bottoneEntra(v.entra.link, v.entra.testo, v.slug)" in mini,
-           '<span class="sc-entra" onclick="event.stopPropagation()"' in mini,
-           "${quadra}${entra}${v.logo ?" in mini,
-           ".scoprire-card .sc-entra{position:absolute;left:5.4%;bottom:7px;z-index:3}" in mini,
-           "linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%),#E1251B;\n    background-origin:border-box;border:1px solid rgba(255,255,255,.28);\n    text-shadow:0 1px 2px rgba(110,18,0,.6)" in mini))
+    # (tolto a destra, «troppo invasivo», rimesso in fondo a sinistra, e
+    # TOLTO di nuovo: «alla fine non mi piace lì». Resta su pagina e corsi)
+    prova("...la card grande NON disegna il bottone (Andrea: «non mi piace lì»)",
+          (False, False, False, True, False),
+          ("s.entra" in mini,
+           "bottoneEntra(v.entra.link" in mini,
+           'class="sc-entra"' in mini,
+           "${quadra}${v.logo ?" in mini,
+           ".scoprire-card .sc-entra{" in mini))
     try:
         os.remove(_db_en)
     except OSError:
