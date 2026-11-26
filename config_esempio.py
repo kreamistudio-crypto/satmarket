@@ -105,6 +105,9 @@ MODERAZIONE_AI = False
 RICHIESTE = True
 RICHIESTE_SOLO_MODERATORI = False
 RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
+# Ogni richiesta nuova avvisa i moderatori nella stanza «Moderazione»
+# del gruppo degli admin (26 nov 2026); False la spegne.
+RICHIESTE_AVVISO_MODERATORI = True
 
 # --- L'assistente del bot (28 ott 2026, cantiere bot-assistente) -----
 # Chi scrive una domanda al bot riceve la risposta di Claude, che si
@@ -676,6 +679,10 @@ PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),
                           (3, 45_000), (4, 50_000))
 PROMO_SCOPRIRE_GIORNI = 30
 PROMO_SCOPRIRE_POSTI = 10
+# (26 nov 2026) True: «Il negozio nella home» resta nel foglio Promuovi
+# ma grigio, e non si compra (servono i posti per le collaborazioni:
+# li mette lo staff con /promossi). False: si compra.
+PROMO_SCOPRIRE_IN_ARRIVO = True
 
 # LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026): gli unici
 # domini che una descrizione di annuncio rende TOCCABILI. Tutto il
@@ -1342,6 +1349,12 @@ P2P_RECAPITO_NEL_TEMPO = True
 # scambio e il server non accetta buste nuove; quelle che ci sono se ne
 # vanno come sempre, a scambio finito. Solo False spegne.
 P2P_CHAT_SCAMBIO = True
+# LE SPUNTE NELLA CHAT (26 nov 2026): ACCESA di serie. Sotto i propri
+# messaggi ✓ = sul server, ✓✓ = ritirato dal telefono dell'altra parte,
+# ✓✓ arancioni = l'altra parte ha avuto la chat davanti. Vale per le chat
+# di scambi P2P, ordini del mercatino e scambi on-chain. Solo False
+# spegne: niente spunte, e il server non scrive fin dove ognuno ha visto.
+CHAT_SPUNTE = True
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026): chi lo chiede dal
 # bottone 🔔 della testata del libro o dal cassetto Avvisi del Profilo
 # riceve un messaggio quando nel libro compaiono ordini nuovi — del tipo

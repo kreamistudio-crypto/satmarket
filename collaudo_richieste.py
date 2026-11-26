@@ -64,6 +64,11 @@ def main():
     async def notifica(chi, testo, bottone=None):
         DETTO.append((chi, testo, bottone))
     S.notifica = notifica
+    MODERATI = []
+
+    async def notifica_admin(testo, bottone=None, argomento=""):
+        MODERATI.append((testo, bottone, argomento))
+    S.notifica_admin = notifica_admin
 
     ora = int(time.time())
     con = S.db()
@@ -124,6 +129,16 @@ def main():
           _errore(lambda: crea(CERCA, {"testo": "un buono", "categoria": CAT}))[0])
     S.RICHIESTE_SOLO_MODERATORI = False
 
+    print("\n[1b) la categoria proposta, senza AI]")
+    # (26 nov 2026) dagli annunci con le stesse parole nel titolo
+    def proponi(testo, chi=CERCA):
+        banco.come(chi)
+        return banco.chiama(S.proponi_categoria_richiesta, testo, "", "")["categoria"]
+    prova("«buono amazon» → la categoria dei buoni", CAT, proponi("Cerco un buono Amazon da 50 €"))
+    prova("«una sedia» → Casa e giardino", "Casa e giardino", proponi("vorrei una sedia"))
+    prova("parole che nessuno usa, o niente: nessuna proposta", ["", "", ""],
+          [proponi("xyzzy introvabile"), proponi(""), proponi("da 50")])
+
     print("\n[2) la nascita]")
     prova("testo troppo corto", (400, "Scrivi cosa cerchi"),
           _errore(lambda: crea(CERCA, {"testo": " ab ", "categoria": CAT})))
@@ -144,8 +159,21 @@ def main():
     prova("la richiesta nasce", True, bool(r.get("ok")) and rid > 0)
     riga = righe("SELECT stato, budget_sats, scade - creato, avviso_id FROM richieste "
                  "WHERE id=?", rid)[0]
-    prova("...aperta, col budget, per 14 giorni", ("aperta", 55000, 14 * 86400),
-          riga[:3])
+    prova("...aperta, col budget, per 30 giorni (la durata di serie)",
+          ("aperta", 55000, 30 * 86400), riga[:3])
+    # (26 nov 2026) e i moderatori lo sanno, col megafono
+    m = MODERATI[0] if MODERATI else ("", None, "")
+    prova("l'avviso ai moderatori: uno, nella stanza «Moderazione»", (1, "moderazione"),
+          (len(MODERATI), m[2]))
+    prova("...col megafono, il numero, il testo, la categoria, il budget, chi e quanto dura",
+          [True, True, True, True, True],
+          [m[0].startswith(f"📣 <b>Nuova richiesta in Cerco #{rid}</b>"),
+           f"«Cerco un buono Amazon da 50 €» · {CAT}" in m[0],
+           "Budget: fino a 55.000 sats" in m[0],
+           f"Chi chiede: U{CERCA} (id {CERCA})" in m[0],
+           m[0].endswith("Dura 30 giorni")])
+    prova("...e il tasto che apre la richiesta", ("Apri la richiesta", f"cerco_{rid}"),
+          (m[1][0], m[1][1].rsplit("startapp=", 1)[-1]) if m[1] else None)
     prova("...e col suo avviso di ricerca gemello: le parole vere, la categoria, "
           "il budget", [("buono amazon", f"|{CAT}|", 55000)],
           righe("SELECT parole, categorie, prezzo_max_sats FROM avvisi_ricerca "
@@ -174,6 +202,41 @@ def main():
     prova("un secondo giro non riavvisa nessuno dei cinque", set(),
           set(chi) & {d[0] for d in DETTO})
 
+    print("\n[3b) chi le ha chieste dal cassetto Avvisi]")
+    # (26 nov 2026) «🙋 Avvisami delle nuove richieste di Cerco»: 401 tutte
+    # le categorie, 402 solo Libri, 403 tutte ma «🔕», 404 spento
+    con = S.db()
+    for tg, on, cat in ((401, 1, ""), (402, 1, "|Libri|"), (403, 1, ""), (404, 0, "")):
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id, nome, negozio, registrato, "
+                    "avvisi_richieste, avvisi_mercatino_categorie) VALUES(?,?,?,?,?,?)",
+                    (tg, f"U{tg}", f"neg{tg}", ora, on, cat))
+    con.execute("INSERT OR IGNORE INTO richieste_muti(tg_id, creato) VALUES(403, ?)", (ora,))
+    con.commit()
+    con.close()
+    def interruttore(chi, attivo):
+        banco.come(chi)
+
+        async def leggi(_req):
+            return {"attivo": attivo}
+        S.leggi_json = leggi
+        return banco.chiama(S.scegli_avvisi_richieste, None, "", "")
+    prova("l'interruttore si accende dalla sua rotta", {"ok": True, "avvisi_richieste": True},
+          interruttore(404, True))
+    interruttore(404, False)
+    prova("...e si spegne", [(0,)], righe("SELECT avvisi_richieste FROM utenti WHERE tg_id=404"))
+    DETTO.clear()
+    rb = crea(112, {"testo": "Cerco un buono Amazon da 20 €", "categoria": CAT})
+    a_chi = {d[0] for d in DETTO}
+    prova("l'avviso arriva a chi l'ha acceso con tutte le categorie, col tasto «Offri»",
+          (True, "Offri", f"cerco_{rb.get('id')}"),
+          next(((True, d[2][0], d[2][1].rsplit("startapp=", 1)[-1])
+                for d in DETTO if d[0] == 401), None))
+    prova("...mai a chi vuole un'altra categoria, a chi ha «🔕», a chi l'ha spento",
+          set(), a_chi & {402, 403, 404})
+    prova("...e conta fra gli avvisati, col tetto dei tre al giorno", True,
+          (401,) in righe("SELECT tg_id FROM richieste_avvisati WHERE richiesta_id=?",
+                          rb.get("id")))
+
     print("\n[4) i tetti]")
     for altro in (112, 113, 114):
         crea(altro, {"testo": f"buono Amazon numero {altro}", "categoria": CAT})
@@ -181,8 +244,35 @@ def main():
                   "GROUP BY tg_id", ora - 86400)
     prova("nessun venditore riceve piu' di 3 avvisi in 24 ore", True,
           all(n <= 3 for _, n in conti))
-    crea(CERCA, {"testo": "un buono carburante", "categoria": CAT})
-    crea(CERCA, {"testo": "un voucher Ryanair", "categoria": CAT})
+    prova("budget in euro storto", 400,
+          _errore(lambda: crea(CERCA, {"testo": "un buono", "categoria": CAT,
+                                       "budget_valuta": "eur", "budget_eur": -5}))[0])
+    # (26 nov 2026) il budget in euro e la durata a scelta
+    r2 = crea(CERCA, {"testo": "un buono carburante", "categoria": CAT,
+                      "budget_valuta": "eur", "budget_eur": "50.499", "giorni": 60})
+    prima = len(MODERATI)
+    S.RICHIESTE_AVVISO_MODERATORI = False
+    r3 = crea(CERCA, {"testo": "un voucher Ryanair", "categoria": CAT, "giorni": 7})
+    S.RICHIESTE_AVVISO_MODERATORI = True
+    prova("a leva spenta i moderatori non sono avvisati", prima, len(MODERATI))
+    prova("...e il testo dell'utente arriva scappato, coi suoi giorni",
+          [True, True], [any("Dura 60 giorni" in t for t, _, _ in MODERATI),
+                         all("<b>Nuova" in t and t.count("<b>") == 1 for t, _, _ in MODERATI)])
+    prova("in euro: i sats a zero, gli euro coi centesimi, 60 giorni come scelto",
+          [(0, 50.5, 60 * 86400)],
+          righe("SELECT budget_sats, budget_eur, scade - creato FROM richieste WHERE id=?",
+                r2.get("id")))
+    prova("...e il gemello cerca col tetto in euro", [(0, 50.5)],
+          righe("SELECT prezzo_max_sats, prezzo_max_eur FROM avvisi_ricerca WHERE id="
+                "(SELECT avviso_id FROM richieste WHERE id=?)", r2.get("id")))
+    prova("una durata fuori elenco torna a 30 giorni", [(30 * 86400,)],
+          righe("SELECT scade - creato FROM richieste WHERE id=?", r3.get("id")))
+    prova("la bacheca dice le durate e il budget in euro", ([30, 60, 90], 50.5),
+          (lista(CERCA).get("durate"),
+           next((v["budget_eur"] for v in lista(CERCA)["richieste"]
+                 if v["id"] == r2.get("id")), None)))
+    prova("l'avviso in euro: la virgola e il simbolo", "Budget: fino a 50,50 €",
+          S._fmt_eur(50.5) and f"Budget: fino a {S._fmt_eur(50.5)} €")
     prova("la quarta richiesta aperta no", 400,
           _errore(lambda: crea(CERCA, {"testo": "un buono Zalando", "categoria": CAT}))[0])
 

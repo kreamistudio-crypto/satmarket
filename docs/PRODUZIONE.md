@@ -276,6 +276,11 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   spenta resta il multi-account del web d'agosto, coi due guasti curati
   (la pastiglia nel Profilo e lo switch verso gli account nati con
   Nostr). Coi perché: Architettura, «PIÙ ACCOUNT OVUNQUE».
+  ACCESA IN PRODUZIONE dal 26 nov 2026 09:04 (decisione di Andrea, dal
+  badge chiesto da un negozio con tre account): riga in fondo al config
+  del VPS, copia `/root/config-prima-piu-account-2026-11-26.py`. Per
+  spegnerla si toglie quella riga e si riavvia (Cantieri, «Il tondino
+  degli altri account»).
 - LE LEVE DALLA PAGINA (27 ott 2026, cantiere leve-tutte): 182 leve su
   256 si cambiano dal pannello admin («⚙️ Apri la pagina delle leve»),
   e il valore scritto da lì VINCE sul `config.py` del VPS, anche dopo

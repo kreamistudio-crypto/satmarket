@@ -1032,6 +1032,42 @@ async def giro():
                     if c.get_loop() is not qui:
                         gruppo.discard(c)
 
+    async def s14():
+        # LE SPUNTE (26 nov 2026, cantiere chat-spunte): le cifre che il
+        # ritiro porta, sulla rotta vera — per tutte e tre le chat e' la
+        # stessa rotta, quindi qui basta il mercatino
+        SRV.CHAT_SPUNTE = True
+        n = nuovo_ordine("locked")
+        o = f"m{n}"
+        await cs.chiama(invia, C, {"ordine": o, "tipo": "saluto", "busta": cs.busta("sp-saluto-c")})
+        n1 = (await cs.chiama(invia, C, {"ordine": o, "tipo": "msg", "busta": cs.busta("sp-uno")})).get("n", 0)
+        a = await cs.chiama(leggi, C, {"ordine": o, "dopo": 0})
+        prova("✓: chi compra ha scritto, chi vende non ha ritirato — arrivato e visto a zero",
+              {"arrivato": 0, "visto": 0}, a.get("spunte"))
+        await cs.chiama(leggi, V, {"ordine": o, "dopo": 0})
+        a = await cs.chiama(leggi, C, {"ordine": o, "dopo": n1})
+        prova("✓✓: il telefono di chi vende ha ritirato — arrivato fino al messaggio, visto no",
+              (True, 0), ((a.get("spunte") or {}).get("arrivato", 0) >= n1, (a.get("spunte") or {}).get("visto")))
+        await cs.chiama(leggi, V, {"ordine": o, "dopo": n1, "visto": n1})
+        a = await cs.chiama(leggi, C, {"ordine": o, "dopo": n1})
+        prova("✓✓ arancioni: chi vende ha visto, e chi compra lo legge", n1, (a.get("spunte") or {}).get("visto"))
+        await cs.chiama(leggi, V, {"ordine": o, "dopo": n1, "visto": n1 + 999})
+        a = await cs.chiama(leggi, C, {"ordine": o, "dopo": n1})
+        prova("...un «visto» oltre quel che ha ritirato non passa", True,
+              (a.get("spunte") or {}).get("visto", 0) <= (a.get("spunte") or {}).get("arrivato", 0))
+        prova("...un estraneo non le chiede: 403", 403,
+              cs.no(await cs.chiama(leggi, X, {"ordine": o, "dopo": 0, "visto": 5})))
+        SRV.CHAT_SPUNTE = False
+        try:
+            n2 = (await cs.chiama(invia, C, {"ordine": o, "tipo": "msg", "busta": cs.busta("sp-due")})).get("n", 0)
+            await cs.chiama(leggi, V, {"ordine": o, "dopo": 0, "visto": n2})
+            a = await cs.chiama(leggi, C, {"ordine": o, "dopo": n2})
+            prova("LEVA SPENTA: il ritiro non porta le cifre, e il visto non si scrive", (False, n1),
+                  ("spunte" in a, cs.cassetto("SELECT visto_fino FROM letture WHERE ordine=? AND tg_id=?",
+                                              o, V)[0][0]))
+        finally:
+            SRV.CHAT_SPUNTE = True
+
     await sezione(1, "LA LEVA SPENTA", s1)
     await sezione(2, "L'ACCENSIONE AL PAGAMENTO", s2)
     await sezione(3, "LE CHIAVI D'ORDINE", s3)
@@ -1044,6 +1080,7 @@ async def giro():
     await sezione(11, "LA RIAPERTURA VERA: LA CHAT FERMA, RILETTA E RITROVATA", s11)
     await sezione(12, "IL CASSETTO DEL SERVER RINASCE: NESSUNA CHAT «ALTROVE» PER SBAGLIO", s12)
     await sezione(13, "DRITTI ALLA CHAT, E SI SCRIVE SUBITO: IL SECONDO NON HA MAI APERTO LA PAGINA", s13)
+    await sezione(14, "LE SPUNTE: ARRIVATO E VISTO, SULLA ROTTA VERA", s14)
     for gruppo in (SRV._TASK_EVENTI_P2P, SRV._TASK_CHAT_P2P):
         if gruppo:
             await asyncio.gather(*list(gruppo), return_exceptions=True)

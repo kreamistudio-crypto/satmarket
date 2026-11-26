@@ -498,6 +498,18 @@ async def prove():
     prova("...tolta «per stanotte» se ne va del tutto: era proprio lei", (0, 0, 0),
           (r.get("fino"), r.get("una_fino"), r.get("salta_fino")))
 
+    print("\n7b) partito per New York dopo averla salvata: il fuso segue il telefono (26 nov 2026)")
+    prima = OROLOGIO.ora                              # le 22:30 di giovedi' a Roma, le 16:30 a New York
+    r = await scrivi_pausa(PUBBLICA, {"solo_fuso": True, "fuso": "America/New_York", "scarto": -240})
+    prova("il telefono a New York porta la pausa con se': stesse fasce, e alle 16:30 di la' non e' "
+          "in pausa", ("America/New_York", [NOTTI], 0), (r.get("fuso"), r.get("fasce"), r.get("fino")))
+    OROLOGIO.ora = utc(16, 3, 0, 0)                   # le 23:00 a New York, le 05:00 a Roma
+    prova("...alle 23 di New York lo e', fino alle 07:00 di New York (non di Roma)", utc(16, 11, 0),
+          leggi_pausa(PUBBLICA)["fino"])
+    r = await scrivi_pausa(PUBBLICA, {"solo_fuso": True, "fuso": "Europe/Rome; x", "scarto": 60})
+    prova("...un fuso in forma strana non scrive niente", "America/New_York", r.get("fuso"))
+    OROLOGIO.ora = prima
+
     print("\n8) a leva spenta non si ferma niente")
     SRV.P2P_TEMPO_DI_CHI_PUBBLICA = False
     pubblica(ORD4)

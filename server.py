@@ -1980,6 +1980,16 @@ try:
     from config import PROMO_SCOPRIRE_POSTI
 except ImportError:
     PROMO_SCOPRIRE_POSTI = 10
+# IL NEGOZIO NELLA HOME, IN ARRIVO (26 nov 2026, Andrea: «il negozio al
+# momento rimane disabilitato perché stiamo per implementare delle
+# collaborazioni... lascialo nel foglio, però mettilo grigio»). True: la
+# voce c'e' ma grigia, e la cassa la rifiuta anche chiesta a mano; i
+# negozi nella home li mette lo staff (`/promossi`, che non passa di
+# qui). False: si compra come prima, coi posti e gli scalini di sopra.
+try:
+    from config import PROMO_SCOPRIRE_IN_ARRIVO
+except ImportError:
+    PROMO_SCOPRIRE_IN_ARRIVO = True
 # Gli accorciatori, ed e' la riga che regge tutta la moderazione del
 # link: un `bit.ly/xyz` si approva pulito e il giorno dopo punta
 # altrove — quindi il link dev'essere ISPEZIONABILE, o non lo si puo'
@@ -7819,6 +7829,7 @@ def init_db():
         testo TEXT NOT NULL,
         categoria TEXT DEFAULT '',
         budget_sats INTEGER DEFAULT 0,  -- 0 = nessun tetto
+        budget_eur REAL DEFAULT 0,      -- o in euro (allora sats a 0)
         stato TEXT DEFAULT 'aperta',    -- aperta | chiusa
         creato INTEGER, scade INTEGER,
         avvisati INTEGER DEFAULT 0,     -- quanti venditori avvisati
@@ -9557,7 +9568,10 @@ def init_db():
         categoria_nuova TEXT DEFAULT '',
         motivo TEXT DEFAULT '',
         creato INTEGER DEFAULT 0,
-        stato TEXT DEFAULT 'proposta',   -- proposta | applicata | scartata
+        stato TEXT DEFAULT 'proposta',   -- proposta | applicata | scartata | tenuta
+        -- «tenuta» (25 nov 2026): l'AI ha risposto «resta dov'e'».
+        -- Non e' una decisione e non va in coda: e' la memoria della
+        -- domanda gia' fatta, perche' il giro dell'ora non la ripaghi.
         deciso_da INTEGER DEFAULT 0,     -- tg_id del moderatore
         deciso_il INTEGER DEFAULT 0
     );
@@ -10424,6 +10438,11 @@ def init_db():
                     "avvisi_mercatino_categorie TEXT DEFAULT ''",
                     "avvisi_mercatino_prezzo REAL DEFAULT 0",
                     "avvisi_mercatino_valuta TEXT DEFAULT ''",
+                    # LE RICHIESTE DI «CERCO» A CHI LE VUOLE (26 nov 2026,
+                    # Andrea): «🙋 Avvisami delle nuove richieste di Cerco»
+                    # nel cassetto Avvisi, 0 = SPENTO di serie; le
+                    # categorie sono quelle degli annunci qui sopra
+                    "avvisi_richieste INTEGER DEFAULT 0",
                     # LE OFFERTE DEI NEGOZI (14 nov 2026, cantiere
                     # invito-codice-sconto): 1 = ricevo i codici sconto
                     # che mi mandano i negozi da cui ho comprato. ACCESO
@@ -10564,6 +10583,13 @@ def init_db():
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # il budget di «Cerco» anche in euro (26 nov 2026, cantiere
+    # cerco-ritocchi, Andrea: «Nel budget massimo devo poter selezionare
+    # anche in euro»): la tabella e' nata il 25 col solo budget in sats
+    try:
+        con.execute("ALTER TABLE richieste ADD COLUMN budget_eur REAL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # il dollaro dell'andamento (14 nov 2026, cantiere prezzo-btc-p2p): la
     # tabella e' nata il 13 col solo euro, sul collaudo
     try:
@@ -25430,6 +25456,51 @@ def _id_annuncio(chi: str) -> int:
     return int(m.group(1)) if m else 0
 
 
+MSG_BANNER_REGALATO = (
+    "🖼 <b>Un regalo per il tuo negozio!</b> Ti abbiamo sbloccato il "
+    "banner del negozio, gratis.\n\nOra puoi chiederlo dal Profilo, in "
+    "«🖼 Banner del negozio». Lo guarderà un moderatore prima che vada "
+    "in vetrina.")
+
+
+def _regala_banner(con, chi: str, admin_id: int, adesso: int):
+    """La porta del banner regalata dal moderatore (`/promossi banner`).
+    Torna (fatto, testo per il moderatore, tg_id da avvisare o 0).
+    Il negozio si cerca come nel collega dal pannello: col codice o col
+    nome a scelta. La porta GIA' aperta non si riscrive (la data e'
+    quella del primo sblocco, come in `_incassa_sblocco`), e il segno
+    del regalo e la porta vanno nello STESSO commit: una porta senza
+    il segno farebbe suonare il libro mastro."""
+    cod = _codice_da_link_negozio(chi)
+    u = con.execute(
+        "SELECT tg_id, nome, negozio, banner_sbloccato_il FROM utenti "
+        "WHERE negozio<>'' AND (negozio=? OR (negozio_slug=? COLLATE "
+        "NOCASE AND negozio_slug!='')) LIMIT 1", (cod, cod)).fetchone() \
+        if cod else None
+    if not u:
+        return 0, (f"Nessun negozio col codice <b>{html.escape(chi)}</b>."), 0
+    nome = html.escape(u["nome"] or "")
+    neg = html.escape(u["negozio"])
+    if int(u["banner_sbloccato_il"] or 0):
+        return 0, (f"Il negozio <b>{nome}</b> (<code>{neg}</code>) ha già "
+                   "il banner sbloccato."), 0
+    con.execute("INSERT INTO impostazioni(chiave, valore) VALUES(?,?) "
+                "ON CONFLICT(chiave) DO UPDATE SET valore=excluded.valore",
+                (f"banner_regalato:{int(u['tg_id'])}",
+                 f"{adesso} da {int(admin_id)}"))
+    cur = con.execute("UPDATE utenti SET banner_sbloccato_il=? "
+                      "WHERE tg_id=? AND banner_sbloccato_il=0",
+                      (adesso, u["tg_id"]))
+    if cur.rowcount != 1:
+        con.rollback()
+        return 0, (f"Il negozio <b>{nome}</b> (<code>{neg}</code>) ha già "
+                   "il banner sbloccato."), 0
+    con.commit()
+    return 1, (f"✅ Banner regalato a <b>{nome}</b> (<code>{neg}</code>): "
+               "ora può chiederlo dal Profilo. Quando lo carica, ti arriva "
+               "da approvare."), int(u["tg_id"])
+
+
 async def comando_promossi(mittente: dict, testo: str):
     """`/promossi` — le promozioni a pagamento viste dal moderatore (23
     nov 2026). Solo admin. Tre forme:
@@ -25443,6 +25514,16 @@ async def comando_promossi(mittente: dict, testo: str):
       `/promossi premio <id>`        il premio di uno zap generoso (25
                                      nov 2026): 7 giorni come sopra, e
                                      a chi vende arriva il grazie
+      `/promossi banner <codice>`    regala lo sblocco del banner a un
+                                     negozio (26 nov 2026, BitcoinLabs)
+    IL BANNER REGALATO (26 nov 2026, Andrea sulla scheda: «Glielo
+    regaliamo»): apre la stessa porta che apre la fattura
+    (`banner_sbloccato_il`), senza fattura. Il banner poi lo carica chi
+    vende e lo approva un moderatore, come sempre: si regala la PORTA,
+    non l'insegna. Il regalo si scrive in `impostazioni`
+    (`banner_regalato:<tg_id>`), e il libro mastro lo legge: senza, il
+    controllo «porta del banner aperta senza pagamento» suonerebbe ogni
+    giorno su un regalo deciso.
     L'EVIDENZA REGALATA (24 nov 2026, Andrea: «dobbiamo mettere anche
     delle card in evidenza, in maniera gratuita… decidiamo noi chi
     mettere»): e' la stessa di quella pagata — la data che si somma, il
@@ -25462,6 +25543,7 @@ async def comando_promossi(mittente: dict, testo: str):
     chi = pezzi[2].strip() if len(pezzi) > 2 else ""
     adesso = int(time.time())
     premiato = None
+    regalato = 0
     con = db()
     try:
         if cosa == "negozio" and chi:
@@ -25520,6 +25602,9 @@ async def comando_promossi(mittente: dict, testo: str):
                     if cosa == "premio":
                         premiato = (int(a["venditore_id"] or 0),
                                     a["titolo"] or "")
+        elif cosa == "banner" and chi:
+            fatto, testo_out, regalato = _regala_banner(con, chi, chat,
+                                                        adesso)
         elif cosa == "annuncio" and chi.isdigit():
             cur = con.execute("UPDATE annunci SET evidenza_fino=0 "
                               "WHERE id=? AND evidenza_fino>0", (int(chi),))
@@ -25564,7 +25649,9 @@ async def comando_promossi(mittente: dict, testo: str):
                       "link dell'annuncio)",
                       "<code>/promossi premio ID</code> — il premio di uno "
                       "zap generoso: 7 giorni In evidenza e il grazie a chi "
-                      "vende", "",
+                      "vende",
+                      "<code>/promossi banner CODICE</code> — regala lo "
+                      "sblocco del banner a un negozio", "",
                       "Togliere non rimborsa: i sats si restituiscono a mano "
                       "dal pannello, come per il banner."]
             testo_out = "\n".join(righe)
@@ -25575,6 +25662,8 @@ async def comando_promossi(mittente: dict, testo: str):
                              argomento="riepiloghi")
     if premiato and premiato[0]:
         await notifica(premiato[0], zap_testo_premio(premiato[1]))
+    if regalato:
+        await notifica(regalato, MSG_BANNER_REGALATO)
     return await bot_api("sendMessage", {"chat_id": chat, "text": testo_out,
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
@@ -38744,9 +38833,19 @@ def _sposta_categoria(con, annuncio_id: int, da: str, a: str,
     chiamante. L'UPDATE e' condizionato sulla categoria di partenza:
     il secondo moderatore che tocca lo stesso gruppo trova il fatto
     compiuto, come per la revisione."""
+    # LA SOTTOCATEGORIA NON SI PORTA DIETRO (26 nov 2026): quella di
+    # partenza e' una casella dell'ALTRA categoria (la «merch» di
+    # Bitcoin finita sotto «Abbigliamento» non si vedeva in nessuna
+    # delle due). Si rifa' col giudice della categoria nuova, e nel
+    # dubbio resta '' — come alla nascita.
+    r = con.execute("SELECT titolo, descrizione FROM annunci WHERE id=?",
+                    (annuncio_id,)).fetchone()
+    sotto = sottocategoria_indovina(a, r["titolo"] or "",
+                                    r["descrizione"] or "") if r else ""
     fatto = con.execute(
-        "UPDATE annunci SET categoria=? WHERE id=? AND stato='attivo' "
-        "AND categoria=?", (a, annuncio_id, da)).rowcount == 1
+        "UPDATE annunci SET categoria=?, sottocategoria=? WHERE id=? "
+        "AND stato='attivo' AND categoria=?",
+        (a, sotto, annuncio_id, da)).rowcount == 1
     con.execute("UPDATE categoria_proposta SET stato=?, deciso_da=?, "
                 "deciso_il=? WHERE annuncio_id=?",
                 ("applicata" if fatto else "scartata", admin_id,
@@ -40144,6 +40243,11 @@ def _leve_stato():
                   int(PROMO_SCOPRIRE_GIORNI or 0)),
             _leva("Negozio nella home: posti (0 = senza limite)",
                   "PROMO_SCOPRIRE_POSTI", int(PROMO_SCOPRIRE_POSTI or 0)),
+            _leva("Negozio nella home: in arrivo (grigio, non si compra)",
+                  "PROMO_SCOPRIRE_IN_ARRIVO", bool(PROMO_SCOPRIRE_IN_ARRIVO),
+                  acceso="nel foglio Promuovi la voce e' grigia, la "
+                         "mettono solo i moderatori (/promossi)",
+                  spento="il negozio nella home si compra dal foglio"),
             _leva("Link toccabili in descrizione",
                   "LINK_DESCRIZIONE_AMMESSI",
                   _elenco(d for d, _p in LINK_DESCRIZIONE_AMMESSI),
@@ -40200,6 +40304,12 @@ def _leve_stato():
                   spento="la vedono tutti"),
             _leva("Il modello che sceglie i venditori",
                   "RICHIESTE_MODELLO", RICHIESTE_MODELLO),
+            _leva("L'avviso ai moderatori per ogni richiesta",
+                  "RICHIESTE_AVVISO_MODERATORI",
+                  bool(RICHIESTE_AVVISO_MODERATORI),
+                  acceso="ogni richiesta nuova arriva nella stanza "
+                         "«Moderazione» del gruppo degli admin",
+                  spento="le richieste nuove non avvisano i moderatori"),
         ]},
         {"gruppo": "🛡 Moderazione", "voci": [
             _leva("Terza via (il dubbio va in revisione)",
@@ -40899,6 +41009,13 @@ def _leve_stato():
                   spento="la chat non compare e il server non accetta "
                          "buste nuove; quelle che ci sono si cancellano "
                          "come sempre, a scambio finito"),
+            # LE SPUNTE NELLA CHAT (26 nov 2026): accesa di serie
+            _leva("Spunte nella chat", "CHAT_SPUNTE", CHAT_SPUNTE,
+                  acceso="sotto i propri messaggi ✓ arrivato al server, ✓✓ "
+                         "arrivato al telefono dell'altra parte, ✓✓ arancioni "
+                         "visto; nelle chat di scambi, ordini e on-chain",
+                  spento="niente spunte, e il server non scrive fin dove "
+                         "ognuno ha visto"),
             # GLI AVVISI DEI NUOVI ORDINI (9 ott 2026): la leva globale e la
             # finestra del raggruppamento; la preferenza resta per persona
             _leva("Avvisi dei nuovi ordini P2P", "P2P_AVVISI_NUOVI_ORDINI",
@@ -42827,9 +42944,36 @@ def riallinea_ricerca(con, tetto: int = 0) -> int:
         return 0
 
 
+# LE PAROLINE VUOTE DELLA RICERCA (26 nov 2026): articoli, preposizioni
+# e congiunzioni — non dicono COSA si cerca. Prima contavano come parole
+# vere: in «generatore di corrente» il «di» stava in quasi ogni
+# descrizione. Fuori dalla DOMANDA e non dall'indice: nell'indice non
+# pesano, e una ricerca fatta SOLO di paroline le tiene (vedi sotto).
+# Le forme apostrofate arrivano da `normalizza` gia' spezzate
+# («dell'auto» -> «dell auto»), per questo ci sono «dell», «nell»...
+_PAROLE_VUOTE_RICERCA = frozenset(
+    "il lo la gli le un una uno di da del dello della dei degli delle "
+    "dell dal dallo dalla dai dagli dalle dall in nel nello nella nei "
+    "negli nelle nell su sul sullo sulla sui sugli sulle sull per con "
+    "col tra fra al allo alla ai agli alle all ed od che".split()
+)
+
+
 def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
     """La domanda dell'utente tradotta in due query FTS5: la STRETTA
     (tutte le parole) e la LARGA (almeno una).
+
+    ALMENO UNA PAROLA NEL TITOLO O NELLA CATEGORIA (26 nov 2026, Andrea
+    col caso «generatore di corrente» che pescava un teleruttore ABB:
+    «corrente», «generazione» e «di» stavano tutti nella sua
+    descrizione lunga, e nessuno nel titolo). Vale per tutt'e due i
+    giri: la STRETTA vuole tutte le parole dovunque PIU' una di loro
+    nel titolo o nella categoria; la LARGA vuole una parola sola, ma
+    li'. Una parola persa in descrizione non basta piu' a far uscire un
+    annuncio; la descrizione resta a confermare, e a pesare in BM25.
+    Il prezzo dichiarato: un titolo generico («Logitech G915») si trova
+    con «tastiera» solo se la parola sta nella sua categoria o
+    sottocategoria (coi sinonimi, vedi `_campi_indice`).
 
     SI PROVA PRIMA LA STRETTA E POI LA LARGA, ed e' il compromesso che
     regge a tutti i volumi: «tastiera meccanica» deve dare le tastiere
@@ -42848,8 +42992,13 @@ def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
     termini escono da `normalizza`, quindi sono solo lettere e cifre e
     non possono contenere la virgoletta che chiuderebbe la stringa —
     si virgoletta lo stesso, che una guardia che oggi non serve e' la
-    guardia che regge domani."""
-    parole = [p for p in normalizza(q).split() if len(p) >= 2]
+    guardia che regge domani.
+
+    Le PAROLINE VUOTE si tolgono, ma solo se resta qualcosa: chi cerca
+    proprio «la» o «di» fa la ricerca di ieri invece di una vetrina
+    vuota senza motivo."""
+    tutte = [p for p in normalizza(q).split() if len(p) >= 2]
+    parole = [p for p in tutte if p not in _PAROLE_VUOTE_RICERCA] or tutte
     if not parole:
         return ("", "")
     gruppi = []
@@ -42858,7 +43007,11 @@ def _domanda_fts(q: str, prefisso: bool = True) -> tuple[str, str]:
         voci = [f'"{t}"{coda}' for t in termini(p)]
         gruppi.append(voci[0] if len(voci) == 1
                       else "(" + " OR ".join(voci) + ")")
-    return (" AND ".join(gruppi), " OR ".join(gruppi))
+    almeno_una = " OR ".join(gruppi)
+    nel_titolo = "{titolo categoria} : (" + almeno_una + ")"
+    if len(gruppi) == 1:
+        return (nel_titolo, nel_titolo)
+    return (" AND ".join(gruppi) + " AND " + nel_titolo, nel_titolo)
 
 
 def cerca_ids(con, q: str, tetto: int = TETTO_RICERCA,
@@ -52575,17 +52728,16 @@ async def _incassa_ordine(ordine_id: int) -> dict:
     if magazzino:
         msg += "\n\n" + _coda_magazzino(magazzino)
     # ...e sotto, il tasto che apre l'ordine (dove stanno la data e la
-    # guida): solo dove c'e' la data, gli altri avvisi restano quelli di ieri
+    # guida). Dal 17 nov stava solo dove c'era la data; dal 26 nov 2026
+    # SU OGNI «Hai venduto» (Andrea, dalla prova di «Non hai sats?»: «non
+    # c'e' nessun tasto che mi porta sull'ordine») — il messaggio dice
+    # «segna l'ordine come spedito», e l'ordine dev'essere a un tocco.
     # L'ABBONAMENTO (20 nov 2026) ha i suoi avvisi, nel giro del link:
     # «spedisci» e «il deposito aspetta il pacco» qui direbbero il falso
-    if canale_abbo:
-        pass
-    elif entro:
+    if not canale_abbo:
         await notifica(o["venditore_id"], msg,
                        (BOTTONE_ORDINE_VENDUTO,
                         f"{URL_PUBBLICO}/?ordine={int(ordine_id)}"))
-    else:
-        await notifica(o["venditore_id"], msg)
     # LA RICEVUTA DEL COMPRATORE, su OGNI strada dell'accredito: da qui
     # ci passano il poll della Mini App e le due funzioni dell'orologio,
     # e proprio in quelle lui non e' davanti allo schermo. Il titolo e'
@@ -57892,6 +58044,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     profilo["avvisi_mercatino"] = _pref_avvisi_mercatino(u)
     profilo["seguiti"] = _seguiti_di(user["id"])
     profilo["avvisi_mercatino_leve"] = _leve_avvisi_mercatino()
+    # ...e le richieste di «Cerco» a chi le vuole (26 nov 2026)
+    profilo["avvisi_richieste"] = bool(_campo_riga(u, "avvisi_richieste", 0)) if u else False
     # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
     # all'apertura lo legge da qui, senza aprire i relay
     profilo["p2p_tocca"] = p2p_tocca
@@ -63411,7 +63565,8 @@ async def listino_promo(annuncio: int = 0,
                 "giorni": int(PROMO_SCOPRIRE_GIORNI or 0),
                 "banner": _banner_vivo(u),
                 "fino": fino if fino > adesso else 0,
-                "consigliato": bool(u and u["promo_consigliato"])}
+                "consigliato": bool(u and u["promo_consigliato"]),
+                "in_arrivo": bool(PROMO_SCOPRIRE_IN_ARRIVO)}
     finally:
         con.close()
     return fuori
@@ -63472,6 +63627,10 @@ async def compra_promo(req: Request,
                    else f"in evidenza {giorni} giorni")
                 + f", annuncio {aid}")
     else:
+        # in arrivo: la prima guardia del negozio, prima di ogni altra
+        if PROMO_SCOPRIRE_IN_ARRIVO:
+            con.close()
+            raise HTTPException(409, "Il negozio nella home è in arrivo")
         u = con.execute("SELECT negozio, banner_stato, banner_foto "
                         "FROM utenti WHERE tg_id=?",
                         (user["id"],)).fetchone()
@@ -64913,7 +65072,7 @@ async def elimina_avviso_ricerca(avviso_id: int,
 # l'AI per intercettare chi puo' soddisfarla». Le parti, e ognuna ha il
 # suo perche':
 #  · LA RICHIESTA: un testo, la categoria, un budget massimo in sats
-#    (facoltativo). Aperta RICHIESTE_GIORNI giorni, al piu'
+#    (facoltativo). Aperta 30, 60 o 90 giorni (RICHIESTE_DURATE), al piu'
 #    RICHIESTE_MAX_APERTE aperte per persona: una bacheca che si riempie
 #    di richieste dimenticate e' una bacheca che nessuno legge.
 #  · IL FILTRO PAROLE e' quello degli annunci (`termine_vietato`), gratis
@@ -64954,9 +65113,23 @@ try:
     from config import RICHIESTE_MODELLO
 except ImportError:
     RICHIESTE_MODELLO = "claude-haiku-4-5-20251001"
+# L'AVVISO AI MODERATORI (26 nov 2026, Andrea: «voglio che veniamo
+# avvisati anche quando qualcuno pubblica nella sezione cerco», «magari
+# con un'icona caratteristica»): ogni richiesta nuova va nella stanza
+# «Moderazione» del gruppo degli admin, col megafono del riquadro. Accesa
+# di serie; `RICHIESTE_AVVISO_MODERATORI = False` nel config la spegne.
+try:
+    from config import RICHIESTE_AVVISO_MODERATORI
+except ImportError:
+    RICHIESTE_AVVISO_MODERATORI = True
 RICHIESTE_MAX_APERTE = 3
-RICHIESTE_GIORNI = 14
+# QUANTO RESTA APERTA LO SCEGLIE CHI CERCA (26 nov 2026, Andrea: «dai la
+# possibilità di decidere quanto tempo lasciarlo attivo, 14 giorni è troppo
+# poco»): una delle durate, di serie la prima
+RICHIESTE_DURATE = (30, 60, 90)
+RICHIESTE_GIORNI = RICHIESTE_DURATE[0]
 RICHIESTE_VENDITORI = 5
+RICHIESTE_ISCRITTI_MAX = 2000   # chi ha acceso l'interruttore: un tetto di buon senso
 RICHIESTE_PREFILTRO = 20
 RICHIESTE_TETTO_GIORNO = 3
 RICHIESTE_TESTO_MAX = 140
@@ -64991,9 +65164,35 @@ def _parole_richiesta(testo: str) -> list:
             and p not in _RICHIESTE_PAROLE_VUOTE]
 
 
+def categoria_per_richiesta(con, testo: str) -> str:
+    """LA CATEGORIA PROPOSTA (26 nov 2026, Andrea: «forse ha senso che la
+    categoria venga proposta in automatico, se vuole la cambia»), SENZA
+    AI: fra gli annunci attivi, quelli col titolo che ha le parole della
+    richiesta (un pezzo di parola che ne apre una del titolo, come il
+    prefiltro dei venditori), e vince la categoria che ne raccoglie di
+    piu', parola per parola. Nessuna parola, o nessun annuncio: ''."""
+    parole = _parole_richiesta(testo)
+    if not parole:
+        return ""
+    punti: dict = {}
+    for a in con.execute(
+            "SELECT titolo, categoria FROM annunci WHERE stato='attivo' "
+            "ORDER BY id DESC LIMIT 5000").fetchall():
+        token = normalizza(a["titolo"] or "").split()
+        p = sum(1 for w in parole if any(t.startswith(w) for t in token))
+        if p and a["categoria"] in CATEGORIE:
+            punti[a["categoria"]] = punti.get(a["categoria"], 0) + p
+    if not punti:
+        return ""
+    # a pari punti l'ordine del catalogo, mai il caso
+    return max(punti, key=lambda c: (punti[c], -CATEGORIE.index(c)))
+
+
 def _richiesta_pubblica(r, mio_id: int, offerte: int) -> dict:
     return {"id": r["id"], "testo": r["testo"], "categoria": r["categoria"],
-            "budget_sats": r["budget_sats"] or 0, "scade": r["scade"],
+            "budget_sats": r["budget_sats"] or 0,
+            "budget_eur": (r["budget_eur"] if "budget_eur" in r.keys() else 0) or 0,
+            "scade": r["scade"],
             "creato": r["creato"], "stato": r["stato"],
             "mia": r["tg_id"] == mio_id, "offerte": offerte}
 
@@ -65053,6 +65252,38 @@ def _candidati_richiesta(con, rich: dict) -> list:
     return [{"tg_id": v, "titoli": titoli[v]} for v in ordine]
 
 
+def _iscritti_richiesta(con, rich: dict, fuori: set) -> list:
+    """CHI HA CHIESTO LE RICHIESTE (26 nov 2026, Andrea: le notifiche del
+    mercatino anche per «Cerco»): chi ha acceso «🙋 Avvisami delle nuove
+    richieste di Cerco», con le categorie che ha scelto per gli annunci
+    (nessuna = tutte). Tolti come per i venditori: chi cerca, i «🔕», chi
+    e' gia' stato avvisato di questa (o sta in `fuori`, i cinque appena
+    scelti) e chi ha gia' i suoi RICHIESTE_TETTO_GIORNO avvisi in 24 ore."""
+    adesso = int(time.time())
+    muti = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_muti").fetchall()}
+    pieni = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_avvisati WHERE creato>? "
+        "GROUP BY tg_id HAVING COUNT(*)>=?",
+        (adesso - 86400, RICHIESTE_TETTO_GIORNO)).fetchall()}
+    gia = {r["tg_id"] for r in con.execute(
+        "SELECT tg_id FROM richieste_avvisati WHERE richiesta_id=?",
+        (rich["id"],)).fetchall()}
+    via = muti | pieni | gia | set(fuori) | {rich["tg_id"]}
+    chi = []
+    for u in con.execute(
+            "SELECT tg_id, avvisi_mercatino_categorie AS cat FROM utenti "
+            "WHERE avvisi_richieste=1 ORDER BY tg_id LIMIT ?",
+            (RICHIESTE_ISCRITTI_MAX,)).fetchall():
+        if u["tg_id"] in via or not richieste_per(u["tg_id"]):
+            continue
+        cat = str(u["cat"] or "")
+        if cat and f"|{rich['categoria']}|" not in cat:
+            continue
+        chi.append(u["tg_id"])
+    return chi
+
+
 PROMPT_RICHIESTE = (
     "Sei l'assistente di un mercatino online. Ti do la richiesta di chi "
     "cerca qualcosa e un elenco numerato di venditori, ognuno con alcuni "
@@ -65095,6 +65326,47 @@ async def _scegli_venditori(rich: dict, candidati: list) -> list:
         return primi
 
 
+def _riga_budget_richiesta(rich: dict) -> str:
+    """La riga del budget, nella valuta in cui e' scritto (vuota senza)."""
+    if rich.get("budget_eur"):
+        return f"\nBudget: fino a {_fmt_eur(rich['budget_eur'])} €"
+    if rich.get("budget_sats"):
+        return f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
+    return ""
+
+
+async def _avvisa_moderatori_richiesta(richiesta_id: int) -> None:
+    """La richiesta nuova ai moderatori (`RICHIESTE_AVVISO_MODERATORI`):
+    nella stanza «Moderazione» del gruppo, o in privato se il gruppo non
+    c'e' (la strada di `notifica_admin`). Solo un avviso, niente bottoni
+    di decisione: la richiesta e' gia' in bacheca. Fail-open."""
+    if not RICHIESTE_AVVISO_MODERATORI:
+        return
+    try:
+        con = db()
+        r = con.execute(
+            "SELECT r.*, u.nome AS chi FROM richieste r LEFT JOIN utenti u "
+            "ON u.tg_id=r.tg_id WHERE r.id=?", (richiesta_id,)).fetchone()
+        con.close()
+        if not r:
+            return
+        rich = dict(r)
+        giorni = max(1, round((rich["scade"] - rich["creato"]) / 86400))
+        testo = (f"📣 <b>Nuova richiesta in Cerco #{richiesta_id}</b>\n"
+                 f"«{html.escape(rich['testo'])}» · "
+                 f"{html.escape(rich['categoria'])}"
+                 f"{_riga_budget_richiesta(rich)}\n"
+                 f"Chi chiede: {html.escape(rich['chi'] or '')} "
+                 f"(id {rich['tg_id']})\n"
+                 f"Dura {giorni} giorni")
+        await notifica_admin(testo, bottone=(
+            "Apri la richiesta", link_telegram("cerco", richiesta_id)),
+            argomento="moderazione")
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori della richiesta {richiesta_id} "
+              f"saltato: {e}")
+
+
 async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
     """In sottofondo, dopo la nascita della richiesta: prefiltro, scelta,
     avviso. Fail-open totale: chi ha chiesto ha gia' la sua risposta."""
@@ -65109,6 +65381,10 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
         candidati = _candidati_richiesta(con, rich)
         con.close()
         scelti = await _scegli_venditori(rich, candidati)
+        # ...e chi le ha chieste dal cassetto Avvisi (26 nov 2026)
+        con = db()
+        scelti = list(scelti) + _iscritti_richiesta(con, rich, set(scelti))
+        con.close()
         if not scelti:
             return
         adesso = int(time.time())
@@ -65121,8 +65397,7 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
                     (len(scelti), richiesta_id))
         con.commit()
         con.close()
-        budget = (f"\nBudget: fino a {_fmt_sats(rich['budget_sats'])} sats"
-                  if rich["budget_sats"] else "")
+        budget = _riga_budget_richiesta(rich)
         testo = (f"🙋 Qualcuno cerca: <b>{html.escape(rich['testo'])}</b>"
                  f"{budget}\nSe ce l'hai, fagli un'offerta: la paga col "
                  f"deposito di garanzia, come ogni annuncio.")
@@ -65133,6 +65408,21 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
     except Exception as e:
         print(f"⚠️ Avviso ai venditori della richiesta {richiesta_id} "
               f"saltato: {e}")
+
+
+@app.get("/api/richieste/categoria")
+async def proponi_categoria_richiesta(testo: str = "",
+                                      x_tg_init_data: str = Header(""),
+                                      barattolo_sessione: str = Cookie("")):
+    """La categoria proposta mentre si scrive (`categoria_per_richiesta`)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not richieste_per(user["id"]):
+        raise HTTPException(404, "Non disponibile")
+    con = db()
+    try:
+        return {"categoria": categoria_per_richiesta(con, str(testo)[:140])}
+    finally:
+        con.close()
 
 
 @app.get("/api/richieste")
@@ -65171,7 +65461,8 @@ async def lista_richieste(x_tg_init_data: str = Header(""),
                             (user["id"],)).fetchone())
     con.close()
     return {"richieste": voci, "muto": muto,
-            "max_aperte": RICHIESTE_MAX_APERTE, "giorni": RICHIESTE_GIORNI}
+            "max_aperte": RICHIESTE_MAX_APERTE, "giorni": RICHIESTE_GIORNI,
+            "durate": list(RICHIESTE_DURATE)}
 
 
 @app.post("/api/richieste")
@@ -65187,12 +65478,25 @@ async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
     categoria = d.get("categoria") or ""
     if categoria not in CATEGORIE:
         raise HTTPException(400, "Scegli la categoria")
+    # il budget in UNA valuta: in euro (col toggle € del client) o in sats
+    budget, budget_eur = 0, 0.0
     try:
-        budget = int(d.get("budget_sats") or 0)
-    except (TypeError, ValueError):
+        if d.get("budget_valuta") == "eur":
+            budget_eur = round(float(d.get("budget_eur") or 0), 2)
+        else:
+            budget = int(d.get("budget_sats") or 0)
+    except (TypeError, ValueError, OverflowError):
         raise HTTPException(400, "Budget non valido")
-    if budget < 0 or budget > 2_100_000_000_000_000:
+    if (budget < 0 or budget > 2_100_000_000_000_000
+            or not 0 <= budget_eur <= 10_000_000):
         raise HTTPException(400, "Budget non valido")
+    # la durata scelta, fra quelle ammesse (fuori elenco: la prima)
+    try:
+        giorni = int(d.get("giorni") or 0)
+    except (TypeError, ValueError, OverflowError):
+        giorni = 0
+    if giorni not in RICHIESTE_DURATE:
+        giorni = RICHIESTE_GIORNI
     # strato 1, lo stesso degli annunci
     trovato = termine_vietato(testo, "")
     if trovato:
@@ -65227,18 +65531,20 @@ async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
         cur = con.execute(
             "INSERT INTO avvisi_ricerca(tg_id, categorie, comune, lat, lon, "
             "raggio_km, prezzo_max_sats, prezzo_max_eur, parole, attivo, "
-            "creato) VALUES(?,?,'',0,0,0,?,0,?,1,?)",
-            (user["id"], f"|{categoria}|", budget, " ".join(parole), adesso))
+            "creato) VALUES(?,?,'',0,0,0,?,?,?,1,?)",
+            (user["id"], f"|{categoria}|", budget, budget_eur, " ".join(parole),
+             adesso))
         avviso_id = cur.lastrowid
     cur = con.execute(
-        "INSERT INTO richieste(tg_id, testo, categoria, budget_sats, stato, "
-        "creato, scade, avviso_id) VALUES(?,?,?,?,'aperta',?,?,?)",
-        (user["id"], testo, categoria, budget, adesso,
-         adesso + RICHIESTE_GIORNI * 86400, avviso_id))
+        "INSERT INTO richieste(tg_id, testo, categoria, budget_sats, budget_eur, "
+        "stato, creato, scade, avviso_id) VALUES(?,?,?,?,?,'aperta',?,?,?)",
+        (user["id"], testo, categoria, budget, budget_eur, adesso,
+         adesso + giorni * 86400, avviso_id))
     rid = cur.lastrowid
     con.commit()
     con.close()
     asyncio.create_task(_avvisa_venditori_richiesta(rid))
+    asyncio.create_task(_avvisa_moderatori_richiesta(rid))
     return {"ok": True, "id": rid}
 
 
@@ -65316,6 +65622,24 @@ async def collega_offerta_richiesta(richiesta_id, annuncio_id: int,
                                                           annuncio_id)))
     except Exception as e:
         print(f"⚠️ Offerta alla richiesta {richiesta_id} non collegata: {e}")
+
+
+@app.post("/api/me/avvisi-richieste")
+async def scegli_avvisi_richieste(req: Request, x_tg_init_data: str = Header(""),
+                                  barattolo_sessione: str = Cookie("")):
+    """«🙋 Avvisami delle nuove richieste di Cerco» (26 nov 2026): {attivo}.
+    Solo a chi «Cerco» la vede (`richieste_per`)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not richieste_per(user["id"]):
+        raise HTTPException(404, "Non disponibile")
+    d = await leggi_json(req)
+    attivo = 1 if d.get("attivo") else 0
+    con = db()
+    con.execute("UPDATE utenti SET avvisi_richieste=? WHERE tg_id=?",
+                (attivo, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "avvisi_richieste": bool(attivo)}
 
 
 @app.post("/api/me/avvisi-mercatino")
@@ -69581,6 +69905,31 @@ def _salta_pausa_p2p(con, tg_id, adesso: int) -> dict:
     return _mia_pausa_p2p(con, tg, adesso)
 
 
+def _fuso_pausa_p2p(con, tg_id, d, adesso: int) -> dict:
+    """IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026, cantiere chat-spunte;
+    la domanda di un utente all'estero, Andrea: «Ok, perfetto»). La pausa
+    si scrive nell'ora di chi la salva, col fuso che il telefono aveva in
+    quel momento: chi parte DOPO averla salvata restava in pausa con
+    l'ora di casa. Il telefono che vede un fuso diverso da quello salvato
+    manda `{"solo_fuso": true, "fuso", "scarto"}`, e qui cambiano SOLO
+    fuso e scarto: le fasce restano le stesse ore («dormo dalle 22 alle
+    7» vale dove sono), la una tantum (un epoch) non c'entra, e anche
+    `salta_fino` resta — non e' un'intenzione nuova, e' la stessa pausa
+    in un altro posto. Un fuso in una forma strana, uno scarto fuori
+    dalle 14 ore o nessuna pausa salvata: non si scrive niente. Torna
+    quel che `_mia_pausa_p2p` direbbe subito dopo. Pura sulla
+    connessione; COMMITTA."""
+    tg = int(tg_id or 0)
+    fuso = str((d or {}).get("fuso") or "")
+    scarto = (d or {}).get("scarto")
+    if (FORMA_FUSO_P2P.fullmatch(fuso) and isinstance(scarto, int)
+            and not isinstance(scarto, bool) and -840 <= scarto <= 840):
+        con.execute("UPDATE p2p_pause SET fuso=?, scarto=?, aggiornato=? WHERE tg_id=?",
+                    (fuso, int(scarto), int(adesso), tg))
+        con.commit()
+    return _mia_pausa_p2p(con, tg, adesso)
+
+
 def _scrivi_pausa_p2p(con, tg_id, pausa: dict, adesso: int) -> dict:
     """Scrive la pausa di una persona (gia' pulita: `_pausa_pulita_p2p`)
     e torna quel che `_mia_pausa_p2p` direbbe subito dopo. Una pausa senza
@@ -72996,6 +73345,10 @@ async def scrivi_pausa_p2p(req: Request, x_tg_init_data: str = Header(""),
         # fasce — le tiene, e salta solo la pausa aperta adesso
         if isinstance(d, dict) and d.get("salta") is True:
             fuori = _salta_pausa_p2p(con, user["id"], adesso)
+        # IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026): `{"solo_fuso":
+        # true, ...}` cambia fuso e scarto, e nient'altro
+        elif isinstance(d, dict) and d.get("solo_fuso") is True:
+            fuori = _fuso_pausa_p2p(con, user["id"], d, adesso)
         else:
             fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)
     except ValueError as e:
@@ -74378,6 +74731,22 @@ try:
     P2P_CHAT_SCAMBIO = P2P_CHAT_SCAMBIO is not False
 except ImportError:
     P2P_CHAT_SCAMBIO = True
+# LE SPUNTE (26 nov 2026, cantiere chat-spunte; l'idea e' di un utente,
+# Andrea: «Ok, perfetto. Le voglio arancioni»): sotto i MIEI messaggi
+# ✓ = la busta e' sul server, ✓✓ = il telefono dell'altra parte l'ha
+# ritirata, ✓✓ arancioni = l'altra parte ha avuto la chat davanti agli
+# occhi. Valgono per le tre chat del cassetto (P2P, mercatino, on-chain).
+# Il server sa gia' il ritiro (`letture.letto_fino`); il «visto» lo dice
+# il telefono di chi guarda, col ritiro dopo (`visto_fino`). ACCESA di
+# serie: spenta, il ritiro non porta le cifre e non scrive il visto, e le
+# spunte spariscono. Solo un False scritto la spegne.
+try:
+    from config import CHAT_SPUNTE
+    if not isinstance(CHAT_SPUNTE, bool):
+        print("[p2p] CHAT_SPUNTE non e' True/False: le spunte restano accese")
+    CHAT_SPUNTE = CHAT_SPUNTE is not False
+except ImportError:
+    CHAT_SPUNTE = True
 P2P_CHAT_BUSTA_MAX = 4096         # 500 caratteri, chiusi e in base64, stanno sotto
 P2P_CHAT_BUSTA_MOD_MAX = 16384    # la busta per un moderatore porta piu' chiavi
 P2P_CHAT_MSG_MAX = 200            # messaggi per scambio E PER CHI SCRIVE (14 nov 2026): ~1,2 MB nel caso peggiore
@@ -74948,6 +75317,7 @@ def db_chat():
                 visto_il INTEGER NOT NULL DEFAULT 0,
                 avvisato_fino INTEGER NOT NULL DEFAULT 0,
                 avvisi INTEGER NOT NULL DEFAULT 0,
+                visto_fino INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(ordine, giro, tg_id)
             );
             -- LE CHIAVI D'ORDINE DEL MERCATINO (16 ott 2026): la sola
@@ -74996,6 +75366,13 @@ def db_chat():
                 PRIMARY KEY(ordine, giro, da)
             );
         """)
+        # LE SPUNTE (26 nov 2026): fin dove ognuno ha avuto la chat davanti
+        # agli occhi. Il cassetto di ieri la colonna non ce l'ha: si
+        # aggiunge, una volta (sqlite dice «duplicate column» le altre)
+        try:
+            con.execute("ALTER TABLE letture ADD COLUMN visto_fino INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         con.commit()
         try:
             os.chmod(DB_CHAT, 0o600)      # lo legge solo chi fa girare il server
@@ -75096,6 +75473,34 @@ def _chat_p2p_ritira(cc, ordine: str, giro: int, io: int, dopo: int,
                        "mia": int(r["da"]) == int(io), "busta": r["busta"],
                        "quando": int(r["quando"])} for r in righe],
             "fino": fino, "perso": perso}
+
+
+def _chat_spunte(cc, ordine: str, giro: int, io: int, altro: int,
+                 visto) -> dict:
+    """LE SPUNTE (26 nov 2026, cantiere chat-spunte). Pura sulla
+    connessione del cassetto; va chiamata DOPO il ritiro, che ha gia'
+    scritto la riga di chi chiede. Due gesti:
+    • scrive fin dove CHI CHIEDE ha avuto la chat davanti (`visto`, il
+      numero di busta che dice il suo telefono), mai oltre quel che ha
+      ritirato davvero e mai all'indietro: un telefono che riparte da
+      zero, o che mente in avanti, non sposta niente;
+    • torna fin dove l'ALTRA parte ha ritirato (`arrivato`) e fin dove ha
+      visto (`visto`). Sono numeri di busta: il telefono li confronta coi
+      numeri dei suoi messaggi.
+    Il moderatore non passa di qui: leggere una disputa non accende
+    nessuna spunta."""
+    try:
+        visto = max(0, int(visto or 0))
+    except (TypeError, ValueError):
+        visto = 0
+    if visto:
+        cc.execute("UPDATE letture SET visto_fino=MAX(visto_fino, MIN(?, letto_fino)) "
+                   "WHERE ordine=? AND giro=? AND tg_id=?", (visto, ordine, giro, int(io)))
+        cc.commit()
+    r = cc.execute("SELECT letto_fino, visto_fino FROM letture WHERE ordine=? AND giro=? "
+                   "AND tg_id=?", (ordine, giro, int(altro or 0))).fetchone()
+    return {"arrivato": int(r["letto_fino"]) if r else 0,
+            "visto": int(r["visto_fino"]) if r else 0}
 
 
 def _chat_p2p_posa(cc, ordine: str, giro: int, io: int, tipo: str,
@@ -75436,6 +75841,11 @@ async def chat_leggi_p2p(req: Request, x_tg_init_data: str = Header(""),
         cc.execute("DELETE FROM allegati WHERE ordine=? AND giro<>?", (ordine, st["giro"]))
         corpo = _chat_p2p_ritira(cc, ordine, st["giro"], user["id"], dopo,
                                  int(time.time()))
+        # LE SPUNTE (26 nov 2026): il mio «visto» entra, le cifre
+        # dell'altra parte escono. A leva spenta niente delle due
+        if CHAT_SPUNTE:
+            corpo["spunte"] = _chat_spunte(cc, ordine, st["giro"], user["id"],
+                                           st["altro"], d.get("visto"))
         # il segno di nascita del cassetto (19 ott 2026): il telefono vede
         # se il file e' rinato anche quando `perso` non lo vede
         corpo["cassetto"] = _chat_nascita(cc)
@@ -107256,7 +107666,13 @@ async def _chiedi_categorie(voci: list) -> dict:
     e' un prompt che diverge: si corregge una, si dimentica l'altra, e
     la coda si riempie di proposte diverse secondo chi le ha chieste.
     Fail-open come tutta la moderazione: se la chiamata esplode, il
-    lotto passa e si riprova al giro dopo."""
+    lotto passa e si riprova al giro dopo.
+
+    IL FALLIMENTO DICE None, NON {} (25 nov 2026): {} vuol dire «l'AI
+    li ha guardati e restano tutti dove sono», e il giro se lo segna
+    (le righe «tenuta»). Una chiamata esplosa non ha guardato niente, e
+    segnarla come risposta toglierebbe quegli annunci dalla coda per
+    sempre senza che nessuno li abbia visti."""
     import ricategorizza
     corpo = "\n\n".join(
         f"ANNUNCIO {i}\nTITOLO: {(t or '')[:160]}\n"
@@ -107271,7 +107687,7 @@ async def _chiedi_categorie(voci: list) -> dict:
             messages=[{"role": "user", "content": corpo}])
     except Exception as e:
         print(f"⚠️ Lotto di ricategorizzazione saltato: {e}")
-        return {}
+        return None
     testo = "".join(b.text for b in r.content if b.type == "text")
     ora = {i: c for i, _, _, c in voci}
     fuori = {}
@@ -107308,7 +107724,17 @@ async def ricategorizza_automatico():
       2. e non si ripaga due volte cio' che e' gia' in coda: niente
          chiamata per gli annunci che hanno gia' una proposta in
          attesa sulla categoria che hanno adesso;
-      3. il tetto per giro, che un'ondata la digerisce in piu' ore.
+      3. il tetto per giro, che un'ondata la digerisce in piu' ore;
+      4. CHIESTO E' CHIESTO (25 nov 2026, visto da Andrea: venti
+         proposte nuove a ogni ora, quasi tutte magliette da
+         «Bitcoin» ad «Abbigliamento»). Il «resta dov'e'» dell'AI non
+         lasciava traccia: l'annuncio tornava nel giro dopo, si
+         ripagava la domanda, e prima o poi l'AI rispondeva diverso —
+         la coda si riempiva di ripensamenti, un'ora alla volta. Ora
+         anche il «resta» si scrive (stato «tenuta», fuori dalla coda
+         dei moderatori), e il freno 2 lo copre gia': l'annuncio si
+         richiede solo se cambia categoria. Andrea: «la tengo, ma una
+         volta sola».
     Piu' la leva del config, che la spegne del tutto.
 
     CONSEGUENZA DICHIARATA del freno 1: un annuncio deciso resta
@@ -107338,6 +107764,15 @@ async def ricategorizza_automatico():
             # in «Altro» per la stessa ragione — la categoria del suo
             # e-commerce non e' la nostra.
             f"  AND ({SQL_ORIGINE_ESTERNA} OR a.categoria='Altro') "
+            # I NEGOZI COLLEGATI SOLO DA «ALTRO» (26 nov 2026, visto da
+            # Andrea: 875 magliette di un WooCommerce, messe in «Bitcoin»
+            # dal negozio, chieste all'AI cento all'ora e spostate in
+            # «Abbigliamento» a gruppi). La loro categoria l'ha scelta
+            # qualcuno — il cassetto, il negozio, al piu' il nome — come
+            # per chi pubblica dal form: la macchina guarda solo chi e'
+            # rimasto in «Altro». Gli importati da Nostr nascono in
+            # «Altro» e restano guardati come prima.
+            "  AND (a.fonte='' OR a.categoria='Altro') "
             # deciso e' deciso (qualunque categoria abbia adesso), e
             # cio' che e' gia' in coda non si richiede
             "  AND NOT EXISTS(SELECT 1 FROM categoria_proposta p "
@@ -107350,17 +107785,40 @@ async def ricategorizza_automatico():
         if not righe:
             return
         proposte = {}
+        guardati = []          # solo i lotti a cui l'AI ha risposto davvero
         for i in range(0, len(righe), 20):
             lotto = righe[i:i + 20]
-            proposte.update(await _chiedi_categorie(
+            fuori = await _chiedi_categorie(
                 [(r["id"], r["titolo"], r["descrizione"], r["categoria"])
-                 for r in lotto]))
+                 for r in lotto])
+            if fuori is None:
+                continue       # esplosa: nessuno guardato, si riprova
+            proposte.update(fuori)
+            guardati += [r["id"] for r in lotto]
         ora = {r["id"]: (r["categoria"], r["titolo"]) for r in righe}
+        adesso = int(time.time())
+        # IL FRENO 4: chi l'AI ha guardato e lasciato dov'e' si segna,
+        # con la categoria di adesso — cosi' il NOT EXISTS lo salta
+        # finche' quella non cambia. Mai sopra una riga DECISA.
+        tenuti = [i for i in guardati if i not in proposte]
+        if tenuti:
+            con = db()
+            con.executemany(
+                "INSERT INTO categoria_proposta(annuncio_id, categoria_ora, "
+                "categoria_nuova, motivo, creato, stato, deciso_da, "
+                "deciso_il) VALUES(?,?,?,'',?,'tenuta',0,0) "
+                "ON CONFLICT(annuncio_id) DO UPDATE SET "
+                "categoria_ora=excluded.categoria_ora, "
+                "categoria_nuova=excluded.categoria_nuova, "
+                "creato=excluded.creato, stato='tenuta' "
+                "WHERE categoria_proposta.stato IN ('proposta','tenuta')",
+                [(i, ora[i][0], ora[i][0], adesso) for i in tenuti])
+            con.commit()
+            con.close()
         if not proposte:
             print(f"🗂 Ricategorizzazione: {len(righe)} guardati, "
                   f"nessuno da spostare")
             return
-        adesso = int(time.time())
         con = db()
         con.executemany(
             "INSERT INTO categoria_proposta(annuncio_id, categoria_ora, "
@@ -107374,8 +107832,10 @@ async def ricategorizza_automatico():
             # La cintura del freno 1: anche se un domani la query
             # sopra se ne dimenticasse, una riga DECISA non si
             # sovrascrive mai da qui. E' il registro di chi ha deciso
-            # cosa, e la macchina non lo cancella.
-            "WHERE categoria_proposta.stato='proposta'",
+            # cosa, e la macchina non lo cancella. Una «tenuta» invece
+            # si', che non e' una decisione: e' una domanda vecchia, e
+            # l'annuncio e' tornato qui perche' ha cambiato categoria.
+            "WHERE categoria_proposta.stato IN ('proposta','tenuta')",
             [(i, ora[i][0], nuova, adesso) for i, nuova in proposte.items()])
         con.commit()
         con.close()
@@ -112172,7 +112632,11 @@ CONTROLLI_LIBRO_MASTRO = (
      "SELECT u.tg_id FROM utenti u WHERE COALESCE(u.banner_sbloccato_il,0)"
      ">=1789603200 "
      "AND NOT EXISTS (SELECT 1 FROM pagamenti p WHERE p.tg_id=u.tg_id "
-     "AND p.motivo='banner' AND p.stato IN ('pagato','rimborsato'))"),
+     "AND p.motivo='banner' AND p.stato IN ('pagato','rimborsato')) "
+     # (26 nov 2026) ...ne' la porta regalata dal moderatore con
+     # `/promossi banner`: il segno sta in `impostazioni`
+     "AND NOT EXISTS (SELECT 1 FROM impostazioni i "
+     "WHERE i.chiave='banner_regalato:'||u.tg_id)"),
     ("sblocco pagato due volte",
      "due pagamenti riusciti per la stessa porta: qualcuno ha pagato "
      "due volte una cosa che si compra una volta sola",
@@ -127809,7 +128273,9 @@ FILE_SCOPRIRE = ("lampo.webp", "sconto.webp", "p2p.webp",
                  # solo col nastro di luce che li lega, «Cerco» col
                  # megafono, e la sua etichetta che esce dal riquadro
                  "occ-offerte.webp", "occ-sconti.webp", "cerco.webp",
-                 "cerco-etichetta.webp")
+                 "cerco-etichetta.webp",
+                 # l'omino che alza la mano accanto al titolo di Cerco
+                 "cerco-omino.webp")
 
 
 # Le anteprime dei reparti (ago 2026): l'og:image di

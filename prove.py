@@ -20333,7 +20333,8 @@ def prove_notifica_fail_open():
 
     tentativi = []
 
-    async def _trasporto_sempre_rotto(tg_id, testo):
+    # (26 nov 2026) col tasto: «Hai venduto» porta sempre «📦 Apri l'ordine»
+    async def _trasporto_sempre_rotto(tg_id, testo, *a, **k):
         tentativi.append(tg_id)
         raise Cascata("ConnectTimeout: api.telegram.org")
 
@@ -20371,6 +20372,9 @@ def prove_notifica_fail_open():
               # loro collaudo in `collaudo_scorta_codici`: qui tacciono
               "scorta_per_ordine": lambda o: False,
               "WEB_PUSH_ATTIVO": False,
+              # (26 nov 2026) «📦 Apri l'ordine» su ogni «Hai venduto»
+              "BOTTONE_ORDINE_VENDUTO": "📦 Apri l'ordine",
+              "URL_PUBBLICO": "https://barattolo.store",
               "print": lambda s: None}
     exec(pezzo_async("notifica"), catena)
     gruppo_admin_spento(catena)
@@ -31816,12 +31820,13 @@ def prove_pagina_acquisto():
     #    client (searchbar, carrello, i due dell'offerta, il dettaglio,
     #    LA CASSA — che e' l'unica a passare da una fabbrica invece che
     #    dal markup — l'ordine, il pannello, e dall'ago 2026 il foglio
-    #    dell'offerta sul CARRELLO). Chi ne aggiunge una lo sente da
+    #    dell'offerta sul CARRELLO; DIECI dal 26 nov 2026 col budget
+    #    di «Cerco»). Chi ne aggiunge una lo sente da
     #    qui, invece di scoprirlo da un toggle che non si accende: e'
     #    aggiornaCurToggle a doverli conoscere tutti — ed e' anche il
     #    motivo per cui quel foglio non ha inventato nessun comando
     #    suo, ha aggiunto una superficie a quello che c'era gia'.
-    prova("...e le superfici del toggle sono nove", 9,
+    prova("...e le superfici del toggle sono dieci", 10,
           mini3.count('class="cur-seg'))
     prova("...tutte pescate per data-cur, mai per id", True,
           "'.cur-seg button[data-cur]'" in mini3)
@@ -32463,6 +32468,8 @@ def prove_libro_mastro():
         CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT,
           motivo TEXT, riferimento TEXT DEFAULT '', importo_sats INT,
           stato TEXT DEFAULT 'creato', payout_stato TEXT DEFAULT '');
+        -- (26 nov 2026) il segno della porta del banner regalata
+        CREATE TABLE impostazioni(chiave TEXT PRIMARY KEY, valore TEXT);
         CREATE UNIQUE INDEX idx_rimborso_chiusura ON rimborsi_asta(puntata_id)
           WHERE motivo IN ('perdente','annullo_admin');
         CREATE UNIQUE INDEX idx_rimborso_tardivo ON rimborsi_asta(rilancio_id)
@@ -39638,6 +39645,7 @@ def prove_liste_ritorno():
         "const document = {querySelector: () => ({id: 'view-' + attiva})};\n"
         + pezzo_js(mini, "const LISTE_RITORNO = {", "\n};\n") + "\n};\n"
         + "let listePos = {};\n"
+        + "let striscaFerma = null;   /* salti-home: la striscia ferma, qui mai alzata */\n"
         + "function salva(){\n" + blocco + "\n}\n"
         + pezzo_js(mini, "function posizioneDaRendere(view){", "\n}\n")
         + "\n}\n" + r"""
@@ -41009,6 +41017,9 @@ def prove_ricevuta_compratore():
                # funnel: `reale()` non basta da solo, che questa
                # funzione ha delle dipendenze sue — chi estrae un
                # pezzo ne eredita le dipendenze
+               # (26 nov 2026) «📦 Apri l'ordine» su ogni «Hai venduto»
+               "BOTTONE_ORDINE_VENDUTO": "📦 Apri l'ordine",
+               "URL_PUBBLICO": "https://barattolo.store",
                **{k: _reg[k] for k in ("registra_uscita_negozio",
                                        "_coda_magazzino")}}
         exec("async " + pezzo("_incassa_ordine"), amb)
@@ -47863,7 +47874,7 @@ def prove_fogli_di_casa():
     # riprendi i sats?» di chi ha depositato, a tempo per pagare finito.
     # CENTOQUARANTATRE (23 nov 2026, cantiere promozioni): il foglio di
     # «🚀 Promuovi» sull'annuncio e quello del negozio in Da scoprire.
-    prova("i gesti che passano dalla domanda unica sono centoquarantasei (dal 30 ott "
+    prova("i gesti che passano dalla domanda unica sono centoquarantasette (dal 30 ott "
           "2026 i sette degli scambi P2P on-chain: prendi, info, annulla, "
           "disputa, libera, rinuncia, decidi; «Togli» dove si riceve on-chain; "
           "dal 1 nov «Hai inviato gli USDT?» e «Hai ricevuto gli euro?» col "
@@ -47891,8 +47902,9 @@ def prove_fogli_di_casa():
           "comprare da un annuncio; dal 23 nov «🚀 Promuovi» e il negozio "
           "in Da scoprire; e il moderatore che rifiuta o toglie nome e "
           "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza; dal 24 nov "
-          "«Mandi l'immagine incollata?» della chat)",
-          146, solo_codice(mini).count("chiediConferma({"))
+          "«Mandi l'immagine incollata?» della chat; dal 26 nov la scelta "
+          "dell'annuncio da promuovere dal Profilo)",
+          147, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -51651,7 +51663,8 @@ def _ambiente_ricerca():
         exec(pezzo(nome), amb)
     for catalogo, fine in (("SINONIMI_CATEGORIA = {", "\n}"),
                            ("SOTTOCATEGORIE = {", "\n}"),
-                           ("SINONIMI_SOTTOCATEGORIA = {", "\n}")):
+                           ("SINONIMI_SOTTOCATEGORIA = {", "\n}"),
+                           ("_PAROLE_VUOTE_RICERCA = frozenset(", "\n)")):
         i = _SORGENTE.index(catalogo)
         exec(_SORGENTE[i:_SORGENTE.index(fine, i) + 2], amb)
     # lo stemmer col suo import fail-open, esattamente com'e' scritto
@@ -51837,13 +51850,45 @@ def prove_ricerca():
     ostili = ['tastiera" OR titolo:', 'a" NEAR/9 "b', "bici*)(", "-- drop"]
     prova("nessuna domanda ostile esce dalla forma", [],
           [s for s in ostili
-           if not re.fullmatch(r'(?:"[a-z0-9]+"\*?|[()* ]|AND|OR)*',
+           if not re.fullmatch(r'(?:"[a-z0-9]+"\*?|[()* ]|AND|OR'
+                               r'|\{titolo categoria\} :)*',
                                dom(s)[0])])
     # Gli operatori ostili NON prendono: `normalizza` li ha gia'
     # ridotti a parole, quindi restano una ricerca qualunque — quel
     # che deve valere e' che nessuna esploda e che la forma tenga.
     prova("...e nessuna ricerca ostile esplode", [True] * 4,
           [isinstance(cerca(s), list) for s in ostili])
+
+    # --- ALMENO UNA PAROLA NEL TITOLO O NELLA CATEGORIA (26 nov 2026) --
+    # Il caso vero di Andrea, con la descrizione vera ridotta all'osso:
+    # «generatore di corrente» pescava un teleruttore perche' «corrente»,
+    # «generazione» (stessa radice di «generatore») e «di» stavano tutti
+    # nella descrizione, e nessuno nel titolo.
+    annuncio(20, "Teleruttore ABB AF09Z bobina 12-20 VDC",
+             "La serie AF e' la generazione attuale di teleruttori. "
+             "Corrente di esercizio AC-1 25 A, gruppi elettrogeni.",
+             cat="Elettronica")
+    annuncio(21, "Generatore di corrente 3 kW a benzina", "usato poco",
+             cat="Casa e giardino")
+    annuncio(22, "Carrello porta attrezzi", "regge un generatore",
+             cat="Casa e giardino")
+    amb["riallinea_ricerca"](con)
+    prova("«generatore di corrente» trova il generatore e basta", [21],
+          cerca("generatore di corrente"))
+    prova("...e il giro largo vuole la parola nel titolo", [21],
+          cerca("generatore elicottero"))
+    prova("una parola sola nella descrizione non basta", [],
+          cerca("poco"))
+    prova("...ma nel titolo si', anche per un annuncio solo", [20],
+          cerca("teleruttore"))
+    prova("le paroline vuote non contano: «di» da solo nella domanda",
+          True, "di" not in dom("generatore di corrente")[0].replace(
+              '"', " ").split())
+    prova("...ma una domanda di sole paroline cerca lo stesso", True,
+          bool(dom("di")[0]))
+    for i in (20, 21, 22):
+        con.execute("DELETE FROM annunci WHERE id=?", (i,))
+    con.commit()
 
     # --- LA PERTINENZA, che e' l'unica cosa che si perde in silenzio --
     ids = cerca("collezione")
@@ -52464,7 +52509,7 @@ def prove_scoprire():
     # effetti ridotti; il negozio si apre a corsa non finita; la testata
     # tiene margini e angoli; e resta solo per il negozio dove si e' volati
     _vo = pezzo_js(mini, "function voloNegozio(card, chi, aperto, da){", "\n}")
-    _vm = re.search(r"const VOLO_MS = (\d+), VOLO_APRI_MS = (\d+);", mini)
+    _vm = re.search(r"const VOLO_MS = (\d+), VOLO_APRI_MS = (\d+)[,;]", mini)
     prova("il volo parte solo dal telefono, col negozio pronto, senza effetti ridotti",
           (True, True, True),
           ("cardToccata && mqNetflix.matches ? document.querySelector(" in _ds,
@@ -52482,14 +52527,57 @@ def prove_scoprire():
           ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; scopertaToccata = ''; return; }" in mini,
            "cardToccata = ''; scopertaToccata = '';" in _ds,
            "if (!ridisegno && !negozioInVolo) negozioTestataDi = {chi: '', src: ''};" in _an.split("try {")[0]))
-    # IL MIO NEGOZIO NON VOLA (25 nov 2026, Andrea: «Under AI sì, To the
-    # Moon no»): apriNegozio aspetta la bozza del proprietario, e il volo
-    # toglieva il velo su una pagina non ancora aperta
-    prova("il proprietario non vola: il suo negozio sale e si riempie dopo",
-          (True, True),
-          ("const mio = !!myNegozio && chi === myNegozio;\n  if (negozioPronto(chi) && !mio) {" in _ds,
-           _ds.find("&& !mio) {") < _ds.find("voloNegozio(card, chi, aperto, da)")
-           < _ds.find("negozioInAttesa(chi);")))
+    # IL MIO NEGOZIO VOLA ANCHE LUI (26 nov 2026, Andrea dal telefono:
+    # «quando clicchi sembra che la pagina salti»; il 25 nov il
+    # proprietario non volava, e la sua pagina saliva dal basso): la bozza
+    # si chiede al tocco, il volo scopre la pagina solo a disegno fatto, e
+    # se la bozza tarda la pagina si apre con l'anello (mai la home che
+    # torna). Senza volo il suo negozio resta quello che sale e si riempie
+    _sv = _vo[_vo.index("let disegno;"):_vo.index("function scopriNegozioVolato(){")]
+    prova("il proprietario vola anche lui: la bozza chiesta al tocco, prima del volo",
+          (True, True, True, 0),
+          ("const mio = !!myNegozio && chi === myNegozio;\n  if (mio && !DEMO && !VETRINA) anticipaBozza(chi);" in _ds,
+           _ds.find("anticipaBozza(chi);") < _ds.find("if (negozioPronto(chi)) {")
+           < _ds.find("voloNegozio(card, chi, aperto, da)") < _ds.find("if (!mio) {")
+           < _ds.find("negozioInAttesa(chi);"),
+           "if (!mio) {\n      const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));" in _ds,
+           _ds.count("&& !mio) {")))
+    prova("...il volo scopre la pagina solo quando e' disegnata, e se tarda apre l'anello",
+          (True, True, True, True, True),
+          ("try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _sv,
+           "Promise.resolve(disegno).then(scopri, scopri);" in _sv,
+           "negozioInAttesa(chi);\n      testataNegozio(chi);\n      go('negozio');\n      scopri();\n    }, VOLO_ATTESA_MS);" in _sv,
+           "window.scrollTo(0, 0);" not in _sv and "velo.remove();" not in _sv,
+           re.search(r"VOLO_APRI_MS = \d+, VOLO_ATTESA_MS = (\d+);", mini) is not None))
+    _bz = pezzo_js(mini, "async function bozzaDelVenditore(codice, alTocco){")
+    _esito = _node_banco("""
+let bozzaAnticipata = null, chieste = 0, adesso = 1000;
+const BOZZA_ANTICIPO_MS = 5000;
+const Date = {now: () => adesso};
+async function caricaRaccontiMiei(){ chieste++;
+  return [{stato: 'bozza', negozio: 'ab12', n: chieste}]; }
+""" + pezzo_js(mini, "function anticipaBozza(codice){", "\n}") + "\n}\n" + _bz + """
+(async () => {
+  const r = {};
+  anticipaBozza('ab12');
+  r.dopo_tocco = chieste;
+  r.presa = (await bozzaDelVenditore('ab12')).n;
+  r.una_volta = (await bozzaDelVenditore('ab12')).n;
+  anticipaBozza('ab12'); adesso += 6000;
+  r.vecchia = (await bozzaDelVenditore('ab12')).n;
+  anticipaBozza('zz99');
+  r.altro_negozio = (await bozzaDelVenditore('ab12')).n;
+  r.chieste = chieste;
+  console.log(JSON.stringify(r));
+})();
+""")
+    if _esito is None:
+        salta("la bozza chiesta al tocco", "serve node")
+    else:
+        prova("in node: la bozza chiesta al tocco si usa una volta sola, fresca e "
+              "del negozio giusto; sennò si richiede",
+              {"dopo_tocco": 1, "presa": 1, "una_volta": 2, "vecchia": 4,
+               "altro_negozio": 6, "chieste": 6}, _esito)
     # LA TESTATA ANCHE DAL TONDO (25 nov 2026): senza banner, in cima va
     # l'immagine della card di «Da scoprire»; col banner niente testata
     _ct = pezzo_js(mini, "function conTestata(chi, id, apri){", "\n}") + "\n}\n"
@@ -52555,7 +52643,7 @@ console.log(JSON.stringify(r));
           (True, True, True, True),
           ("vola.remove();" in _vo, "velo.remove();" in _vo,
            "card.style.visibility = '';" in _vo,
-           "try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _vo))
+           "try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _vo))
     # GIA' NELLA FILA, NON ANCHE IN GRIGLIA (24 nov 2026 notte, Andrea: «le
     # card in evidenza sono già nella loro fascia apposita, non devono
     # essere mostrate così nella pagina normale del mercatino»): la griglia
@@ -53421,8 +53509,11 @@ dice("a chi ha gia votato la card RESTA", ['p2p','lampo','sconto'],
 occasioniServer = {lampo: 0, sconto: 0};
 rifai();
 // (fino al 24 nov 2026 con lei restava la card delle aste: tolta,
-// cantiere home-card-pulite)
-dice('...e senza occasioni resta lei sola', ['p2p'], idCard());
+// cantiere home-card-pulite). DAL 25 NOV 2026 SERA i due riquadri
+// restano anche senza occasioni (Andrea: «le card si devono sempre
+// vedere»): nella fila resta lei sola, sopra la griglia loro due
+dice('...e senza occasioni nella fila resta lei sola, e i riquadri restano',
+     ['p2p','lampo','sconto'], idCard());
 // IL PREZZO DICHIARATO: con una card fissa la sezione non puo' piu'
 // sparire — il display:none era la proprieta' piu' forte del blocco,
 // e questa riga e' il posto dove il suo prezzo si vede.
@@ -56048,7 +56139,7 @@ def prove_racconti_bozza():
           and "anteprima = await bozzaDelVenditore(myNegozio);" in _an)
     prova("...e solo le bozze", True,
           "x.stato !== 'pubblicato'" in pezzo_js(
-              mini, "async function bozzaDelVenditore(codice){"))
+              mini, "async function bozzaDelVenditore(codice, alTocco){"))
     # IL CASSETTO DEL PANNELLO ha il messaggio pronto per lui, finche' la
     # pagina e' in bozza e il venditore c'e' davvero
     _box = pezzo_js(mini, "function boxRacconti(lista){")
@@ -67581,8 +67672,25 @@ def prove_card_p2p_vetrina():
     prova("...in una fascia a se', con la luce dall'alto e le card sollevate",
           [True, True, True],
           ["#p2pVetrinaSez{margin:14px 0 10px;" in mini,
-           "radial-gradient(70% 120px at 50% 0,rgba(247,147,26,.30)" in mini,
+           "radial-gradient(50% 120px at 50% 0,rgba(247,147,26,.26)" in mini,
            "#p2pVetrinaSez .p2p-vt-fila .card{box-shadow:0 12px 20px" in mini])
+    # LA LUCE DI LATO E LA LAMPADINA (26 nov 2026, cantiere luce-p2p,
+    # Andrea: «come se fosse una lampadina che si accende», poi «l2»): la
+    # luce di lato sempre, quella dall'alto solo accesa, e il movimento
+    # solo nel passaggio da chiusa ad aperta, tolto a fine animazione
+    # senza timer; il titolo a sinistra
+    _fc2 = pezzo_js(mini, "function filaCardP2P(html, spenta, attesa){", "\n}\n")
+    prova("...con la luce di lato, e accesa la lampadina che si diffonde",
+          [True, True, True, True, True, True, False],
+          ["background:radial-gradient(70% 160px at 0 0,rgba(247,147,26,.34)" in mini,
+           "#p2pVetrinaSez:not(.spenta)::before{" in mini,
+           "#p2pVetrinaSez.si-accende::before{transform-origin:28% 0;" in mini,
+           "const siAccende = !chiusa && sez.classList.contains('spenta');" in _fc2
+           and _fc2.index("const siAccende") < _fc2.index("sez.classList[chiusa ? 'add' : 'remove']('spenta');")
+           < _fc2.index("if (chiusa) sez.classList.remove('si-accende');") < _fc2.index("if (siAccende) {"),
+           "if (e.pseudoElement === '::before') sez.classList.remove('si-accende');" in _fc2,
+           "#p2pVetrinaSez .p2p-vt-tutti{margin-left:auto}" in mini,
+           "setTimeout" in _fc2])
     prova("la griglia disegnata ridisegna la fila (accesa o spenta con la vista)", True,
           "renderVetrinaP2P();" in pezzo_js(mini, "function renderGrid(items){", "\n}\n"))
     # ⚠️ DAI RELAY NIENTE (26 set 2026, ritocco di Andrea a 7ee92f5): la
@@ -67781,6 +67889,7 @@ function aggiornaFrecce(id){ FRECCE.push(id); }
         + pezzo_js(mini, "function ordineDaEvento(ev, adesso){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function libroDaEventi(eventi, adesso){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function capiP2P(da, a){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function altezzaMorbida(box, cambia){", "\n}\n") + "\n}\n" \
         + blocco + r"""
 const ADESSO = Math.floor(Date.now() / 1000);
 const O = (id, lato, euro, extra) => Object.assign({id, lato, euro, euroMax: 0, sats: 0,
@@ -67872,6 +67981,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   await giro();
   out.cambiFila = [p2pCambiPub['0b0e7c3e-1111-4222-8333-444455556666'], 'f7' in p2pCambiPub];
   out.fila = {display: el('p2pVetrinaSez').style.display, card: conta(),
+              luce: el('p2pVetrinaSez').classList.contains('si-accende'),
               conta: el('p2pVetrinaConta').textContent, fetch: FETCH.length,
               url: FETCH[0] && FETCH[0].url, metodo: FETCH[0] && FETCH[0].metodo,
               auth: FETCH[0] && FETCH[0].h['X-Tg-Init-Data'], volto: p2pFacce.f7 && p2pFacce.f7.nome,
@@ -68056,7 +68166,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   out.riaccesa = {sez: el('p2pVetrinaSez').style.display, guscio: el('p2pVetrinaGuscio').style.display,
     casa: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
     giri: TIMERS.map(t => t.ms), timbri: TIMBRATI.slice(),
-    inMezzo: el('p2pVetrinaSez').classList.contains('spenta')};
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'),
+    luce: el('p2pVetrinaSez').classList.contains('si-accende')};
   await giro();
   out.riaccesaChiede = [FETCH.length, FETCH.length ? FETCH[FETCH.length - 1].cache : ''];
   renderVetrinaP2P();                                // accesa: un giro armato fra un minuto
@@ -68085,7 +68196,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   const fascia = () => ({sez: el('p2pVetrinaSez').style.display,
     guscio: el('p2pVetrinaGuscio').style.display,
     acceso: el('p2pVetrinaLeva').innerHTML.includes('aria-checked="true"'),
-    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'), card: conta()});
+    inMezzo: el('p2pVetrinaSez').classList.contains('spenta'), card: conta(),
+    luce: el('p2pVetrinaSez').classList.contains('si-accende')});
   out.primoSpenta = fascia();
   setFilaP2P(true);
   out.primoTocco = fascia();
@@ -68245,7 +68357,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           "sessione, i volti nella cache, e il giro dopo a un minuto",
           {"display": "", "card": 6, "conta": "6", "fetch": 1, "url": "/api/p2p/libro",
            "metodo": "GET", "auth": "INIT", "volto": "Luca", "prossimo": [True],
-           "primaCard": "f7"}, o["fila"])
+           "primaCard": "f7", "luce": False}, o["fila"])
     prova("(28 set 2026) ...il volto della fotografia entra nella cache unica e nella card; "
           "gli altri restano la sagoma: senza `miei` nessuno e' «?»",
           ["Luca", False, 5, True], o["voltiFila"])
@@ -68305,7 +68417,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           "(nessun giro si arma)", [0, 0, 0], o["spentaNonChiede"])
     prova("...riacceso (dalla home o dal Profilo): la fila torna e chiede SUBITO la fotografia",
           {"sez": "", "guscio": "", "casa": True, "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"],
-           "inMezzo": False},
+           "inMezzo": False, "luce": True},
           o["riaccesa"])
     prova("...senza cache", [1, "no-cache"], o["riaccesaChiede"])
     prova("...spento su un ALTRO dispositivo (il timbro piu' nuovo arriva con /api/me): spento qui",
@@ -68318,10 +68430,10 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     # sparisce mentre le card arrivano, e arrivano in un colpo solo
     prova("IL PRIMO TOCCO a fascia spenta e fotografia mai chiesta: la fascia resta "
           "com'era, con l'interruttore gia' acceso, e le card arrivano col giro",
-          [{"sez": "", "guscio": "none", "acceso": False, "inMezzo": True, "card": 0},
-           {"sez": "", "guscio": "none", "acceso": True, "inMezzo": True, "card": 0},
+          [{"sez": "", "guscio": "none", "acceso": False, "inMezzo": True, "card": 0, "luce": False},
+           {"sez": "", "guscio": "none", "acceso": True, "inMezzo": True, "card": 0, "luce": False},
            {"sez": "", "guscio": "", "acceso": True, "inMezzo": False, "card": 1,
-            "chiesto": 1}],
+            "chiesto": 1, "luce": True}],
           [o["primoSpenta"], o["primoTocco"], o["primoArrivo"]])
     prova("...e se la fotografia torna vuota la fascia se ne va, come sempre",
           ["", "none"], [o["primoVuotoAttesa"], o["primoVuoto"]])
@@ -102669,7 +102781,10 @@ def prove_chat_scambio():
            ("invia", "ordine: id, tipo: 'chiave_ordine', busta: k.pub"),
            ("invia", "ordine: id, tipo: 'mod', per: m, busta: busta"), ("invia", "ordine: id, tipo: 'msg', busta: b.busta"),
            ("invia", "ordine: id, tipo: 'saluto', busta: c.saluto.busta"),
-           ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0"), ("moderatori", "ordine: id"),
+           # (26 nov 2026, chat-spunte) ...e fin dove ho avuto la chat davanti:
+           # un numero di busta, per le ✓✓ arancioni di chi mi scrive
+           ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0, visto: (prima && prima.vistoFino) | 0"),
+           ("moderatori", "ordine: id"),
            ("novita", "ordini: ids"),
            # (20 ott 2026) la scorta: la domanda vuota, e i lucchetti (solo
            # parti pubbliche e semi: lo guarda `prove_chat_dalla_notifica`)
@@ -102892,8 +103007,9 @@ def prove_chat_scambio():
           True, o["serverSenzaTesto"])
     prova("...NE' UNA CHIAVE: ne' le due usa-e-getta (segrete e pubbliche) ne' quelle dello scambio",
           True, o["serverSenzaChiavi"])
+    # (26 nov 2026, chat-spunte) il ritiro porta anche `visto`, un numero
     prova("...e riceve solo POST, con tre forme di corpo e nessun dato nell'indirizzo",
-          (True, ["busta,ordine,tipo", "dopo,ordine", "ordini"]), (o["soloPost"], o["corpi"]))
+          (True, ["busta,ordine,tipo", "dopo,ordine,visto", "ordini"]), (o["soloPost"], o["corpi"]))
     prova("IL PALLINO chiede gli ultimi numeri dei suoi scambi vivi, e basta",
           ['novita:{"ordini":["5a1e0000-c2c2-4a2b-9c3d-000000000001"]}'], o["novitaChiede"])
     prova("...un messaggio dell'altra persona non ancora aperto: acceso sulla card e sul pallino degli scambi",
@@ -114664,7 +114780,7 @@ def prove_connettori_registro():
     prova("...e la coda arriva in fondo al messaggio del venditore",
           True,
           0 <= inc.find("_coda_magazzino(magazzino)")
-          < inc.find('notifica(o["venditore_id"], msg)'))
+          < inc.find('notifica(o["venditore_id"], msg,'))
     rim = codice(pezzo("_rimborsa_compratore"))
     # EMENDATA (13 ott 2026, cantiere annullata-pagata): il ramo della
     # fattura annullata e pagata ha un commit suo PRIMA — esce senza
@@ -119009,6 +119125,54 @@ const spento = () => dots.every(d => !d.on);
         + pezzo_js(mini, "function quantiAspettanoAltri(){", "\n}\n")
     prova("il pallino non fa domande sue: niente fetch, niente orologi", True,
           all(x not in corpo for x in ("fetch(", "setInterval", "setTimeout")))
+    # --- IL TONDINO SULLA FOTO (26 nov 2026, dal campo: Luca col negozio
+    # e due account) — il numero sulla foto di un account NON in uso, lo
+    # stesso `aspetta` della riga «⚡ N ti aspetta». Si ESEGUE la vera
+    # renderAccountSheet su un DOM di cartone. ---
+    banco2 = r"""
+let piuAccount = true, accountAperti = [], accountAttivoId = '710', accountMax = 5;
+const box = {innerHTML: ''}, sub = {textContent: ''};
+function el(id){ return id === 'accountLista' ? box : id === 'accountSub' ? sub : null; }
+function miniAccount(){ return false; }
+function montaPorteAccount(){}
+function esc(t){ return String(t).replace(/[<>&"']/g, ''); }
+function voltoConto(c){ return '<div class="avatar">' + esc(c.nome) + '</div>'; }
+""" + pezzo_js(mini, "function idConto(c){", "\n}\n") + "\n}\n" \
+      + pezzo_js(mini, "function renderAccountSheet(){", "\n}\n") + "\n}\n" + r"""
+const bolle = () => (box.innerHTML.match(/class="conto-bolla"[^>]*>([^<]*)</g) || [])
+  .map(x => x.replace(/.*>/, '').replace('<', ''));
+const out = {};
+accountAperti = [{id: '710', nome: 'Io', aspetta: 3}, {id: '711', nome: 'Negozio', aspetta: 2},
+                 {id: '712', nome: 'Altro', aspetta: 0}];
+renderAccountSheet();
+out.solo_altro = bolle();
+out.testo = box.innerHTML.includes('⚡ 2 ti aspettano');
+out.dentro = box.innerHTML.includes('<div class="conto-volto"><div class="avatar">Negozio</div><span class="conto-bolla"');
+accountAperti[1].aspetta = 250;
+renderAccountSheet();
+out.tetto = bolle();
+accountAperti[1].aspetta = 'x<b>';
+renderAccountSheet();
+out.storto = bolle();
+accountAperti[1].aspetta = 1;
+piuAccount = false;
+renderAccountSheet();
+out.leva_spenta = bolle();
+console.log(JSON.stringify(out));
+"""
+    v2 = _node_banco(banco2)
+    if v2 is None:
+        salta("il tondino sulla foto, girato per davvero", "node non installato")
+    else:
+        prova("il tondino sta solo sulla foto di un account NON in uso che aspetta",
+              ["2"], v2.get("solo_altro"))
+        prova("...e la riga lo dice ancora a parole", True, v2.get("testo"))
+        prova("...nell'involucro suo, accanto al volto (che taglia tondo)",
+              True, v2.get("dentro"))
+        prova("oltre 99 resta 99: il tondino non si allarga a dismisura",
+              ["99"], v2.get("tetto"))
+        prova("un numero storto dal server non disegna niente", [], v2.get("storto"))
+        prova("a leva spenta niente tondino", [], v2.get("leva_spenta"))
 
 
 def prove_piu_account_ovunque():
@@ -124449,6 +124613,8 @@ def prove_avvisi_mercatino():
     js = (
         "let DEMO = false, myTgId = 222, myCanaleNotifiche = '', myNpubAccesso = '', myNpub = '', myNpubVerified = false;\n"
         "let VETRINA = false, negozioCorrente = null;\n"
+        # la riga di «Cerco» (26 nov 2026) qui resta fuori: la prova sta in prove_richieste
+        "const cercoAttivo = () => false;\n"
         "const CATS = ['Tutto', 'Elettronica', 'Motori', 'Bitcoin'];\n"
         "const voltoHTML = (p, cls) => '<i class=\"' + cls + '\" data-nome=\"' + p.nome + '\"></i>';\n"
         "const el = () => null, toast = () => {}, haptic = () => {};\n"
@@ -133458,6 +133624,41 @@ def _livelli_dal_sorgente():
     amb = {}
     exec(_SORGENTE[i:_SORGENTE.index("]\n", i) + 2], {}, amb)
     return amb["LIVELLI"]
+
+
+def prove_categorie_una_volta():
+    """LE CATEGORIE CHIESTE UNA VOLTA SOLA (25 nov 2026, cantiere
+    categorie-una-volta, Andrea: «la tengo, ma una volta sola»). Il giro
+    dell'ora ripagava ogni ora la stessa domanda all'AI, perche' il
+    «resta dov'e'» non lasciava traccia. Qui le sentinelle sul sorgente:
+    il fallimento dice None (non {}, che vorrebbe dire «tutti a posto»),
+    il giro segna «tenuta» SOLO chi sta in un lotto che ha risposto, e
+    una riga decisa da un moderatore non la riscrive nessuno. Il giro
+    vero, con l'AI finta, sta in `collaudo_categorie_una_volta`."""
+    print("\n[le categorie chieste una volta sola]")
+    chiedi = pezzo("_chiedi_categorie")
+    prova("_chiedi_categorie: la chiamata esplosa rende None",
+          True, "return None" in chiedi)
+    prova("...e non piu' il {} che sembrava «tutti a posto»",
+          False, "return {}" in chiedi.split("except", 1)[-1])
+    giro = pezzo("ricategorizza_automatico")
+    prova("il giro salta i lotti esplosi senza segnarli",
+          True, "if fuori is None:" in giro and "guardati" in giro)
+    prova("chi resta dov'e' si segna «tenuta»", True, "'tenuta'" in giro)
+    prova("tenute e proposte si riscrivono solo se ancora aperte "
+          "(deciso e' deciso)", 2,
+          giro.count("WHERE categoria_proposta.stato IN "
+                     "('proposta','tenuta')"))
+    prova("una tenuta non si richiede finche' la categoria e' quella",
+          True, "p.categoria_ora=a.categoria" in giro)
+    prova("i negozi collegati entrano nel giro solo da «Altro» (26 nov 2026)",
+          True, "AND (a.fonte='' OR a.categoria='Altro')" in giro)
+    prova("approvare rifa' la sottocategoria sulla categoria nuova", True,
+          "sottocategoria_indovina(a, " in pezzo("_sposta_categoria")
+          and "SET categoria=?, sottocategoria=?" in pezzo("_sposta_categoria"))
+    prova("la coda dei moderatori mostra solo le proposte", True,
+          "p.stato='proposta'" in _SORGENTE[
+              _SORGENTE.index("_SQL_PROPOSTE = "):][:600])
 
 
 def prove_quadro_servizi():
@@ -143834,6 +144035,164 @@ console.log(JSON.stringify({
     prova("...un abbonamento che non e' fra le card del negozio non conta",
           "scendi", out["fuori"])
     prova("...e vuole il vero booleano", "scendi", out["storto"])
+
+
+def prove_salti_home():
+    """I SALTI DELLA HOME (25 nov 2026, cantiere salti-home, Andrea dal
+    telefono in produzione: «quando passo dal p2p alla home del mercatino
+    mezzo secondo schermata nera» e «quando schiaccio sulle icone categorie
+    salta tutto»). Tre cure: la home e le schede del P2P non sbiadiscono
+    dal nero; la fascia «Scambi P2P» e la riga delle sottocategorie cambiano
+    altezza scorrendo (altezzaMorbida) e lo scorrimento del reparto punta
+    all'arrivo (restoMorbido); la ✕ della categoria lascia la striscia
+    dov'e' (striscaFerma). Le meccaniche girano in node sulle funzioni
+    vere, con un DOM di cartone che sa le altezze."""
+    print("\n[i salti della home: niente nero, fasce che scorrono]")
+    import shutil, subprocess
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+
+    # --- 1) IL NERO: nessuna vista riparte da trasparente -----------------
+    # (prima solo home e P2P; poi Andrea: «si correggi anche quello», per
+    # Swap, Ordini e la card aperta)
+    prova("ogni vista compare piena, senza partire da trasparente",
+          [True, False],
+          [".view.active{display:block}" in css,
+           bool(re.search(r"\.view\.active\{[^}]*animation", css))])
+    prova("...il fadein resta ai fogli e ai modali, che si aprono SOPRA la pagina",
+          [True, True],
+          ["#testModale.open{animation:fadein .18s}" in css,
+           ".sheet-bg.open{display:block;animation:fadein .15s}" in css])
+    prova("...e le corse proprie delle viste restano loro (la salita del negozio)",
+          True, "#view-negozio.active.sale-dal-basso{animation:negozio-sale" in css)
+
+    # --- 2) LE FASCE: chi le usa -----------------------------------------
+    fc = pezzo_js(mini, "function filaCardP2P(html, spenta, attesa){", "\n}\n")
+    rs = pezzo_js(mini, "function renderSottoRiga(){", "\n}\n")
+    ss = pezzo_js(mini, "function scorriSottoHeader(sez){", "\n}")
+    prova("la fascia «Scambi P2P» cambia altezza scorrendo, e il contenuto passa da li'",
+          [True, True],
+          ["altezzaMorbida(sez, () => {" in fc,
+           0 < fc.index("altezzaMorbida(sez, () => {") < fc.index("sez.style.display = (html.length || chiusa) ? '' : 'none';")
+           < fc.index("fila.innerHTML = html.join('');") < fc.index("aggiornaFrecce('p2pVetrinaFila');")])
+    prova("la riga delle sottocategorie si apre e si chiude scorrendo", 2,
+          rs.count("altezzaMorbida(wrap, () => {"))
+    prova("lo scorrimento del reparto punta a dove la pagina sara' a corsa finita", True,
+          "- sotto - restoMorbido(sez)" in ss)
+
+    # --- 3) LA STRISCIA FERMA: la ✕ della categoria ----------------------
+    tt = pezzo_js(mini, "function tornaATutto(){", "\n}\n")
+    pd = pezzo_js(mini, "function posizioneDaRendere(view){", "\n}\n")
+    prova("la ✕ della categoria segna la striscia PRIMA del passo indietro, e la butta se non parte",
+          True,
+          0 < tt.index("striscaFerma = (r && r.bottom") < tt.index("if (consumaGradinoReparto()) return true;")
+          < tt.index("striscaFerma = null;"))
+    prova("...e il ritorno la rimette dov'era, prima della posizione salvata della vetrina",
+          True,
+          0 <= pd.index("if (view === 'esplora' && navApplicando && striscaFerma) {")
+          < pd.index("if (view === 'esplora' && navApplicando && vetrinaPos"))
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco delle fasce che scorrono gira in node", "node non c'e'")
+        return
+    am = pezzo_js(mini, "function altezzaMorbida(box, cambia){", "\n}\n") + "\n}\n"
+    rm = pezzo_js(mini, "function restoMorbido(sez){", "\n}\n") + "\n}\n"
+    banco = r"""
+let RIDOTTI = false, ATTIVA = true;
+const effettiRidotti = () => RIDOTTI;
+const MORBIDA_MS = 280;
+const Node = {DOCUMENT_POSITION_FOLLOWING: 4};
+const document = {visibilityState: 'visible'};
+const TIMER = new Map(); let N = 0;
+const setTimeout = (f) => { TIMER.set(++N, f); return N; };
+const clearTimeout = (k) => { TIMER.delete(k); };
+const corri = () => { for (const [k, f] of [...TIMER]) { TIMER.delete(k); f(); } };
+/* il cartone: l'altezza la dice `alto` quando si vede, l'altezza
+   scritta a mano vince (come nel browser), i margini dal «CSS» */
+function scatola(id, alto, mt, mb, ordine){
+  const b = {id, alto, ordine, isConnected: true, style: {display: ''}, cm: {mt, mb},
+    getBoundingClientRect(){
+      if (this.style.display === 'none') return {height: 0, top: 0};
+      return {height: this.style.height ? parseFloat(this.style.height) : this.alto, top: 0}; },
+    get offsetHeight(){ return this.getBoundingClientRect().height; },
+    contains(x){ return x === this; },
+    compareDocumentPosition(x){ return x.ordine > this.ordine ? 4 : 2; }};
+  return b;
+}
+const getComputedStyle = b => ({
+  marginTop: b.style.marginTop || (b.style.display === 'none' ? '0' : b.cm.mt + 'px'),
+  marginBottom: b.style.marginBottom || (b.style.display === 'none' ? '0' : b.cm.mb + 'px'),
+  paddingTop: '0px', paddingBottom: '0px'});
+const VISTA = {classList: {contains: () => ATTIVA}};
+const EL = {};
+const el = id => id === 'view-esplora' ? VISTA : EL[id];
+""" + am + rm + r"""
+const out = {};
+/* A) la fascia spenta (78 + 14 + 10) se ne va: resta in pagina mentre si chiude */
+const f = EL.p2pVetrinaSez = scatola('p2pVetrinaSez', 78, 14, 10, 2);
+const strum = scatola('strumenti', 39, 0, 0, 3);
+altezzaMorbida(f, () => { f.style.display = 'none'; });
+out.chiude = [f.style.display, f.style.height, f.style.marginTop, f.style.opacity, f.style.overflow];
+/* a meta' corsa (finta: 40 px) lo scorrimento sa che sotto mancano ancora 40+... */
+f.style.height = '40px'; f.style.marginTop = '7px'; f.style.marginBottom = '5px';
+out.resto = restoMorbido(strum);
+out.restoSopra = restoMorbido(scatola('catSez', 157, 0, 0, 1));
+corri();
+out.finita = [f.style.display, f.style.height, f.style.marginTop, f.style.overflow, f._morbidaFine];
+/* B) e torna: parte da zero e trasparente */
+altezzaMorbida(f, () => { f.style.display = ''; });
+out.apre = [f.style.display, f.style.height, f.style.opacity];
+/* una seconda corsa a meta' posa la prima e riparte dal punto vero */
+altezzaMorbida(f, () => { f.style.display = 'none'; });
+out.seconda = [f.style.display, f.style.height];
+corri();
+out.posata = [f.style.display, f.style.height];
+/* C) controprove: effetti ridotti, home dietro, cambio senza differenza */
+RIDOTTI = true;
+altezzaMorbida(f, () => { f.style.display = ''; });
+out.ridotti = [f.style.display, f.style.height, TIMER.size];
+RIDOTTI = false; ATTIVA = false;
+altezzaMorbida(f, () => { f.style.display = 'none'; });
+out.dietro = [f.style.display, f.style.height, TIMER.size];
+ATTIVA = true;
+altezzaMorbida(f, () => {});
+out.uguale = [f.style.height, TIMER.size];
+/* D) il cartone senza misure (i banchi delle altre prove): cambio secco */
+const nudo = {style: {display: ''}};
+altezzaMorbida(nudo, () => { nudo.style.display = 'none'; });
+out.nudo = nudo.style.display;
+/* E) la riga che si apre: il suo margine di sopra sta ancora crescendo */
+const r = EL.sottoRigaWrap = scatola('sottoRigaWrap', 139, 10, 0, 1.5);
+r.style.display = 'none';
+altezzaMorbida(r, () => { r.style.display = ''; });
+out.riga = [r.style.height, r.style.marginTop];
+r.style.marginTop = '0px';   /* a inizio corsa il margine e' ancora zero */
+out.restoRiga = restoMorbido(r);
+corri();
+console.log(JSON.stringify(out));
+"""
+    r = subprocess.run([node, "-e", banco], capture_output=True, text=True, timeout=60)
+    try:
+        o = json.loads(r.stdout or "null") or {}
+    except ValueError:
+        o = {"errore": (r.stderr or r.stdout)[-400:]}
+    prova("la fascia che sparisce resta in pagina e si chiude dalla sua altezza vera",
+          ["", "0px", "0px", "0", "hidden"], o.get("chiude", o))
+    prova("...lo scorrimento sa quanto manca ancora sotto di lei (40+7+5 = 52), e niente sopra",
+          [52, 0], [o.get("resto"), o.get("restoSopra")])
+    prova("...e a corsa finita e' sparita davvero, senza stili lasciati", ["none", "", "", "", None],
+          o.get("finita"))
+    prova("la fascia che torna parte da zero e trasparente", ["", "78px", "1"],
+          o.get("apre"))
+    prova("...una seconda corsa a meta' posa la prima e si chiude da dov'era", [["", "0px"], ["none", ""]],
+          [o.get("seconda"), o.get("posata")])
+    prova("CONTROPROVE: effetti ridotti, home dietro e nessuna differenza fanno il cambio secco",
+          [["", "", 0], ["none", "", 0], ["", 0]],
+          [o.get("ridotti"), o.get("dietro"), o.get("uguale")])
+    prova("...e un cartone senza misure (gli altri banchi) cambia secco come prima", "none", o.get("nudo"))
+    prova("la riga che si apre cresce da zero, e il suo margine che cresce sposta l'arrivo (-10)",
+          [["139px", "10px"], -10], [o.get("riga"), o.get("restoRiga")])
 
 
 def prove_consigliati():
@@ -177120,6 +177479,29 @@ console.log(JSON.stringify(['https://t.me/corsibot?start=xy', 'https://t.me/cana
           '"","","","","","","","",""]', righe[0] if righe else "")
     prova("e il tocco riapre solo la stessa forma", "[true,false,false]",
           righe[1] if len(righe) > 1 else "")
+    # (26 nov 2026) e l'invito a un gruppo, dopo il bot: le due porte in fila
+    prova("dalla scorta si tocca anche l'invito t.me/+, e niente altro",
+          True, "op.linkBot ? linkCanaleToccabile(linkBotToccabile(scappato))"
+          in mini)
+    prog2 = (r"""
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tg = null;
+""" + mini[mini.index("const RE_LINK_BOT ="):mini.index("\n", mini.index("const RE_LINK_BOT ="))]
+          + "\n" + mini[mini.index("const RE_INVITO_CANALE ="):mini.index("\n", mini.index("const RE_INVITO_CANALE ="))]
+          + fn("function linkBotToccabile(testoEsc){")
+          + fn("function linkCanaleToccabile(testoEsc){") + r"""
+const t = 'Bot: https://t.me/corsibot?start=x1\nAula: https://t.me/+AbCdEf123456_x\nSito: https://evil.example/a';
+const h = linkCanaleToccabile(linkBotToccabile(esc(t)));
+console.log(JSON.stringify([(h.match(/href="([^"]*)"/g) || []), h.endsWith('Sito: https://evil.example/a'), h.includes('apriInvitoCanale'), h.includes('apriLinkBot')]));
+""")
+    out2 = subprocess.run(["node", "-e", prog2], capture_output=True,
+                          text=True, timeout=30)
+    prova("...il bot e l'invito diventano link, il sito resta testo",
+          '[["href=\\"https://t.me/corsibot?start=x1\\"",'
+          '"href=\\"https://t.me/+AbCdEf123456_x\\""],true,true,true]',
+          out2.stdout.strip())
+    if out2.returncode:
+        print(out2.stderr[:400])
     if out.returncode:
         print(out.stderr[:400])
     tog = fn("async function togliScorta(btn){")
@@ -184659,9 +185041,11 @@ def prove_tempo_pubblica_app():
     # (12 ott 2026, notte, cantiere libro-vuoto) la terza e' «togli la
     # pausa per stanotte» (`togliPausaAdessoP2P`): stessa rotta, col
     # corpo `{salta: true}`
-    prova("...il blocco dentro non ha nessuna fetch; quello fuori ne ha tre, una lettura e "
-          "due scritture, tutte su /p2p/pausa",
-          [0, 3, 3, 2],
+    # (26 nov 2026, cantiere chat-spunte) la quarta e' il fuso che segue il
+    # telefono (`seguiFusoPausaP2P`): stessa rotta, col corpo `{solo_fuso: true}`
+    prova("...il blocco dentro non ha nessuna fetch; quello fuori ne ha quattro, una lettura e "
+          "tre scritture, tutte su /p2p/pausa",
+          [0, 4, 4, 3],
           [nudo.count("fetch("), chiede.count("fetch("), chiede.count("${API_BASE}/p2p/pausa"),
            chiede.count("method: 'POST'")])
     prova("il custode non si nomina nemmeno qui: nessuna frase del blocco dice «coordinatore» "
@@ -188438,8 +188822,10 @@ def prove_canale_admin():
           # il certificato vicino alla scadenza: negli errori
           # (25 nov 2026, grazie-zap) lo zap generoso col comando del
           # premio pronto: nei riepiloghi, come la quota di swap@
+          # (26 nov 2026, cerco-moderazione) la richiesta nuova di «Cerco»:
+          # nella moderazione
           {"assistenza": 1, "dispute": 11, "dm": 1, "errori": 41,
-           "liquidita": 5, "moderazione": 28, "riepiloghi": 31}, per_stanza)
+           "liquidita": 5, "moderazione": 29, "riepiloghi": 31}, per_stanza)
     prova("...e chi aggiunge domani un avviso da admin senza stanza, o "
           "con una stanza che non esiste, trova questa prova rossa", [],
           [s for s in stanze_scritte if s not in NOMI])
@@ -188477,7 +188863,7 @@ def prove_canale_admin():
                                               "avvisa_profilo_mio",
                                               "_avvisa_ponte", "_avvisa_liquidita")))
     prova("IL NUMERO: 79 punti da cui nasceva un avviso da admin prima, "
-          "128 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
+          "129 adesso (in piu' ci sono la ronda dei relay di Mostro, le "
           "spese di spedizione ferme, la fattura annullata pagata, la "
           "ronda dei relay Nostr, il cassetto dei file della chat, la "
           "quota arrivata su swap@, l'unione degli account dal web, il "
@@ -188509,7 +188895,8 @@ def prove_canale_admin():
           "nome e la foto scelti da approvare; e la pagina collegata a un "
           "negozio dal pannello; dal 25 nov il servizio del quadro che tace "
           "o torna, e il certificato vicino alla scadenza; e lo zap "
-          "generoso col comando del premio)", 128,
+          "generoso col comando del premio; dal 26 nov la richiesta nuova "
+          "di «Cerco»)", 129,
           totale)
     con_admin_ids = sorted({f.name for f in funzioni for n in _ast.walk(f)
                             if isinstance(n, _ast.Name) and n.id == "ADMIN_IDS"})
@@ -191534,10 +191921,16 @@ def prove_ordine_in_pausa():
           ("salta_fino" in [c[1] for c in vecchio.execute("PRAGMA table_info(p2p_pause)")],
            mia(vecchio, 5, SERA)["fino"]))
     rotta = pezzo("scrivi_pausa_p2p")
+    # (26 nov 2026, cantiere chat-spunte) `{solo_fuso: true}` passa dal
+    # giudice del fuso, e anche lui non riscrive le fasce
     prova("la rotta: `{salta: true}` passa dal giudice del salto e non riscrive le fasce; "
-          "ogni altro corpo e' la scrittura di sempre", True,
+          "`{solo_fuso: true}` dal giudice del fuso; ogni altro corpo e' la scrittura di sempre", True,
           'if isinstance(d, dict) and d.get("salta") is True:\n'
           '            fuori = _salta_pausa_p2p(con, user["id"], adesso)\n'
+          '        # IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026): `{"solo_fuso":\n'
+          '        # true, ...}` cambia fuso e scarto, e nient\'altro\n'
+          '        elif isinstance(d, dict) and d.get("solo_fuso") is True:\n'
+          '            fuori = _fuso_pausa_p2p(con, user["id"], d, adesso)\n'
           '        else:\n'
           '            fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)'
           in rotta)
@@ -198797,6 +199190,8 @@ def prove_barre_paycode():
             "function chatScLinkP2P(testo){", "function chatScAllarmiP2P(testo){",
             "function chatScTestoHTML(testo, senzaPdf){", "function payCodeScambioP2P(o){",
             "function schedaPdfPayCodeP2P(l, pcScambio){", "function chatScMessaggiHTML(c, altro, o){",
+            # (26 nov 2026, chat-spunte) la spunta accanto all'ora dei miei
+            "function spuntaChatScP2P(m, sp){",
             "function disegnaBarreP2P(){", "function apriBarreP2P(d){"))
         + "\nlet p2pBarreDati = null;\n"
         + "\nconst TAB = " + _tab.group(0) + ";\n"
@@ -203496,7 +203891,7 @@ def prove_miniature_leggere():
 
     # --- 3) il riquadro delle liste piccole ---------------------------
     prova("nessun 💰 al posto della foto, nessuna foto piena nelle "
-          "liste piccole", (0, 8),   # l'ottava: la testata dei codici pronti (24 nov 2026)
+          "liste piccole", (0, 9),   # l'ottava: la testata dei codici pronti (24 nov 2026); la nona: la scelta dell'annuncio da promuovere dal Profilo (26 nov 2026)
           (mini.count("replaceWith('💰')"), mini.count("riquadroMini(")
            - 1))
     # fino alla funzione dopo: dentro ci sono funzioni annidate
@@ -205799,13 +206194,54 @@ def prove_richieste():
           "che apre la richiesta, la cifra coi puntini", [True, True, True],
           ["deposito di garanzia" in avv,
            '"Offri", link_telegram("cerco", richiesta_id)' in avv,
-           "_fmt_sats(rich['budget_sats'])" in avv])
+           "budget = _riga_budget_richiesta(rich)" in avv])
+    _rb = srv[srv.index("def _riga_budget_richiesta("):]
+    _rb = _rb[:_rb.index("\n\n\n")]
+    # (26 nov 2026) il budget anche in euro, e la durata a scelta
+    prova("l'avviso dice il budget in euro quando e' in euro", True,
+          "_fmt_eur(rich['budget_eur'])" in _rb and "_fmt_sats(rich['budget_sats'])" in _rb)
+    # (26 nov 2026) l'avviso ai moderatori: nella stanza «Moderazione», con
+    # la sua leva, lanciato dalla nascita della richiesta
+    _am = srv[srv.index("async def _avvisa_moderatori_richiesta("):]
+    _am = _am[:_am.index("\n\n\n")]
+    prova("ogni richiesta nuova avvisa i moderatori, con la sua leva accesa di serie",
+          [True, True, True, True],
+          ["asyncio.create_task(_avvisa_moderatori_richiesta(rid))" in srv,
+           "if not RICHIESTE_AVVISO_MODERATORI:" in _am,
+           'argomento="moderazione"' in _am,
+           "RICHIESTE_AVVISO_MODERATORI = True" in srv])
+    # (26 nov 2026) le richieste a chi le ha chieste dal cassetto Avvisi
+    prova("«🙋 Avvisami delle nuove richieste di Cerco»: colonna spenta di serie, "
+          "rotta, /api/me, l'avviso che la legge, il cassetto",
+          [True, True, True, True, True, True],
+          ['"avvisi_richieste INTEGER DEFAULT 0"' in srv,
+           '@app.post("/api/me/avvisi-richieste")' in srv,
+           'profilo["avvisi_richieste"]' in srv,
+           "_iscritti_richiesta(con, rich, set(scelti))" in avv,
+           "🙋 Avvisami delle nuove richieste di Cerco" in mini
+           and "!cercoAttivo() ? ''" in mini,
+           "myAvvisiRichieste = me.avvisi_richieste === true;" in mini])
+    # (26 nov 2026) la categoria proposta mentre si scrive, senza AI
+    _cp = srv[srv.index("def categoria_per_richiesta("):]
+    _cp = _cp[:_cp.index("\n\n\n")]
+    prova("la categoria proposta: rotta sua, niente AI, il campo che la chiede, "
+          "e la scelta a mano che vince",
+          [True, False, True, True, True],
+          ['@app.get("/api/richieste/categoria")' in srv,
+           "ai." in _cp or "RICHIESTE_MODELLO" in _cp,
+           'oninput="cercoProponiCategoria()"' in mini,
+           "poi: () => { cercoCatAMano = true; }" in mini,
+           "if (giro !== cercoCatGiro || cercoCatAMano) return;" in mini])
+    prova("le durate sono tre, di serie la prima (30 giorni)", [True, True],
+          ["RICHIESTE_DURATE = (30, 60, 90)" in srv,
+           "RICHIESTE_GIORNI = RICHIESTE_DURATE[0]" in srv])
     _blocco = srv[srv.index("_RICHIESTE_PAROLE_VUOTE = frozenset("):
                   srv.index('@app.post("/api/me/avvisi-mercatino")')]
     _testi = codice(_blocco).lower() if "codice" in globals() else _blocco.lower()
     prova("lessico: mai «assicurat» ne' «escrow» nei testi di «Cerco»", True,
           "assicurat" not in _testi and "escrow" not in _testi)
-    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 3,
+    # tre nell'avviso ai moderatori (26 nov 2026): testo, categoria, nome
+    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 6,
           _blocco.count("html.escape("))
     _pub = srv[srv.index("async def pubblica("):]
     _pub = _pub[:_pub.index("\n@app.")]
@@ -205833,6 +206269,8 @@ def prove_richieste():
           "const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
           ".replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n"
           "const icoCategoria = c => '[' + c + ']';\n"
+          "const fmtEur = e => e.toFixed(2).replace('.', ',');\n"
+          + pezzo_js(mini, "function cercoLeggiBudget(") + "\n"
           + mini[i:f] +
           "\nconst ora = Math.floor(Date.now()/1000), f = {};\n"
           "f.molti = cercoScade(ora + 5*86400 + 60); f.uno = cercoScade(ora + 86400 + 60);\n"
@@ -205842,6 +206280,12 @@ def prove_richieste():
           "f.mia = cardRichiesta({id: 5, testo: 'buono', categoria: 'Libri',"
           " budget_sats: 0, scade: ora + 3*86400, mia: true, offerte: 2,"
           " annunci: [{id: 9, titolo: '<b>Buono</b>', prezzo_sats: 1000}]});\n"
+          "f.euro = cardRichiesta({id: 6, testo: 'bici', categoria: 'Libri',"
+          " budget_sats: 0, budget_eur: 50, scade: ora + 3*86400, mia: false});\n"
+          "f.leggi = [cercoLeggiBudget('50,5','eur'), cercoLeggiBudget('50.5','eur'),"
+          " cercoLeggiBudget('1.500','eur'), cercoLeggiBudget('1.500,25','eur'),"
+          " cercoLeggiBudget('zero','eur'), cercoLeggiBudget('55.000','sats'),"
+          " cercoLeggiBudget('','sats')];\n"
           "console.log(JSON.stringify(f));\n")
     r = _node_banco(js)
     if r is None:
@@ -205859,18 +206303,35 @@ def prove_richieste():
               [True, False, True, False, True],
               ["openDetail(9)" in _m, "<b>Buono</b>" in _m, "chiudiRichiesta(5)" in _m,
                "offriPerRichiesta" in _m, "2 offerte" in _m])
+        prova("la card col budget in euro", [True, False],
+              ["fino a <b class=\"mono\">50,00</b> €" in r.get("euro", ""),
+               "sats" in r.get("euro", "")])
+        prova("il budget letto: la virgola, il punto, le migliaia, i sats",
+              [50.5, 50.5, 1500, 1500.25, 0, 55000, 0], r.get("leggi"))
     # l'etichetta del megafono esce SOLO sopra «Sconti»: da sola andrebbe
     # sopra l'ordinamento e i filtri
     prova("l'etichetta che esce nasce nascosta e si accende solo dopo «Sconti»",
           [True, True],
           [bool(_re.search(r"\.occ-cerco \.cerco-eti\{[^}]*display:none", mini)),
            '#occasioniBanner [data-id="sconto"] ~ .occ-cerco .cerco-eti{display:block}' in mini])
+    # (26 nov 2026) l'omino accanto al titolo, l'interruttore stile
+    # Barattolo al posto della casella, il toggle € / ₿ nel budget
+    _rc = pezzo_js(mini, "function renderCerco(){")
+    prova("Cerco: l'omino nel titolo, l'interruttore, il toggle del budget",
+          [True, True, False, True],
+          ['src="/assets/scoprire/cerco-omino.webp"' in mini,
+           'role="switch"' in _rc and "mutoRichieste(" in _rc,
+           'type="checkbox"' in _rc,
+           "cercoBudgetSegue();" in mini[mini.index("function setValuta(v){"):][:6000]])
+    # (25 nov 2026 sera) i due riquadri restano anche senza occasioni
+    prova("Offerte e Sconti sempre in vista, fuori dal barattolo", True,
+          "const vive = vistaBarattolo ? [] : OCCASIONI;" in mini)
     prova("il riquadro sta in coda ai due, mai in DEMO, vetrina o barattolo",
           [True, True],
           ["const cerco = !vistaBarattolo && cercoAttivo();" in mini,
            "function cercoAttivo(){ return cercoLeva && !DEMO && !VETRINA; }" in mini])
     for _f in ("occ-offerte.webp", "occ-sconti.webp", "cerco.webp",
-               "cerco-etichetta.webp"):
+               "cerco-etichetta.webp", "cerco-omino.webp"):
         prova("il disegno %s c'e' e la rotta lo serve" % _f, (True, True),
               (os.path.exists(os.path.join("assets", "scoprire", _f)),
                '"%s"' % _f in srv[srv.index("FILE_SCOPRIRE = ("):][:900]))
@@ -215284,9 +215745,10 @@ def prove_non_hai_sats():
     prova("il telefono: solo senza Lightning address ne' wallet on-chain, con la "
           "leva", True,
           "!!myViaEuro && !myLnAddress && !myOnchainIncasso" in per_me)
-    prova("i due tasti: arancioni, «Non hai sats?» e «Non hai sats? Compra da "
-          "qui», mai «paga in euro»", True,
-          "'Non hai sats? Compra da qui' : 'Non hai sats?'" in mini
+    prova("i due tasti: arancioni, «Non hai sats?» e «Non hai sats? Paga in "
+          "altri modi» (26 nov 2026, Andrea: niente euro, chi e' di Lugano "
+          "paga in franchi), mai «paga in euro»", True,
+          "'Non hai sats? Paga in altri modi' : 'Non hai sats?'" in mini
           and 'id="payViaEuro" class="btn orange via-euro-btn"' in mini
           and "paga in euro" not in _fn_js(mini, "function viaEuroTasto(sats, dove){").lower())
     i_qr = mini.index('<div class="qr" id="payQr"></div>')
@@ -215322,7 +215784,7 @@ def prove_non_hai_sats():
           "controllo, la verifica), e niente annullo dell'ordine a meta'", True,
           "viaEuroScambioDellOrdine(o.id)" in pdp
           and "const v = viaEuroPassoOrdine(ve);" in pdp
-          and "Sto preparando il pagamento…" in pvo
+          and "'<div class=\"via-euro-attesa\">Ordine preso</div>'" in pvo
           and "viaEuroPassi(p, 'viaEuroSeguo=" in pvo and "viaEuroPasso1(p, nome)" in pvo
           and "sta controllando il pagamento" in pvo and "verificaDaOrdine(this)" in pvo
           and "viaEuroScambioDellOrdine(o.id) ? ''" in mini
@@ -215407,10 +215869,10 @@ console.log(JSON.stringify(r));
 
     # --- i passi dopo «Continua» (secondo giro) ------------------------------
     rp = _fn_js(mini, "function renderViaEuroPasso(){")
-    prova("le scritte approvate: «Sto preparando il pagamento…», «Manda N € a "
+    prova("le scritte approvate: «Ordine preso» (26 nov 2026), «Manda N € a "
           "…», «Ho inviato gli euro», «… sta controllando il pagamento», «Puoi chiudere "
           "l'app, ti avvisiamo noi.»", True,
-          "Sto preparando il pagamento…" in rp and "viaEuroPasso1(o, nome)" in rp
+          "'<div class=\"via-euro-attesa\">Ordine preso</div>'" in rp and "viaEuroPasso1(o, nome)" in rp
           and "viaEuroPassi(o, 'viaEuroHoPagato()')" in rp and "' sta controllando il pagamento'" in rp
           and "Puoi chiudere l\\'app, ti avvisiamo noi." in rp)
     prova("...il recapito e il tempo sono quelli della pagina di sempre, e "
@@ -215747,13 +216209,48 @@ def prove_chiedi_al_venditore():
           and "chiesto<?\",\n            (*VIA_EURO_VIVE, adesso - VIA_EURO_CHIEDI_S)" in srv)
 
     # --- il telefono --------------------------------------------------------
-    prova("il tasto si accende anche con solo chi vende a cifra fissa", True,
-          "if (!viaEuroOfferta(sats) && !viaEuroFissiOra(sats).length) return '';" in mini
-          and "(!!viaEuroOfferta(sats) || viaEuroFissiOra(sats).length > 0)" in mini)
+    # 26 nov 2026 (Andrea dalla prova con Sam): il tasto SOLO con un match
+    # vero; chi vende a cifra fissa non lo accende piu', e la cassa non
+    # chiede piu' a loro
+    prova("il tasto si accende solo con un match vero, mai per chi vende "
+          "a cifra fissa (26 nov 2026)", True,
+          "  if (!viaEuroOfferta(sats)) return '';" in mini
+          and "const si = sats > 0 && !!viaEuroOfferta(sats);" in mini
+          and "viaEuroFissiOra(sats).length" not in mini)
     ap = _fn_js(mini, "async function apriViaEuro(dove){")
-    prova("...e il foglio chiede, o riprende la ricerca viva per l'annuncio",
-          True, "renderViaEuroChiedi(fissi);" in ap and "viaEuroAspetta(); return;" in ap
-          and "mia.annuncio_id === l.id" in ap)
+    prova("...e senza match al tocco il tasto si spegne, niente richiesta "
+          "ai venditori dalla cassa", True,
+          "if (!o) { payViaEuroVista(0);" in ap
+          and "renderViaEuroChiedi" not in ap)
+    od = _fn_js(mini, "function openDetail(id){")
+    lb = _fn_js(mini, "function viaEuroLibro(poi){")
+    dl = _fn_js(mini, "function viaEuroDopoLibro(){")
+    prova("la ricerca in silenzio: il libro si legge aprendo la scheda, chi "
+          "chiede si accoda alla lettura in volo, e a libro letto si "
+          "ridisegnano cassa e foglio del QR (26 nov 2026)", True,
+          "if (!mio && typeof viaEuroLibro === 'function') viaEuroLibro(viaEuroDopoLibro);" in od
+          and "if (p2pLettura) { p2pLettura.then(dopo).catch(() => {}); return; }" in lb
+          and "if (acqDati && el('acqCompra')) renderAcquisto();" in dl
+          and "payViaEuroVista(viaEuroSatsQr)" in dl
+          and "viaEuroSatsQr = sats > 0 ? sats : 0;" in mini)
+    inc_v = pezzo("_incassa_ordine")
+    prova("«Hai venduto» porta SEMPRE «📦 Apri l'ordine», anche a mano e "
+          "senza data (26 nov 2026); l'abbonamento no", True,
+          "if not canale_abbo:\n        await notifica(o[\"venditore_id\"], msg,\n"
+          "                       (BOTTONE_ORDINE_VENDUTO," in inc_v
+          and "elif entro:\n        await notifica(o[\"venditore_id\"]" not in inc_v)
+    sp = _fn_js(mini, "function spintaIntervalloP2P(){")
+    ae = _fn_js(mini, "function apriEuroTabP2P(modo){")
+    prova("la spinta all'intervallo: la frase di Andrea, solo a chi vende "
+          "sats in euro a prezzo di mercato, sempre in vista sotto "
+          "l'importo e in cima al foglio al primo tocco (26 nov 2026)", True,
+          "const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo "
+          "ordine viene preso molto più spesso.';" in mini
+          and "if (p2pLato === 'compro' || p2pNuovoFisso) return false;" in sp
+          and "return valutaFoglioP2P() === 'EUR';" in sp
+          and "'<div class=\"p2p-spinta-intervallo\" id=\"p2pNuovoNotaDue\">' + esc(P2P_SPINTA_INTERVALLO)" in mini
+          and "m.nome === 'min' && spintaIntervalloP2P()" in ae
+          and "localStorage.setItem('p2pSpintaIntervallo', '1')" in ae)
     asp = _fn_js(mini, "function viaEuroAspetta(){")
     prova("il foglio che aspetta va avanti da solo quando il match arriva nel "
           "libro", True, "if (viaEuroOfferta(viaEuroSats)) {" in asp
@@ -216185,6 +216682,272 @@ def prove_chat_onchain():
     ar = mini[mini.index("apriScambioOnchainDaAvvisoP2P(P2P_SCAMBIO_URL).then("):][:400]
     prova("IL TASTO DELL'AVVISO (`&chat=1`) apre lo scambio on-chain e porta dritti alla chat",
           True, "chatDaAvvisoP2P(P2P_SCAMBIO_URL)" in ar and "esito === 'aperto'" in ar)
+
+
+def prove_chat_spunte():
+    """LE SPUNTE NELLA CHAT, E IL FUSO DELLA PAUSA CHE SEGUE IL TELEFONO
+    (26 nov 2026, cantiere chat-spunte; le due idee sono di un utente,
+    girate da Andrea: «Ok, perfetto. Le voglio arancioni»).
+
+    Sotto i MIEI messaggi: ✓ la busta e' sul server, ✓✓ il telefono
+    dell'altra parte l'ha ritirata, ✓✓ arancioni l'altra parte ha avuto la
+    chat davanti. Quel che qui si rompe in silenzio: un «visto» che va
+    oltre quel che si e' ritirato (un telefono che mente in avanti) o che
+    torna indietro (uno che riparte da zero); la lettura del moderatore che
+    accende le spunte; la leva spenta che le lascia; le spunte sui
+    messaggi dell'altra parte o sulle righe di sistema; il «visto» detto
+    solo al battito dopo, cosi' chi chiude l'app subito lascia le ✓✓
+    grigie; il cassetto di ieri senza la colonna.
+    E LA PAUSA: chi parte DOPO averla salvata restava in pausa con l'ora
+    di casa. Il telefono in un altro fuso la porta con se', con le stesse
+    ore, senza toccare fasce, una tantum e «per stanotte»."""
+    print("\n[le spunte nella chat, e il fuso della pausa che segue il telefono]")
+    import calendar as _cal
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: la leva, la colonna, la rotta -----------------------
+    prova("LA LEVA: accesa di serie, e solo un False scritto la spegne", True,
+          "    CHAT_SPUNTE = CHAT_SPUNTE is not False\nexcept ImportError:\n"
+          "    CHAT_SPUNTE = True\n" in src)
+    prova("...dichiarata ACCESA nel config d'esempio, e nel pannello «Stato delle leve»",
+          (True, True), ("\nCHAT_SPUNTE = True\n" in esempio,
+                         '_leva("Spunte nella chat", "CHAT_SPUNTE", CHAT_SPUNTE,' in pezzo("_leve_stato")))
+    schema = pezzo("db_chat")
+    prova("la colonna del visto sta nel CREATE e nell'ALTER per il cassetto di ieri", (True, True),
+          ("                visto_fino INTEGER NOT NULL DEFAULT 0,\n" in schema,
+           'con.execute("ALTER TABLE letture ADD COLUMN visto_fino INTEGER NOT NULL DEFAULT 0")'
+           in schema))
+    leggi = src[src.index('@app.post("/api/p2p/chat/leggi")'):]
+    leggi = leggi[:leggi.index("\n\n\n")]
+    prova("la rotta del ritiro: le spunte DOPO il ritiro, solo a leva accesa, per l'altra parte",
+          True, 0 < leggi.index("corpo = _chat_p2p_ritira(") < leggi.index(
+              "        if CHAT_SPUNTE:\n"
+              "            corpo[\"spunte\"] = _chat_spunte(cc, ordine, st[\"giro\"], user[\"id\"],\n"
+              "                                           st[\"altro\"], d.get(\"visto\"))"))
+    prova("...e il moderatore non passa di li': la sua lettura non accende niente", False,
+          "_chat_spunte" in pezzo("_chat_p2p_per_moderatore") + pezzo("_chat_mercatino_per_moderatore"))
+
+    # --- 2) IL SERVER: il giudice vero, su sqlite in memoria ---------------
+    amb = {"sqlite3": sqlite3}
+    for f in ("_chat_p2p_ritira", "_chat_spunte"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb["P2P_CHAT_RITIRO_MAX"] = 300
+    ritira, spunte = amb["_chat_p2p_ritira"], amb["_chat_spunte"]
+    tabelle = schema[schema.index('con.executescript("""') + len('con.executescript("""'):]
+    tabelle = tabelle[:tabelle.index('""")')]
+    cc = sqlite3.connect(":memory:")
+    cc.row_factory = sqlite3.Row
+    cc.executescript(tabelle)
+    O, A, B, ORA = "o-spunte", 111, 222, 1_790_000_000
+
+    def busta(da, tipo="msg"):
+        return cc.execute("INSERT INTO buste(ordine, giro, da, tipo, busta, quando) "
+                          "VALUES(?,1,?,?,?,?)", (O, da, tipo, "QUJD" * 12, ORA)).lastrowid
+    for chi in (A, B):
+        busta(chi, "saluto")
+    n1 = busta(A)
+    ritira(cc, O, 1, A, 0, ORA)
+    prova("✓: A ha scritto, B non ha ancora ritirato — per A niente arrivato, niente visto",
+          {"arrivato": 0, "visto": 0}, spunte(cc, O, 1, A, B, 0))
+    ritira(cc, O, 1, B, 0, ORA + 5)
+    prova("✓✓: il telefono di B ha ritirato — arrivato fino al messaggio, visto ancora no",
+          (True, 0), (spunte(cc, O, 1, A, B, 0)["arrivato"] >= n1, spunte(cc, O, 1, A, B, 0)["visto"]))
+    spunte(cc, O, 1, B, A, n1)
+    prova("✓✓ arancioni: B dice di averlo visto, e A lo legge", n1, spunte(cc, O, 1, A, B, 0)["visto"])
+    n2 = busta(A)
+    spunte(cc, O, 1, B, A, n2 + 50)
+    prova("UN TELEFONO CHE MENTE IN AVANTI non va oltre quel che ha ritirato", n1,
+          spunte(cc, O, 1, A, B, 0)["visto"])
+    spunte(cc, O, 1, B, A, 1)
+    prova("...e uno che riparte da zero non torna indietro", n1, spunte(cc, O, 1, A, B, 0)["visto"])
+    prova("un «visto» storto o assente non scrive e non esplode", [n1, n1, n1],
+          [(spunte(cc, O, 1, B, A, v), spunte(cc, O, 1, A, B, 0)["visto"])[1]
+           for v in ("x", None, -9)])
+    prova("le cifre sono dell'ALTRA parte: a B tornano quelle di A, non le sue", (True, 0),
+          (spunte(cc, O, 1, B, A, 0)["arrivato"] >= n1, spunte(cc, O, 1, B, A, 0)["visto"]))
+    prova("un altro giro non vede le letture di questo", {"arrivato": 0, "visto": 0},
+          spunte(cc, O, 2, A, B, 0))
+    vecchio = sqlite3.connect(":memory:")
+    vecchio.executescript(tabelle.replace("                visto_fino INTEGER NOT NULL DEFAULT 0,\n", ""))
+    exec(compile("try:\n    vecchio.execute(\"ALTER TABLE letture ADD COLUMN visto_fino INTEGER NOT NULL "
+                 "DEFAULT 0\")\nexcept sqlite3.OperationalError:\n    pass\n", "alter", "exec"),
+         {"vecchio": vecchio, "sqlite3": sqlite3})
+    prova("IL CASSETTO DI IERI riceve la colonna, e il secondo avvio non esplode", True,
+          "visto_fino" in [c[1] for c in vecchio.execute("PRAGMA table_info(letture)")])
+
+    # --- 3) IL TELEFONO: le sentinelle ------------------------------------
+    rit = pezzo_js(mini, "function chatScRitiraP2P(id){", "\n}\n")
+    prova("il ritiro dice il mio «visto», e da quel momento non c'e' piu' niente da ridire", True,
+          0 < rit.index("delete p2pChatScRidire[id];")
+          < rit.index("visto: (prima && prima.vistoFino) | 0"))
+    prova("...tiene le cifre dell'altra parte nella voce della chat (null a leva spenta)", True,
+          "esito.c.spunte = spunteDalServerChatScP2P(d.spunte);" in rit)
+    prova("...e se il visto e' andato avanti mentre era in volo, si ridice SUBITO", True,
+          "else if (p2pChatScRidire[id]) setTimeout(() => { chatScRitiraP2P(id); }, 0);" in rit)
+    msg = pezzo_js(mini, "function chatScMessaggiHTML(c, altro, o){", "\n}\n")
+    prova("la spunta sta accanto all'ora, dentro la riga «Tu · 09:15»", True,
+          "(m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + spuntaChatScP2P(m, c && c.spunte) + '</small>'"
+          in msg)
+    # (26 nov 2026, spunte-etichette, Andrea: «fallo un po' più vivo»)
+    prova("arancioni VIVE: --sats-deep di giorno, il --sats pieno di sera", (True, True),
+          (".chatsc-spunte.vista{color:var(--sats-deep)}" in mini,
+           'html[data-tema="scuro"] .chatsc-spunte.vista{color:var(--sats)}' in mini))
+    inv = pezzo_js(mini, "async function chatScInviaP2P(id, testo, f){", "\n}\n")
+    prova("il messaggio appena partito prende subito il numero del server: la ✓ senza aspettare", True,
+          "nServer ? {n: nServer} : {}" in inv)
+
+    # --- 4) IL TELEFONO: i pezzi veri in node -----------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("le spunte girano in node", "node non c'e'")
+        return
+    pezzi = "\n".join([
+        pezzo_js(mini, "function spunteDalServerChatScP2P(sp){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function spuntaChatScP2P(m, sp){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function chatScVistoP2P(id){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function fusoPausaNuovoP2P(pausa, fuso){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function seguiFusoPausaP2P(){", "\n}\n") + "\n}",
+    ])
+    banco = r"""
+const p2pChatScRidire = {}, p2pChatScInVolo = {};
+let VOCE = null, RITIRI = 0, SEGNATI = 0;
+const chatScDiP2P = () => VOCE, chatScScriviP2P = (id, c) => { VOCE = c; };
+const chatScNonLettiP2P = () => (VOCE && VOCE.vistoFino < VOCE.cursore) ? 1 : 0;
+const chatScSegnaP2P = () => { SEGNATI++; };
+const chatScRitiraP2P = () => { RITIRI++; };
+const setTimeout = f => f();
+let p2pFusoPausaProvato = '', p2pMiaPausa = null, FUSO = '', CHIAMATE = [], RIVESTITE = 0;
+const fusoTelefonoP2P = () => FUSO, authHdr = () => 'h', API_BASE = '/api';
+const rivestiRighePausaP2P = () => { RIVESTITE++; };
+let RISPOSTA = null;
+const fetch = async (url, o) => { CHIAMATE.push([url, o.method, JSON.parse(o.body)]);
+  return {ok: !!RISPOSTA, json: async () => RISPOSTA}; };
+__PEZZI__
+(async () => {
+const out = {};
+const sp = spunteDalServerChatScP2P({arrivato: 7, visto: 4});
+const mio = n => ({mio: true, n: n, testo: 'x'});
+out.segni = [spuntaChatScP2P(mio(3), sp), spuntaChatScP2P(mio(5), sp), spuntaChatScP2P(mio(9), sp)];
+out.mute = [spuntaChatScP2P(mio(3), null), spuntaChatScP2P({mio: false, n: 3}, sp),
+            spuntaChatScP2P({mio: true, n: 3, sis: 1}, sp), spuntaChatScP2P({mio: true, testo: 'x'}, sp)];
+out.storte = [spunteDalServerChatScP2P(null), spunteDalServerChatScP2P('x'),
+              spunteDalServerChatScP2P({arrivato: '-3', visto: 'a'})];
+VOCE = {cursore: 9, vistoFino: 4, spunte: sp};
+chatScVistoP2P('o1');
+out.visto = [VOCE.vistoFino, !!p2pChatScRidire.o1, RITIRI];
+chatScVistoP2P('o1');
+out.fermo = RITIRI;
+p2pChatScInVolo.o2 = 1; delete p2pChatScRidire.o1;
+VOCE = {cursore: 12, vistoFino: 9, spunte: sp};
+chatScVistoP2P('o2');
+out.inVolo = [!!p2pChatScRidire.o2, RITIRI];
+VOCE = {cursore: 15, vistoFino: 12, spunte: null};
+chatScVistoP2P('o3');
+out.senzaLeva = [VOCE.vistoFino, !!p2pChatScRidire.o3, RITIRI];
+const P = {fasce: [{g: [0], da: 1320, a: 420}], fuso: 'Europe/Rome', una_fino: 0};
+out.nuovo = [fusoPausaNuovoP2P(P, 'America/New_York'), fusoPausaNuovoP2P(P, 'Europe/Rome'),
+             fusoPausaNuovoP2P(P, ''), fusoPausaNuovoP2P(Object.assign({}, P, {fuso: ''}), 'Asia/Tokyo'),
+             fusoPausaNuovoP2P({fasce: [], fuso: 'Europe/Rome', una_fino: 0}, 'Asia/Tokyo'),
+             fusoPausaNuovoP2P({fasce: [], fuso: 'Europe/Rome', una_fino: 99}, 'Asia/Tokyo'),
+             fusoPausaNuovoP2P(null, 'Asia/Tokyo')];
+p2pMiaPausa = P; FUSO = 'America/New_York';
+RISPOSTA = {attiva: true, fasce: P.fasce, fuso: 'America/New_York'};
+await seguiFusoPausaP2P();
+await seguiFusoPausaP2P();
+const c0 = CHIAMATE[0] || [];
+out.segue = [CHIAMATE.length, c0[0], c0[1], Object.keys(c0[2] || {}).sort().join(','),
+             (c0[2] || {}).solo_fuso, (c0[2] || {}).fuso, typeof (c0[2] || {}).scarto,
+             p2pMiaPausa.fuso, RIVESTITE];
+p2pMiaPausa = P; FUSO = 'Asia/Tokyo'; RISPOSTA = null;
+await seguiFusoPausaP2P();
+await seguiFusoPausaP2P();
+out.rifiutata = [CHIAMATE.length, p2pMiaPausa.fuso];
+console.log(JSON.stringify(out));
+})();
+"""
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "spunte.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco.replace("__PEZZI__", pezzi))
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if r.returncode:
+        prova("le spunte girano in node", "", (r.stdout or "") + (r.stderr or ""))
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    # (26 nov 2026, spunte-etichette) sullo schermo i segni, al lettore dello
+    # schermo la parola: «Letto», «Consegnato», «Inviato»
+    S = '<span class="chatsc-spunte%s" role="img" aria-label="%s">%s</span>'
+    prova("✓✓ arancioni fin dove ha visto, ✓✓ grigie fin dove e' arrivato, ✓ oltre — e il lettore "
+          "dello schermo dice «Letto», «Consegnato», «Inviato»",
+          [" " + S % (" vista", "Letto", "✓✓"), " " + S % ("", "Consegnato", "✓✓"),
+           " " + S % ("", "Inviato", "✓")], o["segni"])
+    en = open("lingua/en.js", encoding="utf-8").read()
+    prova("...e le tre parole hanno l'inglese (l'aria-label lo traduce il traduttore)", [],
+          [p for p in ('"Letto": "Read"', '"Consegnato": "Delivered"', '"Inviato": "Sent"') if p not in en])
+    prova("niente spunte senza cifre (leva spenta), sui suoi messaggi, sulle righe di sistema, "
+          "o su un mio messaggio che il server non ha ancora numerato", ["", "", "", ""], o["mute"])
+    prova("le cifre storte del server: niente spunte, o zeri", [None, None, {"arrivato": 0, "visto": 0}],
+          o["storte"])
+    prova("IL VISTO AVANZA: si segna, e il ritiro che lo dice parte subito", [9, True, 1], o["visto"])
+    prova("...e se non avanza non parte niente (nessun giro senza fine)", 1, o["fermo"])
+    prova("...con un ritiro gia' in volo non ne parte un altro: ci pensa la sua coda", [True, 1],
+          o["inVolo"])
+    prova("...a leva spenta (nessuna cifra dal server) il visto si segna e basta, come ieri",
+          [15, False, 1], o["senzaLeva"])
+    prova("IL FUSO DELLA PAUSA: solo con una pausa che dice il suo fuso, e un telefono altrove",
+          ["America/New_York", "", "", "", "", "Asia/Tokyo", ""], o["nuovo"])
+    prova("...UNA domanda per fuso, sulla rotta della pausa, col corpo che cambia solo il fuso; "
+          "la risposta diventa la mia pausa e le righe si rivestono",
+          [1, "/api/p2p/pausa", "POST", "fuso,scarto,solo_fuso", True, "America/New_York", "number",
+           "America/New_York", 1], o["segue"])
+    prova("...anche se il server non risponde non si richiede a ogni apertura del foglio", [2, "Europe/Rome"],
+          o["rifiutata"])
+
+    # --- 5) IL SERVER: il giudice del fuso, su sqlite in memoria -----------
+    amb = {"sqlite3": sqlite3, "json": _json, "re": re, "P2P_PAUSA_FASCE_MAX": 6,
+           "P2P_PAUSA_UNA_MAX_S": 7 * 86400, "P2P_PAUSA_CATENA_MAX": 16}
+    i = src.index("\nFORMA_FUSO_P2P = ") + 1
+    exec(src[i:src.index("\n", i)], amb)
+    for f in ("_legale_europea_p2p", "_scarto_fuso_p2p", "_fine_fascia_p2p", "_fine_pausa_p2p",
+              "_pausa_p2p", "_salta_pausa_p2p", "_scrivi_pausa_p2p", "_mia_pausa_p2p",
+              "_fuso_pausa_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    scrivi, salta, mia, fuso = (amb["_scrivi_pausa_p2p"], amb["_salta_pausa_p2p"],
+                                amb["_mia_pausa_p2p"], amb["_fuso_pausa_p2p"])
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_pause(")
+    con = sqlite3.connect(":memory:")
+    con.executescript(src[i:src.index("\n    );", i) + 7])
+
+    def utc(g, h, mi=0):
+        return _cal.timegm((2026, 10, g, h, mi, 0))
+    NOTTI = {"g": [0, 1, 2, 3, 4, 5, 6], "da": 1320, "a": 420}
+    scrivi(con, 5, {"fasce": [NOTTI], "fuso": "Europe/Rome", "scarto": 120,
+                    "una_da": 0, "una_fino": 0}, utc(12, 10))
+    prova("salvata a Roma, «22-7»: alle 05:00 di Roma (le 23 a New York) e' in pausa fino alle "
+          "07:00 di Roma", utc(14, 5), mia(con, 5, utc(14, 3))["fino"])
+    r = fuso(con, 5, {"solo_fuso": True, "fuso": "America/New_York", "scarto": -240}, utc(14, 3))
+    prova("PARTITO PER NEW YORK: il fuso segue il telefono, le ore restano 22-7 — in pausa fino "
+          "alle 07:00 di New York", ("America/New_York", [NOTTI], utc(14, 11)),
+          (r["fuso"], r["fasce"], r["fino"]))
+    salta(con, 5, utc(14, 3))
+    r = fuso(con, 5, {"solo_fuso": True, "fuso": "Europe/Rome", "scarto": 120}, utc(14, 3, 1))
+    prova("...e «tolta per stanotte» resta tolta: non e' un'intenzione nuova", (True, 0),
+          (r["salta_fino"] > 0, r["fino"]))
+    prova("un fuso in forma strana, uno scarto fuori dalle 14 ore o un True: non si scrive niente",
+          ["Europe/Rome"] * 3,
+          [fuso(con, 5, d, utc(14, 4))["fuso"] for d in (
+              {"fuso": "Europe/Rome; DROP", "scarto": 60}, {"fuso": "Asia/Tokyo", "scarto": 900},
+              {"fuso": "Asia/Tokyo", "scarto": True})])
+    prova("chi non ha una pausa non se ne trova una", (0, []),
+          (con.execute("SELECT COUNT(*) FROM p2p_pause WHERE tg_id=9").fetchone()[0],
+           fuso(con, 9, {"fuso": "Asia/Tokyo", "scarto": 540}, utc(14, 4))["fasce"]))
 
 
 def prove_indirizzo_resta_dove_sta():
@@ -223299,6 +224062,7 @@ def prove_promozioni():
     for riga in ("PROMOZIONI_ATTIVE = True",
                  "PROMO_IN_CIMA_ORE = 24",
                  "PROMO_SCOPRIRE_POSTI = 10",
+                 "PROMO_SCOPRIRE_IN_ARRIVO = True",
                  "PROMO_EVIDENZA_DURATE = {7: 1, 15: 1.7}",
                  "PROMO_EVIDENZA_POSTI = 8",
                  "PROMO_SCOPRIRE_GIORNI = 30"):
@@ -223600,8 +224364,9 @@ console.log(JSON.stringify([a, b, c]));""")
     # Il tasto «Promuovi» ha la carta lucida della porta della Classifica
     # Streak, nei colori del razzo, e sta in cima alla scheda.
     ap = pezzo_js(mini, "async function apriPromuovi(aid){", "\n}\n")
-    prova("il foglio ha tre voci: In cima, In evidenza, il negozio",
-          (1, 1, 1, 0),
+    prova("il foglio ha tre voci: In cima, In evidenza, il negozio (che "
+          "dal 26 nov ha due vesti: in arrivo, o in vendita)",
+          (1, 1, 2, 0),
           (ap.count("tipo: 'cima'"), ap.count("tipo: 'evidenza'"),
            ap.count("tipo: 'scoprire'"), ap.count("tipo: 'evidenza:'")))
     prova("...e «Paga» compra la durata scelta, o il negozio", (True, True),
@@ -223611,9 +224376,12 @@ console.log(JSON.stringify([a, b, c]));""")
     prova("nel foglio nessuna emoji: le icone sono disegnate", [],
           _emoji.findall(_senza_commenti_js(
               ap + pezzo_js(mini, "function vocePromoHTML(v, prima){", "\n}\n"))))
-    prova("...e il tasto Promuovi, nella scheda e nel cassetto, porta il "
-          "razzo disegnato e la carta lucida", (2, 0),
+    prova("...e il tasto Promuovi, nella scheda, nel cassetto e sotto "
+          "«Annunci» del Profilo, porta il razzo disegnato e la carta lucida", (3, 0),
           (mini.count('class="btn promo-porta'), mini.count("🚀 Promuovi</button>")))
+    prova("...le sfumature partono dal bordo: niente coda rossa sotto il "
+          "bordo di sinistra", True,
+          "gap:8px;" in mini and "    background-origin:border-box}\n  .btn.promo-porta svg{" in mini)
     prova("...la carta lucida e' la ricetta della porta Streak", True,
           ".btn.promo-porta{background:radial-gradient(120% 140% at 0% 0%,"
           "rgba(255,255,255,.18) 0%,rgba(255,255,255,0) 55%)," in mini)
@@ -224257,6 +225025,73 @@ INSERT INTO utenti VALUES(1, 500),(2, 300),(3, 0),(4, 50),(5, 900);""")
           ("titolo: `Il negozio nella home," in _cs, _cs.count("Da scoprire"),
            "sc.libero_da && !sc.fino" in _cs))
 
+    # IL NEGOZIO NELLA HOME, IN ARRIVO (26 nov 2026, Andrea: «lascialo nel
+    # foglio, però mettilo grigio»): la leva, il listino, la cassa che
+    # rifiuta PRIMA del banner, il foglio e il cassetto del banner
+    _cp = pezzo("compra_promo")
+    prova("in arrivo: il listino lo dice, la cassa rifiuta per prima, la "
+          "leva e' sul pannello", (True, True, True),
+          ('"in_arrivo": bool(PROMO_SCOPRIRE_IN_ARRIVO)}' in pezzo("listino_promo"),
+           _cp.index("if PROMO_SCOPRIRE_IN_ARRIVO:") < _cp.index('SELECT negozio, banner_stato, banner_foto "\n                        "FROM utenti') < _cp.rindex("crea_invoice"),
+           '"PROMO_SCOPRIRE_IN_ARRIVO", bool(PROMO_SCOPRIRE_IN_ARRIVO),' in src))
+    _apc = _senza_commenti_js(ap)
+    prova("...nel foglio la voce resta, grigia, col solo nome e la scritta "
+          "(e niente banner da chiedere); nel cassetto, la scritta", (True, True, True, True),
+          ("const SCOPRIRE_IN_ARRIVO = 'In arrivo';" in mini,
+           "voci.push({tipo: 'scoprire', titolo: 'Il negozio nella home', testo: '',\n      no: SCOPRIRE_IN_ARRIVO});" in _apc,
+           "if (sc.in_arrivo) promoServeBanner = false;" in _apc,
+           "if (sc.in_arrivo) { toast('Il negozio nella home: ' + SCOPRIRE_IN_ARRIVO.toLowerCase(), 5000); return; }"
+           in pezzo_js(mini, "async function chiediPromoScoprire(){", "\n}\n")))
+
+    # «PROMUOVI» DAL PROFILO (26 nov 2026, Andrea: il tasto «inglobato
+    # sotto il tasto annunci nella sezione profilo», e chi lo apre
+    # «decide quale annuncio suo promuovere»)
+    _cat = mini.index('<div class="grp" id="grpCatalogo">')
+    _neg = mini.index('<div class="grp" id="grpNegozio">')
+    _pp = mini.find('<div id="promuoviProfilo" hidden>')
+    prova("il tasto sta DENTRO «Annunci», sotto il titolo e prima del corpo, "
+          "spento di serie, e si accende con la leva delle promozioni", (True, True, True),
+          (_cat < mini.index("Annunci<span", _cat) < _pp < mini.index('<div class="grp-b">', _cat) < _neg,
+           'onclick="promuoviDalProfilo()"' in mini[_pp:_neg],
+           "promoAttive = j.promozioni_attive === true;\n  aggiornaPromuoviProfilo();" in mini))
+    _pd = pezzo_js(mini, "const promuovibile = l =>", "\n/* LA FATTURA DI UNA PROMOZIONE")
+    r = _node_banco("""
+const esc = s => String(s), fmt = n => String(n), fmtEur = n => String(n);
+const riquadroMini = () => '<i></i>';
+const astaE = l => !!l.asta, esaurito = l => !!l.esa, inFerie = l => !!l.ferie;
+const ICONA_PROMO = {porta: '<svg></svg>'};
+let DEMO = false, VETRINA = false, promoAttive = true, myListings = [];
+const box = {hidden: true, firstElementChild: {innerHTML: ''}};
+const el = id => id === 'promuoviProfilo' ? box : null;
+const log = [];
+const toast = t => log.push('toast:' + t);
+const apriPromuovi = id => log.push('apri:' + id);
+let conf = null; const chiediConferma = c => { conf = c; };
+""" + _pd + """
+aggiornaPromuoviProfilo();
+const acceso = [box.hidden, box.firstElementChild.innerHTML];
+promoAttive = false; aggiornaPromuoviProfilo(); const spento = box.hidden;
+promuoviDalProfilo();
+myListings = [{id: 1, stato: 'attivo', asta: true}, {id: 2, stato: 'attivo', esa: true},
+  {id: 3, stato: 'attivo', ferie: true}, {id: 4, stato: 'revisione'}, {id: 5, stato: 'attivo', title: 'x', price: 7}];
+promuoviDalProfilo();
+myListings.push({id: 6, stato: 'attivo', title: 'y', price: 9});
+promuoviDalProfilo();
+const scelta = [conf.titolo, conf.etichetta, conf.corpo,
+  (conf.testata.match(/name="promoAnnuncio"/g) || []).length, conf.testata.includes('value="5" checked')];
+promoAnnuncioScelto = 6; conf.poi();
+setTimeout(() => console.log(JSON.stringify([acceso, spento, log, scelta])), 5);""")
+    if r is None:
+        salta("il Promuovi del Profilo, girato in node", "node non c'e'")
+    else:
+        prova("in node: acceso solo a cassa aperta; nessun annuncio = la frase; "
+              "uno solo = dritto al foglio; piu' d'uno = la scelta (aste, "
+              "esauriti, in ferie e in revisione fuori), poi il foglio DOPO",
+              [[False, "<svg></svg>Promuovi"], True,
+               ["toast:Non hai annunci da promuovere: pubblicane uno dalla scheda Vendi",
+                "apri:5", "apri:6"],
+               ["Promuovi", "Avanti", "Scegli quale annuncio promuovere.", 2, True]], r)
+
     # ---- 8. IL COLLAUDO STA IN CI -------------------------------------
     prova("collaudo_promozioni e' fra i collaudi della CI", True,
           "\ncollaudo_promozioni\n" in
@@ -224485,7 +225320,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain chat_spunte onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -224506,7 +225341,7 @@ CATEGORIE = {
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina
-    ricategorizza collaudo_ricategorizza asta proxy_asta annullo
+    ricategorizza collaudo_ricategorizza categorie_una_volta asta proxy_asta annullo
     annullo_venditore spunta_rimborso abbandonati pagamenti_non_arrivati
     ritiro disarmo importo_uscita foto foto_scarti fotocamera_pagina
     tela_bugiarda duplica_annuncio avatar foto_spenta
@@ -224543,7 +225378,7 @@ CATEGORIE = {
     promesse_badge promesse_raggiungibili percentuale_della_promessa
     verde_e_filtri prezzo_accordo scoprire scoprire_quadra strisce_web sponsor
     numeri_negozio racconto_girato racconti_bozza storia_dal_link
-    consigliati link_invito_canale guardia_is_bot altri_scorrimento widget ricerca
+    consigliati salti_home link_invito_canale guardia_is_bot altri_scorrimento widget ricerca
     condivisione_venditore condividi_col_link link_dentro_telegram
     zona_comune_in_modifica cassa_strada_chiusa casa_vuota_gratis
     spedizione_standard cambio_converte paga_ora apri_nel_wallet
@@ -225655,6 +226490,7 @@ def main():
               prove_racconti_bozza,
               prove_storia_dal_link,
               prove_consigliati,
+              prove_salti_home,
               prove_link_invito_canale,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
@@ -225690,6 +226526,7 @@ def main():
               prove_p2p_sconto,
               prove_ronda_nodo,
               prove_quadro_servizi,
+              prove_categorie_una_volta,
               prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,
@@ -226047,6 +226884,7 @@ def main():
               prove_pubblica_passi,
               prove_bitpost_gift_card,
               prove_promozioni,
+              prove_chat_spunte,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)

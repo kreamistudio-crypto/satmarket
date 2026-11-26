@@ -1767,9 +1767,18 @@
       linear-gradient(100deg,#FFC23D 0%,#FF7417 48%,#E1251B 100%),#E1251B;
     border:1px solid rgba(255,255,255,.28);color:#FFFFFF;
     text-shadow:0 1px 2px rgba(110,18,0,.6);box-shadow:0 6px 18px -6px rgba(225,37,27,.65);
-    display:flex;align-items:center;justify-content:center;gap:8px}
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    /* LA LINEA ROSSA A SINISTRA (26 nov 2026, Andrea: «fatta male,
+       sembra un bug»): le sfumature partono dal padding e si RIPETONO
+       sotto il bordo di 1px, che a sinistra mostrava la coda rossa
+       della sfumatura. Partono dal bordo, e la linea non c'e' piu'. */
+    background-origin:border-box}
   .btn.promo-porta svg{width:18px;height:18px;flex:none;filter:drop-shadow(0 1px 1.5px rgba(110,18,0,.6))}
   .btn.promo-porta.in-cima{margin:0 0 14px}
+  /* dentro il riquadro di «Annunci» del Profilo, sotto il titolo: i
+     margini sono quelli del corpo del gruppo (12px ai lati) */
+  #promuoviProfilo{padding:0 12px 12px}
+  .btn.promo-porta.promo-profilo{width:100%;margin:0}
   /* IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea, che
      ROVESCIA il dondolio alla mascotte vissuto un'ora: il bottone
      resta FERMO — e con lui bersaglio, anello e :active — quindi il
@@ -1880,8 +1889,27 @@
     width:100%;margin-top:8px;padding:9px 12px;border-radius:10px;
     border:1px solid var(--line);background:none;color:inherit;
     font:inherit;text-align:left;cursor:pointer}
-  .cerco-muto{display:flex;gap:8px;align-items:center;margin:22px 0 8px;
-    color:var(--muted);font-size:14px}
+  /* «🔕» IN STILE BARATTOLO (26 nov 2026, Andrea: «mettimi il tasto non
+     avvisarmi delle notifiche più bello in stile barattolo»): una card
+     con l'interruttore della fascia P2P, senza il ₿ nel pallino («non
+     mettermi il simbolo di btc lì») */
+  .cerco-muto{display:flex;gap:12px;align-items:center;justify-content:space-between;
+    margin:22px 0 8px;padding:12px 14px;border-radius:14px;
+    background:var(--card);border:1px solid var(--line);
+    font-size:14px;font-weight:700;color:var(--ink)}
+  .cerco-muto .p2p-vt-btc{flex:none}
+  /* l'omino che alza la mano accanto al titolo (Andrea, 25 nov 2026:
+     «fai l'icona personalizzata dell'omino che alza la mano»), disegnato
+     con Flow e scontornato («non è scontornato»): piccolo, senza l'ombra
+     e il dondolo delle figure grandi delle schede */
+  #view-cerco .sicu-hero img.cerco-omino{width:62px;height:62px;
+    filter:none;animation:none;vertical-align:-17px;margin-right:4px}
+  /* e la pagina un filo più su («spostala leggermente più in alto») */
+  #view-cerco .sicu-hero{padding-top:0;margin-top:-8px}
+  #view-cerco .sicu-hero h2{margin-top:0}
+  /* il budget col toggle € / ₿ dentro il campo, come l'offerta */
+  .cerco-budget-campo{display:flex;gap:10px;align-items:center}
+  .cerco-budget-campo input{flex:1;min-width:0}
   .scoprire-card[data-id="sconto"] img{
     animation:sc-respiro 6s ease-in-out infinite}
   /* e il ₿ del P2P PULSA: il soggetto e' un simbolo che ILLUMINA una
@@ -2830,7 +2858,9 @@
      card degli scambi P2P, sono troppo lunghe rispetto alle altre»):
      erano mezza fila (173 px a 390), adesso 150 come la fila di sopra */
   .p2p-vt-fila .card{flex:0 0 150px;width:150px}
-  /* IL TITOLO AL CENTRO, «Vedi tutti» a destra (24 nov 2026, cantiere
+  /* (dal 26 nov 2026 il titolo della fascia P2P sta a sinistra: vedi LA
+     LUCE DI LATO E LA LAMPADINA; la griglia qui sotto resta la base)
+     IL TITOLO AL CENTRO, «Vedi tutti» a destra (24 nov 2026, cantiere
      home-card-pulite): tre colonne, quella di sinistra vuota, cosi' il
      titolo con l'interruttore sta in mezzo alla riga e non si sposta col
      numero delle card. A 320 px la colonna di destra si allarga quanto
@@ -2852,11 +2882,40 @@
      filo di luce sul bordo di sopra e un'ombra leggera ai due bordi. Le
      card hanno l'ombra profonda delle card in evidenza. Spenta, restano
      titolo e interruttore dentro la stessa luce. Uguale nei due temi. */
-  #p2pVetrinaSez{margin:14px 0 10px;
-    background:radial-gradient(70% 120px at 50% 0,rgba(247,147,26,.30),rgba(247,147,26,0) 100%),
-      linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.18));
+  /* LA LUCE DI LATO E LA LAMPADINA (26 nov 2026 notte, cantiere
+     luce-p2p; Andrea, fra quattro stili nuovi «la 4 è bellissima», poi
+     «quando lo accendi si colora in arancio anche verso destra», «fluido
+     il movimento del colore che si espande», «non un pannello di luce
+     netto […] ma come se fosse una lampadina che si accende», e fra due
+     video «l2»). Titolo a SINISTRA, «Vedi tutti» a destra. La fascia ha
+     sempre una luce arancio che entra dall'angolo in alto a sinistra;
+     ACCESA, sopra si posano la luce dall'alto di prima (`::before`) e il
+     filo e le ombre ai bordi (`::after`). Quando si accende con un tocco
+     (`si-accende`, la mette `filaCardP2P` solo nel passaggio da chiusa
+     ad aperta: mai all'apertura della pagina ne' tornando in Esplora) la
+     luce dall'alto nasce piccola vicino al titolo e si allarga sfumata su
+     tutta la fascia in poco piu' di un secondo; e' piu' larga della
+     fascia (-40% ai lati) e sfuma a zero prima dei suoi bordi, cosi'
+     mentre cresce non mostra mai uno spigolo. Con gli effetti ridotti
+     niente movimento: la regola universale toglie l'animazione e resta
+     la luce accesa. */
+  #p2pVetrinaSez{margin:14px 0 10px;position:relative;isolation:isolate;overflow:hidden;
+    background:radial-gradient(70% 160px at 0 0,rgba(247,147,26,.34),rgba(247,147,26,0) 100%)}
+  #p2pVetrinaSez > *{position:relative;z-index:1}
+  #p2pVetrinaSez:not(.spenta)::before{content:"";position:absolute;top:0;bottom:0;left:-40%;right:-40%;
+    z-index:0;pointer-events:none;
+    background:radial-gradient(50% 120px at 50% 0,rgba(247,147,26,.26),rgba(247,147,26,0) 100%)}
+  #p2pVetrinaSez:not(.spenta)::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.18));
     box-shadow:inset 0 1px 0 rgba(247,147,26,.25)}
-  #p2pVetrinaSez .p2p-vt-testa{padding-top:14px}
+  #p2pVetrinaSez.si-accende::before{transform-origin:28% 0;
+    animation:p2pLuceDiffonde 1.1s cubic-bezier(.25,.7,.3,1) both}
+  #p2pVetrinaSez.si-accende::after{animation:p2pLuceVela .9s ease-out both}
+  @keyframes p2pLuceDiffonde{0%{opacity:0;transform:scale(.35,.7)}35%{opacity:.9}100%{opacity:1;transform:none}}
+  @keyframes p2pLuceVela{from{opacity:0}to{opacity:1}}
+  #p2pVetrinaSez .p2p-vt-testa{display:flex;align-items:center;gap:10px;padding-top:14px}
+  #p2pVetrinaSez .p2p-vt-titolo .section-label{font-size:13px}
+  #p2pVetrinaSez .p2p-vt-tutti{margin-left:auto}
   #p2pVetrinaSez .p2p-vt-fila{padding-top:12px;padding-bottom:22px}
   #p2pVetrinaSez .p2p-vt-fila .card{box-shadow:0 12px 20px rgba(0,0,0,.42),0 3px 6px rgba(0,0,0,.25)}
   /* spenta: lo stesso respiro sopra e sotto, titolo e interruttore in
@@ -4533,6 +4592,15 @@
       font-size:14px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
     .chatmod-msg.mio{background:var(--sats-soft)}
     .chatmod-msg small{display:block;font-size:12px}
+    /* LE SPUNTE (26 nov 2026, Andrea: «Le voglio arancioni»): grigie
+       come la riga dell'ora finche' l'altra parte non ha visto, poi
+       arancioni. PIU' VIVE (26 nov 2026, Andrea: «fallo un po' più
+       vivo»): di giorno --sats-deep (il --sats-text di prima era
+       spento; il --sats pieno sul fondo dei miei messaggi, --sats-soft,
+       quasi spariva), di sera il --sats pieno, che sul fondo scuro si vede */
+    .chatsc-spunte{letter-spacing:-.18em;margin-left:2px;white-space:nowrap}
+    .chatsc-spunte.vista{color:var(--sats-deep)}
+    html[data-tema="scuro"] .chatsc-spunte.vista{color:var(--sats)}
     /* L'ASSISTENZA IN APP (3 nov 2026): il vestito della chat col
        moderatore, con la lista piu' alta (e' la pagina intera) e le
        righe dell'elenco degli admin, una per utente */
@@ -8438,7 +8506,19 @@
 
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
-  .view.active{display:block;animation:fadein .18s ease}
+  /* NESSUNA VISTA SBIADISCE (25 nov 2026, cantiere salti-home, Andrea
+     dalla webapp: «quando passo dal p2p alla home del mercatino mezzo
+     secondo schermata nera», poi «si correggi anche quello» per Swap,
+     Ordini e la card aperta). Fino a quel giorno qui c'era
+     `animation:fadein .18s ease`, che parte da opacity 0 sul fondo
+     scuro: misurato nel browser, il primo fotogramma della vista nuova
+     (il piu' pesante: impaginarla tutta) si dipingeva TRASPARENTE, e sul
+     telefono quel fotogramma lungo e' il nero. Adesso la pagina nuova
+     compare piena al primo fotogramma, come le schede di un'app. Le corse
+     che una vista ha di suo restano sue (la salita del negozio, la
+     morfosi di Vendi); il `@keyframes fadein` resta ai fogli e ai
+     modali, che si aprono SOPRA la pagina e non lasciano mai il nero. */
+  .view.active{display:block}
   /* il negozio aperto da «Da scoprire» sale dal basso (24 nov 2026,
      apriNegozioDaScoprire); la regola universale degli effetti ridotti la
      spegne come ogni altra corsa */
@@ -10940,6 +11020,18 @@
      lezione della striscia delle categorie). L'aria attorno c'e'
      gia': il .seller ha 14px di margine sopra e sotto. */
   .seller.attivo{outline:2.5px solid var(--sats);outline-offset:2px}
+  /* IL TONDINO DEGLI ALTRI ACCOUNT (26 nov 2026, dal campo: Luca col
+     negozio e due account): sulla foto di un account che NON e' quello
+     in uso, il numero delle cose che lo aspettano — lo stesso
+     `aspetta` del «⚡ N ti aspetta» scritto accanto, che resta e lo
+     dice a parole. Il volto ha overflow:hidden (la foto tonda), quindi
+     il tondino vive in un involucro suo e sborda dall'angolo, come il
+     pallino sul tappo. Per gli screen reader parla la riga di testo. */
+  .conto-volto{position:relative;flex:0 0 auto}
+  .conto-bolla{position:absolute;top:-4px;right:-6px;min-width:20px;height:20px;
+    padding:0 5px;box-sizing:border-box;border-radius:10px;background:var(--sats);
+    color:#2a2318;font-weight:800;font-size:12px;line-height:20px;text-align:center;
+    box-shadow:0 0 0 2px var(--card);pointer-events:none}
   /* LA CLASSIFICA: la riga e' un `.seller` con due pezzi in piu' —
      la posizione a sinistra e la freccia a destra, come il
      riquadro venditore del dettaglio. Nessun colore nuovo: le
@@ -11508,6 +11600,13 @@
   .via-euro-cifra{font-size:40px;font-weight:900;text-align:center;margin:8px 0 2px;color:var(--ink)}
   .via-euro-sotto{font-size:13px;font-weight:600;color:var(--muted);text-align:center;margin:0 0 14px}
   .via-euro-metodi{display:flex;gap:10px;margin:0 0 14px}
+  /* LA SPINTA ALL'INTERVALLO (26 nov 2026, Andrea: «mettila bene in
+     evidenza»): una scatola arancio sotto l'importo di chi vende sats, e
+     la stessa in cima al foglio dell'importo al primo tocco */
+  .p2p-spinta-intervallo{background:var(--sats-soft);border:1.5px solid var(--sats);
+    color:var(--ink);border-radius:12px;padding:10px 12px;margin:8px 0 4px;
+    font-size:14px;font-weight:800;line-height:1.35}
+  .p2p-spinta-intervallo.in-cima{margin:0 0 12px}
   .via-euro-metodi > .btn{flex:1;min-width:0}
   .via-euro-attesa{display:flex;align-items:center;justify-content:center;gap:10px;
     font-size:15px;font-weight:700;color:var(--ink);padding:24px 0}
@@ -15060,7 +15159,7 @@ function barreDellApp(){
    LA VERSIONE e' l'inizio dello sha256 del dizionario (righe LF),
    come SWAP_TELEFONO_VER: la controlla `prove_lingua_inglese`, e un
    dizionario cambiato non resta nella cache di un giorno. */
-const LINGUA_VER = 'cf026dc000';
+const LINGUA_VER = '59968a77ec';
 function linguaApp(){
   const italiano = l => !l || String(l).toLowerCase().startsWith('it');
   let scelta = '';
@@ -16702,7 +16801,7 @@ document.getElementById('cartello')?.remove();</script>
         <!-- GLI AVVISI DEL MERCATINO (9 ott 2026): le preferenze e i
              venditori seguiti restano da noi, quindi si dice — e si dice
              anche cosa il venditore NON vede. -->
-        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🛒 Avvisami dei nuovi annunci</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
+        <li>Gli <b>avvisi del mercatino</b>, se li accendi (sono spenti di serie): le categorie e il prezzo massimo che hai scelto per «<b>🛒 Avvisami dei nuovi annunci</b>», se hai acceso «<b>🙋 Avvisami delle nuove richieste di Cerco</b>», e i <b>venditori che segui</b> — che <b>non lo sanno</b>: nessuno vede chi lo segue, né quanti. E per ogni annuncio di cui ti abbiamo avvisato, il suo numero accanto al tuo, per non avvisarti due volte: se ne va da solo dopo un mese.</li>
         <!-- IL CARRELLO SALVATO (6 ott 2026): un dato nuovo che resta da
              noi, quindi si dice — cosa c'e' dentro, cosa NON c'e', chi
              non lo vede. La durata sta qui sotto, fra le altre. -->
@@ -17037,14 +17136,22 @@ document.getElementById('cartello')?.remove();</script>
     <button class="back" onclick="navIndietro()">← Torna</button>
     <div class="sicu">
       <div class="sicu-hero">
-        <h2>🙋 Cerco</h2>
+        <h2><img class="cerco-omino" src="/assets/scoprire/cerco-omino.webp" alt="" width="62" height="62">Cerco</h2>
         <p class="occhiello">Scrivi cosa cerchi: avvisiamo i venditori che possono avercelo</p>
       </div>
       <div class="cerco-modulo">
-        <div class="field"><input id="cercoTesto" maxlength="140" autocomplete="off" placeholder="Es. un buono Amazon da 50 €"></div>
+        <div class="field"><input id="cercoTesto" maxlength="140" autocomplete="off" placeholder="Es. un buono Amazon da 50 €" oninput="cercoProponiCategoria()"></div>
         <div class="field"><select id="cercoCat" hidden><option value=""></option></select>
           <button type="button" class="campo-scelta" id="cercoCatBtn" onclick="cercoPrepara();apriPicker('cercoCat')" aria-haspopup="dialog"><span class="cs-val"><span class="cs-vuoto">Scegli la categoria</span></span><span class="cs-freccia" aria-hidden="true">▾</span></button></div>
-        <div class="field"><input id="cercoBudget" inputmode="numeric" autocomplete="off" placeholder="Budget massimo in sats (facoltativo)"></div>
+        <!-- il budget nella valuta che si sta guardando, col toggle di
+             sempre (26 nov 2026, Andrea): il toggle converte la cifra -->
+        <div class="field cerco-budget-campo"><input id="cercoBudget" inputmode="decimal" autocomplete="off" placeholder="Budget massimo (facoltativo)">
+          <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
+            <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
+            <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
+          </div></div>
+        <div class="hint" style="margin:4px 0 6px">Quanto dura</div>
+        <div class="consegna-scelta" id="cercoGiorni" style="margin:0 0 12px"></div>
         <button class="btn orange" id="cercoInvia" onclick="inviaRichiesta()">📣 Chiedilo a tutti</button>
       </div>
       <div id="cercoCorpo"></div>
@@ -17539,6 +17646,16 @@ document.getElementById('cartello')?.remove();</script>
       <div class="grp" id="grpCatalogo">
         <button type="button" class="grp-h" onclick="toggleGrp('grpCatalogo')"
                 aria-expanded="false">Annunci<span class="fr">▾</span></button>
+        <!-- «PROMUOVI» DAL PROFILO (26 nov 2026, Andrea: «inglobare il tasto
+             sotto il tasto annunci nella sezione profilo, così si capisce
+             che serve per promuovere appunto gli annunci», poi «tipo
+             agganciato al tasto annunci»): lo stesso razzo della scheda
+             dell'annuncio, DENTRO il riquadro di «Annunci», subito sotto
+             il titolo — si vede anche a gruppo chiuso. Solo a cassa aperta
+             (aggiornaPromuoviProfilo); il disegno e la parola li mette il
+             JS, dalla stessa ICONA_PROMO. -->
+        <div id="promuoviProfilo" hidden><button type="button" class="btn promo-porta promo-profilo"
+             onclick="promuoviDalProfilo()"></button></div>
         <div class="grp-b">
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
@@ -18469,7 +18586,7 @@ document.getElementById('cartello')?.remove();</script>
     <div class="qr" id="payQr"></div>
     <!-- «Non hai sats?» (23 nov 2026, giroconto interno): subito sotto il
          codice, senza scorrere; lo accende payViaEuroVista -->
-    <button type="button" id="payViaEuro" class="btn orange via-euro-btn" style="display:none;margin:0 0 12px" onclick="apriViaEuro('qr')">Non hai sats? Compra da qui</button>
+    <button type="button" id="payViaEuro" class="btn orange via-euro-btn" style="display:none;margin:0 0 12px" onclick="apriViaEuro('qr')">Non hai sats? Paga in altri modi</button>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
     <div id="payQrNota" style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
     <!-- la porta della guida «Il tuo primo wallet» (17 nov 2026): e' di
@@ -22561,6 +22678,7 @@ async function loadListings(anonimo){
   negoziPromossi = Array.isArray(j.negozi_promossi) ? j.negozi_promossi : [];
   inEvidenzaServer = Array.isArray(j.in_evidenza) ? j.in_evidenza.map(mapListing) : [];
   if (j.promozioni_attive !== undefined) promoAttive = j.promozioni_attive === true;
+  aggiornaPromuoviProfilo();
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   /* i totali del like: arrivano di qui perche' e' l'unico canale che
      tocca anche gli anonimi. Si ridisegna subito — la pagina puo'
@@ -24898,7 +25016,14 @@ function go(view){
    vorra' aggiungerne una deve prima garantire che il suo markup
    sopravviva al ritorno, com'e' per la vetrina: e' quel che hanno
    fatto le sorelle di LISTE_RITORNO (5 ott 2026), negozio compreso. */
+let striscaFerma = null;   /* vedi LA STRISCIA RESTA DOV'E' in tornaATutto */
 function posizioneDaRendere(view){
+  if (view === 'esplora' && navApplicando && striscaFerma) {
+    const top = striscaFerma.top;
+    striscaFerma = null;
+    const cs = el('catSez');
+    if (cs) return Math.max(0, Math.round(window.scrollY + cs.getBoundingClientRect().top - top));
+  }
   if (view === 'esplora' && navApplicando && vetrinaPos
       && vetrinaPos.n === el('grid').children.length) return vetrinaPos.y;
   /* le liste sorelle (LISTE_RITORNO): stesso giudice, stessa cintura
@@ -27731,7 +27856,12 @@ let occasioniFirma = '';
 function renderOccasioni(){
   const box = el('occasioniBanner');
   if (!box) return;
-  const vive = vistaBarattolo ? [] : OCCASIONI.filter(v => v.vivo());
+  /* SEMPRE IN VISTA (25 nov 2026 sera, Andrea: «quando non c'è nessuna
+     offerta a tempo o sconto comunque le card si devono sempre vedere»):
+     i due riquadri non aspettano piu' i flag della busta (`vivo`). Un
+     filtro acceso senza niente da mostrare trova la griglia vuota, e si
+     spegne dallo stesso riquadro. Col barattolo aperto restano spenti. */
+  const vive = vistaBarattolo ? [] : OCCASIONI;
   /* «Cerco» (25 nov 2026): il terzo riquadro, largo sotto i due, a chi
      ce l'ha (il server lo dice in /api/me); non e' un filtro della
      griglia ma una porta, quindi niente anello acceso */
@@ -28473,9 +28603,95 @@ function scorriSottoHeader(sez){
   const hdr = document.querySelector('#view-esplora header');
   const sotto = (hdr ? hdr.offsetHeight : 0)
               + (el('chips') ? el('chips').offsetHeight : 0) + 4;
+  /* - restoMorbido: la fascia che si sta ancora chiudendo SOPRA `sez`
+     (o la riga che si sta aprendo) cambiera' il posto d'arrivo, e lo
+     scorrimento deve puntare a dove `sez` sara' a corsa finita */
   window.scrollTo({
-    top: Math.max(0, scrollY + sez.getBoundingClientRect().top - sotto),
+    top: Math.max(0, scrollY + sez.getBoundingClientRect().top - sotto - restoMorbido(sez)),
     behavior: tourRidotto() ? 'auto' : 'smooth'});
+}
+/* LE FASCE DELLA HOME ENTRANO ED ESCONO SENZA SCATTO (25 nov 2026,
+   cantiere salti-home, Andrea dal telefono: «quando schiaccio sulle
+   icone categorie salta tutto»). Toccata una categoria, la fascia
+   «Scambi P2P» spariva in un fotogramma (78 px, spenta; molti di piu'
+   con le card) e la riga delle sottocategorie compariva nello stesso
+   istante (139 px): tutto quel che sta sotto saltava, e subito dopo
+   partiva lo scorrimento. Adesso la fascia che cambia altezza la cambia
+   in 0,28 s — altezza, margini e trasparenza — e lo scorrimento parte
+   insieme, gia' puntato sull'arrivo (restoMorbido): un movimento solo.
+   `cambia` fa il cambio vero (display, classi, contenuto) come prima;
+   qui si misura prima e dopo e si fa scorrere la differenza. Fuori dalla
+   home in vista, con gli effetti ridotti, o dove il layout non c'e' (i
+   banchi delle prove) il cambio resta secco, com'era. */
+const MORBIDA_MS = 280;
+function altezzaMorbida(box, cambia){
+  if (!box) { cambia(); return; }
+  if (box._morbidaFine) box._morbidaFine();   /* una corsa a meta' si posa */
+  const vivo = typeof box.getBoundingClientRect === 'function'
+    && box.isConnected && !effettiRidotti()
+    && el('view-esplora')?.classList.contains('active')
+    && document.visibilityState !== 'hidden';
+  if (!vivo) { cambia(); return; }
+  const fuori = b => {
+    if (b.style.display === 'none') return {h: 0, mt: 0, mb: 0, pt: 0, pb: 0};
+    const cs = getComputedStyle(b);
+    return {h: b.getBoundingClientRect().height,
+            mt: parseFloat(cs.marginTop) || 0, mb: parseFloat(cs.marginBottom) || 0,
+            pt: parseFloat(cs.paddingTop) || 0, pb: parseFloat(cs.paddingBottom) || 0};
+  };
+  const a = fuori(box);
+  cambia();
+  const z = fuori(box);
+  const tot = m => m.h + m.mt + m.mb;
+  if (Math.abs(tot(a) - tot(z)) < 1) return;
+  const sparisce = box.style.display === 'none';
+  if (sparisce) box.style.display = '';
+  const st = box.style;
+  st.transition = 'none';
+  st.overflow = 'hidden';
+  st.boxSizing = 'border-box';
+  const metti = m => {
+    st.height = m.h + 'px'; st.marginTop = m.mt + 'px'; st.marginBottom = m.mb + 'px';
+    st.paddingTop = m.pt + 'px'; st.paddingBottom = m.pb + 'px';
+  };
+  metti(a);
+  st.opacity = a.h ? '' : '0';
+  void box.offsetHeight;   /* il punto di partenza si dipinge davvero */
+  const t = `${MORBIDA_MS}ms ease`;
+  st.transition = `height ${t},margin ${t},padding ${t},opacity ${t}`;
+  metti(z);
+  st.opacity = z.h ? '1' : '0';
+  box._morbidaArrivo = tot(z);
+  box._morbidaMt = z.mt;
+  let timer = 0;
+  const fine = () => {
+    clearTimeout(timer);
+    box._morbidaFine = null; box._morbidaArrivo = box._morbidaMt = null;
+    st.transition = st.overflow = st.boxSizing = st.height = '';
+    st.marginTop = st.marginBottom = st.paddingTop = st.paddingBottom = st.opacity = '';
+    if (sparisce) st.display = 'none';
+  };
+  box._morbidaFine = fine;
+  timer = setTimeout(fine, MORBIDA_MS + 40);
+}
+/* quanto cambiera' ancora, a corsa finita, l'altezza delle fasce in
+   corsa che stanno SOPRA `sez` nella pagina */
+function restoMorbido(sez){
+  let r = 0;
+  ['sottoRigaWrap', 'p2pVetrinaSez'].forEach(id => {
+    const b = el(id);
+    if (!b || b._morbidaArrivo == null) return;
+    const cs = getComputedStyle(b);
+    /* la fascia stessa: il suo margine di sopra sta ancora crescendo
+       (o calando), e il suo bordo scendera' (o salira') di tanto */
+    if (b === sez) { r -= b._morbidaMt - (parseFloat(cs.marginTop) || 0); return; }
+    if (b.contains(sez)) return;
+    if (!(b.compareDocumentPosition(sez) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+    const ora = b.getBoundingClientRect().height
+      + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+    r += ora - b._morbidaArrivo;
+  });
+  return r;
 }
 /* Il gesto della card: accende il suo filtro, e IL RITOCCO DELLA CARD
    ACCESA SPEGNE — il gesto del barattolino e della card categoria. E'
@@ -28820,7 +29036,21 @@ function consumaGradinoReparto(){
    sempre. Torna true quando il passo indietro e' partito: il
    chiamante non deve piu' toccare niente. */
 function tornaATutto(){
+  /* LA STRISCIA RESTA DOV'E' (25 nov 2026, cantiere salti-home): chi
+     chiude il reparto dalla striscia la sta guardando, e il passo
+     indietro lo riportava alla posizione salvata della vetrina — di
+     solito la cima — con un salto secco. Se la striscia e' in vista si
+     segna dov'e' sullo schermo, e il ritorno (posizioneDaRendere) la
+     rimette li'. Dalle pillole appiccicate, a striscia fuori schermo,
+     resta il ritorno di sempre. */
+  const cs = el('catSez');
+  const r = cs && el('view-esplora').classList.contains('active')
+    ? cs.getBoundingClientRect() : null;
+  const hdr = document.querySelector('#view-esplora header');
+  striscaFerma = (r && r.bottom > (hdr ? hdr.offsetHeight : 0) && r.top < window.innerHeight)
+    ? {top: r.top} : null;
   if (consumaGradinoReparto()) return true;
+  striscaFerma = null;
   setCat('Tutto');
   return false;
 }
@@ -29310,7 +29540,9 @@ function renderSottoRiga(){
   sottoRigaFirma = firma;
   const sez = el('catSez');
   if (!voci.length) {
-    wrap.style.display = 'none'; riga.innerHTML = ''; sottoRigaCat = '';
+    /* la riga che se ne va si chiude scorrendo (altezzaMorbida) */
+    altezzaMorbida(wrap, () => { wrap.style.display = 'none'; riga.innerHTML = ''; });
+    sottoRigaCat = '';
     if (sez) sez.classList.remove('con-sotto');
     return;
   }
@@ -29332,8 +29564,11 @@ function renderSottoRiga(){
      ripeteva il disegno della categoria che sta gia' accesa sopra. Per
      tornare a tutta la categoria si ritocca lo scaffale acceso; per
      uscire, la categoria (con la sua ✕). */
-  riga.innerHTML = voci.map(v => card(v.id, v.nome, v.n, figSotto(v.id, c))).join('');
-  wrap.style.display = '';
+  /* ...e quella che arriva si apre scorrendo, insieme alla sua entrata */
+  altezzaMorbida(wrap, () => {
+    riga.innerHTML = voci.map(v => card(v.id, v.nome, v.n, figSotto(v.id, c))).join('');
+    wrap.style.display = '';
+  });
   if (sez) sez.classList.add('con-sotto');
   if (entra) entraSottoRiga(wrap, riga);
   aggiornaFrecce('sottoRiga');
@@ -30135,20 +30370,28 @@ function apriNegozioDaScoprire(chi, aperto, da){
     `#scoprireStrip .scoprire-card[data-id="${CSS.escape(cardToccata)}"]`) : null;
   const daId = scopertaToccata;
   cardToccata = ''; scopertaToccata = '';
-  /* IL MIO NEGOZIO NON VOLA (25 nov 2026, Andrea dal telefono: «c'è ancora
-     il difetto quando clicco sulle card grosse [...] Under AI sì, To the
-     Moon no»): sul negozio di chi guarda apriNegozio ASPETTA la bozza del
-     venditore (bozzaDelVenditore) prima di disegnare, e il volo — che
-     conta su un disegno nello stesso giro — toglieva il velo su una
-     pagina non ancora aperta: la home tornava per un attimo, e il negozio
-     arrivava dopo. Al proprietario il negozio si apre come se non fosse
-     pronto: la pagina sale subito, e si riempie quando la bozza c'e'. */
+  /* IL MIO NEGOZIO VOLA ANCHE LUI (26 nov 2026, Andrea dal telefono:
+     «quando clicchi sembra che la pagina salti [...] vorrei che fosse
+     fluida anche chi non ha un banner»). Il 25 nov il proprietario non
+     volava: sul SUO negozio apriNegozio aspetta la bozza del venditore
+     (bozzaDelVenditore) prima di disegnare, e il volo toglieva il velo su
+     una pagina non ancora aperta (la home tornava per un attimo). Al suo
+     posto la pagina saliva dal basso, ed e' il salto del video: lo vedeva
+     solo lui, sul negozio di AndreAI (senza banner), mentre To The Moon
+     (col banner, di un altro) volava. Ora la bozza si chiede GIA' AL
+     TOCCO (`anticipaBozza`), mentre la card vola, e il volo scopre la
+     pagina solo quando e' disegnata (vedi voloNegozio). Senza volo
+     (effetti ridotti, card fuori schermo) il suo negozio resta quello
+     che sale con l'anello e si riempie quando la bozza c'e'. */
   const mio = !!myNegozio && chi === myNegozio;
-  if (negozioPronto(chi) && !mio) {
+  if (mio && !DEMO && !VETRINA) anticipaBozza(chi);
+  if (negozioPronto(chi)) {
     if (card && !effettiRidotti() && voloNegozio(card, chi, aperto, da)) return;
-    const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));
-    saleDalBasso();
-    return fatto;
+    if (!mio) {
+      const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));
+      saleDalBasso();
+      return fatto;
+    }
   }
   negozioInAttesa(chi);
   go('negozio');
@@ -30255,7 +30498,7 @@ function testataNegozio(chi){
   t.innerHTML = src ? `<img src="${esc(src)}" alt="" decoding="async"
     onerror="this.parentNode.hidden=true">` : '';
 }
-const VOLO_MS = 420, VOLO_APRI_MS = 260;
+const VOLO_MS = 420, VOLO_APRI_MS = 260, VOLO_ATTESA_MS = 1500;
 let scartoInsegna = 48;
 function voloNegozio(card, chi, aperto, da){
   const img = card.querySelector('img');
@@ -30299,7 +30542,31 @@ function voloNegozio(card, chi, aperto, da){
     /* il negozio si apre sotto la copia, che finisce la sua corsa */
     negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};
     negozioInVolo = true;
-    try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
+    let disegno;
+    try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
+    /* SI SCOPRE A PAGINA DISEGNATA (26 nov 2026, il volo del proprietario):
+       per tutti gli altri apriNegozio disegna nello stesso giro, e la sua
+       promessa e' gia' mantenuta — si scopre prima del fotogramma dopo,
+       come prima. Sul negozio proprio aspetta la bozza (chiesta al tocco):
+       intanto la copia resta ferma in cima, sul velo. Se la bozza tarda
+       piu' di VOLO_ATTESA_MS la pagina si apre con l'anello e si riempie
+       quando arriva, come la salita: mai la home che torna. */
+    let scoperto = false;
+    const scopri = () => {
+      if (scoperto) return;
+      scoperto = true;
+      scopriNegozioVolato();
+    };
+    Promise.resolve(disegno).then(scopri, scopri);
+    setTimeout(() => {
+      if (scoperto) return;
+      negozioInAttesa(chi);
+      testataNegozio(chi);
+      go('negozio');
+      scopri();
+    }, VOLO_ATTESA_MS);
+  }, VOLO_APRI_MS);
+  function scopriNegozioVolato(){
     window.scrollTo(0, 0);
     fermaCorse(v);
     v.classList.remove('sale-dal-basso');
@@ -30334,7 +30601,7 @@ function voloNegozio(card, chi, aperto, da){
                       new Promise(z => setTimeout(z, 400))]).then(via);
       else via();
     }, VOLO_MS - VOLO_APRI_MS);
-  }, VOLO_APRI_MS);
+  }
   return true;
 }
 
@@ -30888,11 +31155,28 @@ async function caricaRaccontiMiei(){
   return (await r.json()).racconti || [];
 }
 
+/* LA BOZZA CHIESTA AL TOCCO (26 nov 2026): toccando la card grande del
+   SUO negozio la bozza si chiede subito, mentre la card vola, e
+   apriNegozio la trova pronta (o quasi) invece di chiederla dopo. Vale
+   pochi secondi e una volta sola: e' sempre quella appena chiesta, mai
+   una vecchia. */
+const BOZZA_ANTICIPO_MS = 5000;
+let bozzaAnticipata = null;     // {codice, p, t}
+function anticipaBozza(codice){
+  bozzaAnticipata = {codice, p: bozzaDelVenditore(codice, true), t: Date.now()};
+}
 /* La bozza che parla del venditore, per il SUO negozio: vestita da
    anteprima sua, o null. Solo le BOZZE — una pagina pubblicata la
    porta gia' il negozio a tutti. Fail-open: se la porta non risponde
    il negozio si apre lo stesso, senza la bozza sopra. */
-async function bozzaDelVenditore(codice){
+async function bozzaDelVenditore(codice, alTocco){
+  /* quella chiesta al tocco della card (anticipaBozza), se e' di questo
+     negozio e fresca: una sola volta, il disegno dopo richiede */
+  const a = bozzaAnticipata;
+  if (!alTocco && a && a.codice === codice && Date.now() - a.t < BOZZA_ANTICIPO_MS) {
+    bozzaAnticipata = null;
+    return a.p;
+  }
   try {
     const b = (await caricaRaccontiMiei()).find(
       x => x.stato !== 'pubblicato' && x.negozio === codice);
@@ -31950,6 +32234,8 @@ function setValuta(v){
      un'altra offerta. A non derivare ci pensa l'ancora: la cifra
      resta quella scritta, e il toggle la RILEGGE convertita. */
   if (el('offertaSheet')?.classList.contains('open')) aggiornaFoglioOfferta();
+  /* e il budget di «Cerco», con la stessa ragione: la cifra si converte */
+  if (el('view-cerco')?.classList.contains('active')) cercoBudgetSegue();
   /* e il gemello del carrello, con la stessa ragione: li' il toggle
      cambia la valuta del CAMPO, e a non far derivare la cifra ci
      pensa la sua ancora */
@@ -38716,6 +39002,8 @@ function openDetail(id){
      la vista più forte che c'è. Sul proprio annuncio non si manda
      nemmeno — il server la scarterebbe comunque, ma perché chiedere. */
   if (!mio) registraVista(id);
+  /* «Non hai sats?»: il libro P2P si legge gia' qui, in silenzio (26 nov 2026) */
+  if (!mio && typeof viaEuroLibro === 'function') viaEuroLibro(viaEuroDopoLibro);
   /* l'offerta accettata dell'utente su QUESTO annuncio: banner e
      totali dei bottoni compra parlano la cifra pattuita */
   const offAcc = offertaAccettataPer(l.id);
@@ -44417,7 +44705,39 @@ PICKER.cercoCat = {titolo: 'Categoria',
   voci: () => [...el('sellCat').options].map(o => ({val: o.value,
     resa: `${icoCategoria(o.value)}<span><b>${esc(o.value)}</b></span>`})),
   campo: v => v ? `${icoCategoria(v)}<span>${esc(v)}</span>`
-                : '<span class="cs-vuoto">Scegli la categoria</span>'};
+                : '<span class="cs-vuoto">Scegli la categoria</span>',
+  poi: () => { cercoCatAMano = true; }};
+
+/* LA CATEGORIA PROPOSTA (26 nov 2026, Andrea: «forse ha senso che la
+   categoria venga proposta in automatico, se vuole la cambia»): quando
+   chi scrive si ferma, il server la indovina dagli annunci con le stesse
+   parole (senza AI) e il campo si compila; scelta a mano, non si tocca
+   piu' finche' la richiesta non parte. */
+let cercoCatAMano = false, cercoCatTimer = null, cercoCatGiro = 0;
+function cercoProponiCategoria(){
+  clearTimeout(cercoCatTimer);
+  if (cercoCatAMano) return;
+  cercoCatTimer = setTimeout(async () => {
+    const testo = (el('cercoTesto')?.value || '').trim();
+    const giro = ++cercoCatGiro;
+    let cat = '';
+    if (testo.length >= 3) {
+      try {
+        const r = await fetch(`${API_BASE}/richieste/categoria?testo=${encodeURIComponent(testo)}`,
+          {headers: {'X-Tg-Init-Data': authHdr()}});
+        cat = r.ok ? ((await r.json()).categoria || '') : '';
+      } catch(e) { return; }
+    }
+    // una risposta vecchia, o una scelta a mano arrivata nel frattempo, vincono
+    if (giro !== cercoCatGiro || cercoCatAMano) return;
+    cercoPrepara();
+    const sel = el('cercoCat');
+    if (!sel || sel.value === cat) return;
+    if (cat && ![...sel.options].some(o => o.value === cat)) return;
+    sel.value = cat;
+    aggiornaPicker('cercoCat');
+  }, 600);
+}
 
 /* LA PORTA: il riquadro, il bottone della ricerca vuota (che porta con
    se' la ricerca fatta), il tasto «Offri» dell'avviso del bot */
@@ -44426,16 +44746,62 @@ function apriCerco(testo){
   if (!cercoAttivo()) return;
   go('cerco');
   cercoPrepara();
+  cercoBudgetValuta = valutaVista;    // il campo parla la valuta di adesso
+  aggiornaCurToggle();
+  disegnaGiorniCerco();
   if (typeof testo === 'string' && el('cercoTesto')) {
     el('cercoTesto').value = testo.slice(0, 140);
+    cercoCatAMano = false;
     if (activeCat && activeCat !== 'Tutto' && el('cercoCat')) {
+      // la categoria della ricerca fatta vale come scelta a mano
       el('cercoCat').value = activeCat;
       aggiornaPicker('cercoCat');
-    }
+      cercoCatAMano = true;
+    } else cercoProponiCategoria();
   }
   caricaCerco();
 }
 function chiediloATutti(){ apriCerco(el('q').value.trim()); }
+
+/* IL BUDGET IN EURO O IN SATS (26 nov 2026, Andrea: «Nel budget massimo
+   devo poter selezionare anche in euro, metti il solito toggle»): il campo
+   parla `valutaVista`, e il toggle CONVERTE la cifra scritta, come nel
+   foglio dell'offerta — o 50 euro diventerebbero 50 sats. */
+let cercoBudgetValuta = 'sats';
+/* PURA: la cifra scritta, nella sua valuta (euro con la virgola) */
+function cercoLeggiBudget(testo, valuta){
+  const t = String(testo || '').trim();
+  if (valuta === 'eur') {
+    // la virgola e' il decimale; senza virgola il punto lo e' anche lui,
+    // tranne quando fa le migliaia («1.500»)
+    let x = t.replace(/\s/g, '');
+    if (x.indexOf(',') >= 0 || /^\d{1,3}(\.\d{3})+$/.test(x)) x = x.replace(/\./g, '').replace(',', '.');
+    const n = Number(x);
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  }
+  return Math.max(0, Math.floor(Number(t.replace(/\D/g, '')) || 0));
+}
+function cercoBudgetSegue(){
+  const c = el('cercoBudget');
+  if (!c || cercoBudgetValuta === valutaVista) { cercoBudgetValuta = valutaVista; return; }
+  const n = cercoLeggiBudget(c.value, cercoBudgetValuta);
+  if (n) c.value = valutaVista === 'eur'
+    ? String(Math.round(n * eurPerSat * 100) / 100).replace('.', ',')
+    : String(Math.round(n / eurPerSat));
+  cercoBudgetValuta = valutaVista;
+}
+/* QUANTO DURA (26 nov 2026, Andrea: «dai la possibilità di decidere quanto
+   tempo lasciarlo attivo, 14 giorni è troppo poco»): le durate le manda il
+   server (`durate`), di serie la prima */
+let cercoGiorni = 30;
+function disegnaGiorniCerco(){
+  const box = el('cercoGiorni');
+  if (!box) return;
+  const durate = (cercoDati && cercoDati.durate) || [30, 60, 90];
+  if (durate.indexOf(cercoGiorni) < 0) cercoGiorni = durate[0];
+  box.innerHTML = durate.map(g =>
+    `<button type="button" class="consegna-pill${cercoGiorni === g ? ' attiva' : ''}" onclick="cercoGiorni=${Number(g)};disegnaGiorniCerco()">${Number(g)} giorni</button>`).join('');
+}
 /* le voci del modulo sono quelle di Vendi: si copiano la prima volta */
 function cercoPrepara(){
   const sel = el('cercoCat');
@@ -44463,7 +44829,9 @@ function cercoScade(sec){
   return g === 1 ? 'ancora 1 giorno' : 'scade oggi';
 }
 function cardRichiesta(r){
-  const budget = r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
+  const budget = r.budget_eur
+    ? `<div class="cerco-budget">fino a <b class="mono">${fmtEur(Number(r.budget_eur))}</b> €</div>`
+    : r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
   const conto = r.offerte ? ` · 📬 ${r.offerte} ${r.offerte === 1 ? 'offerta' : 'offerte'}` : '';
   let piede;
   if (r.mia) {
@@ -44492,25 +44860,32 @@ function renderCerco(){
     <div class="section-label" style="padding:22px 0 0">Cercano</div>
     ${altre.length ? `<div class="cerco-lista">${altre.map(cardRichiesta).join('')}</div>`
       : '<div class="hint" style="margin-top:8px">Nessuna richiesta aperta, per ora.</div>'}
-    <label class="cerco-muto"><input type="checkbox" ${d.muto ? 'checked' : ''}
-      onchange="mutoRichieste(this.checked)"> 🔕 Non avvisarmi delle richieste</label>`;
+    <div class="cerco-muto"><span>🔕 Non avvisarmi delle richieste</span>
+      <button type="button" class="p2p-vt-btc${d.muto ? ' su' : ''}" role="switch"
+        aria-checked="${d.muto ? 'true' : 'false'}" aria-label="Non avvisarmi delle richieste"
+        onclick="mutoRichieste(${d.muto ? 'false' : 'true'})"><span aria-hidden="true"></span></button></div>`;
+  disegnaGiorniCerco();
 }
 
 async function inviaRichiesta(){
   haptic();
   const testo = (el('cercoTesto').value || '').trim();
   const categoria = el('cercoCat').value || '';
-  const budget = Math.max(0, Math.floor(Number(String(el('cercoBudget').value || '0').replace(/\D/g, '')) || 0));
+  const inEuro = cercoBudgetValuta === 'eur';
+  const budget = cercoLeggiBudget(el('cercoBudget').value, cercoBudgetValuta);
   if (testo.length < 4) { toast('Scrivi cosa cerchi'); return; }
   if (!categoria) { toast('Scegli la categoria'); return; }
   const ripristina = bottoneInAttesa(el('cercoInvia'), 'Invio…');
   try {
     const r = await fetch(`${API_BASE}/richieste`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({testo, categoria, budget_sats: budget})});
+      body: JSON.stringify({testo, categoria, giorni: cercoGiorni,
+        ...(inEuro ? {budget_valuta: 'eur', budget_eur: budget} : {budget_sats: budget})})});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { const e = j.detail || 'Non ci sono riuscito, riprova'; toast(e, tempoLettura(e)); return; }
     el('cercoTesto').value = ''; el('cercoBudget').value = '';
+    cercoGiorni = 0;   // la prossima riparte dalla durata di serie
+    cercoCatAMano = false;   // ...e la categoria torna a proporsi
     toast('📣 Richiesta inviata: avvisiamo i venditori adatti', 5000);
     caricaCerco();
   } finally { ripristina(); }
@@ -44529,6 +44904,7 @@ async function mutoRichieste(muto){
     body: JSON.stringify({muto: !!muto})});
   if (!r.ok) { toast('Non ci sono riuscito, riprova'); return; }
   if (cercoDati) cercoDati.muto = !!muto;
+  renderCerco();
 }
 
 /* «OFFRI»: Vendi con la richiesta in mano. La categoria e' quella della
@@ -50763,6 +51139,7 @@ function normalizzaAvvisiMercatino(p){
 }
 let myAvvisiMercatino = normalizzaAvvisiMercatino(null);   // spento di serie
 let mySeguiti = [];                 // [{nome, negozio, username, avatar, creato}]
+let myAvvisiRichieste = false;      // «🙋 Avvisami delle nuove richieste di Cerco», spento di serie
 let avvisiMercatinoLeve = null;     // {attivi, minuti, seguiMinuti} da /api/me
 function avvisiMercatinoInCasa(){
   return !!(avvisiMercatinoLeve && avvisiMercatinoLeve.attivi) && !DEMO && !!myTgId;
@@ -50804,7 +51181,14 @@ function contenutoAvvisiMercatino(){
   /* in fondo la riga sola, la STESSA del blocco P2P: «Arriva nella chat
      del bot Telegram» o «Arriva come messaggio Nostr», senza frequenza.
      Vale per le due cose del blocco, quindi sta fuori da tutt'e due */
-  return seguitiAvvisiMercatino() + '<div class="avm-tutti">' + h + '</div>'
+  /* LE RICHIESTE DI «CERCO» (26 nov 2026, Andrea: «vieni notificato
+     anche nel caso in cui qualcuno pubblica nella sezione cerco?»): un
+     interruttore suo, spento di serie, con le categorie scelte qui sopra */
+  const r = !cercoAttivo() ? '' : '<div class="avm-tutti avm-richieste"><div class="avn-testa">'
+    + '<div class="avn-titolo">🙋 Avvisami delle nuove richieste di Cerco</div>'
+    + interruttoreAvm(myAvvisiRichieste, 'setAvvisiRichieste(' + (myAvvisiRichieste ? 'false' : 'true') + ')')
+    + '</div></div>';
+  return seguitiAvvisiMercatino() + '<div class="avm-tutti">' + h + '</div>' + r
     + '<div class="avn-dove">' + esc(doveArrivanoAvvisi()) + '</div>';
 }
 /* I VENDITORI CHE SEGUI, IN CIMA AL BLOCCO (9 ott 2026, sera, ritocco di
@@ -50854,6 +51238,19 @@ async function setAvvisiMercatino(patch){
   if ('attivo' in patch)
     toast(myAvvisiMercatino.attivo ? '🆕 Ti avviso dei nuovi annunci'
                                    : 'Avvisi dei nuovi annunci spenti');
+}
+async function setAvvisiRichieste(attivo){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/avvisi-richieste`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivo: !!attivo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myAvvisiRichieste = d.avvisi_richieste === true;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
 }
 function scegliCategoriaAvvisiMercatino(c){
   if (!myAvvisiMercatino.attivo) return;   // spento: le chip sono `disabled`
@@ -54726,6 +55123,9 @@ const PROMO_SCALINI = 'Il prezzo sale man mano che i posti si riempiono.';
    tappo e Promosso: «In vetrina», con lo stile 6 (la card tinta col
    bollino sopra il titolo). */
 const PROMO_ETICHETTA = 'In vetrina';
+/* la scritta della voce del negozio quando non si compra (26 nov 2026):
+   un posto solo, la leggono il foglio Promuovi e il cassetto del banner */
+const SCOPRIRE_IN_ARRIVO = 'In arrivo';
 const scoprireSempre = giorni =>
   `Finiti i ${giorni} giorni, il negozio resta per sempre nei Consigliati.`;
 const dataPromo = ts => new Date(ts * 1000).toLocaleDateString('it-IT',
@@ -54856,8 +55256,16 @@ async function apriPromuovi(aid){
      allora la voce resta spenta come prima, con la stessa frase. */
   const sc = n.scoprire || {};
   const cassettoBanner = !!(bannerLeve && bannerLeve.attivo);
-  promoServeBanner = sc.sats > 0 && !sc.banner && cassettoBanner;
-  if (sc.sats > 0)
+  /* IN ARRIVO (26 nov 2026, Andrea: «lascialo nel foglio, però mettilo
+     grigio»): la voce c'e', spenta, col solo nome e la scritta; niente
+     prezzo ne' banner da chiedere, che non si compra (la leva
+     PROMO_SCOPRIRE_IN_ARRIVO del server, che la cassa rifiuta anche). */
+  if (sc.in_arrivo) promoServeBanner = false;
+  else promoServeBanner = sc.sats > 0 && !sc.banner && cassettoBanner;
+  if (sc.in_arrivo)
+    voci.push({tipo: 'scoprire', titolo: 'Il negozio nella home', testo: '',
+      no: SCOPRIRE_IN_ARRIVO});
+  else if (sc.sats > 0)
     voci.push({tipo: 'scoprire',
       titolo: `Il negozio nella home, ${sc.giorni} giorni, ${fmt(sc.sats)} sats`,
       testo: (sc.fino ? `È già nella home fino al ${dataPromo(sc.fino)}: i giorni si aggiungono.`
@@ -54885,6 +55293,40 @@ async function apriPromuovi(aid){
       if (promoScelta === 'evidenza') return pagaPromo('evidenza:' + promoGiorni, aid);
       return pagaPromo(promoScelta, aid);
     }});
+}
+/* «PROMUOVI» DAL PROFILO (26 nov 2026, Andrea: «quando qualcuno lo
+   apre, decide quale annuncio suo promuovere»). Si puo' promuovere quel
+   che nella scheda ha il tasto: attivo, non un'asta, non esaurito, non
+   in ferie (le guardie di openDetail). Uno solo: si va dritti al foglio
+   Promuovi. Piu' d'uno: prima la scelta, poi lo stesso foglio di
+   sempre. Il foglio Promuovi si apre DOPO che eseguiConferma ha rimesso
+   il suo bottone (setTimeout): aperto dentro `poi`, il ripristino di
+   «Avanti» gli scriverebbe sopra l'etichetta del pagamento. */
+const promuovibile = l => l.stato === 'attivo' && !astaE(l) && !esaurito(l) && !inFerie(l);
+let promoAnnuncioScelto = 0;
+function aggiornaPromuoviProfilo(){
+  const box = el('promuoviProfilo');
+  if (!box) return;
+  box.hidden = !promoAttive || DEMO || VETRINA;
+  const b = box.firstElementChild;
+  if (!box.hidden && b && !b.innerHTML) b.innerHTML = ICONA_PROMO.porta + 'Promuovi';
+}
+function promuoviDalProfilo(){
+  const lista = myListings.filter(promuovibile);
+  if (!lista.length) { toast('Non hai annunci da promuovere: pubblicane uno dalla scheda Vendi', 5000); return; }
+  if (lista.length === 1) return apriPromuovi(lista[0].id);
+  promoAnnuncioScelto = lista[0].id;
+  chiediConferma({
+    titolo: 'Promuovi',
+    testata: `<div class="promo-scelte">${lista.map((l, i) => `<div class="promo-voce"><label class="promo-riga">
+      <input type="radio" name="promoAnnuncio" value="${l.id}"${i ? '' : ' checked'}
+             onchange="promoAnnuncioScelto = +this.value">
+      ${riquadroMini(l.thumbs && l.thumbs[0], l.emoji, 44, '')}
+      <span class="promo-testo"><b>${esc(l.title)}</b><small class="mono">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</small></span>
+    </label></div>`).join('')}</div>`,
+    corpo: 'Scegli quale annuncio promuovere.',
+    etichetta: 'Avanti',
+    poi: () => { const aid = promoAnnuncioScelto; setTimeout(() => apriPromuovi(aid), 0); }});
 }
 /* LA FATTURA DI UNA PROMOZIONE: il calco di pagaSlugNegozio, e la regola
    e' la sua — le altre modalita' del paySheet si spengono qui, o il suo
@@ -54962,6 +55404,7 @@ async function chiediPromoScoprire(){
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
   } catch(e) { toast('Rete assente: riprova'); return; }
   const sc = d.scoprire || {};
+  if (sc.in_arrivo) { toast('Il negozio nella home: ' + SCOPRIRE_IN_ARRIVO.toLowerCase(), 5000); return; }
   if (!d.attive || !(sc.sats > 0)) { toast('Le promozioni non sono attive al momento', 5000); return; }
   if (!sc.banner) { toast('Prima serve il banner del negozio approvato: la card è fatta con quello', 6000); return; }
   if (sc.libero_da && !sc.fino) { toast(`I negozi nella home sono al completo: il prossimo posto si libera il ${dataPromo(sc.libero_da)}`, 7000); return; }
@@ -59173,7 +59616,8 @@ function resaCodice(testo, o){
         onclick="${copia}"><span class="mono codice-cifre">${esc(testo)}</span><span class="codice-tocca">📋 Tocca per copiare</span></button>`;
   const scappato = esc(testo);
   const corpo = op.linkCanale ? linkCanaleToccabile(scappato)
-              : op.linkBot ? linkBotToccabile(scappato) : scappato;
+              : op.linkBot ? linkCanaleToccabile(linkBotToccabile(scappato))
+              : scappato;
   return `
       <div class="codice-blocco">${corpo}</div>
       <button class="btn ghost" style="margin-top:8px"
@@ -59212,7 +59656,14 @@ function apriInvitoCanale(url){
    bot Telegram finisce per «bot» per regola di Telegram, quindi un
    canale, un gruppo o un sito restano testo da copiare, come ogni
    altro digitale. Come l'invito: la forma non ha caratteri che esc()
-   cambi, si lavora sul testo gia' passato da esc(). */
+   cambi, si lavora sul testo gia' passato da esc().
+   E L'INVITO A UN GRUPPO, https://t.me/+…, si tocca anche lui dalla
+   scorta (26 nov 2026, seconda scelta di Andrea: «Sì, anche gli inviti
+   t.me/+»; il partner consegna i corsi con un invito monouso al gruppo
+   che fa da aula): `resaCodice` passa il testo da `linkBotToccabile` e
+   poi da `linkCanaleToccabile`, la stessa porta dell'abbonamento. Le
+   due forme non si pestano: un nome di bot comincia per lettera, un
+   invito per «+». Un sito resta testo da copiare. */
 const RE_LINK_BOT = /(?<![\w\/.:=?&+-])https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{1,28}bot(?:\?start=[A-Za-z0-9_-]{1,64})?(?![\w\/?&=+.%#-])/gi;
 function linkBotToccabile(testoEsc){
   return String(testoEsc || '').replace(RE_LINK_BOT, u =>
@@ -73062,15 +73513,20 @@ function renderAccountSheet(){
         if (!/^-?\d{1,20}$/.test(id)) return '';
         const attivo = id === accountAttivoId;
         const nome = c.nome || c.username || 'Account';
-        const aspetta = piuAccount && !attivo && Number(c.aspetta) > 0
-          ? ` · ⚡ ${Number(c.aspetta)} ${Number(c.aspetta) === 1 ? 'ti aspetta' : 'ti aspettano'}` : '';
+        const quanti = piuAccount && !attivo && Number(c.aspetta) > 0
+          ? Math.min(99, Math.floor(Number(c.aspetta))) : 0;
+        const aspetta = quanti
+          ? ` · ⚡ ${quanti} ${quanti === 1 ? 'ti aspetta' : 'ti aspettano'}` : '';
         return `<div class="seller${attivo?' attivo':''}"`
           + (attivo ? '' : ` role="button" tabindex="0"`
               + ` onclick="cambiaAccount('${id}')"`
               + ` onkeydown="if(event.key==='Enter'||event.key===' ')`
               + `{event.preventDefault();cambiaAccount('${id}')}"`)
           + ` style="margin-top:8px${attivo?'':';cursor:pointer'}">`
-          + voltoConto(c)
+          + (quanti
+              ? `<div class="conto-volto">${voltoConto(c)}`
+                + `<span class="conto-bolla" aria-hidden="true">${quanti}</span></div>`
+              : voltoConto(c))
           + `<div class="who"><b>${esc(nome)}</b>`
           + `<div class="rep">${c.telegram?'Telegram · ':''}`
           + `${c.username?'@'+esc(c.username)+' · ':''}`
@@ -85741,26 +86197,47 @@ function viaEuroOfferta(sats){
 /* il libro, se manca o e' vecchio, si legge in sottofondo e poi si
    ridisegna chi l'ha chiesto. Al piu' un tentativo al minuto: se i relay
    tacciono, la cassa non si ridisegna in tondo. */
+/* ...e se una lettura e' gia' in volo (l'ha aperta la scheda), chi chiede
+   si accoda a quella: il ridisegno arriva lo stesso (26 nov 2026) */
 function viaEuroLibro(poi){
   if (!viaEuroPerMe()) return;
   const fresco = p2pLibro && (Date.now() - p2pLibro.quando) < P2P_LIBRO_FRESCO_MS;
-  if (fresco || Date.now() - viaEuroLibroTentato < 60000) return;
+  if (fresco) return;
+  const dopo = () => { if (typeof poi === 'function') poi(); };
+  if (p2pLettura) { p2pLettura.then(dopo).catch(() => {}); return; }
+  if (Date.now() - viaEuroLibroTentato < 60000) return;
   viaEuroLibroTentato = Date.now();
-  caricaLibroP2P().then(() => { if (typeof poi === 'function') poi(); }).catch(() => {});
+  caricaLibroP2P().then(dopo).catch(() => {});
+}
+/* LA RICERCA IN SILENZIO (26 nov 2026, Andrea dalla prova con Sam: «uno
+   apre il prodotto e senza che se ne accorga gia' cerca dei match: se non
+   li trova non compare neanche il bottone, se li trova si sposta Paga e
+   compare Non hai sats?»). Il libro si legge APRENDO LA SCHEDA, non piu'
+   aprendo la cassa: prima arrivava dopo il primo «Paga», e il tasto
+   compariva solo chiudendo il QR. A libro letto si ridisegnano la cassa
+   e, se e' aperto, il foglio della fattura. */
+let viaEuroSatsQr = 0;       // il totale della fattura nel foglio del QR, 0 = spento
+function viaEuroDopoLibro(){
+  if (acqDati && el('acqCompra')) renderAcquisto();
+  const f = el('paySheet');
+  if (viaEuroSatsQr > 0 && f && f.classList.contains('open')) payViaEuroVista(viaEuroSatsQr);
 }
 function viaEuroTasto(sats, dove){
-  /* ...o chi vende a cifra fissa, a cui chiedere (24 nov 2026) */
-  if (!viaEuroOfferta(sats) && !viaEuroFissiOra(sats).length) return '';
+  /* SOLO CON UN MATCH VERO (26 nov 2026, Andrea: «se non li trova non
+     compare neanche il bottone»): chi vende a cifra fissa non lo accende
+     piu' — la richiesta a loro (24 nov) faceva aspettare minuti senza
+     sapere se arrivava */
+  if (!viaEuroOfferta(sats)) return '';
   viaEuroSats = sats;
   const qr = dove === 'qr';
   return '<button type="button" class="btn orange via-euro-btn" onclick="apriViaEuro(\''
-    + (qr ? 'qr' : 'cassa') + '\')">' + (qr ? 'Non hai sats? Compra da qui' : 'Non hai sats?') + '</button>';
+    + (qr ? 'qr' : 'cassa') + '\')">' + (qr ? 'Non hai sats? Paga in altri modi' : 'Non hai sats?') + '</button>';
 }
 /* accanto a «Paga», nella stessa fila: il bottone di sempre resta
    identico, e senza offerta la cassa e' quella di ieri */
 function viaEuroAccanto(paga, sats){
   const t = sats > 0 ? viaEuroTasto(sats, 'cassa') : '';
-  if (!t) { viaEuroLibro(() => { if (acqDati && el('acqCompra')) renderAcquisto(); }); return paga; }
+  if (!t) { viaEuroLibro(viaEuroDopoLibro); return paga; }
   return '<div class="via-euro-fila">' + paga + t + '</div>';
 }
 /* nel foglio del QR: si accende con la fattura di un ordine del mercatino,
@@ -85768,8 +86245,10 @@ function viaEuroAccanto(paga, sats){
 function payViaEuroVista(sats){
   const b = el('payViaEuro');
   if (!b) return;
-  const si = sats > 0 && (!!viaEuroOfferta(sats) || viaEuroFissiOra(sats).length > 0);
+  viaEuroSatsQr = sats > 0 ? sats : 0;
+  const si = sats > 0 && !!viaEuroOfferta(sats);
   if (si) viaEuroSats = sats;
+  else if (sats > 0) viaEuroLibro(viaEuroDopoLibro);
   b.style.display = si ? '' : 'none';
 }
 /* IL FOGLIO DEL PREZZO: un numero solo, in euro interi (Mostro vuole
@@ -85781,25 +86260,9 @@ let viaEuroInCorso = {};    // ordine P2P -> il corpo dell'acquisto, solo in mem
 async function apriViaEuro(dove){
   haptic();
   const o = viaEuroOfferta(viaEuroSats);
-  /* NESSUN MATCH, MA CHI VENDE A CIFRA FISSA (24 nov 2026): si chiede a
-     loro; se una ricerca per questo annuncio e' gia' viva, si riprende */
-  if (!o) {
-    const fissi = viaEuroFissiOra(viaEuroSats);
-    const l = currentListing;
-    if (!viaEuroCerca && l) {
-      const st = await viaEuroStato();
-      const mia = st && st.mia;
-      if (mia && mia.annuncio_id === l.id && (mia.stato === 'chiedo' || mia.stato === 'allargo'))
-        viaEuroCerca = mia;
-    }
-    if (!fissi.length && !viaEuroCerca) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
-    if (dove === 'qr') closeSheet();
-    if (viaEuroCerca) { viaEuroAspetta(); return; }
-    renderViaEuroChiedi(fissi);
-    el('sheetBg').classList.add('open');
-    el('viaEuroSheet').classList.add('open');
-    return;
-  }
+  /* il match e' sparito fra il disegno e il tocco: il tasto si spegne
+     (26 nov 2026: niente piu' richiesta a chi vende a cifra fissa) */
+  if (!o) { payViaEuroVista(0); if (acqDati && el('acqCompra')) renderAcquisto(); return; }
   /* dal foglio del QR: il foglio della fattura si chiude (il suo ordine
      da 15 minuti lo sostituisce il server col deposito lungo) */
   if (dove === 'qr') closeSheet();
@@ -85998,7 +86461,9 @@ function renderViaEuroPasso(){
   const nome = nomeControparteP2P(o, 'chi vende i sats');
   if (passo === 'attesa') {
     if (tit) tit.textContent = '';
-    box.innerHTML = '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>';
+    /* «ORDINE PRESO» e basta (26 nov 2026, Andrea dalla prova con Sam: «dovrebbe
+       dire semplicemente ordine preso e fine») */
+    box.innerHTML = '<div class="via-euro-attesa">Ordine preso</div>';
     return;
   }
   if (passo === 'paga') {
@@ -86078,7 +86543,7 @@ function viaEuroPassoOrdine(p){
   const orma = passo + ':' + p.stato + ':' + (recapitoEuroArrivatoP2P(p) ? 1 : 0);
   const nome = nomeControparteP2P(p, 'chi vende i sats');
   if (passo === 'attesa')
-    return {orma, html: '<div class="via-euro-attesa"><span class="attesa-anello"></span>Sto preparando il pagamento…</div>'};
+    return {orma, html: '<div class="via-euro-attesa">Ordine preso</div>'};
   if (passo === 'paga')
     return {orma, html: '<h4>' + esc(viaEuroPasso1(p, nome)) + '</h4>'
       + viaEuroPassi(p, 'viaEuroSeguo=\'' + esc(p.id) + '\';viaEuroHoPagato()')};
@@ -108970,6 +109435,10 @@ function renderNuovoOrdineP2P(){
           + (p2pNuovoFisso ? 'quelli che scrivi tu.' : 'al cambio di quel momento, col tuo premio.') + '</div>'
         : p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
+        /* chi vende sats: la spinta, sempre in vista, al posto del «solo se»
+           (26 nov 2026) — tiene l'id della nota, che il primo tocco svela */
+        : (typeof spintaIntervalloP2P === 'function' && spintaIntervalloP2P())
+        ? '<div class="p2p-spinta-intervallo" id="p2pNuovoNotaDue">' + esc(P2P_SPINTA_INTERVALLO) + '</div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
   });
@@ -110785,6 +111254,18 @@ function apriEuroTabP2P(modo){
   const box = el('p2pEuroCorpo');
   if (box) box.innerHTML = corpoEuroTabP2P(p2pEuroBozza,
     Object.assign(campiNuovoP2P(), {tettoTesto: maxTestoP2P()}), m.unita || segnoValutaTabP2P(), m.nome);
+  /* AL PRIMO TOCCO, IL BANNER (26 nov 2026, Andrea: «quando clicca li'
+     sopra la prima volta gli esce fuori un banner che lo informa»): una
+     volta per telefono, in cima al foglio */
+  if (box && m.nome === 'min' && spintaIntervalloP2P()) {
+    let visto = false;
+    try { visto = localStorage.getItem('p2pSpintaIntervallo') === '1'; } catch(e) {}
+    if (!visto) {
+      box.insertAdjacentHTML('afterbegin',
+        '<div class="p2p-spinta-intervallo in-cima">' + esc(P2P_SPINTA_INTERVALLO) + '</div>');
+      try { localStorage.setItem('p2pSpintaIntervallo', '1'); } catch(e) {}
+    }
+  }
   el('sheetBg').classList.add('open');
   el('p2pEuroSheet').classList.add('open');
 }
@@ -111113,6 +111594,19 @@ function scegliValutaP2P(cod){
    del primo, e una volta sola. Il tocco che la fa scattare e' lo
    stesso che apre la tastiera, quindi un render qui porterebbe via il
    fuoco al campo che si sta per riempire. */
+/* LA SPINTA ALL'INTERVALLO (26 nov 2026, Andrea dalla prova di «Non hai
+   sats?»: chi compra dal mercatino senza sats trova un venditore solo se
+   la sua cifra sta dentro un ordine, e un intervallo la prende quasi
+   sempre — una cifra fissa quasi mai). La vede chi VENDE sats in euro a
+   prezzo di mercato, dove l'intervallo si puo' fare: non a prezzo fisso,
+   non on-chain, non col tabacchino, non in una moneta. Scritta di Andrea. */
+const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.';
+function spintaIntervalloP2P(){
+  if (p2pLato === 'compro' || p2pNuovoFisso) return false;
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return false;
+  if (tabacchinoP2P(p2pNuovoMetodi)) return false;
+  return valutaFoglioP2P() === 'EUR';
+}
 function svelaSecondoImportoP2P(){
   /* a rete on-chain l'importo e' uno solo: il 2-di-3 blocca una cifra.
      Barattozon in «Compra BTC» no (17 nov 2026 sera): la fascia la stringe
@@ -117391,13 +117885,30 @@ function filaCardP2P(html, spenta, attesa){
   const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
   if (!sez || !fila) return;
   const chiusa = spenta || (attesa && !html.length);
+  /* l'altezza che cambia scorre invece di saltare (altezzaMorbida,
+     cantiere salti-home): la fascia che sparisce col tocco di una
+     categoria, o che torna con «Tutto» */
+  altezzaMorbida(sez, () => {
   sez.style.display = (html.length || chiusa) ? '' : 'none';
   const guscio = el('p2pVetrinaGuscio');
   if (guscio) guscio.style.display = chiusa ? 'none' : '';
   /* spenta, la fascia resta col solo titolo: `spenta` le da' lo stesso
      respiro sopra e sotto, cosi' titolo e interruttore stanno in mezzo
      (25 nov 2026, cantiere fascia-p2p) */
+  /* la lampadina (26 nov 2026, cantiere luce-p2p): solo nel passaggio da
+     chiusa ad aperta di una fascia gia' sulla pagina, cioe' dopo un tocco
+     sull'interruttore (o le card che arrivano dopo il tocco) */
+  const siAccende = !chiusa && sez.classList.contains('spenta');
   sez.classList[chiusa ? 'add' : 'remove']('spenta');
+  if (chiusa) sez.classList.remove('si-accende');
+  if (siAccende) {
+    sez.classList.add('si-accende');
+    /* via a luce ferma (la fine della luce dall'alto, la piu' lunga), cosi'
+       un ritorno in Esplora non la riaccende; niente timer */
+    sez.onanimationend = e => {
+      if (e.pseudoElement === '::before') sez.classList.remove('si-accende');
+    };
+  }
   /* l'interruttore si riscrive intero: lo stato sta tutto nel markup.
      Dal 25 nov 2026 e' quello COL BITCOIN (`p2p-vt-btc`, Andrea fra
      quattro prove: «va bene l'interruttore col Bitcoin»): il pallino e'
@@ -117407,6 +117918,7 @@ function filaCardP2P(html, spenta, attesa){
     role="switch" aria-checked="${spenta ? 'false' : 'true'}" aria-label="Scambi P2P nella home"
     onclick="setFilaP2P(${spenta ? 'true' : 'false'})"><span aria-hidden="true">₿</span></button>`;
   fila.innerHTML = html.join('');
+  });
   /* le frecce seguono il contenuto, come nelle due strisce: sei card
      o due cambiano quanto c'e' da scorrere, e la riga riporta all'inizio */
   aggiornaFrecce('p2pVetrinaFila');
@@ -119480,8 +119992,41 @@ async function chiediMiaPausaP2P(){
     const d = await r.json();
     if (!d || d.attiva !== true) return false;
     p2pMiaPausa = d;
+    seguiFusoPausaP2P();
     return true;
   } catch(e) { return false; }
+}
+/* ---- IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026, cantiere chat-spunte;
+   la domanda di un utente all'estero, Andrea: «Ok, perfetto») ----
+   La pausa vale nell'ora del fuso che il telefono aveva quando si e'
+   premuto «Salva»: chi partiva DOPO restava in pausa con l'ora di casa.
+   Adesso, se il telefono e' in un altro fuso, la pausa lo segue da sola
+   con le STESSE ORE («22-7» resta 22-7, dove sono). Senza dire niente:
+   e' la pausa che la persona ha gia' scelto. Una volta per fuso e per
+   apertura dell'app, anche se il server non risponde. */
+let p2pFusoPausaProvato = '';
+/* PURA: il fuso a cui portare la pausa, o '' se non serve. Solo con una
+   pausa salvata che dice il suo fuso, e un telefono che sa il suo */
+function fusoPausaNuovoP2P(pausa, fuso){
+  const ora = String(fuso || '');
+  if (!pausa || !ora || !pausa.fuso) return '';
+  if (!(Array.isArray(pausa.fasce) && pausa.fasce.length) && !(Number(pausa.una_fino) > 0)) return '';
+  return String(pausa.fuso) === ora ? '' : ora;
+}
+async function seguiFusoPausaP2P(){
+  const fuso = fusoPausaNuovoP2P(p2pMiaPausa, fusoTelefonoP2P());
+  if (!fuso || p2pFusoPausaProvato === fuso) return;
+  p2pFusoPausaProvato = fuso;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/pausa`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({solo_fuso: true, fuso: fuso, scarto: -new Date().getTimezoneOffset()})});
+    const d = r.ok ? await r.json().catch(() => null) : null;
+    if (d && d.attiva === true) {
+      p2pMiaPausa = d;
+      if (typeof rivestiRighePausaP2P === 'function') rivestiRighePausaP2P();
+    }
+  } catch(e) {}
 }
 /* LA MIA PAUSA SI CHIEDE UNA VOLTA AL MINUTO, non a ogni ridisegno
    (cantiere pausa-in-vista): le righe di stato nascono con quel che si
@@ -121869,6 +122414,9 @@ const CHATSC_FRENO_MS = 1500;     // fra un invio e il successivo
 const CHATSC_DOPO = ['rilasciato', 'fattura_nuova', 'pagamento_ritentato'];
 /* `let` e non `const`: il banco lo accorcia */
 let CHATSC_POLSO_MS = 5000;
+/* LE SPUNTE (26 nov 2026): gli scambi dove il mio «visto» e' andato
+   avanti e il server non lo sa ancora */
+const p2pChatScRidire = {};
 const CHATSC_AVVISO = 'Barattolo non ti scrive mai qui. Non uscire dallo scambio per pagare. Non mandare codici o chiavi.';
 const CHATSC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta e non la legge, e a fine scambio la cancella. Un moderatore la legge solo se una di voi due apre una disputa.';
 const CHATSC_RIGA_LINK = 'C\'è un link: non aprirlo per pagare o per «verificare» qualcosa.';
@@ -122523,7 +123071,15 @@ function chatScVistoP2P(id){
   const c = chatScDiP2P(id);
   if (!c) return;
   const prima = chatScNonLettiP2P();
-  if ((c.vistoFino | 0) < (c.cursore | 0)) { c.vistoFino = c.cursore | 0; chatScScriviP2P(id, c); }
+  if ((c.vistoFino | 0) < (c.cursore | 0)) {
+    c.vistoFino = c.cursore | 0; chatScScriviP2P(id, c);
+    /* LE SPUNTE (26 nov 2026): l'altra parte lo sa col prossimo ritiro,
+       che parte adesso; se uno e' gia' in volo, ci pensa la sua coda */
+    if (c.spunte) {
+      p2pChatScRidire[id] = 1;
+      if (!p2pChatScInVolo[id]) setTimeout(() => { chatScRitiraP2P(id); }, 0);
+    }
+  }
   if (chatScNonLettiP2P() !== prima) chatScSegnaP2P();
 }
 function chatScNovitaP2P(){
@@ -122923,7 +123479,10 @@ function chatScRitiraP2P(id){
   p2pChatScInVolo[id] = (async () => {
     await caricaNostrTools();
     const prima = chatScDiP2P(id);
-    const d = await chatScFetch('leggi', {ordine: id, dopo: (prima && prima.cursore) | 0});
+    /* LE SPUNTE (26 nov 2026): fin dove ho avuto la chat davanti, per le
+       ✓✓ arancioni di chi mi scrive. Detto adesso, non serve ridirlo */
+    delete p2pChatScRidire[id];
+    const d = await chatScFetch('leggi', {ordine: id, dopo: (prima && prima.cursore) | 0, visto: (prima && prima.vistoFino) | 0});
     /* le chiavi d'ordine che il server presenta (mercatino) */
     if (merc && d.aperta)
       p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : [],
@@ -123002,6 +123561,9 @@ function chatScRitiraP2P(id){
     const esito = chatScPosaP2P(o, tk, c0, d.buste, d.giro);
     /* il segno di nascita del cassetto che ha dato queste buste */
     if (d.cassetto) esito.c.cassetto = d.cassetto;
+    /* LE SPUNTE: fin dove l'altra parte ha ritirato e ha visto. Senza
+       (la leva spenta) non ce ne sono */
+    esito.c.spunte = spunteDalServerChatScP2P(d.spunte);
     chatScScriviP2P(id, esito.c);
     if (esito.adottata) scrivi('chiave ritrovata dalla copia sigillata, la chat continua qui');
     rileggi = !!esito.rileggi;
@@ -123035,6 +123597,10 @@ function chatScRitiraP2P(id){
     /* una chiave ritrovata: si rilegge SUBITO da capo, senza aspettare
        il battito — e' il momento in cui i messaggi di prima tornano */
     if (rileggi) setTimeout(() => { chatScRitiraP2P(id); }, 0);
+    /* LE SPUNTE: il «visto» e' andato avanti mentre il ritiro era in
+       volo — si dice subito, non al battito dopo (chi chiude l'app
+       entro cinque secondi lascerebbe le ✓✓ grigie all'altra parte) */
+    else if (p2pChatScRidire[id]) setTimeout(() => { chatScRitiraP2P(id); }, 0);
   });
   return p2pChatScInVolo[id];
 }
@@ -123045,12 +123611,15 @@ async function chatScInviaP2P(id, testo, f){
   if (!chatScServeP2P(o) || !chatScProntaP2P(c, o)) throw new Error('La chat non è ancora aperta');
   const quando = Math.floor(Date.now() / 1000);
   const b = chatScBustaP2P(o, c, testo, quando, f);
-  await chatScFetch('invia', {ordine: id, tipo: 'msg', busta: b.busta});
+  const esito = await chatScFetch('invia', {ordine: id, tipo: 'msg', busta: b.busta});
   const agg = chatScDiP2P(id);
   if (!agg) return;
+  /* LE SPUNTE (26 nov 2026): il numero che il server ha dato alla busta
+     arriva con la risposta, e la ✓ c'e' subito, senza aspettare il ritiro */
+  const nServer = (esito && Number(esito.n) > 0) ? (esito.n | 0) : 0;
   if (!(agg.msgs || []).some(m => m.id === b.dentro.id))
     agg.msgs = (agg.msgs || []).concat([Object.assign({id: b.dentro.id, t: quando, mio: true, testo: testo},
-                                                      f ? {f: f} : {})])
+                                                      nServer ? {n: nServer} : {}, f ? {f: f} : {})])
       .slice(-CHATSC_MAX_MSG);
   chatScScriviP2P(id, agg);
 }
@@ -123650,7 +124219,7 @@ function chatScMessaggiHTML(c, altro, o){
     const li = chatScLinkP2P(m.testo);
     return '<div class="chatmod-msg' + (m.mio ? ' mio' : '') + '">'
       + '<small>' + esc(m.mio ? 'Tu' : altro)
-      + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + '</small>'
+      + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + spuntaChatScP2P(m, c && c.spunte) + '</small>'
       /* il messaggio di un file: il riquadro al posto di «📎 Foto» */
       + ((m.f && m.testo === testoAllegatoChatScP2P(m.f.tipo)) ? '' : chatScTestoHTML(m.testo, true))
       + (m.f ? allegatoChatScHTML(m.f, (o && o.id) || '', false) : '')
@@ -123666,6 +124235,35 @@ function chatScMessaggiHTML(c, altro, o){
       + (al.fuori ? '<div class="chatsc-allarme">⚠️ ' + esc((o && o.mercatino && !o.onchain) ? CHATSC_MERC_RIGA_FUORI : CHATSC_RIGA_FUORI) + '</div>' : '')
       + '</div>';
   }).join('');
+}
+/* ---- LE SPUNTE (26 nov 2026, cantiere chat-spunte; l'idea e' di un
+   utente, Andrea: «Le voglio arancioni») ----
+   Sotto i MIEI messaggi: ✓ la busta e' sul server; ✓✓ il telefono
+   dell'altra parte l'ha ritirata; ✓✓ arancioni l'altra parte ha avuto
+   la chat davanti agli occhi. Le cifre (numeri di busta) le dice il
+   server col ritiro, e solo a leva `CHAT_SPUNTE` accesa: senza cifre,
+   nessuna spunta. Sullo schermo solo segni; IL LETTORE DELLO SCHERMO
+   (26 nov 2026, cantiere spunte-etichette, Andrea: «Per chi usa il
+   lettore dello schermo sì, va bene la tua soluzione») legge una parola
+   al posto del segno: «Inviato», «Consegnato», «Letto» (`role="img"`
+   con l'`aria-label`, che il traduttore porta in inglese). */
+/* PURA: le cifre del server, pulite — o null */
+function spunteDalServerChatScP2P(sp){
+  if (!sp || typeof sp !== 'object') return null;
+  return {arrivato: Math.max(0, Math.floor(Number(sp.arrivato) || 0)),
+          visto: Math.max(0, Math.floor(Number(sp.visto) || 0))};
+}
+/* PURA: la spunta di un messaggio. Solo i miei, solo con un numero del
+   server (prima non e' ancora arrivato), e mai le righe di sistema */
+function spuntaChatScP2P(m, sp){
+  if (!sp || !m || !m.mio || m.sis) return '';
+  const n = Math.floor(Number(m.n) || 0);
+  if (n <= 0) return '';
+  const vista = n <= (sp.visto | 0);
+  const doppia = vista || n <= (sp.arrivato | 0);
+  return ' <span class="chatsc-spunte' + (vista ? ' vista' : '') + '" role="img" aria-label="'
+    + (vista ? 'Letto' : doppia ? 'Consegnato' : 'Inviato') + '">'
+    + (doppia ? '✓✓' : '✓') + '</span>';
 }
 function oraBreveChatScP2P(ts){
   const d = new Date((Number(ts) || 0) * 1000);
@@ -125461,6 +126059,7 @@ async function avvia(){
     myAvvisiMercatino = normalizzaAvvisiMercatino(me.avvisi_mercatino);
     mySeguiti = Array.isArray(me.seguiti) ? me.seguiti : [];
     avvisiMercatinoLeve = me.avvisi_mercatino_leve || null;
+    myAvvisiRichieste = me.avvisi_richieste === true;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»

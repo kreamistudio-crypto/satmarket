@@ -5585,7 +5585,19 @@
   una): «tastiera meccanica» deve dare le tastiere meccaniche e non
   tutte le tastiere, ma su un catalogo piccolo l'intersezione è spesso
   vuota — e una vetrina vuota, quando qualcosa da mostrare c'era, è
-  peggio di una imprecisa. Ogni parola è un GRUPPO (radice «o»
+  peggio di una imprecisa. ALMENO UNA PAROLA NEL TITOLO O NELLA
+  CATEGORIA (26 nov 2026, Andrea: «generatore di corrente» pescava un
+  teleruttore ABB perché «corrente», «generazione» — stessa radice
+  «gener» di «generatore» — e «di» stavano nella sua descrizione
+  lunga): la STRETTA vuole tutte le parole dovunque PIÙ una di loro in
+  `{titolo categoria}`, la LARGA una sola ma lì. Una parola persa in
+  descrizione non fa più uscire un annuncio: la descrizione conferma e
+  pesa in BM25, non apre. Prezzo dichiarato: un titolo generico
+  («Logitech G915») si trova con «tastiera» solo se la parola sta nella
+  categoria o sottocategoria (coi sinonimi). Le PAROLINE VUOTE
+  (`_PAROLE_VUOTE_RICERCA`: articoli, preposizioni, congiunzioni) si
+  tolgono dalla domanda e non dall'indice, e una domanda di sole
+  paroline le tiene. Ogni parola è un GRUPPO (radice «o»
   troncamento) e sono i gruppi a legarsi in «e»; l'ULTIMA parola è un
   prefisso, perché chi digita ce l'ha quasi sempre a metà. I termini
   escono da `normalizza` — il setaccio di casa, lo STESSO del filtro
@@ -7925,6 +7937,16 @@
   gli angoli tondi e il bordo acceso, e i banner `#occasioniBanner` stanno
   fra `#filtriBox` e la fascia P2P.
   Cantieri, «La fila Scambi P2P in una fascia a sé».
+  Dal 26 nov 2026 (cantiere luce-p2p) il titolo della fascia sta A
+  SINISTRA (flex, «Vedi tutti» spinto a destra) e la luce arancio entra
+  da sinistra; accesa, `::before` colora tutta la fascia e `::after` porta
+  filo e velature. Nel SOLO passaggio da chiusa ad aperta di una fascia
+  gia' sulla pagina `filaCardP2P` mette `si-accende`: la luce cresce da
+  `transform-origin:28% 0` come una lampadina (il `::before` e' piu'
+  largo della fascia, -40% ai lati, cosi' crescendo non mostra spigoli) e
+  la classe se ne va su `animationend` del `::before`, senza timer. Non
+  parte all'apertura della pagina ne' al ritorno in Esplora; con gli
+  effetti ridotti niente animazione. Cantieri, «La luce di lato e la lampadina».
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
@@ -12554,6 +12576,11 @@
   (la regola dell'abbonamento, `linkCanaleToccabile`, resta com'è).
   Il tocco passa da `apriLinkBot`, che riprova la forma e dentro
   Telegram usa openTelegramLink.
+  E L'INVITO A UN GRUPPO (26 nov 2026, seconda scelta di Andrea: «Sì,
+  anche gli inviti t.me/+»): dalla scorta il testo passa poi da
+  `linkCanaleToccabile`, la porta dell'abbonamento, così l'invito
+  monouso al gruppo-aula di un corso si apre con un tocco. Le due forme
+  non si pestano (un bot comincia per lettera, un invito per «+»).
   LA VIA SI CORREGGE A MANO, MA SOLO SUGLI IMPORTATI (ago 2026, caso
   vero dal campo: un annuncio da Nostr la cui descrizione dice «invio
   codice di licenza» e che in colonna ha `consegna=''` — quel campo il
@@ -28534,6 +28561,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e la coda si riempie di proposte diverse secondo chi le ha chieste.
   Fail-open totale come la moderazione: lotto saltato = si riprova al
   giro dopo.
+  IL FRENO 4, CHIESTO È CHIESTO (25 nov 2026, cantiere
+  categorie-una-volta; Andrea: «la tengo, ma una volta sola»). I tre
+  freni ricordavano le proposte e le decisioni, ma NON il «resta
+  dov'è»: un annuncio che l'AI lasciava al suo posto non lasciava
+  traccia, tornava al giro dopo e la domanda si ripagava ogni ora — e
+  prima o poi l'AI rispondeva diverso, così la coda si riempiva di
+  proposte nuove sugli stessi annunci (quattro «🗂 N nuove proposte»
+  in una sera). Ora chi sta in un lotto a cui l'AI ha RISPOSTO e non
+  ha una proposta si segna nella stessa tabella con lo stato
+  `tenuta` (categoria_ora = categoria_nuova = quella di adesso): il
+  NOT EXISTS del freno 2 già lo salta finché la categoria resta
+  quella, e la coda dei moderatori non lo vede (filtra
+  `stato='proposta'`). Un annuncio che cambia categoria si richiede:
+  la domanda è nuova. Il lotto ESPLOSO non segna niente, ed è per
+  questo che `_chiedi_categorie` rende `None` e non `{}` quando la
+  chiamata cade: `{}` vuol dire «tutti a posto», e segnare «tenuti»
+  venti annunci che nessuno ha guardato li toglierebbe dal giro per
+  sempre. Tenute e proposte si riscrivono solo da righe ancora aperte
+  (`stato IN ('proposta','tenuta')`): una decisa resta del moderatore.
+  Spegnere la leva (`RICATEGORIZZA_AUTO = False`) era l'alternativa
+  offerta ad Andrea, scartata da lui: i nuovi importati in «Altro»
+  meritano una proposta. Provato da `collaudo_categorie_una_volta`
+  (la funzione vera con l'AI finta) e `prove_categorie_una_volta`.
+  I NEGOZI COLLEGATI SOLO DA «ALTRO» (26 nov 2026, cantiere
+  categorie-negozi): un prodotto con `fonte` (WooCommerce, Shopify…)
+  entra nel giro solo se sta in «Altro» (`a.fonte='' OR
+  a.categoria='Altro'`): la sua categoria viene dal cassetto, dal
+  negozio o dal nome, e la macchina non la corregge, come per chi
+  pubblica dal form. Gli importati da Nostr nascono in «Altro» e restano
+  guardati in ogni categoria. E APPROVARE RIFÀ LA SOTTOCATEGORIA:
+  `_sposta_categoria` la ricalcola con `sottocategoria_indovina` sulla
+  categoria nuova (nel dubbio ''), perché quella vecchia è una casella
+  dell'altra categoria e l'annuncio spariva da tutte e due.
   LA REGOLA «BITCOIN» È TEMATICA (ago 2026, dal campo: 19 proposte, e
   UNDICI tiravano fuori da «Bitcoin» sacche, poster cypherpunk e
   magliette — Andrea le scartava a mano). Non era il modello a
@@ -33560,7 +33620,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scrive sugli ordini e niente esce verso i relay: la pausa si CHIEDE
   all'orologio. LE ROTTE: `GET /api/p2p/pausa` (la propria, senza
   parametri; a leva spenta `attiva: false`) e `POST /api/p2p/pausa` (il
-  corpo intero sostituisce; vuoto = toglie; 409 a leva spenta);
+  corpo intero sostituisce; vuoto = toglie; 409 a leva spenta;
+  `{salta: true}` toglie la pausa per stanotte; `{solo_fuso: true, fuso,
+  scarto}` — 26 nov 2026, `_fuso_pausa_p2p` — cambia SOLO fuso, scarto e
+  `aggiornato`: lo manda `seguiFusoPausaP2P` quando il telefono è in un
+  fuso diverso da quello salvato, una volta per fuso e per apertura);
   `/api/p2p/facce` e `/api/p2p/libro` servono `pause`;
   `_posso_prendere_p2p` ferma col motivo `pausa` e il `fino` (mai sul
   proprio ordine). «Dimentica il profilo» la toglie, la fusione degli
@@ -34503,6 +34567,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   premio non parte da solo. `/promossi premio` è `/promossi evidenza`
   a 7 giorni fissi, e a premio dato manda a chi vende `zap_testo_premio`.
   Fail-open: un intoppo è «⚠️ zap: grazie non partito» nel journal.
+- IL BANNER REGALATO (26 nov 2026, BitcoinLabs; Andrea sulla scheda:
+  «Glielo regaliamo»). `/promossi banner <codice o link del negozio>`
+  apre la porta del banner (`banner_sbloccato_il`, la stessa che apre la
+  fattura di `_incassa_sblocco`) senza fattura: `_regala_banner`. Si
+  regala la PORTA, non l'insegna: il banner lo carica chi vende e lo
+  approva un moderatore, come sempre. Il segno del regalo sta in
+  `impostazioni` (`banner_regalato:<tg_id>` = «data da admin»), nello
+  STESSO commit della porta, e il controllo del libro mastro «porta del
+  banner aperta senza pagamento» (e il suo gemello 17e.2 in
+  query_libro_mastro.sql) lo salta. Una porta già aperta non si
+  riscrive. A chi vende `MSG_BANNER_REGALATO`. LIMITE NOTO: il segno è
+  per tg_id, quindi in una fusione Nostr→Telegram la porta regalata
+  alla metà Nostr passa di là senza il segno, e il libro mastro suona:
+  si regala alla metà che resta (Telegram).
 - LA MANCIA AL VENDITORE (14 nov 2026, cantiere mancia-venditore; il
   perché in CANTIERI, «La mancia al venditore»). Un blocco suo in
   server.py, subito DOPO quello degli zap (ne usa `zap_leggi_bolt11`
@@ -35300,6 +35378,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   resta fino alla fine dello scambio. `chatScCeP2P(o)` è il giudice «in
   questo scambio la chat c'è»: la leva, `chatScServeP2P`, e il server
   che non ha detto né «finita» né «senza l'altra parte».
+  LE SPUNTE (26 nov 2026, cantiere chat-spunte; perché in CANTIERI,
+  «Le spunte nella chat»). Sotto i MIEI messaggi, accanto all'ora: ✓ la
+  busta è sul server, ✓✓ il telefono dell'altra parte l'ha ritirata
+  (`letture.letto_fino`, che il server scriveva già), ✓✓ arancioni
+  (`--sats-deep` di giorno, `--sats` di sera: «più vivo», 26 nov) l'altra
+  parte ha avuto la chat davanti
+  (`letture.visto_fino`, colonna nuova: nel CREATE e nell'ALTER di
+  `db_chat`). Il «visto» lo dice il telefono di chi guarda: `vistoFino`
+  del cassetto (lo stesso del pallino) viaggia nel corpo del ritiro,
+  `{ordine, dopo, visto}`; `_chat_spunte` (dopo `_chat_p2p_ritira`) lo
+  scrive con `MAX(visto_fino, MIN(visto, letto_fino))` — mai oltre il
+  ritirato, mai indietro — e torna `spunte: {arrivato, visto}` dell'ALTRA
+  parte, numeri di busta. Sul client `esito.c.spunte` sta nella voce
+  della chat, `spuntaChatScP2P` disegna (pura, solo segni sullo schermo;
+  al lettore dello schermo `role="img"` con l'`aria-label` «Inviato»,
+  «Consegnato», «Letto», tradotto dal traduttore); `chatScInviaP2P` prende subito il numero che `invia` ha dato
+  alla busta; `chatScVistoP2P`, quando il visto avanza e le spunte ci
+  sono, segna `p2pChatScRidire` e fa partire un ritiro (o lo lascia alla
+  coda di quello in volo): chi chiude l'app subito non lascia le ✓✓
+  grigie. Il moderatore legge da `/moderazione/chat`, che non passa di
+  lì: la sua lettura non accende niente. LA LEVA `CHAT_SPUNTE`, ACCESA
+  di serie (solo un False la spegne), in `config_esempio.py` e nel
+  pannello; spenta, il ritiro non porta `spunte` e non scrive il visto,
+  e il client non disegna niente. Vale per le tre chat del cassetto:
+  scambi P2P, ordini del mercatino, scambi on-chain. Le prove:
+  `prove_chat_spunte`, `collaudo_chat_mercatino` (sezione 14).
   IL PALLINO DEI NON LETTI (12 ott 2026, sera): `POST
   /api/p2p/chat/novita` `{ordini: [...]}` (al più
   `P2P_CHAT_NOVITA_MAX`) → `{ultimi: {ordine: n}}`, il numero
@@ -38686,7 +38790,15 @@ mai il kind 0 di nessuno: regola ferrea 2).
   restano `evidenza`. Dalla sera del 25 nov anche «In cima» per l'utente
   si chiama «In vetrina» (la parola sta in UN posto, `PROMO_ETICHETTA`
   nell'app) e «Da scoprire» si chiama «Il negozio nella home»; id,
-  motivi e colonne restano `cima` e `scoprire`. LA CARD IN VETRINA SI
+  motivi e colonne restano `cima` e `scoprire`. «PROMUOVI» ANCHE DAL
+  PROFILO (26 nov): `#promuoviProfilo` dentro il gruppo «Annunci»,
+  acceso da `aggiornaPromuoviProfilo` con `promoAttive`; `promuovibile`
+  ha le guardie del tasto della scheda, e con piu' annunci la scelta
+  passa da `chiediConferma` prima di `apriPromuovi`. IL NEGOZIO NELLA
+  HOME IN ARRIVO (26 nov): `PROMO_SCOPRIRE_IN_ARRIVO` (True di serie) =
+  voce grigia nel foglio, `in_arrivo` nel listino, 409 in
+  `compra_promo` prima di ogni altra guardia del negozio; `/promossi`
+  resta la strada dello staff. LA CARD IN VETRINA SI
   VEDE: `annunci.sponsor_fino` (additiva, la scrive solo l'incasso, il
   rimborso la azzera, gate in lettura) viaggia in `CAMPI_VETRINA`, e
   per `PROMO_IN_CIMA_ORE` `cardHTML` accende la cornice arancio,
@@ -38841,10 +38953,13 @@ mai il kind 0 di nessuno: regola ferrea 2).
   due file. Le foto hanno la forma `av_<negozio>_<millisecondi>.jpg`.
   Leve: `PROFILO_MIO_ATTIVO` (accesa di serie), `PROFILO_MIO_GIORNI` (30).
 - «CERCO», LE RICHIESTE DI CHI CERCA (25 nov 2026, cantiere richieste):
-  chi non trova una cosa la scrive (`testo` 4-140, categoria, budget in
-  sats facoltativo) e la richiesta VA da chi può avercela invece di
+  chi non trova una cosa la scrive (`testo` 4-140, categoria, budget
+  facoltativo in UNA valuta: `budget_sats` oppure `budget_eur`, col
+  toggle € / ₿ dal 26 nov) e la richiesta VA da chi può avercela invece di
   restare in bacheca. Tabelle: `richieste` (stato aperta | chiusa |
-  scaduta, `scade` a 14 giorni, `avvisati`, `avviso_id` = il gemello in
+  scaduta, `scade` ai giorni scelti fra `RICHIESTE_DURATE` = 30/60/90:
+  di serie il primo, fuori elenco si torna al primo, il GET li manda come
+  `durate`; `avvisati`, `avviso_id` = il gemello in
   `avvisi_ricerca`), `richieste_avvisati` (chi ha già avuto l'avviso:
   mai due volte), `richieste_offerte` (gli annunci collegati),
   `richieste_muti` (chi non vuole avvisi). Il giro: `_candidati_richiesta`
@@ -38857,7 +38972,30 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `RICHIESTE_VENDITORI` = 5; senza chiave, con un errore o con una
   risposta storta prende i primi 5 del prefiltro: FAIL-OPEN, l'avviso
   parte comunque) e `_avvisa_venditori_richiesta` (`notifica` con il
-  bottone «Offri» → `link_telegram("cerco", id)` → `/?cerco=<id>`). Il
+  bottone «Offri» → `link_telegram("cerco", id)` → `/?cerco=<id>`).
+  Dal 26 nov anche `_avvisa_moderatori_richiesta`: ogni richiesta nuova
+  va ai moderatori con `notifica_admin(..., argomento="moderazione")` (la
+  stanza «🛡️ Moderazione» del gruppo degli admin, o in privato senza
+  gruppo), titolo col megafono «📣 Nuova richiesta in Cerco #N» e il
+  tasto «Apri la richiesta»; solo un avviso, niente decisione. Leva
+  `RICHIESTE_AVVISO_MODERATORI`, accesa di serie. E chi ha acceso
+  «🙋 Avvisami delle nuove richieste di Cerco» (colonna
+  `utenti.avvisi_richieste`, spenta di serie, rotta
+  `POST /api/me/avvisi-richieste`, letta da /api/me) entra nello stesso
+  giro dopo i cinque dell'AI (`_iscritti_richiesta`: le categorie degli
+  avvisi del mercatino, nessuna = tutte; fuori chi cerca, i «🔕», chi è
+  già avvisato e chi ha i suoi 3 in 24 ore), conta fra gli avvisati e
+  riceve lo stesso messaggio con «Offri». Sempre dal 26 nov la
+  CATEGORIA SI PROPONE DA SOLA: `categoria_per_richiesta(con, testo)`,
+  senza AI, conta le parole della richiesta (`_parole_richiesta`) che
+  aprono una parola del titolo degli annunci attivi (gli ultimi 5000)
+  e somma per categoria; vince la più votata, a pari merito la prima di
+  `CATEGORIE`; niente in comune = "" e il menu resta «Scegli la
+  categoria». Rotta `GET /api/richieste/categoria?testo=` (stessa porta
+  `richieste_per`). Il client (`cercoProponiCategoria`) chiede 600 ms
+  dopo l'ultimo tasto, butta le risposte vecchie (`cercoCatGiro`) e si
+  ferma per sempre, fino al prossimo invio, appena la persona sceglie a
+  mano (`cercoCatAMano`, dal `poi` del picker). Il
   gemello in `avvisi_ricerca` (se ci sono parole e c'è posto fra i 5
   avvisi dell'utente) fa il resto: un annuncio NUOVO che combacia avvisa
   chi cerca col giro di sempre; chiusa o scaduta la richiesta, il gemello

@@ -96311,3 +96311,315 @@ RESTA DA GUARDARE. Le scritte nuove (pagina, card, toast, i due avvisi del bot) 
 Se chi vende chiede di annullare dopo che chi paga in euro ha toccato «Ho inviato gli euro», la schermata tornava al passo «Manda» (lo stato dello scambio diventa `annullo_proposto` e il «pagato» si perdeva). Ora `viaEuroPasso` legge `primaAnnullo` — lo stesso giudice di `azioniDisponibili`, che già non offre «Ho inviato gli euro» due volte — e resta su «… sta controllando il pagamento», senza «Annulla il pagamento». Nessun testo nuovo. Provato in `prove_non_hai_sats` (i passi in node), suite severa e collaudi.
 
 IL PROMEMORIA DELLA RECENSIONE (stesso cantiere; Andrea: «cambiamolo», il testo lasciato a noi). La recensione di chi gli ha venduto i sats sta nella pagina dello scambio, che chi paga in euro non deve vedere: un testo che lo mandasse altrove direbbe il falso, e uno che lo portasse lì romperebbe la regola di Andrea. Quindi a lui il promemoria non parte (la riga nel journal lo dice); a chi vende resta quello di sempre, e la recensione dell'oggetto ha la strada del mercatino. Provato dal vero banco delle attese.
+
+## I riquadri dopo la produzione: la sveglia a sinistra, e sempre in vista (25 nov 2026 sera, cantiere riquadri-sempre; Andrea, guardando la home vera: «La sveglia spostala leggermente a sinistra, poi quando non c'è nessuna offerta a tempo o sconto comunque le card si devono sempre vedere», poi «Si va bene» alla foto 48)
+
+LA SVEGLIA. `occ-offerte.webp` ritagliato di nuovo dalla stessa striscia di Flow (`flow7-striscia.png`, taglio 0,33,1336,310), con la finestra spostata di 55 px a destra: la sveglia scende di circa l'8% verso sinistra, il nastro resta quello e il velo scuro a sinistra è lo stesso (alpha .85 che svanisce al 60%). Gli ultimi 22 px a destra ripetono il nastro che apre «Sconti»: fra i due riquadri c'è lo spazio, e non si vede. Nessuna modifica Flow sopra la modifica (la lezione delle icone: degrada).
+SEMPRE IN VISTA. `renderOccasioni` non filtra più i due riquadri coi flag della busta (`vivo`): restano sempre, fuori dal barattolo. Un filtro acceso senza niente trova la griglia vuota e si spegne dallo stesso riquadro. L'etichetta del megafono, che esce solo sopra «Sconti», così esce sempre.
+PROVATO. Suite severa (una prova di `prove_scoprire_p2p` chiedeva la regola vecchia, «senza occasioni resta lei sola»: riscritta con la nuova) e una sentinella in `prove_richieste`; giro in Playwright senza offerte né sconti vivi: i tre riquadri in vista, la sveglia più a sinistra (foto 48).
+
+## Le categorie chieste all'AI una volta sola (25 nov 2026, cantiere categorie-una-volta; Andrea: «la tengo, ma una volta sola»)
+
+Andrea ha ricevuto in una sera quattro avvisi «🗂 N nuove proposte di categoria», e ne arrivavano anche prima della promozione. La causa: il giro dell'ora (`ricategorizza_automatico`, in coda a ogni import Nostr e quindi anche a ogni riavvio) ricordava le proposte e le decisioni dei moderatori, ma non il «resta dov'è». L'annuncio che l'AI lasciava al suo posto tornava al giro dopo, la domanda a Haiku si ripagava, e prima o poi la risposta cambiava: proposte nuove sugli stessi annunci, ogni ora.
+DECISIONE (card, scelta di Andrea fra tre: spegnere la leva, tenerla così, «una volta sola»). Il freno 4, CHIESTO È CHIESTO: chi sta in un lotto a cui l'AI ha risposto e non ha una proposta si segna in `categoria_proposta` con lo stato nuovo `tenuta` (stessa categoria prima e dopo). Il NOT EXISTS che c'era già lo salta finché la categoria resta quella; un cambio di categoria lo rimette in giro, perché la domanda è nuova. La coda dei moderatori non lo vede (filtra `stato='proposta'`). `_chiedi_categorie` ora rende `None` quando la chiamata cade, non `{}`: col `{}` di prima un lotto esploso sarebbe sembrato «tutti a posto» e venti annunci mai guardati sarebbero usciti dal giro per sempre. Le righe decise (applicata, scartata) non le riscrive nessuno: entrambi gli INSERT della macchina hanno `WHERE stato IN ('proposta','tenuta')` sul DO UPDATE. Gli script a mano (`ricategorizza.py`, `sposta_a_mano.py`) restano come sono: sono gesti di una persona e sovrascrivono di proposito, `tenuta` compresa.
+SCARTATO: spegnere `RICATEGORIZZA_AUTO` (lo voleva Andrea in un primo momento, poi ha scelto di tenerla: i nuovi importati in «Altro» meritano una proposta); un'impronta del testo per richiedere al cambio di titolo (già scartata a luglio: per gli importati il testo lo riscrivono i relay ogni ora, sarebbe lo stesso giro più lento).
+NESSUN TESTO NUOVO per gli utenti né per i moderatori. Quel che un moderatore approva poi non pubblica niente di nuovo su Nostr: gli importati non si toccano, i nati qui aggiornano il loro evento (risposto ad Andrea che chiedeva di Nostrology).
+PROVATO. `collaudo_categorie_una_volta` gira la funzione vera su un database usa-e-getta con l'AI finta: primo giro una proposta e due tenute, in coda solo la proposta, un avviso; il giro dopo nessuno richiesto e nessun avviso, anche se l'AI cambierebbe idea; un cambio di categoria richiede quello solo e la tenuta diventa proposta; un lotto esploso non segna niente e si richiede; una riga decisa non si richiede né si sovrascrive. 19 prove; contro il server.py di prima 7 rosse, e con l'esplosione trattata come risposta 2 rosse. `prove_categorie_una_volta` in prove.py fa le sentinelle sul sorgente (5 rosse sul server di prima).
+RESTA DA GUARDARE. Le proposte già in coda restano lì: si approvano o si scartano dal Profilo come sempre. Dopo la promozione, il segno che funziona è che gli avvisi «🗂» arrivano solo quando entrano annunci nuovi.
+
+## La home senza nero e senza salti: P2P ↔ home, categorie, ricerca, la ✕ (25 nov 2026, cantiere salti-home; Andrea, video dal telefono in produzione: «Guarda cosa succede quando passo dal p2p alla home del mercatino per mezzo secondo schermata nera. Inoltre guarda cosa succede quando schiaccio sulle icone categorie salta tutto... È piena di bug di questo tipo la home controllala bene tutta»)
+
+COSA SI VEDEVA (fotogrammi del video, 720×1570 a 90 fps, e lo stesso misurato nel browser a 360×785 sul server locale in collaudo). 1) A ogni cambio fra P2P e home la pagina nuova ripartiva da trasparente sul fondo scuro: luminosità 43 → 65 in 150 ms nel video; nel browser il primo fotogramma della home, il più lungo (impaginare la vetrina intera), si dipinge a opacity 0. È il nero. Lo stesso tornando alla home da una card. 2) Toccata una categoria, nello stesso fotogramma la fascia «Scambi P2P» spariva (78 px da spenta, molti di più con le card: `vetrinaNuda` è falsa fuori da «Tutto») e la riga delle sottocategorie compariva (139 px): sotto tutto saltava di +71 px, e poi partiva lo scorrimento verso la riga. Lo stesso, al contrario, con «Tutto», e con la ricerca (anche lei spegne la fascia). 3) Ritoccando la categoria accesa (la ✕) dopo essere risaliti a mano, la pagina tornava di colpo alla posizione salvata della vetrina (al minuto 0:13 del video: dalla striscia alla Mensola in un fotogramma).
+
+CAUSE. 1) `.view.active{animation:fadein .18s}` vale per ogni vista, home compresa. 2) `filaCardP2P` e `renderSottoRiga` cambiano `display` secco. 3) Il passo indietro della ✕ (`consumaGradinoReparto` → `navApplica` → `go`) rimette `vetrinaPos`, che è la posizione dell'ultima USCITA dalla vetrina (per esempio verso il P2P), non dove si è adesso.
+
+DECISO. 1) `.view.active{display:block}`, senza più il fadein: ogni vista compare piena al primo fotogramma, come le schede di un'app. Il primo giro lo toglieva solo a home e schede P2P; Andrea, al prima/dopo: «si correggi anche quello» per Swap, Ordini e la card aperta, che avevano lo stesso nero. Restano le corse proprie (la salita del negozio, la morfosi di Vendi) e il fadein di fogli e modali, che si aprono sopra la pagina. 2) `altezzaMorbida(box, cambia)`: misura il riquadro, fa il cambio vero com'era, rimisura, e se l'altezza è cambiata la fa scorrere in 0,28 s (altezza, margini, padding, trasparenza; chi sparisce resta in pagina fino a fine corsa). La usano la fascia P2P (tutto il cambio di `filaCardP2P`) e la riga delle sottocategorie (entrata e uscita). Una corsa a metà si posa prima della nuova. Secco com'era con gli effetti ridotti, a home non in vista o pagina nascosta, e dove il layout non c'è (i banchi). `scorriSottoHeader` toglie `restoMorbido(sez)`: quanto cambieranno ancora le fasce in corsa sopra l'arrivo, più il margine che sta ancora crescendo sull'arrivo stesso. Così lo scorrimento parte insieme alle fasce, già puntato su dove la riga starà: un movimento solo (misurato: l'arrivo resta a 175 px, header 120 + pillole 51 + 4, come prima). 3) `tornaATutto` segna dov'è la striscia sullo schermo (`striscaFerma`) se è in vista, e `posizioneDaRendere` la rimette lì prima di guardare `vetrinaPos`; dalle pillole appiccicate, a striscia fuori schermo, resta il ritorno di sempre. Nessuna scritta nuova.
+
+STRADE SCARTATE. Per il nero: un fadein più corto, o solo opacity senza il translate (il primo fotogramma resterebbe comunque trasparente). Per le categorie: lasciare la fascia P2P anche nei reparti (gli scambi P2P stanno nella vetrina nuda, regola di LE CARD P2P IN VETRINA); scorrere secco nello stesso fotogramma del cambio (un taglio invece di un salto: è lo «scatto» bocciato il 18 nov); tenere ferma la griglia e far saltare la striscia (si salta proprio dove c'è il dito); scaldare le 120 icone delle sottocategorie (2,2 MB) per togliere i quadrati vuoti dell'entrata: non è un salto (i riquadri hanno già la loro misura), resta da guardare se Andrea lo chiede.
+
+PROVATO. Server locale in collaudo (config di cartone fuori dal worktree, relay morti, semina_collaudo), Chromium a 360×785 tema scuro, un registro per fotogramma delle posizioni (scrollY, striscia, riga, fascia, strumenti, griglia, opacità della vista) e `PerformanceObserver('layout-shift')` su un giro di tutta la home: avvio, P2P e ritorno, scorrimento, interruttore P2P, categoria e «Tutto», una card e indietro, il foglio dell'ordinamento, ricerca e ricerca svuotata, Swap e Ordini e ritorno. PRIMA: P2P → home a opacity 0,00 per due fotogrammi poi 150 ms di dissolvenza; categoria: strumenti 359 → 430 in un fotogramma. DOPO: home piena al primo fotogramma; categoria: 359 → 360 → 368 → 374 mentre la riga si apre e lo scorrimento sale, arrivo a 175. La ✕ ritoccata nella parte visibile della tessera: la pagina resta a y=116, la riga si chiude e la fascia torna scorrendo. Dopo il secondo giro: zero fotogrammi sbiaditi su tutto il giro (P2P, card, Swap, Ordini). Video prima/dopo in /mnt/project-files/salti-home/. `prove_salti_home`: nessuna animazione sulle viste e il fadein rimasto a fogli e modali, i tre usi di altezzaMorbida, il conto di restoMorbido nello scorrimento, l'ordine di striscaFerma; in node, su un DOM di cartone che sa le altezze, la fascia che si chiude e torna, il resto a metà corsa (52 = 40+7+5), la seconda corsa che posa la prima, la riga che si apre col margine che sposta l'arrivo. Controprove: tolto il `-restoMorbido`, rovesciato il `vivo`, tolto il conto del margine, rimesso il fadein, tolta la striscia: rosse (le ultime due esplodono sull'ancora). I banchi di `prove_card_p2p_vetrina` e `prove_liste_ritorno` ricevono la vera altezzaMorbida (secca sul loro cartone) e la `striscaFerma` mai alzata. Suite severa nel venv senza coincurve sull'albero rebasato su 16f03be6: 31.736 verdi (le due saltate di nostr-tools, per la variabile puntata male, rigirate verdi nelle loro sezioni); collaudi della CI: 175 verdi.
+
+RESTA DA GUARDARE. Sul telefono di Andrea dopo la promozione: P2P ↔ home senza nero; categoria, ricerca e ✕ senza salti, anche con la fascia P2P accesa e piena di card (sul banco non c'erano ordini P2P: la fascia accesa senza card se ne va scorrendo, com'era la regola). Andrea guarda dalla webapp (la registrazione era quella, non Telegram): il banco era la stessa cosa, il browser fuori da Telegram.
+
+## «Cerco» ritoccato: il budget in euro, quanto dura, l'interruttore, l'omino e i riquadri meno scuri (26 nov 2026, cantiere cerco-ritocchi; Andrea: «Nel budget massimo devo poter selezionare anche in euro metti il solito toggle», «fai l'icona personalizzata dell'omino che alza la mano… fallo con flow», «mettimi il tasto non avvisarmi delle notifiche più bello in stile barattolo», «14 giorni è troppo poco», «le card offerte sconti e negozio… un po' troppo scure», poi «si» alle scritte con «l'omino metti l'altra versione» e «il toggle delle notifiche non mettermi il simbolo di btc»)
+
+IL BUDGET IN EURO. Il campo parla la valuta vista (`valutaVista`) col toggle € / ₿ di sempre, e il toggle CONVERTE la cifra già scritta (`cercoBudgetSegue`, il patto del foglio dell'offerta: sennò 50 euro diventano 50 sats). Il server tiene UNA valuta: `budget_valuta: 'eur'` scrive `budget_eur` (colonna nuova, migrazione con ALTER) e lascia i sats a 0, sennò `budget_sats` come prima; il gemello in `avvisi_ricerca` prende `prezzo_max_eur`, che esisteva già, quindi gli annunci nuovi combaciano col tetto in euro senza codice nuovo. La card dice «fino a 50,00 €», l'avviso del bot «Budget: fino a 50,00 €» con `_fmt_eur`. La lettura della cifra (`cercoLeggiBudget`, pura): la virgola è il decimale, il punto pure tranne quando fa le migliaia («1.500»).
+QUANTO DURA. `RICHIESTE_DURATE = (30, 60, 90)`, di serie la prima; una durata fuori elenco torna a 30, mai un errore. Le pillole sono le `consegna-pill` del Vendi, e dopo l'invio si ripartono da 30. Scartato: un campo libero coi giorni (una richiesta dimenticata per un anno avvisa venditori per niente).
+L'INTERRUTTORE. La casella è diventata una card con l'interruttore della fascia P2P (`.p2p-vt-btc`), ma col pallino VUOTO: Andrea il ₿ lì non lo vuole.
+L'OMINO. Due versioni da Flow (1:1, ragazzo con la felpa arancio che alza la mano); Andrea ha scelto la prima. Scontornato a mano dal fondo scuro: si allaga dai bordi tutto quel che è fondo o alone (verde/rosso > 0,62 e rosso < 135: il bordo del disegno è un marrone rosso che non passa), apertura 5×5 per i peli d'alone, si tiene la massa più grande. `cerco-omino.webp` (192 px) in `FILE_SCOPRIRE`, 62 px accanto al titolo, e la testata di «Cerco» 16 px più su («l'omino fallo leggermente più grande e la pagina spostala leggermente più in alto»). Scartato: la tessera scura col fondo originale («non è scontornato»).
+I RIQUADRI. Il velo a sinistra di `occ-offerte`, `occ-sconti` e `cerco` è passato dal quasi nero (24,17,11 a .85/.9) al marrone della card (#2C2517 a .68/.72): il lato delle scritte esce del colore dello sfondo, i titoli bianchi si leggono uguale. Stessi tagli di prima (la sveglia resta a 55 px).
+PROVATO. `prove_richieste` (budget in euro in node, la lettura delle cifre, le sentinelle di durate, omino, interruttore e toggle), `collaudo_richieste` (euro coi centesimi e i sats a zero, il gemello col tetto in euro, 60 giorni scelti, 7 che torna a 30, le durate nel GET), suite severa e collaudi della CI; foto 49, 49b, 50 e 51 nei due temi.
+DA GUARDARE. Il post in `NOVITA.md` di «Cerco» dice ancora «il budget massimo in sats»: è un testo per gli utenti, non toccato senza il sì di Andrea.
+
+## La luce di lato e la lampadina (26 nov 2026 notte, cantiere luce-p2p; Andrea, per curiosità: «Fammi vedere altri stili della sezione P2P acceso e spento», poi «la 4 è bellissima», «l2» e «porta su develop»)
+
+Dopo la fascia P2P del 25 nov (stile B, luce dall'alto, titolo al centro) Andrea ha chiesto altri stili, accesi e spenti, solo per vederli. Cinque prove dalla pagina vera (V0 com'era, V1-V4): gli è piaciuta la 4, TITOLO A SINISTRA e luce arancio che entra da sinistra. Poi: «si può mettere che quando lo accendi si colora in arancio anche verso destra? cioè aver colorata tutta la fascia un po' come succede adesso in produzione», e «mi piacerebbe che fosse fluido il movimento del colore che si espande». Tre video dell'accensione (W1 la luce che si allarga, W2 e W3 altre corse): «la W1 va bene ma la luce dovrebbe diffondersi, non vedere un pannello di luce netto con la linea che va da sinistra a destra, ma come se fosse una lampadina che si accende». Due lampadine (L1, L2): scelta L2.
+DECISIONE. Da spenta la fascia ha solo la luce da sinistra (`radial-gradient(70% 160px at 0 0,…)`) e il titolo resta centrato come deciso il 25 (classe `spenta`). Da accesa il titolo va a sinistra, «Vedi tutti» a destra (`margin-left:auto`), e due pseudo-elementi colorano tutta la fascia come in produzione: `::before` la luce piena dall'alto, `::after` il filo arancio in cima e le velature sopra e sotto. LA LAMPADINA: solo nel passaggio da chiusa ad aperta di una fascia già sulla pagina `filaCardP2P` aggiunge `si-accende`, e la luce del `::before` cresce in 1,1 s da un punto a sinistra (`transform-origin:28% 0`, da `scale(.35,.7)` e trasparente a piena), mentre filo e velature entrano in dissolvenza. La classe se ne va su `animationend` del `::before` (niente timer: i banchi a DOM finto catturano i setTimeout), e una fascia che si chiude la perde subito. Il `::before` è più largo della fascia (-40% ai lati, gradiente al 50%) e la sezione ha `overflow:hidden`: la prima L2 mostrava uno spigolo verticale mentre cresceva.
+SCARTATO: V1, V2, V3 (gli altri stili di prova); il titolo al centro anche da accesa; W2 e W3; W1 così com'era (il «pannello di luce netto» che scorre); L1. L'animazione all'apertura della pagina o al ritorno in Esplora: la lampadina è la risposta al tocco, non un effetto d'ingresso.
+NESSUN TESTO NUOVO: le scritte della fascia sono quelle di prima. Con gli effetti ridotti la regola universale su `*::before` toglie l'animazione e la fascia si accende e basta.
+PROVATO. In `prove_card_p2p_vetrina` la luce nuova, i due pseudo-elementi, l'ordine dei gesti in `filaCardP2P` (si-accende deciso prima di togliere `spenta`, tolto su chiusa, via su `animationend` del `::before`, nessun `setTimeout`) e nel banco node la classe `si-accende` in tre momenti: assente al primo disegno, presente alla riaccensione, presente solo al terzo tocco del PRIMO TOCCO (spenta, accesa da caricamento, accesa da tocco). Controprova sul miniapp.html di prima: 3 rosse. Video e foto delle prove in `/mnt/project-files/toggle-p2p/curiosita/`.
+RESTA DA GUARDARE. Sul telefono vero, che la luce che cresce resti fluida anche coi telefoni meno potenti (è una sola trasformazione su un pseudo-elemento, dovrebbe).
+
+## Il tondino degli altri account: il numero sulla foto nel foglio «I tuoi account» (26 nov 2026, cantiere badge-account, dal campo)
+
+IL FATTO. Luca (negozio «Un tempo per te», tre account aperti sul sito: il suo, Migliobruno e UHMAMI) ha chiesto «un badge che indica se c'è qualcosa da fare (un nuovo ordine, o altro) all'interno di un profilo senza doverci per forza accedere». Il segno c'era già dal 21 ott (voce «Il pallino degli altri account»): «⚡ N ti aspetta» nella riga e il pallino sul tappo. Ma tutt'e due seguono `PIU_ACCOUNT_OVUNQUE`, spenta in produzione, mentre sul SITO il multi-account vive da agosto senza leva: Luca vedeva il foglio e non i segni.
+
+DECISO (Andrea, 26 nov 09:02). La leva si ACCENDE in produzione (riga nel config del VPS, riavvio, salute 200 alle 09:04, copia `/root/config-prima-piu-account-2026-11-26.py`): con lei vivono il «⚡ ti aspetta», il pallino del tappo e il resto di «Più account ovunque» (account Nostr dentro la Mini App, «Stai usando» sui gesti coi soldi, «Esci da tutti», annotazioni per il moderatore). In più, nel codice, il TONDINO: un cerchio arancio col numero sull'angolo della foto di ogni account NON in uso che ha qualcosa che lo aspetta. È lo stesso `aspetta` di `_quanto_aspetta` (ordini pagati da spedire più scambi P2P dove tocca a lui), quindi nessuna domanda nuova al server e nessuna rotta nuova.
+
+COME. Il volto ha `overflow:hidden` (la foto tonda), quindi il tondino vive in un involucro suo (`.conto-volto`, relativo) e sborda dall'angolo come il pallino del tappo (`.conto-bolla`, anello del colore della card). Fermo a 99, perché un numero più lungo allargherebbe il cerchio fino a coprire la foto; un valore storto dal server (non un numero) non disegna niente. `aria-hidden`: per lo screen reader parla già la riga «⚡ N ti aspetta», che resta. NESSUN TESTO NUOVO: c'è solo una cifra.
+
+SCARTATO. Staccare il conteggio dalla leva lasciandola spenta (la strada B proposta ad Andrea): con la leva accesa non serve. Aggiungere resi e contestazioni al conteggio: proposto, non chiesto.
+
+PROVATO. In `prove_pallino_altri_account` sei prove nuove su un banco node che ESEGUE la vera `renderAccountSheet`: il tondino solo sull'account non in uso che aspetta, la riga a parole che resta, l'involucro accanto al volto, il tetto a 99, il numero storto, la leva spenta. Tre mutazioni, tre uccise (tondino anche su quello in uso; senza tetto; senza leva). Guardato in Chromium col CSS vero dell'app, chiaro e scuro.
+
+RESTA DA GUARDARE. Sul telefono di Andrea, dopo la promozione: con due account aperti e un ordine pagato sull'altro, il tondino sulla foto e il pallino sul tappo. E dentro Telegram, ora che la leva è accesa, il giro di «Più account ovunque» (aggiungere un account Nostr e passare dall'uno all'altro).
+
+## «Cerco» avvisa i moderatori (26 nov 2026, cantiere cerco-moderazione; Andrea: «voglio che veniamo avvisati anche quando qualcuno pubblica nella sezione cerco», «magari con un'icona caratteristica», poi «Ottimo, sì, va bene» alla proposta col testo)
+
+COSA. Ogni richiesta nuova lancia, accanto all'avviso ai venditori, `_avvisa_moderatori_richiesta`: un messaggio nella stanza «🛡️ Moderazione» del gruppo degli admin passando da `notifica_admin` (che senza gruppo, o col gruppo giù, scrive in privato a ogni moderatore: la strada di tutti gli avvisi non urgenti). Testo approvato: «📣 Nuova richiesta in Cerco #N», poi «testo» · categoria, la riga del budget se c'è (nella sua valuta), «Chi chiede: nome (id …)», «Dura N giorni», e il tasto «Apri la richiesta» che apre la pagina sulla richiesta (`link_telegram("cerco", id)`, lo stesso dell'«Offri»).
+PERCHÉ COSÌ. L'icona è il 📣, il megafono del riquadro (alternativa proposta: 🙋); niente bottoni di decisione come per gli annunci in revisione, perché la richiesta è già in bacheca e il filtro parole l'ha già passata. La riga del budget ora vive in un posto solo (`_riga_budget_richiesta`), per i venditori e per i moderatori.
+LA LEVA. `RICHIESTE_AVVISO_MODERATORI`, accesa di serie, nel pannello «⚙️ Stato delle leve» sotto «🙋 Cerco»: se le richieste diventano troppe si spegne dal config.
+PROVATO. `collaudo_richieste`: un avviso solo, stanza «moderazione», testo intero col budget e i 30 giorni, il tasto che apre la richiesta, i 60 giorni di una richiesta in euro, nessun avviso a leva spenta; `prove_richieste`: le sentinelle (lancio dalla nascita, leva, stanza, html.escape anche qui). Suite severa e collaudi della CI.
+
+## «Cerco» a chi lo chiede: l'interruttore nel cassetto Avvisi (26 nov 2026, cantiere cerco-avvisi; Andrea: «vieni notificato anche nel caso in cui qualcuno pubblica un annuncio nella sezione cerco?», poi «ok» alla proposta e alla scritta)
+
+PRIMA. Gli avvisi del mercatino («🛒 Avvisami dei nuovi annunci», i venditori seguiti) scattavano solo per gli annunci: una richiesta di «Cerco» arrivava solo ai cinque scelti dall'AI e, da stamattina, ai moderatori.
+COSA. Nel blocco «Mercatino» del cassetto Avvisi, sotto gli annunci, un interruttore suo: «🙋 Avvisami delle nuove richieste di Cerco», spento di serie, visibile solo a chi «Cerco» la vede (`cercoAttivo`). Colonna `utenti.avvisi_richieste`, rotta `POST /api/me/avvisi-richieste` (404 a chi «Cerco» non c'è), stato in /api/me. Nel giro dell'avviso, dopo i cinque dell'AI, `_iscritti_richiesta` aggiunge chi l'ha acceso: le categorie sono quelle già scelte per gli annunci (nessuna = tutte), fuori chi cerca, chi ha «🔕», chi è già stato avvisato e chi ha già i suoi 3 avvisi in 24 ore (lo stesso tetto dei venditori, perché contano nella stessa tabella `richieste_avvisati`). Il messaggio è quello dei venditori, col tasto «Offri». Tetto di buon senso `RICHIESTE_ISCRITTI_MAX` = 2000 righe lette.
+SCARTATO. Un blocco di categorie suo per «Cerco» (due elenchi di 28 chip uno sotto l'altro: troppo); far valere l'interruttore degli annunci anche per le richieste (chi vuole gli annunci nuovi non per forza vuole le richieste altrui). Nessun toast nuovo: il cambio si vede dall'interruttore.
+PROVATO. `collaudo_richieste` [3b]: la rotta accende e spegne; l'avviso arriva a chi ha tutte le categorie, col tasto «Offri» sulla richiesta; mai a chi vuole un'altra categoria, a chi ha «🔕», a chi l'ha spento; conta fra gli avvisati. `prove_richieste`: sentinelle di colonna, rotta, /api/me, giro, cassetto. Foto 52 nei due temi. Suite severa e collaudi della CI.
+I TESTI ATTORNO (col «si» di Andrea): la pagina della privacy nomina l’interruttore nel blocco degli avvisi del mercatino; il post `NOVITA.md` di «Cerco» dice «in euro o in sats», e una voce nuova racconta euro, durata e interruttore.
+
+## «Cerco» sceglie da solo la categoria (26 nov 2026, cantiere cerco-categoria; Andrea: «ha senso fargli inserire anche la categoria? … gli venga proposta in automatico, se vuole può cambiarla», poi «ok» alla proposta senza AI)
+
+COSA. Mentre si scrive cosa si cerca, 600 ms dopo l'ultimo tasto, il menu della categoria si compila da solo. La sceglie `categoria_per_richiesta` sul server (rotta `GET /api/richieste/categoria`): le parole della richiesta, le stesse del prefiltro dei venditori, contro i titoli degli annunci attivi; vince la categoria con più parole in comune, a pari merito la prima dell'elenco. Se non c'è niente in comune resta «Scegli la categoria» e decide la persona, come prima.
+PERCHÉ COSÌ. Senza AI: è istantanea, gratis, non manda il testo a nessuno, e il mercatino stesso dice dove stanno le cose (una «bici» sta dove stanno le bici). Una scelta a mano vince per sempre, fino all'invio: il picker segna `cercoCatAMano` e le risposte in volo si buttano (`cercoCatGiro`), così un tasto tardivo non rimette la categoria vecchia. Si entra da un reparto (`activeCat`): conta come scelta a mano. Nessun testo nuovo.
+SCARTATE. Haiku a ogni pausa (costa, è lento, e per una parola come «sedia» non serve); togliere del tutto il menu (la categoria serve al prefiltro dei venditori e agli iscritti per categoria).
+PROVATO. `collaudo_richieste` [1b]: «buono amazon» va nella categoria dei buoni, «sedia» in «Casa e giardino», niente in comune, testo vuoto e solo numeri restano vuoti; `prove_richieste`: le sentinelle del client (attesa, risposte vecchie, scelta a mano). Dal vivo in Playwright: «bici» → Biciclette, «maglione» → Abbigliamento, poi la scelta a mano resta. Suite severa e collaudi della CI.
+
+## Le spunte nella chat, e il fuso della pausa che segue il telefono (26 nov 2026, cantiere chat-spunte; un utente scrive ad Andrea: «potreste aggiungere le spunte nei messaggi della chat… non si riesce a capire se qualcuno ha ricevuto o letto il messaggio», e «ho inserito una pausa notturna ai miei ordini di acquisto. Barattolo si setta automaticamente sul mio fuso orario attuale? Sono all'estero»; Andrea al piano in dieci righe: «Ok, perfetto. Le voglio arancioni»)
+
+LA DOMANDA DEL FUSO, LA RISPOSTA. La pausa usa il fuso del TELEFONO, mai uno fisso: `corpoPausaP2P` manda il nome IANA (`Intl…timeZone`) e lo scarto in minuti, e `_scarto_fuso_p2p` fa l'ora legale. Ma lo prendeva SOLO al «Salva»: chi partiva dopo restava in pausa con l'ora di casa. LA CORREZIONE (proposta nella stessa risposta, «Ok, perfetto» letto come sì per tutte e due le cose, e detto): `seguiFusoPausaP2P`, dopo ogni lettura della propria pausa, se il telefono è in un altro fuso manda `{solo_fuso: true, fuso, scarto}` e `_fuso_pausa_p2p` cambia SOLO fuso, scarto e `aggiornato` (la base dello scarto di ripiego). Le fasce restano le stesse ORE («22-7» vale dove sei), la una tantum è un epoch e non c'entra, e `salta_fino` resta: non è un'intenzione nuova (il salvataggio intero lo azzera, questo no). Una volta per fuso e per apertura dell'app, anche se il server non risponde. Nessuna scritta nuova.
+
+LE SPUNTE, COME SONO. Sotto i MIEI messaggi, accanto all'ora: ✓ sul server; ✓✓ grigie il telefono dell'altra parte l'ha ritirata; ✓✓ arancioni l'ha avuta davanti agli occhi. Il server il ritiro lo sapeva già (`letture.letto_fino`, nato per gli avvisi); il «visto» lo sapeva solo il telefono (`vistoFino`, quello che spegne il pallino), e adesso lo dice col ritiro dopo (`visto` nel corpo, colonna `visto_fino`). NIENTE ROTTA NUOVA: il ritiro che il telefono fa ogni cinque secondi a chat aperta porta le cifre e le spunte si aggiornano da sole. Tre chat, una cura: il cassetto è lo stesso per scambi P2P, ordini del mercatino e on-chain. Arancioni come ha scelto Andrea, col token `--sats-text` e non `--sats`: il fondo dei miei messaggi è `--sats-soft`, e di giorno il `--sats` lì sopra non si vede. LEVA `CHAT_SPUNTE`, accesa di serie.
+
+LE SCELTE MIE, COI PERCHÉ. (1) IL VISTO NON VA OLTRE IL RITIRATO e non torna indietro (`MAX(visto_fino, MIN(visto, letto_fino))`): un telefono ritoccato non accende ✓✓ arancioni su messaggi che non ha, e uno che riparte da zero (cassetto rinato, chiave ritrovata) non le spegne. (2) IL VISTO SI DICE SUBITO: col solo battito, chi apre la chat e chiude l'app entro cinque secondi lasciava le ✓✓ grigie per sempre (fino alla prossima apertura). `chatScVistoP2P`, quando il visto avanza e le spunte ci sono, fa partire il ritiro; se uno è in volo lo fa la sua coda (`p2pChatScRidire`). Non gira all'infinito: il ritiro dopo non fa avanzare niente. (3) IL MESSAGGIO APPENA PARTITO ha subito il suo numero (`invia` lo dava già, il telefono lo buttava): la ✓ c'è senza aspettare il ritiro. (4) IL MODERATORE non accende niente: legge da un'altra rotta, che non tocca `letture`. (5) SOLO SEGNI, nessuna parola né etichetta (la regola delle scritte nuove): per questo il segno ha `aria-hidden` e niente `title`; un'etichetta per chi usa il lettore di schermo vorrebbe una scritta, e va chiesta.
+
+SCARTATO. (a) Le sole due spunte alla Telegram (✓ inviato, ✓✓ letto): l'utente chiedeva proprio «ricevuto o letto», e il server il «ricevuto» lo sapeva già. (b) Il «ricevuto» dalla domanda del pallino (`/novita`, ogni 30 s su qualunque pagina): avrebbe voluto dire «l'app è aperta», ma quella domanda per patto non scrive niente (`prove_chat_scambio` lo guarda) e il ritiro basta. (c) L'avviso Telegram partito come «ricevuto»: partito non vuol dire arrivato.
+
+DA SAPERE. Il telefono ritira la chat solo con la pagina dello scambio (o dell'ordine) aperta: le ✓✓ grigie dicono «ha aperto lo scambio», e quasi sempre le arancioni arrivano subito dopo. Chi usa due dispositivi in due fusi diversi (il PC a casa, il telefono in viaggio) sposta la pausa a ogni apertura dall'uno o dall'altro: caso raro, ed è la pausa del dispositivo che sta usando.
+
+PROVATO. `prove_chat_spunte` (nuova, categoria p2p): leva e colonna (CREATE e ALTER), la rotta che chiede le spunte DOPO il ritiro e solo a leva accesa, il moderatore che non passa di lì; il giudice vero su sqlite (✓, ✓✓, ✓✓ arancioni, il telefono che mente in avanti, quello che riparte da zero, il visto storto, le cifre dell'altra parte, un altro giro, il cassetto di ieri che riceve la colonna); in node i pezzi veri del telefono (i tre segni, le spunte mute, le cifre storte, il visto che fa partire il ritiro, quello in volo, la leva spenta, il fuso: quando serve, una domanda per fuso col corpo giusto, la risposta rifiutata); il giudice del fuso su sqlite (salvata a Roma e partito per New York, in pausa fino alle 07:00 di là, «per stanotte» che resta, fuso storto, scarto fuori, True al posto dello scarto, chi non ha pausa). CONTROPROVE, sette rotture una per una e tutte rosse: il visto senza il tetto del ritirato, senza il MAX, lo scarto senza il controllo, la ✓✓ arancione letta dall'arrivato, il ritiro che parte anche a leva spenta, la domanda del fuso ripetuta, la coda del ritiro tolta. Aggiornate le sentinelle che contano corpi e fetch: `prove_chat_scambio` (il ritiro porta `visto`), `prove_tempo_pubblica_app` (quattro fetch sulla pausa, non tre), `prove_ordine_in_pausa` (la rotta col ramo `solo_fuso`). Sulle rotte vere: `collaudo_chat_mercatino` sezione 14 (✓, ✓✓, arancioni, il visto oltre il ritirato, l'estraneo 403, la leva spenta che non porta cifre e non scrive) e `collaudo_ordine_in_pausa` passo 7b (New York, le 07:00 di là, il fuso storto). Suite severa e collaudi della CI in un venv senza coincurve.
+
+RESTA DA GUARDARE. Sul telefono vero, con due account: le ✓✓ arancioni che arrivano a chi scrive pochi secondi dopo che l'altro apre la chat, e il colore sul fondo dei propri messaggi nei due temi. Per la pausa: un telefono con «fuso automatico» spento dice il fuso che ha scritto a mano, e quello vale.
+
+## Dai codici pronti si tocca anche l'invito al gruppo (26 nov 2026, cantiere inviti-scorta; scelta di Andrea sulla scheda: «Sì, anche gli inviti t.me/+»)
+
+PERCHÉ. Carmrain ha mandato i corsi di BitcoinLabs: tutti e tre si
+consegnano con un link d'invito monouso a un gruppo Telegram che fa da
+aula (https://t.me/+…), non col bot. Con la regola del 24 nov quel link
+arrivava come testo da copiare.
+
+COSA. In `resaCodice`, sugli ordini della scorta, il testo passa da
+`linkBotToccabile` e poi da `linkCanaleToccabile`, la stessa porta
+dell'invito dell'abbonamento (con `apriInvitoCanale`). I siti esterni
+restano testo. Per la scorta Carmrain deve creare gli inviti SENZA
+scadenza e con limite di una persona: un invito a sette giorni scadrebbe
+mentre aspetta il suo compratore; i sette giorni li conta lui dalla
+consegna.
+
+PROVATO. `prove_scorta_codici`: la riga della resa (controprova: senza
+la seconda porta, rosso) e in node bot + invito diventano link, il sito
+resta testo. `prove_link_invito_canale` invariata e verde.
+
+## Il banner regalato dal moderatore (26 nov 2026, cantiere regala-banner; Andrea sulla scheda: «Glielo regaliamo», per il negozio di BitcoinLabs)
+
+PERCHÉ. Andrea voleva caricare lui il banner del negozio di Carmrain. Non
+si può: il banner lo carica solo chi vende, e solo a porta sbloccata,
+cioè dopo aver pagato. Sulla scheda: «Glielo regaliamo».
+
+COSA. `/promossi banner <codice>` (il codice o il link del negozio, come
+nel collega dal pannello) apre la stessa porta della fattura, senza
+fattura. Il banner poi lo carica Carmrain e lo approva Andrea: il
+moderatore resta l'occhio prima della vetrina. A chi vende arriva
+`MSG_BANNER_REGALATO`, ai moderatori il solito «🚀 /promossi banner …».
+
+LE SCELTE. Il segno del regalo in `impostazioni` e non una riga in
+`pagamenti` con importo zero: `pagamenti` è il libro degli incassi, e
+una riga a zero sarebbe un incasso finto da spiegare a ogni ronda. Il
+libro mastro però lo deve sapere, sennò «porta del banner aperta senza
+pagamento» suonerebbe ogni giorno su un regalo deciso (la stessa storia
+delle porte regalate il 15 set, che hanno una data di comodo): il
+controllo e il suo gemello SQL saltano chi ha il segno. Una porta già
+aperta non si riscrive (la data è quella del primo sblocco).
+
+PROVATO. `collaudo_promozioni`, scena «la porta regalata»: chi non è
+admin non regala; dal link del negozio la porta si apre senza fattura;
+il messaggio a chi vende e il fatto ai moderatori; la porta si chiede
+davvero; il libro mastro non suona sul regalo e suona ancora su una
+porta aperta da sola; ridata non cambia la data né riavvisa; un codice
+che non c'è lo dice.
+
+DA GUARDARE. Il primo regalo vero (Carmrain) dopo la promozione: poi lui
+carica il banner (l'immagine è in /mnt/project-files/bitcoinlabs/corsi/)
+e Andrea lo approva.
+
+## «Promuovi» anche nel Profilo, sotto «Annunci» (26 nov 2026, cantiere promuovi-profilo)
+
+Andrea: il tasto «Promuovi» che sta in cima alla scheda di ogni annuncio
+va anche nel Profilo; prima «sotto la classifica streak e il podio», poi
+«inglobare il tasto sotto il tasto annunci nella sezione profilo, così si
+capisce che serve per promuovere appunto gli annunci», e chi lo apre
+«decide quale annuncio suo promuovere», e visto l'anteprima «tipo
+agganciato al tasto annunci». DECISO: lo stesso razzo (`promo-porta`,
+`ICONA_PROMO.porta`), DENTRO il riquadro del gruppo «Annunci», subito
+sotto il titolo (si vede anche a gruppo chiuso); si vede solo a cassa
+aperta (`aggiornaPromuoviProfilo`, chiamata dove arriva
+`promozioni_attive`). Gli annunci proposti sono quelli che nella scheda
+hanno il tasto (`promuovibile`: attivo, non asta, non esaurito, non in
+ferie). Uno solo: dritto al foglio Promuovi. Piu' d'uno: il foglio di
+conferma con le righe a radio (foto piccola, nome, prezzo, lo stesso
+vestito delle voci promo), «Avanti», poi il foglio di sempre. Testi
+nuovi approvati da Andrea prima del codice: «Scegli quale annuncio
+promuovere.», «Avanti», «Non hai annunci da promuovere: pubblicane uno
+dalla scheda Vendi».
+LA TRAPPOLA EVITATA: `eseguiConferma` rimette il suo bottone DOPO
+l'azione (`bottoneInAttesa`): aprire il foglio Promuovi dentro `poi`
+avrebbe riscritto «Avanti» sopra l'etichetta del pagamento. Si apre in
+un setTimeout, a ripristino fatto (provato in node e a schermo: dopo
+«Avanti» il bottone dice «Paga»).
+SCARTATO: una lista nuova in un foglio suo (il foglio di conferma basta
+e porta gia' il volto dell'account); filtrare i soli annunci senza
+promozione in corso (il listino lo dice gia' dentro il foglio, con le
+date).
+PROVATO: `collaudo_promozioni` (in arrivo nel listino e il 409 prima
+del banner, poi il resto a leva spenta); `prove_promozioni` (posto del
+tasto dentro il gruppo, la leva, la linea rossa, in arrivo,
+il banco node: spento, nessuno, uno, piu' d'uno con le esclusioni, il
+foglio dopo), suite severa e collaudi; schermate a 360px chiaro e scuro.
+NELLO STESSO GIRO, chieste da Andrea guardando l'anteprima:
+- LA LINEA ROSSA A SINISTRA del tasto Promuovi («sembra un bug»): lo
+  era. Le sfumature di `.btn.promo-porta` partivano dal padding e si
+  ripetevano sotto il bordo di 1px, che a sinistra mostrava la coda
+  rossa. `background-origin:border-box`, e vale anche per il tasto
+  della scheda e del cassetto del banner.
+- IL NEGOZIO NELLA HOME, IN ARRIVO («stiamo per implementare delle
+  collaborazioni, quindi quella parte lì ci serve... lascialo nel
+  foglio, però mettilo grigio»): leva `PROMO_SCOPRIRE_IN_ARRIVO`, True
+  di serie (cosi' in produzione non serve una riga nel config del
+  VPS). Il listino porta `in_arrivo`; la voce resta nel foglio, spenta,
+  col solo nome e la scritta (`SCOPRIRE_IN_ARRIVO`, scelta da Andrea);
+  il cassetto del banner lo dice in un toast; la cassa rifiuta con un
+  409 PRIMA di guardare negozio e banner, anche chiesta a mano. I
+  negozi li mette lo staff con `/promossi`, che non passa dalla cassa.
+  Si riaccende dal pannello.
+DA GUARDARE: chi ha piu' di 100 annunci vede nella scelta solo i primi
+caricati (`myListings` si allunga scorrendo «I tuoi annunci»).
+
+## Le spunte, secondo giro: la parola per il lettore dello schermo e l'arancio più vivo (26 nov 2026, cantiere spunte-etichette; Andrea: «Per chi usa il lettore dello schermo sì, va bene la tua soluzione. Non c'è bisogno di mostrarmi la scritta prima», e «Il colore arancione delle spunte, fallo più vivo… fallo solo il colore»)
+
+LA PAROLA. Il segno aveva `aria-hidden` (la regola delle scritte nuove, nella voce di ieri «Le spunte nella chat»): chi usa il lettore dello schermo non sapeva niente. Adesso `spuntaChatScP2P` dà al segno `role="img"` e l'`aria-label` «Inviato» (✓), «Consegnato» (✓✓ grigie), «Letto» (✓✓ arancioni): il lettore legge la parola al posto di «segno di spunta». Sullo schermo non cambia niente. L'inglese lo fa il traduttore, che gli `aria-label` li traduce già (`T_ATTRIBUTI`): «Consegnato» e «Letto» erano già nel dizionario, «Inviato» → «Sent» è nuovo, e `LINGUA_VER` va con l'impronta nuova del file. SCARTATO: un testo nascosto dentro lo span (la classe che si legge solo col lettore): lo leggerebbe insieme al segno, «segno di spunta Letto».
+
+L'ARANCIO. Di giorno `--sats-deep` (#D97706) al posto di `--sats-text` (#B45309, spento); il `--sats` pieno di giorno resta scartato perché sul fondo dei miei messaggi (`--sats-soft`) quasi spariva. Di sera il `--sats` pieno (#F7931A) al posto del `--sats-text` serale (#FFB25C, pastello): sul fondo scuro si vede bene. È un segno e non un testo, quindi la soglia è quella dei segni.
+
+PROVATO. `prove_chat_spunte`: le tre etichette sui tre segni, le tre parole nel dizionario inglese, i due colori nei due temi; `prove_lingua_inglese` (l'impronta del dizionario), `prove_barre_paycode` e `prove_chat_scambio` (che fanno girare la resa dei messaggi). Controprova: l'etichetta di «Letto» scambiata con «Consegnato» fa rossa la prova. Suite severa e collaudi della CI nel venv senza coincurve.
+
+## Il volo della card grande anche sul negozio proprio (26 nov 2026, cantiere card-senza-banner; Andrea dal telefono, video: «quando clicchi sembra che la pagina salti [...] vorrei che fosse fluida anche chi non ha un banner del negozio: l'immagine va su e poi compare il testo del negozio sotto»)
+
+COSA SI VEDEVA. Toccando la card grande di AndreAI in «Da scoprire» la home spariva di colpo e la pagina del negozio saliva dal fondo (la testata partiva a metà schermo e saliva); toccando To The Moon la card volava in cima e diventava il banner. Andrea l'ha letta come «senza banner / col banner».
+
+LA CAUSA (riprodotta in un browser a 360×785 col negozio di prova di chi guarda, registrando la vista a ogni fotogramma). Non è il banner: è il PROPRIETARIO. Il 25 nov (cantiere card-grandi, «IL DIFETTO DEL VOLO, SOLO SUL SUO NEGOZIO») il volo era stato spento sul negozio di chi guarda, perché `apriNegozio` aspetta la bozza del venditore (`bozzaDelVenditore`) prima di disegnare e il volo scopriva una pagina non ancora aperta; al suo posto la salita dal basso. AndreAI è il negozio di Andrea (e non ha banner), To The Moon no: per un altro utente anche AndreAI volava già, con la testata dalla card. Misure: prima, sul negozio proprio, nessuna copia e la vista da 785 a 10 px in 0,3 s; dopo, la copia da (6,124) a (15,10) e la pagina aperta sotto a 357 ms, come per gli altri.
+
+LA CURA. 1) La bozza si chiede AL TOCCO (`anticipaBozza`, in `apriNegozioDaScoprire`, solo sul negozio proprio e fuori da demo e vetrina), mentre la card vola: `bozzaDelVenditore` usa quella promessa una volta sola, se è dello stesso negozio e ha meno di 5 s (`BOZZA_ANTICIPO_MS`), sennò richiede — mai una bozza vecchia. 2) Il volo scopre la pagina solo quando `apriNegozio` ha disegnato (`Promise.resolve(disegno).then(scopri)`): per gli altri la promessa è già mantenuta nello stesso giro e non cambia niente; sul negozio proprio la copia resta ferma in cima sul velo finché la bozza arriva. 3) Se la bozza tarda più di `VOLO_ATTESA_MS` (1,5 s) la pagina si apre con l'anello e la testata, e si riempie quando arriva: mai la home che torna. Il proprietario senza volo (effetti ridotti, card fuori schermo) resta sulla strada di prima: sale con l'anello e si riempie. Nessun testo nuovo.
+
+STRADE SCARTATE. Preparare la bozza insieme al negozio pronto della home (vecchia fino a 5 minuti: il venditore che ha appena cambiato la pagina vedrebbe quella di prima); disegnare subito senza bozza e ridisegnare dopo (la storia pubblicata che diventa la bozza sotto gli occhi: un altro salto); un tetto al tempo della bozza che poi la salta (il venditore la vede SEMPRE, decisione di set 2026).
+
+PROVATO. Nel browser, a ogni fotogramma: proprietario senza banner, proprietario col banner (atterra sul banner), un altro utente con e senza banner (come prima), la bozza rallentata a 0,7 s (la copia aspetta in cima, poi la pagina) e a 2,5 s (a 1,5 s l'anello, poi si riempie). `prove_scoprire`: la bozza chiesta al tocco prima del volo, la pagina scoperta solo a disegno fatto e l'anello a tempo scaduto, un banco node di `anticipaBozza`/`bozzaDelVenditore` (una volta sola, fresca, del negozio giusto). Controprove: tolto l'anticipo, scoperta immediata, anticipo riusato: tre rossi. Suite severa e collaudi della CI (anche nel venv senza coincurve): vedi il rapporto del push. Prima/dopo: /mnt/project-files/card-senza-banner/ (prima-dopo.mp4, fotogrammi.jpg).
+
+DA GUARDARE. Sul telefono di Andrea dopo la promozione, sulla card di AndreAI: con la rete lenta del telefono la copia può restare in cima qualche decimo di secondo prima che compaia la pagina.
+
+
+## Le magliette del negozio collegato: l'AI guarda i negozi solo da «Altro» (26 nov 2026, cantiere categorie-negozi; Andrea: «mi continuano ad arrivare nella sezione moderazione questi messaggi… se vado a cercare Bitcoin e poi abbigliamento, non vedo quelle magliette», poi «riporta le magliette in Bitcoin, abbigliamento e gadget… e poi correggi gli avvisi»)
+
+COSA SUCCEDEVA. Dopo «chiesto è chiesto» (25 nov) gli avvisi «🗂 N nuove proposte · Bitcoin → Abbigliamento» non erano più gli stessi annunci richiesti: era un negozio WooCommerce collegato (connettore 3) con circa 875 magliette in «Bitcoin», che il giro digeriva 100 all'ora (dal journal: 20, 58, 39, 20, 27, 100 proposte; nel database 447 «tenute» e 428 «applicate»). E le 428 approvate erano finite in «Abbigliamento» portandosi dietro la sottocategoria «merch» di Bitcoin: una casella che sotto Abbigliamento non esiste, quindi non si vedevano né in Bitcoin → «Abbigliamento e gadget» né in una sottocategoria di Abbigliamento.
+LA CORREZIONE. (1) Un prodotto con `fonte` entra nel giro solo se sta in «Altro»: la sua categoria l'ha scelta il cassetto, il negozio o il nome, e la macchina non corregge le scelte (la stessa regola dei nativi). Gli importati da Nostr restano guardati come prima. (2) `_sposta_categoria` rifà la sottocategoria con `sottocategoria_indovina` sulla categoria nuova (nel dubbio ''). (3) Le 428 riportate in Bitcoin con un UPDATE lanciato da Andrea sul VPS, con la copia prima (`/root/satmarket-prima-magliette-2026-11-26.db`); le righe restano «applicate», quindi non tornano nel giro.
+SCARTATE. Spegnere la leva (i nuovi importati in «Altro» meritano ancora la proposta); insegnare le sottocategorie all'AI (prompt più lungo per un caso che la regola dei negozi chiude da sola).
+PROVATO. `collaudo_categorie_una_volta`: il prodotto del negozio in «Bitcoin» non si chiede, quello in «Altro» sì; approvare Bitcoin → Abbigliamento toglie la «merch». `prove_categorie_una_volta`: due sentinelle. Suite severa e collaudi della CI.
+
+## La ricerca in alto più precisa: almeno una parola nel titolo (26 nov 2026, cantiere ricerca-precisa; Andrea: «quando cerco generatore di corrente mi viene proposto teleruttore ABB [...] dovrebbe cercarmi solamente i generatori di corrente o comunque qualcosa di inerente»)
+
+LA CAUSA (letta sulla produzione, `/api/listings?q=generatore di corrente`, main 845c3e74). Nel mercatino non c'è nessun generatore, e usciva un solo annuncio: il teleruttore. Ci arrivava dalla STRETTA, non dal giro largo, per tre motivi insieme: 1) le parole potevano stare tutte nella sola descrizione, e quella del teleruttore è lunghissima («Corrente di esercizio…», «la generazione attuale di teleruttori»); 2) lo stemmer porta «generatore» e «generazione» sulla stessa radice «gener»; 3) «di» contava come una parola vera.
+
+LA CURA (proposta in 10 righe, ok di Andrea). In `_domanda_fts`: 1) le PAROLINE VUOTE (`_PAROLE_VUOTE_RICERCA`, articoli, preposizioni anche apostrofate, congiunzioni) escono dalla domanda — non dall'indice, quindi niente reindicizzazione e `VERSIONE_RICERCA` resta 1; una domanda di sole paroline le tiene; 2) la STRETTA vuole tutte le parole dovunque PIÙ almeno una in `{titolo categoria}` (filtro di colonna FTS5); 3) la LARGA, il ripiego quando nessuno ha tutte le parole, vuole una parola sola ma nel titolo o nella categoria. I pesi BM25 e l'ordine per pertinenza non cambiano. Niente AI, niente scritte nuove: «generatore di corrente» oggi dà la vetrina vuota con la scritta che c'è già.
+
+STRADE SCARTATE. Togliere il troncamento a cinque lettere o cambiare lo stemmer: «generatore»/«generazione» combaciano già sulla radice dello stemmer, quindi non sarebbe bastato, e il troncamento tiene insieme tastiera/tastiere (la voce d'agosto). Togliere del tutto il giro largo: rovescia la decisione d'agosto («una vetrina vuota quando qualcosa c'era è peggio»); stretto al titolo, il giro largo resta sensato.
+
+IL PREZZO, detto ad Andrea prima: un annuncio col titolo generico («Logitech G915») si trova con «tastiera» solo se la parola sta nella categoria o sottocategoria coi loro sinonimi, non più se sta solo nella descrizione.
+
+PROVATO. `prove_ricerca`: il caso vero (teleruttore con «generazione», «corrente», «di» in descrizione; un generatore nel titolo; un carrello che nomina il generatore in descrizione) → solo il generatore, nella stretta e nel giro largo; una parola solo in descrizione non basta; le paroline fuori dalla domanda, ma una domanda di sole paroline cerca; la regex delle domande ostili ammette il solo filtro `{titolo categoria} :`. CONTROPROVA col `_domanda_fts` di prima: 4 rosse (il teleruttore torna fuori: [21, 20]). `collaudo_ricerca` (server vero): la poltrona che ripete «tastiera» quattro volte in descrizione non esce più (era la prova dei pesi, riscritta), «tastiera meccanica di» trova la Keychron, prezzo e regione rifatti sui collezionabili; controprova rossa col server di prima.
+
+DA GUARDARE. Dopo la promozione, con Andrea: qualche ricerca vera sul telefono. Se un venditore lamenta che il suo annuncio non si trova, è quasi sempre un titolo che non nomina la cosa: si corregge il titolo (o un sinonimo nella sottocategoria).
+## «Non hai sats?» si accende da solo (26 nov 2026)
+
+Dalla prova dal vivo con Alan e Sam (soldi veri, solo moderatori),
+Andrea ha chiesto tre cose.
+- «ORDINE PRESO» E BASTA: dopo la presa, chi paga in euro vedeva
+  «Sto preparando il pagamento…» con l'anello, finche' chi vende non
+  bloccava i sats. Ora vede solo «Ordine preso» («dovrebbe dire
+  semplicemente ordine preso e fine»), nel foglio e nella pagina
+  dell'ordine.
+- IL TASTO ARRIVAVA TARDI: il libro P2P si leggeva aprendo la cassa, e
+  dai relay ci mette qualche secondo. Chi toccava «Paga» prima vedeva
+  «Non hai sats?» solo chiudendo il QR. Adesso il libro si legge
+  APRENDO LA SCHEDA, in silenzio (`openDetail` → `viaEuroLibro`).
+  Chi chiede il libro mentre una lettura e' in volo si accoda a quella.
+  A libro letto `viaEuroDopoLibro` ridisegna la cassa e, se e' aperto,
+  il foglio della fattura (`viaEuroSatsQr`). Mentre cerca si vede solo
+  «Paga»; con un match «Paga» si sposta e compare «Non hai sats?».
+- SOLO CON UN MATCH VERO («se non li trova non compare neanche il
+  bottone»): chi vende a cifra fissa non accende piu' il tasto, e la
+  cassa non chiede piu' a loro (la richiesta del 24 nov faceva
+  aspettare minuti senza sapere se arrivava). Il codice della richiesta
+  resta (server e fogli), ma dalla cassa non si raggiunge piu'.
+STRADA SCARTATA: il tasto sempre acceso con una ricerca di 5 secondi e
+«Non ci sono ordini disponibili» (provata in questo giro e buttata:
+Andrea vuole che il tasto non compaia proprio senza match).
+LE SCELTE DI ANDREA: il bottone resta «Non hai sats?», senza «euro»;
+nel foglio del QR «Non hai sats? Compra da qui» diventa «Non hai
+sats? Paga in altri modi» (testo suo: chi e' di Lugano pagherebbe in
+franchi, e «euro» confonderebbe);
+oggi paga solo gli ordini in euro, e gli USDT sono un cantiere a
+parte, se lo vorra'. Da proporre: spingere chi vende sats a pubblicare
+un INTERVALLO invece di una cifra fissa (testo e incentivo da decidere
+con lui).
+LA SPINTA ALL'INTERVALLO (stesso giorno, frase approvata da Andrea:
+«mettila bene in evidenza», e «quando clicca li' sopra la prima volta
+gli esce fuori un banner»): a chi VENDE sats in euro a prezzo di
+mercato (`spintaIntervalloP2P`: non a prezzo fisso, non on-chain, non
+col tabacchino, non in una moneta) sotto l'importo c'e' una scatola
+arancio, sempre in vista, con `P2P_SPINTA_INTERVALLO`. Prende il posto
+del «💡 Tocca il secondo campo solo se vuoi creare un ordine a
+intervallo», che diceva il contrario della spinta (per chi compra sats
+resta). Al primo tocco dell'importo la stessa frase sta in cima al
+foglio dell'importo, una volta per telefono (`localStorage`
+`p2pSpintaIntervallo`). Perche': chi paga dal mercatino senza sats
+trova un venditore solo se la sua cifra cade dentro un ordine, e un
+intervallo la prende quasi sempre. L'incentivo vero (sconto, premio)
+resta da decidere.
+«📦 APRI L'ORDINE» SU OGNI «HAI VENDUTO» (stesso giorno, Andrea dopo la
+prova, su uno scambio a mano: «non c'e' nessun tasto che mi porta
+sull'ordine»): dal 17 nov (spedisci-entro) il tasto stava solo sul ramo
+con la data «Spedisci entro…», e gli altri erano rimasti come prima per
+prudenza, non per una scelta. Ora `_incassa_ordine` lo manda sempre,
+tranne all'abbonamento, che ha i suoi avvisi. Stessa etichetta
+(`BOTTONE_ORDINE_VENDUTO`), nessuna scritta nuova.
+PROVATO: `prove_non_hai_sats` e `prove_chiedi_al_venditore` (il tasto
+solo col match, niente richiesta dalla cassa, la lettura dalla scheda
+e il ridisegno, la spinta, il tasto in «Hai venduto»); suite severa
+31806 verdi (2 saltate d'ambiente, nostr-tools); collaudi 175 verdi
+piu' `collaudo_spedisci_entro` emendato (aspettava NESSUN tasto sul
+ritiro e a leva 0: ora c'e') e rigirato verde da solo. Il giro dei
+collaudi e' partito prima della guardia `typeof spintaIntervalloP2P`
+nel foglio «Pubblica» (aggiunta per i banchi node, nel browser la
+funzione c'e' sempre).
+DA GUARDARE: dal telefono di Sam, che il tasto compaia aprendo la
+scheda senza passare dal QR.

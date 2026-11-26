@@ -990,7 +990,25 @@ leva: nessuna
 pubblico: sì
 
 ## 2026-11-25 · cerco-richieste
-frase: Se nel mercatino non trovi quello che cerchi, adesso puoi chiederlo: scrivi cosa ti serve (un buono, un voucher, buoni carburante…), la categoria e, se vuoi, il budget massimo in sats. Barattolo sceglie i venditori più adatti e il bot li avvisa: chi ce l'ha ti fa un'offerta, che compri col deposito di garanzia come ogni annuncio. In home i riquadri nuovi: «Offerte», «Sconti» e «Cerco».
+frase: Se nel mercatino non trovi quello che cerchi, adesso puoi chiederlo: scrivi cosa ti serve (un buono, un voucher, buoni carburante…), la categoria e, se vuoi, il budget massimo in euro o in sats. Barattolo sceglie i venditori più adatti e il bot li avvisa: chi ce l'ha ti fa un'offerta, che compri col deposito di garanzia come ogni annuncio. In home i riquadri nuovi: «Offerte», «Sconti» e «Cerco».
 dove: Esplora → il riquadro «Cerco» sotto «Offerte» e «Sconti»; oppure una ricerca senza risultati → «🙋 Chiedilo a tutti».
 leva: RICHIESTE (accesa di serie, aperta a tutti)
+pubblico: no
+
+## 2026-11-26 · cerco-avvisi
+frase: In «Cerco» il budget si scrive anche in euro, e scegli per quanto tenere aperta la richiesta: 30, 60 o 90 giorni. E se vuoi sapere quando qualcuno cerca qualcosa, nel Profilo c'è «🙋 Avvisami delle nuove richieste di Cerco»: ti arriva un messaggio col tasto «Offri», per le categorie scelte negli avvisi, al massimo 3 al giorno.
+dove: Esplora → «Cerco»; Profilo → Impostazioni → Avvisi → blocco «Mercatino».
+leva: RICHIESTE (accesa di serie); l'interruttore resta spento finché non lo accendi
+pubblico: no
+
+## 2026-11-26 · chat-spunte
+frase: Nella chat degli scambi e degli ordini adesso sotto i tuoi messaggi ci sono le spunte: una ✓ quando il messaggio è partito, due ✓✓ quando è arrivato sul telefono dell'altra persona, e le due ✓✓ diventano arancioni quando l'ha letto. E se hai messo la pausa ai tuoi ordini P2P e poi parti, la pausa segue da sola il fuso orario del tuo telefono, con le stesse ore.
+dove: La chat di uno scambio P2P, di un ordine o di uno scambio on-chain → accanto all'ora dei tuoi messaggi; «I miei scambi» → «⏸ Pausa degli ordini».
+leva: CHAT_SPUNTE (le spunte; accesa di serie)
+pubblico: no
+
+## 2026-11-26 · spinta-intervallo
+frase: Quando vendi sats nel P2P, sotto l'importo adesso trovi in evidenza: «Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.» La prima volta che tocchi l'importo te lo dice anche in cima al foglio.
+dove: P2P → Vendi BTC → Pubblica ordine → l'importo (prezzo di mercato, in euro).
+leva: nessuna
 pubblico: no
