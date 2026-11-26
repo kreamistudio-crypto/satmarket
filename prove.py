@@ -51656,7 +51656,8 @@ def _ambiente_ricerca():
         exec(pezzo(nome), amb)
     for catalogo, fine in (("SINONIMI_CATEGORIA = {", "\n}"),
                            ("SOTTOCATEGORIE = {", "\n}"),
-                           ("SINONIMI_SOTTOCATEGORIA = {", "\n}")):
+                           ("SINONIMI_SOTTOCATEGORIA = {", "\n}"),
+                           ("_PAROLE_VUOTE_RICERCA = frozenset(", "\n)")):
         i = _SORGENTE.index(catalogo)
         exec(_SORGENTE[i:_SORGENTE.index(fine, i) + 2], amb)
     # lo stemmer col suo import fail-open, esattamente com'e' scritto
@@ -51842,13 +51843,45 @@ def prove_ricerca():
     ostili = ['tastiera" OR titolo:', 'a" NEAR/9 "b', "bici*)(", "-- drop"]
     prova("nessuna domanda ostile esce dalla forma", [],
           [s for s in ostili
-           if not re.fullmatch(r'(?:"[a-z0-9]+"\*?|[()* ]|AND|OR)*',
+           if not re.fullmatch(r'(?:"[a-z0-9]+"\*?|[()* ]|AND|OR'
+                               r'|\{titolo categoria\} :)*',
                                dom(s)[0])])
     # Gli operatori ostili NON prendono: `normalizza` li ha gia'
     # ridotti a parole, quindi restano una ricerca qualunque — quel
     # che deve valere e' che nessuna esploda e che la forma tenga.
     prova("...e nessuna ricerca ostile esplode", [True] * 4,
           [isinstance(cerca(s), list) for s in ostili])
+
+    # --- ALMENO UNA PAROLA NEL TITOLO O NELLA CATEGORIA (26 nov 2026) --
+    # Il caso vero di Andrea, con la descrizione vera ridotta all'osso:
+    # «generatore di corrente» pescava un teleruttore perche' «corrente»,
+    # «generazione» (stessa radice di «generatore») e «di» stavano tutti
+    # nella descrizione, e nessuno nel titolo.
+    annuncio(20, "Teleruttore ABB AF09Z bobina 12-20 VDC",
+             "La serie AF e' la generazione attuale di teleruttori. "
+             "Corrente di esercizio AC-1 25 A, gruppi elettrogeni.",
+             cat="Elettronica")
+    annuncio(21, "Generatore di corrente 3 kW a benzina", "usato poco",
+             cat="Casa e giardino")
+    annuncio(22, "Carrello porta attrezzi", "regge un generatore",
+             cat="Casa e giardino")
+    amb["riallinea_ricerca"](con)
+    prova("«generatore di corrente» trova il generatore e basta", [21],
+          cerca("generatore di corrente"))
+    prova("...e il giro largo vuole la parola nel titolo", [21],
+          cerca("generatore elicottero"))
+    prova("una parola sola nella descrizione non basta", [],
+          cerca("poco"))
+    prova("...ma nel titolo si', anche per un annuncio solo", [20],
+          cerca("teleruttore"))
+    prova("le paroline vuote non contano: «di» da solo nella domanda",
+          True, "di" not in dom("generatore di corrente")[0].replace(
+              '"', " ").split())
+    prova("...ma una domanda di sole paroline cerca lo stesso", True,
+          bool(dom("di")[0]))
+    for i in (20, 21, 22):
+        con.execute("DELETE FROM annunci WHERE id=?", (i,))
+    con.commit()
 
     # --- LA PERTINENZA, che e' l'unica cosa che si perde in silenzio --
     ids = cerca("collezione")
