@@ -1345,6 +1345,12 @@ P2P_RECAPITO_NEL_TEMPO = True
 # scambio e il server non accetta buste nuove; quelle che ci sono se ne
 # vanno come sempre, a scambio finito. Solo False spegne.
 P2P_CHAT_SCAMBIO = True
+# LE SPUNTE NELLA CHAT (26 nov 2026): ACCESA di serie. Sotto i propri
+# messaggi ✓ = sul server, ✓✓ = ritirato dal telefono dell'altra parte,
+# ✓✓ arancioni = l'altra parte ha avuto la chat davanti. Vale per le chat
+# di scambi P2P, ordini del mercatino e scambi on-chain. Solo False
+# spegne: niente spunte, e il server non scrive fin dove ognuno ha visto.
+CHAT_SPUNTE = True
 # GLI AVVISI DEI NUOVI ORDINI DEL LIBRO (9 ott 2026): chi lo chiede dal
 # bottone 🔔 della testata del libro o dal cassetto Avvisi del Profilo
 # riceve un messaggio quando nel libro compaiono ordini nuovi — del tipo

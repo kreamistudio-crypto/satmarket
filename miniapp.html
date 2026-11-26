@@ -4583,6 +4583,12 @@
       font-size:14px;line-height:1.4;overflow-wrap:anywhere;white-space:pre-wrap}
     .chatmod-msg.mio{background:var(--sats-soft)}
     .chatmod-msg small{display:block;font-size:12px}
+    /* LE SPUNTE (26 nov 2026, Andrea: «Le voglio arancioni»): grigie
+       come la riga dell'ora finche' l'altra parte non ha visto, poi
+       arancioni. --sats-text e non --sats: sul fondo dei miei messaggi
+       (--sats-soft) il --sats di giorno non si vedrebbe */
+    .chatsc-spunte{letter-spacing:-.18em;margin-left:2px;white-space:nowrap}
+    .chatsc-spunte.vista{color:var(--sats-text)}
     /* L'ASSISTENZA IN APP (3 nov 2026): il vestito della chat col
        moderatore, con la lista piu' alta (e' la pagina intera) e le
        righe dell'elenco degli admin, una per utente */
@@ -119813,8 +119819,41 @@ async function chiediMiaPausaP2P(){
     const d = await r.json();
     if (!d || d.attiva !== true) return false;
     p2pMiaPausa = d;
+    seguiFusoPausaP2P();
     return true;
   } catch(e) { return false; }
+}
+/* ---- IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026, cantiere chat-spunte;
+   la domanda di un utente all'estero, Andrea: «Ok, perfetto») ----
+   La pausa vale nell'ora del fuso che il telefono aveva quando si e'
+   premuto «Salva»: chi partiva DOPO restava in pausa con l'ora di casa.
+   Adesso, se il telefono e' in un altro fuso, la pausa lo segue da sola
+   con le STESSE ORE («22-7» resta 22-7, dove sono). Senza dire niente:
+   e' la pausa che la persona ha gia' scelto. Una volta per fuso e per
+   apertura dell'app, anche se il server non risponde. */
+let p2pFusoPausaProvato = '';
+/* PURA: il fuso a cui portare la pausa, o '' se non serve. Solo con una
+   pausa salvata che dice il suo fuso, e un telefono che sa il suo */
+function fusoPausaNuovoP2P(pausa, fuso){
+  const ora = String(fuso || '');
+  if (!pausa || !ora || !pausa.fuso) return '';
+  if (!(Array.isArray(pausa.fasce) && pausa.fasce.length) && !(Number(pausa.una_fino) > 0)) return '';
+  return String(pausa.fuso) === ora ? '' : ora;
+}
+async function seguiFusoPausaP2P(){
+  const fuso = fusoPausaNuovoP2P(p2pMiaPausa, fusoTelefonoP2P());
+  if (!fuso || p2pFusoPausaProvato === fuso) return;
+  p2pFusoPausaProvato = fuso;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/pausa`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({solo_fuso: true, fuso: fuso, scarto: -new Date().getTimezoneOffset()})});
+    const d = r.ok ? await r.json().catch(() => null) : null;
+    if (d && d.attiva === true) {
+      p2pMiaPausa = d;
+      if (typeof rivestiRighePausaP2P === 'function') rivestiRighePausaP2P();
+    }
+  } catch(e) {}
 }
 /* LA MIA PAUSA SI CHIEDE UNA VOLTA AL MINUTO, non a ogni ridisegno
    (cantiere pausa-in-vista): le righe di stato nascono con quel che si
@@ -122202,6 +122241,9 @@ const CHATSC_FRENO_MS = 1500;     // fra un invio e il successivo
 const CHATSC_DOPO = ['rilasciato', 'fattura_nuova', 'pagamento_ritentato'];
 /* `let` e non `const`: il banco lo accorcia */
 let CHATSC_POLSO_MS = 5000;
+/* LE SPUNTE (26 nov 2026): gli scambi dove il mio «visto» e' andato
+   avanti e il server non lo sa ancora */
+const p2pChatScRidire = {};
 const CHATSC_AVVISO = 'Barattolo non ti scrive mai qui. Non uscire dallo scambio per pagare. Non mandare codici o chiavi.';
 const CHATSC_PATTO = 'Cifrata fra voi due: Barattolo la trasporta e non la legge, e a fine scambio la cancella. Un moderatore la legge solo se una di voi due apre una disputa.';
 const CHATSC_RIGA_LINK = 'C\'è un link: non aprirlo per pagare o per «verificare» qualcosa.';
@@ -122856,7 +122898,15 @@ function chatScVistoP2P(id){
   const c = chatScDiP2P(id);
   if (!c) return;
   const prima = chatScNonLettiP2P();
-  if ((c.vistoFino | 0) < (c.cursore | 0)) { c.vistoFino = c.cursore | 0; chatScScriviP2P(id, c); }
+  if ((c.vistoFino | 0) < (c.cursore | 0)) {
+    c.vistoFino = c.cursore | 0; chatScScriviP2P(id, c);
+    /* LE SPUNTE (26 nov 2026): l'altra parte lo sa col prossimo ritiro,
+       che parte adesso; se uno e' gia' in volo, ci pensa la sua coda */
+    if (c.spunte) {
+      p2pChatScRidire[id] = 1;
+      if (!p2pChatScInVolo[id]) setTimeout(() => { chatScRitiraP2P(id); }, 0);
+    }
+  }
   if (chatScNonLettiP2P() !== prima) chatScSegnaP2P();
 }
 function chatScNovitaP2P(){
@@ -123256,7 +123306,10 @@ function chatScRitiraP2P(id){
   p2pChatScInVolo[id] = (async () => {
     await caricaNostrTools();
     const prima = chatScDiP2P(id);
-    const d = await chatScFetch('leggi', {ordine: id, dopo: (prima && prima.cursore) | 0});
+    /* LE SPUNTE (26 nov 2026): fin dove ho avuto la chat davanti, per le
+       ✓✓ arancioni di chi mi scrive. Detto adesso, non serve ridirlo */
+    delete p2pChatScRidire[id];
+    const d = await chatScFetch('leggi', {ordine: id, dopo: (prima && prima.cursore) | 0, visto: (prima && prima.vistoFino) | 0});
     /* le chiavi d'ordine che il server presenta (mercatino) */
     if (merc && d.aperta)
       p2pChatMercInfo[id] = {peers: Array.isArray(d.peers) ? d.peers : [], mie: Array.isArray(d.mie) ? d.mie : [],
@@ -123335,6 +123388,9 @@ function chatScRitiraP2P(id){
     const esito = chatScPosaP2P(o, tk, c0, d.buste, d.giro);
     /* il segno di nascita del cassetto che ha dato queste buste */
     if (d.cassetto) esito.c.cassetto = d.cassetto;
+    /* LE SPUNTE: fin dove l'altra parte ha ritirato e ha visto. Senza
+       (la leva spenta) non ce ne sono */
+    esito.c.spunte = spunteDalServerChatScP2P(d.spunte);
     chatScScriviP2P(id, esito.c);
     if (esito.adottata) scrivi('chiave ritrovata dalla copia sigillata, la chat continua qui');
     rileggi = !!esito.rileggi;
@@ -123368,6 +123424,10 @@ function chatScRitiraP2P(id){
     /* una chiave ritrovata: si rilegge SUBITO da capo, senza aspettare
        il battito — e' il momento in cui i messaggi di prima tornano */
     if (rileggi) setTimeout(() => { chatScRitiraP2P(id); }, 0);
+    /* LE SPUNTE: il «visto» e' andato avanti mentre il ritiro era in
+       volo — si dice subito, non al battito dopo (chi chiude l'app
+       entro cinque secondi lascerebbe le ✓✓ grigie all'altra parte) */
+    else if (p2pChatScRidire[id]) setTimeout(() => { chatScRitiraP2P(id); }, 0);
   });
   return p2pChatScInVolo[id];
 }
@@ -123378,12 +123438,15 @@ async function chatScInviaP2P(id, testo, f){
   if (!chatScServeP2P(o) || !chatScProntaP2P(c, o)) throw new Error('La chat non è ancora aperta');
   const quando = Math.floor(Date.now() / 1000);
   const b = chatScBustaP2P(o, c, testo, quando, f);
-  await chatScFetch('invia', {ordine: id, tipo: 'msg', busta: b.busta});
+  const esito = await chatScFetch('invia', {ordine: id, tipo: 'msg', busta: b.busta});
   const agg = chatScDiP2P(id);
   if (!agg) return;
+  /* LE SPUNTE (26 nov 2026): il numero che il server ha dato alla busta
+     arriva con la risposta, e la ✓ c'e' subito, senza aspettare il ritiro */
+  const nServer = (esito && Number(esito.n) > 0) ? (esito.n | 0) : 0;
   if (!(agg.msgs || []).some(m => m.id === b.dentro.id))
     agg.msgs = (agg.msgs || []).concat([Object.assign({id: b.dentro.id, t: quando, mio: true, testo: testo},
-                                                      f ? {f: f} : {})])
+                                                      nServer ? {n: nServer} : {}, f ? {f: f} : {})])
       .slice(-CHATSC_MAX_MSG);
   chatScScriviP2P(id, agg);
 }
@@ -123983,7 +124046,7 @@ function chatScMessaggiHTML(c, altro, o){
     const li = chatScLinkP2P(m.testo);
     return '<div class="chatmod-msg' + (m.mio ? ' mio' : '') + '">'
       + '<small>' + esc(m.mio ? 'Tu' : altro)
-      + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + '</small>'
+      + (m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + spuntaChatScP2P(m, c && c.spunte) + '</small>'
       /* il messaggio di un file: il riquadro al posto di «📎 Foto» */
       + ((m.f && m.testo === testoAllegatoChatScP2P(m.f.tipo)) ? '' : chatScTestoHTML(m.testo, true))
       + (m.f ? allegatoChatScHTML(m.f, (o && o.id) || '', false) : '')
@@ -123999,6 +124062,30 @@ function chatScMessaggiHTML(c, altro, o){
       + (al.fuori ? '<div class="chatsc-allarme">⚠️ ' + esc((o && o.mercatino && !o.onchain) ? CHATSC_MERC_RIGA_FUORI : CHATSC_RIGA_FUORI) + '</div>' : '')
       + '</div>';
   }).join('');
+}
+/* ---- LE SPUNTE (26 nov 2026, cantiere chat-spunte; l'idea e' di un
+   utente, Andrea: «Le voglio arancioni») ----
+   Sotto i MIEI messaggi: ✓ la busta e' sul server; ✓✓ il telefono
+   dell'altra parte l'ha ritirata; ✓✓ arancioni l'altra parte ha avuto
+   la chat davanti agli occhi. Le cifre (numeri di busta) le dice il
+   server col ritiro, e solo a leva `CHAT_SPUNTE` accesa: senza cifre,
+   nessuna spunta. Solo segni, nessuna parola. */
+/* PURA: le cifre del server, pulite — o null */
+function spunteDalServerChatScP2P(sp){
+  if (!sp || typeof sp !== 'object') return null;
+  return {arrivato: Math.max(0, Math.floor(Number(sp.arrivato) || 0)),
+          visto: Math.max(0, Math.floor(Number(sp.visto) || 0))};
+}
+/* PURA: la spunta di un messaggio. Solo i miei, solo con un numero del
+   server (prima non e' ancora arrivato), e mai le righe di sistema */
+function spuntaChatScP2P(m, sp){
+  if (!sp || !m || !m.mio || m.sis) return '';
+  const n = Math.floor(Number(m.n) || 0);
+  if (n <= 0) return '';
+  const vista = n <= (sp.visto | 0);
+  const doppia = vista || n <= (sp.arrivato | 0);
+  return ' <span class="chatsc-spunte' + (vista ? ' vista' : '') + '" aria-hidden="true">'
+    + (doppia ? '✓✓' : '✓') + '</span>';
 }
 function oraBreveChatScP2P(ts){
   const d = new Date((Number(ts) || 0) * 1000);

@@ -1000,3 +1000,9 @@ frase: In «Cerco» il budget si scrive anche in euro, e scegli per quanto tener
 dove: Esplora → «Cerco»; Profilo → Impostazioni → Avvisi → blocco «Mercatino».
 leva: RICHIESTE (accesa di serie); l'interruttore resta spento finché non lo accendi
 pubblico: no
+
+## 2026-11-26 · chat-spunte
+frase: Nella chat degli scambi e degli ordini adesso sotto i tuoi messaggi ci sono le spunte: una ✓ quando il messaggio è partito, due ✓✓ quando è arrivato sul telefono dell'altra persona, e le due ✓✓ diventano arancioni quando l'ha letto. E se hai messo la pausa ai tuoi ordini P2P e poi parti, la pausa segue da sola il fuso orario del tuo telefono, con le stesse ore.
+dove: La chat di uno scambio P2P, di un ordine o di uno scambio on-chain → accanto all'ora dei tuoi messaggi; «I miei scambi» → «⏸ Pausa degli ordini».
+leva: CHAT_SPUNTE (le spunte; accesa di serie)
+pubblico: no

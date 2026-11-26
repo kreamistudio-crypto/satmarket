@@ -102695,7 +102695,10 @@ def prove_chat_scambio():
            ("invia", "ordine: id, tipo: 'chiave_ordine', busta: k.pub"),
            ("invia", "ordine: id, tipo: 'mod', per: m, busta: busta"), ("invia", "ordine: id, tipo: 'msg', busta: b.busta"),
            ("invia", "ordine: id, tipo: 'saluto', busta: c.saluto.busta"),
-           ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0"), ("moderatori", "ordine: id"),
+           # (26 nov 2026, chat-spunte) ...e fin dove ho avuto la chat davanti:
+           # un numero di busta, per le ✓✓ arancioni di chi mi scrive
+           ("leggi", "ordine: id, dopo: (prima && prima.cursore) | 0, visto: (prima && prima.vistoFino) | 0"),
+           ("moderatori", "ordine: id"),
            ("novita", "ordini: ids"),
            # (20 ott 2026) la scorta: la domanda vuota, e i lucchetti (solo
            # parti pubbliche e semi: lo guarda `prove_chat_dalla_notifica`)
@@ -102918,8 +102921,9 @@ def prove_chat_scambio():
           True, o["serverSenzaTesto"])
     prova("...NE' UNA CHIAVE: ne' le due usa-e-getta (segrete e pubbliche) ne' quelle dello scambio",
           True, o["serverSenzaChiavi"])
+    # (26 nov 2026, chat-spunte) il ritiro porta anche `visto`, un numero
     prova("...e riceve solo POST, con tre forme di corpo e nessun dato nell'indirizzo",
-          (True, ["busta,ordine,tipo", "dopo,ordine", "ordini"]), (o["soloPost"], o["corpi"]))
+          (True, ["busta,ordine,tipo", "dopo,ordine,visto", "ordini"]), (o["soloPost"], o["corpi"]))
     prova("IL PALLINO chiede gli ultimi numeri dei suoi scambi vivi, e basta",
           ['novita:{"ordini":["5a1e0000-c2c2-4a2b-9c3d-000000000001"]}'], o["novitaChiede"])
     prova("...un messaggio dell'altra persona non ancora aperto: acceso sulla card e sul pallino degli scambi",
@@ -184923,9 +184927,11 @@ def prove_tempo_pubblica_app():
     # (12 ott 2026, notte, cantiere libro-vuoto) la terza e' «togli la
     # pausa per stanotte» (`togliPausaAdessoP2P`): stessa rotta, col
     # corpo `{salta: true}`
-    prova("...il blocco dentro non ha nessuna fetch; quello fuori ne ha tre, una lettura e "
-          "due scritture, tutte su /p2p/pausa",
-          [0, 3, 3, 2],
+    # (26 nov 2026, cantiere chat-spunte) la quarta e' il fuso che segue il
+    # telefono (`seguiFusoPausaP2P`): stessa rotta, col corpo `{solo_fuso: true}`
+    prova("...il blocco dentro non ha nessuna fetch; quello fuori ne ha quattro, una lettura e "
+          "tre scritture, tutte su /p2p/pausa",
+          [0, 4, 4, 3],
           [nudo.count("fetch("), chiede.count("fetch("), chiede.count("${API_BASE}/p2p/pausa"),
            chiede.count("method: 'POST'")])
     prova("il custode non si nomina nemmeno qui: nessuna frase del blocco dice «coordinatore» "
@@ -191801,10 +191807,16 @@ def prove_ordine_in_pausa():
           ("salta_fino" in [c[1] for c in vecchio.execute("PRAGMA table_info(p2p_pause)")],
            mia(vecchio, 5, SERA)["fino"]))
     rotta = pezzo("scrivi_pausa_p2p")
+    # (26 nov 2026, cantiere chat-spunte) `{solo_fuso: true}` passa dal
+    # giudice del fuso, e anche lui non riscrive le fasce
     prova("la rotta: `{salta: true}` passa dal giudice del salto e non riscrive le fasce; "
-          "ogni altro corpo e' la scrittura di sempre", True,
+          "`{solo_fuso: true}` dal giudice del fuso; ogni altro corpo e' la scrittura di sempre", True,
           'if isinstance(d, dict) and d.get("salta") is True:\n'
           '            fuori = _salta_pausa_p2p(con, user["id"], adesso)\n'
+          '        # IL FUSO CHE SEGUE IL TELEFONO (26 nov 2026): `{"solo_fuso":\n'
+          '        # true, ...}` cambia fuso e scarto, e nient\'altro\n'
+          '        elif isinstance(d, dict) and d.get("solo_fuso") is True:\n'
+          '            fuori = _fuso_pausa_p2p(con, user["id"], d, adesso)\n'
           '        else:\n'
           '            fuori = _scrivi_pausa_p2p(con, user["id"], _pausa_pulita_p2p(d, adesso), adesso)'
           in rotta)
@@ -199064,6 +199076,8 @@ def prove_barre_paycode():
             "function chatScLinkP2P(testo){", "function chatScAllarmiP2P(testo){",
             "function chatScTestoHTML(testo, senzaPdf){", "function payCodeScambioP2P(o){",
             "function schedaPdfPayCodeP2P(l, pcScambio){", "function chatScMessaggiHTML(c, altro, o){",
+            # (26 nov 2026, chat-spunte) la spunta accanto all'ora dei miei
+            "function spuntaChatScP2P(m, sp){",
             "function disegnaBarreP2P(){", "function apriBarreP2P(d){"))
         + "\nlet p2pBarreDati = null;\n"
         + "\nconst TAB = " + _tab.group(0) + ";\n"
@@ -216520,6 +216534,263 @@ def prove_chat_onchain():
           True, "chatDaAvvisoP2P(P2P_SCAMBIO_URL)" in ar and "esito === 'aperto'" in ar)
 
 
+def prove_chat_spunte():
+    """LE SPUNTE NELLA CHAT, E IL FUSO DELLA PAUSA CHE SEGUE IL TELEFONO
+    (26 nov 2026, cantiere chat-spunte; le due idee sono di un utente,
+    girate da Andrea: «Ok, perfetto. Le voglio arancioni»).
+
+    Sotto i MIEI messaggi: ✓ la busta e' sul server, ✓✓ il telefono
+    dell'altra parte l'ha ritirata, ✓✓ arancioni l'altra parte ha avuto la
+    chat davanti. Quel che qui si rompe in silenzio: un «visto» che va
+    oltre quel che si e' ritirato (un telefono che mente in avanti) o che
+    torna indietro (uno che riparte da zero); la lettura del moderatore che
+    accende le spunte; la leva spenta che le lascia; le spunte sui
+    messaggi dell'altra parte o sulle righe di sistema; il «visto» detto
+    solo al battito dopo, cosi' chi chiude l'app subito lascia le ✓✓
+    grigie; il cassetto di ieri senza la colonna.
+    E LA PAUSA: chi parte DOPO averla salvata restava in pausa con l'ora
+    di casa. Il telefono in un altro fuso la porta con se', con le stesse
+    ore, senza toccare fasce, una tantum e «per stanotte»."""
+    print("\n[le spunte nella chat, e il fuso della pausa che segue il telefono]")
+    import calendar as _cal
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    esempio = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: la leva, la colonna, la rotta -----------------------
+    prova("LA LEVA: accesa di serie, e solo un False scritto la spegne", True,
+          "    CHAT_SPUNTE = CHAT_SPUNTE is not False\nexcept ImportError:\n"
+          "    CHAT_SPUNTE = True\n" in src)
+    prova("...dichiarata ACCESA nel config d'esempio, e nel pannello «Stato delle leve»",
+          (True, True), ("\nCHAT_SPUNTE = True\n" in esempio,
+                         '_leva("Spunte nella chat", "CHAT_SPUNTE", CHAT_SPUNTE,' in pezzo("_leve_stato")))
+    schema = pezzo("db_chat")
+    prova("la colonna del visto sta nel CREATE e nell'ALTER per il cassetto di ieri", (True, True),
+          ("                visto_fino INTEGER NOT NULL DEFAULT 0,\n" in schema,
+           'con.execute("ALTER TABLE letture ADD COLUMN visto_fino INTEGER NOT NULL DEFAULT 0")'
+           in schema))
+    leggi = src[src.index('@app.post("/api/p2p/chat/leggi")'):]
+    leggi = leggi[:leggi.index("\n\n\n")]
+    prova("la rotta del ritiro: le spunte DOPO il ritiro, solo a leva accesa, per l'altra parte",
+          True, 0 < leggi.index("corpo = _chat_p2p_ritira(") < leggi.index(
+              "        if CHAT_SPUNTE:\n"
+              "            corpo[\"spunte\"] = _chat_spunte(cc, ordine, st[\"giro\"], user[\"id\"],\n"
+              "                                           st[\"altro\"], d.get(\"visto\"))"))
+    prova("...e il moderatore non passa di li': la sua lettura non accende niente", False,
+          "_chat_spunte" in pezzo("_chat_p2p_per_moderatore") + pezzo("_chat_mercatino_per_moderatore"))
+
+    # --- 2) IL SERVER: il giudice vero, su sqlite in memoria ---------------
+    amb = {"sqlite3": sqlite3}
+    for f in ("_chat_p2p_ritira", "_chat_spunte"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    amb["P2P_CHAT_RITIRO_MAX"] = 300
+    ritira, spunte = amb["_chat_p2p_ritira"], amb["_chat_spunte"]
+    tabelle = schema[schema.index('con.executescript("""') + len('con.executescript("""'):]
+    tabelle = tabelle[:tabelle.index('""")')]
+    cc = sqlite3.connect(":memory:")
+    cc.row_factory = sqlite3.Row
+    cc.executescript(tabelle)
+    O, A, B, ORA = "o-spunte", 111, 222, 1_790_000_000
+
+    def busta(da, tipo="msg"):
+        return cc.execute("INSERT INTO buste(ordine, giro, da, tipo, busta, quando) "
+                          "VALUES(?,1,?,?,?,?)", (O, da, tipo, "QUJD" * 12, ORA)).lastrowid
+    for chi in (A, B):
+        busta(chi, "saluto")
+    n1 = busta(A)
+    ritira(cc, O, 1, A, 0, ORA)
+    prova("✓: A ha scritto, B non ha ancora ritirato — per A niente arrivato, niente visto",
+          {"arrivato": 0, "visto": 0}, spunte(cc, O, 1, A, B, 0))
+    ritira(cc, O, 1, B, 0, ORA + 5)
+    prova("✓✓: il telefono di B ha ritirato — arrivato fino al messaggio, visto ancora no",
+          (True, 0), (spunte(cc, O, 1, A, B, 0)["arrivato"] >= n1, spunte(cc, O, 1, A, B, 0)["visto"]))
+    spunte(cc, O, 1, B, A, n1)
+    prova("✓✓ arancioni: B dice di averlo visto, e A lo legge", n1, spunte(cc, O, 1, A, B, 0)["visto"])
+    n2 = busta(A)
+    spunte(cc, O, 1, B, A, n2 + 50)
+    prova("UN TELEFONO CHE MENTE IN AVANTI non va oltre quel che ha ritirato", n1,
+          spunte(cc, O, 1, A, B, 0)["visto"])
+    spunte(cc, O, 1, B, A, 1)
+    prova("...e uno che riparte da zero non torna indietro", n1, spunte(cc, O, 1, A, B, 0)["visto"])
+    prova("un «visto» storto o assente non scrive e non esplode", [n1, n1, n1],
+          [(spunte(cc, O, 1, B, A, v), spunte(cc, O, 1, A, B, 0)["visto"])[1]
+           for v in ("x", None, -9)])
+    prova("le cifre sono dell'ALTRA parte: a B tornano quelle di A, non le sue", (True, 0),
+          (spunte(cc, O, 1, B, A, 0)["arrivato"] >= n1, spunte(cc, O, 1, B, A, 0)["visto"]))
+    prova("un altro giro non vede le letture di questo", {"arrivato": 0, "visto": 0},
+          spunte(cc, O, 2, A, B, 0))
+    vecchio = sqlite3.connect(":memory:")
+    vecchio.executescript(tabelle.replace("                visto_fino INTEGER NOT NULL DEFAULT 0,\n", ""))
+    exec(compile("try:\n    vecchio.execute(\"ALTER TABLE letture ADD COLUMN visto_fino INTEGER NOT NULL "
+                 "DEFAULT 0\")\nexcept sqlite3.OperationalError:\n    pass\n", "alter", "exec"),
+         {"vecchio": vecchio, "sqlite3": sqlite3})
+    prova("IL CASSETTO DI IERI riceve la colonna, e il secondo avvio non esplode", True,
+          "visto_fino" in [c[1] for c in vecchio.execute("PRAGMA table_info(letture)")])
+
+    # --- 3) IL TELEFONO: le sentinelle ------------------------------------
+    rit = pezzo_js(mini, "function chatScRitiraP2P(id){", "\n}\n")
+    prova("il ritiro dice il mio «visto», e da quel momento non c'e' piu' niente da ridire", True,
+          0 < rit.index("delete p2pChatScRidire[id];")
+          < rit.index("visto: (prima && prima.vistoFino) | 0"))
+    prova("...tiene le cifre dell'altra parte nella voce della chat (null a leva spenta)", True,
+          "esito.c.spunte = spunteDalServerChatScP2P(d.spunte);" in rit)
+    prova("...e se il visto e' andato avanti mentre era in volo, si ridice SUBITO", True,
+          "else if (p2pChatScRidire[id]) setTimeout(() => { chatScRitiraP2P(id); }, 0);" in rit)
+    msg = pezzo_js(mini, "function chatScMessaggiHTML(c, altro, o){", "\n}\n")
+    prova("la spunta sta accanto all'ora, dentro la riga «Tu · 09:15»", True,
+          "(m.t ? ' · ' + esc(oraBreveChatScP2P(m.t)) : '') + spuntaChatScP2P(m, c && c.spunte) + '</small>'"
+          in msg)
+    prova("arancioni col token del testo arancio (sul fondo dei miei messaggi il --sats non si vede)",
+          True, ".chatsc-spunte.vista{color:var(--sats-text)}" in mini)
+    inv = pezzo_js(mini, "async function chatScInviaP2P(id, testo, f){", "\n}\n")
+    prova("il messaggio appena partito prende subito il numero del server: la ✓ senza aspettare", True,
+          "nServer ? {n: nServer} : {}" in inv)
+
+    # --- 4) IL TELEFONO: i pezzi veri in node -----------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("le spunte girano in node", "node non c'e'")
+        return
+    pezzi = "\n".join([
+        pezzo_js(mini, "function spunteDalServerChatScP2P(sp){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function spuntaChatScP2P(m, sp){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function chatScVistoP2P(id){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function fusoPausaNuovoP2P(pausa, fuso){", "\n}\n") + "\n}",
+        pezzo_js(mini, "async function seguiFusoPausaP2P(){", "\n}\n") + "\n}",
+    ])
+    banco = r"""
+const p2pChatScRidire = {}, p2pChatScInVolo = {};
+let VOCE = null, RITIRI = 0, SEGNATI = 0;
+const chatScDiP2P = () => VOCE, chatScScriviP2P = (id, c) => { VOCE = c; };
+const chatScNonLettiP2P = () => (VOCE && VOCE.vistoFino < VOCE.cursore) ? 1 : 0;
+const chatScSegnaP2P = () => { SEGNATI++; };
+const chatScRitiraP2P = () => { RITIRI++; };
+const setTimeout = f => f();
+let p2pFusoPausaProvato = '', p2pMiaPausa = null, FUSO = '', CHIAMATE = [], RIVESTITE = 0;
+const fusoTelefonoP2P = () => FUSO, authHdr = () => 'h', API_BASE = '/api';
+const rivestiRighePausaP2P = () => { RIVESTITE++; };
+let RISPOSTA = null;
+const fetch = async (url, o) => { CHIAMATE.push([url, o.method, JSON.parse(o.body)]);
+  return {ok: !!RISPOSTA, json: async () => RISPOSTA}; };
+__PEZZI__
+(async () => {
+const out = {};
+const sp = spunteDalServerChatScP2P({arrivato: 7, visto: 4});
+const mio = n => ({mio: true, n: n, testo: 'x'});
+out.segni = [spuntaChatScP2P(mio(3), sp), spuntaChatScP2P(mio(5), sp), spuntaChatScP2P(mio(9), sp)];
+out.mute = [spuntaChatScP2P(mio(3), null), spuntaChatScP2P({mio: false, n: 3}, sp),
+            spuntaChatScP2P({mio: true, n: 3, sis: 1}, sp), spuntaChatScP2P({mio: true, testo: 'x'}, sp)];
+out.storte = [spunteDalServerChatScP2P(null), spunteDalServerChatScP2P('x'),
+              spunteDalServerChatScP2P({arrivato: '-3', visto: 'a'})];
+VOCE = {cursore: 9, vistoFino: 4, spunte: sp};
+chatScVistoP2P('o1');
+out.visto = [VOCE.vistoFino, !!p2pChatScRidire.o1, RITIRI];
+chatScVistoP2P('o1');
+out.fermo = RITIRI;
+p2pChatScInVolo.o2 = 1; delete p2pChatScRidire.o1;
+VOCE = {cursore: 12, vistoFino: 9, spunte: sp};
+chatScVistoP2P('o2');
+out.inVolo = [!!p2pChatScRidire.o2, RITIRI];
+VOCE = {cursore: 15, vistoFino: 12, spunte: null};
+chatScVistoP2P('o3');
+out.senzaLeva = [VOCE.vistoFino, !!p2pChatScRidire.o3, RITIRI];
+const P = {fasce: [{g: [0], da: 1320, a: 420}], fuso: 'Europe/Rome', una_fino: 0};
+out.nuovo = [fusoPausaNuovoP2P(P, 'America/New_York'), fusoPausaNuovoP2P(P, 'Europe/Rome'),
+             fusoPausaNuovoP2P(P, ''), fusoPausaNuovoP2P(Object.assign({}, P, {fuso: ''}), 'Asia/Tokyo'),
+             fusoPausaNuovoP2P({fasce: [], fuso: 'Europe/Rome', una_fino: 0}, 'Asia/Tokyo'),
+             fusoPausaNuovoP2P({fasce: [], fuso: 'Europe/Rome', una_fino: 99}, 'Asia/Tokyo'),
+             fusoPausaNuovoP2P(null, 'Asia/Tokyo')];
+p2pMiaPausa = P; FUSO = 'America/New_York';
+RISPOSTA = {attiva: true, fasce: P.fasce, fuso: 'America/New_York'};
+await seguiFusoPausaP2P();
+await seguiFusoPausaP2P();
+const c0 = CHIAMATE[0] || [];
+out.segue = [CHIAMATE.length, c0[0], c0[1], Object.keys(c0[2] || {}).sort().join(','),
+             (c0[2] || {}).solo_fuso, (c0[2] || {}).fuso, typeof (c0[2] || {}).scarto,
+             p2pMiaPausa.fuso, RIVESTITE];
+p2pMiaPausa = P; FUSO = 'Asia/Tokyo'; RISPOSTA = null;
+await seguiFusoPausaP2P();
+await seguiFusoPausaP2P();
+out.rifiutata = [CHIAMATE.length, p2pMiaPausa.fuso];
+console.log(JSON.stringify(out));
+})();
+"""
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "spunte.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco.replace("__PEZZI__", pezzi))
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if r.returncode:
+        prova("le spunte girano in node", "", (r.stdout or "") + (r.stderr or ""))
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    S = '<span class="chatsc-spunte%s" aria-hidden="true">%s</span>'
+    prova("✓✓ arancioni fin dove ha visto, ✓✓ grigie fin dove e' arrivato, ✓ oltre — solo segni",
+          [" " + S % (" vista", "✓✓"), " " + S % ("", "✓✓"), " " + S % ("", "✓")], o["segni"])
+    prova("niente spunte senza cifre (leva spenta), sui suoi messaggi, sulle righe di sistema, "
+          "o su un mio messaggio che il server non ha ancora numerato", ["", "", "", ""], o["mute"])
+    prova("le cifre storte del server: niente spunte, o zeri", [None, None, {"arrivato": 0, "visto": 0}],
+          o["storte"])
+    prova("IL VISTO AVANZA: si segna, e il ritiro che lo dice parte subito", [9, True, 1], o["visto"])
+    prova("...e se non avanza non parte niente (nessun giro senza fine)", 1, o["fermo"])
+    prova("...con un ritiro gia' in volo non ne parte un altro: ci pensa la sua coda", [True, 1],
+          o["inVolo"])
+    prova("...a leva spenta (nessuna cifra dal server) il visto si segna e basta, come ieri",
+          [15, False, 1], o["senzaLeva"])
+    prova("IL FUSO DELLA PAUSA: solo con una pausa che dice il suo fuso, e un telefono altrove",
+          ["America/New_York", "", "", "", "", "Asia/Tokyo", ""], o["nuovo"])
+    prova("...UNA domanda per fuso, sulla rotta della pausa, col corpo che cambia solo il fuso; "
+          "la risposta diventa la mia pausa e le righe si rivestono",
+          [1, "/api/p2p/pausa", "POST", "fuso,scarto,solo_fuso", True, "America/New_York", "number",
+           "America/New_York", 1], o["segue"])
+    prova("...anche se il server non risponde non si richiede a ogni apertura del foglio", [2, "Europe/Rome"],
+          o["rifiutata"])
+
+    # --- 5) IL SERVER: il giudice del fuso, su sqlite in memoria -----------
+    amb = {"sqlite3": sqlite3, "json": _json, "re": re, "P2P_PAUSA_FASCE_MAX": 6,
+           "P2P_PAUSA_UNA_MAX_S": 7 * 86400, "P2P_PAUSA_CATENA_MAX": 16}
+    i = src.index("\nFORMA_FUSO_P2P = ") + 1
+    exec(src[i:src.index("\n", i)], amb)
+    for f in ("_legale_europea_p2p", "_scarto_fuso_p2p", "_fine_fascia_p2p", "_fine_pausa_p2p",
+              "_pausa_p2p", "_salta_pausa_p2p", "_scrivi_pausa_p2p", "_mia_pausa_p2p",
+              "_fuso_pausa_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    scrivi, salta, mia, fuso = (amb["_scrivi_pausa_p2p"], amb["_salta_pausa_p2p"],
+                                amb["_mia_pausa_p2p"], amb["_fuso_pausa_p2p"])
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_pause(")
+    con = sqlite3.connect(":memory:")
+    con.executescript(src[i:src.index("\n    );", i) + 7])
+
+    def utc(g, h, mi=0):
+        return _cal.timegm((2026, 10, g, h, mi, 0))
+    NOTTI = {"g": [0, 1, 2, 3, 4, 5, 6], "da": 1320, "a": 420}
+    scrivi(con, 5, {"fasce": [NOTTI], "fuso": "Europe/Rome", "scarto": 120,
+                    "una_da": 0, "una_fino": 0}, utc(12, 10))
+    prova("salvata a Roma, «22-7»: alle 05:00 di Roma (le 23 a New York) e' in pausa fino alle "
+          "07:00 di Roma", utc(14, 5), mia(con, 5, utc(14, 3))["fino"])
+    r = fuso(con, 5, {"solo_fuso": True, "fuso": "America/New_York", "scarto": -240}, utc(14, 3))
+    prova("PARTITO PER NEW YORK: il fuso segue il telefono, le ore restano 22-7 — in pausa fino "
+          "alle 07:00 di New York", ("America/New_York", [NOTTI], utc(14, 11)),
+          (r["fuso"], r["fasce"], r["fino"]))
+    salta(con, 5, utc(14, 3))
+    r = fuso(con, 5, {"solo_fuso": True, "fuso": "Europe/Rome", "scarto": 120}, utc(14, 3, 1))
+    prova("...e «tolta per stanotte» resta tolta: non e' un'intenzione nuova", (True, 0),
+          (r["salta_fino"] > 0, r["fino"]))
+    prova("un fuso in forma strana, uno scarto fuori dalle 14 ore o un True: non si scrive niente",
+          ["Europe/Rome"] * 3,
+          [fuso(con, 5, d, utc(14, 4))["fuso"] for d in (
+              {"fuso": "Europe/Rome; DROP", "scarto": 60}, {"fuso": "Asia/Tokyo", "scarto": 900},
+              {"fuso": "Asia/Tokyo", "scarto": True})])
+    prova("chi non ha una pausa non se ne trova una", (0, []),
+          (con.execute("SELECT COUNT(*) FROM p2p_pause WHERE tg_id=9").fetchone()[0],
+           fuso(con, 9, {"fuso": "Asia/Tokyo", "scarto": 540}, utc(14, 4))["fasce"]))
+
+
 def prove_indirizzo_resta_dove_sta():
     """«MOSTRA L'INDIRIZZO» NON RIPORTA IN CIMA (16 nov 2026, cantiere
     indirizzo-resta, Andrea: «se premo mostra indirizzo in un ordine il
@@ -224818,7 +225089,7 @@ CATEGORIE = {
     selettore_di_casa ordine_in_pausa relay_per_mostro
     notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
-    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
+    presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain chat_spunte onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
     lista_corta_metodi
     ripubblica_p2p
@@ -226382,6 +226653,7 @@ def main():
               prove_pubblica_passi,
               prove_bitpost_gift_card,
               prove_promozioni,
+              prove_chat_spunte,
               prove_categorie_delle_prove)
     sezioni, titolo = _scelta_da_riga_di_comando(
         _argomenti_della_ci(sys.argv[1:], os.environ), tutte)
