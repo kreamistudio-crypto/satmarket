@@ -491,6 +491,35 @@ def prove_autocomplete_comuni():
     prova("...e non normalizza piu' 7.900 nomi per battuta", 1,
           corpo.count("normalizza("))
 
+    # IL TICINO (26 nov 2026, cantiere comuni-ticino, per Plan B Lugano
+    # che fara' da punto di ritiro): i comuni del cantone entrano come
+    # zona con la sigla TI, gli altri cantoni stanno nel file solo per la
+    # mappa, e sugli omonimi vince l'italiano.
+    COM = amb["COMUNI"]
+    prova("Lugano e' una zona, nuda e con la sigla", [True, True, True],
+          [nz("Lugano") in COM, nz("Lugano TI") in COM,
+           nz("Bellinzona") in COM])
+    prova("la tendina propone «Lugano» col cantone", ["TI"],
+          [c["provincia"] for c in amb["cerca_comuni"]("lugano")["comuni"]
+           if c["nome"] == "Lugano"])
+    prova("...e il Ticino porta ~100 comuni, non tutta la Svizzera", True,
+          90 <= sum(1 for c in amb["COMUNI_LISTA"]
+                    if c["provincia"] == "TI") <= 120)
+    prova("Zurigo e Ginevra non sono zone (solo mappa)", [False, False],
+          [nz("Zurigo") in COM, nz("Ginevra") in COM])
+    # gli omonimi: Muggiò (MB) e Comano (MS) restano quelli di sempre
+    muggio_mb = [r for r in csv.DictReader(
+        open(os.path.join("dati", "comuni.csv"), encoding="utf-8"),
+        delimiter=";") if r["nome"] in ("Muggiò", "Comano")]
+    prova("sugli omonimi il nome nudo resta all'italiano",
+          sorted([(float(r["lat"]), float(r["lon"])) for r in muggio_mb],
+                 key=str),
+          sorted([COM.get(nz("Muggio")), COM.get(nz("Comano"))],
+                 key=str))
+    prova("...e il ticinese omonimo si raggiunge con la sigla",
+          [True, True], [COM.get(nz("Muggio TI")) != COM.get(nz("Muggio")),
+                         nz("Comano TI") in COM])
+
 
 # ====================================================================
 def prove_testo_evento():
@@ -176293,11 +176322,18 @@ def prove_mappa_contanti():
           ["<script" in svg.lower(), "on" + "load" in svg.lower(), len(svg) < 40 * 1024])
     prova("la proiezione del client e' quella del generatore, numero per numero",
           [True, True, True, True],
-          ["LON0, LAT1, K = 6.5, 47.2, 100.0" in gen,
-           "LARGO, ALTO = 920, 1180" in gen,
-           'viewBox="0 0 920 1180"' in svg,
-           "const MAPPA_P2P_PROIEZIONE = { lon0: 6.5, lat1: 47.2, k: 100, cos: 0.7431, "
-           "largo: 920, alto: 1180 };" in mini])
+          ["LON0, LAT1, K = 5.8, 47.9, 100.0" in gen,
+           "LARGO, ALTO = 970, 1250" in gen,
+           'viewBox="0 0 970 1250"' in svg,
+           "const MAPPA_P2P_PROIEZIONE = { lon0: 5.8, lat1: 47.9, k: 100, cos: 0.7431, "
+           "largo: 970, alto: 1250 };" in mini])
+    # LA SVIZZERA NELLA SAGOMA (26 nov 2026, cantiere comuni-ticino): il
+    # generatore legge anche i comuni svizzeri, e il client tiene i punti
+    # fino al bordo nord-ovest della Svizzera (Lugano compreso)
+    prova("la sagoma ha anche la Svizzera, e il client ne tiene i punti",
+          [True, True],
+          ['"dati/comuni-svizzera.csv"' in gen,
+           "lat <= 48 && lon >= 5.5 && lon <= 19" in mini])
 
     # --- 3) IL CLIENT: chi prende i punti, i grappoli, la sezione -----------
     blocco = mini[mini.index("const MAPPA_P2P_PROIEZIONE"):mini.index("let p2pMappaGiu = null;")]
@@ -176395,7 +176431,7 @@ console.log(JSON.stringify(out));
     prova("i comuni si raccolgono per nome, e la mappa non dice piu' della card "
           "(niente SEPA, niente zona senza punto)",
           [["Milano (MI)", 2], ["Roma (RM)", 1]], r.get("comuni"))
-    prova("la proiezione mette Milano dove la sagoma la disegna", [200, 173], r.get("milano"))
+    prova("la proiezione mette Milano dove la sagoma la disegna", [252, 243], r.get("milano"))
     prova("i pallini si fondono solo quando sono troppo vicini", [2, [[2, 3]]],
           [r.get("lontani"), r.get("vicini")])
     prova("lo zoom tiene la forma e il centro, non scende sotto i 40 e non esce dall'Italia",
@@ -176656,7 +176692,7 @@ console.log(JSON.stringify(out));
     prova("...e un nome che arriva sporco esce passato da esc()", True, r.get("pulito"))
     prova("gli id del numerino: solo interi positivi", [7, 9], r.get("ids"))
     prova("...`senza` storto vale zero, e la proiezione e' quella del libro",
-          [[0, 2], [200, 173]], [r.get("senza"), r.get("milano")])
+          [[0, 2], [252, 243]], [r.get("senza"), r.get("milano")])
     prova("chiusa: il tondo comune del P2P (c'e' un pallino), col suo tocco, e niente scatola",
           [6, ["", True, True, True]],
           [r.get("conta"), r.get("chiusa")])
@@ -215499,6 +215535,8 @@ def prove_giroconto_interno():
            bool(vg({**buono, "prezzo_sats": 999}, dom, 150000)),
            bool(vg({**buono, "invoice": "inv999"}, dom, 150000)),
            bool(vg(buono, dom, 999))])
+    prova("...e a tetto 0 (di serie dal 26 nov 2026) nessun tetto", "",
+          vg(buono, dom, 0))
 
     # --- LA PORTA -------------------------------------------------------
     class _HTTPExc(Exception):
@@ -215689,9 +215727,14 @@ def prove_giroconto_interno():
     prova("la cassa: metodo «giroconto» solo a porta aperta e per un oggetto",
           True, 'giroconto = d.get("metodo") == "giroconto"' in cmp
           and 'if giroconto and (not giroconto_attivo() or not d.get("annuncio_id")):' in cmp)
-    prova("...solo sulla cassaforte nodo e sotto il tetto, PRIMA della fattura",
-          True, cmp.index("cf != CASSAFORTE_NODO\n                      or sats_giroconto > GIROCONTO_TETTO_SATS")
+    prova("...solo sulla cassaforte nodo e sotto il tetto (se c'e'), PRIMA "
+          "della fattura", True,
+          cmp.index("cf != CASSAFORTE_NODO\n                      or 0 < GIROCONTO_TETTO_SATS < sats_giroconto")
           < cmp.index("inv = await crea_invoice_escrow("))
+    prova("il tetto tecnico tolto di serie (26 nov 2026, Andrea): 0 = nessun "
+          "tetto, e una riga nel config lo rimette", True,
+          "    GIROCONTO_TETTO_SATS = 0\n" in _SORGENTE
+          and 'if int(tetto or 0) > 0 and domanda["sats"] > int(tetto):' in pezzo("_verdetto_giroconto"))
     amb3 = {"GIROCONTO_AVANZO_PERCENTO": 3, "GIROCONTO_AVANZO_EURO": 1.5}
     exec(pezzo("giroconto_cifra_giusta"), amb3)
     cg = amb3["giroconto_cifra_giusta"]

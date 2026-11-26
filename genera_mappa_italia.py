@@ -10,13 +10,22 @@ LA PROIEZIONE e' una equirettangolare schiacciata sul coseno di 42°
 `MAPPA_P2P_PROIEZIONE` in miniapp.html — una prova li tiene uguali:
 x = (lon - LON0) * K * COS, y = (LAT1 - lat) * K.
 
-Si rilancia solo se cambia il CSV: `python genera_mappa_italia.py`."""
+LA SVIZZERA (26 nov 2026, cantiere comuni-ticino, Andrea: «aggiungi anche
+la Svizzera»): i puntini vengono anche dai ~2.170 comuni di
+`dati/comuni-svizzera.csv`, tutti i cantoni, cosi' la sagoma e' intera e
+il Ticino non resta un'isola. Per farcela stare la proiezione si e'
+allargata a ovest (Ginevra) e a nord (Sciaffusa): LON0 da 6,5 a 5,8 e
+LAT1 da 47,2 a 47,9, e il viewBox e' cresciuto di conseguenza. Come zone
+valide pero' entra il solo Ticino (vedi `carica_comuni` in server.py):
+la mappa disegna la Svizzera, non promette che ci si possa vendere.
+
+Si rilancia solo se cambia un CSV: `python genera_mappa_italia.py`."""
 import csv
 import math
 
-LON0, LAT1, K = 6.5, 47.2, 100.0
+LON0, LAT1, K = 5.8, 47.9, 100.0
 COS = round(math.cos(math.radians(42)), 4)        # 0.7431
-LARGO, ALTO = 920, 1180                           # il viewBox
+LARGO, ALTO = 970, 1250                           # il viewBox
 PASSO = 8                                         # la griglia, in unita'
 
 
@@ -26,10 +35,11 @@ def proietta(lat: float, lon: float) -> tuple[float, float]:
 
 def main():
     caselle = set()
-    with open("dati/comuni.csv", encoding="utf-8") as f:
-        for r in csv.DictReader(f, delimiter=";"):
-            x, y = proietta(float(r["lat"]), float(r["lon"]))
-            caselle.add((round(x / PASSO), round(y / PASSO)))
+    for file in ("dati/comuni.csv", "dati/comuni-svizzera.csv"):
+        with open(file, encoding="utf-8") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                x, y = proietta(float(r["lat"]), float(r["lon"]))
+                caselle.add((round(x / PASSO), round(y / PASSO)))
     tratti = "".join(f"M{cx * PASSO} {cy * PASSO}h0"
                      for cx, cy in sorted(caselle, key=lambda c: (c[1], c[0])))
     svg = ('<svg xmlns="http://www.w3.org/2000/svg" '
