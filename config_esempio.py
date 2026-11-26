@@ -679,6 +679,10 @@ PROMO_SCOPRIRE_SCALINI = ((0, 20_000), (1, 30_000), (2, 40_000),
                           (3, 45_000), (4, 50_000))
 PROMO_SCOPRIRE_GIORNI = 30
 PROMO_SCOPRIRE_POSTI = 10
+# (26 nov 2026) True: «Il negozio nella home» resta nel foglio Promuovi
+# ma grigio, e non si compra (servono i posti per le collaborazioni:
+# li mette lo staff con /promossi). False: si compra.
+PROMO_SCOPRIRE_IN_ARRIVO = True
 
 # LA LISTA BIANCA DEI LINK NELLE DESCRIZIONI (set 2026): gli unici
 # domini che una descrizione di annuncio rende TOCCABILI. Tutto il
