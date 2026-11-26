@@ -30363,20 +30363,28 @@ function apriNegozioDaScoprire(chi, aperto, da){
     `#scoprireStrip .scoprire-card[data-id="${CSS.escape(cardToccata)}"]`) : null;
   const daId = scopertaToccata;
   cardToccata = ''; scopertaToccata = '';
-  /* IL MIO NEGOZIO NON VOLA (25 nov 2026, Andrea dal telefono: «c'è ancora
-     il difetto quando clicco sulle card grosse [...] Under AI sì, To the
-     Moon no»): sul negozio di chi guarda apriNegozio ASPETTA la bozza del
-     venditore (bozzaDelVenditore) prima di disegnare, e il volo — che
-     conta su un disegno nello stesso giro — toglieva il velo su una
-     pagina non ancora aperta: la home tornava per un attimo, e il negozio
-     arrivava dopo. Al proprietario il negozio si apre come se non fosse
-     pronto: la pagina sale subito, e si riempie quando la bozza c'e'. */
+  /* IL MIO NEGOZIO VOLA ANCHE LUI (26 nov 2026, Andrea dal telefono:
+     «quando clicchi sembra che la pagina salti [...] vorrei che fosse
+     fluida anche chi non ha un banner»). Il 25 nov il proprietario non
+     volava: sul SUO negozio apriNegozio aspetta la bozza del venditore
+     (bozzaDelVenditore) prima di disegnare, e il volo toglieva il velo su
+     una pagina non ancora aperta (la home tornava per un attimo). Al suo
+     posto la pagina saliva dal basso, ed e' il salto del video: lo vedeva
+     solo lui, sul negozio di AndreAI (senza banner), mentre To The Moon
+     (col banner, di un altro) volava. Ora la bozza si chiede GIA' AL
+     TOCCO (`anticipaBozza`), mentre la card vola, e il volo scopre la
+     pagina solo quando e' disegnata (vedi voloNegozio). Senza volo
+     (effetti ridotti, card fuori schermo) il suo negozio resta quello
+     che sale con l'anello e si riempie quando la bozza c'e'. */
   const mio = !!myNegozio && chi === myNegozio;
-  if (negozioPronto(chi) && !mio) {
+  if (mio && !DEMO && !VETRINA) anticipaBozza(chi);
+  if (negozioPronto(chi)) {
     if (card && !effettiRidotti() && voloNegozio(card, chi, aperto, da)) return;
-    const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));
-    saleDalBasso();
-    return fatto;
+    if (!mio) {
+      const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));
+      saleDalBasso();
+      return fatto;
+    }
   }
   negozioInAttesa(chi);
   go('negozio');
@@ -30483,7 +30491,7 @@ function testataNegozio(chi){
   t.innerHTML = src ? `<img src="${esc(src)}" alt="" decoding="async"
     onerror="this.parentNode.hidden=true">` : '';
 }
-const VOLO_MS = 420, VOLO_APRI_MS = 260;
+const VOLO_MS = 420, VOLO_APRI_MS = 260, VOLO_ATTESA_MS = 1500;
 let scartoInsegna = 48;
 function voloNegozio(card, chi, aperto, da){
   const img = card.querySelector('img');
@@ -30527,7 +30535,31 @@ function voloNegozio(card, chi, aperto, da){
     /* il negozio si apre sotto la copia, che finisce la sua corsa */
     negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};
     negozioInVolo = true;
-    try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
+    let disegno;
+    try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
+    /* SI SCOPRE A PAGINA DISEGNATA (26 nov 2026, il volo del proprietario):
+       per tutti gli altri apriNegozio disegna nello stesso giro, e la sua
+       promessa e' gia' mantenuta — si scopre prima del fotogramma dopo,
+       come prima. Sul negozio proprio aspetta la bozza (chiesta al tocco):
+       intanto la copia resta ferma in cima, sul velo. Se la bozza tarda
+       piu' di VOLO_ATTESA_MS la pagina si apre con l'anello e si riempie
+       quando arriva, come la salita: mai la home che torna. */
+    let scoperto = false;
+    const scopri = () => {
+      if (scoperto) return;
+      scoperto = true;
+      scopriNegozioVolato();
+    };
+    Promise.resolve(disegno).then(scopri, scopri);
+    setTimeout(() => {
+      if (scoperto) return;
+      negozioInAttesa(chi);
+      testataNegozio(chi);
+      go('negozio');
+      scopri();
+    }, VOLO_ATTESA_MS);
+  }, VOLO_APRI_MS);
+  function scopriNegozioVolato(){
     window.scrollTo(0, 0);
     fermaCorse(v);
     v.classList.remove('sale-dal-basso');
@@ -30562,7 +30594,7 @@ function voloNegozio(card, chi, aperto, da){
                       new Promise(z => setTimeout(z, 400))]).then(via);
       else via();
     }, VOLO_MS - VOLO_APRI_MS);
-  }, VOLO_APRI_MS);
+  }
   return true;
 }
 
@@ -31116,11 +31148,28 @@ async function caricaRaccontiMiei(){
   return (await r.json()).racconti || [];
 }
 
+/* LA BOZZA CHIESTA AL TOCCO (26 nov 2026): toccando la card grande del
+   SUO negozio la bozza si chiede subito, mentre la card vola, e
+   apriNegozio la trova pronta (o quasi) invece di chiederla dopo. Vale
+   pochi secondi e una volta sola: e' sempre quella appena chiesta, mai
+   una vecchia. */
+const BOZZA_ANTICIPO_MS = 5000;
+let bozzaAnticipata = null;     // {codice, p, t}
+function anticipaBozza(codice){
+  bozzaAnticipata = {codice, p: bozzaDelVenditore(codice, true), t: Date.now()};
+}
 /* La bozza che parla del venditore, per il SUO negozio: vestita da
    anteprima sua, o null. Solo le BOZZE — una pagina pubblicata la
    porta gia' il negozio a tutti. Fail-open: se la porta non risponde
    il negozio si apre lo stesso, senza la bozza sopra. */
-async function bozzaDelVenditore(codice){
+async function bozzaDelVenditore(codice, alTocco){
+  /* quella chiesta al tocco della card (anticipaBozza), se e' di questo
+     negozio e fresca: una sola volta, il disegno dopo richiede */
+  const a = bozzaAnticipata;
+  if (!alTocco && a && a.codice === codice && Date.now() - a.t < BOZZA_ANTICIPO_MS) {
+    bozzaAnticipata = null;
+    return a.p;
+  }
   try {
     const b = (await caricaRaccontiMiei()).find(
       x => x.stato !== 'pubblicato' && x.negozio === codice);

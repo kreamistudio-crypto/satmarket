@@ -52469,7 +52469,7 @@ def prove_scoprire():
     # effetti ridotti; il negozio si apre a corsa non finita; la testata
     # tiene margini e angoli; e resta solo per il negozio dove si e' volati
     _vo = pezzo_js(mini, "function voloNegozio(card, chi, aperto, da){", "\n}")
-    _vm = re.search(r"const VOLO_MS = (\d+), VOLO_APRI_MS = (\d+);", mini)
+    _vm = re.search(r"const VOLO_MS = (\d+), VOLO_APRI_MS = (\d+)[,;]", mini)
     prova("il volo parte solo dal telefono, col negozio pronto, senza effetti ridotti",
           (True, True, True),
           ("cardToccata && mqNetflix.matches ? document.querySelector(" in _ds,
@@ -52487,14 +52487,57 @@ def prove_scoprire():
           ("if (voce && voce.tocca) { voce.tocca(); cardToccata = ''; scopertaToccata = ''; return; }" in mini,
            "cardToccata = ''; scopertaToccata = '';" in _ds,
            "if (!ridisegno && !negozioInVolo) negozioTestataDi = {chi: '', src: ''};" in _an.split("try {")[0]))
-    # IL MIO NEGOZIO NON VOLA (25 nov 2026, Andrea: «Under AI sì, To the
-    # Moon no»): apriNegozio aspetta la bozza del proprietario, e il volo
-    # toglieva il velo su una pagina non ancora aperta
-    prova("il proprietario non vola: il suo negozio sale e si riempie dopo",
-          (True, True),
-          ("const mio = !!myNegozio && chi === myNegozio;\n  if (negozioPronto(chi) && !mio) {" in _ds,
-           _ds.find("&& !mio) {") < _ds.find("voloNegozio(card, chi, aperto, da)")
-           < _ds.find("negozioInAttesa(chi);")))
+    # IL MIO NEGOZIO VOLA ANCHE LUI (26 nov 2026, Andrea dal telefono:
+    # «quando clicchi sembra che la pagina salti»; il 25 nov il
+    # proprietario non volava, e la sua pagina saliva dal basso): la bozza
+    # si chiede al tocco, il volo scopre la pagina solo a disegno fatto, e
+    # se la bozza tarda la pagina si apre con l'anello (mai la home che
+    # torna). Senza volo il suo negozio resta quello che sale e si riempie
+    _sv = _vo[_vo.index("let disegno;"):_vo.index("function scopriNegozioVolato(){")]
+    prova("il proprietario vola anche lui: la bozza chiesta al tocco, prima del volo",
+          (True, True, True, 0),
+          ("const mio = !!myNegozio && chi === myNegozio;\n  if (mio && !DEMO && !VETRINA) anticipaBozza(chi);" in _ds,
+           _ds.find("anticipaBozza(chi);") < _ds.find("if (negozioPronto(chi)) {")
+           < _ds.find("voloNegozio(card, chi, aperto, da)") < _ds.find("if (!mio) {")
+           < _ds.find("negozioInAttesa(chi);"),
+           "if (!mio) {\n      const fatto = conTestata(chi, daId, () => apriNegozio(chi, aperto, undefined, da));" in _ds,
+           _ds.count("&& !mio) {")))
+    prova("...il volo scopre la pagina solo quando e' disegnata, e se tarda apre l'anello",
+          (True, True, True, True, True),
+          ("try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _sv,
+           "Promise.resolve(disegno).then(scopri, scopri);" in _sv,
+           "negozioInAttesa(chi);\n      testataNegozio(chi);\n      go('negozio');\n      scopri();\n    }, VOLO_ATTESA_MS);" in _sv,
+           "window.scrollTo(0, 0);" not in _sv and "velo.remove();" not in _sv,
+           re.search(r"VOLO_APRI_MS = \d+, VOLO_ATTESA_MS = (\d+);", mini) is not None))
+    _bz = pezzo_js(mini, "async function bozzaDelVenditore(codice, alTocco){")
+    _esito = _node_banco("""
+let bozzaAnticipata = null, chieste = 0, adesso = 1000;
+const BOZZA_ANTICIPO_MS = 5000;
+const Date = {now: () => adesso};
+async function caricaRaccontiMiei(){ chieste++;
+  return [{stato: 'bozza', negozio: 'ab12', n: chieste}]; }
+""" + pezzo_js(mini, "function anticipaBozza(codice){", "\n}") + "\n}\n" + _bz + """
+(async () => {
+  const r = {};
+  anticipaBozza('ab12');
+  r.dopo_tocco = chieste;
+  r.presa = (await bozzaDelVenditore('ab12')).n;
+  r.una_volta = (await bozzaDelVenditore('ab12')).n;
+  anticipaBozza('ab12'); adesso += 6000;
+  r.vecchia = (await bozzaDelVenditore('ab12')).n;
+  anticipaBozza('zz99');
+  r.altro_negozio = (await bozzaDelVenditore('ab12')).n;
+  r.chieste = chieste;
+  console.log(JSON.stringify(r));
+})();
+""")
+    if _esito is None:
+        salta("la bozza chiesta al tocco", "serve node")
+    else:
+        prova("in node: la bozza chiesta al tocco si usa una volta sola, fresca e "
+              "del negozio giusto; sennò si richiede",
+              {"dopo_tocco": 1, "presa": 1, "una_volta": 2, "vecchia": 4,
+               "altro_negozio": 6, "chieste": 6}, _esito)
     # LA TESTATA ANCHE DAL TONDO (25 nov 2026): senza banner, in cima va
     # l'immagine della card di «Da scoprire»; col banner niente testata
     _ct = pezzo_js(mini, "function conTestata(chi, id, apri){", "\n}") + "\n}\n"
@@ -52560,7 +52603,7 @@ console.log(JSON.stringify(r));
           (True, True, True, True),
           ("vola.remove();" in _vo, "velo.remove();" in _vo,
            "card.style.visibility = '';" in _vo,
-           "try { apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _vo))
+           "try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }" in _vo))
     # GIA' NELLA FILA, NON ANCHE IN GRIGLIA (24 nov 2026 notte, Andrea: «le
     # card in evidenza sono già nella loro fascia apposita, non devono
     # essere mostrate così nella pagina normale del mercatino»): la griglia
@@ -56056,7 +56099,7 @@ def prove_racconti_bozza():
           and "anteprima = await bozzaDelVenditore(myNegozio);" in _an)
     prova("...e solo le bozze", True,
           "x.stato !== 'pubblicato'" in pezzo_js(
-              mini, "async function bozzaDelVenditore(codice){"))
+              mini, "async function bozzaDelVenditore(codice, alTocco){"))
     # IL CASSETTO DEL PANNELLO ha il messaggio pronto per lui, finche' la
     # pagina e' in bozza e il venditore c'e' davvero
     _box = pezzo_js(mini, "function boxRacconti(lista){")
