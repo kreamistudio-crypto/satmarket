@@ -31720,6 +31720,12 @@ CAMPI_VETRINA = (
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
     " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
+    # LE RETI DI PUNTI DEL VENDITORE (26 nov 2026, «Info di spedizione»
+    # della scheda): le due colonne GREZZE servono solo a
+    # arricchisci_righe_vetrina, che ne ricava `venditore_reti_punto`
+    # (lista di nomi rete) e le butta — i corrieri scelti non escono
+    "u.spedizionieri AS venditore_spedizionieri, "
+    "u.spedizioniere AS venditore_spedizioniere, "
     "u.rating, u.vendite_ok")
 
 
@@ -31756,7 +31762,26 @@ def arricchisci_righe_vetrina(righe):
     a calcolare offline il nome di 27 file di illustrazione —, qui no.
     Un client che non lo trova (server di ieri) fa il link senza coda,
     che continua a funzionare: fail-open senza un ramo d'errore."""
+    # 6) LE RETI DI PUNTI (26 nov 2026): a quali reti di locker/punti di
+    # ritiro il venditore sa consegnare davvero — il giudice e' lo
+    # stesso della cassa (`reti_punto` sopra `reti_venditore`, col gate
+    # dei punti Barattolo spenti), qui se ne esce solo la lista dei
+    # NOMI, per la tendina «Info di spedizione» della scheda. Le due
+    # colonne grezze si buttano sempre (anche se il giudizio fallisce).
+    # Fail-open: un errore vale lista vuota, cioe' niente riga «punto»,
+    # mai una vetrina rotta. Il gate si legge UNA volta per pagina.
+    _barattolo_viva = None
     for r in righe:
+        if "venditore_spedizionieri" in r:
+            sp1 = r.pop("venditore_spedizionieri", "") or ""
+            sp2 = r.pop("venditore_spedizioniere", "") or ""
+            try:
+                if _barattolo_viva is None:
+                    _barattolo_viva = rete_barattolo_viva()
+                r["venditore_reti_punto"] = reti_punto(
+                    reti_venditore(sp1, sp2, _barattolo_viva))
+            except Exception:
+                r["venditore_reti_punto"] = []
         r["slug"] = _slug(r.get("titolo") or "")
         # 4) L'ABBONAMENTO A UN CANALE (20 nov 2026): il NOME del canale,
         # per la riga della scheda («Abbonamento di 30 giorni a «Bitcoin
@@ -33654,6 +33679,11 @@ CAMPI_MIEI = (
     "AS venditore_avatar, "
     "(SELECT GROUP_CONCAT(b.badge_id) FROM badge_utente b "
     " WHERE b.tg_id=a.venditore_id) AS venditore_distintivi, "
+    # e le reti di punti (26 nov 2026), per la tendina «Info di
+    # spedizione» anche sul proprio annuncio: le colonne grezze le
+    # butta arricchisci_righe_vetrina, come in CAMPI_VETRINA
+    "u.spedizionieri AS venditore_spedizionieri, "
+    "u.spedizioniere AS venditore_spedizioniere, "
     "u.rating, u.vendite_ok")
 
 

@@ -22073,6 +22073,78 @@ def prove_ferie():
           "&& !inFerie(l)" in mini)
 
 
+def prove_vetrina_reti_punto():
+    """LE RETI DI PUNTI IN VETRINA (26 nov 2026, la tendina «Info di
+    spedizione» della scheda): ogni riga d'annuncio porta
+    `venditore_reti_punto`, la lista dei NOMI delle reti di locker a cui
+    il venditore consegna davvero — giudicata dallo stesso `reti_punto`
+    della cassa — e le due colonne grezze dei corrieri NON escono mai.
+    Il blocco di arricchisci_righe_vetrina si legge dal sorgente e si
+    ESEGUE (con i giudici veri di server.py), non si ricopia."""
+    print("\n[le reti di punti in vetrina]")
+    amb = {"SPEDIZIONIERI": ast.literal_eval(
+               _SORGENTE[_SORGENTE.index("SPEDIZIONIERI = (") + len("SPEDIZIONIERI = "):
+                         _SORGENTE.index("\n", _SORGENTE.index("SPEDIZIONIERI = ("))]),
+           "RETE_BARATTOLO": "Barattolo",
+           "RETE_DEL_CORRIERE": {"InPost": "InPost",
+                                 "Poste Italiane": "Poste Italiane",
+                                 "SDA": "Poste Italiane"}}
+    exec(pezzo("reti_venditore"), amb)
+    exec(pezzo("reti_punto"), amb)
+    arr = pezzo("arricchisci_righe_vetrina")
+    i = arr.index("    # 6) LE RETI DI PUNTI")
+    blocco = arr[i:arr.index('        r["slug"] =', i)]
+    # il blocco ha gia' il rientro del corpo di una funzione: gli si
+    # da' solo la testata, con la funzione-gate al posto del vero
+    cor = "def _blocco(righe, rete_barattolo_viva):\n" + blocco
+    exec(cor, amb)
+    righe = [
+        {"id": 1, "venditore_spedizionieri": "|InPost|BRT|",
+         "venditore_spedizioniere": ""},
+        {"id": 2, "venditore_spedizionieri": "",
+         "venditore_spedizioniere": "SDA"},        # il ripiego singolare
+        {"id": 3, "venditore_spedizionieri": "|DHL|",
+         "venditore_spedizioniere": ""},           # solo corrieri senza rete
+        {"id": 4, "venditore_spedizionieri": "|Barattolo|InPost|",
+         "venditore_spedizioniere": ""},
+        {"id": 5},                                 # riga senza le colonne
+    ]
+    amb["_blocco"](righe, lambda: False)
+    prova("InPost entra, BRT (nessuna rete di punti) no",
+          ["InPost"], righe[0]["venditore_reti_punto"])
+    prova("il ripiego sulla colonna singolare vale: SDA = rete Poste",
+          ["Poste Italiane"], righe[1]["venditore_reti_punto"])
+    prova("con soli corrieri senza rete: lista vuota, mai assente",
+          [], righe[2]["venditore_reti_punto"])
+    prova("i punti Barattolo spenti non compaiono (gate chiuso)",
+          ["InPost"], righe[3]["venditore_reti_punto"])
+    prova("le colonne grezze non escono MAI",
+          [False] * 5, [("venditore_spedizionieri" in r
+                         or "venditore_spedizioniere" in r) for r in righe])
+    prova("una riga senza le colonne resta com'era (nessuna chiave inventata)",
+          False, "venditore_reti_punto" in righe[4])
+    # con i punti Barattolo accesi la rete di casa compare
+    r2 = [{"venditore_spedizionieri": "|Barattolo|", "venditore_spedizioniere": ""}]
+    amb["_blocco"](r2, lambda: True)
+    prova("...e con i punti accesi compare la rete di casa",
+          ["Barattolo"], r2[0]["venditore_reti_punto"])
+    # fail-open: il gate che esplode vale lista vuota, mai una vetrina rotta
+    def _esplode():
+        raise RuntimeError("db rotto")
+    r3 = [{"venditore_spedizionieri": "|InPost|", "venditore_spedizioniere": ""}]
+    amb["_blocco"](r3, _esplode)
+    prova("fail-open: un errore vale lista vuota e le grezze se ne vanno",
+          ([], False), (r3[0]["venditore_reti_punto"],
+                        "venditore_spedizionieri" in r3[0]))
+    # le due colonne entrano nei DUE cataloghi (vetrina e miei) e il
+    # client le legge con la guardia di tipo
+    prova("le colonne grezze stanno in CAMPI_VETRINA e in CAMPI_MIEI",
+          2, _SORGENTE.count('"u.spedizionieri AS venditore_spedizionieri, "'))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client le legge dalla riga, con la guardia di tipo",
+          True, "retiPunto:Array.isArray(a.venditore_reti_punto)" in mini)
+
+
 def prove_stock_raccontato():
     """«Lo stock raccontato bene» (ago 2026): l'annuncio esaurito non
     sparisce piu' del tutto — resta raggiungibile dal link condiviso e
@@ -49685,7 +49757,12 @@ def prove_promesse_badge():
     # UNA superficie sola dall'ago 2026 (era due): la scheda ha smesso
     # di nominare la soglia, e la promessa COL NUMERO vive solo dove
     # parla del NEGOZIO — accanto al bottone del carrello.
-    prova("...e la usa la sola «Altri oggetti»", 2,
+    # (26 nov 2026) PIU' DI UNA: la tendina «Info di spedizione» della
+    # scheda la ripete in fondo alle sue strade, per decisione di
+    # Andrea (il numero esce dentro una tendina, mai sciolto sulle
+    # pillole). Le superfici sono due — «Altri articoli» e quella
+    # tendina — e le chiamate tre: la definizione e le due.
+    prova("...e la usano «Altri articoli» e la tendina «Info di spedizione»", 3,
           mini.count("etichettaSpedGratis("))
     prova("l'etichetta corta dello sconto e' UNA", 1,
           mini.count("function etichettaSconto("))
@@ -49785,8 +49862,8 @@ def prove_promesse_badge():
           ".altri-tit{font-size:13px;padding-left:0;padding-right:0}"
           in mini)
     prova("...e con la formula corta, quella che ci sta a 320", True,
-          ">Altri oggetti del venditore</div>" in _ao
-          and "Altri oggetti di questo venditore" not in _ao)
+          "<span>Altri articoli del negozio</span>" in _ao
+          and "Altri oggetti" not in _ao.split("corpo.insertAdjacentHTML")[1])
     # Il chip azzurro della spedizione e' morto con lo sfollamento
     # colori: la regola CSS restava orfana a far credere che vivesse.
     # Si guardano la REGOLA e l'USO e non il nome nudo, che vive ancora
@@ -72981,6 +73058,8 @@ console.log(JSON.stringify(out));
         "function vesteMetodoP2P(m){",
         "function marchioMetodoP2P(m, conTesto){",
         "function metodiDettP2P(o){",
+        # (26 nov 2026) la tendina dei metodi: metodiDettP2P ci chiude dentro il corpo
+        "function tendinaMetodiP2P(o, metodi, corpo){",
         # (6 ott 2026) e' ASINCRONA: aspetta il negozio dalla rete per
         # lasciare in pari la cronologia — senza `async` nel ritaglio,
         # l'await dentro fa esplodere il banco
@@ -73055,6 +73134,8 @@ console.log(JSON.stringify(out));
                  "const P2P_PREMIO_TAB_MAX = ",
                  "const p2pCoord = ",
                  "let p2pDettOrdine = ", "let p2pDettMetodo = ",
+                 # (26 nov 2026) lo stato aperto/chiuso della tendina dei metodi
+                 "let p2pDettMetodiAperta = ",
                  "let p2pDettImporto = ", "const FRASE_INTERVALLO_DOPO_PRESA = "):
         i_a = mini.index(riga)
         pezzi.append(mini[i_a:mini.index("\n", i_a)])
@@ -178163,9 +178244,9 @@ def prove_contanti_zona():
     dett = fn("function metodiDettP2P(o){")
     prova("il dettaglio la mette sotto il metodo, con uno e con piu' metodi", [True, True, True],
           ["const zona = typeof zonaDettP2P === 'function' ? zonaDettP2P(o) : '';" in dett,
-           "+ marchioMetodoP2P(metodi[0]) + '</b>' + zona});" in dett,
+           "+ marchioMetodoP2P(metodi[0]) + '</b>' + zona)});" in dett,
            # (10 ott 2026, cauzione-metodo-scelto) fra le pillole e la zona sta la riga del metodo fissato
-           "+ marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta\n" in dett])
+           "+ marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta)\n" in dett])
     # (12 ott 2026, contanti-solo-scelti) con piu' metodi la zona solo a «Contanti» scelto
     prova("...con piu' metodi la zona la decide il metodo SCELTO, chiesto allo stesso giudice; sul mio ordine resta",
           [True, True],
@@ -225478,7 +225559,7 @@ CATEGORIE = {
     guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
-    sottocategorie_vetrina
+    sottocategorie_vetrina vetrina_reti_punto
     ricategorizza collaudo_ricategorizza categorie_una_volta asta proxy_asta annullo
     annullo_venditore spunta_rimborso abbandonati pagamenti_non_arrivati
     ritiro disarmo importo_uscita foto foto_scarti fotocamera_pagina
@@ -226570,7 +226651,7 @@ def main():
               prove_conta_feedback,
               prove_classifica, prove_classifica_nascosta,
               prove_classifica_recensioni_tutte,
-              prove_ferie, prove_stock_raccontato, prove_pausa,
+              prove_ferie, prove_vetrina_reti_punto, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_inviti, prove_coorti_titoli,
               prove_pionieri_congelati,
               prove_conto_acquisto,

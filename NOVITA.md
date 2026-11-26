@@ -1018,3 +1018,9 @@ frase: «Non hai sats?» funziona anche in franchi svizzeri: se il telefono è i
 dove: la cassa di un oggetto → «Non hai sats?»; Profilo → Incassi e pagamenti → «💱 Paga senza sats».
 leva: VIA_EURO_SOLO_ADMIN (oggi solo moderatori) e il P2P in franchi (P2P_CHF_ATTIVO)
 pubblico: no
+
+## 2026-11-26 · vetrina-tendine
+frase: Nella scheda di un annuncio compaiono due tendine: «Info di spedizione», che dice per ogni strada (indirizzo, locker, ritiro a mano) dove spedisce il venditore e a che prezzo, e «Altri articoli del negozio», coi primi 10 articoli e il tasto «Vedi tutto il negozio». Anche nel P2P i metodi di pagamento accettati stanno in una tendina nella pagina dell'ordine.
+dove: La scheda di un annuncio, sotto la descrizione («Info di spedizione») e in fondo («Altri articoli del negozio»); P2P → Libro ordini → un ordine → «Metodi di pagamento accettati».
+leva: nessuna
+pubblico: sì

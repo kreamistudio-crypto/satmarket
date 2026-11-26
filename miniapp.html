@@ -10470,6 +10470,41 @@
      respiro sotto lo porta gia' il padding del blocco */
   .altri-promo{margin:6px 0 0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
+  /* LE TENDINE DELLA SCHEDA (26 nov 2026, richiesta di Andrea): «Info
+     di spedizione», «Altri articoli del negozio» e, nel P2P, «Metodi
+     di pagamento accettati» sono <details> nativi, CHIUSI di serie, col
+     vestito del cassetto dell'internazionale (.sped-intl): un summary a
+     tutta larghezza con la freccina `.vt-fr` che ruota all'apertura.
+     Colori solo dalle variabili di casa, quindi chiaro e scuro vanno da
+     soli. Il summary NON e' flex (Safari ci ha litigato a lungo): il
+     flex sta nel div dentro, `.vt-sum`. `.vt-box` e' la versione
+     incorniciata; «Altri articoli» no, e' una sezione e tiene la sua
+     etichetta puntinata (.section-label). */
+  .vt-tendina>summary{cursor:pointer;list-style:none}
+  .vt-tendina>summary::-webkit-details-marker{display:none}
+  .vt-sum{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .vt-fr{font-style:normal;color:var(--muted);order:3;flex:none;line-height:1}
+  .vt-tendina[open]>summary .vt-fr{transform:rotate(180deg)}
+  .vt-box{margin:12px 0;border:1px solid var(--line);border-radius:12px;
+    padding:10px 12px;background:var(--card)}
+  /* `.vt-nuda`: la stessa tendina SENZA cornice, per dove sta gia'
+     dentro una carta (la sezione dei metodi del P2P, .p2p-sez) */
+  .vt-box>summary,.vt-nuda>summary{font-size:13px;font-weight:800;color:var(--ink)}
+  .vt-box>summary .vt-conta,.vt-nuda>summary .vt-conta{font-weight:700;color:var(--sats-deep);margin-left:6px}
+  .vt-box[open]>summary,.vt-nuda[open]>summary{margin-bottom:8px}
+  .p2p-metodi-letto{margin-top:4px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .vt-corpo-altri{padding-bottom:4px}
+  .altri-tutto{margin:12px 0 4px}
+  /* le righe di «Info di spedizione»: una per strada, col DOVE e il
+     QUANTO sotto il nome della strada */
+  .isp-righe{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .isp-righe li{font-size:13px;line-height:1.45;color:var(--ink-soft);font-weight:600}
+  .isp-t{font-weight:800;color:var(--ink)}
+  .isp-t .ico-locker{vertical-align:-3px}
+  .isp-d{display:flex;justify-content:space-between;gap:10px}
+  .isp-d span:last-child{text-align:right;white-space:nowrap;color:var(--ink)}
+  .isp-d b{color:var(--ink)}
+  .isp-nota{font-size:12px;color:var(--muted);font-weight:600}
   /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
      piu', e nemmeno la pagina del riepilogo che l'aveva sostituito: il
      carrello si paga nella CASSA, vedi il suo blocco CSS accanto a
@@ -15684,8 +15719,9 @@ document.getElementById('cartello')?.remove();</script>
        sale a filo dello schermo, da hero immersiva -->
   <div class="view" id="view-dettaglio">
     <div id="detailContent"></div>
-    <!-- La sentinella dello scroll infinito di «Altri oggetti del
-         venditore». Sta FUORI da #detailContent apposta: openDetail ne
+    <!-- La sentinella che fu dello scroll infinito di «Altri articoli
+         del negozio» (dal 26 nov 2026 e' una tendina da 10 articoli e
+         la sentinella tace da sola: nessun cursore da chiedere). Sta FUORI da #detailContent apposta: openDetail ne
          riscrive l'innerHTML a ogni apertura, e una sentinella li'
          dentro morirebbe a ogni giro portandosi via il suo
          osservatore. Qui e' armata una volta per sempre, e una vista
@@ -21705,6 +21741,12 @@ function mapListing(a){
     /* la spunta «non spedisco nel mio paese» (18 set 2026): l'unica
        cosa che chiude la strada di casa — vedi zonaOfferta */
     noSpedCasa:!!a.non_spedisce_casa,
+    /* le reti di locker/punti a cui il venditore consegna davvero (26 nov
+       2026): le giudica il SERVER (`reti_punto`, il giudice della cassa)
+       e qui si mostrano soltanto. Assente = server di ieri = nessuna
+       riga «punto» nella tendina «Info di spedizione». */
+    retiPunto:Array.isArray(a.venditore_reti_punto)
+      ? a.venditore_reti_punto.filter(x => typeof x === 'string' && x) : [],
     zoneSped:(()=>{ try {
         const m = JSON.parse(a.spedizione_zone||'{}');
         return (m && typeof m === 'object') ? m : {};
@@ -33179,6 +33221,80 @@ function spedBadge(l){
   return `<span class="pill${spedGratisOra(l) ? ' pill-trust' : ''}"
     data-sped>${testoSpedBadge(l)}</span>`;
 }
+/* «INFO DI SPEDIZIONE» (26 nov 2026, richiesta di Andrea): una TENDINA
+   nella scheda, chiusa di serie, subito dopo descrizione ed etichetta e
+   prima del riquadro del venditore. Una riga per STRADA, col DOVE e il
+   QUANTO — le pillole di sopra dicono solo che la strada c'e'.
+   ⚠️ A LUGLIO IL COSTO ERA STATO TOLTO DALLE PILLOLE («una cifra sciolta
+   si legge come un prezzo»), e quella decisione resta: qui lo rimette
+   Andrea di suo pugno, DENTRO una tendina e con l'etichetta di ogni
+   strada, che e' proprio quel che mancava alla cifra sciolta.
+   LE CIFRE NELLA VALUTA NATIVA DELLA TARIFFA (euro con la virgola se il
+   venditore l'ha scritta in euro, sats se in sats; 0 = «gratuita»): il
+   toggle €/₿ della scheda NON le segue — convertirle vorrebbe dire un
+   ridisegno a ogni `setValuta` e un «≈» dove la tariffa e' esatta, e
+   il conto vero lo dice comunque la cassa. Compromesso dichiarato.
+   SULL'ASTA NIENTE CIFRE: le strade sono incluse, e un prezzo vicino a
+   una puntata si leggerebbe come una seconda cifra da pagare.
+   Il PUNTO c'e' solo se il server dice che il venditore consegna a una
+   rete di punti (`retiPunto`, da `venditore_reti_punto`), e solo nel
+   paese di casa: stessa regola della cassa. La tariffa del punto e'
+   quella dichiarata (`spedPuntoDich`) o, come alla cassa, la stessa
+   della casa (la retrocompat di `_tariffa_dichiarata`). I punti
+   Barattolo oggi sono spenti: il server non li manda, ed e' giusto. */
+function cifraSpedInfo(tar){
+  if (tar.eur > 0) return `${fmtEur(tar.eur)} €`;
+  if (tar.sats > 0) return `${fmt(tar.sats)} sats`;
+  return '<b>gratuita</b>';
+}
+function righeInfoSpedizione(l){
+  const asta = astaE(l);
+  const prezzo = tar => asta ? 'inclusa' : cifraSpedInfo(tar);
+  const riga = (titolo, voci, nota) => `<li><div class="isp-t">${titolo}</div>`
+    + voci.map(v => `<div class="isp-d"><span>${v[0]}</span><span>${v[1]}</span></div>`).join('')
+    + (nota ? `<div class="isp-nota">${nota}</div>` : '') + '</li>';
+  const out = [];
+  const paeseDom = l.paeseDom || DOM_DEFAULT;
+  if (spedisce(l)) {
+    /* la strada a un indirizzo: la casa (salvo la spunta) e le zone
+       estere dichiarate, nell'ordine dei continenti di casa */
+    const voci = [];
+    if (zonaOfferta(l, 'dom'))
+      voci.push([esc(nomePaese(paeseDom) || paeseDom), prezzo(tariffaZona(l, 'dom'))]);
+    for (const z of ZONE_INTL)
+      if (zonaOfferta(l, z))
+        voci.push([esc(etichettaZona(z, paeseDom)), prezzo(tariffaZona(l, z))]);
+    const extra = (l.spedExtraEur > 0 || l.spedExtra > 0) && !asta
+      ? `+ ${cifraSpedInfo({sats: l.spedExtra, eur: l.spedExtraEur})} per ogni pezzo in più` : '';
+    if (voci.length) out.push(riga(nomeVia('casa'), voci, extra));
+    /* il locker / punto: solo se il venditore ci consegna davvero, e
+       solo a casa */
+    if (zonaOfferta(l, 'dom') && l.retiPunto && l.retiPunto.length) {
+      const tarPunto = l.spedPuntoDich
+        ? {sats: l.spedPunto, eur: l.spedPuntoEur} : tariffaZona(l, 'dom');
+      out.push(riga(nomeVia('punto'),
+        [[esc(nomePaese(paeseDom) || paeseDom), prezzo(tarPunto)]],
+        'Reti: ' + esc(l.retiPunto.join(', '))));
+    }
+  }
+  if (l.consegna === 'ritiro' || l.consegna === 'entrambe')
+    out.push(riga('🤝 Ritiro a mano',
+      [[l.comune ? luogoTesto(l) : 'In zona', asta ? 'incluso' : '<b>gratuito</b>']]));
+  /* la promessa del negozio, a fondo tendina: la stessa etichetta della
+     scheda e di «Altri articoli» (un testo solo, i due non divergono) */
+  const sg = (spedisce(l) && !asta)
+    ? regolaSpedGratis(l.spedGratisSats, l.spedGratisEur, l.spedGratisValuta) : null;
+  if (out.length && sg) out.push(`<li>${etichettaSpedGratis(sg)}</li>`);
+  return out;
+}
+function infoSpedizioneScheda(l){
+  if (!l || !(spedisce(l) || l.consegna === 'ritiro' || l.consegna === 'entrambe')) return '';
+  const righe = righeInfoSpedizione(l);
+  if (!righe.length) return '';
+  return `<details class="vt-tendina vt-box info-sped" id="infoSpedizione">
+    <summary><div class="vt-sum"><span>🚚 Info di spedizione</span><i class="vt-fr" aria-hidden="true">▾</i></div></summary>
+    <ul class="isp-righe">${righe.join('')}</ul></details>`;
+}
 /* SU QUESTO ACQUISTO LA SPEDIZIONE E' GRATIS? Il giudice del badge
    della scheda, e ne servono TRE cose insieme — il testo, il colore
    del guscio e il riallineamento a ogni ± dello stepper — quindi vive
@@ -34467,20 +34583,27 @@ function aggiornaBarraCompra(view){
    conosce gia' quegli id. Fail-open totale: senza nulla da mostrare
    (o con la rete storta) la sezione non nasce e il dettaglio resta
    quello di sempre.
-   DALL'AGO 2026 SI VEDE TUTTO IL NEGOZIO, a scorrimento continuo come
-   la vetrina: la prima pagina e' ALTRI_PAGINA, le altre le chiede la
-   sentinella #altriSentinella. Il tetto vero e' sempre stato il limit
-   della fetch — il vecchio `slice(0,8)` non ha mai morso, si
-   chiedevano sette card e se ne mostravano sei o sette, e la promessa
-   delle «quattro righe piene» del commento non e' mai arrivata —
-   quindi il tetto se n'e' andato insieme al limit.
+   DALL'AGO AL 26 NOV 2026 SI VEDEVA TUTTO IL NEGOZIO, a scorrimento
+   continuo come la vetrina (ALTRI_PAGINA a pagina, il resto lo chiedeva
+   la sentinella #altriSentinella). DAL 26 NOV 2026 E' UNA TENDINA,
+   «Altri articoli del negozio», chiusa di serie (richiesta di Andrea):
+   dentro AL MASSIMO ALTRI_PAGINA = 10 articoli — il tetto e' il limit
+   della fetch, come sempre — e in fondo «Vedi tutto il negozio ›» se
+   il negozio ne ha di piu'. Niente pagina 2: la sentinella resta
+   armata (e' una per sempre, vive fuori dal dettaglio) ma tace da
+   sola, perche' `altriPag.cursore` qui si azzera subito dopo aver
+   letto «c'e' altro?» — vedi sezioneAltriOggetti. `caricaAltriOggetti`
+   resta com'e', dormiente: la sua guardia `!altriPag.cursore` e' quella
+   che la tiene ferma, e toglierla vorrebbe dire toccare `osservaSentinella`.
+   (Il vecchio `slice(0,8)` non ha mai morso: si chiedevano sette card
+   e se ne mostravano sei o sette.)
    IL GIRO SERVE, ed e' la regola gia' pagata in vetrina: il dettaglio
    si svuota a ogni apertura, e le card di QUESTA sezione ne aprono un
    altro restando nella stessa vista — una pagina 2 del venditore di
    prima, arrivata in ritardo, si appiccicherebbe alla griglia del
    venditore nuovo. Il controllo d'identita' sull'annuncio non basta:
    lo stesso annuncio si puo' riaprire. */
-const ALTRI_PAGINA = 12;
+const ALTRI_PAGINA = 10;   // il tetto della tendina (26 nov 2026): prima era la pagina dello scroll infinito
 let altriPag = {id:null, chi:null, cursore:null, caricando:false};
 let altriGiro = 0;
 
@@ -34493,6 +34616,7 @@ async function sezioneAltriOggetti(l){
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
   if (mio) return;
   let altri = [];
+  let haAltri = false;      // il negozio ha altri articoli oltre ai primi ALTRI_PAGINA
   if (DEMO) {
     altri = listings.filter(x=>x.seller===l.seller && x.id!==l.id
                               && x.stato==='attivo');
@@ -34517,6 +34641,12 @@ async function sezioneAltriOggetti(l){
         && !(l.famiglia && x.famiglia===l.famiglia));
       altriPag.chi = chi;
       altriPag.cursore = d.cursore || null;
+      /* UNA PAGINA SOLA (26 nov 2026): il cursore serve a sapere se il
+         negozio ha ALTRO (→ «Vedi tutto il negozio ›»), poi si azzera
+         — la sentinella guarda altriPag.cursore e senza niente da
+         chiedere non fa piu' nulla */
+      haAltri = !!altriPag.cursore;
+      altriPag.cursore = null;
       inCatalogo(altri);
     } catch(e) { return; }
   }
@@ -34531,18 +34661,17 @@ async function sezioneAltriOggetti(l){
      della sezione e da li' si incolla in cima mentre si scorre — e'
      il CSS a farlo (.altri-azione), qui non serve nessun listener.
      Niente piu' vestito di cartone: e' il ghost di casa come tutti
-     gli altri secondari. Il tetto non c'e' piu': si vede tutto il
-     negozio, una pagina alla volta. */
+     gli altri secondari. (Dal 26 nov 2026 il tetto e' tornato, 10
+     articoli dentro la tendina, e il resto sta dietro «Vedi tutto il
+     negozio ›».) */
   /* Se il venditore ha SOLO articoli digitali il carrello non esiste
      per lui: i digitali si comprano singolarmente (la regola della
      griglia del carrello), e la sezione non deve portarci. IL
      GIUDIZIO E' SULLA PRIMA PAGINA — l piu' i primi ALTRI_PAGINA — e
-     NON si rifa' quando ne arrivano altre: rifarlo vorrebbe dire far
-     comparire il blocco appiccicato a meta' scorsa, che e' peggio del
-     caso che cura. IMPERFEZIONE DICHIARATA, e col tetto tolto ora si
-     puo' VEDERE invece di restare teorica: un venditore di soli
-     digitali col primo pezzo fisico oltre il dodicesimo tiene il
-     bottone nascosto anche quando quel pezzo compare scorrendo. Chi
+     dalla tendina (26 nov 2026) NON ne arrivano altre, quindi non si
+     rifa' mai. IMPERFEZIONE DICHIARATA: un venditore di soli
+     digitali col primo pezzo fisico oltre il decimo tiene il
+     bottone nascosto, e quel pezzo sta dietro «Vedi tutto». Chi
      compra quel pezzo trova comunque il carrello nel SUO dettaglio,
      dove il giudizio riparte da lui. */
   const tuttoDigitale = l.consegna==='digitale'
@@ -34597,12 +34726,24 @@ async function sezioneAltriOggetti(l){
      negozio — l'occhio impara UNA fila. */
   const badge = (sgOk ? `<span class="pill">${etichettaSpedGratis(sgOk)}</span>` : '')
               + (scOk.length ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
+  /* LA TENDINA (26 nov 2026): <details> chiuso di serie, il titolo
+     resta l'etichetta puntinata di sempre (dentro il summary) col conto
+     accanto — «10+» se il negozio ne ha di piu' — e la freccina.
+     SUL DESKTOP LARGO (3 colonne, foto | dettagli | altri) la terza
+     colonna vuota col details chiuso sarebbe un buco: li' si APRE di
+     serie, con la stessa media query del CSS delle tre colonne (la via
+     piu' semplice: niente CSS nuovo, chi lo chiude lo chiude). */
+  const largo = document.documentElement.classList.contains('fuori-telegram')
+    && window.matchMedia('(min-width:1600px) and (hover:hover) and (pointer:fine)').matches;
   corpo.insertAdjacentHTML('beforeend', `
-    <div class="altri-sez">
-      <div class="section-label altri-tit">Altri oggetti del venditore</div>
+    <details class="altri-sez vt-tendina"${largo ? ' open' : ''}>
+      <summary><div class="section-label altri-tit"><span>Altri articoli del negozio</span><span class="conta">${altri.length}${haAltri ? '+' : ''}</span><i class="vt-fr" aria-hidden="true">▾</i></div></summary>
+      <div class="vt-corpo-altri">
       ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button>${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}</div>` : ''}
       <div class="grid altri-griglia">${altri.map(cardHTML).join('')}</div>
-    </div>`);
+      ${haAltri ? `<button class="btn ghost altri-tutto" onclick="apriNegozioDaAnnuncio()">Vedi tutto il negozio ›</button>` : ''}
+      </div>
+    </details>`);
   armaViste();
 }
 
@@ -39179,6 +39320,7 @@ function openDetail(id){
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
       ${etichettaScheda(l)}
+      ${infoSpedizioneScheda(l)}
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         ${voltoHTML({nome: l.seller, avatar: l.avatar, negozio: l.negozio,
                      ignoto: true}, 'avatar', {tag: 'div'})}
@@ -97455,6 +97597,7 @@ function rigaPresaBzP2P(bz){
    a chi volesse dettarlo al telefono a una persona. */
 let p2pDettOrdine = '';     // l'id dell'ordine aperto nel dettaglio
 let p2pDettMetodo = '';     // il metodo scelto con le pillole, prima della presa
+let p2pDettMetodiAperta = false;  // (26 nov 2026) la tendina «Metodi di pagamento accettati»: sopravvive al ridisegno
 let p2pDettImporto = 0;     // su un intervallo, la cifra scelta col foglio «Quanto»
 let p2pDettOnchain = '';    // (24 nov 2026) l'ordine per cui chi compra ha scelto «Ricevi on-chain» prima della presa
 
@@ -98350,8 +98493,8 @@ function metodiDettP2P(o){
      nella riga dell'importo. */
   if (metodi.length === 1)
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
-      corpo: '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
-        + marchioMetodoP2P(metodi[0]) + '</b>' + zona});
+      corpo: tendinaMetodiP2P(o, metodi, '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
+        + marchioMetodoP2P(metodi[0]) + '</b>' + zona)});
   /* LA DOMANDA SOPRA LE PILLOLE (9 ott 2026, cantiere prendi-metodo):
      la frase che stava in fondo, rossa, accanto al bottone spento, sale
      qui dove si risponde, e si vede quando serve — al tocco di
@@ -98378,12 +98521,45 @@ function metodiDettP2P(o){
     : zonaDettP2P(Object.assign({}, o, {metodi: p2pDettMetodo ? [p2pDettMetodo] : []}));
   return sezioneNuovoP2P({
     ico: 'metodi', titolo: titolo,
-    corpo: domanda + '<div class="p2p-metodi">' + metodi.map(m =>
+    corpo: tendinaMetodiP2P(o, metodi, domanda + '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
-      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta
+      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta)
   });
+}
+/* LA TENDINA DEI METODI (26 nov 2026, richiesta di Andrea: «anche nel P2P
+   metti metodi di pagamento accettati e sotto un drop down menu»): il
+   corpo della sezione diventa un <details> col summary «Metodi di
+   pagamento accettati · N». Il titolo della sezione ESCE INVARIATO
+   («Metodo di pagamento — come invii gli euro»): dice da che parte va
+   il denaro, e quella e' una decisione di Andrea di settembre.
+   - CHIUSA DI SERIE, e il summary dice da solo quel che serve senza
+     aprirla: con UN metodo solo il metodo stesso (non c'e' niente da
+     scegliere, ma si legge), con piu' metodi il metodo SCELTO, se c'e'.
+   - CHI PRENDE DEVE POTER SCEGLIERE: `chiediMetodoDettP2P` (Compra
+     premuto senza metodo) la APRE da sola, perche' la domanda vive
+     dentro.
+   - LO STATO SOPRAVVIVE AL RIDISEGNO (`ridisegnaSeCambiaP2P`, la
+     scelta di una pillola, il libro che si aggiorna): lo tiene
+     `p2pDettMetodiAperta`, scritta dall'evento `toggle` e riletta qui
+     per rimettere `open`. Si azzera all'apertura di un altro ordine.
+   Sul MIO ordine e' la stessa tendina: dentro i metodi che ho
+   pubblicato e nessuna domanda (nessuno sceglie niente), e nel summary
+   solo il conto. */
+function tendinaMetodiP2P(o, metodi, corpo){
+  const n = metodi.length;
+  /* cosa si legge nel summary a tendina chiusa */
+  const letto = n === 1 ? metodi[0] : (o.mio ? '' : p2pDettMetodo);
+  return '<details class="vt-tendina vt-nuda p2p-metodi-tendina" id="p2pDettMetodiTendina"'
+    + (p2pDettMetodiAperta ? ' open' : '')
+    + ' ontoggle="p2pDettMetodiAperta = this.open">'
+    + '<summary><div class="vt-sum"><span>Metodi di pagamento accettati'
+    + '<span class="vt-conta">' + n + '</span></span>'
+    + '<i class="vt-fr" aria-hidden="true">&#9662;</i></div>'
+    + (letto ? '<div class="p2p-metodi-letto">' + (n === 1 ? '' : 'Scelto: ') + marchioMetodoP2P(letto) + '</div>' : '')
+    + '</summary>'
+    + corpo + '</details>';
 }
 /* la frase, scritta una volta: la legge il dettaglio sotto le pillole e
    «Info P2P» nella voce della cauzione (una prova le tiene uguali) */
@@ -98442,6 +98618,9 @@ function chiediMetodoDettP2P(){
   const sez = d && d.closest('.p2p-sez');
   if (!sez) return false;
   d.hidden = false;
+  /* la domanda sta dentro la tendina dei metodi: se e' chiusa si apre */
+  const tendina = d.closest('details');
+  if (tendina) { tendina.open = true; p2pDettMetodiAperta = true; }
   try {
     sez.scrollIntoView({block: 'center',
                         behavior: tourRidotto() ? 'auto' : 'smooth'});
@@ -98472,6 +98651,7 @@ function apriDettaglioP2P(id){
      chiedere, e il bottone non deve restare spento per una domanda che
      nessuno ha posto */
   p2pDettMetodo = (riga.metodi && riga.metodi.length === 1) ? riga.metodi[0] : '';
+  p2pDettMetodiAperta = false;   // la tendina dei metodi riparte chiusa su ogni ordine
   renderDettaglioP2P();
   el('sheetBg').classList.add('open');
   el('p2pDettSheet').classList.add('open');

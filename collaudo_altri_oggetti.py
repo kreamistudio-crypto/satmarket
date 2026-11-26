@@ -46,7 +46,7 @@ SRV = None          # il modulo server, importato in avvio()
 
 ATTIVI = 27         # quanti annunci ha il venditore in vetrina
 VENDUTI = 3         # ...e quanti sullo scaffale vuoto
-PAGINA = 12         # ALTRI_PAGINA del client: 27 = 12 + 12 + 3
+PAGINA = 12         # la pagina del server di prova: 27 = 12 + 12 + 3 (il client dal 26 nov 2026 chiede una pagina sola da 10: la rotta resta a cursore)
 
 
 def prova(nome, atteso, avuto):
