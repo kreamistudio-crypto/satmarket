@@ -56210,6 +56210,27 @@ console.log(JSON.stringify({
           {"valide": [None, None, None, None, {"riflesso": [0, 0, 100, 100]}],
            "uno": [1, 1, 1, 55], "due": [1, 0, 0, 0], "senzaProp": [1, 1, 0],
            "maschera": True, "storto": "", "vuota": ""}, _fxr)
+    # PRIMA DI COMPRARE, LA COMUNITA' (27 nov 2026, AndreAI): il foglio
+    # prima della pagina d'acquisto, sugli annunci col bottone «Entra»
+    _ap = pezzo_js(mini, "function apriAcquisto(l, dopoComunita){", "\n}\n")
+    _pc = pezzo_js(mini, "function apriComunitaPrimaDiComprare(l){", "\n}\n")
+    prova("«Acquista» passa dal foglio della comunita' DOPO le guardie di "
+          "vetrina e ferie e PRIMA di toccare l'acquisto, e lo salta "
+          "solo chi arriva dal suo «Continua»", (True, True, True),
+          (_ap.index("if (inFerie(l))") < _ap.index("apriComunitaPrimaDiComprare(l)")
+           < _ap.index("currentListing = l;"),
+           "if (!dopoComunita && apriComunitaPrimaDiComprare(l)) return;" in _ap,
+           "if (l) apriAcquisto(l, true);" in pezzo_js(mini, "function continuaDopoComunita(){", "\n}\n")))
+    prova("...il foglio nasce solo con uno slug in forma e il bottone del "
+          "giudice di sempre, e non per chi ha gia' toccato «Entra»: lo "
+          "segna contaEntra, cioe' ogni bottone «Entra» dell'app",
+          (True, True, True, True),
+          ("if (!e || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(e.slug || '')) return false;" in _pc,
+           "const b = bottoneEntra(e.link, e.testo, e.slug);" in _pc,
+           "localStorage.getItem(COMUNITA_CHIAVE + e.slug) === '1') return false;" in _pc,
+           "localStorage.setItem(COMUNITA_CHIAVE + slug, '1');" in pezzo_js(mini, "function contaEntra(slug){", "\n}\n")))
+    prova("...e si chiude con gli altri fogli", True,
+          "el('comunitaSheet').classList.remove('open');" in pezzo_js(mini, "function closeSheet(){", "\n}\n"))
     prova("...il markup sta in fondo alla card, dopo la riserva (che deve "
           "restare accanto all'immagine), e la linea con gli effetti "
           "ridotti non c'e'", (True, True, True),
