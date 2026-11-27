@@ -39132,3 +39132,13 @@ il foglio `estrazioneSheet`).
 - In palio non si compra: `guardia_estrazione` nelle quattro porte
   (compra, set, preventivo, offerta). Il nastro: `in_palio` da
   `arricchisci_righe_vetrina`.
+
+- LA LISTA PUBBLICA (27 nov 2026, cantiere estrazione-verificabile):
+  `_vista_estrazione` dà `biglietti` («numero:biglietto», mai chi) anche
+  a estrazione APERTA; a estratta anche `resto` e `vincitore_biglietto`.
+  `_congela_estrazione` torna il racconto «congelata» e
+  `_racconta_estrazione` manda a ogni partecipante (e a chi regala)
+  l'impronta, il blocco atteso e il suo numero: l'impegno esce dal
+  server prima dell'hash. Il numero arriva in chat anche a chi entra
+  col link (il giro dei dieci minuti).
+

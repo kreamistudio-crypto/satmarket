@@ -111984,17 +111984,30 @@ def _vista_estrazione(con, e, uid) -> dict:
                         "tg_id=?", (e["id"], uid)).fetchone()
         if r:
             v["mio"] = {"numero": r["numero"], "biglietto": r["biglietto"]}
-    if e["stato"] in ("attesa_blocco", "estratta"):
-        v["impronta"] = e["impronta"]
-        v["blocco_altezza"] = e["blocco_altezza"]
+    # LA LISTA E' PUBBLICA DAL PRIMO BIGLIETTO (27 nov 2026, «non e'
+    # verificabile perche' l'ordine non e' pubblico», Andrea): righe
+    # «numero:biglietto» e nient'altro, cioe' un numero d'arrivo e un
+    # codice a caso, MAI chi. Ognuno vede la sua riga entrare al suo
+    # posto e restarci; chiunque guarda vede che la lista cresce solo
+    # in coda, prima che esista il blocco che la estrarra'.
+    if e["stato"] in ("aperta", "attesa_blocco", "estratta"):
         v["biglietti"] = [f"{r['numero']}:{r['biglietto']}" for r in
                           con.execute("SELECT numero, biglietto FROM "
                                       "estrazioni_partecipanti WHERE "
                                       "estrazione_id=? ORDER BY numero",
                                       (e["id"],))]
+    if e["stato"] in ("attesa_blocco", "estratta"):
+        v["impronta"] = e["impronta"]
+        v["blocco_altezza"] = e["blocco_altezza"]
     if e["stato"] == "estratta":
         v["blocco_hash"] = e["blocco_hash"]
         v["vincitore_numero"] = e["vincitore_numero"]
+        # il conto intero, per chi lo rifa' a mano: hash -> resto -> +1
+        n = e["n_partecipanti"] or 0
+        v["resto"] = (int(e["blocco_hash"], 16) % n) if n else None
+        riga = next((b for b in v["biglietti"] if b.split(":")[0]
+                     == str(e["vincitore_numero"])), "")
+        v["vincitore_biglietto"] = riga.split(":", 1)[1] if riga else ""
         v["simulato"] = bool(MODALITA_COLLAUDO)
         if not MODALITA_COLLAUDO:
             v["blocco_link"] = ESTRAZIONI_ESPLORATORE + e["blocco_hash"]
@@ -112145,8 +112158,10 @@ async def partecipa_estrazione(req: Request, x_tg_init_data: str = Header(""),
     if no:
         con.close()
         raise HTTPException(400, no)
-    # chi entra col tocco vede subito il suo numero: niente avviso del bot
-    _iscrivi_estrazione(con, e["id"], user["id"], avvisato=1)
+    # chi entra col tocco vede subito il suo numero, e il bot glielo
+    # riscrive in chat (27 nov 2026): la ricevuta del posto resta da lui,
+    # fuori da Barattolo, per rifare il conto a estrazione fatta
+    _iscrivi_estrazione(con, e["id"], user["id"])
     v = _vista_estrazione(con, e, user["id"])
     con.commit()
     con.close()
@@ -112253,11 +112268,23 @@ def _congela_estrazione(estrazione_id: int, altezza: int):
                     "WHERE id=? AND stato='aperta'", (adesso, e["id"]))
         esito["racconto"] = "vuota"
     else:
-        con.execute("UPDATE estrazioni SET stato='attesa_blocco', impronta=?, "
-                    "n_partecipanti=?, blocco_altezza=? WHERE id=? AND "
-                    "stato='aperta'",
-                    (estrazione_impronta(righe), len(righe), altezza,
-                     e["id"]))
+        impronta = estrazione_impronta(righe)
+        cur = con.execute(
+            "UPDATE estrazioni SET stato='attesa_blocco', impronta=?, "
+            "n_partecipanti=?, blocco_altezza=? WHERE id=? AND "
+            "stato='aperta'", (impronta, len(righe), altezza, e["id"]))
+        if cur.rowcount:
+            # L'IMPRONTA ESCE DA BARATTOLO prima del blocco: finisce
+            # nella chat Telegram di ognuno, dove noi non possiamo piu'
+            # cambiarla. E' l'impegno preso: dopo, la lista che si
+            # mostra deve dare quella stessa impronta.
+            esito.update(racconto="congelata", impronta=impronta,
+                         n=len(righe), altezza=altezza, biglietti=[
+                             (r["tg_id"], r["numero"], r["biglietto"])
+                             for r in con.execute(
+                                 "SELECT tg_id, numero, biglietto FROM "
+                                 "estrazioni_partecipanti WHERE "
+                                 "estrazione_id=?", (e["id"],))])
     con.commit()
     con.close()
     return esito
@@ -112335,30 +112362,47 @@ async def _racconta_estrazione(esito: dict):
             await notifica(tg, f"🎁 L'estrazione di «{titolo}» è stata "
                                "annullata: l'annuncio non c'è più.")
         return
+    if quale == "congelata":
+        chiusa = (f"🔒 La lista dell'estrazione di «{titolo}» si è chiusa "
+                  f"con <b>{esito['n']}</b> partecipanti. L'impronta della "
+                  f"lista è <code>{esito['impronta']}</code>.\n\nIl "
+                  "numero vincente lo sceglierà il blocco Bitcoin "
+                  f"<b>{esito['altezza']}</b>, che non è ancora stato "
+                  "minato: nessuno può sapere adesso chi vince.")
+        for tg, numero, biglietto in esito.get("biglietti") or []:
+            await notifica(tg, f"{chiusa}\n\nIl tuo numero è <b>{numero}"
+                               f"</b>, biglietto <code>{biglietto}</code>: "
+                               "lo trovi nella lista pubblica sulla scheda.",
+                           bottone)
+        await notifica(esito["venditore_id"], chiusa, bottone)
+        return
     if quale != "estratta":
         return
     blocco = (f"blocco {esito['altezza']}" + (" (simulato)"
               if MODALITA_COLLAUDO else ""))
+    conto = (f"\n\nIl conto: l'hash del blocco <code>{esito['hash']}</code>"
+             f" letto come numero, diviso per {esito['n']}, dà resto "
+             f"{esito['numero'] - 1}; più uno fa {esito['numero']}.")
     await notifica(esito["vincitore_id"],
                    f"🎉 <b>Hai vinto!</b> Il tuo numero {esito['numero']} è "
                    f"uscito all'estrazione di «{titolo}» (su {esito['n']} "
                    f"partecipanti, estratto dal {blocco}).\n\nPer la "
                    "consegna scrivi a chi lo regala: "
-                   f"{_chi_contattare(esito['contatto_venditore'])}",
-                   bottone)
+                   f"{_chi_contattare(esito['contatto_venditore'])}"
+                   + conto, bottone)
     await notifica(esito["venditore_id"],
                    f"🎁 L'estrazione di «{titolo}» è fatta: ha vinto il "
                    f"numero {esito['numero']} su {esito['n']} (dal {blocco})."
                    "\n\nScrivigli per la consegna: "
-                   f"{_chi_contattare(esito['contatto_vincitore'])}",
-                   bottone)
+                   f"{_chi_contattare(esito['contatto_vincitore'])}"
+                   + conto, bottone)
     for tg in esito.get("partecipanti") or []:
         if tg == esito["vincitore_id"]:
             continue
         await notifica(tg, f"🎁 L'estrazione di «{titolo}» è fatta: ha vinto "
                            f"il numero {esito['numero']}. Non era il tuo "
-                           "questa volta: grazie di aver partecipato!",
-                       bottone)
+                           "questa volta: grazie di aver partecipato!"
+                           + conto, bottone)
     if esito.get("venduto"):
         try:
             asyncio.create_task(annuncio_su_nostr(

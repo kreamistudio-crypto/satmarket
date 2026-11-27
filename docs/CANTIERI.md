@@ -97235,3 +97235,29 @@ vm-2050 da spegnere e togliere da GitHub. Se un pezzo resta molto più
 lungo degli altri, si rimisurano i pesi (`PESI_PEZZI`). Se il repo
 tornasse privato, undici macchine costerebbero minuti: si riguarda
 questa voce.
+
+## L'estrazione verificabile da tutti (27 nov 2026, cantiere estrazione-verificabile)
+
+Andrea: «non è verificabile perché l'ordine non è pubblico», e poi «se
+uno quando si iscrive sa anche che posizione è, può verificare che
+l'hash diviso gli iscritti fa la sua posizione». Prima la lista
+«numero:biglietto» si vedeva solo DOPO la chiusura: mentre era aperta
+nessuno poteva controllare che i numeri non venissero rimescolati o
+gonfiati con iscritti finti. DECISO: 1) la lista anonima è pubblica
+nella scheda dal primo biglietto (`_vista_estrazione`, stato «aperta»),
+la riga di chi guarda in grassetto; 2) il numero e il biglietto arrivano
+in chat a TUTTI, anche a chi entra col link (prima solo agli invitati:
+`avvisato` non più 1 al tocco), come ricevuta fuori da Barattolo;
+3) alla chiusura ogni partecipante e chi regala ricevono in chat
+l'impronta della lista e il blocco atteso (racconto «congelata»):
+l'impegno esce dal server prima che l'hash esista e non si può più
+cambiare; 4) a estrazione fatta scheda e avvisi danno il conto intero:
+hash, partecipanti, resto, numero e biglietto vincente, con la riga
+Python per rifarlo. SCARTATE: nickname o id anonimizzati nella lista
+(un hash dell'id Telegram si inverte provando gli id, e il biglietto a
+caso basta a riconoscersi); pubblicare la lista solo su Nostr (gli
+eventi pubblici di un'estrazione non sono chiesti). Gli iscritti finti
+creati con più account Telegram restano possibili come in ogni
+estrazione online: la lista pubblica li rende contabili, non
+impossibili. PROVATO: collaudo_estrazioni con le righe nuove (lista
+aperta senza id, ricevuta del link, impronta in chat, conto in scheda).

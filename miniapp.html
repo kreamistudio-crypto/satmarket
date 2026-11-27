@@ -62060,10 +62060,23 @@ function htmlEstrazione(e, id){
     ? `<div style="margin-top:6px"><b>Regolamento:</b> ${esc(e.regolamento)}</div>` : '';
   const mio = e.mio
     ? `<div style="margin-top:8px">✅ <b>Sei dentro:</b> numero <b>${e.mio.numero}</b> · biglietto <span class="mono">${esc(e.mio.biglietto)}</span></div>` : '';
-  const prova = e.biglietti ? `<details><summary>Come si controlla</summary>
-      <div style="margin-top:6px">La lista dei biglietti si è fermata alla chiusura, con questa impronta (sha256 delle righe «numero:biglietto», una per riga): <span class="mono">${esc(e.impronta)}</span>.
-      Il numero vincente è l'hash del blocco ${e.blocco_altezza} letto come numero, diviso per ${e.biglietti.length}: il resto più uno.</div>
-      <div class="mono" style="margin-top:6px;max-height:160px;overflow:auto">${e.biglietti.map(esc).join('<br>')}</div></details>` : '';
+  /* LA LISTA PUBBLICA (27 nov 2026): righe «numero:biglietto», mai chi.
+     Visibile dal primo biglietto; la riga di chi guarda in grassetto,
+     cosi' si vede al suo posto. Il conto intero a estrazione fatta. */
+  const righe = (e.biglietti || []).map(r => {
+    const mia = e.mio && r === `${e.mio.numero}:${e.mio.biglietto}`;
+    const vince = e.stato === 'estratta' && r.split(':')[0] === String(e.vincitore_numero);
+    return mia || vince ? `<b>${esc(r)}${vince ? ' 🎉' : ''}${mia ? ' ← tu' : ''}</b>` : esc(r);
+  });
+  const lista = righe.length ? `<div class="mono" style="margin-top:6px;max-height:160px;overflow:auto">${righe.join('<br>')}</div>` : '';
+  const impronta = e.impronta
+    ? `<div style="margin-top:6px">La lista si è fermata alla chiusura, prima del blocco, con questa impronta (sha256 delle righe «numero:biglietto», una per riga), mandata in chat a ogni partecipante: <span class="mono">${esc(e.impronta)}</span></div>` : '';
+  const conto = e.stato === 'estratta' && e.blocco_hash
+    ? `<div style="margin-top:6px">Hash del blocco ${e.blocco_altezza}: <span class="mono">${esc(e.blocco_hash)}</span><br>Letto come numero e diviso per <b>${n}</b> dà resto <b>${e.resto}</b>; più uno fa <b>${e.vincitore_numero}</b>${e.vincitore_biglietto ? `, biglietto <span class="mono">${esc(e.vincitore_biglietto)}</span>` : ''}.</div>
+       <div style="margin-top:6px">Per rifarlo da te, in Python: <span class="mono">int("hash", 16) % ${n} + 1</span></div>` : '';
+  const prova = righe.length ? `<details${e.stato === 'aperta' ? '' : ' open'}><summary>${e.stato === 'aperta' ? 'La lista dei biglietti, aggiornata a ogni ingresso' : 'Come si controlla'}</summary>
+      ${e.stato === 'aperta' ? '<div style="margin-top:6px">Ogni biglietto prende il numero dopo l\'ultimo e resta lì: alla chiusura il numero vincente sarà l\'hash del blocco letto come numero, diviso per i partecipanti, più uno.</div>' : ''}
+      ${impronta}${conto}${lista}</details>` : '';
   if (e.stato === 'aperta') {
     const come = e.modo === 'link'
       ? 'Partecipa chi apre il link dell\'estrazione e preme «Partecipo».'
@@ -62081,7 +62094,7 @@ function htmlEstrazione(e, id){
          ${n === 0 ? `<button class="btn ghost" onclick="annullaEstrazione(${e.id}, ${id})">Annulla l'estrazione</button>` : ''}` : '';
     return `<h4>🎁 In palio · si chiude il ${estrQuando(e.chiude_il)}</h4>
       <div>${come} Finora: <b>${chi}</b>. Alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza.</div>
-      ${regole}${mio}${partecipa}${mia}`;
+      ${regole}${mio}${partecipa}${mia}${prova}`;
   }
   if (e.stato === 'attesa_blocco') {
     return `<h4>🎁 Estrazione chiusa: si aspetta il blocco</h4>
