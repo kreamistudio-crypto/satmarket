@@ -1036,3 +1036,9 @@ frase: Puoi mettere in palio un tuo annuncio con «🎁 Apri un'estrazione»: pa
 dove: La scheda di un tuo annuncio → «🎁 Apri un'estrazione»; in vetrina l'annuncio porta il nastro «🎁 In palio».
 leva: nessuna
 pubblico: no
+
+## 2026-11-27 · intervallo-onchain
+frase: Anche gli ordini P2P on-chain possono avere un intervallo, «da 20 a 100 €», come quelli Lightning: chi pubblica a prezzo di mercato scrive due cifre, e chi prende sceglie quanto. Con un intervallo il tuo ordine viene preso molto più spesso.
+dove: P2P → + → «On-chain» → l'importo, secondo campo; nel libro la card «da … a …, scegli tu» → «Scegli» → «Quanto vuoi scambiare?».
+leva: P2P_ONCHAIN_INTERVALLO (accesa di serie)
+pubblico: sì
