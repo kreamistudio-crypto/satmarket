@@ -2565,6 +2565,21 @@
      ma in alto a sinistra: senza bottone sopra, la foto sale a filo
      dello schermo e il dettaglio diventa una hero immersiva */
   .back-float{left:10px;right:auto}
+  /* LA FILA IN ALTO A DESTRA (27 nov 2026): il condividi e, sul proprio
+     annuncio, modifica, duplica, nascondi e widget. A 360px cinque
+     cerchietti da 44 stanno in 244px, e l'indietro a sinistra resta
+     libero. */
+  .foto-azioni{position:absolute;top:10px;right:10px;z-index:2;
+    display:flex;gap:6px}
+  .foto-azioni .share-btn{position:static}
+  @media (max-width:340px){.foto-azioni .share-btn{width:40px;height:40px}}
+  /* le azioni di casa che non hanno un'icona: una riga leggera sotto
+     le occasioni, prima dell'uscita rossa */
+  .mio-altro{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;
+    margin:10px 0 2px}
+  .mio-altro button{background:none;border:0;padding:8px 2px;cursor:pointer;
+    font:inherit;font-size:14px;font-weight:800;color:var(--ink-soft);
+    text-decoration:underline;text-underline-offset:3px}
   /* IL BARATTOLINO STA IN BASSO A DESTRA SULLA FOTO (ago 2026,
      modello Vinted, decisione di Andrea): era in alto accanto al
      condividi, e sotto il recinto c'era anche un bottone grande
@@ -39552,6 +39567,28 @@ function openDetail(id){
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>`;
   const condividi = DEMO ? '' : `<button class="share-btn" onclick="condividiAnnuncio()" title="Condividi questo annuncio" aria-label="Condividi">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4"/></svg></button>`;
+  /* LE AZIONI DEL PROPRIETARIO IN ALTO (27 nov 2026, Andrea: «semplifica
+     il menu… vicino al tasto share la matitina… il tasto di copia che
+     fa da duplica, l'occhio barrato per nascondere… il widget per il
+     web come ulteriore icona sempre in alto»). Cerchietti di carta come
+     il condividi, nella stessa fila: ✏️ modifica, ⧉ duplica, occhio
+     barrato, </> widget. Le guardie sono quelle dei bottoni di ieri —
+     solo sull'annuncio normale (asta ed esaurito hanno il loro blocco),
+     il duplicato e il nascondi mai sull'importato. In basso restano le
+     occasioni (lampo, estrazione) e l'uscita rossa. */
+  const azioniMie = (mio && !DEMO && !asta && !esa) ? [
+    `<button class="share-btn" onclick="editListing(${l.id})" title="Modifica questo annuncio" aria-label="Modifica questo annuncio">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>`,
+    l.nostr ? '' : `<button class="share-btn" onclick="duplicaAnnuncio(${l.id})" title="Duplica questo annuncio" aria-label="Duplica questo annuncio">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>`,
+    (!nascondiAttivo || l.nostr || daNegozioCollegato(l)) ? ''
+      : `<button class="share-btn" onclick="nascondiAnnuncio(${l.id}, true)" title="Nascondi dalla vetrina" aria-label="Nascondi dalla vetrina">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 4.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg></button>`,
+    `<button class="share-btn" onclick="apriWidget('annuncio',${l.id})" title="Widget per il web" aria-label="Widget per il web">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg></button>`
+  ].join('') : '';
+  const filaAlta = (azioniMie || condividi)
+    ? `<div class="foto-azioni">${azioniMie}${condividi}</div>` : '';
   /* Il barattolino dei preferiti (ago 2026): stessa fabbrica delle
      card — stessa icona, stesso livello per-annuncio, stesso numero
      accanto — e sta in BASSO a destra sulla foto, modello Vinted. Il
@@ -39569,8 +39606,8 @@ function openDetail(id){
          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>` : '';
   const foto = (l.photos && l.photos.length)
     ? `<div class="detail-foto"><div class="detail-photos${l.photos.length>1?'':' una'}">${l.photos.map((p,i)=>`<img src="${esc(p)}"${i?' loading="lazy"':''} decoding="async" alt="" style="cursor:zoom-in" onclick="apriLightbox(${i})">`).join('')}</div>
-       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${(l.didascalie||[]).some(t => t) ? `<div class="detail-didascalia${l.photos.length>1?' con-pallini':''}" aria-live="polite"></div>` : ''}${frecce}${indietro}${barattolino}${condividi}</div>`
-    : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${condividi}</div>`;
+       ${l.photos.length>1?`<div class="foto-dots">${l.photos.map((_,i)=>`<button${i?'':' class="on"'} aria-label="Vai alla foto ${i+1}"></button>`).join('')}</div>`:''}${(l.didascalie||[]).some(t => t) ? `<div class="detail-didascalia${l.photos.length>1?' con-pallini':''}" aria-live="polite"></div>` : ''}${frecce}${indietro}${barattolino}${filaAlta}</div>`
+    : `<div class="detail-foto"><div class="detail-ph">${l.emoji}</div>${indietro}${barattolino}${filaAlta}</div>`;
   /* I ponti di contatto NON vivono piu' qui (lug 2026): si trovano
      entrando nella scheda del venditore, dove gia' c'erano. Il
      riquadro nel dettaglio resta solo anagrafica: avatar, nome,
@@ -39720,66 +39757,23 @@ function openDetail(id){
            ${!(lampoLeve && lampoLeve.attive) || inFerie(l) ? '' : (lampoAttiva(l)
              ? `<button class="btn ghost" onclick="annullaLampo()">⚡ Offerta lampo attiva (−${l.lampoPct}%) — annullala</button>`
              : `<button class="btn ghost" onclick="apriLampo()">⚡ Lancia un'offerta lampo</button>`)}
-           <button class="btn ghost" onclick="editListing(${l.id})">✏️ Modifica questo annuncio</button>
-           <!-- LA PORTA DEL DUPLICATO (ago 2026), e sta SUBITO DOPO
-                la modifica perche' sono i due gesti che partono da
-                questo annuncio: uno lo cambia, l'altro ne fa nascere
-                un altro uguale. L'ordine della colonna resta quello
-                dichiarato — occasione → ritocco → stock → uscita.
-                SOLO QUI, e non nella riga di «I tuoi annunci»: vale
-                la misura gia' scritta per il rifornimento — a 320px
-                .mio-azioni concede 196px e la coppia
-                Modifica+Elimina se li prende tutti, quindi un terzo
-                badge va a capo e fa crescere OGNI riga della lista.
-                E solo su cio' che e' NATO QUI: duplicare un importato
-                darebbe un nativo gemello del suo evento Nostr, cioe'
-                il doppione che la deduplica esiste per togliere. E'
-                la stessa guardia del rifornimento, un rigo piu' giu'. -->
-           ${l.nostr ? '' : `<button class="btn ghost" onclick="duplicaAnnuncio(${l.id})">📄 Duplica questo annuncio</button>`}
            ${/* L'ESTRAZIONE (26 nov 2026): un pezzo solo, attivo, nato
                 qui e non all'asta — le stesse guardie del server, che
                 resta il giudice */''}${(!l.nostr && !asta && !esa && !l.inPalio && !l.abbonamento && (l.quantita||1) <= 1 && !DEMO)
              ? `<button class="btn ghost" onclick="apriEstrazione(${l.id})">🎁 Apri un'estrazione</button>` : ''}
-           <!-- LA PORTA DELLO STOCK SULL'ANNUNCIO ATTIVO (ago 2026), ed
-                e' obbligatoria: le tre strade che aprivano il foglio
-                erano tutte gatate sull'esaurito, quindi senza questa
-                «per ora e' finito» sarebbe un gesto che nessuno puo'
-                fare. E' il gemello del bottone arancio che
-                bloccoMioEsaurito mette QUI quando l'annuncio e' finito:
-                la scheda e' dove il proprio annuncio si gestisce.
-                Sta fra Modifica ed Elimina, che l'ordine della colonna
-                e' occasione → ritocco → stock → uscita, e l'uscita
-                rossa resta ultima.
-                SCARTATO il terzo badge nella riga di «I tuoi annunci»,
-                ed e' una misura: .mio-azioni e' flex-wrap e a 320px la
-                riga concede 196px, che la coppia Modifica+Elimina
-                chiede gia' tutti (fianco sceso a 12 apposta) — un terzo
-                badge va a capo e fa crescere OGNI riga della lista.
-                L'importato non ce l'ha: la sua quantita' vive sui
-                relay e ricarica_quantita risponde 400 (la stessa
-                guardia di bottoneRifornisci). Un SERVIZIO nemmeno
-                (cantiere quantita-servizi): non ha scorte, e la
-                stessa rotta lo rifiuta per lo stesso motivo. -->
-           ${(l.nostr || l.consegna === 'servizio') ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
-           ${/* LA SCORTA DI CODICI (24 nov 2026): i codici pronti, che
-                partono da soli al pagamento. Solo sul codice online puro:
-                la stessa guardia del server (scortaPossibile). */
-              scortaPossibile(l) ? `<button class="btn ghost" onclick="apriScorta(${l.id})">🔑 Codici pronti</button>` : ''}
-           ${/* NASCONDERE UN ANNUNCIO SOLO (23 nov 2026): esce dalla
-                vetrina senza scadenza, e torna da «I tuoi annunci». Sta
-                dopo lo stock perche' e' il suo parente (l'esaurito resta
-                in vetrina grigio, il nascosto no) e prima dell'uscita
-                rossa, che resta ultima. Non sull'importato: il suo
-                stato vive alla fonte (la stessa guardia del server). */
-              (!nascondiAttivo || l.nostr || daNegozioCollegato(l)) ? ''
-              : `<button class="btn ghost" onclick="nascondiAnnuncio(${l.id}, true)">🙈 Nascondi dalla vetrina</button>`}
-           <button class="btn ghost" onclick="apriWidget('annuncio',${l.id})">&lt;/&gt; Widget per il web</button>
-           <!-- L'uscita della colonna, e ora un bottone vero: il
-                testuale sottolineato spariva fra due ghost — proprio
-                il gesto che non si torna indietro. Il testo dice solo
-                cosa fa: «Questo è un tuo annuncio» lo diceva gia' la
-                riga verde sopra, e in mezzo a Modifica e Lampo non
-                serviva ripeterlo. -->
+           ${/* MODIFICA, DUPLICA, NASCONDI E WIDGET sono icone in alto,
+                accanto al condividi (27 nov 2026, `azioniMie`). Qui
+                sotto restano le occasioni, questa riga leggera per lo
+                stock e i codici, e l'uscita rossa, ultima.
+                LO STOCK (ago 2026) e' la porta obbligatoria del «per
+                ora e' finito» sull'attivo; non sull'importato (la sua
+                quantita' vive sui relay) ne' sul servizio (non ha
+                scorte). LA SCORTA DI CODICI (24 nov 2026) solo sul
+                codice online puro (scortaPossibile). */''}${(() => {
+              const altro = ((l.nostr || l.consegna === 'servizio') ? '' : `<button onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`)
+                + (scortaPossibile(l) ? `<button onclick="apriScorta(${l.id})">🔑 Codici pronti</button>` : '');
+              return altro ? `<div class="mio-altro">${altro}</div>` : '';
+            })()}
            <button class="btn allarme" onclick="deleteListing(${l.id}, true)">${etichettaElimina(l, true)}</button>`
         : esa
             ? `<div class="trust-note"><span><b>Per ora è esaurito.</b> L'annuncio resta qui e non va da nessuna parte: se il venditore rimette dei pezzi torna comprabile da solo. Intanto puoi metterlo nel barattolo 🫙 per ritrovarlo al volo.</span></div>`

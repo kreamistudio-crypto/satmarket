@@ -19108,9 +19108,10 @@ def prove_duplica_annuncio():
     # E SOLO SU CIO' CHE E' NATO QUI: duplicare un importato darebbe
     # un nativo gemello del suo evento, cioe' il doppione che la
     # deduplica dei doppioni Nostr esiste per togliere.
+    # (27 nov 2026, menu in icone) il bottone e' l'icona della fila in alto
     prova("client: il bottone non nasce sugli importati", True,
-          "${l.nostr ? '' : `<button class=\"btn ghost\" "
-          "onclick=\"duplicaAnnuncio(${l.id})\">" in mini)
+          "l.nostr ? '' : `<button class=\"share-btn\" "
+          "onclick=\"duplicaAnnuncio(${l.id})\"" in mini)
 
 
 
@@ -22514,9 +22515,10 @@ def prove_pausa():
     # motivo — anche i servizi restano fuori, la stessa ragione
     # dell'importato: niente scorte da ricaricare (server.py rigetta
     # anche loro, non solo l'origine esterna).
+    # (27 nov 2026, menu in icone) ora e' un tasto della riga leggera
     prova("...e non la offre agli importati ne' ai servizi", True,
-          "${(l.nostr || l.consegna === 'servizio') ? '' : `<button "
-          "class=\"btn ghost\" onclick=\"apriRifornisci(" in mini)
+          "((l.nostr || l.consegna === 'servizio') ? '' : `<button "
+          "onclick=\"apriRifornisci(" in mini)
     prova("la card NON offre la pausa (li' si scorre, non si spegne)",
           True, "if (!esaurito(l) || astaE(l) || l.nostr "
           "|| l.consegna === 'servizio') return '';"
@@ -112858,7 +112860,7 @@ def prove_quantita_servizi():
           pezzo_js(mini, "function bottoneRifornisci(l){", "\n}\n"))
     prova("...idem «Aggiorna i pezzi» sulla scheda propria", True,
           "l.consegna === 'servizio') ? '' : `<button "
-          "class=\"btn ghost\" onclick=\"apriRifornisci(" in mini)
+          "onclick=\"apriRifornisci(" in mini)
 
     # ---- 56-58: il form di vendita ------------------------------------
     prova("il campo «Quantità disponibile» si nasconde anche per "
@@ -178199,13 +178201,16 @@ def prove_nascondi_annuncio():
     prova("il tasto nasce spento e lo accende solo un true del server",
           [True, True], ["let nascondiAttivo = false;" in mini,
                          "nascondiAttivo = me.nascondi_annuncio === true;" in mini])
-    i_tasto = mini.index("🙈 Nascondi dalla vetrina</button>")
-    prova("sulla scheda: dopo lo stock, prima del widget e dell'uscita rossa, "
-          "e non sull'importato", [True, True, True],
-          [mini.rindex("🔄 Aggiorna i pezzi</button>", 0, i_tasto)
+    # EMENDATA (27 nov 2026, Andrea: «semplifica il menu»): il tasto e'
+    # l'occhio barrato nella fila in alto della scheda (`azioniMie`),
+    # fra il duplica e il widget; le guardie restano quelle di ieri
+    i_tasto = mini.index('title="Nascondi dalla vetrina"')
+    prova("sulla scheda: nella fila in alto, dopo il duplica e prima del "
+          "widget, e non sull'importato", [True, True, True],
+          [mini.rindex('title="Duplica questo annuncio"', 0, i_tasto)
            > i_tasto - 1500,
-           i_tasto < mini.index("Widget per il web</button>", i_tasto)
-           < mini.index("deleteListing(${l.id}, true)", i_tasto),
+           i_tasto < mini.index('title="Widget per il web"', i_tasto)
+           < mini.index("const filaAlta", i_tasto),
            "(!nascondiAttivo || l.nostr || daNegozioCollegato(l)) ? ''"
            in mini[i_tasto - 400:i_tasto]])
     riga = mini[mini.index("const rigaMioAnnuncio = l =>"):]
