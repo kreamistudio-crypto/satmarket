@@ -1054,3 +1054,15 @@ frase: Le estrazioni ora si controllano da soli: la lista dei biglietti è pubbl
 dove: La scheda di un annuncio «🎁 In palio» → «La lista dei biglietti»; in chat dal bot il tuo numero, l'impronta e il conto finale.
 leva: nessuna
 pubblico: no
+
+## 2026-11-27 · tendine-canali
+frase: Anche i post nei canali Telegram hanno le tendine: «Info di spedizione» (strada per strada, dove si spedisce e a che prezzo, e il locker solo se il venditore consegna davvero ai punti di ritiro), «Altri articoli del negozio» (fino a 10, col «Vedi tutto il negozio ›») e, per gli scambi P2P, «Metodi di pagamento accettati». Si aprono con un tocco.
+dove: I canali Telegram di Barattolo, sotto ogni nuovo annuncio e ogni ordine P2P.
+leva: nessuna
+pubblico: sì
+
+## 2026-11-27 · cerco-nei-canali
+frase: Le richieste di «Cerco» escono anche nei canali Telegram: chi cerca una cosa la vede in piazza, con il budget e il tasto «Fai un'offerta su Barattolo» che apre la richiesta. Quando la richiesta si chiude o scade, il post sparisce da solo.
+dove: I canali Telegram di Barattolo; la richiesta nasce da Cerco → «📣 Chiedilo a tutti».
+leva: POST_CERCO_CANALI (accesa di serie)
+pubblico: sì
