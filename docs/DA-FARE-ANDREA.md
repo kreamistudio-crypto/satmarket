@@ -1257,3 +1257,30 @@ niente.
 **Dopo la promozione** si vede nel pannello «⚙️ Stato delle leve»,
 gruppo delle promozioni: le tre scale coi loro scalini.
 
+## 35. Il resto dell'intervallo torna nel libro: la prova in produzione coi due account moderatori (27 nov 2026, cantiere resto-intervallo; Andrea: «lo proviamo in produzione io e Alan, non nel collaudo»)
+
+**Niente da scrivere nel config**: le due leve sono di serie accesa e
+chiusa ai soli moderatori (`P2P_RESTO_INTERVALLO`,
+`P2P_RESTO_INTERVALLO_SOLO_ADMIN`), e arrivano con la promozione. Si
+guardano nel pannello «⚙️ Stato delle leve».
+
+La prova (DOPO la promozione), dal tuo account e da quello di Alan:
+1. Lightning, Vendi: pubblica dal tuo account un ordine a mercato da 10 a
+   100 €. Nella scatola arancione deve esserci «Se ne prendono solo una
+   parte, il resto torna da solo nel libro.»
+2. Alan lo prende per 20 €, paga e tocca «Ho inviato»; tu liberi i sats.
+3. Entro un paio di minuti, nel libro e fra i tuoi scambi deve comparire
+   un ordine tuo da 10 a 80 €, con gli stessi metodi. Ritiralo se non lo
+   vuoi tenere.
+4. Lightning, Compra: lo stesso al contrario (tu pubblichi un Compra 10–100
+   €, Alan vende 20 €, tu tocchi «Ho inviato», Alan libera): deve
+   ricomparire il tuo Compra 10–80 €.
+5. On-chain: un Vendi BTC 10–100 € preso per 20 €; a scambio concluso
+   deve ricomparire nel libro un ordine 10–80 €.
+
+Se il resto non compare su Lightning, da «Info P2P» tocca «🩺 Copia la
+diagnosi» e incollala nel thread: le righe «resto …» dicono cosa ha fatto
+il telefono.
+
+Andata bene, si apre a tutti con UNA riga nel config del VPS e il riavvio:
+`P2P_RESTO_INTERVALLO_SOLO_ADMIN = False`. Fatta, questa voce si cancella.

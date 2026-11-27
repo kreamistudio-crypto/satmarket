@@ -41352,6 +41352,21 @@ def _leve_stato():
                          "ha depositato: per tutti gli altri e' come spento",
                   spento="«Riprendi i sats» vale per chiunque abbia "
                          "depositato (se la leva e' accesa)"),
+            # IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026)
+            _leva("Resto dell'intervallo di nuovo nel libro",
+                  "P2P_RESTO_INTERVALLO", P2P_RESTO_INTERVALLO,
+                  acceso="un ordine P2P a intervallo preso per una parte "
+                         "torna nel libro col resto, a scambio concluso "
+                         "(Lightning e on-chain)",
+                  spento="un ordine a intervallo si chiude alla prima presa"),
+            _leva("Resto dell'intervallo solo ai moderatori",
+                  "P2P_RESTO_INTERVALLO_SOLO_ADMIN",
+                  P2P_RESTO_INTERVALLO_SOLO_ADMIN,
+                  acceso="il resto torna nel libro solo sugli ordini "
+                         "pubblicati da un moderatore: per gli altri e' "
+                         "come spento",
+                  spento="il resto torna nel libro per chiunque abbia "
+                         "pubblicato (se la leva e' accesa)"),
             # IL RITORNO DA SOLO (20 nov 2026, ritorno-da-solo-oc)
             _leva("Sats on-chain indietro da soli a tempo finito",
                   "P2P_ONCHAIN_RITORNO_DA_SOLO", P2P_ONCHAIN_RITORNO_DA_SOLO,
@@ -58044,6 +58059,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # P2P_USDT_ATTIVO, la porticina degli admin e il P2P per me. Senza,
     # il libro non mostra gli ordini in USDT e il foglio offre l'euro solo.
     profilo["p2p_usdt"] = p2p_usdt_ammesso(user["id"])
+    # ...e il resto dell'intervallo che torna nel libro (27 nov 2026): il
+    # telefono manda la chiave del prossimo scambio solo con questa
+    profilo["p2p_resto_intervallo"] = p2p_resto_intervallo_per(user["id"])
     # ...e gli ordini P2P in franchi svizzeri (14 nov 2026, cantiere
     # p2p-chf): lo stesso cancello, con le sue due leve
     profilo["p2p_chf"] = p2p_chf_ammesso(user["id"])
@@ -120990,6 +121008,66 @@ if not isinstance(P2P_ONCHAIN_INTERVALLO, bool):
     P2P_ONCHAIN_INTERVALLO = False
 
 
+# IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026, Andrea: «se l'ordine
+# da 10.000 euro e uno ti compra 10 euro... c'e' un altro 9.990 euro di
+# liquidita' disponibili»). Un ordine a intervallo preso per una parte non
+# si chiude piu' tutto: a scambio concluso il resto torna nel libro con lo
+# stesso «Da» e un «Fino a» piu' basso (massimo meno la cifra presa). Sotto
+# il «Da» non torna niente; uguale al «Da» torna a cifra unica.
+# Su Lightning lo fa mostrod (`handle_child_order` di release.rs), se il
+# telefono di chi ha pubblicato manda la chiave del prossimo scambio
+# (`NextTrade`) col rilascio o con «Ho inviato»: lo fa il telefono, questo
+# server dice solo a chi. On-chain lo fa questo server, alla chiusura
+# «rilasciato» (`_p2p_onchain_resto_nel_libro`): non alla presa, perche' se
+# lo scambio salta la rinascita rimette gia' l'intervallo intero.
+# LA LEVA accesa di serie, con la porticina `P2P_RESTO_INTERVALLO_SOLO_ADMIN`
+# (True di serie, Andrea: «lo proviamo in produzione io e Alan»): finche' e'
+# chiusa vale solo per un moderatore che ha PUBBLICATO l'ordine. Si apre a
+# tutti scrivendo False nel config.
+try:
+    from config import P2P_RESTO_INTERVALLO
+    P2P_RESTO_INTERVALLO = P2P_RESTO_INTERVALLO is not False
+except ImportError:
+    P2P_RESTO_INTERVALLO = True
+try:
+    from config import P2P_RESTO_INTERVALLO_SOLO_ADMIN
+    # solo un False scritto apre a tutti: una riga storta resta chiusa
+    P2P_RESTO_INTERVALLO_SOLO_ADMIN = P2P_RESTO_INTERVALLO_SOLO_ADMIN is not False
+except ImportError:
+    P2P_RESTO_INTERVALLO_SOLO_ADMIN = True
+
+
+def p2p_resto_intervallo_per(tg_id) -> bool:
+    """La leva PER QUESTA PERSONA (chi ha pubblicato l'ordine): accesa e,
+    a porticina chiusa, solo per un moderatore."""
+    if P2P_RESTO_INTERVALLO is not True:
+        return False
+    if P2P_RESTO_INTERVALLO_SOLO_ADMIN is not False:
+        try:
+            return bool(tg_id) and e_admin(int(tg_id))
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def p2p_resto_intervallo_capi(lo, hi, preso) -> tuple:
+    """PURA: i due capi del resto di un intervallo `lo`–`hi` dopo una presa
+    di `preso` (stessa unita', centesimi o euro). `(lo, resto)` se il resto
+    e' un intervallo, `(lo, lo)` se e' uguale al «Da» (cifra unica), ()
+    se e' sotto il «Da», se l'ordine non era a intervallo o se i numeri
+    sono storti. La stessa regola di mostrod (`get_child_order`)."""
+    try:
+        if any(isinstance(x, bool) for x in (lo, hi, preso)):
+            return ()
+        lo, hi, preso = int(lo or 0), int(hi or 0), int(preso or 0)
+    except (TypeError, ValueError):
+        return ()
+    if not (0 < lo < hi) or not (lo <= preso <= hi):
+        return ()
+    resto = hi - preso
+    return (lo, resto) if resto >= lo else ()
+
+
 def p2p_onchain_giudica_intervallo(metodi, euro_min_cent, euro_cent,
                                    mercato: bool, coin: bool) -> tuple:
     """PURA: i due capi di un ordine nuovo, `(min, max)` in centesimi, o
@@ -126147,7 +126225,7 @@ def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
     return ""
 
 
-def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
+def _p2p_onchain_rinasci(con, o, adesso: int, resto: tuple = ()) -> int:
     """Fa rinascere nel libro l'ordine dello scambio `o`: un ordine nuovo
     con un nome nuovo e gli stessi patti di quando era stato pubblicato
     (lato, prezzo o premio, cifra, metodi, filtro, paracadute ripartito
@@ -126157,7 +126235,10 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     (Barattozon in «Vendi BTC») lo stesso PayCode e la stessa scadenza, e
     nel libro fino a 8 ore prima di quella. Torna l'id nuovo, o 0 se
     l'ordine era gia' rinato, se chi l'aveva pubblicato non ha piu' la sua
-    chiave on-chain, o se al PayCode non restano piu' di 8 ore. Committa."""
+    chiave on-chain, o se al PayCode non restano piu' di 8 ore. Committa.
+    Con `resto` (27 nov 2026, il resto dell'intervallo) i due capi sono
+    quelli: `(lo, hi)` un intervallo, `(lo, lo)` la cifra unica `lo`; vale
+    solo a prezzo di mercato (l'intervallo c'e' solo li')."""
     vecchio = int(o["id"])
     if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE rinato_da=?",
                    (vecchio,)).fetchone():
@@ -126189,6 +126270,14 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     # L'INTERVALLO (27 nov 2026): l'ordine rinasce coi suoi due capi, non
     # con la cifra scelta da chi l'aveva preso
     capi = p2p_onchain_intervallo(o) if mercato else ()
+    # IL RESTO (27 nov 2026): lo stesso «Da», il «Fino a» abbassato della
+    # cifra presa; uguale al «Da» torna a cifra unica
+    cifra = int(o["euro_cent"])
+    if resto:
+        if not mercato or len(resto) != 2 or not (0 < int(resto[0]) <= int(resto[1])):
+            return 0
+        cifra = int(resto[1])
+        capi = (int(resto[0]), int(resto[1])) if int(resto[0]) < int(resto[1]) else ()
     ordine = P2P_ONCHAIN_PREFISSO + secrets.token_hex(8)
     cur = con.execute(
         "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
@@ -126199,7 +126288,7 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
         " fascia_min_cent, fascia_max_cent)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (ordine, lato, maker, 0 if mercato else int(o["prezzo_sats"]),
-         capi[1] if capi else int(o["euro_cent"]), o["metodi"], recapito,
+         capi[1] if capi else cifra, o["metodi"], recapito,
          p2p_onchain_scade_libro(adesso, tab_scade), adesso, adesso,
          "mercato" if mercato else "fisso",
          int(_p2p_onchain_campo(o, "premio", 0) or 0) if mercato else 0,
@@ -126227,6 +126316,56 @@ def p2p_onchain_testo_rinato(perche: str) -> str:
             ": l'ordine è di nuovo nel libro uguale, stesso prezzo, stessi metodi, "
             "stesso tempo per pagare.\n\nSe non lo vuoi più, tocca «🚫 Non "
             "ripubblicarlo»: si apre l'ordine, e lì lo ritiri con un tocco.")
+
+
+def p2p_onchain_capi_resto(o) -> tuple:
+    """PURA: i capi del resto di uno scambio on-chain RILASCIATO preso da un
+    ordine a intervallo (vedi `p2p_resto_intervallo_capi`), o (): non
+    rilasciato, a cifra unica, col PayCode o Barattozon, o resto sotto il
+    «Da». La cifra presa e' `euro_cent`, riscritta alla presa."""
+    if str(_p2p_onchain_campo(o, "stato", "") or "") != "rilasciato":
+        return ()
+    if str(_p2p_onchain_campo(o, "paycode", "") or ""):
+        return ()
+    if int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0):
+        return ()
+    if not _p2p_onchain_mercato(o):
+        return ()
+    capi = p2p_onchain_intervallo(o)
+    if not capi:
+        return ()
+    return p2p_resto_intervallo_capi(capi[0], capi[1],
+                                     _p2p_onchain_campo(o, "euro_cent", 0))
+
+
+async def _p2p_onchain_resto_nel_libro(o) -> int:
+    """IL RESTO DELL'INTERVALLO (27 nov 2026): a scambio rilasciato, un
+    ordine uguale nel libro col resto (vedi `p2p_onchain_capi_resto`), se
+    la leva vale per chi l'aveva pubblicato. Nessun avviso: l'ordine
+    compare fra i suoi. Fail-open come la rinascita: lo scambio concluso
+    resta concluso anche se qui qualcosa va storto. Torna l'id nuovo, o 0."""
+    try:
+        if not p2p_resto_intervallo_per(int(o["maker_id"] or 0)):
+            return 0
+        resto = p2p_onchain_capi_resto(o)
+        if not resto:
+            return 0
+        con = _p2p_onchain_db()
+        try:
+            nuovo = _p2p_onchain_rinasci(con, o, int(time.time()), resto)
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: il resto dello scambio {o['id']} non è "
+              f"tornato nel libro ({type(e).__name__}: {e})", flush=True)
+        return 0
+    if not nuovo:
+        return 0
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(nuovo))
+    print(f"🔁 P2P on-chain: il resto dello scambio {o['id']} "
+          f"({resto[0]}–{resto[1]} cent) è tornato nel libro come {nuovo}", flush=True)
+    return nuovo
 
 
 async def _p2p_onchain_rinasci_e_di(o, perche: str) -> int:
@@ -126492,6 +126631,11 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     # n'e' andato)
     await _p2p_onchain_rinasci_e_di(
         o, p2p_onchain_rinasce_perche(o, stato, 0, mancato_a, mancato_perche))
+    # (27 nov 2026) scambio concluso da un ordine a intervallo: il resto
+    # torna nel libro. `o` e' la riga di PRIMA della chiusura: lo stato
+    # lo si dice qui, il resto e' come allora
+    if stato == "rilasciato":
+        await _p2p_onchain_resto_nel_libro(dict(o, stato="rilasciato"))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 

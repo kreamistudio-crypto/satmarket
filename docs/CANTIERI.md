@@ -97017,3 +97017,78 @@ foto della schermata mandate ad Andrea prima del push
 (/mnt/project-files/intervallo-obbligatorio/). Da guardare dopo la
 promozione: il primo ordine nuovo nel libro e un «Non hai sats?» che lo
 trova.
+
+## Il resto dell'intervallo torna nel libro (27 nov 2026, cantiere resto-intervallo)
+
+Andrea, dal thread «Pagare in euro e franchi senza sats»: «se l'ordine da
+10.000 euro e uno ti compra 10 euro... c'è un altro 990 euro di liquidità
+disponibili», e poi «facciamolo subito». Adesso che gli ordini a mercato
+sono sempre a intervallo (con il «Da» già pieno a 10, che quasi nessuno
+cambia), un ordine che si chiude alla prima presa butta via il grosso
+della liquidità. Ok al piano in 10 righe alle 12:42 («vai»).
+
+Deciso:
+- il resto è la regola di mostrod (`get_child_order` in release.rs):
+  stesso «Da», «Fino a» = massimo meno la cifra presa; sotto il «Da» non
+  torna niente, uguale al «Da» torna a cifra unica. Vale anche on-chain,
+  con lo stesso giudice scritto in Python (`p2p_resto_intervallo_capi`);
+- QUANDO: a scambio concluso, non alla presa. Su Lightning non si sceglie
+  (il figlio nasce nel rilascio). On-chain si poteva fare alla presa, ma
+  se lo scambio salta la rinascita rimette già l'intervallo intero: due
+  ordini da ricucire. Alla chiusura `rilasciato` le due strade non si
+  toccano mai;
+- LIGHTNING, nel telefono e non nel nodo (Mostro non si tocca, 20 nov):
+  chi ha pubblicato manda `Payload::NextTrade` col rilascio (ordine di
+  vendita) o con «Ho inviato» (ordine di acquisto: `fiat_sent.rs` la
+  tiene per il rilascio dell'altro). È esattamente il pezzo che il
+  verbale di settembre diceva mancante («L'INTERVALLO SI CHIUDE ALLA
+  PRIMA PRESA»), e l'obiezione di allora — un figlio con una chiave che
+  la pagina non sa governare — è caduta con l'adozione di settembre
+  (`adottaOrdiniAltroveP2P` ricostruisce la riga di un mio ordine da
+  restore e libro). Il telefono prenota l'indice come quando pubblica
+  (mazzo e cloud PRIMA del gesto), lo ricorda sulla riga (`restoIndice`:
+  un «Riprova» manda la STESSA chiave, mai una seconda) e scrive la riga
+  provvisoria `nuovo:N` (al mio rilascio; per un ordine d'acquisto quando
+  l'altro libera i sats, `nasceRigaRestoP2P`, che prima direbbe «Sto
+  pubblicando l'ordine…» per tutto il controllo degli euro) con i patti dell'ordine (metodi, premio, zona,
+  filtro, tempo per pagare, paracadute, ripubblica); il `new-order` di
+  mostrod sulla chiave nuova la rinomina e col nome vero si intesta al
+  server. Se il figlio non nasce, la riga provvisoria si toglie da sola
+  un quarto d'ora dopo il rilascio (`togliRestiMancatiP2P`; prima del
+  rilascio si aspetta sempre, che con «Ho inviato» il figlio arriva solo
+  quando l'altro libera i sats). Fuori: monete, Barattozon, profili in
+  pensione (non contano più gli indici);
+- i capi della presa si ricordano sulla riga (`fasciaMin`/`fasciaMax`,
+  dal filo o dalla riga) perché `euro` collassa sulla cifra scelta;
+- ON-CHAIN il server, a scambio `rilasciato`, rifà l'ordine col resto
+  (`_p2p_onchain_resto_nel_libro`, che riusa `_p2p_onchain_rinasci` col
+  parametro `resto`: stessi patti, `rinato_da` = lo scambio, una volta
+  sola). Nessun avviso del bot (nessun testo nuovo chiesto): l'ordine
+  compare fra i suoi;
+- LA LEVA `P2P_RESTO_INTERVALLO` accesa di serie, con la porticina
+  `P2P_RESTO_INTERVALLO_SOLO_ADMIN` chiusa di serie (Andrea: «lo proviamo
+  in produzione io e Alan, non nel collaudo»), come «Riprendi i sats». Il
+  telefono la sa da /api/me (`p2p_resto_intervallo`), on-chain la guarda
+  il server su chi aveva pubblicato. Si apre a tutti con `= False`;
+- la scritta (card di Andrea «Il resto torna nel libro»), nella scatola
+  arancione sotto la spinta, solo a chi la leva vale: «Se ne prendono solo
+  una parte, il resto torna da solo nel libro.» La ripubblica allo
+  scadere resta (Andrea: serve quando nessuno lo prende).
+
+Scartato: l'avviso del bot «il resto è tornato nel libro» (non chiesto);
+il resto on-chain alla presa (vedi sopra); toccare il nodo.
+
+Provato: `prove_resto_intervallo` (la regola, la leva per persona, il resto
+on-chain sul database con la cifra unica e la rinascita di sempre intatta,
+il telefono in node: la regola dei gesti, l'indice prenotato una volta, la
+riga provvisoria coi patti, il messaggio canonico `{"next_trade": [...]}`,
+la pulizia delle righe mai nate; controprove su resto sotto il «Da», cifra
+del resto e indice ricordato), suite severa e collaudi della CI in un venv
+senza coincurve. Letto sui sorgenti di mostro v0.20.2 e mostro-core 0.17.3
+(release.rs, fiat_sent.rs, `verify`): NON letto il nostro fork `-bar12`,
+che dal cloud non si vede: se una delle sue quattordici patch tocca il
+rilascio, lo dice la prova dal vivo (DA-FARE, voce 35).
+
+Da guardare: la prova in produzione con Andrea e Alan, Lightning (Vendi e
+Compra) e on-chain; poi `P2P_RESTO_INTERVALLO_SOLO_ADMIN = False`, e allora
+la voce in NOVITA e in `assistente/sapere.md`.
