@@ -97261,3 +97261,75 @@ creati con più account Telegram restano possibili come in ogni
 estrazione online: la lista pubblica li rende contabili, non
 impossibili. PROVATO: collaudo_estrazioni con le righe nuove (lista
 aperta senza id, ricevuta del link, impronta in chat, conto in scheda).
+
+## Le tendine nei canali e il Cerco nei canali (27 nov 2026)
+
+Andrea, il giorno dopo le tendine della Mini App: «io parlavo soprattutto
+dei canali su telegram. Inoltre vorrei aggiungere il cerco». Fatto, in un
+commit: la stessa cosa nei POST dei tre canali (il nostro, Subito Crypto,
+BitcoinPodcast), e le richieste di Cerco che escono anche loro.
+Su Telegram la tendina è la citazione espandibile dell'HTML
+(`<blockquote expandable>`, anche nelle caption delle foto): titolo in
+grassetto fuori, righe dentro.
+- «🚚 Info di spedizione» al posto della riga di consegna
+  (`_righe_consegna_promo`): gemella della scheda, stesse regole e parole
+  (casa, zone estere, supplemento, locker solo con le reti, ritiro a mano,
+  codice online). Correzione dovuta: la vecchia riga diceva SEMPRE «a un
+  punto di ritiro», falso dal 12 ott (`reti_punto`). Il giudice è quello
+  della cassa; la caption riceve le colonne dei corrieri dai cinque SELECT e,
+  se mancano, niente locker (fail-closed). Le cifre vanno nella valuta
+  nativa della tariffa: l'euro ancorato esce «4,50 €» anche a cambio muto,
+  quindi `_costo_sped_promo` e il «da …» col minimo sono spariti (ogni
+  strada ha il suo prezzo). Sull'asta «inclusa», come nella scheda. Il
+  solo codice online non ha tendina (la scheda non gliela dà): la riga di
+  sempre.
+- «🛍 Altri articoli del negozio»: fino a 10 (`MAX_VETRINA_PROMO` 3→10),
+  «Vedi tutto il negozio ›» col link del negozio già nella firma quando ce
+  ne sono altri (`_altri_del_venditore` ne legge uno in più). IL TETTO: la
+  caption di una foto ha 1024 caratteri VISIBILI; `_quanti_ne_stanno`
+  (pura) toglie articoli dal fondo finché ci sta, e se non ne entra nemmeno
+  uno la sezione sparisce. Si misura sempre a 1024, anche per il ripiego di
+  testo (4096): il post nuovo e quello riscritto col ✅ Venduto restano
+  uguali. Se anche senza articoli sfora (titolo e zone enormi), il post
+  parte lo stesso: se Telegram rifiuta la foto c'è il ripiego di testo.
+- P2P: «💳 Metodi di pagamento accettati», un metodo per riga, «💵 Contanti»
+  con la zona 📍 dentro; il resto del post identico.
+- CERCO NEI CANALI: `_caption_canale_cerco` (pura) e
+  `_posta_richiesta_nei_canali`, lanciata dalla rotta che crea la richiesta
+  accanto ai due avvisi. Le regole del P2P: Subito Crypto solo con
+  @username e una volta a settimana contando TRE timbri (colonna nuova
+  `promo_vetrina_cerco_il`; giudice comune `_settimana_piena_vetrina`, che
+  ora usa anche il P2P: un Cerco su Subito Crypto chiude la settimana
+  anche per un ordine P2P e viceversa), timbro prima dell'invio; gli altri
+  due senza freno. Leva `POST_CERCO_CANALI` (accesa di serie, nel pannello
+  «Stato delle leve» accanto ai post automatici e nel config d'esempio).
+  Non ho guardato POST_AUTOMATICI (il P2P non lo guarda nemmeno).
+- LA PULIZIA: tabella nuova `post_cerco_canale` e non `post_p2p_canale`:
+  là `ordine` è una stringa del coordinatore, il giro che la guarda gira
+  solo col P2P acceso e dimentica le righe dopo 7 giorni, mentre una
+  richiesta dura fino a 90. `ritira_post_cerco` (cancella; oltre le 48 ore
+  riscrive «Richiesta chiusa»; la riga va solo a gesto riuscito) parte da
+  `chiudi_richiesta` e dall'orologio grande (`giro_post_cerco_canale`,
+  dieci minuti: richieste chiuse, scadute — che si chiudono alla lettura —
+  o sparite). Dietro VETRINA_SI_PULISCE, il cui testo nel pannello ora
+  nomina anche il Cerco.
+- La richiesta di oggi non ha né zona né descrizione (140 caratteri,
+  categoria, budget, durata): il post non inventa righe, e la blockquote
+  «Dettagli» chiesta in via condizionale non c'è. La firma è
+  la riga unica della piazza (`_firma_venditore`, decisione di Andrea
+  sul P2P) con «Richiesta da» al posto di «Annuncio da».
+Scartato: riusare `post_p2p_canale` con `ordine='cerco:N'` (due giri, una
+memoria di 7 giorni, e il testo «Ordine P2P non più disponibile» sul post
+sbagliato); tendina anche per il solo digitale.
+Provato: `prove_cerco_canali` nuova (tetto dei 1024 con titolo e zone
+pesanti, «Vedi tutto», caption del Cerco con l'escape di «<», freno a tre
+timbri, il post vero nei tre canali su sqlite con Telegram di cartone, il
+ritiro per chiusa/scaduta/oltre 48 ore/Telegram muto/leva spenta);
+adeguate dove misuravano la cosa cambiata: la riga di consegna e la
+vetrina in `prove_canale_bot`, i metodi in `prove_contanti_zona`, la tabella
+di `prove_venduto_canale` (le colonne dei corrieri), l'elenco di chi parla
+col canale e il conto degli escape in `prove_richieste`.
+Da guardare: il primo post vero nei canali (Andrea: un Cerco di prova da un
+account con @username) e come Telegram mostra le tendine su desktop e
+iPhone; se i post di Cerco sono troppi per Subito Crypto (il freno è
+settimanale per persona, non per canale).

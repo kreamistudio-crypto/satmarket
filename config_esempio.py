@@ -2221,6 +2221,12 @@ POST_AUTOMATICI = True
 # (oltre le 48 ore Telegram non lascia cancellare: il post si riscrive).
 # False = com'era: i post P2P restano.
 VETRINA_SI_PULISCE = True
+# Il «Cerco» nei canali (27 nov 2026): ogni richiesta nuova di Cerco esce
+# anche nei canali Telegram (il nostro, Subito Crypto, BitcoinPodcast), e
+# sparisce quando la richiesta si chiude o scade (con VETRINA_SI_PULISCE
+# accesa). Subito Crypto al massimo una a settimana per persona.
+# False = nessun post nuovo (quelli usciti restano).
+POST_CERCO_CANALI = True
 # ...e l'annuncio venduto del mercatino: di serie resta nei canali col
 # «✅ Venduto» (scelta di Andrea). True = anche il suo post sparisce
 # (vale solo con VETRINA_SI_PULISCE accesa).

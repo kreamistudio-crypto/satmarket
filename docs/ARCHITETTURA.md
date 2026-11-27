@@ -8507,6 +8507,48 @@
   che non promette meno del vero); tariffa ancorata all'EURO col cambio
   muto = la strada si dice e la cifra NO — mai un numero inventato, la
   regola dell'avviso EUR senza cambio.
+  LE TENDINE DEL CANALE (27 nov 2026, Andrea: «io parlavo soprattutto
+  dei canali su telegram»): LE DUE PARAGRAFATE QUI SOTTO — la riga
+  «🚚 Spedizione a un indirizzo o a un punto di ritiro» col «da …» e la
+  vetrina a tre link — SONO SUPERATE. Su Telegram la tendina è la
+  citazione espandibile dell'HTML (`<b>Titolo</b>\n<blockquote
+  expandable>righe</blockquote>`, Bot API 7.4+, vale anche nelle
+  caption): `_tendina_canale`. `_righe_consegna_promo(a)` è la gemella di
+  `infoSpedizioneScheda` della Mini App, stesse regole e stesse parole:
+  «📦 A un indirizzo» (casa salvo la spunta `non_spedisce_casa`, zone
+  estere di `spedizione_zone` coi nomi di `ZONA_ETICHETTA`, «+ X per ogni
+  pezzo in più»), «📮 Locker / punto di ritiro» SOLO se
+  `reti_punto(reti_venditore(...))` dà una rete (le colonne
+  `venditore_spedizionieri/-e` arrivano con la riga: i cinque SELECT che
+  costruiscono la caption le chiedono, e senza = nessun locker,
+  fail-closed), «🤝 Ritiro a mano», «💾 Codice online»; cifre nella
+  valuta NATIVA della tariffa (niente cambio, niente «≈»), sull'asta
+  «inclusa». Il solo digitale resta la riga «💾 Codice online, subito».
+  `_costo_sped_promo` e il «da …» col minimo non ci sono più: ogni strada
+  ha il suo prezzo. «🛍 Altri articoli del negozio»: fino a 10
+  (`MAX_VETRINA_PROMO`), `_altri_del_venditore` ne legge uno in più per
+  sapere se chiudere con «Vedi tutto il negozio ›» (il link del negozio
+  della firma). IL TETTO È 1024 CARATTERI VISIBILI (i tag e gli href non
+  contano, il testo dentro sì: `_lunghezza_visibile`), e lo tiene
+  `_quanti_ne_stanno` togliendo articoli dal fondo; si misura SEMPRE a
+  1024 anche per il ripiego di testo (4096), così il post nuovo e quello
+  riscritto col ✅ non cambiano faccia. Nel P2P `_caption_canale_p2p`
+  mette i metodi in «💳 Metodi di pagamento accettati», uno per riga, con
+  la zona del contanti dentro.
+  IL CERCO NEI CANALI (stesso giorno, «vorrei aggiungere il cerco»):
+  `_posta_richiesta_nei_canali` (lanciata alla nascita della richiesta,
+  fail-open, leva `POST_CERCO_CANALI`) manda `_caption_canale_cerco`
+  (pura) nei tre canali con le regole del P2P: Subito Crypto solo a chi
+  ha @username (tg_id>0) e UNA volta a settimana contando TRE timbri
+  (`promo_canale_il`, `promo_vetrina_p2p_il`, `promo_vetrina_cerco_il`,
+  giudice comune `_settimana_piena_vetrina`, usato anche dal P2P),
+  timbro PRIMA dell'invio; nostro e BitcoinPodcast senza freno. I
+  message_id stanno in `post_cerco_canale` (tabella a parte, non
+  `post_p2p_canale`: là `ordine` è una stringa del coordinatore e il
+  giro che la guarda gira solo col P2P); li toglie `ritira_post_cerco`
+  (cancella, oltre le 48 ore riscrive «Richiesta chiusa») da
+  `chiudi_richiesta` subito e da `giro_post_cerco_canale` ogni dieci
+  minuti per le scadute o sparite, con la leva VETRINA_SI_PULISCE.
   E PORTA LA VETRINA DEL VENDITORE (`_vetrina_venditore`,
   `MAX_VETRINA_PROMO` 3): è LA CONTROPARTITA DEL FRENO — un post a
   settimana, ma quel post non parla di un oggetto solo, linka anche gli

@@ -22140,7 +22140,11 @@ def prove_vetrina_reti_punto():
     # le due colonne entrano nei DUE cataloghi (vetrina e miei) e il
     # client le legge con la guardia di tipo
     prova("le colonne grezze stanno in CAMPI_VETRINA e in CAMPI_MIEI",
-          2, _SORGENTE.count('"u.spedizionieri AS venditore_spedizionieri, "'))
+          [1, 1],
+          # (27 nov 2026) le altre cinque SELECT le chiede la caption del canale:
+          # qui si contano solo i due cataloghi
+          [_SORGENTE[_SORGENTE.index(f"\n{c} = ("):_SORGENTE.index('u.vendite_ok")', _SORGENTE.index(f"\n{c} = ("))]
+           .count('"u.spedizionieri AS venditore_spedizionieri, "') for c in ("CAMPI_VETRINA", "CAMPI_MIEI")])
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("il client le legge dalla riga, con la guardia di tipo",
           True, "retiPunto:Array.isArray(a.venditore_reti_punto)" in mini)
@@ -28496,9 +28500,12 @@ def prove_indirizzo_giusto():
     prova("server: i due avvisi al venditore pure", 2,
           src.count('msg += ("\\n\\n📦 Il compratore ha scelto la '
                     '<b>spedizione a "\n                "un indirizzo</b>:'))
-    prova("server: e la riga del canale", 1,
-          src.count('"🚚 Spedizione a un indirizzo o a un punto di '
-                    'ritiro"'))
+    # (27 nov 2026) la riga del canale e' diventata la tendina «Info di
+    # spedizione» («A un indirizzo», e il locker solo con le reti): la
+    # vecchia frase, che diceva SEMPRE «punto di ritiro», non deve tornare
+    prova("server: la riga del canale non dice piu' «a un indirizzo o a un punto di ritiro»; c'e' la tendina", [0, 1],
+          [src.count('"🚚 Spedizione a un indirizzo o a un punto di ritiro"'),
+           src.count('_tendina_canale("🚚 Info di spedizione", righe)')])
 
     # --- IL GIUDICE DELLA CONFERMA, fatto girare ----------------------
     import time as _t
@@ -37579,19 +37586,40 @@ def prove_canale_bot():
     prova("chiamarla senza il freno e' un errore", "TypeError", senza)
 
     # --- 2) LA CAPTION DEL CANALE --------------------------------
-    cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store",
-           "LINK_BOT": "https://t.me/ilbarattolobot"}
+    cap = {"html": html, "re": re, "json": json, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
+           "TETTO_CAPTION_VISIBILE": 1024, "MAX_VETRINA_PROMO": 10}
     # la firma passa dal giudice della npub, che a sua volta vuole il
     # bech32: chi estrae una funzione ne eredita le dipendenze
     exec(next(r for r in _SORGENTE.split("\n")
               if r.startswith("CHARSET_BECH32")), cap)
+    # (27 nov 2026, le tendine del canale) la tendina «Info di
+    # spedizione» legge le zone, i nomi dei paesi e le reti di punti con
+    # i giudici VERI del server, estratti come in prove_vetrina_reti_punto
+    for tabella, fine_t in (("ZONE_SPEDIZIONE = (", ")"), ("ZONA_ETICHETTA = {", "}"),
+                            ("ENCLAVI_DOMESTICO = {", "}"),
+                            ("PAESI_PER_ZONA = {", "\n}\n"),
+                            ("_PAESE_NOME = {", "righe}"),
+                            ("DOMESTICO_DEFAULT = ", "\n")):
+        i = _SORGENTE.index("\n" + tabella) + 1
+        exec(_SORGENTE[i:_SORGENTE.index(fine_t, i) + len(fine_t)], cap)
+    cap["SPEDIZIONIERI"] = ast.literal_eval(
+        _SORGENTE[_SORGENTE.index("SPEDIZIONIERI = (") + len("SPEDIZIONIERI = "):
+                  _SORGENTE.index("\n", _SORGENTE.index("SPEDIZIONIERI = ("))])
+    cap["RETE_BARATTOLO"] = "Barattolo"
+    cap["RETE_DEL_CORRIERE"] = {"InPost": "InPost", "Poste Italiane": "Poste Italiane",
+                                "SDA": "Poste Italiane"}
+    cap["rete_barattolo_viva"] = lambda: False
     for f in ("_bech32_polymod", "npub_to_hex",
               "hex_to_npub", "chiave_nostr_provata", "_npub_breve",
-              "_npub_venditore",
+              "_npub_venditore", "nome_paese", "etichetta_zona",
               "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
               "_hashtag_promo", "_firma_venditore", "_tariffa_dichiarata",
-              "_sped_in_sats", "_costo_sped_promo", "_righe_consegna_promo",
-              "_vetrina_venditore", "link_telegram", "_caption_canale"):
+              "_zone_annuncio", "_non_spedisce_casa", "reti_venditore",
+              "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
+              "_tendina_canale", "_cifra_sped_promo", "_reti_punto_promo",
+              "_righe_consegna_promo", "_vetrina_venditore",
+              "link_telegram", "_caption_canale"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
          "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
@@ -37600,7 +37628,8 @@ def prove_canale_bot():
          "consegna": "entrambe", "anche_digitale": 0,
          "spedizione_sats": 5000, "spedizione_eur": 0.0,
          "spedizione_punto_dichiarata": 0,
-         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0}
+         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0,
+         "paese_domestico": "IT", "spedizione_zone": ""}
     t = cap["_caption_canale"](a, 0)
     prova("il titolo c'e' in grassetto", True,
           "<b>Chitarra classica</b>" in t)
@@ -37634,14 +37663,18 @@ def prove_canale_bot():
     # legge PRIMA di aprire, e finora nel canale non c'era.
     # (13 ott 2026, cantiere indirizzo-giusto) «a un indirizzo», non
     # «a casa»: il nome della via e' uno solo, anche nel canale
-    prova("la spedizione nomina tutte e due le destinazioni", True,
-          "🚚 Spedizione a un indirizzo o a un punto di ritiro" in t)
+    # (27 nov 2026, le tendine del canale) la riga «🚚 Spedizione a un
+    # indirizzo o a un punto di ritiro» e' diventata la TENDINA «Info di
+    # spedizione»: queste prove misurano la cosa cambiata
+    prova("la spedizione e' una tendina: titolo fuori, citazione espandibile dentro", True,
+          "<b>🚚 Info di spedizione</b>\n<blockquote expandable>📦 A un indirizzo\n"
+          "• Italia: 5.000 sats" in t)
     prova("col suo costo", True, "5.000 sats" in t)
-    prova("e il ritiro in zona ha la riga sua", True,
-          "🤝 Ritiro in zona" in t)
+    prova("e il ritiro a mano ha la voce sua, con la zona", True,
+          "🤝 Ritiro a mano\n• Torino (TO): <b>gratuito</b></blockquote>" in t)
     solo_sped = cap["_caption_canale"](dict(a, consegna="spedizione"), 0)
     prova("chi non ritira non lo promette", False,
-          "Ritiro in zona" in solo_sped)
+          "Ritiro a mano" in solo_sped)
     gratis = cap["_caption_canale"](dict(a, spedizione_sats=0), 0)
     prova("la spedizione a zero si dice gratuita", True,
           "<b>gratuita</b>" in gratis)
@@ -37659,26 +37692,76 @@ def prove_canale_bot():
           "🚚" not in muto and "🤝" not in muto and "💾" not in muto)
     # LA TARIFFA ANCORATA ALL'EURO SENZA CAMBIO: si dice la strada, mai
     # una cifra inventata (la regola dell'avviso EUR senza cambio).
+    # (27 nov 2026) la tendina dice la tariffa nella valuta NATIVA, come
+    # quella della scheda: l'euro ancorato esce «4,50 €» anche a cambio
+    # muto (non c'e' niente da convertire, e mai una «gratuita» inventata);
+    # il «da» col minimo di `_costo_sped_promo` non c'e' piu', perche'
+    # ogni strada ha la sua riga col suo prezzo
     ancorata = dict(a, spedizione_sats=0, spedizione_eur=4.50)
     senza_cambio = cap["_caption_canale"](ancorata, 0)
-    prova("euro ancorato e cambio muto: la strada c'e'", True,
-          "🚚 Spedizione a un indirizzo o a un punto di ritiro"
-          in senza_cambio)
-    prova("...ma senza cifra e senza «gratuita»", True,
-          "gratuita" not in senza_cambio and "4,50" not in senza_cambio)
-    prova("col cambio la cifra parla euro", True,
-          "4,50 €" in cap["_caption_canale"](ancorata, 60000))
-    # Due strade a prezzo diverso: «da» col MINIMO, mai due cifre.
-    due = dict(a, spedizione_punto_dichiarata=1,
-               spedizione_punto_sats=3000)
-    prova("tariffe diverse: «da» col minimo", True,
-          "da 3.000 sats" in cap["_caption_canale"](due, 0))
+    prova("euro ancorato e cambio muto: la tendina c'e', con la cifra in euro", True,
+          "<b>🚚 Info di spedizione</b>" in senza_cambio
+          and "• Italia: 4,50 €" in senza_cambio)
+    prova("...e mai una «gratuita» inventata", False, "gratuita" in senza_cambio)
+    prova("col cambio la cifra e' la stessa (non si converte)", True,
+          "• Italia: 4,50 €" in cap["_caption_canale"](ancorata, 60000))
+    # IL LOCKER SOLO CON LE RETI (il giudice della cassa, `reti_punto`): la
+    # riga di ieri diceva SEMPRE «a un punto di ritiro», che dal 12 ott
+    # 2026 non e' piu' vero
+    due = dict(a, spedizione_punto_dichiarata=1, spedizione_punto_sats=3000)
+    prova("senza colonne dei corrieri nessun locker (fail-closed)", False,
+          "Locker" in cap["_caption_canale"](due, 0)
+          or "punto di ritiro" in cap["_caption_canale"](due, 0))
+    con_reti = dict(due, venditore_spedizionieri="|InPost|BRT|",
+                    venditore_spedizioniere="")
+    tr = cap["_caption_canale"](con_reti, 0)
+    prova("con una rete di punti il locker c'e', con la sua tariffa e la rete", True,
+          "📮 Locker / punto di ritiro\n• Italia: 3.000 sats\nReti: InPost" in tr
+          and "• Italia: 5.000 sats" in tr)
+    prova("BRT, che non ha la mappa dei punti, non e' una rete", False, "BRT" in tr)
+    prova("solo corrieri senza rete (DHL): niente locker", False,
+          "Locker" in cap["_caption_canale"](
+              dict(due, venditore_spedizionieri="|DHL|"), 0))
+    prova("il ripiego sulla colonna singolare vale (SDA = rete Poste)", True,
+          "Reti: Poste Italiane" in cap["_caption_canale"](
+              dict(due, venditore_spedizionieri="", venditore_spedizioniere="SDA"), 0))
+    prova("senza la tariffa del punto dichiarata il locker costa come la casa", True,
+          "📮 Locker / punto di ritiro\n• Italia: 5.000 sats" in cap["_caption_canale"](
+              dict(con_reti, spedizione_punto_dichiarata=0), 0))
+    prova("i punti Barattolo spenti non entrano (gate chiuso)", False,
+          "Locker" in cap["_caption_canale"](
+              dict(due, venditore_spedizionieri="|Barattolo|"), 0))
+    prova("la spunta «non spedisco a casa» toglie la casa e il locker", True,
+          "• Italia" not in cap["_caption_canale"](dict(con_reti, non_spedisce_casa=1), 0))
+    # LE ZONE ESTERE, con i nomi umani e il supplemento
+    zone = dict(a, spedizione_zone=json.dumps({"eu": {"sats": 12000, "eur": 0},
+                                               "nordamerica": {"sats": 0, "eur": 25.0},
+                                               "marte": {"sats": 1, "eur": 0}}),
+                spedizione_extra_sats=1000, spedizione_extra_eur=0)
+    tz = cap["_caption_canale"](zone, 0)
+    prova("le zone estere: nome umano e prezzo, nell'ordine dei continenti; una zona che "
+          "non esiste si butta", True,
+          "• Italia: 5.000 sats\n• Europa: 12.000 sats\n• Nord America: 25,00 €\n" in tz
+          and "marte" not in tz.lower())
+    prova("il supplemento per pezzo", True, "+ 1.000 sats per ogni pezzo in più" in tz)
+    prova("il paese di casa e' quello dichiarato", True,
+          "• Svizzera: 5.000 sats" in cap["_caption_canale"](dict(a, paese_domestico="CH"), 0))
+    prova("sull'asta niente cifre: «inclusa»", True,
+          "• Italia: inclusa" in cap["_caption_canale"](dict(zone, asta_base_sats=500), 0)
+          and "per ogni pezzo" not in cap["_caption_canale"](dict(zone, asta_base_sats=500), 0))
+    prova("il codice online dentro la tendina, quando c'e' una spedizione", True,
+          "🤝 Ritiro a mano\n• Torino (TO): <b>gratuito</b>\n💾 Codice online</blockquote>"
+          in cap["_caption_canale"](dict(a, anche_digitale=1), 0))
+    prova("il solo codice online non e' una spedizione: la riga di sempre, niente tendina", True,
+          "\n💾 Codice online, subito\n" in cap["_caption_canale"](dict(a, consegna="digitale"), 0)
+          and "Info di spedizione" not in cap["_caption_canale"](dict(a, consegna="digitale"), 0))
 
     # LA CONTROPARTITA DEL FRENO: un post a settimana, ma quel post
     # porta anche gli altri articoli del venditore.
     altri = [{"id": 7, "titolo": "Amplificatore"},
              {"id": 8, "titolo": "Leggio"}]
     v = cap["_caption_canale"](a, 0, altri=altri)
+    # (27 nov 2026) la vetrina e' la tendina «🛍 Altri articoli del negozio»
     # LE VOCI SONO TORNATE ANCORE (16 ott 2026, chiesto da Andrea: «i
     # link devono stare dentro le scritte»). Il DEEP LINK resta quello
     # scelto il 15 ott — cambia solo come si vede: il titolo E' il
@@ -37691,8 +37774,11 @@ def prove_canale_bot():
           'Amplificatore</a>' in v and "startapp=annuncio_8" in v)
     prova("e il negozio resta in coda come sempre", True,
           "vedi il suo negozio" in v)
+    prova("la vetrina e' la tendina «Altri articoli del negozio»: titolo fuori, voci dentro", True,
+          "<b>🛍 Altri articoli del negozio</b>\n<blockquote expandable>• <a href=" in v
+          and "Anche in vendita" not in v)
     prova("senza altri articoli non compare la sezione", False,
-          "Anche in vendita" in t)
+          "Altri articoli" in t)
     lungo = cap["_caption_canale"](a, 0, altri=[
         {"id": 9, "titolo": "T" * 80}])
     # il troncamento si riconosce dal `…` attaccato alla chiusura
@@ -37923,6 +38009,7 @@ console.log(JSON.stringify([
            "_posta_negozio",          # la raffica di un negozio solo
            "comando_canale",          # che il canale lo DICE, non ci posta
            "annuncia_ordine_p2p_canale",  # l'ordine P2P appena pubblicato
+           "_posta_richiesta_nei_canali",  # la richiesta di Cerco (27 nov 2026)
            "promo_in_cima_canale"},   # «⬆️ In cima», la promozione pagata
           # `_manda_post_canale` non c'e': il canale non lo sceglie,
           # lo RICEVE — ed e' precisamente quel che la prova qui
@@ -62014,7 +62101,7 @@ def prove_link_dentro_telegram():
         exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb)
         for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
                   "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
-                  "_firma_venditore", "_premio_canale_p2p", "_caption_canale_p2p"):
+                  "_firma_venditore", "_premio_canale_p2p", "_tendina_canale", "_caption_canale_p2p"):
             exec(pezzo(f), amb)
         return amb["_caption_canale_p2p"](
             "vendo", 100, "Revolut", {"venditore": "Rosina", "venditore_username": "rosina",
@@ -88031,7 +88118,7 @@ def prove_p2p_canale():
               if r.startswith("CHARSET_BECH32")), amb)
     for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
               "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
-              "_firma_venditore", "_premio_canale_p2p", "_caption_canale_p2p"):
+              "_firma_venditore", "_premio_canale_p2p", "_tendina_canale", "_caption_canale_p2p"):
         exec(pezzo(f), amb)
     cap = amb["_caption_canale_p2p"]
     NPUB = ("npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqq"
@@ -168528,6 +168615,7 @@ def prove_p2p_chf():
     amb = {"_fmt_eur": lambda e: f"{e:.2f}".replace(".", ","), "html": __import__("html"),
            "_premio_canale_p2p": lambda l, p: "", "_link_casa_telegram": lambda: "https://t.me/x",
            "_firma_venditore": lambda v: "da Mario"}
+    exec(pezzo("_tendina_canale"), amb)
     exec(pezzo("_caption_canale_p2p"), amb)
     cap = amb["_caption_canale_p2p"]
     prova("il post nel canale dice CHF per i franchi e resta quello di ieri per l'euro",
@@ -179131,35 +179219,48 @@ def prove_contanti_zona():
     exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb_c)
     for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
               "_npub_breve", "_npub_venditore", "_firma_venditore", "_premio_canale_p2p",
-              "_caption_canale_p2p"):
+              "_tendina_canale", "_caption_canale_p2p"):
         exec(pezzo(f), amb_c)
     cap = amb_c["_caption_canale_p2p"]
     rosina = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
     con_zona = cap("vendo", 50, "Contanti", rosina, None, "Milano centro")
-    prova("il post del canale dice la zona con lo stesso «📍», subito sotto il metodo", True,
-          "\n💵 Contanti\n📍 Milano centro\n🔒 Sats bloccati" in con_zona)
+    # (27 nov 2026, le tendine del canale) i metodi stanno nella tendina
+    # «💳 Metodi di pagamento accettati», UNO PER RIGA: queste prove
+    # misurano la cosa cambiata, con le stesse regole di ieri dentro
+    prova("il post del canale dice la zona con lo stesso «📍», dentro la tendina subito sotto il contanti", True,
+          "\n<b>💳 Metodi di pagamento accettati</b>\n<blockquote expandable>💵 Contanti\n"
+          "📍 Milano centro</blockquote>\n🔒 Sats bloccati" in con_zona)
+
     # (10 ott 2026, i punti notati) «💵 Contanti» al posto di «💳 Contanti»
-    def _riga_metodo(metodo):
-        return cap("vendo", 50, metodo, rosina).split("\n")[2]
-    prova("NEL POST IL CONTANTI HA LE SUE BANCONOTE: da solo «💵 Contanti», senza carta", "💵 Contanti",
-          _riga_metodo("Contanti"))
-    prova("...con piu' metodi il 💵 sta solo davanti a «Contanti», e il 💳 intesta gli altri",
-          ["💳 SEPA, 💵 Contanti", "💳 SEPA, Revolut, 💵 Contanti", "💵 Contanti, 💳 SEPA, Revolut"],
-          [_riga_metodo("SEPA, Contanti"), _riga_metodo("SEPA, Revolut, Contanti"),
-           _riga_metodo("Contanti, SEPA, Revolut")])
-    prova("...gli altri metodi, Barattozon e un «contanti» minuscolo restano la riga di ieri",
-          ["💳 SEPA", "💳 Revolut, Satispay", "💳 Contanti al tabacchino", "💳 contanti", "💳 &lt;b&gt;x"],
-          [_riga_metodo("SEPA"), _riga_metodo("Revolut, Satispay"), _riga_metodo("Contanti al tabacchino"),
-           _riga_metodo("contanti"), _riga_metodo("<b>x")])
-    prova("...e un metodo avvelenato accanto al contanti esce scappato", "💳 &lt;b&gt;x, 💵 Contanti",
-          _riga_metodo("<b>x, Contanti"))
-    prova("...senza zona il post e' quello di ieri, parola per parola", [True, False, True],
+    def _righe_metodo(metodo, zona=""):
+        t = cap("vendo", 50, metodo, rosina, None, zona)
+        return t[t.index("<blockquote expandable>") + len("<blockquote expandable>"):
+                 t.index("</blockquote>")].split("\n")
+    prova("NEL POST IL CONTANTI HA LE SUE BANCONOTE: da solo «💵 Contanti», senza carta", ["💵 Contanti"],
+          _righe_metodo("Contanti"))
+    prova("...con piu' metodi UNA RIGA CIASCUNO: il 💵 sta solo davanti a «Contanti», e il 💳 davanti agli altri",
+          [["💳 SEPA", "💵 Contanti"], ["💳 SEPA", "💳 Revolut", "💵 Contanti"],
+           ["💵 Contanti", "💳 SEPA", "💳 Revolut"]],
+          [_righe_metodo("SEPA, Contanti"), _righe_metodo("SEPA, Revolut, Contanti"),
+           _righe_metodo("Contanti, SEPA, Revolut")])
+    prova("...gli altri metodi, Barattozon e un «contanti» minuscolo restano col 💳, come ieri",
+          [["💳 SEPA"], ["💳 Revolut", "💳 Satispay"], ["💳 Contanti al tabacchino"], ["💳 contanti"],
+           ["💳 &lt;b&gt;x"]],
+          [_righe_metodo("SEPA"), _righe_metodo("Revolut, Satispay"), _righe_metodo("Contanti al tabacchino"),
+           _righe_metodo("contanti"), _righe_metodo("<b>x")])
+    prova("...e un metodo avvelenato accanto al contanti esce scappato", ["💳 &lt;b&gt;x", "💵 Contanti"],
+          _righe_metodo("<b>x, Contanti"))
+    prova("...senza zona il post non ha nessun «📍»; con la zona il post e' quello senza, piu' la riga", [True, False, True],
           [cap("vendo", 50, "Contanti", rosina) == cap("vendo", 50, "Contanti", rosina, None, ""),
            "📍" in cap("vendo", 50, "Contanti", rosina),
            con_zona.replace("\n📍 Milano centro", "") == cap("vendo", 50, "Contanti", rosina)])
-    prova("...e la zona di un utente esce scappata", [True, False],
-          ["\n📍 &lt;b&gt;x&lt;/b&gt; &amp; y\n" in cap("vendo", 50, "Contanti", rosina, None, "<b>x</b> & y"),
+    prova("...e la zona di un utente esce scappata", [["💵 Contanti", "📍 &lt;b&gt;x&lt;/b&gt; &amp; y"], False],
+          [_righe_metodo("Contanti", "<b>x</b> & y"),
            "<b>x</b>" in cap("vendo", 50, "Contanti", rosina, None, "<b>x</b> & y")])
+    prova("la tendina ha il titolo FUORI dalla citazione e il resto del post e' quello di sempre", True,
+          cap("vendo", 50, "SEPA", rosina).startswith(
+              "🔁 <b>Vende BTC su Barattolo</b>\n💶 50,00 €\n<b>💳 Metodi di pagamento accettati</b>\n"
+              "<blockquote expandable>💳 SEPA</blockquote>\n🔒 Sats bloccati in un deposito di garanzia"))
     rc = src[src.index('@app.post("/api/p2p/canale")'):]
     rc = rc[:rc.index("\n\n\n")]
     prova("la rotta del canale la tiene SOLO col contanti a parola intera, pulita, e una storta non e' un errore",
@@ -202715,8 +202816,13 @@ def prove_venduto_canale():
         con.execute(f"CREATE TABLE annunci({colonne})")
         con.execute("CREATE TABLE utenti(tg_id INTEGER, nome TEXT, username "
                     "TEXT, npub TEXT, npub_verificata INTEGER, npub_accesso "
-                    "INTEGER, negozio TEXT)")
-        con.execute("INSERT INTO utenti VALUES(222,'V','v','',0,0,'neg')")
+                    "INTEGER, negozio TEXT, spedizionieri TEXT DEFAULT '', "
+                    "spedizioniere TEXT DEFAULT '')")
+        # (27 nov 2026) le due colonne dei corrieri: la caption le chiede
+        # per la tendina «Info di spedizione» (le ha ogni utenti vera)
+        con.execute("INSERT INTO utenti(tg_id,nome,username,npub,"
+                    "npub_verificata,npub_accesso,negozio) "
+                    "VALUES(222,'V','v','',0,0,'neg')")
         if con_podcast:
             con.execute("INSERT INTO annunci(id,venditore_id,titolo,"
                         "post_canale_id,post_vetrina_id,"
@@ -207714,7 +207820,8 @@ def prove_richieste():
     prova("lessico: mai «assicurat» ne' «escrow» nei testi di «Cerco»", True,
           "assicurat" not in _testi and "escrow" not in _testi)
     # tre nell'avviso ai moderatori (26 nov 2026): testo, categoria, nome
-    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 6,
+    # (27 nov 2026) +2: la caption del post nei canali scappa testo e categoria
+    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 8,
           _blocco.count("html.escape("))
     _pub = srv[srv.index("async def pubblica("):]
     _pub = _pub[:_pub.index("\n@app.")]
@@ -207817,6 +207924,418 @@ def prove_richieste():
         prova("il disegno %s c'e' e la rotta lo serve" % _f, (True, True),
               (os.path.exists(os.path.join("assets", "scoprire", _f)),
                '"%s"' % _f in srv[srv.index("FILE_SCOPRIRE = ("):][:900]))
+
+
+def prove_cerco_canali():
+    """LE TENDINE E IL «CERCO» NEI CANALI (27 nov 2026, richiesta di Andrea:
+    «io parlavo soprattutto dei canali su telegram. Inoltre vorrei
+    aggiungere il cerco»). Le tendine della scheda diventano citazioni
+    espandibili nei post (le prove delle caption stanno accanto alle
+    sorelle: prove_canale_bot per l'annuncio, prove_contanti_zona per il
+    P2P); qui:
+     · il tetto dei 1024 caratteri VISIBILI con dieci titoli lunghi, e
+       «Vedi tutto il negozio ›» quando il negozio ne ha ancora;
+     · la caption del Cerco (pura, con l'escape di «<»);
+     · il freno settimanale a TRE timbri;
+     · il post vero nei tre canali, su un database sqlite vero e un
+       Telegram di cartone: chi ha @username, il freno, il timbro prima
+       dell'invio, la leva; e il ritiro quando la richiesta si chiude o
+       scade;
+     · le sentinelle: la leva, la colonna, la tabella, i punti di
+       chiamata."""
+    print("\n[le tendine e il «Cerco» nei canali]")
+    import asyncio as _asCC
+    import html as _htCC
+    import sqlite3 as _sqCC
+    import tempfile as _tfCC
+
+    # --- 1) IL TETTO DEI 1024 VISIBILI -------------------------------
+    cap = {"html": _htCC, "re": re, "json": json, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
+           "TETTO_CAPTION_VISIBILE": 1024, "MAX_VETRINA_PROMO": 10}
+    exec(next(r for r in _SORGENTE.split("\n") if r.startswith("CHARSET_BECH32")), cap)
+    for tabella, fine_t in (("ZONE_SPEDIZIONE = (", ")"), ("ZONA_ETICHETTA = {", "}"),
+                            ("ENCLAVI_DOMESTICO = {", "}"), ("PAESI_PER_ZONA = {", "\n}\n"),
+                            ("_PAESE_NOME = {", "righe}"), ("DOMESTICO_DEFAULT = ", "\n")):
+        i = _SORGENTE.index("\n" + tabella) + 1
+        exec(_SORGENTE[i:_SORGENTE.index(fine_t, i) + len(fine_t)], cap)
+    cap["SPEDIZIONIERI"] = ("Barattolo", "InPost", "Poste Italiane")
+    cap["RETE_BARATTOLO"] = "Barattolo"
+    cap["RETE_DEL_CORRIERE"] = {"InPost": "InPost", "Poste Italiane": "Poste Italiane"}
+    cap["rete_barattolo_viva"] = lambda: False
+    for f in ("_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
+              "_npub_breve", "_npub_venditore", "nome_paese", "etichetta_zona",
+              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria", "_hashtag_promo",
+              "_firma_venditore", "_tariffa_dichiarata", "_zone_annuncio", "_non_spedisce_casa",
+              "reti_venditore", "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
+              "_tendina_canale", "_cifra_sped_promo", "_reti_punto_promo",
+              "_righe_consegna_promo", "_vetrina_venditore", "link_telegram", "_caption_canale",
+              "_riga_budget_richiesta", "_caption_canale_cerco", "_settimana_piena_vetrina"):
+        exec(pezzo(f), cap)
+    vis = cap["_lunghezza_visibile"]
+    prova("i tag e gli href non contano, il testo dentro si' (e «&amp;» e' un carattere solo)", [3, 1, 3],
+          [vis('<a href="https://esempio.example/molto/lungo">abc</a>'), vis("&amp;"), vis("<b>a</b>\nb")])
+    a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000, "valuta": "sats",
+         "zona": "Torino (TO)", "categoria": "Strumenti musicali", "venditore": "Alan",
+         "venditore_username": "AlanBimbati", "venditore_negozio": "abc12345",
+         "consegna": "entrambe", "anche_digitale": 0, "paese_domestico": "IT",
+         "spedizione_sats": 5000, "spedizione_eur": 0.0, "spedizione_punto_dichiarata": 0,
+         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0, "spedizione_zone": ""}
+    lunghi = [{"id": 100 + i, "titolo": f"{i} " + "Titolo lunghissimo da quarantacinque lettere ok"}
+              for i in range(10)]
+    # un annuncio PESANTE: titolo e zona lunghi, tutte le zone estere, il locker, il supplemento
+    a = dict(a, titolo="Chitarra classica spagnola " * 4, zona="Torino, Borgo San Paolo, vicino al mercato",
+             venditore_spedizionieri="|InPost|", spedizione_punto_dichiarata=1, spedizione_punto_sats=3000,
+             spedizione_extra_sats=1000,
+             spedizione_zone=json.dumps({z: {"sats": 10000, "eur": 0} for z in
+                                         ("eu", "asia", "nordamerica", "sudamerica", "oceania",
+                                          "africa", "medioriente")}))
+    pieno = cap["_caption_canale"](a, 0, altri=lunghi)
+    prova("dieci titoli lunghi: la caption sta nei 1024 visibili (e non nei caratteri grezzi, che "
+          "contano gli href)", [True, True],
+          [vis(pieno) <= 1024, len(pieno) > 1024])
+    tolti = pieno.count('startapp=annuncio_1')
+    prova("...se ne sono tolti dal fondo, ma almeno uno c'e'", True, 0 < tolti < 10)
+    prova("...e dice che il negozio ne ha altri: «Vedi tutto il negozio ›» col link del negozio", True,
+          '<a href="https://barattolo.store/negozio/abc12345">Vedi tutto il negozio ›</a></blockquote>' in pieno)
+    prova("...si toglie dal FONDO: restano i primi, nell'ordine", True,
+          'annuncio_100">' in pieno and f'annuncio_{100 + tolti}">' not in pieno
+          and f'annuncio_{100 + tolti - 1}">' in pieno)
+    brevi = [{"id": 7, "titolo": "Amplificatore"}, {"id": 8, "titolo": "Leggio"}]
+    due = cap["_caption_canale"](a, 0, altri=brevi)
+    prova("con pochi titoli brevi nessuno si toglie, e senza altri articoli niente «Vedi tutto»", [True, False],
+          ["annuncio_7" in due and "annuncio_8" in due, "Vedi tutto" in due])
+    dieci = [{"id": 100 + i, "titolo": f"Cosa {i}"} for i in range(10)]
+    prova("esattamente dieci articoli: tutti e dieci, e nessun «Vedi tutto» (il negozio non ne ha altri)",
+          [10, False],
+          [cap["_caption_canale"](a, 0, altri=dieci).count("startapp=annuncio_1"),
+           "Vedi tutto" in cap["_caption_canale"](a, 0, altri=dieci)])
+    undici = [{"id": 100 + i, "titolo": f"Cosa {i}"} for i in range(11)]
+    cu = cap["_caption_canale"](a, 0, altri=undici)
+    prova("undici articoli letti: se ne elencano dieci e c'e' «Vedi tutto il negozio ›»", [10, True],
+          [cu.count("startapp=annuncio_1"), "Vedi tutto il negozio ›" in cu])
+    prova("senza codice negozio niente «Vedi tutto» (porterebbe a un 404)", False,
+          "Vedi tutto" in cap["_caption_canale"](dict(a, venditore_negozio=""), 0, altri=undici))
+    q = cap["_quanti_ne_stanno"]
+    prova("la pura: toglie finche' ci sta, a zero se nemmeno vuota ci sta, mai sotto zero",
+          [10, 4, 0, 0, 0],
+          [q(lambda n: "x" * (100 + n), 10, 1024), q(lambda n: "x" * (100 + n * 200), 10, 1000),
+           q(lambda n: "x" * 5000, 10, 1024), q(lambda n: "", 0, 1024), q(lambda n: "", -3, 1024)])
+    prova("il tetto di Telegram e' uno solo, 1024, anche per il ripiego di testo (lo scrive il commento)",
+          True, "TETTO_CAPTION_VISIBILE = 1024" in _SORGENTE and "MAX_VETRINA_PROMO = 10 " in _SORGENTE)
+    venduto = cap["_caption_canale"](a, 0, venduto=True, altri=lunghi)
+    prova("il post riscritto col ✅ Venduto sta nei 1024 visibili anche lui (il ✅ conta, e si toglie "
+          "un articolo in piu' se serve)", [True, True],
+          [vis(venduto) <= 1024, venduto.endswith("\n\n✅ Venduto")])
+    # i chiamanti leggono i corrieri del venditore, o il locker non uscirebbe mai
+    # (e il ✅ Venduto riscriverebbe un post diverso da quello nuovo)
+    _col = "u.spedizionieri AS venditore_spedizionieri, "
+    prova("le cinque SELECT che costruiscono la caption leggono le colonne dei corrieri: il drenatore, "
+          "il ✅ Venduto, «In cima» e le due dell'anteprima", [1, 1, 1, 2],
+          [pezzo("_drena_promo").count(_col), pezzo("promo_venduto").count(_col),
+           pezzo("promo_in_cima_canale").count(_col),
+           _SORGENTE[_SORGENTE.index("async def comando_anteprima("):].split("\n\n\n")[0].count(_col)])
+
+    # --- 2) LA CAPTION DEL CERCO -------------------------------------
+    chi = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
+    rich = {"id": 7, "testo": "Cerco un Ledger Nano X", "categoria": "Elettronica",
+            "budget_sats": 0, "budget_eur": 80.0}
+    c = cap["_caption_canale_cerco"](rich, chi)
+    prova("il Cerco: titolo, testo tra virgolette, categoria, budget, ancora, firma e hashtag, in ordine", True,
+          c.startswith("🙋 <b>Cerco su Barattolo</b>\n«Cerco un Ledger Nano X»\n🗂 Elettronica\n"
+                       "💰 Budget: fino a 80,00 €\n\n"
+                       '<a href="https://t.me/ilbarattolobot?startapp=cerco_7">'
+                       "🫙 Fai un'offerta su Barattolo</a>\n\nRichiesta da <b>@rosina</b>")
+          and c.endswith("\n\n#cerco #barattolo"))
+    prova("il budget in sats, e nessuna riga senza budget ne' categoria", [True, False, False],
+          ["💰 Budget: fino a 50.000 sats" in cap["_caption_canale_cerco"](
+              dict(rich, budget_eur=0, budget_sats=50000), chi),
+           "💰" in cap["_caption_canale_cerco"](dict(rich, budget_eur=0), chi),
+           "🗂" in cap["_caption_canale_cerco"](dict(rich, categoria=""), chi)])
+    cattiva = cap["_caption_canale_cerco"](
+        dict(rich, testo="<b>Ledger</b> & <i>altro</i>", categoria="<u>x</u>"),
+        dict(chi, venditore_username="", venditore="<i>Tizio</i>"))
+    prova("«<» e «&» nel testo, nella categoria e nel nome escono scappati: il post non si spegne",
+          [True, True, True, False],
+          ["&lt;b&gt;Ledger&lt;/b&gt; &amp; &lt;i&gt;altro&lt;/i&gt;" in cattiva,
+           "&lt;u&gt;x&lt;/u&gt;" in cattiva, "&lt;i&gt;Tizio&lt;/i&gt;" in cattiva,
+           "<b>Ledger</b>" in cattiva])
+    prova("nessun URL nudo (l'indirizzo vive negli href) e il lessico del deposito, mai «escrow»", [False, True],
+          ["https://" in re.sub(r'href="[^"]*"', "", c), "escrow" not in c.lower() and "assicurat" not in c.lower()])
+    prova("il nativo Nostr guadagna l'ancora njump, come nel P2P", True,
+          'href="https://njump.me/' in cap["_caption_canale_cerco"](
+              rich, dict(chi, venditore_username="", venditore_npub_accesso=
+                         "npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9")))
+
+    # --- 3) IL FRENO A TRE TIMBRI -------------------------------------
+    sp = cap["_settimana_piena_vetrina"]
+    ora = 1_800_000_000
+    ieri, vecchio = ora - 86400, ora - 9 * 86400
+    prova("il freno: ognuno dei TRE timbri, da solo, chiude la settimana; nessuno o uno vecchio no",
+          [True, True, True, False, False],
+          [sp({"promo_canale_il": ieri, "promo_vetrina_p2p_il": 0, "promo_vetrina_cerco_il": 0}, 7, ora),
+           sp({"promo_canale_il": 0, "promo_vetrina_p2p_il": ieri, "promo_vetrina_cerco_il": 0}, 7, ora),
+           sp({"promo_canale_il": 0, "promo_vetrina_p2p_il": 0, "promo_vetrina_cerco_il": ieri}, 7, ora),
+           sp({"promo_canale_il": 0, "promo_vetrina_p2p_il": 0, "promo_vetrina_cerco_il": 0}, 7, ora),
+           sp({"promo_canale_il": vecchio, "promo_vetrina_p2p_il": vecchio,
+               "promo_vetrina_cerco_il": vecchio}, 7, ora)])
+    prova("...a ritmo «tutto» (0 giorni) nessun freno, e una colonna che manca vale «mai» "
+          "(NULL compreso)", [False, False, False],
+          [sp({"promo_vetrina_cerco_il": ieri}, 0, ora), sp({}, 7, ora),
+           sp({"promo_canale_il": None, "promo_vetrina_p2p_il": None, "promo_vetrina_cerco_il": None}, 7, ora)])
+    rotta = pezzo("annuncia_ordine_p2p_canale")
+    prova("il P2P conta anche il timbro del Cerco, dallo stesso giudice", [True, True],
+          ["promo_vetrina_p2p_il, promo_vetrina_cerco_il" in rotta,
+           "_settimana_piena_vetrina(" in rotta])
+
+    # --- 4) IL POST VERO, SU UN DATABASE VERO --------------------------
+    def banco(utente=None, richiesta=None, leva=True, ritmo=7, risposta=None, canali=True,
+              lavoro=None):
+        cartella = _tfCC.mkdtemp(prefix="cerco-canali-")
+        percorso = os.path.join(cartella, "t.db")
+        con = _sqCC.connect(percorso)
+        con.executescript("""
+            CREATE TABLE utenti(tg_id INTEGER, nome TEXT, username TEXT, npub TEXT,
+                npub_verificata INTEGER, npub_accesso TEXT, negozio TEXT,
+                promo_canale_il INTEGER DEFAULT 0, promo_vetrina_p2p_il INTEGER DEFAULT 0,
+                promo_vetrina_cerco_il INTEGER DEFAULT 0);
+            CREATE TABLE richieste(id INTEGER PRIMARY KEY, tg_id INTEGER, testo TEXT,
+                categoria TEXT, budget_sats INTEGER DEFAULT 0, budget_eur REAL DEFAULT 0,
+                stato TEXT DEFAULT 'aperta', creato INTEGER, scade INTEGER);
+            CREATE TABLE post_cerco_canale(richiesta_id INTEGER NOT NULL, canale TEXT NOT NULL,
+                message_id INTEGER NOT NULL, creato INTEGER NOT NULL,
+                PRIMARY KEY(canale, message_id));""")
+        u = {"tg_id": 222, "nome": "Rosa", "username": "rosa", "negozio": "neg1"}
+        u.update(utente or {})
+        con.execute("INSERT INTO utenti(tg_id, nome, username, npub, npub_verificata, npub_accesso, "
+                    "negozio, promo_canale_il, promo_vetrina_p2p_il, promo_vetrina_cerco_il) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (u["tg_id"], u["nome"], u["username"], "", 0, "", u["negozio"],
+                     u.get("promo_canale_il", 0), u.get("promo_vetrina_p2p_il", 0),
+                     u.get("promo_vetrina_cerco_il", 0)))
+        r = {"id": 1, "tg_id": u["tg_id"], "testo": "Cerco una bici", "categoria": "Sport",
+             "stato": "aperta", "creato": int(time.time()), "scade": int(time.time()) + 86400 * 30}
+        r.update(richiesta or {})
+        con.execute("INSERT INTO richieste(id, tg_id, testo, categoria, stato, creato, scade) "
+                    "VALUES(?,?,?,?,?,?,?)", (r["id"], r["tg_id"], r["testo"], r["categoria"],
+                                              r["stato"], r["creato"], r["scade"]))
+        con.commit()
+        con.close()
+
+        def db():
+            c = _sqCC.connect(percorso)
+            c.row_factory = _sqCC.Row
+            return c
+
+        chiamate, stampe, contatore = [], [], [900]
+
+        async def bot_api(metodo, dati):
+            chiamate.append((metodo, dati["chat_id"], dati.get("message_id"),
+                             dati.get("text", "")[:12]))
+            if risposta:
+                return risposta(metodo, dati)
+            if metodo == "sendMessage":
+                contatore[0] += 1
+                return {"ok": True, "result": {"message_id": contatore[0]}}
+            return {"ok": True}
+
+        amb = {"db": db, "bot_api": bot_api, "POST_CERCO_CANALI": leva,
+               "VETRINA_SI_PULISCE": True, "RICHIESTE_DURATE": (30, 60, 90),
+               "canale_id": lambda: "@nostro" if canali else "",
+               "canale_vetrina": lambda: "@vetrina" if canali else "",
+               "canale_bitcoin_podcast": lambda: "@podcast" if canali else "",
+               "ritmo_vetrina": lambda: (ritmo, 6, 3), "time": time, "asyncio": _asCC,
+               "html": _htCC, "re": re, "URL_PUBBLICO": "https://barattolo.store",
+               "LINK_BOT": "https://t.me/ilbarattolobot", "_TASK_POST_P2P": set(),
+               "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
+        exec(next(rg for rg in _SORGENTE.split("\n") if rg.startswith("CHARSET_BECH32")), amb)
+        for nome in ("_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
+                     "_npub_breve", "_npub_venditore", "_fmt_sats", "_fmt_eur", "_firma_venditore",
+                     "link_telegram", "_riga_budget_richiesta", "_caption_canale_cerco",
+                     "_settimana_piena_vetrina", "_segna_post_cerco"):
+            exec(pezzo(nome), amb)
+        exec("async " + pezzo("_manda_post_canale"), amb)
+        i = _SORGENTE.index("TESTO_POST_CERCO_TOLTO = (")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        for nome in ("_posta_richiesta_nei_canali", "ritira_post_cerco", "giro_post_cerco_canale"):
+            exec("async " + pezzo(nome), amb)
+        exec(pezzo("_ritira_post_cerco_subito"), amb)
+        (lavoro or (lambda amb, db: _asCC.run(amb["_posta_richiesta_nei_canali"](1))))(amb, db)
+        return chiamate, stampe, db
+
+    def stato(db):
+        c = db()
+        try:
+            return (c.execute("SELECT promo_vetrina_cerco_il FROM utenti").fetchone()[0],
+                    sorted((r["canale"], r["message_id"]) for r in
+                           c.execute("SELECT * FROM post_cerco_canale")))
+        finally:
+            c.close()
+
+    ch, st, db = banco()
+    invii = [(m, c) for m, c, _i, _t in ch]
+    prova("il post esce nei TRE canali, come testo (mai foto), e i tre message_id si ricordano",
+          ([("sendMessage", "@nostro"), ("sendMessage", "@vetrina"), ("sendMessage", "@podcast")],
+           [("@nostro", 901), ("@podcast", 903), ("@vetrina", 902)], []),
+          (invii, stato(db)[1], st))
+    prova("...e il timbro del Cerco su Subito Crypto e' scritto", True, stato(db)[0] > 0)
+    ch, st, db = banco(utente={"promo_vetrina_p2p_il": int(time.time()) - 86400})
+    prova("freno: un ordine P2P uscito ieri su Subito Crypto chiude la settimana: li' niente, gli altri due si'; "
+          "il timbro del Cerco non si scrive", ([("sendMessage", "@nostro"), ("sendMessage", "@podcast")], 0),
+          ([(m, c) for m, c, _i, _t in ch], stato(db)[0]))
+    ch, st, db = banco(utente={"promo_canale_il": int(time.time()) - 86400})
+    prova("...e cosi' un annuncio uscito ieri (`promo_canale_il`)", 2, len(ch))
+    ch, st, db = banco(utente={"promo_vetrina_cerco_il": int(time.time()) - 86400})
+    prova("...e un altro Cerco uscito ieri: al massimo UNO a settimana per persona", 2, len(ch))
+    ch, st, db = banco(utente={"promo_vetrina_cerco_il": int(time.time()) - 9 * 86400})
+    prova("...ma uno di nove giorni fa no: la settimana e' passata", 3, len(ch))
+    ch, st, db = banco(utente={"promo_vetrina_cerco_il": int(time.time()) - 86400}, ritmo=0)
+    prova("a ritmo «tutto» (0 giorni) nessun freno", 3, len(ch))
+    ch, st, db = banco(utente={"username": ""})
+    prova("senza @username Subito Crypto non c'e' (e il timbro non si scrive); gli altri due si'", (2, 0),
+          (len(ch), stato(db)[0]))
+    ch, st, db = banco(utente={"tg_id": -5, "username": "x"}, richiesta={"tg_id": -5})
+    prova("un nativo Nostr (tg_id negativo) non va su Subito Crypto", (["@nostro", "@podcast"]),
+          [c for m, c, _i, _t in ch])
+    ch, st, db = banco(leva=False)
+    prova("a leva spenta non esce niente", ([], []), (ch, stato(db)[1]))
+    ch, st, db = banco(canali=False)
+    prova("senza canali non esce niente e non si timbra", ([], 0), (ch, stato(db)[0]))
+    ch, st, db = banco(richiesta={"stato": "chiusa"})
+    prova("una richiesta gia' chiusa non si annuncia", [], ch)
+    # IL TIMBRO PRIMA DELL'INVIO: con Telegram che esplode a meta' il turno e' comunque speso
+    def esplode(metodo, dati):
+        raise RuntimeError("telegram giu'")
+    ch, st, db = banco(risposta=esplode)
+    prova("il timbro e' scritto PRIMA dell'invio: un guasto puo' far perdere un post, mai raddoppiarlo; "
+          "e il guasto non esce dalla funzione (fail-open)", (True, 0),
+          (stato(db)[0] > 0, len(stato(db)[1])))
+    corpo = pezzo("_posta_richiesta_nei_canali")
+    prova("...e nel sorgente il timbro sta prima dell'invio su Subito Crypto", True,
+          0 < corpo.index("UPDATE utenti SET promo_vetrina_cerco_il") < corpo.index(
+              "_manda_post_canale(canale_vetrina()"))
+
+    # --- 5) IL RITIRO QUANDO LA RICHIESTA SI CHIUDE O SCADE ---------------
+    def ritira(stato_richiesta, scade=None, via_giro=True):
+        def lavoro(amb, db):
+            _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+            c = db()
+            if scade is not None:
+                c.execute("UPDATE richieste SET scade=? WHERE id=1", (scade,))
+            c.execute("UPDATE richieste SET stato=? WHERE id=1", (stato_richiesta,))
+            c.commit()
+            c.close()
+            amb["bot_api_chiamate"].clear()
+            if via_giro:
+                _asCC.run(amb["giro_post_cerco_canale"]())
+            else:
+                _asCC.run(amb["ritira_post_cerco"]([1]))
+        return lavoro
+
+    def banco_ritiro(stato_richiesta, **kw):
+        # le chiamate dopo l'invio: si azzerano dentro `lavoro` e si leggono qui
+        raccolte = []
+
+        def lav(amb, db):
+            amb["bot_api_chiamate"] = raccolte
+            orig = amb["bot_api"]
+
+            async def tracciata(metodo, dati):
+                r = await orig(metodo, dati)
+                raccolte.append((metodo, dati["chat_id"], dati.get("message_id")))
+                return r
+            amb["bot_api"] = tracciata
+            ritira(stato_richiesta, **kw)(amb, db)
+        ch, st, db = banco(lavoro=lav)
+        return raccolte, st, db
+
+    ra, st, db = banco_ritiro("chiusa")
+    cancellati = [(m, c, i) for m, c, i in ra if m == "deleteMessage"]
+    prova("richiesta chiusa: il giro dell'orologio cancella i tre post e le righe se ne vanno",
+          (3, []), (len(cancellati), stato(db)[1]))
+    ra, st, db = banco_ritiro("aperta")
+    prova("richiesta ancora aperta: i post restano", (0, 3),
+          (len([1 for m, c, i in ra if m == "deleteMessage"]), len(stato(db)[1])))
+    ra, st, db = banco_ritiro("aperta", scade=int(time.time()) - 5)
+    prova("richiesta scaduta (anche se nessuno l'ha ancora chiusa leggendo): i post si tolgono", (3, []),
+          (len([1 for m, c, i in ra if m == "deleteMessage"]), stato(db)[1]))
+    ra, st, db = banco_ritiro("chiusa", via_giro=False)
+    prova("il ritiro diretto (il gesto di chi chiude) fa lo stesso", 3,
+          len([1 for m, c, i in ra if m == "deleteMessage"]))
+
+    # oltre le 48 ore: il delete non riesce, si riscrive «Richiesta chiusa»
+    def lav48(amb, db):
+        _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+        c = db()
+        c.execute("UPDATE richieste SET stato='chiusa' WHERE id=1")
+        c.commit()
+        c.close()
+        visti = amb["visti_fuori"]
+
+        async def finta(metodo, dati):
+            visti.append((metodo, dati.get("text", "")))
+            if metodo == "deleteMessage":
+                return {"ok": False, "description": "Bad Request: message can't be deleted for everyone"}
+            return {"ok": True}
+        amb["bot_api"] = finta
+        _asCC.run(amb["giro_post_cerco_canale"]())
+    visti_48 = []
+    ch, st, db48 = banco(lavoro=lambda amb, db: (amb.update(visti_fuori=visti_48), lav48(amb, db)))
+    prova("oltre le 48 ore (delete rifiutato) il post si RISCRIVE «Richiesta chiusa» e la riga se ne va",
+          (3, 3, True, 0),
+          (len([1 for m, t in visti_48 if m == "deleteMessage"]),
+           len([1 for m, t in visti_48 if m == "editMessageText"]),
+           all("Richiesta chiusa" in t for m, t in visti_48 if m == "editMessageText"),
+           len(stato(db48)[1])))
+
+    def lav_muto(amb, db):
+        _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+        c = db()
+        c.execute("UPDATE richieste SET stato='chiusa' WHERE id=1")
+        c.commit()
+        c.close()
+
+        async def muta(metodo, dati):
+            return None
+        amb["bot_api"] = muta
+        _asCC.run(amb["giro_post_cerco_canale"]())
+    ch, st, db_m = banco(lavoro=lav_muto)
+    prova("un Telegram muto non fa perdere i post: le righe restano e ci riprova il giro dopo", 3,
+          len(stato(db_m)[1]))
+
+    def lav_spenta(amb, db):
+        _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+        c = db()
+        c.execute("UPDATE richieste SET stato='chiusa' WHERE id=1")
+        c.commit()
+        c.close()
+        amb["VETRINA_SI_PULISCE"] = False
+        _asCC.run(amb["giro_post_cerco_canale"]())
+    ch, st, db_s = banco(lavoro=lav_spenta)
+    prova("con VETRINA_SI_PULISCE spenta i post restano com'erano (l'interruttore d'emergenza)", 3,
+          len(stato(db_s)[1]))
+
+    # --- 6) LE SENTINELLE ---------------------------------------------
+    crea = pezzo("crea_richiesta") if "def crea_richiesta(" in _SORGENTE else \
+        _SORGENTE[_SORGENTE.index("asyncio.create_task(_avvisa_venditori_richiesta(rid))") - 200:][:600]
+    prova("la nascita della richiesta lancia il post nei canali accanto ai due avvisi", True,
+          "asyncio.create_task(_avvisa_venditori_richiesta(rid))\n"
+          "    asyncio.create_task(_avvisa_moderatori_richiesta(rid))\n"
+          "    asyncio.create_task(_posta_richiesta_nei_canali(rid))" in _SORGENTE)
+    prova("chi chiude la richiesta ritira i post subito, dopo il commit", True,
+          "con.commit()\n    con.close()\n    _ritira_post_cerco_subito(richiesta_id)" in _SORGENTE)
+    prova("l'orologio grande ritira quelli delle richieste scadute", True,
+          "await giro_post_cerco_canale()" in _SORGENTE)
+    prova("la leva: di serie ACCESA nel codice e nel config d'esempio, e nel pannello «Stato delle leve»", True,
+          "except ImportError:\n    POST_CERCO_CANALI = True\n" in _SORGENTE
+          and "\nPOST_CERCO_CANALI = True\n" in open("config_esempio.py", encoding="utf-8").read()
+          and '_leva("Le richieste di Cerco nei canali", "POST_CERCO_CANALI",' in _SORGENTE)
+    prova("la colonna del timbro nasce con la migrazione «ADD COLUMN se manca», a zero", True,
+          '"promo_vetrina_cerco_il INTEGER DEFAULT 0",' in _SORGENTE)
+    prova("la tabella dei post di Cerco nasce con lo schema", True,
+          "CREATE TABLE IF NOT EXISTS post_cerco_canale(" in _SORGENTE)
+    prova("la richiesta non ha zona ne' descrizione: il post non ne inventa", False,
+          "zona" in pezzo("_caption_canale_cerco") or "dettagli" in pezzo("_caption_canale_cerco").lower())
 
 
 def prove_premi_fedelta():
@@ -227269,7 +227788,7 @@ CATEGORIE = {
     meta_cauzione_auto intervallo_obbligatorio
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste cerco_canali premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina vetrina_reti_punto
@@ -228831,6 +229350,7 @@ def main():
               prove_mancia_venditore,
               prove_raccolte,
               prove_richieste,
+              prove_cerco_canali,
               prove_premi_fedelta,
               prove_app_negozio,
               prove_cassa_solo_negozio,
