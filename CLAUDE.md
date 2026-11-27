@@ -74,21 +74,20 @@ modo in cui si rifà un errore già pagato.
   con `-S`. Prima di ogni push:
   `git cat-file commit HEAD | grep -c '^gpgsig'` deve dire 1.
 - IL PUSH È MIO SU `develop`, LA PROMOZIONE SU `main` È SUA (20 ott
-  2026). A cantiere CHIUSO (committato, provato, collaudato, verbale
-  scritto) e con prove verdi nel worktree (`PROVE_SEVERE=1 python
-  prove.py` più i collaudi della CI) si pusha su `develop` SENZA
-  chiedere e mai con force: il collaudo sulla vm-2050 lo mette su da
-  solo (la CI gira solo su main). `main` riceve solo la PROMOZIONE, col
+  2026). A cantiere CHIUSO (committato, verbale scritto) si pusha su
+  `develop` SENZA chiedere e mai con force, SENZA SUITE NÉ COLLAUDI (27
+  nov 2026, regola di Andrea): il collaudo sulla vm-2050 lo mette su da
+  solo e le prove le fa la CI alla promozione. `main` riceve solo la PROMOZIONE, col
   sì di Andrea e la sua frase intera: rebase su main, rifirma con
   `andrea-firma-barattolo`, un push solo, CI fino al verde (`gh run
   watch --exit-status`; con la coda un «cancelled» non è rosso), poi
   `develop` rimesso uguale a main con `--force-with-lease`: l'unico
   force ammesso, solo su develop, solo da chi promuove. Un «non pushare
   ancora» di Andrea vince finché non lo scioglie. Ramo corso nel
-  frattempo: rebase, sezioni toccate + collaudi, push; il verbale dice
-  COSA è girato su QUALE albero, il rapporto NOMINA i commit non miei.
-- LE SESSIONI CLOUD NON ASPETTANO PIÙ LA CI SUL RAMO (da sola parte solo
-  su main, 19 ott 2026): la loro prova è suite e collaudi locali.
+  frattempo: rebase, push; il rapporto NOMINA i commit non miei.
+- LE PROVE SI FANNO SOLO ALLA PROMOZIONE (27 nov 2026): la CI a pezzi
+  (~6 min) gira suite e collaudi interi sul push a main; un rosso si
+  fixa DOPO, con un commit nuovo. In cantiere al più le sezioni toccate.
 - IL VPS È FUORI DAL MIO PERIMETRO: niente ssh, niente query, nemmeno in
   sola lettura. I comandi li scrivo, li esegue Andrea e incolla il
   risultato. Il deploy è suo. Lo stesso vale per il nodo Mostro e per il
