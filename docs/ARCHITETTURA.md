@@ -39184,3 +39184,13 @@ il foglio `estrazioneSheet`).
   server prima dell'hash. Il numero arriva in chat anche a chi entra
   col link (il giro dei dieci minuti).
 
+
+- «NON HAI SATS?» ON-CHAIN (27 nov 2026, cantiere via-euro-onchain): lo
+  scambio P2P on-chain preso con `via_euro` ha come incasso l'indirizzo
+  2-di-3 dell'ordine on-chain del mercatino (`incasso_tipo = 'via_euro'`,
+  `p2p_onchain_ordini.via_euro_ordine`), scelto dal server
+  (`_via_euro_oc_giudica`) e verificato dal telefono di chi compra prima
+  della seconda firma. `_via_euro_oc_esito` (''/'vivo'/'fallito') tiene
+  vivo o annulla l'ordine del mercatino; il rilascio verso il venditore
+  è `senza_resto` e il resto va al venditore (`resto_al_venditore`, solo
+  nella proposta, mai nel cambio in Lightning). Leva `VIA_EURO_ONCHAIN`.
