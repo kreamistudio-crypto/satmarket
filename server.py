@@ -1146,6 +1146,16 @@ try:
     from config import VETRINA_SI_PULISCE
 except ImportError:
     VETRINA_SI_PULISCE = True
+# IL «CERCO» NEI CANALI (27 nov 2026, richiesta di Andrea: «vorrei
+# aggiungere il cerco»): accesa, ogni richiesta nuova di Cerco esce anche
+# nei canali Telegram (il nostro, Subito Crypto, BitcoinPodcast) con
+# l'ancora «Fai un'offerta su Barattolo», e sparisce quando la richiesta
+# si chiude o scade (con VETRINA_SI_PULISCE accesa). Spenta: nessun post
+# nuovo, quelli gia' usciti restano. E' l'interruttore d'emergenza.
+try:
+    from config import POST_CERCO_CANALI
+except ImportError:
+    POST_CERCO_CANALI = True
 # ...E IL VENDUTO DEL MERCATINO RESTA COL ✅ (18 nov 2026, cantiere
 # venduto-resta; Andrea sulla scheda, due volte: «No, lì resta il ✅
 # Venduto», poi «Tieni il ✅ Venduto»). La cancellazione del post di un
@@ -5136,6 +5146,23 @@ def _slug_negozio_libero(con, slug: str, tg_id: int) -> bool:
 # in pubblico escono TUTTI i guadagnati, e il flag decide solo la
 # precedenza: i fiducia stanno in testa al catalogo, quindi in testa
 # alla sfilza — quando il dettaglio annuncio tronca a «+N», restano.
+#
+# SU NOSTR NE ESCONO SOLO DUE (27 nov 2026, Andrea: «pochi e molto
+# importanti, se no si inflazionano»). Fino a ieri OGNI distintivo
+# diventava da solo un badge NIP-58: tredici badge, quasi tutti alla
+# portata di chiunque in una settimana, e un badge che hanno tutti non
+# dice piu' niente a chi lo guarda. Adesso a dire «questo esce su
+# Nostr» e' la chiave `nostr`, un criterio SUO (puo' essere piu' severo
+# di quello dell'app: vedi Specchiato). Senza la chiave il distintivo
+# resta tutto nell'app e su Nostr non va. I due: 🫙 Pioniere (la coorte
+# e' chiusa, non ne nascono piu') e 🛡️ Specchiato con l'asticella alta
+# (assorbe ⭐ Stimato e 🏪 Venditore rodato). Il terzo badge sono gli
+# eventi, assegnati a mano (sezione «BADGE NOSTR NIP-58 (LE LIVE)»).
+# I badge gia' dati dei distintivi usciti si RITIRANO con un gesto
+# dell'admin (ritira_badge_distintivi_usciti), scelta di Andrea.
+SPECCHIATO_NOSTR_AFFARI = 25
+SPECCHIATO_NOSTR_FEEDBACK = 10
+SPECCHIATO_NOSTR_MEDIA = 4.5
 
 DISTINTIVI = [
     dict(id="nostrano", emoji="🟣", nome="Nostrano", fiducia=True,
@@ -5149,7 +5176,14 @@ DISTINTIVI = [
          descrizione="Almeno 10 affari conclusi senza mai perdere "
                      "una disputa",
          criterio=lambda d: d["vendite"] + d["acquisti"] >= 10
-                            and d["dispute_perse"] == 0),
+                            and d["dispute_perse"] == 0,
+         # su Nostr con l'asticella alta: tanti affari veri, nessuna
+         # disputa persa E la stima di chi ci ha avuto a che fare
+         nostr=lambda d: (d["vendite"] + d["acquisti"]
+                          >= SPECCHIATO_NOSTR_AFFARI
+                          and d["dispute_perse"] == 0
+                          and d["fb_ricevuti"] >= SPECCHIATO_NOSTR_FEEDBACK
+                          and d["fb_media"] >= SPECCHIATO_NOSTR_MEDIA)),
     # SEGUE LA COORTE E NON PIU' LA POSIZIONE (26 set 2026): la
     # posizione si ricalcolava a ogni giro e dopo una fusione — una riga
     # cancellata davanti, tutti avanti di uno — il 101° prendeva questo
@@ -5157,7 +5191,8 @@ DISTINTIVI = [
     # e' uno solo, la coorte congelata; vedi COORTI_CHIUSE.
     dict(id="pioniere", emoji="🫙", nome="Pioniere", fiducia=False,
          descrizione="Tra i primi 100 iscritti del Barattolo",
-         criterio=lambda d: d["coorte"] == "pioniere"),
+         criterio=lambda d: d["coorte"] == "pioniere",
+         nostr=lambda d: d["coorte"] == "pioniere"),
     dict(id="primo_acquisto", emoji="⚡", nome="Primo acquisto",
          fiducia=False,
          descrizione="Il primo acquisto concluso col deposito di garanzia",
@@ -5315,6 +5350,14 @@ def controlla_distintivi(con, tg_id: int) -> list[str]:
             if r.rowcount:
                 nuovi.append(dd["id"])
     return nuovi
+
+
+def merita_su_nostr(dd: dict, d: dict | None) -> bool:
+    """Il giudice unico di «questo distintivo esce su Nostr per questa
+    persona» (27 nov 2026): solo chi ha la chiave `nostr` nel catalogo,
+    e solo se il SUO criterio e' vero sui dati di adesso."""
+    f = dd.get("nostr")
+    return bool(d and f and f(d))
 
 
 # ---------------------- LE COORTI (ago 2026) -------------------------
@@ -7831,6 +7874,21 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_post_p2p_canale_ordine
         ON post_p2p_canale(ordine);
+    CREATE TABLE IF NOT EXISTS post_cerco_canale(
+        -- I POST DELLE RICHIESTE DI CERCO NEI CANALI (27 nov 2026): uno per
+        -- canale, per toglierlo quando la richiesta si chiude o scade (il
+        -- gemello di post_p2p_canale, ma a parte: li' l'ordine e' una
+        -- stringa del coordinatore e il giro che li guarda gira solo col
+        -- P2P; qui la richiesta e' un intero nostro e il giro e'
+        -- l'orologio grande). `canale` e' quello DOVE e' uscito.
+        richiesta_id INTEGER NOT NULL,
+        canale TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        creato INTEGER NOT NULL,
+        PRIMARY KEY(canale, message_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_post_cerco_canale_richiesta
+        ON post_cerco_canale(richiesta_id);
     CREATE TABLE IF NOT EXISTS coda_vetrina(
         -- LA CODA DEL CANALE (ott 2026, decisione di Andrea): gli
         -- annunci che il freno «uno per venditore» ha lasciato fuori
@@ -10094,6 +10152,25 @@ def init_db():
         data TEXT PRIMARY KEY,       -- 'AAAA-MM-GG', UTC
         prezzo_eur REAL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS cassa_movimenti(
+        -- LE VOCI A MANO DEI SOLDI (27 nov 2026, cantiere
+        -- cruscotto-guadagni): le entrate che non hanno un flusso da
+        -- leggere (Bitcoin Labs, altro) e le SPESE (abbonamenti, server,
+        -- API). `importo` in sats o in CENTESIMI di euro, secondo
+        -- `valuta`; `ricorrenza` una | mese | anno, da `giorno` fino a
+        -- `fine` ('' = ancora attiva). `da_chi` l'admin che l'ha scritta.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        verso TEXT NOT NULL,             -- entrata | spesa
+        fonte TEXT DEFAULT '',           -- bitcoin_labs | altro (entrate)
+        voce TEXT NOT NULL,
+        importo INTEGER NOT NULL,
+        valuta TEXT NOT NULL,            -- sats | eur
+        ricorrenza TEXT NOT NULL DEFAULT 'una',
+        giorno TEXT NOT NULL,            -- 'AAAA-MM-GG'
+        fine TEXT DEFAULT '',
+        creato INTEGER,
+        da_chi INTEGER DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS fee_dinamica_stato(
         -- Lo split di OGGI fra compratore e venditore (set 2026), riga
         -- singola (id=1): il sentiment si ricalcola una volta al
@@ -10397,6 +10474,11 @@ def init_db():
                     # ordine P2P non deve togliere a nessuno il turno di
                     # casa. 0 = mai, e il DEFAULT e' la migrazione.
                     "promo_vetrina_p2p_il INTEGER DEFAULT 0",
+                    # ...e il timbro dell'ultima RICHIESTA DI CERCO di
+                    # questa persona finita su Subito Crypto (27 nov 2026):
+                    # terza colonna dello stesso freno settimanale, e a se'
+                    # per la stessa ragione delle altre due. 0 = mai.
+                    "promo_vetrina_cerco_il INTEGER DEFAULT 0",
                     # LA DIMENSIONE DEL TESTO (ago 2026): percentuale
                     # scelta dal lettore, valida su ogni dispositivo
                     # (vedi SCALE_FONT). 100 = la misura di sempre,
@@ -23638,17 +23720,32 @@ async def premia_distintivi(tg_id: int):
                        f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
                        f"{dd['nome']}!</b>\n{dd['descrizione']}. "
                        f"Lo trovi nel tuo Profilo. 🫙")
-        # Il gemello su Nostr (set 2026): fail-open anche qui, un giro
-        # in piu' oltre a quello gia' dentro _premia_distintivo — un
-        # intoppo su Nostr non deve MAI intaccare un flusso che stava
-        # gia' premiando un distintivo vero (login, un ordine appena
-        # concluso, un feedback lasciato: nessuno di questi aspetta
-        # un relay per finire il suo lavoro).
+    # Il gemello su Nostr (set 2026; dal 27 nov 2026 SOLO i distintivi
+    # con la chiave `nostr`, vedi DISTINTIVI). Si guarda a OGNI giro e
+    # non solo sui `nuovi`: lo Specchiato su Nostr chiede piu' di
+    # quello dell'app, e il giorno che si arriva a 25 affari l'app non
+    # ha niente di nuovo da dare. _premia_distintivo non duplica mai.
+    # Fail-open anche qui: un intoppo su Nostr non deve MAI intaccare
+    # un flusso che stava gia' premiando un distintivo vero (login, un
+    # ordine appena concluso, un feedback lasciato: nessuno di questi
+    # aspetta un relay per finire il suo lavoro).
+    try:
+        con = db()
+        d = _dati_distintivi(con, tg_id)
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Badge Nostr dei distintivi saltati per {tg_id}: {e}")
+        return
+    if not d or not d["npub_verificata"]:
+        return
+    for dd in DISTINTIVI:
+        if not merita_su_nostr(dd, d):
+            continue
         try:
             await _premia_distintivo(dd, tg_id)
         except Exception as e:
             print(f"⚠️ Badge Nostr del distintivo saltato per {tg_id}/"
-                  f"{did}: {e}")
+                  f"{dd['id']}: {e}")
 
 
 # ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
@@ -25273,7 +25370,9 @@ async def comando_anteprima(mittente: dict, testo: str):
         riga = con.execute(
             "SELECT a.*, u.nome AS venditore, "
             "u.username AS venditore_username, "
-            "u.negozio AS venditore_negozio FROM annunci a "
+            "u.negozio AS venditore_negozio, "
+            "u.spedizionieri AS venditore_spedizionieri, "
+            "u.spedizioniere AS venditore_spedizioniere FROM annunci a "
             "JOIN utenti u ON u.tg_id=a.venditore_id WHERE a.id=?",
             (int(arg),)).fetchone()
     else:
@@ -25283,7 +25382,9 @@ async def comando_anteprima(mittente: dict, testo: str):
         riga = con.execute(
             "SELECT a.*, u.nome AS venditore, "
             "u.username AS venditore_username, "
-            "u.negozio AS venditore_negozio FROM annunci a "
+            "u.negozio AS venditore_negozio, "
+            "u.spedizionieri AS venditore_spedizionieri, "
+            "u.spedizioniere AS venditore_spedizioniere FROM annunci a "
             "JOIN utenti u ON u.tg_id=a.venditore_id "
             "WHERE a.stato='attivo' AND a.contatto_nostr='' "
             "ORDER BY a.creato DESC, a.id DESC LIMIT 1").fetchone()
@@ -39816,6 +39917,287 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
             "cambi": dati_cambi_cruscotto(), "salute": dati_salute()}
 
 
+# --- I GUADAGNI E LE SPESE (27 nov 2026, cantiere cruscotto-guadagni) ---
+# Andrea: «vorrei immediatamente vedere i guadagni, cosa fondamentale. E
+# anche monitorare le spese». Sotto le tre domande del cruscotto, una
+# sezione sola coi soldi: quanto entra, da dove, e quanto esce.
+# LE FONTI AUTOMATICHE, nessuna nuova: il MERCATINO dagli ordini
+# 'released' (protezione + commissione: quel che resta a noi del
+# prezzo, `netto_venditore` con la commissione di OGGI — una stima per
+# gli ordini di quando era un'altra), il P2P dal registro `p2p_conti`
+# e dal 2-di-3 (le commissioni LORDE, come «Scambi P2P»), SATS ROUTING
+# dalla quota del wallet «swap» e gli ZAP dal salvadanaio. Ogni cosa
+# per il giorno in cui e' arrivata (UTC, come `_giorno`).
+# LE FONTI A MANO: Bitcoin Labs (la partnership del 27 nov, che non ha
+# un flusso nostro da leggere) e «altro», e le SPESE. Una riga per voce
+# in `cassa_movimenti`, in sats o in euro, una volta sola o ripetuta
+# ogni mese / ogni anno fino a quando la si ferma. Gli euro diventano
+# sats al prezzo DI QUEL GIORNO (`prezzo_storico`), o a quello di
+# adesso dove manca. Le vedono e le scrivono solo gli AMMINISTRATORI
+# (`vede_statistiche_p2p`): sono i conti, come quelli del P2P.
+FONTI_GUADAGNI = ("mercatino", "p2p", "sats_routing", "zap",
+                  "bitcoin_labs", "altro")
+FONTI_CASSA_A_MANO = ("bitcoin_labs", "altro")
+VERSI_CASSA = ("entrata", "spesa")
+RICORRENZE_CASSA = ("una", "mese", "anno")
+VALUTE_CASSA = ("sats", "eur")
+CASSA_MAX_SATS = 10 ** 12          # un tetto contro i refusi, non un limite vero
+CASSA_MAX_CENT = 10 ** 10          # 100 milioni di euro, idem
+
+
+def _date_ricorrenza_cassa(giorno: str, ricorrenza: str, fine: str,
+                           oggi: str) -> list:
+    """PURA: i giorni in cui una voce cade, da `giorno` fino a `fine`
+    (compreso; '' = mai fermata) e mai oltre `oggi`. Ogni mese lo
+    stesso numero del giorno, che nei mesi corti diventa l'ultimo (il 31
+    di febbraio e' il 28 o il 29); ogni anno uguale."""
+    from datetime import date
+    import calendar
+    try:
+        d0 = date.fromisoformat(giorno)
+        ultimo = date.fromisoformat(oggi)
+        if fine:
+            ultimo = min(ultimo, date.fromisoformat(fine))
+    except (TypeError, ValueError):
+        return []
+    if d0 > ultimo:
+        return []
+    if ricorrenza not in ("mese", "anno"):
+        return [d0.isoformat()]
+    out, passo = [], 1 if ricorrenza == "mese" else 12
+    for i in range(0, 12 * 200, passo):
+        a, m = d0.year + (d0.month - 1 + i) // 12, (d0.month - 1 + i) % 12 + 1
+        d = date(a, m, min(d0.day, calendar.monthrange(a, m)[1]))
+        if d > ultimo:
+            break
+        out.append(d.isoformat())
+    return out
+
+
+def serie_guadagni(mercatino: list, p2p: list, routing: list, zap: list,
+                   movimenti: list, prezzi: dict, eur_ora: float,
+                   oggi: str) -> dict:
+    """PURA: le serie GIORNALIERE della sezione «💰 Guadagni».
+    `mercatino` e `p2p` sono (giorno, volume, commissione); `routing` e
+    `zap` (giorno, sats); `movimenti` le righe di `cassa_movimenti`;
+    `prezzi` gli euro per bitcoin del giorno. Torna una riga per giorno
+    con qualcosa dentro: [giorno, volume mercatino, volume P2P,
+    commissioni mercatino, commissioni P2P, SATS Routing, zap, Bitcoin
+    Labs, altro, spese] — tutto in sats. `senza_cambio` conta le
+    rate in euro che non si sono potute convertire (nessun prezzo,
+    nemmeno quello di adesso): restano fuori, e la pagina lo dice."""
+    righe, senza = {}, 0
+
+    def riga(g):
+        return righe.setdefault(g, [0] * 9)
+    for g, vol, comm in mercatino:
+        r = riga(g)
+        r[0] += int(vol)
+        r[2] += int(comm)
+    for g, vol, comm in p2p:
+        r = riga(g)
+        r[1] += int(vol)
+        r[3] += int(comm)
+    for g, s in routing:
+        riga(g)[4] += int(s)
+    for g, s in zap:
+        riga(g)[5] += int(s)
+    for m in movimenti:
+        for g in _date_ricorrenza_cassa(m["giorno"], m["ricorrenza"],
+                                        m.get("fine") or "", oggi):
+            if m["valuta"] == "eur":
+                p = float(prezzi.get(g) or 0) or float(eur_ora or 0)
+                if p <= 0:
+                    senza += 1
+                    continue
+                sats = int(round(int(m["importo"]) / 100 / p * 1e8))
+            else:
+                sats = int(m["importo"])
+            r = riga(g)
+            if m["verso"] == "spesa":
+                r[8] += sats
+            else:
+                r[6 if m["fonte"] == "bitcoin_labs" else 7] += sats
+    return {"giorni": [[g, *righe[g]] for g in sorted(righe)],
+            "senza_cambio": senza}
+
+
+def _fonti_guadagni(con, adesso: int) -> tuple:
+    """Le quattro fonti automatiche, lette dai loro database: (mercatino,
+    p2p, routing, zap) nella forma di `serie_guadagni`. Un database che
+    manca (un server senza P2P, senza zap) vale una lista vuota."""
+    mercatino = []
+    for o in con.execute(
+            "SELECT creato, prezzo_sats, COALESCE(protezione_sats,0) AS pr "
+            "FROM ordini WHERE stato='released' AND COALESCE(prova,0)=0"):
+        prezzo = int(o["prezzo_sats"] or 0)
+        nostro = max(0, prezzo - netto_venditore(prezzo - int(o["pr"])))
+        mercatino.append((_giorno(o["creato"] or 0), prezzo, nostro))
+    p2p = []
+    try:
+        _consolida_conti_p2p(con, adesso)
+        righe = [dict(r) for r in con.execute(
+            "SELECT chiuso, sats, sats_venditore, sats_compratore FROM "
+            "p2p_conti WHERE esito='completato'")]
+    except sqlite3.OperationalError:
+        righe = []
+    try:
+        righe += [r for r in _conti_onchain_p2p(
+            con, _leggi_onchain_conti_p2p())["righe"]
+            if r["esito"] == "completato"]
+    except Exception as e:
+        print(f"⚠️ Guadagni: il P2P on-chain non si legge ({e})")
+    for r in righe:
+        v, c = int(r["sats_venditore"] or 0), int(r["sats_compratore"] or 0)
+        comm = v - c if v > 0 and c > 0 and v >= c else 0
+        p2p.append((_giorno(r["chiuso"] or 0), int(r["sats"] or 0), comm))
+    routing, zap = [], []
+    for apri, tabella, dove in ((_swap_db, "swap_quota", routing),
+                                (_zap_db, "zap", zap)):
+        try:
+            c2 = apri()
+        except Exception:
+            continue
+        try:
+            dove.extend((_giorno(r["pagato_il"] or 0), int(r["sats"] or 0))
+                        for r in c2.execute(
+                            f"SELECT pagato_il, sats FROM {tabella} "
+                            "WHERE stato='pagato'"))
+        except sqlite3.OperationalError:
+            pass
+        finally:
+            c2.close()
+    return mercatino, p2p, routing, zap
+
+
+def _movimenti_cassa(con) -> list:
+    return [dict(r) for r in con.execute(
+        "SELECT id, verso, fonte, voce, importo, valuta, ricorrenza, giorno, "
+        "COALESCE(fine,'') AS fine, creato FROM cassa_movimenti "
+        "ORDER BY giorno DESC, id DESC")]
+
+
+def _solo_amministratori(x_tg_init_data, barattolo_sessione) -> dict:
+    """Il controllo delle rotte dei soldi: il PRIMO gesto, prima del
+    database. Lo stesso giudice dei conti del P2P."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not vede_statistiche_p2p(user["id"]):
+        raise HTTPException(403, "Riservato agli amministratori")
+    return user
+
+
+@app.get("/api/admin/guadagni")
+async def guadagni_admin(x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: le serie della sezione «💰 Guadagni» di
+    `/admin` e le voci scritte a mano. A raggruppare e a scegliere il
+    periodo ci pensa la pagina, come per gli iscritti."""
+    _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    try:
+        eur_ora = await cambio_btc_eur()
+    except Exception:
+        eur_ora = cambio_noto_ora()
+    adesso = int(time.time())
+    con = db()
+    try:
+        fonti = _fonti_guadagni(con, adesso)
+        movimenti = _movimenti_cassa(con)
+        prezzi = {r["data"]: float(r["prezzo_eur"] or 0) for r in
+                  con.execute("SELECT data, prezzo_eur FROM prezzo_storico")}
+    finally:
+        con.close()
+    dati = serie_guadagni(*fonti, movimenti, prezzi, eur_ora, _giorno(adesso))
+    dati.update(movimenti=movimenti, eur_per_btc=eur_ora,
+                commissione_percento=float(COMMISSIONE_PERCENTO or 0),
+                generato=adesso)
+    return JSONResponse(dati, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/admin/cassa")
+async def cassa_aggiungi_admin(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: una voce nuova, entrata a mano (Bitcoin Labs,
+    altro) o spesa. Tutto passa da un vocabolario o da una forma: la voce
+    e' testo di un admin ma la pagina la scrive sempre con `esc`."""
+    user = _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    from datetime import date
+    verso = str(d.get("verso") or "")
+    fonte = str(d.get("fonte") or "altro") if verso == "entrata" else ""
+    valuta = str(d.get("valuta") or "")
+    ricorrenza = str(d.get("ricorrenza") or "una")
+    voce = " ".join(str(d.get("voce") or "").split())[:60]
+    giorno = str(d.get("giorno") or "")
+    if (verso not in VERSI_CASSA or valuta not in VALUTE_CASSA
+            or ricorrenza not in RICORRENZE_CASSA
+            or (verso == "entrata" and fonte not in FONTI_CASSA_A_MANO)):
+        raise HTTPException(400, "Voce non valida")
+    if not voce:
+        raise HTTPException(400, "Scrivi di cosa si tratta")
+    try:
+        date.fromisoformat(giorno)
+    except ValueError:
+        raise HTTPException(400, "Data non valida")
+    try:
+        importo = float(str(d.get("importo") or "").replace(",", "."))
+    except ValueError:
+        raise HTTPException(400, "Importo non valido")
+    importo = int(round(importo * 100)) if valuta == "eur" else int(importo)
+    if importo <= 0 or importo > (CASSA_MAX_CENT if valuta == "eur"
+                                  else CASSA_MAX_SATS):
+        raise HTTPException(400, "Importo non valido")
+    con = db()
+    try:
+        con.execute(
+            "INSERT INTO cassa_movimenti(verso, fonte, voce, importo, valuta, "
+            "ricorrenza, giorno, fine, creato, da_chi) "
+            "VALUES (?,?,?,?,?,?,?,'',?,?)",
+            (verso, fonte, voce, importo, valuta, ricorrenza, giorno,
+             int(time.time()), int(user["id"])))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
+
+
+@app.post("/api/admin/cassa/{mid}/ferma")
+def cassa_ferma_admin(mid: int, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: una voce che si ripete smette da OGGI (la
+    disdetta di un abbonamento). Le rate gia' cadute restano nei conti."""
+    _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        n = con.execute("UPDATE cassa_movimenti SET fine=? WHERE id=? AND "
+                        "ricorrenza!='una' AND COALESCE(fine,'')=''",
+                        (_giorno(time.time()), int(mid))).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(404, "Voce non trovata o già ferma")
+    return {"ok": True}
+
+
+@app.delete("/api/admin/cassa/{mid}")
+def cassa_cancella_admin(mid: int, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: via una voce sbagliata, con tutta la sua
+    storia (per una disdetta c'e' «Ferma», che la storia la tiene)."""
+    _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        n = con.execute("DELETE FROM cassa_movimenti WHERE id=?",
+                        (int(mid),)).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(404, "Voce non trovata")
+    return {"ok": True}
+
+
 @app.get("/api/admin/stats")
 def statistiche_admin(x_tg_init_data: str = Header(""),
                       barattolo_sessione: str = Cookie("")):
@@ -40827,11 +41209,21 @@ def _leve_stato():
                   spento="i nuovi annunci non vengono raccontati da nessuna "
                          "parte (il ciclo di vita dei post già fatti "
                          "continua)"),
+            # IL CERCO NEI CANALI (27 nov 2026): accesa di serie
+            _leva("Le richieste di Cerco nei canali", "POST_CERCO_CANALI",
+                  bool(POST_CERCO_CANALI),
+                  acceso="ogni richiesta nuova di Cerco esce anche nei "
+                         "canali Telegram (Subito Crypto al massimo una "
+                         "a settimana per persona)",
+                  spento="le richieste restano solo nell'app e negli "
+                         "avvisi ai venditori; i post già usciti restano"),
             # LA VETRINA CHE SI PULISCE (18 nov 2026): accesa di serie
             _leva("I canali si puliscono da soli", "VETRINA_SI_PULISCE",
                   bool(VETRINA_SI_PULISCE),
-                  acceso="il post di un ordine P2P sparisce dai canali "
-                         "quando l'ordine è preso, annullato o scaduto; "
+                  acceso="il post di un ordine P2P (o di una richiesta di "
+                         "Cerco) sparisce dai canali quando l'ordine è "
+                         "preso, annullato o scaduto (la richiesta chiusa "
+                         "o scaduta); "
                          "oltre le 48 ore Telegram non lascia cancellare, "
                          "e il post si riscrive («non più disponibile»)",
                   spento="come prima: i post P2P restano nei canali"),
@@ -41352,6 +41744,21 @@ def _leve_stato():
                          "ha depositato: per tutti gli altri e' come spento",
                   spento="«Riprendi i sats» vale per chiunque abbia "
                          "depositato (se la leva e' accesa)"),
+            # IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026)
+            _leva("Resto dell'intervallo di nuovo nel libro",
+                  "P2P_RESTO_INTERVALLO", P2P_RESTO_INTERVALLO,
+                  acceso="un ordine P2P a intervallo preso per una parte "
+                         "torna nel libro col resto, a scambio concluso "
+                         "(Lightning e on-chain)",
+                  spento="un ordine a intervallo si chiude alla prima presa"),
+            _leva("Resto dell'intervallo solo ai moderatori",
+                  "P2P_RESTO_INTERVALLO_SOLO_ADMIN",
+                  P2P_RESTO_INTERVALLO_SOLO_ADMIN,
+                  acceso="il resto torna nel libro solo sugli ordini "
+                         "pubblicati da un moderatore: per gli altri e' "
+                         "come spento",
+                  spento="il resto torna nel libro per chiunque abbia "
+                         "pubblicato (se la leva e' accesa)"),
             # IL RITORNO DA SOLO (20 nov 2026, ritorno-da-solo-oc)
             _leva("Sats on-chain indietro da soli a tempo finito",
                   "P2P_ONCHAIN_RITORNO_DA_SOLO", P2P_ONCHAIN_RITORNO_DA_SOLO,
@@ -58044,6 +58451,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # P2P_USDT_ATTIVO, la porticina degli admin e il P2P per me. Senza,
     # il libro non mostra gli ordini in USDT e il foglio offre l'euro solo.
     profilo["p2p_usdt"] = p2p_usdt_ammesso(user["id"])
+    # ...e il resto dell'intervallo che torna nel libro (27 nov 2026): il
+    # telefono manda la chiave del prossimo scambio solo con questa
+    profilo["p2p_resto_intervallo"] = p2p_resto_intervallo_per(user["id"])
     # ...e gli ordini P2P in franchi svizzeri (14 nov 2026, cantiere
     # p2p-chf): lo stesso cancello, con le sue due leve
     profilo["p2p_chf"] = p2p_chf_ammesso(user["id"])
@@ -64335,7 +64745,9 @@ async def promo_in_cima_canale(annuncio_id: int):
             "u.npub AS venditore_npub, "
             "u.npub_verificata AS venditore_npub_verificata, "
             "u.npub_accesso AS venditore_npub_accesso, "
-            "u.negozio AS venditore_negozio "
+            "u.negozio AS venditore_negozio, "
+            "u.spedizionieri AS venditore_spedizionieri, "
+            "u.spedizioniere AS venditore_spedizioniere "
             "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
             "WHERE a.id=?", (annuncio_id,)).fetchone()
         if not a or a["stato"] != "attivo" or origine_annuncio(a) \
@@ -65864,6 +66276,238 @@ async def _avvisa_venditori_richiesta(richiesta_id: int) -> None:
               f"saltato: {e}")
 
 
+# ═══ IL «CERCO» NEI CANALI (27 nov 2026, richiesta di Andrea) ═══════════
+# «Io parlavo soprattutto dei canali su telegram. Inoltre vorrei aggiungere
+# il cerco.» Ogni richiesta nuova di Cerco esce anche nei tre canali — il
+# nostro, Subito Crypto, BitcoinPodcast — come il P2P: «🙋 Cerco su
+# Barattolo», il testo, la categoria, il budget, l'ancora per fare
+# un'offerta e la firma di chi cerca. Le regole sono quelle degli ordini
+# P2P (`annuncia_ordine_p2p_canale`): Subito Crypto solo a chi ha
+# @username e al massimo UNA volta a settimana per persona contando i TRE
+# timbri (`promo_canale_il`, `promo_vetrina_p2p_il`,
+# `promo_vetrina_cerco_il`), timbro PRIMA dell'invio; il nostro canale e
+# BitcoinPodcast senza freno. Chi cerca vede la stessa firma dei suoi
+# annunci: e' un utente autenticato che ha premuto «Pubblica», non si
+# scopre niente.
+# I post si ricordano in `post_cerco_canale` e si tolgono quando la
+# richiesta si chiude o scade (`giro_post_cerco_canale`, orologio grande;
+# `chiudi_richiesta` subito), con la leva VETRINA_SI_PULISCE.
+# La richiesta di oggi non ha ne' zona ne' descrizione lunga (testo da 140
+# caratteri, categoria, budget, durata): il post non inventa righe.
+TESTO_POST_CERCO_TOLTO = ("⌛ <b>Richiesta chiusa</b>\n"
+                          "Chi cercava ha chiuso la richiesta, o è scaduta.")
+
+
+def _caption_canale_cerco(rich: dict, chi: dict) -> str:
+    """La caption del post di una richiesta di Cerco nei canali. PURA:
+    `rich` e' la riga di `richieste` (id, testo, categoria, budget_*),
+    `chi` le chiavi del venditore come le vuole `_firma_venditore`
+    (venditore, venditore_username, venditore_npub*, venditore_negozio),
+    letto da `utenti` da chi chiama. Il testo e la categoria li ha
+    scritti un utente e la caption e' HTML: si scappa tutto."""
+    testo = "🙋 <b>Cerco su Barattolo</b>"
+    testo += f"\n«{html.escape(rich['testo'])}»"
+    if rich.get("categoria"):
+        testo += f"\n🗂 {html.escape(rich['categoria'])}"
+    budget = _riga_budget_richiesta(rich).strip()
+    if budget:
+        testo += f"\n💰 {budget}"
+    testo += (f"\n\n<a href=\"{link_telegram('cerco', rich['id'])}\">"
+              "🫙 Fai un'offerta su Barattolo</a>")
+    # «Richiesta da», non «Annuncio da»: la riga e' quella unica della
+    # piazza, cambia solo la parola davanti
+    testo += "\n\n" + _firma_venditore(chi).replace("Annuncio da", "Richiesta da", 1)
+    testo += "\n\n#cerco #barattolo"
+    return testo
+
+
+def _settimana_piena_vetrina(r_u, giorni: int, adesso: float) -> bool:
+    """IL FRENO DI SUBITO CRYPTO, uno a settimana per persona (17 nov
+    2026), contando TUTTI i timbri: un annuncio (`promo_canale_il`), un
+    ordine P2P (`promo_vetrina_p2p_il`) o una richiesta di Cerco
+    (`promo_vetrina_cerco_il`) usciti nei `giorni` del ritmo chiudono la
+    settimana per tutti e tre. `giorni` a 0 = ritmo «tutto», nessun
+    freno. PURA: prende la riga (sqlite o dizionario) e non tocca niente;
+    una colonna che manca vale 0 (mai)."""
+    if giorni <= 0:
+        return False
+    r = dict(r_u)
+    soglia = int(adesso) - giorni * 86400
+    return max(r.get("promo_canale_il") or 0, r.get("promo_vetrina_p2p_il") or 0,
+               r.get("promo_vetrina_cerco_il") or 0) > soglia
+
+
+def _segna_post_cerco(usciti, richiesta_id: int, quando: int) -> None:
+    """Ricorda i post appena usciti, uno per canale. Fail-open: una riga
+    saltata vuol dire un post che resta, mai un gesto rotto."""
+    if not usciti:
+        return
+    try:
+        con = db()
+        try:
+            con.executemany(
+                "INSERT OR IGNORE INTO post_cerco_canale(richiesta_id, canale, "
+                "message_id, creato) VALUES(?,?,?,?)",
+                [(int(richiesta_id), str(c), int(m), int(quando))
+                 for c, m in usciti])
+            con.commit()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Cerco nei canali: riferimento non salvato ({e})", flush=True)
+
+
+async def _posta_richiesta_nei_canali(richiesta_id: int) -> None:
+    """In sottofondo, dopo la nascita della richiesta (accanto agli avvisi
+    ai venditori): il post nei tre canali, ognuno fallisce per conto suo.
+    Fail-open totale: chi ha chiesto ha gia' la sua risposta. A leva
+    spenta, o senza nessun canale, non fa niente."""
+    if not POST_CERCO_CANALI:
+        return
+    try:
+        con = db()
+        r = con.execute(
+            "SELECT r.*, u.nome AS venditore, u.username AS venditore_username, "
+            "u.npub AS venditore_npub, "
+            "u.npub_verificata AS venditore_npub_verificata, "
+            "u.npub_accesso AS venditore_npub_accesso, "
+            "u.negozio AS venditore_negozio, u.promo_canale_il, "
+            "u.promo_vetrina_p2p_il, u.promo_vetrina_cerco_il "
+            "FROM richieste r JOIN utenti u ON u.tg_id=r.tg_id "
+            "WHERE r.id=? AND r.stato='aperta'", (richiesta_id,)).fetchone()
+        con.close()
+        if not r:
+            return
+        rich = dict(r)
+        caption = _caption_canale_cerco(rich, rich)
+        adesso = int(time.time())
+        usciti = []
+        if canale_id():
+            try:
+                mid = await _manda_post_canale(canale_id(), caption, [])
+                if mid:
+                    usciti.append((canale_id(), mid))
+            except Exception as e:
+                print(f"⚠️ Cerco nel canale saltato: {e}", flush=True)
+        # SUBITO CRYPTO: solo chi viene da Telegram e ha un @username, e
+        # una volta a settimana (tre timbri). Il timbro PRIMA dell'invio,
+        # il patto delle campagne: un guasto puo' far perdere un post,
+        # mai raddoppiarlo.
+        if canale_vetrina() and rich["tg_id"] > 0 \
+                and (rich.get("venditore_username") or ""):
+            try:
+                if not _settimana_piena_vetrina(rich, ritmo_vetrina()[0], adesso):
+                    con = db()
+                    con.execute("UPDATE utenti SET promo_vetrina_cerco_il=? "
+                                "WHERE tg_id=?", (adesso, rich["tg_id"]))
+                    con.commit()
+                    con.close()
+                    mid = await _manda_post_canale(canale_vetrina(), caption, [])
+                    if mid:
+                        usciti.append((canale_vetrina(), mid))
+            except Exception as e:
+                print(f"⚠️ Cerco su Subito Crypto saltato: {e}", flush=True)
+        if canale_bitcoin_podcast():
+            try:
+                mid = await _manda_post_canale(canale_bitcoin_podcast(), caption, [])
+                if mid:
+                    usciti.append((canale_bitcoin_podcast(), mid))
+            except Exception as e:
+                print(f"⚠️ Cerco su BitcoinPodcast saltato: {e}", flush=True)
+        _segna_post_cerco(usciti, richiesta_id, adesso)
+    except Exception as e:
+        print(f"⚠️ Post della richiesta {richiesta_id} nei canali saltato: {e}",
+              flush=True)
+
+
+async def ritira_post_cerco(richiesta_ids) -> int:
+    """Toglie dai canali i post di queste richieste: cancella, e se
+    Telegram non lascia (oltre le 48 ore) riscrive «richiesta chiusa»
+    (come `ritira_post_p2p`). La riga se ne va solo quando uno dei due e'
+    riuscito: un Telegram muto non fa perdere il post, ci riprova il giro
+    dopo. Fail-open; torna quanti post ha tolto. Con VETRINA_SI_PULISCE
+    spenta non fa niente."""
+    ids = sorted({int(i) for i in richiesta_ids or [] if i})
+    if not VETRINA_SI_PULISCE or not ids:
+        return 0
+    try:
+        con = db()
+        try:
+            righe = [dict(r) for r in con.execute(
+                "SELECT canale, message_id FROM post_cerco_canale WHERE "
+                f"richiesta_id IN ({','.join('?' * len(ids))})", ids)]
+        finally:
+            con.close()
+        tolti = []
+        for r in righe:
+            dati = {"chat_id": r["canale"], "message_id": r["message_id"]}
+            esito = await bot_api("deleteMessage", dati)
+            fatto = bool(esito and esito.get("ok"))
+            if not fatto and esito and "not found" in str(
+                    esito.get("description") or "").lower():
+                fatto = True          # gia' tolto a mano: e' quel che si voleva
+            if not fatto:
+                esito = await bot_api("editMessageText", {
+                    **dati, "text": TESTO_POST_CERCO_TOLTO,
+                    "parse_mode": "HTML"})
+                fatto = bool(esito and esito.get("ok"))
+            if fatto:
+                tolti.append((r["canale"], r["message_id"]))
+        if tolti:
+            con = db()
+            try:
+                con.executemany("DELETE FROM post_cerco_canale WHERE canale=? "
+                                "AND message_id=?", tolti)
+                con.commit()
+            finally:
+                con.close()
+            print(f"🧹 Canali: {len(tolti)} post di Cerco tolti "
+                  f"(richieste {', '.join(str(i) for i in ids)})", flush=True)
+        return len(tolti)
+    except Exception as e:
+        print(f"⚠️ Canali: post di Cerco non tolti ({e})", flush=True)
+        return 0
+
+
+def _ritira_post_cerco_subito(richiesta_id: int) -> None:
+    """Dal gesto di chi chiude la richiesta: il ritiro parte in
+    sottofondo, e senza un loop resta il giro dell'orologio grande."""
+    if not VETRINA_SI_PULISCE or not richiesta_id:
+        return
+    try:
+        t = asyncio.get_running_loop().create_task(
+            ritira_post_cerco([richiesta_id]))
+    except RuntimeError:
+        return
+    _TASK_POST_P2P.add(t)
+    t.add_done_callback(_TASK_POST_P2P.discard)
+
+
+async def giro_post_cerco_canale() -> None:
+    """Il battito dell'orologio grande (dieci minuti): toglie i post delle
+    richieste non piu' aperte — chiuse da chi cerca, scadute (che si
+    chiudono alla lettura, e qui anche senza nessuno che legga) o sparite
+    — e dimentica le righe piu' vecchie della durata massima.
+    Fail-open come le sorelle."""
+    if not VETRINA_SI_PULISCE:
+        return
+    adesso = int(time.time())
+    con = db()
+    try:
+        con.execute("DELETE FROM post_cerco_canale WHERE creato<?",
+                    (adesso - (max(RICHIESTE_DURATE) + 30) * 86400,))
+        con.commit()
+        ids = [r[0] for r in con.execute(
+            "SELECT DISTINCT p.richiesta_id FROM post_cerco_canale p "
+            "LEFT JOIN richieste r ON r.id=p.richiesta_id "
+            "WHERE r.id IS NULL OR r.stato<>'aperta' OR r.scade<?",
+            (adesso,))]
+    finally:
+        con.close()
+    if ids:
+        await ritira_post_cerco(ids)
+
+
 @app.get("/api/richieste/categoria")
 async def proponi_categoria_richiesta(testo: str = "",
                                       x_tg_init_data: str = Header(""),
@@ -65999,6 +66643,7 @@ async def crea_richiesta(req: Request, x_tg_init_data: str = Header(""),
     con.close()
     asyncio.create_task(_avvisa_venditori_richiesta(rid))
     asyncio.create_task(_avvisa_moderatori_richiesta(rid))
+    asyncio.create_task(_posta_richiesta_nei_canali(rid))
     return {"ok": True, "id": rid}
 
 
@@ -66019,6 +66664,7 @@ async def chiudi_richiesta(richiesta_id: int, x_tg_init_data: str = Header(""),
                     (r["avviso_id"], user["id"]))
     con.commit()
     con.close()
+    _ritira_post_cerco_subito(richiesta_id)
     return {"ok": True}
 
 
@@ -77841,28 +78487,30 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     # la caption resta quella di ieri.
     if premio is not None:
         testo += f"\n🏷️ {_premio_canale_p2p(lato, premio)}"
+    # I METODI IN UNA TENDINA (27 nov 2026, richiesta di Andrea: le tendine
+    # della Mini App anche nei canali): «💳 Metodi di pagamento accettati»,
+    # col titolo fuori e UN METODO PER RIGA dentro la citazione espandibile
+    # (`_tendina_canale`) — la gemella di quella della card.
     # «💵 CONTANTI» NEL POST (10 ott 2026): il contanti di persona porta le
-    # sue banconote come sulla card, e il 💳 resta a intestare gli ALTRI
-    # nomi — «💳 SEPA, 💵 Contanti». A parola intera: «Contanti al
-    # tabacchino» e' Barattozon e resta sotto il 💳, come ieri. Senza
-    # «Contanti» fra le voci la riga e' quella di ieri, byte per byte.
-    voci = [m.strip() for m in str(metodo or "").split(",") if m.strip()]
-    if "Contanti" in voci:
-        pezzi, intestato = [], False
-        for m in voci:
-            if m == "Contanti":
-                pezzi.append("💵 Contanti")
-            else:
-                pezzi.append(("" if intestato else "💳 ") + html.escape(m))
-                intestato = True
-        testo += "\n" + ", ".join(pezzi)
-    else:
-        testo += f"\n💳 {html.escape(metodo)}"
+    # sue banconote come sulla card, e il 💳 intesta gli ALTRI nomi — una
+    # riga ciascuno: «💳 SEPA», «💵 Contanti». A parola intera:
+    # «Contanti al tabacchino» e' Barattozon e resta sotto il 💳, come
+    # ieri.
     # LA ZONA DI SCAMBIO DEL CONTANTI (10 ott 2026): la stessa riga della
-    # card, «📍 Milano centro», sotto il metodo. Arriva gia' giudicata
-    # dalla rotta (solo col contanti, solo pulita); senza, la caption e'
-    # quella di ieri. Testo di un utente: si scappa come il metodo.
-    if zona:
+    # card, «📍 Milano centro», DENTRO la tendina subito sotto il
+    # contanti. Arriva gia' giudicata dalla rotta (solo col contanti, solo
+    # pulita); senza, niente riga. Testo di un utente: si scappa come il
+    # metodo. Se arrivasse senza contanti (la rotta non lo fa) resta fuori
+    # dalla tendina, come ieri, e non si perde.
+    voci = [m.strip() for m in str(metodo or "").split(",") if m.strip()]
+    righe = []
+    for m in voci or [str(metodo or "")]:
+        righe.append("💵 Contanti" if m == "Contanti"
+                     else f"💳 {html.escape(m)}")
+        if m == "Contanti" and zona:
+            righe.append(f"📍 {html.escape(zona)}")
+    testo += "\n" + _tendina_canale("💳 Metodi di pagamento accettati", righe)
+    if zona and "Contanti" not in voci:
         testo += f"\n📍 {html.escape(zona)}"
     testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
     # il post vive nel canale Telegram e basta: a leva accesa il link apre
@@ -78036,16 +78684,16 @@ async def annuncia_ordine_p2p_canale(req: Request,
         try:
             con = db()
             r_u = con.execute("SELECT username, promo_canale_il, "
-                              "promo_vetrina_p2p_il FROM utenti WHERE tg_id=?",
+                              "promo_vetrina_p2p_il, promo_vetrina_cerco_il "
+                              "FROM utenti WHERE tg_id=?",
                               (user["id"],)).fetchone()
             con.close()
             vetrina_ok = bool(r_u and (r_u["username"] or ""))
-            giorni_v = ritmo_vetrina()[0]
-            if vetrina_ok and giorni_v > 0:
-                soglia_v = int(adesso_canale) - giorni_v * 86400
-                if max(r_u["promo_canale_il"] or 0,
-                       r_u["promo_vetrina_p2p_il"] or 0) > soglia_v:
-                    vetrina_ok, settimana_piena = False, True
+            # i TRE timbri (27 nov 2026: anche una richiesta di Cerco su
+            # Subito Crypto chiude la settimana), dal giudice comune
+            if vetrina_ok and _settimana_piena_vetrina(
+                    r_u, ritmo_vetrina()[0], adesso_canale):
+                vetrina_ok, settimana_piena = False, True
         except Exception as e:
             vetrina_ok = False
             print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
@@ -92490,7 +93138,9 @@ async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
     if not _NOSTR:
         raise HTTPException(503, "Nostr è spento sul server")
     riepilogo = {}
-    for dist in DISTINTIVI:
+    # dal 27 nov 2026 solo i distintivi che escono su Nostr (la chiave
+    # `nostr` di DISTINTIVI), e per ognuno col SUO criterio
+    for dist in [x for x in DISTINTIVI if x.get("nostr")]:
         live = await _assicura_badge_distintivo(dist)
         if not live["evento_id"]:
             riepilogo[dist["id"]] = {"errore": "definizione non pubblicata"}
@@ -92501,6 +93151,10 @@ async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
             "ON u.tg_id=b.tg_id WHERE b.badge_id=? AND u.npub_verificata=1",
             (dist["id"],)).fetchall()
         con.close()
+        con = db()
+        candidati = [r for r in candidati
+                     if merita_su_nostr(dist, _dati_distintivi(con, r["tg_id"]))]
+        con.close()
         assegnati, falliti = 0, 0
         for r in candidati:
             if await _premia_distintivo(dist, r["tg_id"]):
@@ -92510,6 +93164,79 @@ async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
             await asyncio.sleep(0.3)
         riepilogo[dist["id"]] = {"assegnati": assegnati, "falliti": falliti,
                                  "candidati": len(candidati)}
+    return {"ok": True, "riepilogo": riepilogo}
+
+
+def _lapide_definizione_badge(live_id: str, evento_def_id: str) -> dict:
+    """La NIP-09 (kind 5) che ritira la DEFINIZIONE di un badge nostro
+    (kind 30009): gemella di _lapide_badge, che ritira un premio."""
+    return firma_evento(5, [
+        ["e", evento_def_id],
+        ["a", f"30009:{_NOSTR[1]}:{live_id}"],
+        ["k", "30009"]],
+        "Badge non piu' assegnato da Barattolo")
+
+
+@app.post("/api/admin/live/ritira-distintivi-usciti")
+async def ritira_badge_distintivi_usciti(x_tg_init_data: str = Header(""),
+                                         barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: ritira da Nostr i badge dei distintivi che non escono
+    piu' (27 nov 2026, scelta di Andrea: «ritirarli», non congelarli).
+    Per ogni distintivo SENZA la chiave `nostr` in DISTINTIVI: una NIP-09
+    per ogni premio ancora in piedi (come ritira_badge_live, si segna
+    ritirato SOLO se un relay accetta), e quando non ne resta nessuno
+    anche la lapide della definizione, e la riga esce dal pannello.
+    Un gesto e non un automatismo: e' l'unico punto del cantiere che
+    pubblica cancellazioni, e parte quando lo preme l'admin. Si puo'
+    rilanciare: chi non e' passato al primo giro passa al secondo, e
+    chi e' gia' ritirato non si tocca. I distintivi nell'app restano."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    riepilogo = {}
+    for dist in [x for x in DISTINTIVI if not x.get("nostr")]:
+        live_id = f"distintivo-{dist['id']}"
+        con = db()
+        live = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                           (live_id,)).fetchone()
+        premi = con.execute(
+            "SELECT pubkey, premiato_evento FROM nostr_badge_partecipanti "
+            "WHERE live_id=? AND premiato_evento<>''", (live_id,)).fetchall()
+        con.close()
+        if not live:
+            continue
+        ritirati, falliti = 0, 0
+        for r in premi:
+            ok = await _spedisci_ai_relay(
+                _lapide_badge(live_id, r["pubkey"], r["premiato_evento"]))
+            if ok:
+                con = db()
+                con.execute(
+                    "UPDATE nostr_badge_partecipanti SET premiato_evento='', "
+                    "premiato_il=0, ritirato=1 WHERE live_id=? AND pubkey=?",
+                    (live_id, r["pubkey"]))
+                con.commit()
+                con.close()
+                ritirati += 1
+            else:
+                falliti += 1
+            await asyncio.sleep(0.3)
+        definizione = "restata (premi ancora da ritirare)"
+        if not falliti:
+            if live["evento_id"] and not await _spedisci_ai_relay(
+                    _lapide_definizione_badge(live_id, live["evento_id"])):
+                definizione = "restata (nessun relay ha accettato)"
+            else:
+                con = db()
+                con.execute("DELETE FROM nostr_badge_live WHERE live_id=?",
+                            (live_id,))
+                con.commit()
+                con.close()
+                definizione = "ritirata"
+        riepilogo[dist["id"]] = {"ritirati": ritirati, "falliti": falliti,
+                                 "definizione": definizione}
     return {"ok": True, "riepilogo": riepilogo}
 
 
@@ -93047,7 +93774,20 @@ def _firma_venditore(a: dict) -> str:
     return riga
 
 
-MAX_VETRINA_PROMO = 3      # quanti altri articoli linka un post
+# LE TENDINE DEL CANALE (27 nov 2026, richiesta di Andrea: «io parlavo
+# soprattutto dei canali su telegram»): le tre tendine della Mini App —
+# «Info di spedizione», «Altri articoli del negozio», «Metodi di
+# pagamento accettati» — anche nei POST. Su Telegram la tendina e' la
+# citazione espandibile dell'HTML (Bot API 7.4+, vale anche nelle
+# caption delle foto): il titolo in grassetto sta FUORI, le righe
+# DENTRO, e chiusa mostra solo le prime righe con «Mostra di piu'».
+MAX_VETRINA_PROMO = 10     # quanti altri articoli elenca la tendina del post
+# LA CAPTION DI UNA FOTO HA 1024 CARATTERI VISIBILI: i tag e gli href
+# non contano, il testo dentro si'. Per il ramo senza foto (il ripiego
+# di `_manda_post_canale`) il tetto sarebbe 4096, ma si misura SEMPRE a
+# 1024: un post solo, uguale con la foto e senza, e il ✅ Venduto che
+# lo ricostruisce non cambia faccia a seconda di come e' uscito.
+TETTO_CAPTION_VISIBILE = 1024
 
 
 def _altri_del_venditore(con, a: dict, quanti: int = MAX_VETRINA_PROMO):
@@ -93056,77 +93796,160 @@ def _altri_del_venditore(con, a: dict, quanti: int = MAX_VETRINA_PROMO):
     Le guardie sono quelle della vetrina — solo 'attivo', mai
     l'annuncio del post — perche' questi sono link che qualcuno
     tocchera' a giorni di distanza: linkare un venduto vorrebbe dire
-    mandare su uno scaffale vuoto chi era venuto a comprare."""
+    mandare su uno scaffale vuoto chi era venuto a comprare.
+    NE LEGGE UNO IN PIU' di `quanti`, ed e' voluto: il post elenca i
+    primi `quanti` e, se ce n'e' un altro, chiude con «Vedi tutto il
+    negozio ›» — senza leggerlo non saprebbe se il negozio ne ha ancora."""
     return [dict(r) for r in con.execute(
         "SELECT id, titolo FROM annunci WHERE venditore_id=? "
         "AND stato='attivo' AND id<>? ORDER BY creato DESC, id DESC "
-        "LIMIT ?", (a["venditore_id"], a["id"], quanti)).fetchall()]
+        "LIMIT ?", (a["venditore_id"], a["id"], quanti + 1)).fetchall()]
 
-def _costo_sped_promo(a: dict, cambio: float) -> str:
-    """Quanto costa la spedizione, in una manciata di caratteri.
 
-    I GIUDICI SONO QUELLI DEL CONTO (`_tariffa_dichiarata`,
-    `_sped_in_sats`) e non una lettura a mano delle colonne: la regola
-    della retrocompat — una tariffa sola dichiarata vale per tutte e
-    due le strade — deve dire qui quel che dice alla cassa, o il
-    canale prometterebbe una cifra che il checkout smentisce.
-    QUANDO LE DUE STRADE DIVERGONO si scrive «da …» col MINIMO: nel
-    post non c'e' spazio per due cifre, e il minimo e' l'unica delle
-    due che non promette meno di quel che si paga davvero.
-    Col cambio muto una tariffa ancorata all'euro NON si converte e la
-    riga esce senza cifra: si dice la strada, mai un numero inventato
-    (la regola dell'avviso EUR senza cambio)."""
-    vie = ["casa"]
-    if a.get("spedizione_punto_dichiarata"):
-        vie.append("punto")
-    valori = []
-    for via in vie:
-        s, e = _tariffa_dichiarata(a, via)
-        v = _sped_in_sats(s, e or 0.0, cambio)
-        if v is None:
-            return ""
-        valori.append((v, s, e or 0.0))
-    v, s, e = min(valori)
-    if v <= 0:
-        return "<b>gratuita</b>"
-    da = "da " if len({x[0] for x in valori}) > 1 else ""
-    return f"{da}{_fmt_eur(e)} €" if e > 0 else f"{da}{_fmt_sats(s)} sats"
+def _lunghezza_visibile(testo: str) -> int:
+    """Quanti caratteri conta Telegram in un testo HTML: i tag e gli
+    href non contano, il testo dentro si' (con le entita' decodificate:
+    «&amp;» e' un carattere solo). PURA."""
+    return len(html.unescape(re.sub(r"<[^>]*>", "", testo)))
 
-def _righe_consegna_promo(a: dict, cambio: float) -> str:
-    """COME ARRIVA LA ROBA, nel post del canale (ago 2026, chiesto da
-    Andrea): una riga per strada offerta, con le stesse icone e le
-    stesse parole della scheda — 🚚 spedizione, 🤝 ritiro in zona,
-    💾 codice online.
 
-    La spedizione nomina TUTTE E DUE le destinazioni («a casa o a un
-    punto di ritiro») perche' dall'ago 2026 la via punto si offre
-    sempre dove c'e' la spedizione: dirne una sola sarebbe la meta'
-    della verita' proprio nel posto dove si decide se aprire.
+def _quanti_ne_stanno(costruisci, quanti: int,
+                      tetto: int = TETTO_CAPTION_VISIBILE) -> int:
+    """Quanti articoli (al massimo `quanti`) lasciano la caption sotto
+    il tetto dei caratteri VISIBILI: `costruisci(n)` e' la caption con
+    n articoli, e si toglie dal fondo finche' ci sta. Torna 0 quando
+    nemmeno senza articoli ci sta (la sezione sparisce; il resto del
+    post, se e' ancora lungo, lo salva il ripiego di testo). PURA."""
+    n = max(0, quanti)
+    while n > 0 and _lunghezza_visibile(costruisci(n)) > tetto:
+        n -= 1
+    return n
+
+
+def _tendina_canale(titolo: str, righe: list) -> str:
+    """La tendina di un post: il titolo in grassetto FUORI, le righe
+    (gia' scappate dal chiamante) nella citazione espandibile. PURA."""
+    return f"<b>{titolo}</b>\n<blockquote expandable>" \
+           + "\n".join(righe) + "</blockquote>"
+
+
+def _cifra_sped_promo(sats, eur, gratis: str = "<b>gratuita</b>") -> str:
+    """Una tariffa di spedizione nella sua valuta NATIVA (euro con la
+    virgola se il venditore l'ha scritta in euro, sats se in sats; zero =
+    gratis): come la tendina della scheda, e per la stessa ragione —
+    il canale non converte, quindi non serve il cambio e non si scrive
+    un «≈» dove la tariffa e' esatta. Il conto vero lo fa la cassa."""
+    if (eur or 0) > 0:
+        return f"{_fmt_eur(eur)} €"
+    if (sats or 0) > 0:
+        return f"{_fmt_sats(sats)} sats"
+    return gratis
+
+
+def _reti_punto_promo(a: dict) -> list:
+    """Le reti di locker / punti di ritiro a cui il venditore consegna
+    davvero: lo stesso giudice della cassa e dell'elenco della Mini App
+    (`reti_punto` sopra `reti_venditore`, col gate dei punti Barattolo).
+    Le colonne arrivano con la riga (`venditore_spedizionieri`,
+    `venditore_spedizioniere`); se mancano, o il giudizio fallisce, la
+    risposta e' NESSUNA rete, cioe' nessun locker nel post: FAIL-CLOSED,
+    perche' promettere un punto di ritiro che non sappiamo servire e'
+    esattamente l'errore del caso dell'ordine 213."""
+    sp1 = a.get("venditore_spedizionieri") or ""
+    sp2 = a.get("venditore_spedizioniere") or ""
+    if not (sp1 or sp2):
+        return []
+    try:
+        return reti_punto(reti_venditore(sp1, sp2, rete_barattolo_viva()))
+    except Exception:
+        return []
+
+
+def _righe_consegna_promo(a: dict) -> str:
+    """COME ARRIVA LA ROBA, nel post del canale: la TENDINA «🚚 Info di
+    spedizione», gemella di quella della scheda (`infoSpedizioneScheda`
+    nella Mini App) con le stesse regole e le stesse parole — una voce
+    per strada, col DOVE e il QUANTO:
+    • «📦 A un indirizzo»: il paese di casa (salvo la spunta «non
+      spedisco a casa») e le zone estere dichiarate, ognuna col suo
+      prezzo, piu' «+ X per ogni pezzo in piu'» se c'e' il supplemento;
+    • «📮 Locker / punto di ritiro»: SOLO se il venditore consegna a una
+      rete di punti (`_reti_punto_promo`), nel paese di casa, con la
+      tariffa del punto se dichiarata e sennò quella di casa. La riga
+      di prima diceva SEMPRE «a un punto di ritiro», che dal 12 ott
+      2026 (`reti_punto`) non e' piu' vero;
+    • «🤝 Ritiro a mano» con la zona, «💾 Codice online» se digitale.
+    I GIUDICI DEL CONTO sono quelli di sempre (`_tariffa_dichiarata`,
+    `_zone_annuncio`, `_non_spedisce_casa`): la regola della
+    retrocompat — una tariffa sola dichiarata vale per tutte e due le
+    strade — deve dire qui quel che dice alla cassa. SULL'ASTA niente
+    cifre, «inclusa», come nella scheda.
     Consegna NON DICHIARATA (gli storici e gli importati da Nostr) =
-    nessuna riga: su una strada che nessuno ha scelto non si promette
-    niente, che e' la regola gia' scritta per i filtri della vetrina."""
+    nessuna tendina: su una strada che nessuno ha scelto non si
+    promette niente. Il SOLO codice online non e' una spedizione (la
+    scheda non gli da' la tendina): resta la riga di sempre."""
     c = a.get("consegna") or ""
+    digitale = c == "digitale" or bool(a.get("anche_digitale"))
+    spedisce = c in ("spedizione", "entrambe")
+    ritira = c in ("ritiro", "entrambe")
+    asta = (a.get("asta_base_sats") or 0) > 0
     righe = []
-    if c in ("spedizione", "entrambe"):
-        riga = "🚚 Spedizione a un indirizzo o a un punto di ritiro"
-        costo = _costo_sped_promo(a, cambio)
-        if costo:
-            riga += f" — {costo}"
-        righe.append(riga)
-    if c in ("ritiro", "entrambe"):
-        righe.append("🤝 Ritiro in zona")
-    if c == "digitale" or a.get("anche_digitale"):
-        righe.append("💾 Codice online, subito")
-    return "\n".join(righe)
 
-def _vetrina_venditore(a: dict, altri: list) -> str:
-    """Gli altri articoli del venditore, linkati sotto al post.
+    def prezzo(sats, eur, gratis="<b>gratuita</b>"):
+        return "inclusa" if asta else _cifra_sped_promo(sats, eur, gratis)
+
+    if spedisce:
+        dom = a.get("paese_domestico") or ""
+        voci = []
+        casa_aperta = not _non_spedisce_casa(a)
+        if casa_aperta:
+            s, e = _tariffa_dichiarata(a, "casa")
+            voci.append(f"• {html.escape(etichetta_zona('dom', dom))}: "
+                        f"{prezzo(s, e)}")
+        zone = _zone_annuncio(
+            {"spedizione_zone": a.get("spedizione_zone") or ""})
+        for z in ZONE_SPEDIZIONE:
+            if z != "dom" and z in zone:
+                s, e = zone[z]
+                voci.append(f"• {ZONA_ETICHETTA[z]}: {prezzo(s, e)}")
+        if voci:
+            righe.append("📦 A un indirizzo")
+            righe += voci
+            extra = _cifra_sped_promo(a.get("spedizione_extra_sats"),
+                                      a.get("spedizione_extra_eur"), "")
+            if extra and not asta:
+                righe.append(f"+ {extra} per ogni pezzo in più")
+        reti = _reti_punto_promo(a) if casa_aperta else []
+        if reti:
+            via = "punto" if a.get("spedizione_punto_dichiarata") else "casa"
+            s, e = _tariffa_dichiarata(a, via)
+            righe.append("📮 Locker / punto di ritiro")
+            righe.append(f"• {html.escape(etichetta_zona('dom', dom))}: "
+                         f"{prezzo(s, e)}")
+            righe.append("Reti: " + html.escape(", ".join(reti)))
+    if ritira:
+        righe.append("🤝 Ritiro a mano")
+        righe.append(f"• {html.escape(a['zona']) if a.get('zona') else 'In zona'}"
+                     f": {'incluso' if asta else '<b>gratuito</b>'}")
+    if righe and digitale:
+        righe.append("💾 Codice online")
+    if righe:
+        return _tendina_canale("🚚 Info di spedizione", righe)
+    return "💾 Codice online, subito" if digitale else ""
+
+
+def _vetrina_venditore(a: dict, altri: list, ce_altro: bool = False) -> str:
+    """Gli altri articoli del venditore, nella tendina sotto al post.
 
     E' la contropartita del freno (ago 2026, decisione di Andrea): un
     post a settimana per venditore, ma quel post non parla di un
     oggetto solo — porta anche gli altri e il negozio, cosi' il
     venditore che pubblica tre cose in un pomeriggio si vede lo
-    stesso, senza tre post.
+    stesso, senza tre post. Dal 27 nov 2026 e' la tendina «🛍 Altri
+    articoli del negozio» (fino a dieci, come nella scheda), e se il
+    negozio ne ha ancora (`ce_altro`) chiude con «Vedi tutto il negozio
+    ›» sul link del negozio — lo stesso della firma, che c'e' solo se il
+    venditore ha il codice.
     I titoli si TRONCANO prima e si scappano dopo (la lezione della
     ricevuta): la caption di Telegram ha 1024 caratteri, e un «<» in
     un titolo spegnerebbe il post in silenzio."""
@@ -93138,8 +93961,11 @@ def _vetrina_venditore(a: dict, altri: list) -> str:
         if len(t) > 46:
             t = t[:45].rstrip() + "…"
         link = link_telegram('annuncio', x['id'])
-        voci.append(f"\n• <a href=\"{link}\">{html.escape(t)}</a>")
-    return "\n\n🛍 Anche in vendita da lui:" + "".join(voci)
+        voci.append(f"• <a href=\"{link}\">{html.escape(t)}</a>")
+    if ce_altro and a.get("venditore_negozio"):
+        voci.append(f"<a href=\"{URL_PUBBLICO}/negozio/"
+                    f"{a['venditore_negozio']}\">Vedi tutto il negozio ›</a>")
+    return "\n\n" + _tendina_canale("🛍 Altri articoli del negozio", voci)
 
 
 def _caption_canale(a: dict, cambio: float, venduto: bool = False,
@@ -93158,23 +93984,39 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False,
     ATTENZIONE a chi la ritocca: `a` DEVE arrivare con le tre chiavi
     del venditore (venditore, venditore_username, venditore_negozio),
     cioe' letta col JOIN su `utenti` — senza, la firma esce anonima e
-    il post NUOVO e quello RIEDITATO col ✅ direbbero cose diverse."""
+    il post NUOVO e quello RIEDITATO col ✅ direbbero cose diverse.
+    Per la tendina «Info di spedizione» servono anche le due colonne
+    dei corrieri (`venditore_spedizionieri`, `venditore_spedizioniere`):
+    senza, nessun locker nel post (fail-closed), e anche qui il nuovo e
+    il riscritto divergerebbero.
+    IL TETTO DEI 1024 VISIBILI lo tengono gli articoli: se con dieci
+    la caption sfora, se ne tolgono dal fondo finche' ci sta (la
+    sezione sparisce se non ne entra nessuno, ma «Vedi tutto il
+    negozio ›» resta a dire che ce ne sono altri)."""
     link = f"{link_telegram('annuncio', a['id'])}"
-    testo = f"🫙 <b>{html.escape(a['titolo'])}</b>"
-    testo += f"\n💰 {_prezzo_promo(a, cambio)}"
-    if a.get("zona"):
-        testo += f"\n📍 {html.escape(a['zona'])}"
-    consegna = _righe_consegna_promo(a, cambio)
-    if consegna:
-        testo += f"\n{consegna}"
-    testo += f"\n\n<a href=\"{link}\">🫙 Apri su Barattolo</a>"
-    testo += "\n⚡ Pagabile in Satoshi"
-    testo += _vetrina_venditore(a, altri or [])
-    testo += f"\n\n{_firma_venditore(a)}"
-    testo += f"\n\n{_hashtag_promo(a)}"
-    if venduto:
-        testo += "\n\n✅ Venduto"
-    return testo
+    elenco = list(altri or [])
+    primi = elenco[:MAX_VETRINA_PROMO]
+
+    def costruisci(n: int) -> str:
+        testo = f"🫙 <b>{html.escape(a['titolo'])}</b>"
+        testo += f"\n💰 {_prezzo_promo(a, cambio)}"
+        if a.get("zona"):
+            testo += f"\n📍 {html.escape(a['zona'])}"
+        consegna = _righe_consegna_promo(a)
+        if consegna:
+            testo += f"\n\n{consegna}" if consegna.startswith("<b>") \
+                else f"\n{consegna}"
+        testo += f"\n\n<a href=\"{link}\">🫙 Apri su Barattolo</a>"
+        testo += "\n⚡ Pagabile in Satoshi"
+        testo += _vetrina_venditore(
+            a, primi[:n], ce_altro=len(elenco) > n)
+        testo += f"\n\n{_firma_venditore(a)}"
+        testo += f"\n\n{_hashtag_promo(a)}"
+        if venduto:
+            testo += "\n\n✅ Venduto"
+        return testo
+
+    return costruisci(_quanti_ne_stanno(costruisci, len(primi)))
 
 
 def _un_post_per_venditore(annunci: list[dict], giorni: int,
@@ -93361,7 +94203,9 @@ async def _drena_promo():
                 "u.npub AS venditore_npub, "
                 "u.npub_verificata AS venditore_npub_verificata, "
                 "u.npub_accesso AS venditore_npub_accesso, "
-                "u.negozio AS venditore_negozio "
+                "u.negozio AS venditore_negozio, "
+                "u.spedizionieri AS venditore_spedizionieri, "
+                "u.spedizioniere AS venditore_spedizioniere "
                 "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
                 "WHERE a.id=?", (i,)).fetchone()
             if a and a["stato"] == "attivo" and not origine_annuncio(a) \
@@ -95677,7 +96521,9 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
             "u.npub AS venditore_npub, "
             "u.npub_verificata AS venditore_npub_verificata, "
             "u.npub_accesso AS venditore_npub_accesso, "
-            "u.negozio AS venditore_negozio "
+            "u.negozio AS venditore_negozio, "
+            "u.spedizionieri AS venditore_spedizionieri, "
+            "u.spedizioniere AS venditore_spedizioniere "
             "FROM annunci a JOIN utenti u ON u.tg_id=a.venditore_id "
             "WHERE a.id=?", (annuncio_id,)).fetchone()
         # gli altri articoli si RILEGGONO: il post riscritto col ✅ non
@@ -111966,17 +112812,30 @@ def _vista_estrazione(con, e, uid) -> dict:
                         "tg_id=?", (e["id"], uid)).fetchone()
         if r:
             v["mio"] = {"numero": r["numero"], "biglietto": r["biglietto"]}
-    if e["stato"] in ("attesa_blocco", "estratta"):
-        v["impronta"] = e["impronta"]
-        v["blocco_altezza"] = e["blocco_altezza"]
+    # LA LISTA E' PUBBLICA DAL PRIMO BIGLIETTO (27 nov 2026, «non e'
+    # verificabile perche' l'ordine non e' pubblico», Andrea): righe
+    # «numero:biglietto» e nient'altro, cioe' un numero d'arrivo e un
+    # codice a caso, MAI chi. Ognuno vede la sua riga entrare al suo
+    # posto e restarci; chiunque guarda vede che la lista cresce solo
+    # in coda, prima che esista il blocco che la estrarra'.
+    if e["stato"] in ("aperta", "attesa_blocco", "estratta"):
         v["biglietti"] = [f"{r['numero']}:{r['biglietto']}" for r in
                           con.execute("SELECT numero, biglietto FROM "
                                       "estrazioni_partecipanti WHERE "
                                       "estrazione_id=? ORDER BY numero",
                                       (e["id"],))]
+    if e["stato"] in ("attesa_blocco", "estratta"):
+        v["impronta"] = e["impronta"]
+        v["blocco_altezza"] = e["blocco_altezza"]
     if e["stato"] == "estratta":
         v["blocco_hash"] = e["blocco_hash"]
         v["vincitore_numero"] = e["vincitore_numero"]
+        # il conto intero, per chi lo rifa' a mano: hash -> resto -> +1
+        n = e["n_partecipanti"] or 0
+        v["resto"] = (int(e["blocco_hash"], 16) % n) if n else None
+        riga = next((b for b in v["biglietti"] if b.split(":")[0]
+                     == str(e["vincitore_numero"])), "")
+        v["vincitore_biglietto"] = riga.split(":", 1)[1] if riga else ""
         v["simulato"] = bool(MODALITA_COLLAUDO)
         if not MODALITA_COLLAUDO:
             v["blocco_link"] = ESTRAZIONI_ESPLORATORE + e["blocco_hash"]
@@ -112127,8 +112986,10 @@ async def partecipa_estrazione(req: Request, x_tg_init_data: str = Header(""),
     if no:
         con.close()
         raise HTTPException(400, no)
-    # chi entra col tocco vede subito il suo numero: niente avviso del bot
-    _iscrivi_estrazione(con, e["id"], user["id"], avvisato=1)
+    # chi entra col tocco vede subito il suo numero, e il bot glielo
+    # riscrive in chat (27 nov 2026): la ricevuta del posto resta da lui,
+    # fuori da Barattolo, per rifare il conto a estrazione fatta
+    _iscrivi_estrazione(con, e["id"], user["id"])
     v = _vista_estrazione(con, e, user["id"])
     con.commit()
     con.close()
@@ -112235,11 +113096,23 @@ def _congela_estrazione(estrazione_id: int, altezza: int):
                     "WHERE id=? AND stato='aperta'", (adesso, e["id"]))
         esito["racconto"] = "vuota"
     else:
-        con.execute("UPDATE estrazioni SET stato='attesa_blocco', impronta=?, "
-                    "n_partecipanti=?, blocco_altezza=? WHERE id=? AND "
-                    "stato='aperta'",
-                    (estrazione_impronta(righe), len(righe), altezza,
-                     e["id"]))
+        impronta = estrazione_impronta(righe)
+        cur = con.execute(
+            "UPDATE estrazioni SET stato='attesa_blocco', impronta=?, "
+            "n_partecipanti=?, blocco_altezza=? WHERE id=? AND "
+            "stato='aperta'", (impronta, len(righe), altezza, e["id"]))
+        if cur.rowcount:
+            # L'IMPRONTA ESCE DA BARATTOLO prima del blocco: finisce
+            # nella chat Telegram di ognuno, dove noi non possiamo piu'
+            # cambiarla. E' l'impegno preso: dopo, la lista che si
+            # mostra deve dare quella stessa impronta.
+            esito.update(racconto="congelata", impronta=impronta,
+                         n=len(righe), altezza=altezza, biglietti=[
+                             (r["tg_id"], r["numero"], r["biglietto"])
+                             for r in con.execute(
+                                 "SELECT tg_id, numero, biglietto FROM "
+                                 "estrazioni_partecipanti WHERE "
+                                 "estrazione_id=?", (e["id"],))])
     con.commit()
     con.close()
     return esito
@@ -112317,30 +113190,47 @@ async def _racconta_estrazione(esito: dict):
             await notifica(tg, f"🎁 L'estrazione di «{titolo}» è stata "
                                "annullata: l'annuncio non c'è più.")
         return
+    if quale == "congelata":
+        chiusa = (f"🔒 La lista dell'estrazione di «{titolo}» si è chiusa "
+                  f"con <b>{esito['n']}</b> partecipanti. L'impronta della "
+                  f"lista è <code>{esito['impronta']}</code>.\n\nIl "
+                  "numero vincente lo sceglierà il blocco Bitcoin "
+                  f"<b>{esito['altezza']}</b>, che non è ancora stato "
+                  "minato: nessuno può sapere adesso chi vince.")
+        for tg, numero, biglietto in esito.get("biglietti") or []:
+            await notifica(tg, f"{chiusa}\n\nIl tuo numero è <b>{numero}"
+                               f"</b>, biglietto <code>{biglietto}</code>: "
+                               "lo trovi nella lista pubblica sulla scheda.",
+                           bottone)
+        await notifica(esito["venditore_id"], chiusa, bottone)
+        return
     if quale != "estratta":
         return
     blocco = (f"blocco {esito['altezza']}" + (" (simulato)"
               if MODALITA_COLLAUDO else ""))
+    conto = (f"\n\nIl conto: l'hash del blocco <code>{esito['hash']}</code>"
+             f" letto come numero, diviso per {esito['n']}, dà resto "
+             f"{esito['numero'] - 1}; più uno fa {esito['numero']}.")
     await notifica(esito["vincitore_id"],
                    f"🎉 <b>Hai vinto!</b> Il tuo numero {esito['numero']} è "
                    f"uscito all'estrazione di «{titolo}» (su {esito['n']} "
                    f"partecipanti, estratto dal {blocco}).\n\nPer la "
                    "consegna scrivi a chi lo regala: "
-                   f"{_chi_contattare(esito['contatto_venditore'])}",
-                   bottone)
+                   f"{_chi_contattare(esito['contatto_venditore'])}"
+                   + conto, bottone)
     await notifica(esito["venditore_id"],
                    f"🎁 L'estrazione di «{titolo}» è fatta: ha vinto il "
                    f"numero {esito['numero']} su {esito['n']} (dal {blocco})."
                    "\n\nScrivigli per la consegna: "
-                   f"{_chi_contattare(esito['contatto_vincitore'])}",
-                   bottone)
+                   f"{_chi_contattare(esito['contatto_vincitore'])}"
+                   + conto, bottone)
     for tg in esito.get("partecipanti") or []:
         if tg == esito["vincitore_id"]:
             continue
         await notifica(tg, f"🎁 L'estrazione di «{titolo}» è fatta: ha vinto "
                            f"il numero {esito['numero']}. Non era il tuo "
-                           "questa volta: grazie di aver partecipato!",
-                       bottone)
+                           "questa volta: grazie di aver partecipato!"
+                           + conto, bottone)
     if esito.get("venduto"):
         try:
             asyncio.create_task(annuncio_su_nostr(
@@ -112574,6 +113464,12 @@ async def orologio():
             scadenze_lampo()
         except Exception as e:
             print(f"⚠️ Scadenze lampo saltate: {e}")
+        try:
+            # i post di Cerco nei canali (27 nov 2026): via quelli delle
+            # richieste chiuse o scadute
+            await giro_post_cerco_canale()
+        except Exception as e:
+            print(f"⚠️ Post di Cerco nei canali: giro saltato: {e}")
         try:
             # gli avvisi del barattolo (17 nov 2026): prezzo sceso, ne
             # resta uno, di nuovo disponibile — a leva spenta esce subito
@@ -120990,6 +121886,66 @@ if not isinstance(P2P_ONCHAIN_INTERVALLO, bool):
     P2P_ONCHAIN_INTERVALLO = False
 
 
+# IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026, Andrea: «se l'ordine
+# da 10.000 euro e uno ti compra 10 euro... c'e' un altro 9.990 euro di
+# liquidita' disponibili»). Un ordine a intervallo preso per una parte non
+# si chiude piu' tutto: a scambio concluso il resto torna nel libro con lo
+# stesso «Da» e un «Fino a» piu' basso (massimo meno la cifra presa). Sotto
+# il «Da» non torna niente; uguale al «Da» torna a cifra unica.
+# Su Lightning lo fa mostrod (`handle_child_order` di release.rs), se il
+# telefono di chi ha pubblicato manda la chiave del prossimo scambio
+# (`NextTrade`) col rilascio o con «Ho inviato»: lo fa il telefono, questo
+# server dice solo a chi. On-chain lo fa questo server, alla chiusura
+# «rilasciato» (`_p2p_onchain_resto_nel_libro`): non alla presa, perche' se
+# lo scambio salta la rinascita rimette gia' l'intervallo intero.
+# LA LEVA accesa di serie, con la porticina `P2P_RESTO_INTERVALLO_SOLO_ADMIN`
+# (True di serie, Andrea: «lo proviamo in produzione io e Alan»): finche' e'
+# chiusa vale solo per un moderatore che ha PUBBLICATO l'ordine. Si apre a
+# tutti scrivendo False nel config.
+try:
+    from config import P2P_RESTO_INTERVALLO
+    P2P_RESTO_INTERVALLO = P2P_RESTO_INTERVALLO is not False
+except ImportError:
+    P2P_RESTO_INTERVALLO = True
+try:
+    from config import P2P_RESTO_INTERVALLO_SOLO_ADMIN
+    # solo un False scritto apre a tutti: una riga storta resta chiusa
+    P2P_RESTO_INTERVALLO_SOLO_ADMIN = P2P_RESTO_INTERVALLO_SOLO_ADMIN is not False
+except ImportError:
+    P2P_RESTO_INTERVALLO_SOLO_ADMIN = True
+
+
+def p2p_resto_intervallo_per(tg_id) -> bool:
+    """La leva PER QUESTA PERSONA (chi ha pubblicato l'ordine): accesa e,
+    a porticina chiusa, solo per un moderatore."""
+    if P2P_RESTO_INTERVALLO is not True:
+        return False
+    if P2P_RESTO_INTERVALLO_SOLO_ADMIN is not False:
+        try:
+            return bool(tg_id) and e_admin(int(tg_id))
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def p2p_resto_intervallo_capi(lo, hi, preso) -> tuple:
+    """PURA: i due capi del resto di un intervallo `lo`–`hi` dopo una presa
+    di `preso` (stessa unita', centesimi o euro). `(lo, resto)` se il resto
+    e' un intervallo, `(lo, lo)` se e' uguale al «Da» (cifra unica), ()
+    se e' sotto il «Da», se l'ordine non era a intervallo o se i numeri
+    sono storti. La stessa regola di mostrod (`get_child_order`)."""
+    try:
+        if any(isinstance(x, bool) for x in (lo, hi, preso)):
+            return ()
+        lo, hi, preso = int(lo or 0), int(hi or 0), int(preso or 0)
+    except (TypeError, ValueError):
+        return ()
+    if not (0 < lo < hi) or not (lo <= preso <= hi):
+        return ()
+    resto = hi - preso
+    return (lo, resto) if resto >= lo else ()
+
+
 def p2p_onchain_giudica_intervallo(metodi, euro_min_cent, euro_cent,
                                    mercato: bool, coin: bool) -> tuple:
     """PURA: i due capi di un ordine nuovo, `(min, max)` in centesimi, o
@@ -126147,7 +127103,7 @@ def p2p_onchain_rinasce_perche(o, stato_nuovo: str, chi_chiude: int = 0,
     return ""
 
 
-def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
+def _p2p_onchain_rinasci(con, o, adesso: int, resto: tuple = ()) -> int:
     """Fa rinascere nel libro l'ordine dello scambio `o`: un ordine nuovo
     con un nome nuovo e gli stessi patti di quando era stato pubblicato
     (lato, prezzo o premio, cifra, metodi, filtro, paracadute ripartito
@@ -126157,7 +127113,10 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     (Barattozon in «Vendi BTC») lo stesso PayCode e la stessa scadenza, e
     nel libro fino a 8 ore prima di quella. Torna l'id nuovo, o 0 se
     l'ordine era gia' rinato, se chi l'aveva pubblicato non ha piu' la sua
-    chiave on-chain, o se al PayCode non restano piu' di 8 ore. Committa."""
+    chiave on-chain, o se al PayCode non restano piu' di 8 ore. Committa.
+    Con `resto` (27 nov 2026, il resto dell'intervallo) i due capi sono
+    quelli: `(lo, hi)` un intervallo, `(lo, lo)` la cifra unica `lo`; vale
+    solo a prezzo di mercato (l'intervallo c'e' solo li')."""
     vecchio = int(o["id"])
     if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE rinato_da=?",
                    (vecchio,)).fetchone():
@@ -126189,6 +127148,14 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     # L'INTERVALLO (27 nov 2026): l'ordine rinasce coi suoi due capi, non
     # con la cifra scelta da chi l'aveva preso
     capi = p2p_onchain_intervallo(o) if mercato else ()
+    # IL RESTO (27 nov 2026): lo stesso «Da», il «Fino a» abbassato della
+    # cifra presa; uguale al «Da» torna a cifra unica
+    cifra = int(o["euro_cent"])
+    if resto:
+        if not mercato or len(resto) != 2 or not (0 < int(resto[0]) <= int(resto[1])):
+            return 0
+        cifra = int(resto[1])
+        capi = (int(resto[0]), int(resto[1])) if int(resto[0]) < int(resto[1]) else ()
     ordine = P2P_ONCHAIN_PREFISSO + secrets.token_hex(8)
     cur = con.execute(
         "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
@@ -126199,7 +127166,7 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
         " fascia_min_cent, fascia_max_cent)"
         " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (ordine, lato, maker, 0 if mercato else int(o["prezzo_sats"]),
-         capi[1] if capi else int(o["euro_cent"]), o["metodi"], recapito,
+         capi[1] if capi else cifra, o["metodi"], recapito,
          p2p_onchain_scade_libro(adesso, tab_scade), adesso, adesso,
          "mercato" if mercato else "fisso",
          int(_p2p_onchain_campo(o, "premio", 0) or 0) if mercato else 0,
@@ -126227,6 +127194,56 @@ def p2p_onchain_testo_rinato(perche: str) -> str:
             ": l'ordine è di nuovo nel libro uguale, stesso prezzo, stessi metodi, "
             "stesso tempo per pagare.\n\nSe non lo vuoi più, tocca «🚫 Non "
             "ripubblicarlo»: si apre l'ordine, e lì lo ritiri con un tocco.")
+
+
+def p2p_onchain_capi_resto(o) -> tuple:
+    """PURA: i capi del resto di uno scambio on-chain RILASCIATO preso da un
+    ordine a intervallo (vedi `p2p_resto_intervallo_capi`), o (): non
+    rilasciato, a cifra unica, col PayCode o Barattozon, o resto sotto il
+    «Da». La cifra presa e' `euro_cent`, riscritta alla presa."""
+    if str(_p2p_onchain_campo(o, "stato", "") or "") != "rilasciato":
+        return ()
+    if str(_p2p_onchain_campo(o, "paycode", "") or ""):
+        return ()
+    if int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0):
+        return ()
+    if not _p2p_onchain_mercato(o):
+        return ()
+    capi = p2p_onchain_intervallo(o)
+    if not capi:
+        return ()
+    return p2p_resto_intervallo_capi(capi[0], capi[1],
+                                     _p2p_onchain_campo(o, "euro_cent", 0))
+
+
+async def _p2p_onchain_resto_nel_libro(o) -> int:
+    """IL RESTO DELL'INTERVALLO (27 nov 2026): a scambio rilasciato, un
+    ordine uguale nel libro col resto (vedi `p2p_onchain_capi_resto`), se
+    la leva vale per chi l'aveva pubblicato. Nessun avviso: l'ordine
+    compare fra i suoi. Fail-open come la rinascita: lo scambio concluso
+    resta concluso anche se qui qualcosa va storto. Torna l'id nuovo, o 0."""
+    try:
+        if not p2p_resto_intervallo_per(int(o["maker_id"] or 0)):
+            return 0
+        resto = p2p_onchain_capi_resto(o)
+        if not resto:
+            return 0
+        con = _p2p_onchain_db()
+        try:
+            nuovo = _p2p_onchain_rinasci(con, o, int(time.time()), resto)
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ P2P on-chain: il resto dello scambio {o['id']} non è "
+              f"tornato nel libro ({type(e).__name__}: {e})", flush=True)
+        return 0
+    if not nuovo:
+        return 0
+    _p2p_onchain_rifai_foto()
+    asyncio.create_task(_p2p_onchain_pubblica(nuovo))
+    print(f"🔁 P2P on-chain: il resto dello scambio {o['id']} "
+          f"({resto[0]}–{resto[1]} cent) è tornato nel libro come {nuovo}", flush=True)
+    return nuovo
 
 
 async def _p2p_onchain_rinasci_e_di(o, perche: str) -> int:
@@ -126492,6 +127509,11 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
     # n'e' andato)
     await _p2p_onchain_rinasci_e_di(
         o, p2p_onchain_rinasce_perche(o, stato, 0, mancato_a, mancato_perche))
+    # (27 nov 2026) scambio concluso da un ordine a intervallo: il resto
+    # torna nel libro. `o` e' la riga di PRIMA della chiusura: lo stato
+    # lo si dice qui, il resto e' come allora
+    if stato == "rilasciato":
+        await _p2p_onchain_resto_nel_libro(dict(o, stato="rilasciato"))
     return {"ok": True, "stato": stato, "txid": txid or arrivato}
 
 
@@ -138449,6 +139471,22 @@ async def _bitpost_catalogo() -> dict:
     return d
 
 
+def bitpost_pagamento_con_indirizzo(p) -> dict:
+    """PURA: il pagamento di Bitpost con l'`address` sempre scritto. La API
+    vera (27 nov 2026) manda solo `destination`, un link
+    «bitcoin:<indirizzo>?amount=...»: l'indirizzo si ricava da li', perche'
+    l'app lo mostra e lo copia a parte."""
+    p = dict(p or {})
+    if not p.get("address"):
+        dest = str(p.get("destination") or "")
+        if dest.lower().startswith("bitcoin:"):
+            dest = dest[8:]
+        indirizzo = dest.split("?", 1)[0].strip()
+        if re.fullmatch(r"[A-Za-z0-9]{14,90}", indirizzo):
+            p["address"] = indirizzo
+    return p
+
+
 def bitpost_minimo_bitcoin(catalogo: dict) -> int:
     """PURA: il minimo in centesimi della rete Bitcoin (0 se non c'e')."""
     for n in (catalogo or {}).get("networks") or []:
@@ -138626,7 +139664,10 @@ async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
              "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
              "denomination": int(d["taglio"]), "quantity": int(d["quanti"]),
              "selected_fee": int(quota),
-             "expected_published_fee": BITPOST_QUOTA_TOTALE}
+             "expected_published_fee": BITPOST_QUOTA_TOTALE,
+             # la rete va DETTA: senza, Bitpost sceglie Liquid (visto dal
+             # vivo il 27 nov 2026), con un'altra commissione e niente 2-di-3
+             "network": "Bitcoin"}
     o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
     adesso = int(time.time())
     con = _bitpost_db()
@@ -138729,7 +139770,8 @@ async def bitpost_ordine(oid: int, x_tg_init_data: str = Header(""),
     except (TypeError, ValueError):
         fuori["carta"] = {}
     if ruolo == "compratore" and st == 2:
-        fuori["pagamento"] = await _bitpost_chiama("GET", f"/orders/{oid}/payment")
+        fuori["pagamento"] = bitpost_pagamento_con_indirizzo(
+            await _bitpost_chiama("GET", f"/orders/{oid}/payment"))
     if st in BITPOST_INCASSABILI or st == 10:
         p = await _bitpost_chiama("GET", f"/orders/{oid}/payouts")
         fuori["incasso"] = next((x for x in p.get("payouts") or []
@@ -139244,7 +140286,10 @@ async def bitpost_offerta_compra(fid: int, req: Request,
              "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
              "denomination": int(d["taglio"]), "quantity": int(d["quanti"]),
              "selected_fee": BITPOST_QUOTA_TOTALE - int(f["quota"]),
-             "expected_published_fee": BITPOST_QUOTA_TOTALE}
+             "expected_published_fee": BITPOST_QUOTA_TOTALE,
+             # la rete va DETTA: senza, Bitpost sceglie Liquid (visto dal
+             # vivo il 27 nov 2026), con un'altra commissione e niente 2-di-3
+             "network": "Bitcoin"}
     try:
         o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
     except HTTPException:

@@ -84,8 +84,9 @@ class BitpostFinto:
         if coda == "":
             return o
         if coda == "payment":
-            return {"network": "Bitcoin", "address": "bc1qfinto",
-                    "destination": "bitcoin:bc1qfinto?amount=0.00011532",
+            # come la API vera (27 nov 2026): niente `address`, solo il link
+            return {"network": "Bitcoin", "method": "BitcoinAddress",
+                    "destination": "bitcoin:bc1qfintofintofinto?amount=0.00011532",
                     "amount_sats": 11532}
         if coda == "cards":
             return {"quantity": 2, "denomination": 5000, "currency": "EUR",
@@ -185,10 +186,11 @@ def main():
     prova("due carte da 50 €: l'ordine nasce", 200, r.status_code)
     oid = r.json()["ordine"]["id"]
     inviato = [x for x in finto.chiamate if x[1] == "/shoppycode/orders"][-1][2]
-    prova("a Bitpost: la xpub, il webhook di casa, niente rete scelta",
-          (XPUB_A, True, False),
+    prova("a Bitpost: la xpub, il webhook di casa, la rete Bitcoin DETTA "
+          "(senza, Bitpost sceglie Liquid)",
+          (XPUB_A, True, "Bitcoin"),
           (inviato["buyer_xpub"], inviato["webhook_url"].endswith("/api/bitpost/webhook"),
-           "network" in inviato))
+           inviato.get("network")))
     prova("la risposta non ripete la xpub", False,
           "buyer_xpub" in r.json()["ordine"])
     r = c.post("/api/bitpost/ordini", json={"taglio": 5000, "quanti": 2,
@@ -216,6 +218,8 @@ def main():
     d = c.get(f"/api/bitpost/ordini/{oid}").json()
     prova("chi compra vede il pagamento, non `purchase`", (11532, False),
           (d["pagamento"]["amount_sats"], "purchase" in d["ordine"]))
+    prova("...con l'indirizzo ricavato dal link bitcoin: (la API vera non lo "
+          "manda a parte)", "bc1qfintofintofinto", d["pagamento"].get("address"))
     banco.come(222, admin=True)
     prova("il Bitworker il pagamento non lo vede", False,
           "pagamento" in c.get(f"/api/bitpost/ordini/{oid}").json())

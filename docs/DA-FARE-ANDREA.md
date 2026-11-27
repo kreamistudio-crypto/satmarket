@@ -1257,3 +1257,67 @@ niente.
 **Dopo la promozione** si vede nel pannello «⚙️ Stato delle leve»,
 gruppo delle promozioni: le tre scale coi loro scalini.
 
+## 35. Il resto dell'intervallo torna nel libro: la prova in produzione coi due account moderatori (27 nov 2026, cantiere resto-intervallo; Andrea: «lo proviamo in produzione io e Alan, non nel collaudo»)
+
+**Niente da scrivere nel config**: le due leve sono di serie accesa e
+chiusa ai soli moderatori (`P2P_RESTO_INTERVALLO`,
+`P2P_RESTO_INTERVALLO_SOLO_ADMIN`), e arrivano con la promozione. Si
+guardano nel pannello «⚙️ Stato delle leve».
+
+La prova (DOPO la promozione), dal tuo account e da quello di Alan:
+1. Lightning, Vendi: pubblica dal tuo account un ordine a mercato da 10 a
+   100 €. Nella scatola arancione deve esserci «Se ne prendono solo una
+   parte, il resto torna da solo nel libro.»
+2. Alan lo prende per 20 €, paga e tocca «Ho inviato»; tu liberi i sats.
+3. Entro un paio di minuti, nel libro e fra i tuoi scambi deve comparire
+   un ordine tuo da 10 a 80 €, con gli stessi metodi. Ritiralo se non lo
+   vuoi tenere.
+4. Lightning, Compra: lo stesso al contrario (tu pubblichi un Compra 10–100
+   €, Alan vende 20 €, tu tocchi «Ho inviato», Alan libera): deve
+   ricomparire il tuo Compra 10–80 €.
+5. On-chain: un Vendi BTC 10–100 € preso per 20 €; a scambio concluso
+   deve ricomparire nel libro un ordine 10–80 €.
+
+Se il resto non compare su Lightning, da «Info P2P» tocca «🩺 Copia la
+diagnosi» e incollala nel thread: le righe «resto …» dicono cosa ha fatto
+il telefono.
+
+Andata bene, si apre a tutti con UNA riga nel config del VPS e il riavvio:
+`P2P_RESTO_INTERVALLO_SOLO_ADMIN = False`. Fatta, questa voce si cancella.
+
+## 36. La CI a pezzi: dopo la promozione, guardare `pronto` e spegnere il runner della VM (27 nov 2026, cantiere ci-a-pezzi; Andrea: «sistema la questione delle CI troppo lente»)
+
+**Alla promozione che la porta**: è un commit che cambia
+`.github/workflows/prove.yml`, quindi `pronto` potrebbe restare indietro.
+A CI verde si guarda (sola lettura, dal PC):
+`git ls-remote origin refs/heads/pronto refs/heads/main` — i due sha
+devono essere uguali. Se `pronto` è rimasto indietro:
+`git push origin origin/main:refs/heads/pronto`.
+
+Il primo giro deve mostrare in Actions undici pezzi che partono insieme
+(«pezzo delle prove 1/5» … «pezzo dei collaudi 6/6»), poi `prove` e
+`pronto`: in tutto circa 6 minuti invece di 39.
+
+**Poi, quando vuoi (niente fretta, non rompe niente se resta):**
+1. GitHub → Settings → Secrets and variables → Actions → Variables:
+   cancella `RUNNER_PROVE` (non la legge più nessuno).
+2. Sulla vm-2050, da `debian` con sudo, spegni il runner (libera
+   processore e memoria al bot di collaudo):
+   `sudo systemctl disable --now ci-runner-vm-2050`
+   e controlla: `systemctl is-active ci-runner-vm-2050` deve dire
+   `inactive`.
+3. GitHub → Settings → Actions → Runners: togli `vm-2050` (Remove). Un
+   runner nostro collegato a un repo pubblico è una porta che non serve.
+
+Fatti i tre gesti, questa voce si cancella.
+
+## 37. Ritirare da Nostr i badge dei distintivi usciti (27 nov 2026, cantiere badge-nostr-tre; Andrea: «semplifica i badge su Nostr», poi «Ritirarli da Nostr»)
+
+**Dopo la promozione che lo porta in produzione**, dalla Mini App:
+pannello admin → «🏺 Badge Nostr» → «🧹 Ritira da Nostr i badge degli
+altri distintivi» → «Ritira». Restano su Nostr solo 🫙 Pioniere, 🛡️
+Specchiato e i badge degli eventi. Se il messaggio dice «N da riprovare»,
+ripremi: chi è già ritirato non si tocca. Poi «🔄 Sincronizza i
+distintivi», che dà lo Specchiato a chi ha già 25 affari.
+
+Fatto e con «0 da riprovare», questa voce si cancella.

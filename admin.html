@@ -33,6 +33,8 @@
     --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.5),0 1px 2px rgba(120,60,0,.22),0 7px 16px -7px rgba(232,128,10,.75);
     --b-sec-bg:#FFFFFF; --b-sec-fg:#23282C; --b-sec-line:rgba(35,40,44,.16);
     --b-sec-sh:0 1px 2px rgba(35,40,44,.08),0 5px 12px -7px rgba(35,40,44,.28);
+    /* le fonti dei guadagni (27 nov 2026): sei colori ben distinti */
+    --f-merc:#2a78d6; --f-p2p:#1B8B54; --f-rout:#7B5BD6; --f-zap:#F7931A; --f-labs:#0E8C8C; --f-altro:#8A8271;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
@@ -47,6 +49,7 @@
       --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.45),0 8px 20px -8px rgba(247,147,26,.5);
       --b-sec-bg:#3A3122; --b-sec-fg:#F1E8D5; --b-sec-line:rgba(241,232,213,.14);
       --b-sec-sh:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.4),0 6px 14px -8px rgba(0,0,0,.7);
+      --f-merc:#3987e5; --f-p2p:#34B47A; --f-rout:#9B80F0; --f-zap:#F7931A; --f-labs:#2BB3B3; --f-altro:#A99F87;
     }
   }
   :root[data-theme="dark"]{
@@ -61,6 +64,7 @@
     --b-pri-sh:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.45),0 8px 20px -8px rgba(247,147,26,.5);
     --b-sec-bg:#3A3122; --b-sec-fg:#F1E8D5; --b-sec-line:rgba(241,232,213,.14);
     --b-sec-sh:inset 0 1px 0 rgba(255,255,255,.06),0 1px 2px rgba(0,0,0,.4),0 6px 14px -8px rgba(0,0,0,.7);
+    --f-merc:#3987e5; --f-p2p:#34B47A; --f-rout:#9B80F0; --f-zap:#F7931A; --f-labs:#2BB3B3; --f-altro:#A99F87;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,sans-serif;font-size:15px;line-height:1.45}
@@ -183,6 +187,16 @@
   .grp-b > .card > h2:first-child{display:none}
   .pila > .card{border:0;box-shadow:none;background:none;padding:0;margin:18px 0 0}
   #p2p > h1:first-child{display:none}
+  /* 💰 GUADAGNI E SPESE (27 nov 2026) */
+  .fonte{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px 6px;padding:8px 0;border-bottom:1px solid var(--line-soft);font-weight:700;font-size:14px}
+  .fonte:last-child{border-bottom:0}
+  .fonte .barra{height:6px;min-width:0}
+  .azioni{display:flex;gap:6px;margin-left:auto}
+  .azioni button,.modulo input,.modulo select{font:inherit;font-weight:700;font-size:14px;border:1px solid var(--b-sec-line);background:var(--b-sec-bg);color:var(--ink);border-radius:10px;padding:6px 10px;min-height:36px}
+  .azioni button{cursor:pointer}
+  .modulo{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+  .modulo input,.modulo select{width:100%;min-width:0}
+  .modulo .due{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   @media (max-width:480px){
     .carta .n{font-size:30px}
     .grp-b{padding:0 10px 12px}
@@ -240,6 +254,7 @@ async function carica(){
   caricaGrafico();
   if (D.p2p_statistiche) caricaP2P();
   if (D.p2p_statistiche) caricaSettimanaP2P();
+  if (D.p2p_statistiche) caricaGuadagni();
 }
 function stato(t){ el('sub').textContent = ''; el('corpo').innerHTML = `<div class="stato">${esc(t)}</div>`; }
 
@@ -304,14 +319,14 @@ function asse(t, y){
   return t.map(v => `<line x1="${SX}" x2="${W - DX}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`
     + `<text x="${SX - 6}" y="${y(v) + 4}" text-anchor="end">${breve(v)}</text>`).join('');
 }
-function assex(ks, x, larg){
+function assex(ks, x, larg, modo = gran()){
   const ogni = Math.max(1, Math.ceil(ks.length / Math.max(2, Math.floor(W / 90))));
   return ks.map((k, i) => i % ogni ? '' :
-    `<text x="${x(i) + larg / 2}" y="${H - 8}" text-anchor="middle">${esc(etichetta(k, gran()))}</text>`).join('');
+    `<text x="${x(i) + larg / 2}" y="${H - 8}" text-anchor="middle">${esc(etichetta(k, modo))}</text>`).join('');
 }
 /* barre impilate (o una serie sola): 2px di aria fra i pezzi, la cima
    arrotondata, il tooltip su tutta la colonna */
-function barre(box, ks, serie, valori, testoTip){
+function barre(box, ks, serie, valori, testoTip, modo = gran()){
   misura(box);
   const n = ks.length, larg = (W - SX - DX) / Math.max(1, n);
   const tot = ks.map(k => (valori[k] || []).reduce((a, b) => a + b, 0));
@@ -336,7 +351,7 @@ function barre(box, ks, serie, valori, testoTip){
     });
     svg += `<rect class="hit" data-i="${i}" x="${x(i)}" y="${ALTO}" width="${larg}" height="${H - ALTO - BASSO}" fill="transparent"/>`;
   });
-  svg += assex(ks, x, larg);
+  svg += assex(ks, x, larg, modo);
   monta(box, svg, i => ({x: x(i) + larg / 2, y: y(tot[i]), testo: testoTip(ks[i], valori[ks[i]] || serie.map(() => 0))}));
 }
 /* linee cumulate: 2px, l'etichetta diretta in coda, crosshair */
@@ -391,9 +406,10 @@ function disegna(){
   ${sezioneSalute(L)}
   <div id="sezServizi">${sezioneServizi()}</div>
   ${sezioneSettimana()}
-  ${sezioneGrafico()}
+  <div id="sezGuadagni">${sezioneGuadagni()}</div>
 
   <div class="sez">Altro</div>
+  <details class="grp" id="altroGraficoP2P" ontoggle="graficoP2P()"><summary>📊 Ordini P2P e prezzo</summary><div class="grp-b">${sezioneGrafico()}</div></details>
   <details class="grp" id="altroIscritti" ontoggle="disegnaGrafici()"><summary>📈 Iscritti e vendite</summary><div class="grp-b"><div class="pila">
   <div class="filtri" role="group" aria-label="Periodo">
     ${[[30,'30 giorni'],[90,'90 giorni'],[365,'Un anno'],[0,'Da sempre']].map(([g, t]) =>
@@ -498,6 +514,7 @@ function disegna(){
   aperti.forEach(id => { const d = el(id); if (d) d.open = true; });
   disegnaGrafici();
   graficoP2P();
+  graficiGuadagni();
   simula();
 }
 
@@ -694,7 +711,8 @@ function scegliG(cosa, valore){
 const bottoniG = (cosa, scelte, ora) => scelte.map(([v, t]) =>
   `<button aria-pressed="${v === ora}" onclick="scegliG('${cosa}','${v}')">${t}</button>`).join('');
 function sezioneGrafico(){
-  return `<div class="sez">Ordini P2P e prezzo</div><div class="riquadro" id="sezGrafico">${internoGrafico()}</div>`;
+  /* dal 27 nov 2026 sta in «Altro», nel suo gruppo: in cima ci sono i guadagni */
+  return `<div class="riquadro" id="sezGrafico" style="box-shadow:none;border:0;padding:0;margin-top:8px">${internoGrafico()}</div>`;
 }
 function internoGrafico(){
   const scelte = `<div class="scelte quattro" role="group" aria-label="Cosa contare">${bottoniG('metrica', METRICHE_G, metricaG)}</div>
@@ -712,7 +730,8 @@ function internoGrafico(){
    un buco nel prezzo spezza la linea invece di inventare un tratto */
 function graficoP2P(){
   const box = el('gP2P');
-  if (!box || !G) return;
+  /* a gruppo chiuso il riquadro e' largo zero: si disegna quando si apre */
+  if (!box || !G || !box.offsetParent) return;
   misura(box);
   const pts = G.punti, n = pts.length, m = METRICHE_G.findIndex(x => x[0] === metricaG);
   const DXP = 44, area = W - SX - DXP, larg = area / Math.max(1, n);
@@ -1103,8 +1122,201 @@ function disegnaP2P(){
   </div>`;
 }
 
+/* ===== 💰 I GUADAGNI E LE SPESE (27 nov 2026, cantiere cruscotto-guadagni) =====
+   Andrea: «vorrei immediatamente vedere i guadagni, cosa fondamentale. E
+   anche monitorare le spese». Sotto le tre domande: quanto entra, da
+   dove (mercatino, P2P, SATS Routing, zap, Bitcoin Labs, altro), quanto
+   esce, e la differenza; poi volumi e commissioni. I numeri li da'
+   `/api/admin/guadagni`, solo agli amministratori (lo stesso giudice dei
+   conti P2P): a chi non lo e' la sezione non nasce. Le voci a mano
+   (Bitcoin Labs, le spese) si scrivono qui sotto. */
+let GU = null, erroreGU = '', periodoGU = 30, cancellaGU = 0;
+/* UN GRAFICO SOLO col selettore (27 nov 2026, Andrea: «volumi e guadagni
+   dovrebbero stare nello stesso grafico con un selettore per semplificare») */
+let vistaGU = 'guadagni';
+const FONTI_GU = [
+  [3, 'Mercatino', '--f-merc'], [4, 'P2P', '--f-p2p'], [5, 'SATS Routing', '--f-rout'],
+  [6, 'Zap', '--f-zap'], [7, 'Bitcoin Labs', '--f-labs'], [8, 'Altro', '--f-altro']];
+const RICORRENZE_GU = {una: 'una volta', mese: 'ogni mese', anno: 'ogni anno'};
+async function caricaGuadagni(){
+  erroreGU = '';
+  try {
+    const r = await fetch('/api/admin/guadagni', {credentials: 'same-origin',
+      headers: {'X-Tg-Init-Data': intestazione()}});
+    if (!r.ok) throw new Error(r.status);
+    GU = await r.json();
+  } catch(e) { GU = null; erroreGU = 'Non riesco a leggere i guadagni: riprova fra poco.'; }
+  ridisegnaGuadagni();
+}
+function ridisegnaGuadagni(){
+  const box = el('sezGuadagni');
+  if (box) { box.innerHTML = sezioneGuadagni(); graficiGuadagni(); }
+}
+const granGU = () => periodoGU && periodoGU <= 31 ? 'giorno' : (periodoGU && periodoGU <= 180 ? 'settimana' : 'mese');
+const oggiGU = () => new Date().toISOString().slice(0, 10);
+const inizioGU = () => !periodoGU ? ((GU.giorni[0] || [])[0] || oggiGU())
+  : new Date(Date.now() - (periodoGU - 1) * GIORNO).toISOString().slice(0, 10);
+function secchiGU(){
+  const modo = granGU(), out = [], visti = new Set();
+  for (let t = new Date(inizioGU() + 'T00:00:00Z').getTime(); t <= Date.now(); t += GIORNO) {
+    const k = chiave(new Date(t).toISOString().slice(0, 10), modo);
+    if (!visti.has(k)) { visti.add(k); out.push(k); }
+  }
+  return out;
+}
+/* i secchi del periodo: per ognuno le nove colonne del server */
+function sommaGU(){
+  const modo = granGU(), da = inizioGU(), m = {};
+  for (const r of GU.giorni) {
+    if (r[0] < da) continue;
+    const v = m[chiave(r[0], modo)] || (m[chiave(r[0], modo)] = Array(9).fill(0));
+    for (let i = 0; i < 9; i++) v[i] += r[i + 1];
+  }
+  return m;
+}
+const euroGU = s => GU.eur_per_btc > 0 ? '≈ € ' + fmtd(s / 1e8 * GU.eur_per_btc, 0) : '';
+const importoGU = m => m.valuta === 'eur' ? euro2(m.importo / 100) : fmt(m.importo) + ' sats';
+function sezioneGuadagni(){
+  if (!D || !D.p2p_statistiche) return '';
+  const titolo = '<div class="sez">💰 Guadagni</div>';
+  if (!GU) return titolo + `<div class="riquadro"><div class="nota" style="margin:0">${esc(erroreGU || 'Carico i guadagni…')}</div></div>`;
+  const per = sommaGU(), tot = Array(9).fill(0);
+  Object.values(per).forEach(v => v.forEach((x, i) => tot[i] += x));
+  const entrate = FONTI_GU.reduce((a, [c]) => a + tot[c - 1], 0), spese = tot[8], netto = entrate - spese;
+  const periodo = periodoGU ? `negli ultimi ${periodoGU} giorni` : 'da sempre';
+  const fonti = FONTI_GU.map(([c, nome, col]) => [nome, tot[c - 1], colore(col)]).sort((a, b) => b[1] - a[1]);
+  return titolo + `
+  <div class="scelte" role="group" aria-label="Periodo dei guadagni">
+    ${[[30, '30 giorni'], [90, '90 giorni'], [365, 'Un anno'], [0, 'Sempre']].map(([g, t]) =>
+      `<button aria-pressed="${g === periodoGU}" onclick="periodoGU=${g};ridisegnaGuadagni()">${t}</button>`).join('')}
+  </div>
+  <div class="carte" style="margin-top:10px">
+    ${carta(breve(entrate), `sats guadagnati ${esc(periodo)}<br>${euroGU(entrate)}`, entrate ? 'bene' : '')}
+    ${carta(breve(spese), `sats di spese<br>${euroGU(spese)}`, spese ? 'guarda' : '')}
+  </div>
+  <div class="carte" style="grid-template-columns:1fr;margin-top:10px">
+    ${carta((netto < 0 ? '−' : '') + breve(Math.abs(netto)) + ' sats', `guadagni meno spese ${euroGU(Math.abs(netto)) ? '· ' + (netto < 0 ? '−' : '') + euroGU(Math.abs(netto)) : ''}`, netto < 0 ? 'urgente' : netto > 0 ? 'bene' : '')}
+  </div>
+  <div class="riquadro" style="margin-top:10px">
+    <div class="scelte" role="group" aria-label="Cosa mostra il grafico" style="margin:0 0 6px">
+      ${[['guadagni', 'Guadagni'], ['volumi', 'Volumi e commissioni']].map(([v, t]) =>
+        `<button aria-pressed="${v === vistaGU}" onclick="vistaGU='${v}';ridisegnaGuadagni()">${t}</button>`).join('')}
+    </div>
+    ${vistaGU === 'guadagni' ? `<div style="font-weight:800">Guadagni per ${granGU()}</div>
+    ${legenda(FONTI_GU.map(([, nome, col]) => ({nome, colore: colore(col)})))}
+    <div class="grafico" id="gGuadagni"></div>
+    <div style="font-weight:800;margin-top:12px">Da dove arrivano</div>
+    <div class="fonti">${fonti.map(([nome, s, col]) => `<div class="fonte">
+      <span class="pezzo" style="background:${col}"></span><b>${esc(nome)}</b>
+      <span>${fmt(s)} sats <span class="sub">${entrate ? fmtd(s / entrate * 100, 0) + '%' : '—'}</span></span>
+      <div class="barra" style="grid-column:1/-1"><b style="width:${entrate ? s / entrate * 100 : 0}%;background:${col}"></b></div></div>`).join('')}</div>
+    <div class="nota">Mercatino: protezione e commissione degli ordini conclusi (la commissione di oggi è ${fmtd(GU.commissione_percento, 2)}%). P2P: le commissioni lorde degli scambi conclusi, Lightning e on-chain. SATS Routing: la quota arrivata a swap@. Zap: il salvadanaio. Bitcoin Labs e «altro» si scrivono a mano qui sotto: se un referral arriva già sull'indirizzo degli zap, non scriverlo due volte.</div>`
+    : `<div style="font-weight:800">Volumi e commissioni per ${granGU()}</div>
+    ${legenda([{nome: 'Volume mercatino', colore: colore('--f-merc')}, {nome: 'Volume P2P', colore: colore('--f-p2p')}, {nome: 'Commissioni (asse destro)', colore: colore('--sats')}])}
+    <div class="grafico" id="gVolumiGU"></div>
+    <div class="nota">Volume ${esc(periodo)}: ${fmt(tot[0] + tot[1])} sats (${fmt(tot[0])} mercatino · ${fmt(tot[1])} P2P). Commissioni: ${fmt(tot[2] + tot[3])} sats${tot[0] + tot[1] ? ', il ' + fmtd((tot[2] + tot[3]) / (tot[0] + tot[1]) * 100, 2) + '% del volume' : ''}.</div>`}
+  </div>
+  ${sezioneSpese()}`;
+}
+/* LE SPESE E LE VOCI A MANO: l'elenco, il conto delle fisse al mese e il
+   modulo. La voce e' testo di un admin: passa da esc() come ogni altro. */
+function sezioneSpese(){
+  const mov = GU.movimenti || [], attiva = m => m.ricorrenza !== 'una' && !m.fine;
+  const alMese = m => (m.valuta === 'eur' ? m.importo / 100 : (GU.eur_per_btc > 0 ? m.importo / 1e8 * GU.eur_per_btc : 0)) / (m.ricorrenza === 'anno' ? 12 : 1);
+  const fisse = mov.filter(m => m.verso === 'spesa' && attiva(m)).reduce((a, m) => a + alMese(m), 0);
+  const nome = m => m.verso === 'spesa' ? '💸' : m.fonte === 'bitcoin_labs' ? '🎓 Bitcoin Labs ·' : '➕';
+  const quando = m => m.ricorrenza === 'una' ? `il ${esc(m.giorno)}`
+    : `${RICORRENZE_GU[m.ricorrenza]} dal ${esc(m.giorno)}${m.fine ? ` · ferma dal ${esc(m.fine)}` : ''}`;
+  return `<div class="sez">💸 Spese e voci a mano</div>
+  <div class="riquadro">
+    ${fisse ? `<div class="nota" style="margin:0 0 6px">Spese fisse attive: <b>${euro2(fisse)} al mese</b> (gli abbonamenti annuali divisi per dodici).</div>` : ''}
+    ${mov.length ? `<div class="salute" style="box-shadow:none;border:0;padding:0">${mov.map(m => `<div class="riga" style="flex-wrap:wrap">
+      <b style="min-width:0;flex:1">${nome(m)} ${esc(m.voce)}<div class="nota" style="margin:0;font-weight:600">${quando(m)}</div></b>
+      <span style="margin-left:0">${m.verso === 'spesa' ? '−' : '+'}${importoGU(m)}</span>
+      <span class="azioni">${attiva(m) ? `<button onclick="fermaCassa(${+m.id})">Ferma</button>` : ''}<button onclick="cancellaCassa(${+m.id}, this)">✕</button></span>
+    </div>`).join('')}</div>` : '<div class="nota" style="margin:0 0 6px">Nessuna voce ancora: aggiungi qui gli abbonamenti (Claude, server, API…) e le entrate di Bitcoin Labs.</div>'}
+    <form id="formCassa" class="modulo" onsubmit="event.preventDefault();aggiungiCassa()">
+      <select name="tipo" aria-label="Tipo"><option value="spesa">💸 Spesa</option><option value="bitcoin_labs">🎓 Entrata Bitcoin Labs</option><option value="altro">➕ Altra entrata</option></select>
+      <input name="voce" maxlength="60" placeholder="Di cosa si tratta (es. Claude Max)" required>
+      <div class="due"><input name="importo" inputmode="decimal" placeholder="Importo" required>
+        <select name="valuta" aria-label="Valuta"><option value="eur">€</option><option value="sats">sats</option></select></div>
+      <div class="due"><select name="ricorrenza" aria-label="Quanto spesso"><option value="una">Una volta</option><option value="mese">Ogni mese</option><option value="anno">Ogni anno</option></select>
+        <input name="giorno" type="date" value="${oggiGU()}" aria-label="Dal giorno" required></div>
+      <div class="scelte"><button type="submit" aria-pressed="true">Aggiungi</button></div>
+      <div class="nota" id="esitoCassa" style="margin:4px 0 0"></div>
+    </form>
+  </div>`;
+}
+async function chiamaCassa(metodo, url, corpo){
+  const r = await fetch(url, {method: metodo, credentials: 'same-origin',
+    headers: {'X-Tg-Init-Data': intestazione(), 'Content-Type': 'application/json'},
+    body: corpo ? JSON.stringify(corpo) : undefined});
+  if (!r.ok) { let t = ''; try { t = (await r.json()).detail; } catch(e) {} throw new Error(t || `il server ha risposto ${r.status}`); }
+}
+async function aggiungiCassa(){
+  const f = el('formCassa'), v = n => f.elements[n].value, tipo = v('tipo');
+  try {
+    await chiamaCassa('POST', '/api/admin/cassa', {verso: tipo === 'spesa' ? 'spesa' : 'entrata',
+      fonte: tipo === 'spesa' ? '' : tipo, voce: v('voce'), importo: v('importo'),
+      valuta: v('valuta'), ricorrenza: v('ricorrenza'), giorno: v('giorno')});
+  } catch(e) { el('esitoCassa').textContent = '⚠️ ' + e.message; return; }
+  await caricaGuadagni();
+}
+async function fermaCassa(id){
+  try { await chiamaCassa('POST', `/api/admin/cassa/${id}/ferma`); } catch(e) {}
+  await caricaGuadagni();
+}
+/* due tocchi per cancellare: il primo chiede, il secondo cancella (niente
+   finestre del browser, che dentro Telegram si comportano male) */
+async function cancellaCassa(id, b){
+  if (cancellaGU !== id) { cancellaGU = id; b.textContent = 'Sicuro?'; return; }
+  cancellaGU = 0;
+  try { await chiamaCassa('DELETE', `/api/admin/cassa/${id}`); } catch(e) {}
+  await caricaGuadagni();
+}
+function graficiGuadagni(){
+  if (!GU) return;
+  const g = el('gGuadagni');
+  const ks = secchiGU(), modo = granGU(), per = sommaGU();
+  const val = {}; Object.keys(per).forEach(k => val[k] = FONTI_GU.map(([c]) => per[k][c - 1]));
+  if (g) barre(g, ks, FONTI_GU.map(([, nome, col]) => ({nome, colore: colore(col)})), val, (k, v) => {
+    const parti = FONTI_GU.map(([, nome], i) => v[i] ? `${nome} ${fmt(v[i])}` : '').filter(Boolean);
+    return `${esc(etichetta(k, modo))} · ${fmt(v.reduce((a, b) => a + b, 0))} sats${parti.length ? '<br>' + parti.map(esc).join(' · ') : ''}`;
+  }, modo);
+  volumiCommissioni(el('gVolumiGU'), ks, per, modo);
+}
+/* barre impilate dei volumi (mercatino, P2P) e la linea delle commissioni
+   sull'asse destro, come il grafico ordini P2P / prezzo */
+function volumiCommissioni(box, ks, per, modo){
+  if (!box) return;
+  misura(box);
+  const n = ks.length, DXP = 44, area = W - SX - DXP, larg = area / Math.max(1, n);
+  const v = k => per[k] || Array(9).fill(0);
+  const t = tacche(Math.max(1, ...ks.map(k => v(k)[0] + v(k)[1]))), max = t[t.length - 1];
+  const tc = tacche(Math.max(1, ...ks.map(k => v(k)[2] + v(k)[3]))), maxc = tc[tc.length - 1];
+  const y = x => ALTO + (H - ALTO - BASSO) * (1 - x / max), yc = x => ALTO + (H - ALTO - BASSO) * (1 - x / maxc);
+  const x = i => SX + i * larg, b = Math.max(2, Math.min(28, larg - 4));
+  let svg = t.map(q => `<line x1="${SX}" x2="${W - DXP}" y1="${y(q)}" y2="${y(q)}" stroke="var(--grid)" stroke-width="1"/>`
+    + `<text x="${SX - 6}" y="${y(q) + 4}" text-anchor="end">${breve(q)}</text>`).join('');
+  tc.forEach(q => svg += `<text x="${W - DXP + 6}" y="${yc(q) + 4}" text-anchor="start">${breve(q)}</text>`);
+  const cM = colore('--f-merc'), cP = colore('--f-p2p'), cC = colore('--sats');
+  ks.forEach((k, i) => {
+    const [vm, vp] = v(k), xx = x(i) + (larg - b) / 2;
+    if (vm) svg += `<rect x="${xx}" y="${y(vm)}" width="${b}" height="${Math.max(1, y(0) - y(vm))}" fill="${cM}"/>`;
+    if (vp) svg += `<rect x="${xx}" y="${y(vm + vp)}" width="${b}" height="${Math.max(1, y(vm) - y(vm + vp) - (vm ? 2 : 0))}" fill="${cP}"/>`;
+  });
+  svg += `<polyline fill="none" stroke="${cC}" stroke-width="2" stroke-linejoin="round" points="${ks.map((k, i) => `${x(i) + larg / 2},${yc(v(k)[2] + v(k)[3])}`).join(' ')}"/>`;
+  ks.forEach((k, i) => svg += `<rect class="hit" data-i="${i}" x="${x(i)}" y="${ALTO}" width="${larg}" height="${H - ALTO - BASSO}" fill="transparent"/>`);
+  svg += assex(ks, x, larg, modo);
+  monta(box, svg, i => { const q = v(ks[i]);
+    return {x: x(i) + larg / 2, y: Math.min(y(q[0] + q[1]), yc(q[2] + q[3])),
+      testo: `${esc(etichetta(ks[i], modo))} · volume ${fmt(q[0] + q[1])} sats<br>mercatino ${fmt(q[0])} · P2P ${fmt(q[1])} · commissioni ${fmt(q[2] + q[3])}`}; });
+}
+
 let ridisegno = 0;
-addEventListener('resize', () => { if (!D) return; clearTimeout(ridisegno); ridisegno = setTimeout(disegna, 150); });
+/* chi sta scrivendo una voce non si vede ridisegnare il modulo in faccia:
+   sul telefono la tastiera che si apre e' un resize */
+addEventListener('resize', () => { if (!D || (document.activeElement && document.activeElement.closest && document.activeElement.closest('#formCassa'))) return; clearTimeout(ridisegno); ridisegno = setTimeout(disegna, 150); });
 carica();
 </script>
 </body>

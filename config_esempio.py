@@ -258,6 +258,15 @@ P2P_ONCHAIN_RIPRENDI_SCADUTO = True
 # ...e la porticina: True (di serie) = il bottone lo vede SOLO un moderatore
 # (ADMIN_IDS) per la prova in produzione. Si apre a tutti scrivendo False.
 P2P_ONCHAIN_RIPRENDI_SCADUTO_SOLO_ADMIN = True
+# Il resto dell'intervallo torna nel libro (27 nov 2026, cantiere
+# resto-intervallo): un ordine P2P a intervallo preso per una parte torna nel
+# libro col resto, a scambio concluso (Lightning: il telefono di chi ha
+# pubblicato manda a mostrod la chiave del prossimo scambio; on-chain lo fa
+# il server). Accesa di serie...
+P2P_RESTO_INTERVALLO = True
+# ...e la porticina: True (di serie) = vale SOLO sugli ordini pubblicati da un
+# moderatore (ADMIN_IDS), per la prova in produzione. Si apre a tutti con False.
+P2P_RESTO_INTERVALLO_SOLO_ADMIN = True
 # I sats on-chain tornano da soli (20 nov 2026, cantiere ritorno-da-solo-oc):
 # finito il tempo per pagare senza «Ho inviato gli euro», la ronda fa da sola
 # il gesto di «Riprendi i sats» per tutti (non Barattozon, non contanti di
@@ -2212,6 +2221,12 @@ POST_AUTOMATICI = True
 # (oltre le 48 ore Telegram non lascia cancellare: il post si riscrive).
 # False = com'era: i post P2P restano.
 VETRINA_SI_PULISCE = True
+# Il «Cerco» nei canali (27 nov 2026): ogni richiesta nuova di Cerco esce
+# anche nei canali Telegram (il nostro, Subito Crypto, BitcoinPodcast), e
+# sparisce quando la richiesta si chiude o scade (con VETRINA_SI_PULISCE
+# accesa). Subito Crypto al massimo una a settimana per persona.
+# False = nessun post nuovo (quelli usciti restano).
+POST_CERCO_CANALI = True
 # ...e l'annuncio venduto del mercatino: di serie resta nei canali col
 # «✅ Venduto» (scelta di Andrea). True = anche il suo post sparisce
 # (vale solo con VETRINA_SI_PULISCE accesa).

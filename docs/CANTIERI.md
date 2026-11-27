@@ -97017,3 +97017,382 @@ foto della schermata mandate ad Andrea prima del push
 (/mnt/project-files/intervallo-obbligatorio/). Da guardare dopo la
 promozione: il primo ordine nuovo nel libro e un «Non hai sats?» che lo
 trova.
+
+## Il resto dell'intervallo torna nel libro (27 nov 2026, cantiere resto-intervallo)
+
+Andrea, dal thread «Pagare in euro e franchi senza sats»: «se l'ordine da
+10.000 euro e uno ti compra 10 euro... c'è un altro 990 euro di liquidità
+disponibili», e poi «facciamolo subito». Adesso che gli ordini a mercato
+sono sempre a intervallo (con il «Da» già pieno a 10, che quasi nessuno
+cambia), un ordine che si chiude alla prima presa butta via il grosso
+della liquidità. Ok al piano in 10 righe alle 12:42 («vai»).
+
+Deciso:
+- il resto è la regola di mostrod (`get_child_order` in release.rs):
+  stesso «Da», «Fino a» = massimo meno la cifra presa; sotto il «Da» non
+  torna niente, uguale al «Da» torna a cifra unica. Vale anche on-chain,
+  con lo stesso giudice scritto in Python (`p2p_resto_intervallo_capi`);
+- QUANDO: a scambio concluso, non alla presa. Su Lightning non si sceglie
+  (il figlio nasce nel rilascio). On-chain si poteva fare alla presa, ma
+  se lo scambio salta la rinascita rimette già l'intervallo intero: due
+  ordini da ricucire. Alla chiusura `rilasciato` le due strade non si
+  toccano mai;
+- LIGHTNING, nel telefono e non nel nodo (Mostro non si tocca, 20 nov):
+  chi ha pubblicato manda `Payload::NextTrade` col rilascio (ordine di
+  vendita) o con «Ho inviato» (ordine di acquisto: `fiat_sent.rs` la
+  tiene per il rilascio dell'altro). È esattamente il pezzo che il
+  verbale di settembre diceva mancante («L'INTERVALLO SI CHIUDE ALLA
+  PRIMA PRESA»), e l'obiezione di allora — un figlio con una chiave che
+  la pagina non sa governare — è caduta con l'adozione di settembre
+  (`adottaOrdiniAltroveP2P` ricostruisce la riga di un mio ordine da
+  restore e libro). Il telefono prenota l'indice come quando pubblica
+  (mazzo e cloud PRIMA del gesto), lo ricorda sulla riga (`restoIndice`:
+  un «Riprova» manda la STESSA chiave, mai una seconda) e scrive la riga
+  provvisoria `nuovo:N` (al mio rilascio; per un ordine d'acquisto quando
+  l'altro libera i sats, `nasceRigaRestoP2P`, che prima direbbe «Sto
+  pubblicando l'ordine…» per tutto il controllo degli euro) con i patti dell'ordine (metodi, premio, zona,
+  filtro, tempo per pagare, paracadute, ripubblica); il `new-order` di
+  mostrod sulla chiave nuova la rinomina e col nome vero si intesta al
+  server. Se il figlio non nasce, la riga provvisoria si toglie da sola
+  un quarto d'ora dopo il rilascio (`togliRestiMancatiP2P`; prima del
+  rilascio si aspetta sempre, che con «Ho inviato» il figlio arriva solo
+  quando l'altro libera i sats). Fuori: monete, Barattozon, profili in
+  pensione (non contano più gli indici);
+- i capi della presa si ricordano sulla riga (`fasciaMin`/`fasciaMax`,
+  dal filo o dalla riga) perché `euro` collassa sulla cifra scelta;
+- ON-CHAIN il server, a scambio `rilasciato`, rifà l'ordine col resto
+  (`_p2p_onchain_resto_nel_libro`, che riusa `_p2p_onchain_rinasci` col
+  parametro `resto`: stessi patti, `rinato_da` = lo scambio, una volta
+  sola). Nessun avviso del bot (nessun testo nuovo chiesto): l'ordine
+  compare fra i suoi;
+- LA LEVA `P2P_RESTO_INTERVALLO` accesa di serie, con la porticina
+  `P2P_RESTO_INTERVALLO_SOLO_ADMIN` chiusa di serie (Andrea: «lo proviamo
+  in produzione io e Alan, non nel collaudo»), come «Riprendi i sats». Il
+  telefono la sa da /api/me (`p2p_resto_intervallo`), on-chain la guarda
+  il server su chi aveva pubblicato. Si apre a tutti con `= False`;
+- la scritta (card di Andrea «Il resto torna nel libro»), nella scatola
+  arancione sotto la spinta, solo a chi la leva vale: «Se ne prendono solo
+  una parte, il resto torna da solo nel libro.» La ripubblica allo
+  scadere resta (Andrea: serve quando nessuno lo prende).
+
+Scartato: l'avviso del bot «il resto è tornato nel libro» (non chiesto);
+il resto on-chain alla presa (vedi sopra); toccare il nodo.
+
+Provato: `prove_resto_intervallo` (la regola, la leva per persona, il resto
+on-chain sul database con la cifra unica e la rinascita di sempre intatta,
+il telefono in node: la regola dei gesti, l'indice prenotato una volta, la
+riga provvisoria coi patti, il messaggio canonico `{"next_trade": [...]}`,
+la pulizia delle righe mai nate; controprove su resto sotto il «Da», cifra
+del resto e indice ricordato), suite severa e collaudi della CI in un venv
+senza coincurve. Letto sui sorgenti di mostro v0.20.2 e mostro-core 0.17.3
+(release.rs, fiat_sent.rs, `verify`): NON letto il nostro fork `-bar12`,
+che dal cloud non si vede: se una delle sue quattordici patch tocca il
+rilascio, lo dice la prova dal vivo (DA-FARE, voce 35).
+
+Da guardare: la prova in produzione con Andrea e Alan, Lightning (Vendi e
+Compra) e on-chain; poi `P2P_RESTO_INTERVALLO_SOLO_ADMIN = False`, e allora
+la voce in NOVITA e in `assistente/sapere.md`.
+
+## Il menu del venditore nella scheda, in icone (27 nov 2026)
+
+Andrea: «semplifica il menu. Per modificare un articolo vicino al tasto
+share dovrebbe esserci la matitina… il tasto di copia che fa da duplica
+o occhio barrato per nascondere l'annuncio. Così in basso deve rimanere
+solo Lancia un'offerta lampo, oppure Apri un'estrazione. Widget per il
+web lo metterei come ulteriore icona sempre in alto». Fatto: in
+`openDetail` la fila `foto-azioni` in alto a destra porta, sul proprio
+annuncio normale (`azioniMie`), matita, duplica, occhio barrato e </>
+prima del condividi: cerchietti di carta da 44 come lui, cinque in 244px
+a 360 (40px sotto i 340). Guardie identiche ai bottoni di ieri (niente
+duplica e nascondi sull'importato, il nascondi solo a leva accesa;
+asta ed esaurito tengono i loro blocchi). In basso: lampo, estrazione,
+una riga leggera (`mio-altro`) con «🔄 Aggiorna i pezzi» e «🔑 Codici
+pronti», e l'uscita rossa.
+SCELTO E DETTO AD ANDREA: «Elimina» resta il bottone rosso in fondo (la
+sua decisione di ago 2026: il testuale spariva fra i ghost, proprio sul
+gesto che non torna indietro), e lo stock con i codici diventano una
+riga piccola invece che icone (sei cerchietti non stanno a 360 accanto
+all'indietro). PROVATO: giro dal vivo in Chromium a 390px, chiaro e
+scuro, nessun errore JavaScript; la prova del nascondi emendata alla
+fila in alto; suite severa.
+
+## Gift card: la simulazione vera con Bitpost, la rete Bitcoin detta e l'indirizzo dal link (27 nov 2026, cantiere gift-card-rete; Andrea: «simula pure tu delle richieste per capire se il flusso con bitpost e le loro API funziona davvero», poi «procedi con la simulazione»)
+
+COSA. Un giro sulla beta vera di Bitpost dalla sessione cloud (chiave come
+segreto di rete, mai letta): crea, aggancia con una seconda xpub, legge il
+pagamento, annulla con `{"party": "buyer"}` (va anche dopo l'aggancio).
+Nessun sats mosso. Due errori nostri trovati e corretti: (1) senza
+`network` Bitpost sceglie LIQUID, con la sua commissione (8% invece del 5%
+di Bitcoin: col nostro `expected_published_fee` ogni ordine tornava 409
+«fee_changed"): ora entrambe le porte d'ordine mandano
+`"network": "Bitcoin"`; (2) il pagamento arriva come link
+`bitcoin:<indirizzo>?amount=…` senza `address` a parte, e l'app lasciava
+vuota la riga dell'indirizzo e il «Copia»: `bitpost_pagamento_con_indirizzo`
+lo ricava dal link (solo se ha la forma di un indirizzo). Il Bitpost finto
+del collaudo ora risponde come quello vero.
+
+DA SAPERE. La beta è TESTNET (indirizzi `tb1q`, confermato da Andrea) pur
+accettando una xpub mainnet; le commissioni in beta sono spente (tornano
+0); il minimo Bitcoin lo leggiamo vivo dal catalogo (oggi 14,02 €), quindi
+nessun numero da cambiare. Durante il giro ho annullato anche il #586 (21
+nov, su Liquid, fermo da allora): non l'avevo creato in questa sessione,
+va chiesto prima.
+
+PROVATO. `prove_bitpost_gift_card` 6-quater, `collaudo_bitpost_gift_card`
+(la rete detta, l'indirizzo dal link), e il giro vero ripetuto col corpo
+corretto: ordine #591 nato su Bitcoin, agganciato, indirizzo `tb1q…`
+ricavato, annullato.
+
+## La CI a pezzi: undici macchine di GitHub insieme, e niente prove su develop (27 nov 2026, cantiere ci-a-pezzi; Andrea: «sii un esperto di DevOps e sistema la questione delle CI troppo lente. Inoltre in collaudo si possono saltare, solo quando si portano in prod si fanno e poi si fixano eventualmente i bug»)
+
+**I NUMERI DI PARTENZA** (gli ultimi 15 giri di main, `gh run list` +
+`gh run view --json jobs`): ~39 minuti a giro, tutti uguali. Il job
+`prove` girava sulla vm-2050 (2 vCPU, `CPUWeight=50` accanto al bot di
+collaudo): prove.py 1005 s in fila su un processore solo, poi i collaudi
+1258 s due alla volta (178 collaudi, 2511 s di lavoro). `segreti` 380 s
+su GitHub, `pronto` 55 s. La CI mirata del 17 nov non salvava niente in
+pratica: sul giro del 27 nov `--dai-file` ha detto «687 sezioni su 687»
+(i commit veri toccano sempre server.py, miniapp.html o i documenti che
+33 sezioni leggono), e i collaudi erano 178 su 178.
+
+**LA LEVA GROSSA: LA MACCHINA.** La vm-2050 era stata scelta il 20 ott
+per non pagare minuti (Cantieri, «Il runner della CI sulla vm-2050»).
+Dal 17 nov il repo è PUBBLICO (Cantieri, la voce della licenza AGPL):
+i runner standard di GitHub per un repo pubblico non si pagano e hanno
+quattro processori. Il perché della VM non c'è più, e in più un runner
+nostro che fa girare il codice di un repo pubblico era una porta da non
+tenere (la guardia `solo-main.sh` la stringeva, ma è meglio non averla).
+Quindi tutto torna su GitHub, e su GitHub si può essere in tanti.
+
+**COSA C'È.**
+- `prove.py --pezzo=K/N`: le sezioni già scelte (con `--dai-file` come
+  prima) divise in N pezzi. Non a giro: il motore P2P da solo vale 104 s
+  e a giro un pezzo ne prendeva 266 contro 78. Coi pesi delle venti
+  sezioni più lente (`PESI_PEZZI`, misurati oggi; le altre mezzo
+  secondo) ognuna va al pezzo meno carico, e i cinque pezzi stanno fra
+  121 e 137 s su questa macchina. L'ordine dentro il pezzo resta quello
+  di `tutte`. Un peso vecchio sbilancia e basta, non perde sezioni.
+- `collaudi_ci.py --pezzo K/N`: a giro sull'elenco già scelto (lì i
+  tempi sono piatti: entro ±12 % dalla media sui tempi veri del runner).
+- Il workflow: `prove-a-pezzi` (matrice 1..5) e `collaudi-a-pezzi`
+  (matrice 1..6, `--paralleli 3` sui quattro processori), `fail-fast:
+  false` perché un giro dica tutti i rossi insieme; il job `prove` è il
+  GIUDICE DEI PEZZI (`needs` su tutti e due, `!cancelled()`, verde solo
+  se entrambi `success`), così il giudice del VPS e `pronto` leggono lo
+  stesso nome di sempre. prove.py e collaudi stanno su macchine diverse:
+  fastapi fuori dalle prove è gratis. Il compileall gira nel solo pezzo
+  1. Tutti i job su `ubuntu-24.04`, nessuna variabile.
+- `segreti`: le due guardate della cronologia (ognuna rifà le patch di
+  3.821 commit) partono insieme in due sottoshell e il passo aspetta
+  tutte e due; i comandi sono quelli di prima, parola per parola.
+- La regola nuova (CLAUDE.md, Andrea): su develop si pusha SENZA suite
+  né collaudi; le prove le fa la CI alla promozione, e un rosso si fixa
+  dopo con un commit nuovo. Il collaudo sulla vm-2050 seguiva già
+  develop senza aspettare niente (`deploy/collaudo/segui.sh`), quindi
+  lato VM non cambia nulla.
+
+**SCARTATO.**
+- Più processi dentro UN job: avrebbe funzionato (cinque pezzi sulla
+  stessa macchina da 4 processori: 149 s invece di 658), ma undici
+  macchine danno più processori di una, e un pezzo rosso si vede per
+  nome nella pagina del giro.
+- Restare sulla VM coi pezzi: due processori, i pezzi si metterebbero in
+  fila.
+- La cronologia dei segreti a partire da `pronto` (molto più corta):
+  `pronto` a volte lo sposta Andrea a mano, e un commit mai guardato
+  passerebbe. Il parallelo dimezza senza cambiare cosa si guarda.
+- Cache di pip/npm: rimisurata, le installazioni durano ~15 s.
+
+**PROVATO.**
+- prove.py intero in fila, su questa macchina: 654 s di sezioni (658 s
+  in tutto), 32.093 prove. Gli stessi in cinque pezzi lanciati INSIEME
+  sulla stessa macchina (ognuno col suo TMPDIR): 2.941 + 7.304 + 7.364 +
+  7.497 + 6.987 = 32.093 passate, 0 fallite, in 149 s. Le cinque liste
+  di `--mostra` sono disgiunte e fanno 687.
+- Le sentinelle della CI aggiornate e verdi: `prove_runner_fisso`,
+  `prove_runner_vm` (la parte del workflow: tutti su GitHub, venv in
+  ogni job a pezzi; i file della VM restano provati finché il runner non
+  è smontato), `prove_collaudi_in_ci` (la catena collaudi → giudice →
+  semaforo), `prove_ci_solo_main`, `prove_ci_leggera`, `prove_node_fisso`;
+  e una nuova, `prove_ci_a_pezzi` (matrice = /N, la partizione in tutti e
+  due i lanciatori, il pezzo storto che esce col 2, i pesi di sezioni
+  che ci sono, il giudice dei pezzi). Sull'albero finale, di nuovo i
+  cinque pezzi insieme: 2.478 + 6.801 + 7.915 + 6.966 + 7.958 = 32.118
+  passate, 0 fallite, in 143 s.
+- I collaudi della CI in sei pezzi lanciati INSIEME su questa macchina
+  (uno alla volta per pezzo, col controllo dei segreti che girava
+  accanto): 30+30+30+30+29+29 = 178 verdi, 0 rossi, in 371 s.
+- Il passo dei segreti estratto dal workflow e girato con `bash -e` sul
+  repo intero (3.821 commit): «cronologia pulita» in 357 s con le due
+  guardate insieme, contro ~6 minuti l'una in fila; e con una nsec finta
+  infilata nella prima guardata esce rosso, dopo aver aspettato anche la
+  seconda.
+
+**DA GUARDARE** (DA-FARE-ANDREA, voce 36): al primo giro su main, che
+`pronto` si sposti (il commit tocca il workflow); i tempi veri dei
+pezzi; poi la variabile `RUNNER_PROVE` da cancellare e il runner della
+vm-2050 da spegnere e togliere da GitHub. Se un pezzo resta molto più
+lungo degli altri, si rimisurano i pesi (`PESI_PEZZI`). Se il repo
+tornasse privato, undici macchine costerebbero minuti: si riguarda
+questa voce.
+
+## L'estrazione verificabile da tutti (27 nov 2026, cantiere estrazione-verificabile)
+
+Andrea: «non è verificabile perché l'ordine non è pubblico», e poi «se
+uno quando si iscrive sa anche che posizione è, può verificare che
+l'hash diviso gli iscritti fa la sua posizione». Prima la lista
+«numero:biglietto» si vedeva solo DOPO la chiusura: mentre era aperta
+nessuno poteva controllare che i numeri non venissero rimescolati o
+gonfiati con iscritti finti. DECISO: 1) la lista anonima è pubblica
+nella scheda dal primo biglietto (`_vista_estrazione`, stato «aperta»),
+la riga di chi guarda in grassetto; 2) il numero e il biglietto arrivano
+in chat a TUTTI, anche a chi entra col link (prima solo agli invitati:
+`avvisato` non più 1 al tocco), come ricevuta fuori da Barattolo;
+3) alla chiusura ogni partecipante e chi regala ricevono in chat
+l'impronta della lista e il blocco atteso (racconto «congelata»):
+l'impegno esce dal server prima che l'hash esista e non si può più
+cambiare; 4) a estrazione fatta scheda e avvisi danno il conto intero:
+hash, partecipanti, resto, numero e biglietto vincente, con la riga
+Python per rifarlo. SCARTATE: nickname o id anonimizzati nella lista
+(un hash dell'id Telegram si inverte provando gli id, e il biglietto a
+caso basta a riconoscersi); pubblicare la lista solo su Nostr (gli
+eventi pubblici di un'estrazione non sono chiesti). Gli iscritti finti
+creati con più account Telegram restano possibili come in ogni
+estrazione online: la lista pubblica li rende contabili, non
+impossibili. PROVATO: collaudo_estrazioni con le righe nuove (lista
+aperta senza id, ricevuta del link, impronta in chat, conto in scheda).
+
+## Le tendine nei canali e il Cerco nei canali (27 nov 2026)
+
+Andrea, il giorno dopo le tendine della Mini App: «io parlavo soprattutto
+dei canali su telegram. Inoltre vorrei aggiungere il cerco». Fatto, in un
+commit: la stessa cosa nei POST dei tre canali (il nostro, Subito Crypto,
+BitcoinPodcast), e le richieste di Cerco che escono anche loro.
+Su Telegram la tendina è la citazione espandibile dell'HTML
+(`<blockquote expandable>`, anche nelle caption delle foto): titolo in
+grassetto fuori, righe dentro.
+- «🚚 Info di spedizione» al posto della riga di consegna
+  (`_righe_consegna_promo`): gemella della scheda, stesse regole e parole
+  (casa, zone estere, supplemento, locker solo con le reti, ritiro a mano,
+  codice online). Correzione dovuta: la vecchia riga diceva SEMPRE «a un
+  punto di ritiro», falso dal 12 ott (`reti_punto`). Il giudice è quello
+  della cassa; la caption riceve le colonne dei corrieri dai cinque SELECT e,
+  se mancano, niente locker (fail-closed). Le cifre vanno nella valuta
+  nativa della tariffa: l'euro ancorato esce «4,50 €» anche a cambio muto,
+  quindi `_costo_sped_promo` e il «da …» col minimo sono spariti (ogni
+  strada ha il suo prezzo). Sull'asta «inclusa», come nella scheda. Il
+  solo codice online non ha tendina (la scheda non gliela dà): la riga di
+  sempre.
+- «🛍 Altri articoli del negozio»: fino a 10 (`MAX_VETRINA_PROMO` 3→10),
+  «Vedi tutto il negozio ›» col link del negozio già nella firma quando ce
+  ne sono altri (`_altri_del_venditore` ne legge uno in più). IL TETTO: la
+  caption di una foto ha 1024 caratteri VISIBILI; `_quanti_ne_stanno`
+  (pura) toglie articoli dal fondo finché ci sta, e se non ne entra nemmeno
+  uno la sezione sparisce. Si misura sempre a 1024, anche per il ripiego di
+  testo (4096): il post nuovo e quello riscritto col ✅ Venduto restano
+  uguali. Se anche senza articoli sfora (titolo e zone enormi), il post
+  parte lo stesso: se Telegram rifiuta la foto c'è il ripiego di testo.
+- P2P: «💳 Metodi di pagamento accettati», un metodo per riga, «💵 Contanti»
+  con la zona 📍 dentro; il resto del post identico.
+- CERCO NEI CANALI: `_caption_canale_cerco` (pura) e
+  `_posta_richiesta_nei_canali`, lanciata dalla rotta che crea la richiesta
+  accanto ai due avvisi. Le regole del P2P: Subito Crypto solo con
+  @username e una volta a settimana contando TRE timbri (colonna nuova
+  `promo_vetrina_cerco_il`; giudice comune `_settimana_piena_vetrina`, che
+  ora usa anche il P2P: un Cerco su Subito Crypto chiude la settimana
+  anche per un ordine P2P e viceversa), timbro prima dell'invio; gli altri
+  due senza freno. Leva `POST_CERCO_CANALI` (accesa di serie, nel pannello
+  «Stato delle leve» accanto ai post automatici e nel config d'esempio).
+  Non ho guardato POST_AUTOMATICI (il P2P non lo guarda nemmeno).
+- LA PULIZIA: tabella nuova `post_cerco_canale` e non `post_p2p_canale`:
+  là `ordine` è una stringa del coordinatore, il giro che la guarda gira
+  solo col P2P acceso e dimentica le righe dopo 7 giorni, mentre una
+  richiesta dura fino a 90. `ritira_post_cerco` (cancella; oltre le 48 ore
+  riscrive «Richiesta chiusa»; la riga va solo a gesto riuscito) parte da
+  `chiudi_richiesta` e dall'orologio grande (`giro_post_cerco_canale`,
+  dieci minuti: richieste chiuse, scadute — che si chiudono alla lettura —
+  o sparite). Dietro VETRINA_SI_PULISCE, il cui testo nel pannello ora
+  nomina anche il Cerco.
+- La richiesta di oggi non ha né zona né descrizione (140 caratteri,
+  categoria, budget, durata): il post non inventa righe, e la blockquote
+  «Dettagli» chiesta in via condizionale non c'è. La firma è
+  la riga unica della piazza (`_firma_venditore`, decisione di Andrea
+  sul P2P) con «Richiesta da» al posto di «Annuncio da».
+Scartato: riusare `post_p2p_canale` con `ordine='cerco:N'` (due giri, una
+memoria di 7 giorni, e il testo «Ordine P2P non più disponibile» sul post
+sbagliato); tendina anche per il solo digitale.
+Provato: `prove_cerco_canali` nuova (tetto dei 1024 con titolo e zone
+pesanti, «Vedi tutto», caption del Cerco con l'escape di «<», freno a tre
+timbri, il post vero nei tre canali su sqlite con Telegram di cartone, il
+ritiro per chiusa/scaduta/oltre 48 ore/Telegram muto/leva spenta);
+adeguate dove misuravano la cosa cambiata: la riga di consegna e la
+vetrina in `prove_canale_bot`, i metodi in `prove_contanti_zona`, la tabella
+di `prove_venduto_canale` (le colonne dei corrieri), l'elenco di chi parla
+col canale e il conto degli escape in `prove_richieste`.
+Da guardare: il primo post vero nei canali (Andrea: un Cerco di prova da un
+account con @username) e come Telegram mostra le tendine su desktop e
+iPhone; se i post di Cerco sono troppi per Subito Crypto (il freno è
+settimanale per persona, non per canale).
+## Su Nostr solo tre badge: Pioniere, Specchiato alzato, gli eventi (27 nov 2026, cantiere badge-nostr-tre; Andrea: «semplifica i badge su Nostr, vorrei che fossero pochi e molto importanti, se no si inflazionano e rischiano di perdere valore»)
+
+Fino a ieri OGNI distintivo dell'app (tredici) diventava da solo un badge
+NIP-58 per chi aveva la npub verificata (`_premia_distintivo`, set 2026):
+quasi tutti alla portata di chiunque in una settimana (Primo acquisto,
+Bottega avviata, Pronto a incassare...), e un badge che hanno tutti non
+dice niente. DECISO con Andrea (proposta nel thread, poi la sua scelta
+sulla card): su Nostr escono 🫙 Pioniere (coorte chiusa, non ne nascono
+più) e 🛡️ Specchiato con un criterio SUO, più severo di quello dell'app:
+25 affari conclusi, zero dispute perse, almeno 10 feedback con media da
+4,5 (assorbe ⭐ Stimato e 🏪 Venditore rodato). Il terzo badge restano gli
+eventi assegnati a mano (la sezione delle live, invariata). Nell'app i
+distintivi non cambiano: a dire «esce su Nostr» è la chiave `nostr` di
+`DISTINTIVI`, giudicata da `merita_su_nostr`. Il gancio di
+`premia_distintivi` guarda a OGNI giro e non solo sui distintivi nuovi,
+perché il giorno dei 25 affari l'app non ha niente di nuovo da dare. Chi
+ha già lo Specchiato su Nostr con la regola vecchia lo tiene (il
+catalogo non revoca, e il ritiro tocca solo i distintivi usciti).
+I BADGE GIÀ DATI DEGLI ALTRI UNDICI SI RITIRANO (scelta di Andrea:
+«Ritirarli da Nostr», non congelarli con «edizione chiusa»): rotta
+`POST /api/admin/live/ritira-distintivi-usciti` e bottone «🧹 Ritira da
+Nostr i badge degli altri distintivi» nel pannello «Badge Nostr», col
+foglio di conferma. Una NIP-09 per premio (ritirato solo se un relay
+accetta), poi la lapide della definizione e la riga esce dal pannello;
+rilanciabile. Un gesto e non un automatismo al riavvio: è l'unico punto
+che pubblica cancellazioni, e parte quando lo preme l'admin (DA-FARE 37).
+SCARTATE: alzare lo Specchiato anche nell'app (Andrea ha chiesto Nostr,
+l'app resta com'è); un badge per il Punto di ritiro (è un ruolo, non un
+merito). PROVATO: `prove_badge_nostr` con la parte 10 nuova (catalogo,
+soglie dello Specchiato una per una, rotta del ritiro). NON provato dal
+vivo: il ritiro sui relay veri, che è il gesto di Andrea in produzione.
+I numeri di quanti avevano i badge stanno nel database del VPS.
+
+## La leva dell'intervallo on-chain che non arrivava al telefono (27 nov 2026 pomeriggio, cantiere intervallo-oc-busta; Andrea in produzione: «Non vedo gli ordini a intervalli in un ordine on chain»)
+COSA. Dopo l'ottava promozione (788ef679) il foglio Pubblica on-chain non mostrava mai il «Da»: l'ordine on-chain partiva sempre a cifra unica, e quindi niente ordini a intervallo nel libro on-chain.
+PERCHÉ. Il server metteva `intervallo` nella busta del libro (`_p2p_onchain_libro`), ma `accogliLibroOnchainP2P` rifà `p2pOnchainLibro` da capo campo per campo e quel campo non l'avevo copiato: `intervalloOcAccesoP2P()` leggeva sempre undefined, cioè leva spenta. Le prove non potevano vederlo: il banco node del cantiere intervallo-onchain scriveva `p2pOnchainLibro` a mano, e il collaudo guarda solo il server.
+CURA. Una riga, `intervallo: busta.intervallo === true`, accanto a `barattozon`. LEZIONE: un banco che finge lo stato a mano non prova il filo che lo riempie; per una leva nuova nella busta il banco passa dalla funzione che legge la busta.
+PROVATO. In `prove_intervallo_onchain` un banco con la `accogliLibroOnchainP2P` vera: accesa solo con true (false, assente o «si» = spenta); controprova senza la riga, quattro false come in produzione.
+DA GUARDARE. Dopo la promozione, dal telefono: Pubblica → on-chain → «Fino a» e «Da»; gli ordini on-chain già nel libro restano a cifra unica (sono nati così).
+
+## I guadagni in evidenza nel cruscotto, e le spese a mano (27 nov 2026, cantiere cruscotto-guadagni; Andrea: «il cruscotto vorrei che fosse più semplice… vorrei immediatamente vedere i guadagni, cosa fondamentale. E anche monitorare le spese»)
+
+COSA. In `/admin`, sotto le tre domande di prima (Da fare, Va tutto bene?, Questa settimana, intatte), una sezione nuova «💰 Guadagni»: periodo 30/90/365/sempre; tre carte (sats guadagnati, sats di spese, guadagni meno spese, con gli euro al cambio di adesso); il grafico dei guadagni per giorno/settimana/mese a barre impilate per FONTE (Mercatino, P2P, SATS Routing, Zap, Bitcoin Labs, Altro) e sotto «Da dove arrivano» con sats e percentuale; il grafico «Volumi e commissioni» (barre mercatino + P2P, linea delle commissioni sull'asse destro). Poi «💸 Spese e voci a mano»: l'elenco, le spese fisse al mese (annuali / 12), e il modulo (Spesa / Entrata Bitcoin Labs / Altra entrata, voce, importo in € o sats, una volta / ogni mese / ogni anno, dal giorno), con «Ferma» (disdetta: la storia resta) e «✕» a due tocchi (cancella tutto, per un refuso).
+
+LE FONTI. Automatiche, nessun dato nuovo: mercatino = ordini 'released' → prezzo − `netto_venditore(prezzo − protezione)`, cioè protezione + commissione, con la commissione di OGGI (stima per gli ordini di quando era un'altra; la pagina dice la percentuale); P2P = commissioni lorde (`sats_venditore − sats_compratore`) da `p2p_conti` e dal 2-di-3, come «Scambi P2P», per giorno di chiusura; SATS Routing = `swap_quota` pagate (la quota di swap@: ho letto «sats routing» come il partner SATS Routing, non le fee di forwarding del nodo, che oggi non incassiamo); Zap = `zap` pagati. A mano, tabella nuova `cassa_movimenti`: Bitcoin Labs (nessun flusso nostro da leggere) e le spese. Gli euro diventano sats al prezzo del giorno (`prezzo_storico`), o a quello di adesso dove manca. Il server espande le ricorrenze (`_date_ricorrenza_cassa`: il 31 nei mesi corti è l'ultimo giorno) e dà le serie giornaliere (`serie_guadagni`, pura); la pagina raggruppa.
+
+CHI. Rotte `/api/admin/guadagni` (GET), `/api/admin/cassa` (POST), `/api/admin/cassa/{id}/ferma` (POST), `/api/admin/cassa/{id}` (DELETE): solo AMMINISTRATORI, lo stesso giudice dei conti P2P (`vede_statistiche_p2p`, via `_solo_amministratori`, primo gesto). A un moderatore la sezione non nasce.
+
+NIENTE SI TOGLIE (la lezione del 15 ott): il grafico «Ordini P2P e prezzo» non sta più in cima ma in «Altro», nel suo gruppo chiuso (si disegna all'apertura); il resto di «Altro» è com'era. `prove_cruscotto_semplice` aggiornata nell'ordine, `prove_cruscotto_guadagni` nuova. Il resize non ridisegna mentre si scrive nel modulo (la tastiera del telefono è un resize).
+
+PROVATO: le due sezioni di prove.py qui sopra, verdi; la pagina disegnata in Chromium a 390 px con dati finti, chiaro e scuro, senza errori nuovi. NON provato: col server vero e un database vero (lo fa la CI alla promozione e la vm-2050).
+
+DA GUARDARE: se un referral di Bitcoin Labs arriva sull'indirizzo degli zap, sta già fra gli Zap (la nota della pagina dice di non scriverlo due volte); il mercatino on-chain, se un giorno avrà una fee, passa dagli stessi ordini 'released'.
+SEGUITO, lo stesso giorno (Andrea: «volumi e guadagni dovrebbero stare nello stesso grafico con un selettore per semplificare»): i due riquadri diventano uno, con in cima il selettore «Guadagni» | «Volumi e commissioni» (`vistaGU`, di serie Guadagni). «Da dove arrivano» resta sotto la vista Guadagni. Provato in Chromium a 390 px, le due viste.
+
+### 27 nov 2026 · «Non hai sats?»: il tempo stretto si vede, e vince l'ordine con più tempo (cantiere via-euro-tempo)
+Andrea: «deve essere molto chiaro che comunque il tempo per quell'ordine è molto stringente», pensando agli ordini P2P a 15 minuti. Scelta sua sulla card: «Riquadro ⏱ + ordine con più tempo».
+
+DECISO. (1) `viaEuroScelta` prende un nono argomento, `minutiDi` (dal client `minutiPagareOrdineP2P`), e fra gli ordini che vanno bene preferisce quello con PIÙ minuti per pagare: 0 vale 24 ore (`VIA_EURO_MINUTI_SERIE = 1440`), poi la cifra più bassa, poi il più recente come prima. Così un ordine a 15 minuti esce solo se è l'unico. (2) Nel riquadro «Non hai sats?», prima di «Continua», se l'ordine scelto ha un tempo corto compare il riquadro del tempo che lo scambio usa già (`rigaTempoPagareScambioP2P` nello stato «fermo»: «⏱ Avrai X per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.»). Nessuna scritta nuova: è il testo già approvato dello scambio. A 24 ore non compare niente.
+
+SCARTATE: escludere del tutto gli ordini a tempo corto (meno venditori trovati, e Andrea ha scelto di mostrarli); una frase nuova solo per «Non hai sats?» (le scritte nuove vogliono il suo ok, quella dello scambio c'era già).
+
+PROVATO: `prove_non_hai_sats` con tre casi nuovi (sceglie quello con più tempo; fra due corti quello più lungo, minuti 60; senza `minutiDi` come prima) e la sentinella del riquadro prima di «Continua»; suite severa e collaudi nel cloud. NON provato dal vivo: si guarda alla prima offerta vera su un ordine a 15–30 minuti.

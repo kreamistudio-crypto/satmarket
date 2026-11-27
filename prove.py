@@ -19108,9 +19108,10 @@ def prove_duplica_annuncio():
     # E SOLO SU CIO' CHE E' NATO QUI: duplicare un importato darebbe
     # un nativo gemello del suo evento, cioe' il doppione che la
     # deduplica dei doppioni Nostr esiste per togliere.
+    # (27 nov 2026, menu in icone) il bottone e' l'icona della fila in alto
     prova("client: il bottone non nasce sugli importati", True,
-          "${l.nostr ? '' : `<button class=\"btn ghost\" "
-          "onclick=\"duplicaAnnuncio(${l.id})\">" in mini)
+          "l.nostr ? '' : `<button class=\"share-btn\" "
+          "onclick=\"duplicaAnnuncio(${l.id})\"" in mini)
 
 
 
@@ -22139,7 +22140,11 @@ def prove_vetrina_reti_punto():
     # le due colonne entrano nei DUE cataloghi (vetrina e miei) e il
     # client le legge con la guardia di tipo
     prova("le colonne grezze stanno in CAMPI_VETRINA e in CAMPI_MIEI",
-          2, _SORGENTE.count('"u.spedizionieri AS venditore_spedizionieri, "'))
+          [1, 1],
+          # (27 nov 2026) le altre cinque SELECT le chiede la caption del canale:
+          # qui si contano solo i due cataloghi
+          [_SORGENTE[_SORGENTE.index(f"\n{c} = ("):_SORGENTE.index('u.vendite_ok")', _SORGENTE.index(f"\n{c} = ("))]
+           .count('"u.spedizionieri AS venditore_spedizionieri, "') for c in ("CAMPI_VETRINA", "CAMPI_MIEI")])
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("il client le legge dalla riga, con la guardia di tipo",
           True, "retiPunto:Array.isArray(a.venditore_reti_punto)" in mini)
@@ -22514,9 +22519,10 @@ def prove_pausa():
     # motivo — anche i servizi restano fuori, la stessa ragione
     # dell'importato: niente scorte da ricaricare (server.py rigetta
     # anche loro, non solo l'origine esterna).
+    # (27 nov 2026, menu in icone) ora e' un tasto della riga leggera
     prova("...e non la offre agli importati ne' ai servizi", True,
-          "${(l.nostr || l.consegna === 'servizio') ? '' : `<button "
-          "class=\"btn ghost\" onclick=\"apriRifornisci(" in mini)
+          "((l.nostr || l.consegna === 'servizio') ? '' : `<button "
+          "onclick=\"apriRifornisci(" in mini)
     prova("la card NON offre la pausa (li' si scorre, non si spegne)",
           True, "if (!esaurito(l) || astaE(l) || l.nostr "
           "|| l.consegna === 'servizio') return '';"
@@ -28494,9 +28500,12 @@ def prove_indirizzo_giusto():
     prova("server: i due avvisi al venditore pure", 2,
           src.count('msg += ("\\n\\n📦 Il compratore ha scelto la '
                     '<b>spedizione a "\n                "un indirizzo</b>:'))
-    prova("server: e la riga del canale", 1,
-          src.count('"🚚 Spedizione a un indirizzo o a un punto di '
-                    'ritiro"'))
+    # (27 nov 2026) la riga del canale e' diventata la tendina «Info di
+    # spedizione» («A un indirizzo», e il locker solo con le reti): la
+    # vecchia frase, che diceva SEMPRE «punto di ritiro», non deve tornare
+    prova("server: la riga del canale non dice piu' «a un indirizzo o a un punto di ritiro»; c'e' la tendina", [0, 1],
+          [src.count('"🚚 Spedizione a un indirizzo o a un punto di ritiro"'),
+           src.count('_tendina_canale("🚚 Info di spedizione", righe)')])
 
     # --- IL GIUDICE DELLA CONFERMA, fatto girare ----------------------
     import time as _t
@@ -37577,19 +37586,40 @@ def prove_canale_bot():
     prova("chiamarla senza il freno e' un errore", "TypeError", senza)
 
     # --- 2) LA CAPTION DEL CANALE --------------------------------
-    cap = {"html": html, "URL_PUBBLICO": "https://barattolo.store",
-           "LINK_BOT": "https://t.me/ilbarattolobot"}
+    cap = {"html": html, "re": re, "json": json, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
+           "TETTO_CAPTION_VISIBILE": 1024, "MAX_VETRINA_PROMO": 10}
     # la firma passa dal giudice della npub, che a sua volta vuole il
     # bech32: chi estrae una funzione ne eredita le dipendenze
     exec(next(r for r in _SORGENTE.split("\n")
               if r.startswith("CHARSET_BECH32")), cap)
+    # (27 nov 2026, le tendine del canale) la tendina «Info di
+    # spedizione» legge le zone, i nomi dei paesi e le reti di punti con
+    # i giudici VERI del server, estratti come in prove_vetrina_reti_punto
+    for tabella, fine_t in (("ZONE_SPEDIZIONE = (", ")"), ("ZONA_ETICHETTA = {", "}"),
+                            ("ENCLAVI_DOMESTICO = {", "}"),
+                            ("PAESI_PER_ZONA = {", "\n}\n"),
+                            ("_PAESE_NOME = {", "righe}"),
+                            ("DOMESTICO_DEFAULT = ", "\n")):
+        i = _SORGENTE.index("\n" + tabella) + 1
+        exec(_SORGENTE[i:_SORGENTE.index(fine_t, i) + len(fine_t)], cap)
+    cap["SPEDIZIONIERI"] = ast.literal_eval(
+        _SORGENTE[_SORGENTE.index("SPEDIZIONIERI = (") + len("SPEDIZIONIERI = "):
+                  _SORGENTE.index("\n", _SORGENTE.index("SPEDIZIONIERI = ("))])
+    cap["RETE_BARATTOLO"] = "Barattolo"
+    cap["RETE_DEL_CORRIERE"] = {"InPost": "InPost", "Poste Italiane": "Poste Italiane",
+                                "SDA": "Poste Italiane"}
+    cap["rete_barattolo_viva"] = lambda: False
     for f in ("_bech32_polymod", "npub_to_hex",
               "hex_to_npub", "chiave_nostr_provata", "_npub_breve",
-              "_npub_venditore",
+              "_npub_venditore", "nome_paese", "etichetta_zona",
               "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria",
               "_hashtag_promo", "_firma_venditore", "_tariffa_dichiarata",
-              "_sped_in_sats", "_costo_sped_promo", "_righe_consegna_promo",
-              "_vetrina_venditore", "link_telegram", "_caption_canale"):
+              "_zone_annuncio", "_non_spedisce_casa", "reti_venditore",
+              "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
+              "_tendina_canale", "_cifra_sped_promo", "_reti_punto_promo",
+              "_righe_consegna_promo", "_vetrina_venditore",
+              "link_telegram", "_caption_canale"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
          "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
@@ -37598,7 +37628,8 @@ def prove_canale_bot():
          "consegna": "entrambe", "anche_digitale": 0,
          "spedizione_sats": 5000, "spedizione_eur": 0.0,
          "spedizione_punto_dichiarata": 0,
-         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0}
+         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0,
+         "paese_domestico": "IT", "spedizione_zone": ""}
     t = cap["_caption_canale"](a, 0)
     prova("il titolo c'e' in grassetto", True,
           "<b>Chitarra classica</b>" in t)
@@ -37632,14 +37663,18 @@ def prove_canale_bot():
     # legge PRIMA di aprire, e finora nel canale non c'era.
     # (13 ott 2026, cantiere indirizzo-giusto) «a un indirizzo», non
     # «a casa»: il nome della via e' uno solo, anche nel canale
-    prova("la spedizione nomina tutte e due le destinazioni", True,
-          "🚚 Spedizione a un indirizzo o a un punto di ritiro" in t)
+    # (27 nov 2026, le tendine del canale) la riga «🚚 Spedizione a un
+    # indirizzo o a un punto di ritiro» e' diventata la TENDINA «Info di
+    # spedizione»: queste prove misurano la cosa cambiata
+    prova("la spedizione e' una tendina: titolo fuori, citazione espandibile dentro", True,
+          "<b>🚚 Info di spedizione</b>\n<blockquote expandable>📦 A un indirizzo\n"
+          "• Italia: 5.000 sats" in t)
     prova("col suo costo", True, "5.000 sats" in t)
-    prova("e il ritiro in zona ha la riga sua", True,
-          "🤝 Ritiro in zona" in t)
+    prova("e il ritiro a mano ha la voce sua, con la zona", True,
+          "🤝 Ritiro a mano\n• Torino (TO): <b>gratuito</b></blockquote>" in t)
     solo_sped = cap["_caption_canale"](dict(a, consegna="spedizione"), 0)
     prova("chi non ritira non lo promette", False,
-          "Ritiro in zona" in solo_sped)
+          "Ritiro a mano" in solo_sped)
     gratis = cap["_caption_canale"](dict(a, spedizione_sats=0), 0)
     prova("la spedizione a zero si dice gratuita", True,
           "<b>gratuita</b>" in gratis)
@@ -37657,26 +37692,76 @@ def prove_canale_bot():
           "🚚" not in muto and "🤝" not in muto and "💾" not in muto)
     # LA TARIFFA ANCORATA ALL'EURO SENZA CAMBIO: si dice la strada, mai
     # una cifra inventata (la regola dell'avviso EUR senza cambio).
+    # (27 nov 2026) la tendina dice la tariffa nella valuta NATIVA, come
+    # quella della scheda: l'euro ancorato esce «4,50 €» anche a cambio
+    # muto (non c'e' niente da convertire, e mai una «gratuita» inventata);
+    # il «da» col minimo di `_costo_sped_promo` non c'e' piu', perche'
+    # ogni strada ha la sua riga col suo prezzo
     ancorata = dict(a, spedizione_sats=0, spedizione_eur=4.50)
     senza_cambio = cap["_caption_canale"](ancorata, 0)
-    prova("euro ancorato e cambio muto: la strada c'e'", True,
-          "🚚 Spedizione a un indirizzo o a un punto di ritiro"
-          in senza_cambio)
-    prova("...ma senza cifra e senza «gratuita»", True,
-          "gratuita" not in senza_cambio and "4,50" not in senza_cambio)
-    prova("col cambio la cifra parla euro", True,
-          "4,50 €" in cap["_caption_canale"](ancorata, 60000))
-    # Due strade a prezzo diverso: «da» col MINIMO, mai due cifre.
-    due = dict(a, spedizione_punto_dichiarata=1,
-               spedizione_punto_sats=3000)
-    prova("tariffe diverse: «da» col minimo", True,
-          "da 3.000 sats" in cap["_caption_canale"](due, 0))
+    prova("euro ancorato e cambio muto: la tendina c'e', con la cifra in euro", True,
+          "<b>🚚 Info di spedizione</b>" in senza_cambio
+          and "• Italia: 4,50 €" in senza_cambio)
+    prova("...e mai una «gratuita» inventata", False, "gratuita" in senza_cambio)
+    prova("col cambio la cifra e' la stessa (non si converte)", True,
+          "• Italia: 4,50 €" in cap["_caption_canale"](ancorata, 60000))
+    # IL LOCKER SOLO CON LE RETI (il giudice della cassa, `reti_punto`): la
+    # riga di ieri diceva SEMPRE «a un punto di ritiro», che dal 12 ott
+    # 2026 non e' piu' vero
+    due = dict(a, spedizione_punto_dichiarata=1, spedizione_punto_sats=3000)
+    prova("senza colonne dei corrieri nessun locker (fail-closed)", False,
+          "Locker" in cap["_caption_canale"](due, 0)
+          or "punto di ritiro" in cap["_caption_canale"](due, 0))
+    con_reti = dict(due, venditore_spedizionieri="|InPost|BRT|",
+                    venditore_spedizioniere="")
+    tr = cap["_caption_canale"](con_reti, 0)
+    prova("con una rete di punti il locker c'e', con la sua tariffa e la rete", True,
+          "📮 Locker / punto di ritiro\n• Italia: 3.000 sats\nReti: InPost" in tr
+          and "• Italia: 5.000 sats" in tr)
+    prova("BRT, che non ha la mappa dei punti, non e' una rete", False, "BRT" in tr)
+    prova("solo corrieri senza rete (DHL): niente locker", False,
+          "Locker" in cap["_caption_canale"](
+              dict(due, venditore_spedizionieri="|DHL|"), 0))
+    prova("il ripiego sulla colonna singolare vale (SDA = rete Poste)", True,
+          "Reti: Poste Italiane" in cap["_caption_canale"](
+              dict(due, venditore_spedizionieri="", venditore_spedizioniere="SDA"), 0))
+    prova("senza la tariffa del punto dichiarata il locker costa come la casa", True,
+          "📮 Locker / punto di ritiro\n• Italia: 5.000 sats" in cap["_caption_canale"](
+              dict(con_reti, spedizione_punto_dichiarata=0), 0))
+    prova("i punti Barattolo spenti non entrano (gate chiuso)", False,
+          "Locker" in cap["_caption_canale"](
+              dict(due, venditore_spedizionieri="|Barattolo|"), 0))
+    prova("la spunta «non spedisco a casa» toglie la casa e il locker", True,
+          "• Italia" not in cap["_caption_canale"](dict(con_reti, non_spedisce_casa=1), 0))
+    # LE ZONE ESTERE, con i nomi umani e il supplemento
+    zone = dict(a, spedizione_zone=json.dumps({"eu": {"sats": 12000, "eur": 0},
+                                               "nordamerica": {"sats": 0, "eur": 25.0},
+                                               "marte": {"sats": 1, "eur": 0}}),
+                spedizione_extra_sats=1000, spedizione_extra_eur=0)
+    tz = cap["_caption_canale"](zone, 0)
+    prova("le zone estere: nome umano e prezzo, nell'ordine dei continenti; una zona che "
+          "non esiste si butta", True,
+          "• Italia: 5.000 sats\n• Europa: 12.000 sats\n• Nord America: 25,00 €\n" in tz
+          and "marte" not in tz.lower())
+    prova("il supplemento per pezzo", True, "+ 1.000 sats per ogni pezzo in più" in tz)
+    prova("il paese di casa e' quello dichiarato", True,
+          "• Svizzera: 5.000 sats" in cap["_caption_canale"](dict(a, paese_domestico="CH"), 0))
+    prova("sull'asta niente cifre: «inclusa»", True,
+          "• Italia: inclusa" in cap["_caption_canale"](dict(zone, asta_base_sats=500), 0)
+          and "per ogni pezzo" not in cap["_caption_canale"](dict(zone, asta_base_sats=500), 0))
+    prova("il codice online dentro la tendina, quando c'e' una spedizione", True,
+          "🤝 Ritiro a mano\n• Torino (TO): <b>gratuito</b>\n💾 Codice online</blockquote>"
+          in cap["_caption_canale"](dict(a, anche_digitale=1), 0))
+    prova("il solo codice online non e' una spedizione: la riga di sempre, niente tendina", True,
+          "\n💾 Codice online, subito\n" in cap["_caption_canale"](dict(a, consegna="digitale"), 0)
+          and "Info di spedizione" not in cap["_caption_canale"](dict(a, consegna="digitale"), 0))
 
     # LA CONTROPARTITA DEL FRENO: un post a settimana, ma quel post
     # porta anche gli altri articoli del venditore.
     altri = [{"id": 7, "titolo": "Amplificatore"},
              {"id": 8, "titolo": "Leggio"}]
     v = cap["_caption_canale"](a, 0, altri=altri)
+    # (27 nov 2026) la vetrina e' la tendina «🛍 Altri articoli del negozio»
     # LE VOCI SONO TORNATE ANCORE (16 ott 2026, chiesto da Andrea: «i
     # link devono stare dentro le scritte»). Il DEEP LINK resta quello
     # scelto il 15 ott — cambia solo come si vede: il titolo E' il
@@ -37689,8 +37774,11 @@ def prove_canale_bot():
           'Amplificatore</a>' in v and "startapp=annuncio_8" in v)
     prova("e il negozio resta in coda come sempre", True,
           "vedi il suo negozio" in v)
+    prova("la vetrina e' la tendina «Altri articoli del negozio»: titolo fuori, voci dentro", True,
+          "<b>🛍 Altri articoli del negozio</b>\n<blockquote expandable>• <a href=" in v
+          and "Anche in vendita" not in v)
     prova("senza altri articoli non compare la sezione", False,
-          "Anche in vendita" in t)
+          "Altri articoli" in t)
     lungo = cap["_caption_canale"](a, 0, altri=[
         {"id": 9, "titolo": "T" * 80}])
     # il troncamento si riconosce dal `…` attaccato alla chiusura
@@ -37921,6 +38009,7 @@ console.log(JSON.stringify([
            "_posta_negozio",          # la raffica di un negozio solo
            "comando_canale",          # che il canale lo DICE, non ci posta
            "annuncia_ordine_p2p_canale",  # l'ordine P2P appena pubblicato
+           "_posta_richiesta_nei_canali",  # la richiesta di Cerco (27 nov 2026)
            "promo_in_cima_canale"},   # «⬆️ In cima», la promozione pagata
           # `_manda_post_canale` non c'e': il canale non lo sceglie,
           # lo RICEVE — ed e' precisamente quel che la prova qui
@@ -48006,8 +48095,9 @@ def prove_fogli_di_casa():
           "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza; dal 24 nov "
           "«Mandi l'immagine incollata?» della chat; dal 26 nov la scelta "
           "dell'annuncio da promuovere dal Profilo, e «Annullare "
-          "l'estrazione?» di chi regala, a lista vuota)",
-          148, solo_codice(mini).count("chiediConferma({"))
+          "l'estrazione?» di chi regala, a lista vuota; dal 27 nov "
+          "«🧹 Ritira i badge» dei distintivi non più su Nostr)",
+          149, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -57586,25 +57676,34 @@ def prove_collaudi_senza_coincurve():
 
 
 def prove_collaudi_in_ci():
-    """I COLLAUDI IN CI (22 set 2026). Lo step che li gira sta nel job
-    `prove` — non in un job suo, perche' il giudice del VPS chiede il
-    verde di `prove` e `segreti` PER NOME, e un job terzo rosso non
-    fermerebbe nessun deploy. E la gabbia della rete si prova MORDERE,
-    non solo esistere: un sitecustomize che non si carica piu' lascia
-    passare tutto senza dire niente."""
+    """I COLLAUDI IN CI (22 set 2026). Il giudice del VPS chiede il verde
+    di `prove` e `segreti` PER NOME, e un job terzo rosso da solo non
+    fermerebbe nessun deploy: fino al 27 nov 2026 lo step stava DENTRO
+    `prove`. Dal 27 nov (cantiere ci-a-pezzi) i collaudi girano in sei
+    pezzi, nel job `collaudi-a-pezzi`, e `prove` e' il giudice dei pezzi:
+    lo aspetta (`needs`) ed e' verde solo se il risultato dei collaudi e'
+    `success`. Qui si tiene quella catena. E la gabbia della rete si
+    prova MORDERE, non solo esistere: un sitecustomize che non si carica
+    piu' lascia passare tutto senza dire niente."""
     print("\n[i collaudi in CI]")
     import subprocess
     import tempfile
     wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
-    job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    job = wf[wf.index("\n  collaudi-a-pezzi:"):wf.index("\n  prove:")]
+    giudice = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
     i = job.find("python collaudi_ci.py")
-    prova("lo step dei collaudi sta nel job `prove`", True, i > 0)
+    prova("lo step dei collaudi sta nel job dei pezzi dei collaudi", True, i > 0)
+    prova("...e `prove` li aspetta e chiede che siano verdi", [True, True, True],
+          ["needs: [prove-a-pezzi, collaudi-a-pezzi]" in giudice,
+           "COLLAUDI: ${{ needs.collaudi-a-pezzi.result }}" in giudice,
+           '[ "$COLLAUDI" != success ]' in giudice])
     # L'ELENCO STA IN ci/collaudi.txt (13 ott 2026): il passo dice solo
     # DOVE, con la riga esatta — vedi `prove_elenco_dei_collaudi`. Le
     # due opzioni in coda sono della CI leggera (16 ott 2026), e le
     # guarda `prove_ci_leggera`.
     prova("...e legge l'elenco dal suo file, fuori dal workflow",
-          "python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2 "
+          "python collaudi_ci.py --elenco ci/collaudi.txt "
+          "--pezzo ${{ matrix.pezzo }}/6 --paralleli 3 "
           "--salvo-solo-documenti-da pronto",
           job[i:job.find("\n", i)].strip() if i > 0 else None)
     elenco = _collaudi_della_ci()
@@ -57619,8 +57718,11 @@ def prove_collaudi_in_ci():
     # che si potesse leggere e non che dicesse il vero
     prova("...e c'e' la classifica, che stava nel solo compileall", True,
           "collaudo_classifica" in elenco)
-    prova("...e parla anche quando le prove sono rosse", True,
-          "!cancelled()" in job[job.rfind("- name:", 0, i):i])
+    # parla anche quando le prove sono rosse: e' un job suo, senza
+    # `needs`, e il giudice dei pezzi parla anche lui quando un pezzo e'
+    # rosso (`!cancelled()`), sennò resterebbe «skipped»
+    prova("...e parla anche quando le prove sono rosse", [False, True],
+          ["\n    needs:" in job, "if: ${{ !cancelled() }}" in giudice])
 
     # la gabbia, fatta girare: un nome che non esiste per costruzione
     # (.invalid non si risolve mai), quindi anche a gabbia rotta non
@@ -57803,32 +57905,132 @@ def prove_ci_solo_main():
           [False, False, False],
           ["pull_request" in senza_commenti, "schedule:" in senza_commenti,
            "branches-ignore" in senza_commenti])
-    lavori = _re.findall(r"(?m)^  ([a-z_]+):\n", senza_commenti.split("\njobs:\n", 1)[1])
-    prova("i tre lavori, coi nomi che il giudice del VPS chiede",
-          ["prove", "segreti", "pronto"], lavori)
+    lavori = _re.findall(r"(?m)^  ([a-z_-]+):\n", senza_commenti.split("\njobs:\n", 1)[1])
+    prova("i lavori, coi nomi che il giudice del VPS chiede (dal 27 nov anche i pezzi)",
+          ["prove-a-pezzi", "collaudi-a-pezzi", "prove", "segreti", "pronto"], lavori)
     job_pronto = wf[wf.index("\n  pronto:"):]
     prova("`pronto` si alza SOLO su un push a main: un giro a mano non lo sposta",
           1, job_pronto.count(
               "if: github.ref == 'refs/heads/main' && github.event_name == 'push'"))
     prima_di_pronto = wf[:wf.index("\n  pronto:")]
-    # L'UNICA ECCEZIONE (20 ott 2026, cantiere runner-vm): la riga
-    # `runs-on` di `prove` guarda il ramo per scegliere la MACCHINA (sui
-    # rami sempre GitHub), mai per saltare il job. Si toglie quella riga,
-    # esatta, e il resto deve restare senza condizioni come prima.
-    riga_macchina = "    runs-on: " + RUNS_ON_PROVE
-    resto = "\n".join(r for r in prima_di_pronto.splitlines()
-                      if not _re.fullmatch(riga_macchina, r))
+    # DAL 27 NOV 2026 (cantiere ci-a-pezzi) non c'e' piu' nemmeno la riga
+    # che sceglieva la macchina di `prove` guardando il ramo: tutti i job
+    # stanno su GitHub, e nessuno guarda ne' il ramo ne' l'evento. L'unica
+    # condizione prima di `pronto` e' il `!cancelled()` del giudice dei
+    # pezzi, che non guarda nessuno dei due.
     prova("...e prove e segreti non guardano ne' il ramo ne' l'evento: a mano provano tutto",
-          [False, False],
-          ["github.event_name" in resto, "github.ref ==" in resto])
-    prova("...salvo la riga che sceglie la macchina di `prove`, una e sola", 1,
-          sum(1 for r in prima_di_pronto.splitlines() if _re.fullmatch(riga_macchina, r)))
+          [False, False, False],
+          ["github.event_name" in prima_di_pronto, "github.ref ==" in prima_di_pronto,
+           "vars." in prima_di_pronto])
     prova("il salto dei soli documenti resta, contro `pronto`", 1,
           senza_commenti.count("--salvo-solo-documenti-da pronto"))
     claude = open("CLAUDE.md", encoding="utf-8").read().replace("\r\n", "\n")
-    prova("CLAUDE.md lo dice alle sessioni cloud", True,
-          "LE SESSIONI CLOUD NON ASPETTANO PIÙ LA CI SUL RAMO" in claude
-          and "la loro prova è suite e collaudi locali" in claude)
+    # e dal 27 nov 2026 (regola di Andrea) nemmeno le sessioni girano la
+    # suite prima di develop: le prove le fa la CI alla promozione
+    prova("CLAUDE.md lo dice alle sessioni", True,
+          "LE PROVE SI FANNO SOLO ALLA PROMOZIONE" in claude
+          and "SENZA SUITE NÉ COLLAUDI" in claude)
+
+
+def prove_ci_a_pezzi():
+    """LA CI A PEZZI (27 nov 2026, cantiere ci-a-pezzi, Andrea: «sistema la
+    questione delle CI troppo lente»). Le prove in cinque pezzi e i
+    collaudi in sei, undici macchine di GitHub insieme, e il job `prove`
+    giudice dei pezzi. Qui si tiene: (1) che il numero dei pezzi scritto
+    nel lanciatore sia quello della matrice — una matrice da 4 con un
+    `/5` lascerebbe un pezzo intero di sezioni MAI girato, verde; (2) che
+    la divisione sia una PARTIZIONE (ogni nome in un pezzo solo, nessuno
+    perso, l'ordine di partenza tenuto, la stessa su ogni macchina), in
+    prove.py e in collaudi_ci.py; (3) che un pezzo storto fermi tutto col
+    2; (4) che i pesi parlino di sezioni che ci sono; (5) che il giudice
+    dei pezzi aspetti tutti e due i job e chieda `success` a entrambi.
+    Il perche' e i numeri: docs/CANTIERI.md, «La CI a pezzi»."""
+    print("\n[la CI a pezzi]")
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read().replace("\r\n", "\n")
+    vivo = "\n".join(r for r in wf.splitlines() if not r.lstrip().startswith("#"))
+
+    def job(nome):
+        j = vivo[vivo.index(f"\n  {nome}:"):]
+        m = re.search(r"\n  [\w-]+:\n", j[3:])
+        return j if not m else j[:m.start() + 3]
+
+    for nome, lancio in (("prove-a-pezzi", r"run: python prove\.py --pezzo=\$\{\{ matrix\.pezzo \}\}/(\d+)\s*$"),
+                         ("collaudi-a-pezzi", r"run: python collaudi_ci\.py .*--pezzo \$\{\{ matrix\.pezzo \}\}/(\d+) .*$")):
+        j = job(nome)
+        matrice = re.search(r"(?m)^        pezzo: \[([0-9, ]+)\]\s*$", j)
+        voci = [int(x) for x in matrice.group(1).split(",")] if matrice else []
+        n = re.search(r"(?m)" + lancio, j)
+        prova(f"{nome}: la matrice e' 1..N e il lanciatore dice /N",
+              [True, True], [bool(voci) and voci == list(range(1, len(voci) + 1)),
+                             bool(n) and int(n.group(1)) == len(voci)])
+        prova(f"...piu' di un pezzo, e un rosso non ferma gli altri ({nome})", [True, True],
+              [len(voci) > 1, "fail-fast: false" in j])
+    giudice = job("prove")
+    prova("il giudice `prove` aspetta i due job a pezzi, parla anche sul rosso",
+          [True, True, False],
+          ["needs: [prove-a-pezzi, collaudi-a-pezzi]" in giudice,
+           "if: ${{ !cancelled() }}" in giudice, "always()" in giudice])
+    prova("...e chiede `success` a tutti e due", [True, True, True, True],
+          ["PROVE: ${{ needs.prove-a-pezzi.result }}" in giudice,
+           "COLLAUDI: ${{ needs.collaudi-a-pezzi.result }}" in giudice,
+           '[ "$PROVE" != success ]' in giudice, "exit 1" in giudice])
+    prova("...e `pronto` aspetta il giudice e i segreti, come prima", True,
+          "needs: [prove, segreti]" in job("pronto"))
+    prova("fastapi solo nei collaudi: prove.py gira senza", [False, True],
+          ["fastapi" in job("prove-a-pezzi"), "fastapi" in job("collaudi-a-pezzi")])
+    prova("il compileall gira una volta sola, nel primo pezzo", True,
+          bool(re.search(r"- name: Tutto compila\n        if: matrix\.pezzo == 1\n",
+                         job("prove-a-pezzi"))))
+
+    # LA PARTIZIONE, in prove.py
+    nomi = [f"prove_x{i}" for i in range(40)] + ["prove_p2p_motore", "prove_lingua_inglese"]
+    pesi = {"prove_x3": 50, "prove_x7": 20, "prove_x8": 20}
+    for n in (1, 2, 5, 7):
+        pezzi = [_il_mio_pezzo(nomi, k, n, pesi) for k in range(1, n + 1)]
+        tutti = [x for pz in pezzi for x in pz]
+        prova(f"prove.py, {n} pezzi: ognuno in un pezzo solo, nessuno perso, l'ordine tenuto",
+              [True, True, True],
+              [sorted(tutti) == sorted(nomi), len(tutti) == len(set(tutti)),
+               all(pz == [x for x in nomi if x in pz] for pz in pezzi)])
+    prova("...la stessa divisione a ogni giro", True,
+          _il_mio_pezzo(nomi, 2, 5, pesi) == _il_mio_pezzo(list(nomi), 2, 5, dict(pesi)))
+    prova("...la sezione piu' pesante va da sola nel primo pezzo", True,
+          "prove_x3" in _il_mio_pezzo(nomi, 1, 5, pesi))
+    prova("...piu' pezzi che sezioni: i pezzi in piu' restano vuoti", [["prove_x0"], []],
+          [_il_mio_pezzo(["prove_x0"], 1, 2), _il_mio_pezzo(["prove_x0"], 2, 2)])
+    prova("il pezzo dagli argomenti: =, spazio, e via dal resto",
+          [(2, 5, ["--mostra"]), (3, 3, []), (1, 1, ["--categoria=p2p"])],
+          [_togli_pezzo(["--pezzo=2/5", "--mostra"]), _togli_pezzo(["--pezzo", "3/3"]),
+           _togli_pezzo(["--categoria=p2p"])])
+    storti = []
+    for v in (["--pezzo=6/5"], ["--pezzo=0/5"], ["--pezzo=due"], ["--pezzo"], ["--pezzo=1/"]):
+        try:
+            _togli_pezzo(v)
+            storti.append(None)
+        except SystemExit as e:
+            storti.append(e.code)
+    prova("...un pezzo storto ferma col 2 (6/5, 0/5, due, vuoto, 1/)", [2] * 5, storti)
+    prova("i pesi parlano di sezioni che ci sono", [],
+          [n for n in PESI_PEZZI if not callable(globals().get(n))])
+
+    # LA PARTIZIONE, in collaudi_ci.py
+    amb = {"__file__": "collaudi_ci.py"}
+    exec(open("collaudi_ci.py", encoding="utf-8").read().split("\ndef racconta(")[0], amb)
+    tp, mio = amb.get("togli_pezzo"), amb.get("il_mio_pezzo")
+    prova("collaudi_ci.py ha il pezzo", [True, True], [callable(tp), callable(mio)])
+    if callable(tp) and callable(mio):
+        el = [f"collaudo_{i}" for i in range(17)]
+        pezzi = [mio(el, k, 6) for k in range(1, 7)]
+        tutti = [x for pz in pezzi for x in pz]
+        prova("...sei pezzi: ognuno in un pezzo solo, nessuno perso", [True, True],
+              [sorted(tutti) == sorted(el), len(tutti) == len(set(tutti))])
+        prova("...e l'opzione si legge ovunque stia, il resto resta com'e'",
+              [(2, 6, ["--elenco", "ci/collaudi.txt", "--paralleli", "3"]), (1, 1, ["collaudo_x"])],
+              [tp(["--elenco", "ci/collaudi.txt", "--pezzo", "2/6", "--paralleli", "3"]),
+               tp(["collaudo_x"])])
+        prova("...e una storta torna None (il lanciatore esce col 2)", [None] * 4,
+              [tp(["--pezzo", "7/6"]), tp(["--pezzo", "0/6"]), tp(["--pezzo"]), tp(["--pezzo", "x"])])
 
 
 def prove_ci_leggera():
@@ -57846,6 +58048,10 @@ def prove_ci_leggera():
     import tempfile
     wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
     testa = wf.split("\njobs:", 1)[0]
+    # dal 27 nov 2026 (ci-a-pezzi) le prove e i collaudi stanno nei job a
+    # pezzi, e `prove` e' il loro giudice
+    job_pezzi_prove = wf[wf.index("\n  prove-a-pezzi:"):wf.index("\n  collaudi-a-pezzi:")]
+    job_pezzi_collaudi = wf[wf.index("\n  collaudi-a-pezzi:"):wf.index("\n  prove:")]
     job_prove = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
     job_segreti = wf[wf.index("\n  segreti:"):wf.index("\n  pronto:")]
     job_pronto = wf[wf.index("\n  pronto:"):]
@@ -57859,13 +58065,15 @@ def prove_ci_leggera():
           _re.search(r"cancel-in-progress:\s*true", senza_commenti) is not None)
     # 2. I TETTI, uno per job
     prova("ogni job ha il suo tetto di minuti",
-          ["60", "15", "10"],
+          ["20", "20", "5", "15", "10"],
           [(_re.search(r"(?m)^    timeout-minutes: (\d+)\s*$", j) or [None, None])[1]
-           for j in (job_prove, job_segreti, job_pronto)])
+           for j in (job_pezzi_prove, job_pezzi_collaudi, job_prove,
+                     job_segreti, job_pronto)])
     # 3. IL SALTO DEI DOCUMENTI tocca SOLO i collaudi: prove.py e i
     # segreti girano interi a ogni giro, senza condizioni nuove
-    passo_prove = job_prove[job_prove.index("- name: Le prove\n"):]
-    passo_prove = passo_prove[:passo_prove.index("\n      - name:", 1)]
+    passo_prove = job_pezzi_prove[job_pezzi_prove.index("- name: Le prove\n"):]
+    fine = passo_prove.find("\n      - name:", 1)
+    passo_prove = passo_prove if fine < 0 else passo_prove[:fine]
     prova("il passo di prove.py resta senza condizioni: la scelta la fa "
           "prove.py da se' (ci-mirata, `_argomenti_della_ci`)",
           [False, True],
@@ -61894,7 +62102,7 @@ def prove_link_dentro_telegram():
         exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb)
         for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
                   "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
-                  "_firma_venditore", "_premio_canale_p2p", "_caption_canale_p2p"):
+                  "_firma_venditore", "_premio_canale_p2p", "_tendina_canale", "_caption_canale_p2p"):
             exec(pezzo(f), amb)
         return amb["_caption_canale_p2p"](
             "vendo", 100, "Revolut", {"venditore": "Rosina", "venditore_username": "rosina",
@@ -87911,7 +88119,7 @@ def prove_p2p_canale():
               if r.startswith("CHARSET_BECH32")), amb)
     for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub",
               "chiave_nostr_provata", "_npub_breve", "_npub_venditore",
-              "_firma_venditore", "_premio_canale_p2p", "_caption_canale_p2p"):
+              "_firma_venditore", "_premio_canale_p2p", "_tendina_canale", "_caption_canale_p2p"):
         exec(pezzo(f), amb)
     cap = amb["_caption_canale_p2p"]
     NPUB = ("npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqq"
@@ -95096,7 +95304,9 @@ def prove_p2p_campanello():
     # delle 12 parole, come la gamba dell'app
     # TREDICI dal 27 nov 2026 («bunker-dopo-chiusura»): il profilo che nasce
     # per le chat di un nativo Nostr registra la sua pubblica, come il gesto
-    prova("i chiamanti di registraChiaviP2P sono tredici", 13, len(_reg))
+    # QUATTORDICI dal 27 nov 2026 («resto-intervallo»): la trade key del
+    # resto che torna nel libro, come quella di un ordine pubblicato a mano
+    prova("i chiamanti di registraChiaviP2P sono quattordici", 14, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
@@ -112856,7 +113066,7 @@ def prove_quantita_servizi():
           pezzo_js(mini, "function bottoneRifornisci(l){", "\n}\n"))
     prova("...idem «Aggiorna i pezzi» sulla scheda propria", True,
           "l.consegna === 'servizio') ? '' : `<button "
-          "class=\"btn ghost\" onclick=\"apriRifornisci(" in mini)
+          "onclick=\"apriRifornisci(" in mini)
 
     # ---- 56-58: il form di vendita ------------------------------------
     prova("il campo «Quantità disponibile» si nasconde anche per "
@@ -126134,6 +126344,54 @@ def prove_indirizzo_lightning():
           and "/.well-known/lnurlp/zap" in prod)
 
 
+def prove_cruscotto_guadagni():
+    """💰 I GUADAGNI E LE SPESE nel cruscotto (27 nov 2026, cantiere
+    cruscotto-guadagni): le date delle voci che si ripetono, le serie per
+    fonte, gli euro al prezzo del giorno, e le rotte dei soldi chiuse a
+    chi non vede i conti."""
+    print("\n💰 Il cruscotto: guadagni per fonte e spese a mano")
+    amb = {}
+    exec(pezzo("_date_ricorrenza_cassa") + "\n\n" + pezzo("serie_guadagni"), amb)
+    d = amb["_date_ricorrenza_cassa"]
+    prova("ogni mese: il 31 diventa l'ultimo dei mesi corti, mai oltre oggi",
+          ["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"],
+          d("2026-01-31", "mese", "", "2026-05-02"))
+    prova("...ogni anno fino al giorno in cui la si ferma",
+          ["2024-02-29", "2025-02-28", "2026-02-28"],
+          d("2024-02-29", "anno", "2026-03-01", "2026-11-27"))
+    prova("...una voce nel futuro non cade ancora", [],
+          d("2026-12-01", "una", "", "2026-11-27"))
+    sg = amb["serie_guadagni"](
+        [("2026-11-01", 1000, 20)], [("2026-11-01", 5000, 50)],
+        [("2026-11-02", 7)], [("2026-11-03", 9)],
+        [{"verso": "spesa", "fonte": "", "importo": 2000, "valuta": "eur",
+          "ricorrenza": "una", "giorno": "2026-10-15", "fine": ""},
+         {"verso": "entrata", "fonte": "bitcoin_labs", "importo": 500,
+          "valuta": "sats", "ricorrenza": "una", "giorno": "2026-11-03",
+          "fine": ""}],
+        {"2026-10-15": 80000.0}, 90000.0, "2026-11-27")
+    prova("le colonne per giorno: volumi, commissioni, SATS Routing, zap, "
+          "Bitcoin Labs, altro, spese (20 € al prezzo DI QUEL GIORNO)",
+          [["2026-10-15", 0, 0, 0, 0, 0, 0, 0, 0, 25000],
+           ["2026-11-01", 1000, 5000, 20, 50, 0, 0, 0, 0, 0],
+           ["2026-11-02", 0, 0, 0, 0, 7, 0, 0, 0, 0],
+           ["2026-11-03", 0, 0, 0, 0, 0, 9, 500, 0, 0]], sg["giorni"])
+    for rotta in ("guadagni_admin", "cassa_aggiungi_admin",
+                  "cassa_ferma_admin", "cassa_cancella_admin"):
+        r = pezzo(rotta)
+        prova(f"{rotta}: il controllo degli amministratori e' il primo gesto",
+              True, "_solo_amministratori(" in r
+              and r.index("_solo_amministratori(") < r.find("db()"))
+    prova("...e il giudice e' quello dei conti P2P", True,
+          "vede_statistiche_p2p(user" in pezzo("_solo_amministratori"))
+    pagina = open("admin.html", encoding="utf-8").read()
+    prova("la pagina: la voce scritta a mano passa da esc(), e la sezione "
+          "nasce solo per chi vede i conti", True,
+          "esc(m.voce)" in pagina
+          and "if (!D || !D.p2p_statistiche) return '';" in pagina
+          and "if (D.p2p_statistiche) caricaGuadagni();" in pagina)
+
+
 def prove_grazie_zap():
     """IL GRAZIE A CHI CI FA UNO ZAP (25 nov 2026, cantiere grazie-zap).
     Andrea: il grazie «a tutti, anche chi ci manda 1 sat», il premio
@@ -132879,10 +133137,14 @@ def prove_cruscotto_semplice():
                        "<h2>Fee di routing</h2>", "<h2>I canali del nodo</h2>",
                        "${cardZap(D.zap)}", "${cardDisputeP2P(D.dispute_p2p)}")
            if pagina.find(x) < altro])      # -1 = sparita: rosso, non un'eccezione
-    prova("in cima, nell'ordine: da fare, salute, settimana, grafico", True,
+    # dal 27 nov 2026 (cantiere cruscotto-guadagni) sotto le tre domande
+    # ci sono i guadagni, e il grafico ordini P2P / prezzo e' in «Altro»
+    prova("in cima, nell'ordine: da fare, salute, settimana, guadagni; il "
+          "grafico P2P in «Altro»", True,
           pagina.index("${sezioneDaFare()}") < pagina.index("${sezioneSalute(L)}")
-          < pagina.index("${sezioneSettimana()}") < pagina.index("${sezioneGrafico()}")
-          < altro)
+          < pagina.index("${sezioneSettimana()}")
+          < pagina.index('<div id="sezGuadagni">${sezioneGuadagni()}</div>')
+          < altro < pagina.index("${sezioneGrafico()}"))
     prova("la sezione degli Scambi P2P nasce nascosta e si mostra solo DOPO "
           "il controllo del 403", True,
           'id="p2pBox" hidden' in pagina
@@ -136311,8 +136573,12 @@ def prove_badge_nostr():
     vero2.close()
 
     corpo_sync = pezzo("sincronizza_badge_distintivi")
-    prova("la sincronizzazione scorre TUTTI i distintivi", True,
-          "for dist in DISTINTIVI:" in corpo_sync)
+    prova("la sincronizzazione scorre SOLO i distintivi che escono su "
+          "Nostr (27 nov 2026)", True,
+          'for dist in [x for x in DISTINTIVI if x.get("nostr")]:'
+          in corpo_sync)
+    prova("...e per ognuno col SUO criterio, non quello dell'app", True,
+          "merita_su_nostr(dist, _dati_distintivi(" in corpo_sync)
     prova("...prende chi ce l'ha gia' con npub verificata", True,
           "badge_id=? AND u.npub_verificata=1" in
           " ".join(corpo_sync.split()))
@@ -136320,11 +136586,55 @@ def prove_badge_nostr():
           'await _premia_distintivo(dist, r["tg_id"])' in corpo_sync)
 
     corpo_gancio = pezzo("premia_distintivi")
-    prova("premia_distintivi aggancia il badge Nostr per ogni "
-          "distintivo nuovo", True,
-          "await _premia_distintivo(dd, tg_id)" in corpo_gancio)
-    prova("...ma un intoppo su Nostr non rompe il resto (due try, non "
-          "uno solo)", 2, corpo_gancio.count("try:"))
+    prova("premia_distintivi aggancia il badge Nostr solo a chi lo "
+          "merita su Nostr", True,
+          "await _premia_distintivo(dd, tg_id)" in corpo_gancio
+          and "if not merita_su_nostr(dd, d):" in corpo_gancio)
+    prova("...ma un intoppo su Nostr non rompe il resto (tre try, non "
+          "uno solo)", 3, corpo_gancio.count("try:"))
+
+    # --- 10) su Nostr solo tre badge (27 nov 2026, Andrea) -------------
+    i = _SORGENTE.index("SPECCHIATO_NOSTR_AFFARI = ")
+    amb10 = {}
+    exec(_SORGENTE[i:_SORGENTE.index("\n]\n", i) + 3], amb10)
+    exec(pezzo("merita_su_nostr"), amb10)
+    cat = {x["id"]: x for x in amb10["DISTINTIVI"]}
+    prova("escono su Nostr SOLO Pioniere e Specchiato",
+          ["pioniere", "specchiato"],
+          sorted(k for k, x in cat.items() if x.get("nostr")))
+    base = dict(vendite=20, acquisti=5, dispute_perse=0, fb_ricevuti=10,
+                fb_media=4.5, coorte="")
+    mer = amb10["merita_su_nostr"]
+    prova("Specchiato su Nostr: 25 affari, 0 dispute, 10 feedback da "
+          "4,5 bastano", True, mer(cat["specchiato"], base))
+    prova("...24 affari no (nell'app si', da 10)", (False, True),
+          (mer(cat["specchiato"], {**base, "vendite": 19}),
+           cat["specchiato"]["criterio"]({**base, "vendite": 19})))
+    prova("...una disputa persa no", False,
+          mer(cat["specchiato"], {**base, "dispute_perse": 1}))
+    prova("...9 feedback no", False,
+          mer(cat["specchiato"], {**base, "fb_ricevuti": 9}))
+    prova("...media 4,4 no", False,
+          mer(cat["specchiato"], {**base, "fb_media": 4.4}))
+    prova("Pioniere su Nostr segue la coorte", (True, False),
+          (mer(cat["pioniere"], {**base, "coorte": "pioniere"}),
+           mer(cat["pioniere"], base)))
+    prova("un distintivo senza la chiave non esce mai", False,
+          mer(cat["primo_acquisto"], {**base, "acquisti": 99}))
+    prova("...e senza dati nemmeno", False, mer(cat["pioniere"], None))
+
+    corpo_rit = pezzo("ritira_badge_distintivi_usciti")
+    prova("il ritiro e' riservato ai moderatori", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in corpo_rit
+          and 'if not e_admin(user["id"]):' in corpo_rit)
+    prova("...tocca SOLO i distintivi senza la chiave nostr", True,
+          'for dist in [x for x in DISTINTIVI if not x.get("nostr")]:'
+          in corpo_rit)
+    prova("...segna ritirato SOLO se un relay accetta", True,
+          "if ok:" in corpo_rit and "ritirato=1" in corpo_rit)
+    prova("...e la definizione si ritira solo a premi tutti ritirati",
+          True, "if not falliti:" in corpo_rit
+          and "_lapide_definizione_badge(" in corpo_rit)
 
 
 def prove_foglio_tastiera_iphone():
@@ -158332,19 +158642,17 @@ def prove_runner_fisso():
     # posto si guarda l'immagine del ripiego
     con_variabile = [(n, r) for n, r in runner
                      if re.fullmatch(RUNS_ON_PROVE, r)]
-    wf = open(os.path.join(cartella, "prove.yml"), encoding="utf-8").read()
-    job_prove = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
-    prova("la macchina da una variabile: UNA riga sola, quella del job `prove`",
-          [1, True], [len(con_variabile),
-                      re.search(r"(?m)^    runs-on: (.*?)\s*$", job_prove) is not None
-                      and re.fullmatch(RUNS_ON_PROVE, re.search(
-                          r"(?m)^    runs-on: (.*?)\s*$", job_prove)[1]) is not None])
+    # DAL 27 NOV 2026 (cantiere ci-a-pezzi) nessun job sceglie piu' la
+    # macchina da una variabile: il repo e' pubblico, GitHub non si paga,
+    # e i pezzi girano tutti sulle sue macchine
+    prova("nessun job sceglie la macchina da una variabile (dal 27 nov 2026)",
+          [0, []], [len(con_variabile), [r for _n, r in runner if "vars." in r]])
     immagini = [(n, re.fullmatch(RUNS_ON_PROVE, r)[1]
                  if re.fullmatch(RUNS_ON_PROVE, r) else r) for n, r in runner]
     prova("nessun runner e' un'etichetta mobile: tutti `ubuntu-NN.NN`", [],
           [r for r in immagini
            if not re.fullmatch(r"ubuntu-\d\d\.\d\d", r[1])])
-    prova("...e tutti i job girano sulla stessa immagine (per `prove`, il ripiego)", 1,
+    prova("...e tutti i job girano sulla stessa immagine", 1,
           len({r[1] for r in immagini}))
 
 
@@ -158367,33 +158675,37 @@ def prove_runner_vm():
     wf = open(os.path.join(".github", "workflows", "prove.yml"),
               encoding="utf-8").read().replace("\r\n", "\n")
     vivo = "\n".join(r for r in wf.splitlines() if not r.lstrip().startswith("#"))
-    job_prove = vivo[vivo.index("\n  prove:"):vivo.index("\n  segreti:")]
-    job_segreti = vivo[vivo.index("\n  segreti:"):vivo.index("\n  pronto:")]
-    job_pronto = vivo[vivo.index("\n  pronto:"):]
-    macchina = lambda j: (re.search(r"(?m)^    runs-on: (.*?)\s*$", j) or [None, None])[1]
-    prova("`prove`: su main la variabile, sennò e sui rami GitHub", True,
-          re.fullmatch(RUNS_ON_PROVE, macchina(job_prove) or "") is not None)
-    prova("`segreti` e `pronto` su GitHub col numero, mai la variabile", [True, True, False, False],
-          [bool(re.fullmatch(r"ubuntu-\d\d\.\d\d", macchina(job_segreti) or "")),
-           bool(re.fullmatch(r"ubuntu-\d\d\.\d\d", macchina(job_pronto) or "")),
-           "vars." in job_segreti, "vars." in job_pronto])
+    # DAL 27 NOV 2026 (cantiere ci-a-pezzi) nessun job gira piu' sulla
+    # vm-2050: il repo e' pubblico, GitHub non si paga, e undici pezzi in
+    # parallelo vanno piu' veloci di una VM da due processori. Si tiene
+    # che TUTTI i job stiano su GitHub col numero, e che i file della VM
+    # (sotto) restino sani finche' il runner non e' smontato.
+    macchine = re.findall(r"(?m)^    runs-on: (.*?)\s*$", vivo)
+    prova("tutti i job su GitHub col numero, nessuno dalla variabile", [True, False],
+          [len(macchine) >= 5 and all(re.fullmatch(r"ubuntu-\d\d\.\d\d", m) for m in macchine),
+           "vars." in vivo])
     prova("...e da nessuna parte un'etichetta della macchina nostra scritta a mano",
           [False, False], ["self-hosted" in vivo, "vm-2050" in vivo])
-    # L'AMBIENTE USA-E-GETTA: prima di ogni pip e di prove.py
-    passo = re.search(r"- name: Un ambiente usa-e-getta\n((?:        .*\n)+)", job_prove + "\n")
-    corpo = passo.group(1) if passo else ""
-    prova("il passo dell'ambiente usa-e-getta: venv, PATH e TMPDIR in $RUNNER_TEMP", [True, True, True, False],
-          ['python -m venv "$RUNNER_TEMP/venv"' in corpo,
-           'echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"' in corpo,
-           'echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"' in corpo,
-           "if:" in corpo])
-    dopo = [job_prove.find(s) for s in ("actions/setup-python@",)]
-    prima = [m.start() for m in re.finditer(r"pip install", job_prove)] \
-        + [job_prove.find("run: python prove.py")]
-    prova("...dopo setup-python e PRIMA di ogni pip e di prove.py", True,
-          bool(passo) and all(0 <= d < passo.start() for d in dopo)
-          and len(prima) >= 3 and all(passo.start() < p for p in prima))
-    prova("...una volta sola", 1, job_prove.count("- name: Un ambiente usa-e-getta"))
+    # L'AMBIENTE USA-E-GETTA: in ogni job a pezzi, prima di ogni pip e
+    # del lanciatore
+    for nome_job, lancio in (("prove-a-pezzi", "run: python prove.py"),
+                             ("collaudi-a-pezzi", "run: python collaudi_ci.py")):
+        job = vivo[vivo.index(f"\n  {nome_job}:"):]
+        job = job[:re.search(r"\n  [\w-]+:\n", job[3:]).start() + 3]
+        passo = re.search(r"- name: Un ambiente usa-e-getta\n((?:        .*\n)+)", job + "\n")
+        corpo = passo.group(1) if passo else ""
+        prova(f"{nome_job}: il passo dell'ambiente usa-e-getta: venv, PATH e TMPDIR in $RUNNER_TEMP",
+              [True, True, True, False],
+              ['python -m venv "$RUNNER_TEMP/venv"' in corpo,
+               'echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"' in corpo,
+               'echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"' in corpo,
+               "if:" in corpo])
+        dopo = [job.find("actions/setup-python@")]
+        prima = [m.start() for m in re.finditer(r"pip install", job)] + [job.find(lancio)]
+        prova(f"...dopo setup-python e PRIMA di ogni pip e del lanciatore ({nome_job})", True,
+              bool(passo) and all(0 <= d < passo.start() for d in dopo)
+              and len(prima) >= 2 and all(passo.start() < q for q in prima))
+        prova(f"...una volta sola ({nome_job})", 1, job.count("- name: Un ambiente usa-e-getta"))
 
     # I FILE DELLA VM
     cartella = os.path.join("deploy", "ci-vm")
@@ -158481,13 +158793,14 @@ def prove_node_fisso():
     print("\n[node della CI col numero]")
     wf = open(os.path.join(".github", "workflows", "prove.yml"),
               encoding="utf-8").read()
-    job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    # dal 27 nov 2026 (ci-a-pezzi) le prove girano nei pezzi
+    job = wf[wf.index("\n  prove-a-pezzi:"):wf.index("\n  collaudi-a-pezzi:")]
     righe = [r for r in job.splitlines() if not r.lstrip().startswith("#")]
     vivo = "\n".join(righe)
     passo = re.search(r"- uses: actions/setup-node@\S+.*\n"
                       r"((?:[ ]{8,}\S.*\n)+)", vivo)
     corpo = passo.group(1) if passo else ""
-    prova("il job `prove` mette node con setup-node", True, bool(passo))
+    prova("il job dei pezzi delle prove mette node con setup-node", True, bool(passo))
     prova("...a una versione col numero: N, N.N o N.N.N", True,
           bool(re.search(r'(?m)^\s+node-version: "\d+(\.\d+){0,2}"\s*$',
                          corpo)))
@@ -168403,6 +168716,7 @@ def prove_p2p_chf():
     amb = {"_fmt_eur": lambda e: f"{e:.2f}".replace(".", ","), "html": __import__("html"),
            "_premio_canale_p2p": lambda l, p: "", "_link_casa_telegram": lambda: "https://t.me/x",
            "_firma_venditore": lambda v: "da Mario"}
+    exec(pezzo("_tendina_canale"), amb)
     exec(pezzo("_caption_canale_p2p"), amb)
     cap = amb["_caption_canale_p2p"]
     prova("il post nel canale dice CHF per i franchi e resta quello di ieri per l'euro",
@@ -178197,13 +178511,16 @@ def prove_nascondi_annuncio():
     prova("il tasto nasce spento e lo accende solo un true del server",
           [True, True], ["let nascondiAttivo = false;" in mini,
                          "nascondiAttivo = me.nascondi_annuncio === true;" in mini])
-    i_tasto = mini.index("🙈 Nascondi dalla vetrina</button>")
-    prova("sulla scheda: dopo lo stock, prima del widget e dell'uscita rossa, "
-          "e non sull'importato", [True, True, True],
-          [mini.rindex("🔄 Aggiorna i pezzi</button>", 0, i_tasto)
+    # EMENDATA (27 nov 2026, Andrea: «semplifica il menu»): il tasto e'
+    # l'occhio barrato nella fila in alto della scheda (`azioniMie`),
+    # fra il duplica e il widget; le guardie restano quelle di ieri
+    i_tasto = mini.index('title="Nascondi dalla vetrina"')
+    prova("sulla scheda: nella fila in alto, dopo il duplica e prima del "
+          "widget, e non sull'importato", [True, True, True],
+          [mini.rindex('title="Duplica questo annuncio"', 0, i_tasto)
            > i_tasto - 1500,
-           i_tasto < mini.index("Widget per il web</button>", i_tasto)
-           < mini.index("deleteListing(${l.id}, true)", i_tasto),
+           i_tasto < mini.index('title="Widget per il web"', i_tasto)
+           < mini.index("const filaAlta", i_tasto),
            "(!nascondiAttivo || l.nostr || daNegozioCollegato(l)) ? ''"
            in mini[i_tasto - 400:i_tasto]])
     riga = mini[mini.index("const rigaMioAnnuncio = l =>"):]
@@ -179003,35 +179320,48 @@ def prove_contanti_zona():
     exec(next(r for r in src.split("\n") if r.startswith("CHARSET_BECH32")), amb_c)
     for f in ("_fmt_eur", "_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
               "_npub_breve", "_npub_venditore", "_firma_venditore", "_premio_canale_p2p",
-              "_caption_canale_p2p"):
+              "_tendina_canale", "_caption_canale_p2p"):
         exec(pezzo(f), amb_c)
     cap = amb_c["_caption_canale_p2p"]
     rosina = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
     con_zona = cap("vendo", 50, "Contanti", rosina, None, "Milano centro")
-    prova("il post del canale dice la zona con lo stesso «📍», subito sotto il metodo", True,
-          "\n💵 Contanti\n📍 Milano centro\n🔒 Sats bloccati" in con_zona)
+    # (27 nov 2026, le tendine del canale) i metodi stanno nella tendina
+    # «💳 Metodi di pagamento accettati», UNO PER RIGA: queste prove
+    # misurano la cosa cambiata, con le stesse regole di ieri dentro
+    prova("il post del canale dice la zona con lo stesso «📍», dentro la tendina subito sotto il contanti", True,
+          "\n<b>💳 Metodi di pagamento accettati</b>\n<blockquote expandable>💵 Contanti\n"
+          "📍 Milano centro</blockquote>\n🔒 Sats bloccati" in con_zona)
+
     # (10 ott 2026, i punti notati) «💵 Contanti» al posto di «💳 Contanti»
-    def _riga_metodo(metodo):
-        return cap("vendo", 50, metodo, rosina).split("\n")[2]
-    prova("NEL POST IL CONTANTI HA LE SUE BANCONOTE: da solo «💵 Contanti», senza carta", "💵 Contanti",
-          _riga_metodo("Contanti"))
-    prova("...con piu' metodi il 💵 sta solo davanti a «Contanti», e il 💳 intesta gli altri",
-          ["💳 SEPA, 💵 Contanti", "💳 SEPA, Revolut, 💵 Contanti", "💵 Contanti, 💳 SEPA, Revolut"],
-          [_riga_metodo("SEPA, Contanti"), _riga_metodo("SEPA, Revolut, Contanti"),
-           _riga_metodo("Contanti, SEPA, Revolut")])
-    prova("...gli altri metodi, Barattozon e un «contanti» minuscolo restano la riga di ieri",
-          ["💳 SEPA", "💳 Revolut, Satispay", "💳 Contanti al tabacchino", "💳 contanti", "💳 &lt;b&gt;x"],
-          [_riga_metodo("SEPA"), _riga_metodo("Revolut, Satispay"), _riga_metodo("Contanti al tabacchino"),
-           _riga_metodo("contanti"), _riga_metodo("<b>x")])
-    prova("...e un metodo avvelenato accanto al contanti esce scappato", "💳 &lt;b&gt;x, 💵 Contanti",
-          _riga_metodo("<b>x, Contanti"))
-    prova("...senza zona il post e' quello di ieri, parola per parola", [True, False, True],
+    def _righe_metodo(metodo, zona=""):
+        t = cap("vendo", 50, metodo, rosina, None, zona)
+        return t[t.index("<blockquote expandable>") + len("<blockquote expandable>"):
+                 t.index("</blockquote>")].split("\n")
+    prova("NEL POST IL CONTANTI HA LE SUE BANCONOTE: da solo «💵 Contanti», senza carta", ["💵 Contanti"],
+          _righe_metodo("Contanti"))
+    prova("...con piu' metodi UNA RIGA CIASCUNO: il 💵 sta solo davanti a «Contanti», e il 💳 davanti agli altri",
+          [["💳 SEPA", "💵 Contanti"], ["💳 SEPA", "💳 Revolut", "💵 Contanti"],
+           ["💵 Contanti", "💳 SEPA", "💳 Revolut"]],
+          [_righe_metodo("SEPA, Contanti"), _righe_metodo("SEPA, Revolut, Contanti"),
+           _righe_metodo("Contanti, SEPA, Revolut")])
+    prova("...gli altri metodi, Barattozon e un «contanti» minuscolo restano col 💳, come ieri",
+          [["💳 SEPA"], ["💳 Revolut", "💳 Satispay"], ["💳 Contanti al tabacchino"], ["💳 contanti"],
+           ["💳 &lt;b&gt;x"]],
+          [_righe_metodo("SEPA"), _righe_metodo("Revolut, Satispay"), _righe_metodo("Contanti al tabacchino"),
+           _righe_metodo("contanti"), _righe_metodo("<b>x")])
+    prova("...e un metodo avvelenato accanto al contanti esce scappato", ["💳 &lt;b&gt;x", "💵 Contanti"],
+          _righe_metodo("<b>x, Contanti"))
+    prova("...senza zona il post non ha nessun «📍»; con la zona il post e' quello senza, piu' la riga", [True, False, True],
           [cap("vendo", 50, "Contanti", rosina) == cap("vendo", 50, "Contanti", rosina, None, ""),
            "📍" in cap("vendo", 50, "Contanti", rosina),
            con_zona.replace("\n📍 Milano centro", "") == cap("vendo", 50, "Contanti", rosina)])
-    prova("...e la zona di un utente esce scappata", [True, False],
-          ["\n📍 &lt;b&gt;x&lt;/b&gt; &amp; y\n" in cap("vendo", 50, "Contanti", rosina, None, "<b>x</b> & y"),
+    prova("...e la zona di un utente esce scappata", [["💵 Contanti", "📍 &lt;b&gt;x&lt;/b&gt; &amp; y"], False],
+          [_righe_metodo("Contanti", "<b>x</b> & y"),
            "<b>x</b>" in cap("vendo", 50, "Contanti", rosina, None, "<b>x</b> & y")])
+    prova("la tendina ha il titolo FUORI dalla citazione e il resto del post e' quello di sempre", True,
+          cap("vendo", 50, "SEPA", rosina).startswith(
+              "🔁 <b>Vende BTC su Barattolo</b>\n💶 50,00 €\n<b>💳 Metodi di pagamento accettati</b>\n"
+              "<blockquote expandable>💳 SEPA</blockquote>\n🔒 Sats bloccati in un deposito di garanzia"))
     rc = src[src.index('@app.post("/api/p2p/canale")'):]
     rc = rc[:rc.index("\n\n\n")]
     prova("la rotta del canale la tiene SOLO col contanti a parola intera, pulita, e una storta non e' un errore",
@@ -200649,7 +200979,7 @@ def prove_intervallo_onchain():
     prova("...e un ordine a cifra unica rinasce con la sua cifra, senza capi",
           [4500, 0, 0], [n2["euro_cent"], n2["fascia_min_cent"], n2["fascia_max_cent"]])
     rotto = pezzo("_p2p_onchain_rinasci").replace(
-        "capi[1] if capi else int(o[\"euro_cent\"])", "int(o[\"euro_cent\"])", 1)
+        "capi[1] if capi else cifra", "cifra", 1)
     amb4 = dict(amb3)
     exec(rotto, amb4)
     nid3 = amb4["_p2p_onchain_rinasci"](con, riga(), 100000)
@@ -200738,6 +201068,309 @@ def prove_intervallo_onchain():
            mini.count("if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > interoP2P(campi.euro).n\n"
                       "      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {\n"
                       "    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;")])
+    # LA LEVA CHE NON ARRIVAVA (27 nov 2026 pomeriggio, Andrea in produzione:
+    # «Non vedo gli ordini a intervalli in un ordine on chain»). Il server
+    # mandava `intervallo` nella busta, ma `accogliLibroOnchainP2P` rifaceva
+    # p2pOnchainLibro da capo senza copiarlo: il «Da» on-chain non compariva
+    # MAI. Il banco di sopra scriveva p2pOnchainLibro a mano e non poteva
+    # vederlo; questo passa dalla funzione vera che legge la busta.
+    accogli = pezzo_js(mini, "function accogliLibroOnchainP2P(busta){", "\n}\n") + "\n}\n"
+    leva = pezzo_js(mini, "function intervalloOcAccesoP2P(){", "\n}\n") + "\n}\n"
+    banco_leva = ("let p2pOnchainLibro = {eventi: [], miei: [], quando: 0};\n"
+                  "let p2pOnchainLetto = 0;\n"
+                  "const vestiOcP2P = o => o, onchainRete = () => ({nome: 'signet'});\n")
+    giro_leva = ("const f = [];\n"
+                 "accogliLibroOnchainP2P({eventi: [], intervallo: true}); f.push(intervalloOcAccesoP2P());\n"
+                 "accogliLibroOnchainP2P({eventi: [], intervallo: false}); f.push(intervalloOcAccesoP2P());\n"
+                 "accogliLibroOnchainP2P({eventi: []}); f.push(intervalloOcAccesoP2P());\n"
+                 "accogliLibroOnchainP2P({eventi: [], intervallo: 'si'}); f.push(intervalloOcAccesoP2P());\n"
+                 "console.log(JSON.stringify(f));\n")
+    out_leva = _node_banco(banco_leva + accogli + leva + giro_leva)
+    rotto_leva = accogli.replace("    intervallo: busta.intervallo === true,\n", "")
+    out_rotto = _node_banco(banco_leva + rotto_leva + leva + giro_leva)
+    if out_leva is None:
+        salta("la leva dell'intervallo letta dalla busta vera", "node non installato")
+    else:
+        prova("la leva dell'intervallo arriva al foglio passando dalla busta vera: accesa solo "
+              "con un true (server di ieri o storta = spenta)",
+              [True, False, False, False], out_leva)
+        prova("controprova: senza la riga in accogliLibroOnchainP2P il «Da» on-chain non "
+              "compare mai, come in produzione il 27 nov",
+              [True, [False, False, False, False]], [rotto_leva != accogli, out_rotto])
+
+
+def prove_resto_intervallo():
+    """IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026, cantiere
+    resto-intervallo, Andrea: «se l'ordine da 10.000 euro e uno ti compra
+    10 euro... c'e' un altro 9.990 euro di liquidita' disponibili»). Il
+    server: la regola del resto (quella di mostrod), la leva con la
+    porticina dei moderatori, il resto on-chain a scambio rilasciato sul
+    database. Il telefono: la chiave del prossimo scambio col rilascio o
+    con «Ho inviato» di chi ha pubblicato, l'indice prenotato una volta,
+    la riga provvisoria coi patti, il messaggio canonico, la riga che se
+    ne va se il figlio non nasce, la scritta nella scatola. Con le
+    controprove."""
+    print("\n[Il resto dell'intervallo torna nel libro]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- la regola del resto ---
+    amb = {}
+    exec(pezzo("p2p_resto_intervallo_capi"), amb)
+    C = amb["p2p_resto_intervallo_capi"]
+    prova("il resto: 10–10.000 preso 10 → 10–9.990; 10–100 preso 20 → 10–80; preso 90 → "
+          "cifra unica 10; preso 95 → niente; a cifra unica, fuori fascia o storto → niente",
+          [(10, 9990), (10, 80), (10, 10), (), (), (), (), (), ()],
+          [C(10, 10000, 10), C(10, 100, 20), C(10, 100, 90), C(10, 100, 95),
+           C(0, 100, 20), C(10, 100, 101), C(10, 100, 5), C(10, "cento", 20), C(10, 100, True)])
+    rottoC = pezzo("p2p_resto_intervallo_capi").replace("if resto >= lo else ()", "if resto > 0 else ()", 1)
+    ambC = {}
+    exec(rottoC, ambC)
+    prova("controprova: senza il «sotto il Da niente» un resto di 5 € su un «Da» di 10 tornerebbe",
+          [True, (10, 5)], [rottoC != pezzo("p2p_resto_intervallo_capi"),
+                            ambC["p2p_resto_intervallo_capi"](10, 100, 95)])
+    # --- la leva ---
+    prova("la leva: accesa di serie, porticina dei moderatori chiusa di serie, una riga storta "
+          "resta chiusa, nel pannello e in /api/me",
+          [True, True, True, True, True],
+          ["except ImportError:\n    P2P_RESTO_INTERVALLO = True\n" in src,
+           "except ImportError:\n    P2P_RESTO_INTERVALLO_SOLO_ADMIN = True\n" in src,
+           "P2P_RESTO_INTERVALLO_SOLO_ADMIN = P2P_RESTO_INTERVALLO_SOLO_ADMIN is not False" in src,
+           '"P2P_RESTO_INTERVALLO", P2P_RESTO_INTERVALLO,' in src
+           and '"P2P_RESTO_INTERVALLO_SOLO_ADMIN",' in src,
+           'profilo["p2p_resto_intervallo"] = p2p_resto_intervallo_per(user["id"])' in src])
+    ambL = {"e_admin": lambda t: t == 999, "P2P_RESTO_INTERVALLO": True,
+            "P2P_RESTO_INTERVALLO_SOLO_ADMIN": True}
+    exec(pezzo("p2p_resto_intervallo_per"), ambL)
+    L = ambL["p2p_resto_intervallo_per"]
+    a = [L(999), L(111), L(0), L("x")]
+    ambL["P2P_RESTO_INTERVALLO_SOLO_ADMIN"] = False
+    a += [L(111)]
+    ambL["P2P_RESTO_INTERVALLO"] = False
+    a += [L(999)]
+    prova("per persona: a porticina chiusa solo il moderatore, aperta tutti, leva spenta nessuno",
+          [True, False, False, False, True, False], a)
+    # --- on-chain, sul database ---
+    amb3 = {"json": json, "sqlite3": sqlite3, "time": time, "secrets": __import__("secrets"),
+            "cambio_noto_ora": lambda *a: 60000.0, "_cambio_cache": {"quando": 777},
+            "print": lambda *a, **k: None}
+    for nome in ("P2P_ONCHAIN_PREFISSO", "P2P_ONCHAIN_ORE_LIBRO", "P2P_ONCHAIN_ORE_DEPOSITO",
+                 "P2P_ONCHAIN_TAB_MARGINE_S"):
+        j = src.index(f"\n{nome} = ") + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb3)
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_mercato", "p2p_onchain_scade_libro",
+              "p2p_onchain_intervallo", "p2p_resto_intervallo_capi", "p2p_onchain_capi_resto",
+              "_p2p_onchain_rinasci"):
+        exec(pezzo(f), amb3)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_onchain_ordini(")
+    con.execute(src[i:src.index('aggiornato INTEGER NOT NULL)"""', i)] + "aggiornato INTEGER NOT NULL)")
+    k = src.index("PRAGMA table_info(p2p_onchain_ordini)")
+    a = src.index("for col, tipo in (", k) + len("for col, tipo in ")
+    for col, tipo in eval(src[a:src.index(":\n        if col not in gia:", a)]):
+        con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+    con.execute("CREATE TABLE onchain_xpub(tg_id INTEGER)")
+    con.execute("INSERT INTO onchain_xpub VALUES(111)")
+
+    def riga(**kw):
+        d = {"ordine": "bar-onchain-resto" + str(next(_NOMI_FINTI)), "lato": "sell", "maker_id": 111,
+             "taker_id": 222, "prezzo_sats": 50000, "euro_cent": 2000, "metodi": '["Revolut"]',
+             "recapito": "IT60", "stato": "rilasciato", "scade": 10, "creato": 1, "aggiornato": 1,
+             "prezzo_tipo": "mercato", "premio": 2, "fascia_min_cent": 1000,
+             "fascia_max_cent": 10000, "zona": "Milano"}
+        d.update(kw)
+        cur = con.execute(f"INSERT INTO p2p_onchain_ordini({','.join(d)}) VALUES("
+                          f"{','.join('?' * len(d))})", list(d.values()))
+        return con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (cur.lastrowid,)).fetchone()
+    CR = amb3["p2p_onchain_capi_resto"]
+    prova("i capi del resto on-chain: rilasciato 10–100 € preso 20 → 10–80; preso 90 → 10; "
+          "non rilasciato, col PayCode, Barattozon, a prezzo fisso o a cifra unica → niente",
+          [(1000, 8000), (1000, 1000), (), (), (), (), ()],
+          [CR(riga()), CR(riga(euro_cent=9000)), CR(riga(stato="annullato")),
+           CR(riga(paycode='{"scade": 9}')), CR(riga(tab_min_cent=2500)),
+           CR(riga(prezzo_tipo="fisso")), CR(riga(fascia_min_cent=0, fascia_max_cent=0))])
+    Rn = amb3["_p2p_onchain_rinasci"]
+    vecchio = riga()
+    nid = Rn(con, vecchio, 100000, CR(vecchio))
+    n = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (nid,)).fetchone()
+    prova("IL RESTO NEL LIBRO: lo scambio da 20 € su 10–100 € si chiude, nasce un ordine nel "
+          "libro 10–80 € (massimo in `euro_cent`), stessi patti, figlio dello scambio",
+          ["pending", 8000, 1000, 8000, "mercato", 2, "Milano", "IT60", int(vecchio["id"])],
+          [n["stato"], n["euro_cent"], n["fascia_min_cent"], n["fascia_max_cent"],
+           n["prezzo_tipo"], n["premio"], n["zona"], n["recapito"], n["rinato_da"]])
+    prova("...e una volta sola: lo stesso scambio non fa due resti",
+          0, Rn(con, vecchio, 100001, CR(vecchio)))
+    v2 = riga(euro_cent=9000)
+    n2 = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                     (Rn(con, v2, 100000, CR(v2)),)).fetchone()
+    prova("...un resto uguale al «Da» torna a cifra unica (10 €, senza capi)",
+          [1000, 0, 0], [n2["euro_cent"], n2["fascia_min_cent"], n2["fascia_max_cent"]])
+    v3 = riga(prezzo_tipo="fisso")
+    prova("...a prezzo fisso un resto passato a mano non nasce", 0, Rn(con, v3, 100000, (1000, 8000)))
+    v4 = riga(stato="annullato", euro_cent=3000)
+    n4 = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                     (Rn(con, v4, 100000),)).fetchone()
+    prova("...e la rinascita di sempre (senza resto) rimette l'intervallo intero",
+          [10000, 1000, 10000], [n4["euro_cent"], n4["fascia_min_cent"], n4["fascia_max_cent"]])
+    rotto = pezzo("_p2p_onchain_rinasci").replace("        cifra = int(resto[1])\n", "", 1)
+    amb4 = dict(amb3)
+    exec(rotto, amb4)
+    v5 = riga(euro_cent=9000)
+    nid5 = amb4["_p2p_onchain_rinasci"](con, v5, 100000, (1000, 1000))
+    prova("controprova: senza la cifra del resto, il resto a cifra unica nascerebbe coi 90 € "
+          "dello scambio appena chiuso",
+          [True, 9000], [rotto != pezzo("_p2p_onchain_rinasci"),
+                         con.execute("SELECT euro_cent FROM p2p_onchain_ordini WHERE id=?",
+                                     (nid5,)).fetchone()[0]])
+    cf = src[src.index('stato = "rilasciato" if verso == "venditore" else "rimborsato"'):
+             src.index('@app.post("/api/p2p/onchain/{oid}/disputa")')]
+    rs = pezzo("_p2p_onchain_resto_nel_libro", fine="\n\n\nasync def ")
+    prova("la chiusura on-chain: solo se rilasciato, dopo la rinascita, e dietro la leva di "
+          "chi ha pubblicato; fail-open, nessun avviso",
+          [True, True, True, True, False],
+          ['if stato == "rilasciato":\n        await _p2p_onchain_resto_nel_libro(dict(o, stato="rilasciato"))' in cf,
+           cf.index("_p2p_onchain_rinasci_e_di(") < cf.index("_p2p_onchain_resto_nel_libro("),
+           'if not p2p_resto_intervallo_per(int(o["maker_id"] or 0)):' in rs,
+           "except Exception as e:" in rs, "_notifica_p2p_onchain" in rs])
+    # --- il telefono ---
+    prova("il telefono: la leva da /api/me, i capi ricordati alla presa, la chiave nella porta "
+          "dei gesti, la pulizia dopo l'adozione, la riga del resto d'acquisto al rilascio",
+          [True, True, True, True, True],
+          ["myP2PResto = !!me.p2p_resto_intervallo;" in mini,
+           "if (lo > 0 && hi > lo) { o.fasciaMin = lo; o.fasciaMax = hi; }" in pezzo_js(mini, "function avanzaOrdineP2P(ordine, azione, payload){", "\n}\n"),
+           "try { payload = await payloadRestoP2P(o, azione, mz); }" in pezzo_js(mini, "async function chiamataOrdineP2P(o, azione, payload){", "\n}\n"),
+           "nati += togliRestiMancatiP2P(p2pMieiOrdini, p2pMieiQuando);" in pezzo_js(mini, "function adottaOrdiniAltroveP2P(locali){", "\n}\n"),
+           "&& (nuovo.stato === 'rilasciato' || nuovo.stato === 'concluso')\n" in pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")])
+    prova("la scritta approvata nella scatola, solo a chi la leva vale, sotto la spinta",
+          [True, True],
+          ["const P2P_RESTO_TESTO = 'Se ne prendono solo una parte, il resto torna da solo nel libro.';" in mini,
+           "+ (myP2PResto ? '<small class=\"p2p-spinta-fissa\">' + esc(P2P_RESTO_TESTO) + '</small>' : '')\n"
+           "          + '<small class=\"p2p-spinta-fissa\">' + esc(P2P_INTERVALLO_FISSA)" in mini])
+    j0 = mini.index("const CAMPI_MOSTRO = {")
+    campi = mini[j0:mini.index("\n};\n", j0) + 4]
+    banco = (
+        "let myP2PResto = true;\nconst window = {NostrTools: {schnorr: true}};\n"
+        "const CLOUD_MAZZO = 'm';\nlet MAZZO = {sk: 'aa', pub: 'id', indice: 7};\nlet cloud = [];\n"
+        "function mazzoMostro(){ return MAZZO; }\nfunction ricordaMazzo(m){ MAZZO = m; }\n"
+        "function mazzoSerializza(m){ return JSON.stringify(m); }\n"
+        "async function cloudScrivi(k, v){ cloud.push(JSON.parse(v).indice); }\n"
+        "function chiaveScambio(sk, i){ return {sk: sk + i, pub: 'pub' + i, indice: i}; }\n"
+        "let RIGHE = {};\nfunction ordiniP2P(){ return JSON.parse(JSON.stringify(RIGHE)); }\n"
+        "function scriviOrdineP2P(o){ RIGHE[o.id] = JSON.parse(JSON.stringify(o)); }\n"
+        "const localStorage = {setItem(k, v){ RIGHE = JSON.parse(v); }};\n"
+        "function chiaveP2P(k){ return k; }\nconst MOSTRO_ORDINI_CHIAVE = 'o';\n"
+        "function diarioP2P(){}\nlet chiavi = [];\nasync function registraChiaviP2P(l){ chiavi.push(l[0]); }\n"
+        "let ascolti = 0;\nasync function mostroRiascolta(){ ascolti++; }\n"
+        "function cancellaRigaP2P(id){ if (!RIGHE[id]) return false; delete RIGHE[id]; return true; }\n"
+        "function valutaCoinP2P(v){ return v === 'ETH'; }\n"
+        + pezzo_js(mini, "function nomeProvvisorioP2P(indice){", "\n") + "\n"
+        + pezzo_js(mini, "function provvisorioP2P(id){", "\n") + "\n"
+        + "const P2P_RESTO_ATTESA_S = 15 * 60;\n"
+        + mini[mini.index("const P2P_RESTO_DOPO = "):mini.index("\n", mini.index("const P2P_RESTO_DOPO = "))] + "\n"
+        + pezzo_js(mini, "function restoIntervalloP2P(o, azione){", "\n}\n") + "\n}" + "\n"
+        + pezzo_js(mini, "async function payloadRestoP2P(o, azione, mz){", "\n}\n") + "\n}" + "\n"
+        + pezzo_js(mini, "async function nasceRigaRestoP2P(o){", "\n}\n") + "\n}" + "\n"
+        + pezzo_js(mini, "function togliRestiMancatiP2P(mieiOrdini, quando){", "\n}\n") + "\n}" + "\n"
+        + campi
+        + pezzo_js(mini, "function canonicoMostro(campi, o){") + "\n"
+        + pezzo_js(mini, "function idMostroVero(id){") + "\n"
+        + pezzo_js(mini, "function messaggioMostro(azione, opz){") + "\n"
+        + r"""
+(async () => {
+const f = {};
+const base = {id: 'a1', mio: true, lato: 'vendo', euro: 20, euroMax: 0, fasciaMin: 10, fasciaMax: 100,
+  fiat: 'EUR', metodi: ['SEPA', 'Revolut'], premium: 2, zona: 'Milano', filtro: 3, minutiPagare: 60,
+  ripubblica: {si: 1}, paracadute: 0, indice: 5, pubTrade: 'pub5'};
+const R = (x, az) => restoIntervalloP2P(Object.assign({}, base, x), az);
+f.regola = [R({}, 'release'), R({lato: 'compro'}, 'fiat-sent'), R({euro: 90}, 'release'),
+  R({euro: 95}, 'release'), R({lato: 'compro'}, 'release'), R({}, 'fiat-sent'),
+  R({mio: false}, 'release'), R({fasciaMax: 0}, 'release'), R({fiat: 'ETH'}, 'release'),
+  R({tabacchino: {ordine: 1}}, 'release'), R({}, 'cancel')];
+RIGHE.a1 = Object.assign({}, base);
+const p1 = await payloadRestoP2P(RIGHE.a1, 'release', MAZZO);
+f.primo = [p1, MAZZO.indice, cloud.slice(), RIGHE.a1.restoIndice, chiavi.slice(), ascolti];
+const fg = RIGHE['nuovo:8'];
+f.figlio = fg && [fg.stato, fg.mio, fg.lato, fg.indice, fg.pubTrade, fg.euro, fg.euroMax,
+  fg.metodi, fg.premium, fg.zona, fg.filtro, fg.minutiPagare, fg.ripubblica, 'paracadute' in fg, fg.restoDi, fg.contattato];
+/* il «Riprova»: stessa chiave, nessun indice nuovo, nessuna riga in piu' */
+const p2 = await payloadRestoP2P(RIGHE.a1, 'release', MAZZO);
+f.riprova = [p2, MAZZO.indice, cloud.length, Object.keys(RIGHE).length];
+/* il messaggio sul filo, canonico */
+f.filo = JSON.stringify(messaggioMostro('release', {requestId: 4, indice: null,
+  id: '11111111-2222-3333-4444-555555555555', payload: p1}));
+/* l'ordine d'acquisto: la chiave parte con «Ho inviato», la riga nasce al
+   rilascio dell'altro */
+RIGHE.c1 = Object.assign({}, base, {id: 'c1', lato: 'compro'});
+const p3 = await payloadRestoP2P(RIGHE.c1, 'fiat-sent', MAZZO);
+f.compro = [p3, RIGHE.c1.restoIndice, !!RIGHE['nuovo:9'], ascolti];
+const nato = await nasceRigaRestoP2P(Object.assign({}, RIGHE.c1, {stato: 'rilasciato'}));
+const due = await nasceRigaRestoP2P(Object.assign({}, RIGHE.c1, {stato: 'concluso'}));
+f.compro.push(nato, due, RIGHE['nuovo:9'] && [RIGHE['nuovo:9'].lato, RIGHE['nuovo:9'].euroMax, RIGHE['nuovo:9'].restoDi], ascolti);
+delete RIGHE['nuovo:9']; delete RIGHE.c1;
+/* leva spenta, o un mazzo in pensione: niente */
+myP2PResto = false;
+f.spenta = await payloadRestoP2P(Object.assign({}, base, {id: 'b'}), 'release', MAZZO);
+myP2PResto = true;
+f.pensione = await payloadRestoP2P(Object.assign({}, base, {id: 'c'}), 'release', {sk: 'zz', indice: 3});
+/* la riga provvisoria che non nasce se ne va; quella nota, troppo giovane
+   o col padre non ancora rilasciato resta */
+RIGHE['nuovo:20'] = {id: 'nuovo:20', indice: 20, mio: true, restoDi: 'x', creato: 1000};
+RIGHE['nuovo:21'] = {id: 'nuovo:21', indice: 21, mio: true, creato: 1000};
+RIGHE['nuovo:22'] = {id: 'nuovo:22', indice: 22, mio: true, restoDi: 'p', creato: 1000};
+RIGHE.p = {id: 'p', stato: 'euro_inviati', aggiornato: 1000};
+const prima = Object.keys(RIGHE).sort();
+f.giovane = togliRestiMancatiP2P({}, 1000 + 60);
+f.noto = togliRestiMancatiP2P({k: {indice: 8}, j: {indice: 20}}, 1000 + 3600);
+f.tolto = togliRestiMancatiP2P({k: {indice: 5}}, 1000 + 3600);
+f.padreVivo = !!RIGHE['nuovo:22'];
+RIGHE.p = {id: 'p', stato: 'concluso', aggiornato: 5000};
+f.padreFresco = togliRestiMancatiP2P({}, 5000 + 60);
+f.padreFinito = togliRestiMancatiP2P({}, 5000 + 3600);
+f.dopo = [prima.length, Object.keys(RIGHE).sort()];
+console.log(JSON.stringify(f));
+})();
+""")
+    out = _node_banco(banco)
+    if out is None:
+        salta("i pezzi del telefono per il resto dell'intervallo", "node non installato")
+        return
+    prova("la regola del telefono: vendo al rilascio, compro con «Ho inviato»; cifra unica al "
+          "«Da»; niente sotto il «Da», sul gesto sbagliato, se non e' mio, senza capi, in moneta, "
+          "con Barattozon o su un altro gesto",
+          [{"min": 10, "max": 80}, {"min": 10, "max": 80}, {"min": 10, "max": 10}] + [None] * 8,
+          out["regola"])
+    prova("al rilascio: la chiave del prossimo scambio, l'indice prenotato (mazzo e cloud) e "
+          "ricordato sulla riga, la chiave al server, e (al mio rilascio) la riga e l'orecchio",
+          [{"next_trade": ["pub8", 8]}, 8, [8], 8, ["pub8"], 1], out["primo"])
+    prova("la riga provvisoria del resto: «nuovo:8», mia, coi patti dell'ordine (metodi, premio, "
+          "zona, filtro, tempo, ripubblica), 10–80 €, figlia dello scambio",
+          ["pubblico", True, "vendo", 8, "pub8", 10, 80, ["SEPA", "Revolut"], 2, "Milano", 3, 60,
+           {"si": 1}, False, "a1", True], out["figlio"])
+    prova("...un secondo tocco manda la STESSA chiave: nessun indice bruciato, nessuna riga in piu'",
+          [{"next_trade": ["pub8", 8]}, 8, 1, 2], out["riprova"])
+    prova("sul filo il payload e' quello di mostro-core (`Payload::NextTrade`, snake_case)",
+          '{"order":{"version":2,"request_id":4,"trade_index":null,'
+          '"id":"11111111-2222-3333-4444-555555555555","action":"release",'
+          '"payload":{"next_trade":["pub8",8]}}}', out["filo"])
+    prova("l'ordine d'acquisto: la chiave (indice 9) parte con «Ho inviato» senza riga; la riga "
+          "nasce al rilascio dell'altro, una volta sola, e allora si ascolta",
+          [{"next_trade": ["pub9", 9]}, 9, False, 1, True, False, ["compro", 80, "c1"], 2],
+          out["compro"])
+    prova("a leva spenta o con un profilo in pensione il gesto parte come prima, senza resto",
+          [None, None], [out["spenta"], out["pensione"]])
+    prova("la riga di un resto mai nato se ne va un quarto d'ora dopo il rilascio; una nota alla "
+          "restore, troppo giovane, col padre fermo a «Ho inviato» o non di un resto resta",
+          [0, 0, 1, True, 0, 1, [6, ["a1", "nuovo:21", "nuovo:8", "p"]]],
+          [out["giovane"], out["noto"], out["tolto"], out["padreVivo"], out["padreFresco"],
+           out["padreFinito"], out["dopo"]])
+    # controprova sul telefono: senza la prenotazione ricordata, il «Riprova» brucerebbe una chiave
+    buonoJ = pezzo_js(mini, "async function payloadRestoP2P(o, azione, mz){", "\n}\n") + "\n}"
+    rottoJ = buonoJ.replace("let indice = o.restoIndice | 0;", "let indice = 0;", 1)
+    out2 = _node_banco(banco.replace(buonoJ, rottoJ))
+    prova("controprova: senza l'indice ricordato sulla riga, il secondo tocco prenoterebbe "
+          "un'altra chiave (9) e un secondo resto",
+          [True, 9], [rottoJ != buonoJ, out2 and out2["riprova"][1]])
 
 
 def prove_estensione_barattozon():
@@ -202313,8 +202946,13 @@ def prove_venduto_canale():
         con.execute(f"CREATE TABLE annunci({colonne})")
         con.execute("CREATE TABLE utenti(tg_id INTEGER, nome TEXT, username "
                     "TEXT, npub TEXT, npub_verificata INTEGER, npub_accesso "
-                    "INTEGER, negozio TEXT)")
-        con.execute("INSERT INTO utenti VALUES(222,'V','v','',0,0,'neg')")
+                    "INTEGER, negozio TEXT, spedizionieri TEXT DEFAULT '', "
+                    "spedizioniere TEXT DEFAULT '')")
+        # (27 nov 2026) le due colonne dei corrieri: la caption le chiede
+        # per la tendina «Info di spedizione» (le ha ogni utenti vera)
+        con.execute("INSERT INTO utenti(tg_id,nome,username,npub,"
+                    "npub_verificata,npub_accesso,negozio) "
+                    "VALUES(222,'V','v','',0,0,'neg')")
         if con_podcast:
             con.execute("INSERT INTO annunci(id,venditore_id,titolo,"
                         "post_canale_id,post_vetrina_id,"
@@ -207312,7 +207950,8 @@ def prove_richieste():
     prova("lessico: mai «assicurat» ne' «escrow» nei testi di «Cerco»", True,
           "assicurat" not in _testi and "escrow" not in _testi)
     # tre nell'avviso ai moderatori (26 nov 2026): testo, categoria, nome
-    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 6,
+    # (27 nov 2026) +2: la caption del post nei canali scappa testo e categoria
+    prova("il testo del venditore si scappa (html.escape) in ogni avviso", 8,
           _blocco.count("html.escape("))
     _pub = srv[srv.index("async def pubblica("):]
     _pub = _pub[:_pub.index("\n@app.")]
@@ -207415,6 +208054,418 @@ def prove_richieste():
         prova("il disegno %s c'e' e la rotta lo serve" % _f, (True, True),
               (os.path.exists(os.path.join("assets", "scoprire", _f)),
                '"%s"' % _f in srv[srv.index("FILE_SCOPRIRE = ("):][:900]))
+
+
+def prove_cerco_canali():
+    """LE TENDINE E IL «CERCO» NEI CANALI (27 nov 2026, richiesta di Andrea:
+    «io parlavo soprattutto dei canali su telegram. Inoltre vorrei
+    aggiungere il cerco»). Le tendine della scheda diventano citazioni
+    espandibili nei post (le prove delle caption stanno accanto alle
+    sorelle: prove_canale_bot per l'annuncio, prove_contanti_zona per il
+    P2P); qui:
+     · il tetto dei 1024 caratteri VISIBILI con dieci titoli lunghi, e
+       «Vedi tutto il negozio ›» quando il negozio ne ha ancora;
+     · la caption del Cerco (pura, con l'escape di «<»);
+     · il freno settimanale a TRE timbri;
+     · il post vero nei tre canali, su un database sqlite vero e un
+       Telegram di cartone: chi ha @username, il freno, il timbro prima
+       dell'invio, la leva; e il ritiro quando la richiesta si chiude o
+       scade;
+     · le sentinelle: la leva, la colonna, la tabella, i punti di
+       chiamata."""
+    print("\n[le tendine e il «Cerco» nei canali]")
+    import asyncio as _asCC
+    import html as _htCC
+    import sqlite3 as _sqCC
+    import tempfile as _tfCC
+
+    # --- 1) IL TETTO DEI 1024 VISIBILI -------------------------------
+    cap = {"html": _htCC, "re": re, "json": json, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
+           "TETTO_CAPTION_VISIBILE": 1024, "MAX_VETRINA_PROMO": 10}
+    exec(next(r for r in _SORGENTE.split("\n") if r.startswith("CHARSET_BECH32")), cap)
+    for tabella, fine_t in (("ZONE_SPEDIZIONE = (", ")"), ("ZONA_ETICHETTA = {", "}"),
+                            ("ENCLAVI_DOMESTICO = {", "}"), ("PAESI_PER_ZONA = {", "\n}\n"),
+                            ("_PAESE_NOME = {", "righe}"), ("DOMESTICO_DEFAULT = ", "\n")):
+        i = _SORGENTE.index("\n" + tabella) + 1
+        exec(_SORGENTE[i:_SORGENTE.index(fine_t, i) + len(fine_t)], cap)
+    cap["SPEDIZIONIERI"] = ("Barattolo", "InPost", "Poste Italiane")
+    cap["RETE_BARATTOLO"] = "Barattolo"
+    cap["RETE_DEL_CORRIERE"] = {"InPost": "InPost", "Poste Italiane": "Poste Italiane"}
+    cap["rete_barattolo_viva"] = lambda: False
+    for f in ("_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
+              "_npub_breve", "_npub_venditore", "nome_paese", "etichetta_zona",
+              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria", "_hashtag_promo",
+              "_firma_venditore", "_tariffa_dichiarata", "_zone_annuncio", "_non_spedisce_casa",
+              "reti_venditore", "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
+              "_tendina_canale", "_cifra_sped_promo", "_reti_punto_promo",
+              "_righe_consegna_promo", "_vetrina_venditore", "link_telegram", "_caption_canale",
+              "_riga_budget_richiesta", "_caption_canale_cerco", "_settimana_piena_vetrina"):
+        exec(pezzo(f), cap)
+    vis = cap["_lunghezza_visibile"]
+    prova("i tag e gli href non contano, il testo dentro si' (e «&amp;» e' un carattere solo)", [3, 1, 3],
+          [vis('<a href="https://esempio.example/molto/lungo">abc</a>'), vis("&amp;"), vis("<b>a</b>\nb")])
+    a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000, "valuta": "sats",
+         "zona": "Torino (TO)", "categoria": "Strumenti musicali", "venditore": "Alan",
+         "venditore_username": "AlanBimbati", "venditore_negozio": "abc12345",
+         "consegna": "entrambe", "anche_digitale": 0, "paese_domestico": "IT",
+         "spedizione_sats": 5000, "spedizione_eur": 0.0, "spedizione_punto_dichiarata": 0,
+         "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0, "spedizione_zone": ""}
+    lunghi = [{"id": 100 + i, "titolo": f"{i} " + "Titolo lunghissimo da quarantacinque lettere ok"}
+              for i in range(10)]
+    # un annuncio PESANTE: titolo e zona lunghi, tutte le zone estere, il locker, il supplemento
+    a = dict(a, titolo="Chitarra classica spagnola " * 4, zona="Torino, Borgo San Paolo, vicino al mercato",
+             venditore_spedizionieri="|InPost|", spedizione_punto_dichiarata=1, spedizione_punto_sats=3000,
+             spedizione_extra_sats=1000,
+             spedizione_zone=json.dumps({z: {"sats": 10000, "eur": 0} for z in
+                                         ("eu", "asia", "nordamerica", "sudamerica", "oceania",
+                                          "africa", "medioriente")}))
+    pieno = cap["_caption_canale"](a, 0, altri=lunghi)
+    prova("dieci titoli lunghi: la caption sta nei 1024 visibili (e non nei caratteri grezzi, che "
+          "contano gli href)", [True, True],
+          [vis(pieno) <= 1024, len(pieno) > 1024])
+    tolti = pieno.count('startapp=annuncio_1')
+    prova("...se ne sono tolti dal fondo, ma almeno uno c'e'", True, 0 < tolti < 10)
+    prova("...e dice che il negozio ne ha altri: «Vedi tutto il negozio ›» col link del negozio", True,
+          '<a href="https://barattolo.store/negozio/abc12345">Vedi tutto il negozio ›</a></blockquote>' in pieno)
+    prova("...si toglie dal FONDO: restano i primi, nell'ordine", True,
+          'annuncio_100">' in pieno and f'annuncio_{100 + tolti}">' not in pieno
+          and f'annuncio_{100 + tolti - 1}">' in pieno)
+    brevi = [{"id": 7, "titolo": "Amplificatore"}, {"id": 8, "titolo": "Leggio"}]
+    due = cap["_caption_canale"](a, 0, altri=brevi)
+    prova("con pochi titoli brevi nessuno si toglie, e senza altri articoli niente «Vedi tutto»", [True, False],
+          ["annuncio_7" in due and "annuncio_8" in due, "Vedi tutto" in due])
+    dieci = [{"id": 100 + i, "titolo": f"Cosa {i}"} for i in range(10)]
+    prova("esattamente dieci articoli: tutti e dieci, e nessun «Vedi tutto» (il negozio non ne ha altri)",
+          [10, False],
+          [cap["_caption_canale"](a, 0, altri=dieci).count("startapp=annuncio_1"),
+           "Vedi tutto" in cap["_caption_canale"](a, 0, altri=dieci)])
+    undici = [{"id": 100 + i, "titolo": f"Cosa {i}"} for i in range(11)]
+    cu = cap["_caption_canale"](a, 0, altri=undici)
+    prova("undici articoli letti: se ne elencano dieci e c'e' «Vedi tutto il negozio ›»", [10, True],
+          [cu.count("startapp=annuncio_1"), "Vedi tutto il negozio ›" in cu])
+    prova("senza codice negozio niente «Vedi tutto» (porterebbe a un 404)", False,
+          "Vedi tutto" in cap["_caption_canale"](dict(a, venditore_negozio=""), 0, altri=undici))
+    q = cap["_quanti_ne_stanno"]
+    prova("la pura: toglie finche' ci sta, a zero se nemmeno vuota ci sta, mai sotto zero",
+          [10, 4, 0, 0, 0],
+          [q(lambda n: "x" * (100 + n), 10, 1024), q(lambda n: "x" * (100 + n * 200), 10, 1000),
+           q(lambda n: "x" * 5000, 10, 1024), q(lambda n: "", 0, 1024), q(lambda n: "", -3, 1024)])
+    prova("il tetto di Telegram e' uno solo, 1024, anche per il ripiego di testo (lo scrive il commento)",
+          True, "TETTO_CAPTION_VISIBILE = 1024" in _SORGENTE and "MAX_VETRINA_PROMO = 10 " in _SORGENTE)
+    venduto = cap["_caption_canale"](a, 0, venduto=True, altri=lunghi)
+    prova("il post riscritto col ✅ Venduto sta nei 1024 visibili anche lui (il ✅ conta, e si toglie "
+          "un articolo in piu' se serve)", [True, True],
+          [vis(venduto) <= 1024, venduto.endswith("\n\n✅ Venduto")])
+    # i chiamanti leggono i corrieri del venditore, o il locker non uscirebbe mai
+    # (e il ✅ Venduto riscriverebbe un post diverso da quello nuovo)
+    _col = "u.spedizionieri AS venditore_spedizionieri, "
+    prova("le cinque SELECT che costruiscono la caption leggono le colonne dei corrieri: il drenatore, "
+          "il ✅ Venduto, «In cima» e le due dell'anteprima", [1, 1, 1, 2],
+          [pezzo("_drena_promo").count(_col), pezzo("promo_venduto").count(_col),
+           pezzo("promo_in_cima_canale").count(_col),
+           _SORGENTE[_SORGENTE.index("async def comando_anteprima("):].split("\n\n\n")[0].count(_col)])
+
+    # --- 2) LA CAPTION DEL CERCO -------------------------------------
+    chi = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
+    rich = {"id": 7, "testo": "Cerco un Ledger Nano X", "categoria": "Elettronica",
+            "budget_sats": 0, "budget_eur": 80.0}
+    c = cap["_caption_canale_cerco"](rich, chi)
+    prova("il Cerco: titolo, testo tra virgolette, categoria, budget, ancora, firma e hashtag, in ordine", True,
+          c.startswith("🙋 <b>Cerco su Barattolo</b>\n«Cerco un Ledger Nano X»\n🗂 Elettronica\n"
+                       "💰 Budget: fino a 80,00 €\n\n"
+                       '<a href="https://t.me/ilbarattolobot?startapp=cerco_7">'
+                       "🫙 Fai un'offerta su Barattolo</a>\n\nRichiesta da <b>@rosina</b>")
+          and c.endswith("\n\n#cerco #barattolo"))
+    prova("il budget in sats, e nessuna riga senza budget ne' categoria", [True, False, False],
+          ["💰 Budget: fino a 50.000 sats" in cap["_caption_canale_cerco"](
+              dict(rich, budget_eur=0, budget_sats=50000), chi),
+           "💰" in cap["_caption_canale_cerco"](dict(rich, budget_eur=0), chi),
+           "🗂" in cap["_caption_canale_cerco"](dict(rich, categoria=""), chi)])
+    cattiva = cap["_caption_canale_cerco"](
+        dict(rich, testo="<b>Ledger</b> & <i>altro</i>", categoria="<u>x</u>"),
+        dict(chi, venditore_username="", venditore="<i>Tizio</i>"))
+    prova("«<» e «&» nel testo, nella categoria e nel nome escono scappati: il post non si spegne",
+          [True, True, True, False],
+          ["&lt;b&gt;Ledger&lt;/b&gt; &amp; &lt;i&gt;altro&lt;/i&gt;" in cattiva,
+           "&lt;u&gt;x&lt;/u&gt;" in cattiva, "&lt;i&gt;Tizio&lt;/i&gt;" in cattiva,
+           "<b>Ledger</b>" in cattiva])
+    prova("nessun URL nudo (l'indirizzo vive negli href) e il lessico del deposito, mai «escrow»", [False, True],
+          ["https://" in re.sub(r'href="[^"]*"', "", c), "escrow" not in c.lower() and "assicurat" not in c.lower()])
+    prova("il nativo Nostr guadagna l'ancora njump, come nel P2P", True,
+          'href="https://njump.me/' in cap["_caption_canale_cerco"](
+              rich, dict(chi, venditore_username="", venditore_npub_accesso=
+                         "npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9")))
+
+    # --- 3) IL FRENO A TRE TIMBRI -------------------------------------
+    sp = cap["_settimana_piena_vetrina"]
+    ora = 1_800_000_000
+    ieri, vecchio = ora - 86400, ora - 9 * 86400
+    prova("il freno: ognuno dei TRE timbri, da solo, chiude la settimana; nessuno o uno vecchio no",
+          [True, True, True, False, False],
+          [sp({"promo_canale_il": ieri, "promo_vetrina_p2p_il": 0, "promo_vetrina_cerco_il": 0}, 7, ora),
+           sp({"promo_canale_il": 0, "promo_vetrina_p2p_il": ieri, "promo_vetrina_cerco_il": 0}, 7, ora),
+           sp({"promo_canale_il": 0, "promo_vetrina_p2p_il": 0, "promo_vetrina_cerco_il": ieri}, 7, ora),
+           sp({"promo_canale_il": 0, "promo_vetrina_p2p_il": 0, "promo_vetrina_cerco_il": 0}, 7, ora),
+           sp({"promo_canale_il": vecchio, "promo_vetrina_p2p_il": vecchio,
+               "promo_vetrina_cerco_il": vecchio}, 7, ora)])
+    prova("...a ritmo «tutto» (0 giorni) nessun freno, e una colonna che manca vale «mai» "
+          "(NULL compreso)", [False, False, False],
+          [sp({"promo_vetrina_cerco_il": ieri}, 0, ora), sp({}, 7, ora),
+           sp({"promo_canale_il": None, "promo_vetrina_p2p_il": None, "promo_vetrina_cerco_il": None}, 7, ora)])
+    rotta = pezzo("annuncia_ordine_p2p_canale")
+    prova("il P2P conta anche il timbro del Cerco, dallo stesso giudice", [True, True],
+          ["promo_vetrina_p2p_il, promo_vetrina_cerco_il" in rotta,
+           "_settimana_piena_vetrina(" in rotta])
+
+    # --- 4) IL POST VERO, SU UN DATABASE VERO --------------------------
+    def banco(utente=None, richiesta=None, leva=True, ritmo=7, risposta=None, canali=True,
+              lavoro=None):
+        cartella = _tfCC.mkdtemp(prefix="cerco-canali-")
+        percorso = os.path.join(cartella, "t.db")
+        con = _sqCC.connect(percorso)
+        con.executescript("""
+            CREATE TABLE utenti(tg_id INTEGER, nome TEXT, username TEXT, npub TEXT,
+                npub_verificata INTEGER, npub_accesso TEXT, negozio TEXT,
+                promo_canale_il INTEGER DEFAULT 0, promo_vetrina_p2p_il INTEGER DEFAULT 0,
+                promo_vetrina_cerco_il INTEGER DEFAULT 0);
+            CREATE TABLE richieste(id INTEGER PRIMARY KEY, tg_id INTEGER, testo TEXT,
+                categoria TEXT, budget_sats INTEGER DEFAULT 0, budget_eur REAL DEFAULT 0,
+                stato TEXT DEFAULT 'aperta', creato INTEGER, scade INTEGER);
+            CREATE TABLE post_cerco_canale(richiesta_id INTEGER NOT NULL, canale TEXT NOT NULL,
+                message_id INTEGER NOT NULL, creato INTEGER NOT NULL,
+                PRIMARY KEY(canale, message_id));""")
+        u = {"tg_id": 222, "nome": "Rosa", "username": "rosa", "negozio": "neg1"}
+        u.update(utente or {})
+        con.execute("INSERT INTO utenti(tg_id, nome, username, npub, npub_verificata, npub_accesso, "
+                    "negozio, promo_canale_il, promo_vetrina_p2p_il, promo_vetrina_cerco_il) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (u["tg_id"], u["nome"], u["username"], "", 0, "", u["negozio"],
+                     u.get("promo_canale_il", 0), u.get("promo_vetrina_p2p_il", 0),
+                     u.get("promo_vetrina_cerco_il", 0)))
+        r = {"id": 1, "tg_id": u["tg_id"], "testo": "Cerco una bici", "categoria": "Sport",
+             "stato": "aperta", "creato": int(time.time()), "scade": int(time.time()) + 86400 * 30}
+        r.update(richiesta or {})
+        con.execute("INSERT INTO richieste(id, tg_id, testo, categoria, stato, creato, scade) "
+                    "VALUES(?,?,?,?,?,?,?)", (r["id"], r["tg_id"], r["testo"], r["categoria"],
+                                              r["stato"], r["creato"], r["scade"]))
+        con.commit()
+        con.close()
+
+        def db():
+            c = _sqCC.connect(percorso)
+            c.row_factory = _sqCC.Row
+            return c
+
+        chiamate, stampe, contatore = [], [], [900]
+
+        async def bot_api(metodo, dati):
+            chiamate.append((metodo, dati["chat_id"], dati.get("message_id"),
+                             dati.get("text", "")[:12]))
+            if risposta:
+                return risposta(metodo, dati)
+            if metodo == "sendMessage":
+                contatore[0] += 1
+                return {"ok": True, "result": {"message_id": contatore[0]}}
+            return {"ok": True}
+
+        amb = {"db": db, "bot_api": bot_api, "POST_CERCO_CANALI": leva,
+               "VETRINA_SI_PULISCE": True, "RICHIESTE_DURATE": (30, 60, 90),
+               "canale_id": lambda: "@nostro" if canali else "",
+               "canale_vetrina": lambda: "@vetrina" if canali else "",
+               "canale_bitcoin_podcast": lambda: "@podcast" if canali else "",
+               "ritmo_vetrina": lambda: (ritmo, 6, 3), "time": time, "asyncio": _asCC,
+               "html": _htCC, "re": re, "URL_PUBBLICO": "https://barattolo.store",
+               "LINK_BOT": "https://t.me/ilbarattolobot", "_TASK_POST_P2P": set(),
+               "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
+        exec(next(rg for rg in _SORGENTE.split("\n") if rg.startswith("CHARSET_BECH32")), amb)
+        for nome in ("_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
+                     "_npub_breve", "_npub_venditore", "_fmt_sats", "_fmt_eur", "_firma_venditore",
+                     "link_telegram", "_riga_budget_richiesta", "_caption_canale_cerco",
+                     "_settimana_piena_vetrina", "_segna_post_cerco"):
+            exec(pezzo(nome), amb)
+        exec("async " + pezzo("_manda_post_canale"), amb)
+        i = _SORGENTE.index("TESTO_POST_CERCO_TOLTO = (")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        for nome in ("_posta_richiesta_nei_canali", "ritira_post_cerco", "giro_post_cerco_canale"):
+            exec("async " + pezzo(nome), amb)
+        exec(pezzo("_ritira_post_cerco_subito"), amb)
+        (lavoro or (lambda amb, db: _asCC.run(amb["_posta_richiesta_nei_canali"](1))))(amb, db)
+        return chiamate, stampe, db
+
+    def stato(db):
+        c = db()
+        try:
+            return (c.execute("SELECT promo_vetrina_cerco_il FROM utenti").fetchone()[0],
+                    sorted((r["canale"], r["message_id"]) for r in
+                           c.execute("SELECT * FROM post_cerco_canale")))
+        finally:
+            c.close()
+
+    ch, st, db = banco()
+    invii = [(m, c) for m, c, _i, _t in ch]
+    prova("il post esce nei TRE canali, come testo (mai foto), e i tre message_id si ricordano",
+          ([("sendMessage", "@nostro"), ("sendMessage", "@vetrina"), ("sendMessage", "@podcast")],
+           [("@nostro", 901), ("@podcast", 903), ("@vetrina", 902)], []),
+          (invii, stato(db)[1], st))
+    prova("...e il timbro del Cerco su Subito Crypto e' scritto", True, stato(db)[0] > 0)
+    ch, st, db = banco(utente={"promo_vetrina_p2p_il": int(time.time()) - 86400})
+    prova("freno: un ordine P2P uscito ieri su Subito Crypto chiude la settimana: li' niente, gli altri due si'; "
+          "il timbro del Cerco non si scrive", ([("sendMessage", "@nostro"), ("sendMessage", "@podcast")], 0),
+          ([(m, c) for m, c, _i, _t in ch], stato(db)[0]))
+    ch, st, db = banco(utente={"promo_canale_il": int(time.time()) - 86400})
+    prova("...e cosi' un annuncio uscito ieri (`promo_canale_il`)", 2, len(ch))
+    ch, st, db = banco(utente={"promo_vetrina_cerco_il": int(time.time()) - 86400})
+    prova("...e un altro Cerco uscito ieri: al massimo UNO a settimana per persona", 2, len(ch))
+    ch, st, db = banco(utente={"promo_vetrina_cerco_il": int(time.time()) - 9 * 86400})
+    prova("...ma uno di nove giorni fa no: la settimana e' passata", 3, len(ch))
+    ch, st, db = banco(utente={"promo_vetrina_cerco_il": int(time.time()) - 86400}, ritmo=0)
+    prova("a ritmo «tutto» (0 giorni) nessun freno", 3, len(ch))
+    ch, st, db = banco(utente={"username": ""})
+    prova("senza @username Subito Crypto non c'e' (e il timbro non si scrive); gli altri due si'", (2, 0),
+          (len(ch), stato(db)[0]))
+    ch, st, db = banco(utente={"tg_id": -5, "username": "x"}, richiesta={"tg_id": -5})
+    prova("un nativo Nostr (tg_id negativo) non va su Subito Crypto", (["@nostro", "@podcast"]),
+          [c for m, c, _i, _t in ch])
+    ch, st, db = banco(leva=False)
+    prova("a leva spenta non esce niente", ([], []), (ch, stato(db)[1]))
+    ch, st, db = banco(canali=False)
+    prova("senza canali non esce niente e non si timbra", ([], 0), (ch, stato(db)[0]))
+    ch, st, db = banco(richiesta={"stato": "chiusa"})
+    prova("una richiesta gia' chiusa non si annuncia", [], ch)
+    # IL TIMBRO PRIMA DELL'INVIO: con Telegram che esplode a meta' il turno e' comunque speso
+    def esplode(metodo, dati):
+        raise RuntimeError("telegram giu'")
+    ch, st, db = banco(risposta=esplode)
+    prova("il timbro e' scritto PRIMA dell'invio: un guasto puo' far perdere un post, mai raddoppiarlo; "
+          "e il guasto non esce dalla funzione (fail-open)", (True, 0),
+          (stato(db)[0] > 0, len(stato(db)[1])))
+    corpo = pezzo("_posta_richiesta_nei_canali")
+    prova("...e nel sorgente il timbro sta prima dell'invio su Subito Crypto", True,
+          0 < corpo.index("UPDATE utenti SET promo_vetrina_cerco_il") < corpo.index(
+              "_manda_post_canale(canale_vetrina()"))
+
+    # --- 5) IL RITIRO QUANDO LA RICHIESTA SI CHIUDE O SCADE ---------------
+    def ritira(stato_richiesta, scade=None, via_giro=True):
+        def lavoro(amb, db):
+            _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+            c = db()
+            if scade is not None:
+                c.execute("UPDATE richieste SET scade=? WHERE id=1", (scade,))
+            c.execute("UPDATE richieste SET stato=? WHERE id=1", (stato_richiesta,))
+            c.commit()
+            c.close()
+            amb["bot_api_chiamate"].clear()
+            if via_giro:
+                _asCC.run(amb["giro_post_cerco_canale"]())
+            else:
+                _asCC.run(amb["ritira_post_cerco"]([1]))
+        return lavoro
+
+    def banco_ritiro(stato_richiesta, **kw):
+        # le chiamate dopo l'invio: si azzerano dentro `lavoro` e si leggono qui
+        raccolte = []
+
+        def lav(amb, db):
+            amb["bot_api_chiamate"] = raccolte
+            orig = amb["bot_api"]
+
+            async def tracciata(metodo, dati):
+                r = await orig(metodo, dati)
+                raccolte.append((metodo, dati["chat_id"], dati.get("message_id")))
+                return r
+            amb["bot_api"] = tracciata
+            ritira(stato_richiesta, **kw)(amb, db)
+        ch, st, db = banco(lavoro=lav)
+        return raccolte, st, db
+
+    ra, st, db = banco_ritiro("chiusa")
+    cancellati = [(m, c, i) for m, c, i in ra if m == "deleteMessage"]
+    prova("richiesta chiusa: il giro dell'orologio cancella i tre post e le righe se ne vanno",
+          (3, []), (len(cancellati), stato(db)[1]))
+    ra, st, db = banco_ritiro("aperta")
+    prova("richiesta ancora aperta: i post restano", (0, 3),
+          (len([1 for m, c, i in ra if m == "deleteMessage"]), len(stato(db)[1])))
+    ra, st, db = banco_ritiro("aperta", scade=int(time.time()) - 5)
+    prova("richiesta scaduta (anche se nessuno l'ha ancora chiusa leggendo): i post si tolgono", (3, []),
+          (len([1 for m, c, i in ra if m == "deleteMessage"]), stato(db)[1]))
+    ra, st, db = banco_ritiro("chiusa", via_giro=False)
+    prova("il ritiro diretto (il gesto di chi chiude) fa lo stesso", 3,
+          len([1 for m, c, i in ra if m == "deleteMessage"]))
+
+    # oltre le 48 ore: il delete non riesce, si riscrive «Richiesta chiusa»
+    def lav48(amb, db):
+        _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+        c = db()
+        c.execute("UPDATE richieste SET stato='chiusa' WHERE id=1")
+        c.commit()
+        c.close()
+        visti = amb["visti_fuori"]
+
+        async def finta(metodo, dati):
+            visti.append((metodo, dati.get("text", "")))
+            if metodo == "deleteMessage":
+                return {"ok": False, "description": "Bad Request: message can't be deleted for everyone"}
+            return {"ok": True}
+        amb["bot_api"] = finta
+        _asCC.run(amb["giro_post_cerco_canale"]())
+    visti_48 = []
+    ch, st, db48 = banco(lavoro=lambda amb, db: (amb.update(visti_fuori=visti_48), lav48(amb, db)))
+    prova("oltre le 48 ore (delete rifiutato) il post si RISCRIVE «Richiesta chiusa» e la riga se ne va",
+          (3, 3, True, 0),
+          (len([1 for m, t in visti_48 if m == "deleteMessage"]),
+           len([1 for m, t in visti_48 if m == "editMessageText"]),
+           all("Richiesta chiusa" in t for m, t in visti_48 if m == "editMessageText"),
+           len(stato(db48)[1])))
+
+    def lav_muto(amb, db):
+        _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+        c = db()
+        c.execute("UPDATE richieste SET stato='chiusa' WHERE id=1")
+        c.commit()
+        c.close()
+
+        async def muta(metodo, dati):
+            return None
+        amb["bot_api"] = muta
+        _asCC.run(amb["giro_post_cerco_canale"]())
+    ch, st, db_m = banco(lavoro=lav_muto)
+    prova("un Telegram muto non fa perdere i post: le righe restano e ci riprova il giro dopo", 3,
+          len(stato(db_m)[1]))
+
+    def lav_spenta(amb, db):
+        _asCC.run(amb["_posta_richiesta_nei_canali"](1))
+        c = db()
+        c.execute("UPDATE richieste SET stato='chiusa' WHERE id=1")
+        c.commit()
+        c.close()
+        amb["VETRINA_SI_PULISCE"] = False
+        _asCC.run(amb["giro_post_cerco_canale"]())
+    ch, st, db_s = banco(lavoro=lav_spenta)
+    prova("con VETRINA_SI_PULISCE spenta i post restano com'erano (l'interruttore d'emergenza)", 3,
+          len(stato(db_s)[1]))
+
+    # --- 6) LE SENTINELLE ---------------------------------------------
+    crea = pezzo("crea_richiesta") if "def crea_richiesta(" in _SORGENTE else \
+        _SORGENTE[_SORGENTE.index("asyncio.create_task(_avvisa_venditori_richiesta(rid))") - 200:][:600]
+    prova("la nascita della richiesta lancia il post nei canali accanto ai due avvisi", True,
+          "asyncio.create_task(_avvisa_venditori_richiesta(rid))\n"
+          "    asyncio.create_task(_avvisa_moderatori_richiesta(rid))\n"
+          "    asyncio.create_task(_posta_richiesta_nei_canali(rid))" in _SORGENTE)
+    prova("chi chiude la richiesta ritira i post subito, dopo il commit", True,
+          "con.commit()\n    con.close()\n    _ritira_post_cerco_subito(richiesta_id)" in _SORGENTE)
+    prova("l'orologio grande ritira quelli delle richieste scadute", True,
+          "await giro_post_cerco_canale()" in _SORGENTE)
+    prova("la leva: di serie ACCESA nel codice e nel config d'esempio, e nel pannello «Stato delle leve»", True,
+          "except ImportError:\n    POST_CERCO_CANALI = True\n" in _SORGENTE
+          and "\nPOST_CERCO_CANALI = True\n" in open("config_esempio.py", encoding="utf-8").read()
+          and '_leva("Le richieste di Cerco nei canali", "POST_CERCO_CANALI",' in _SORGENTE)
+    prova("la colonna del timbro nasce con la migrazione «ADD COLUMN se manca», a zero", True,
+          '"promo_vetrina_cerco_il INTEGER DEFAULT 0",' in _SORGENTE)
+    prova("la tabella dei post di Cerco nasce con lo schema", True,
+          "CREATE TABLE IF NOT EXISTS post_cerco_canale(" in _SORGENTE)
+    prova("la richiesta non ha zona ne' descrizione: il post non ne inventa", False,
+          "zona" in pezzo("_caption_canale_cerco") or "dettagli" in pezzo("_caption_canale_cerco").lower())
 
 
 def prove_premi_fedelta():
@@ -217013,7 +218064,8 @@ console.log(JSON.stringify([7, 8, 9, 10, 0, 11].map(n => (viaEuroScambioDellOrdi
     # --- la scelta, in node ------------------------------------------------
     prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
             + _riga_js(mini, "const VIA_EURO_MARGINE = ")
-            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk){")
+            + _riga_js(mini, "const VIA_EURO_MINUTI_SERIE = ")
+            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk, minutiDi){")
             + r"""
 const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
   euro: 10, euroMax: 100, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
@@ -217038,6 +218090,12 @@ const CHF = ['TWINT', 'Revolut'];
 r.chf = viaEuroScelta([O('a', {metodi: ['TWINT']}), O('b', {fiat: 'CHF', metodi: ['Bonifico CH', 'Wise']}),
   O('c', {fiat: 'CHF', metodi: ['Bonifico CH', 'TWINT', 'Revolut'], premium: 3})], 40000, per, 0.02, {}, [], 'CHF', CHF);
 r.chfNoEuro = viaEuroScelta([O('a', {metodi: ['SEPA Instant']})], 40000, per, 0.02, {}, [], 'CHF', CHF);
+// (27 nov 2026) piu' tempo prima: 'a' costa meno ma da' 15 minuti, 'b' le 24 ore
+const MIN = {a: 15, c: 60, d: 30};
+const md = o => MIN[o.id] || 0;
+r.tempo = viaEuroScelta([O('a'), O('b', {premium: 3})], 40000, per, 0.02, {}, [], 'EUR', null, md);
+r.tempoCorti = viaEuroScelta([O('a'), O('c', {premium: 3}), O('d', {premium: 1})], 40000, per, 0.02, {}, [], 'EUR', null, md);
+r.senzaMinuti = viaEuroScelta([O('a'), O('b', {premium: 3})], 40000, per, 0.02, {});
 console.log(JSON.stringify(r));
 """)
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
@@ -217075,6 +218133,22 @@ console.log(JSON.stringify(r));
           ["c", ["TWINT", "Revolut"], "CHF", None],
           [r["chf"]["id"], r["chf"]["metodi"], r["chf"]["fiat"], r["chfNoEuro"]])
     prova("...e in euro l'offerta lo dice", "EUR", r["base"]["fiat"])
+    prova("piu' tempo prima (27 nov 2026): fra chi va bene vince chi da' piu' "
+          "minuti per pagare (le 24 ore di serie battono i 15 minuti anche "
+          "costando di piu'), fra due corti il piu' lungo; l'offerta porta i "
+          "minuti (0 = 24 ore); senza minuti la scelta di prima",
+          [["b", 0], ["c", 60], "a"],
+          [[r["tempo"]["id"], r["tempo"]["minuti"]], [r["tempoCorti"]["id"], r["tempoCorti"]["minuti"]],
+           r["senzaMinuti"]["id"]])
+    rv = _fn_js(mini, "function renderViaEuro(){")
+    rt = _fn_js(mini, "function viaEuroRigaTempo(o){")
+    prova("...e prima di «Continua» il riquadro ⏱ dello scambio, con la sua "
+          "frase di sempre, solo per un ordine a tempo corto", True,
+          rv.index("+ viaEuroRigaTempo(o)") < rv.index("onclick=\"viaEuroContinua()\"")
+          and "rigaTempoPagareScambioP2P({stato: 'attivo', lato: 'compro', pagaEntro: 0," in rt
+          and "if (!min || typeof rigaTempoPagareScambioP2P !== 'function') return '';" in rt
+          and "minutiPagareOrdineP2P : null);" in mini
+          and "'Avrai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.'" in mini)
 
     # --- i franchi: la valuta dal fuso, la scelta a mano, le parole ---------
     prog_chf = ("let _ls = {}; const localStorage = {getItem: k => _ls[k] || null, "
@@ -225547,6 +226621,23 @@ console.log(JSON.stringify(fuori));
     prova("...la ronda rilegge il catalogo, e lo stato lo porta all'app",
           [True, True], ["await _shoppy_rileggi()" in pezzo("_orologio_bitpost"),
                          '"carte": shoppy_carte_per_chi(shoppy_carte_lette(), catalogo)' in pezzo("bitpost_stato")])
+    # --- 6-quater) LA SIMULAZIONE VERA (27 nov 2026, beta di Bitpost):
+    # senza `network` Bitpost sceglie Liquid; il pagamento arriva come link
+    # «bitcoin:» senza `address` a parte. -------------------------------
+    _amb_p = {"re": re}
+    exec(pezzo("bitpost_pagamento_con_indirizzo"), _amb_p)
+    _pi = _amb_p["bitpost_pagamento_con_indirizzo"]
+    prova("6-quater) l'indirizzo dal link bitcoin:, quello gia' scritto resta, "
+          "un link storto non inventa niente",
+          ["tb1q3fla7k7m2q9e0wp97prl25ajfs0wlrg6djknqrrhqsvx248fy5rsucu4hw",
+           "bc1qgia", None, None],
+          [_pi({"destination": "bitcoin:tb1q3fla7k7m2q9e0wp97prl25ajfs0wlrg6djknqrrhqsvx248fy5rsucu4hw?amount=0.00035644"}).get("address"),
+           _pi({"address": "bc1qgia", "destination": "bitcoin:bc1qaltro"}).get("address"),
+           _pi({"destination": "bitcoin:<script>?amount=1"}).get("address"),
+           _pi(None).get("address")])
+    prova("...tutte e due le porte d'ordine dicono la rete Bitcoin", [True, True],
+          ['"network": "Bitcoin"}' in pezzo("bitpost_crea"),
+           '"network": "Bitcoin"}' in pezzo("bitpost_offerta_compra")])
     prova("i gruppi del pannello in ordine alfabetico, senza l'emoji davanti",
           True, 'key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())'
           in pezzo("_leve_stato"))
@@ -226831,7 +227922,7 @@ CATEGORIE = {
     logo_compra_vendi tempo_di_chi_pubblica tempo_pubblica_app
     disputa_automatica_p2p pausa_in_vista paracadute_p2p paracadute_app
     selettore_di_casa ordine_in_pausa relay_per_mostro
-    notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain intervallo_onchain importo_copia
+    notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain intervallo_onchain resto_intervallo importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
     presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain chat_spunte onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
@@ -226850,7 +227941,7 @@ CATEGORIE = {
     meta_cauzione_auto intervallo_obbligatorio
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste cerco_canali premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina vetrina_reti_punto
@@ -226868,7 +227959,7 @@ CATEGORIE = {
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
     tracking_corretto tracking_venditore tracking_facoltativo
     posta_senza_traccia spedisci_entro
-    vantaggi_livelli stradina cruscotto_admin cruscotto_semplice buoni_cumulabili
+    vantaggi_livelli stradina cruscotto_admin cruscotto_semplice cruscotto_guadagni buoni_cumulabili
     barattolo savers_proprietario visualizzazioni barattolo_in_striscia
     interesse barattolo_filtra barattolo_condiviso notifica_fail_open
     messaggio_admin avviso_contatto forma_tracking bip353 conta_feedback
@@ -226931,7 +228022,7 @@ CATEGORIE = {
     npub_una_casa accesso_di_casa parole_che_avvisano leve relay_leva relay_di_barattolo posta_relay
     backup_prima_del_deploy backup_database_occupato sbirciata anteprime
     seo onion cookie_onion script_nel_workflow deploy giudice_deploy
-    collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
+    collaudi_in_ci ci_leggera ci_solo_main ci_a_pezzi elenco_dei_collaudi
     collaudi_senza_coincurve servizio_non_root guardiano_ponte
     guardia_liquidita canale_admin gruppo_admin_coda deploy_nel_gruppo
     bussola tetto_claude_md novita_md conoscenza_tappo annotazioni_negli_ambienti nwc_cifratura
@@ -227316,6 +228407,72 @@ def _argomenti_della_ci(argv, env):
             and env.get("GITHUB_REF") == "refs/heads/main"):
         return ["--dai-file=origin/pronto"] + list(argv)
     return list(argv)
+
+
+# I PEZZI (27 nov 2026, cantiere ci-a-pezzi, richiesta di Andrea: «sistema
+# la questione delle CI troppo lente»). La CI divide le sezioni fra N
+# macchine di GitHub che girano INSIEME: `--pezzo=2/5` gira il secondo di
+# cinque pezzi delle sezioni GIA' scelte, divise coi pesi qui sotto, cosi'
+# ogni sezione sta in un pezzo solo e l'unione dei pezzi e' il giro intero.
+# Ogni pezzo e' un processo suo, con le sue PASSATE e FALLITE: il giudice
+# e' il job `prove` del workflow, che e' verde solo se lo sono tutti.
+# Senza l'opzione si gira tutto, come prima. Il perche' e i numeri:
+# docs/CANTIERI.md, «La CI a pezzi».
+def _togli_pezzo(argv):
+    """`--pezzo=K/N` (o `--pezzo K/N`) tolto da argv: torna (k, n, resto),
+    (1, 1, argv) senza. Esce col 2 se e' storto: un pezzo letto male
+    lascerebbe sezioni mai girate, e nessuno se ne accorgerebbe."""
+    resto, k, n = [], 1, 1
+    argv = list(argv)
+    while argv:
+        a = argv.pop(0)
+        if a == "--pezzo" or a.startswith("--pezzo="):
+            v = a.split("=", 1)[1] if "=" in a else (argv.pop(0) if argv else "")
+            m = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})", v)
+            if not m or not 1 <= int(m.group(1)) <= int(m.group(2)):
+                print(f"  pezzo storto: «{v}» (vuole K/N, con 1 <= K <= N)")
+                sys.exit(2)
+            k, n = int(m.group(1)), int(m.group(2))
+        else:
+            resto.append(a)
+    return k, n, resto
+
+
+# I PESI DEI PEZZI: le sezioni piu' lente, in secondi, misurate il 27 nov
+# 2026 su una macchina sola (giro intero 654 s). Le altre valgono mezzo
+# secondo. Con i pesi i pezzi si riempiono dal piu' leggero (il primo
+# libero prende la sezione piu' pesante rimasta), e cinque pezzi stanno
+# fra 121 e 137 s; a giro, senza pesi, uno ne avrebbe preso 266 per colpa
+# del solo motore P2P. Un peso vecchio sbilancia e basta: ogni sezione
+# gira comunque in un pezzo solo. Un nome che non c'e' piu' lo trova
+# `prove_categorie_delle_prove`.
+PESI_PEZZI = {
+    "prove_p2p_motore": 104, "prove_backup_prima_del_deploy": 30,
+    "prove_lingua_inglese": 22, "prove_banner_fee_personale": 22,
+    "prove_avviso_dm_nostr": 22, "prove_backup_database_occupato": 17,
+    "prove_contanti_a_mano": 12, "prove_lettore_negozi_in_tempo": 11,
+    "prove_annullo_in_disputa": 10, "prove_config_esempio": 10,
+    "prove_giro_guidato_p2p": 10, "prove_p2p_ascolto": 10,
+    "prove_certificati_relay": 10, "prove_relay_per_mostro": 9,
+    "prove_notifiche_telefono": 8, "prove_cartone_submarine": 8,
+    "prove_tor_chiavi_scambio": 7, "prove_stampa_e_salti": 7,
+    "prove_logout_apk": 7, "prove_canale_bot": 6,
+}
+
+
+def _il_mio_pezzo(nomi, k, n, pesi=None):
+    """I nomi del pezzo K di N, nell'ordine in cui stanno in `nomi`.
+    Ogni nome finisce in un pezzo solo e l'unione e' `nomi`: si scorre
+    dal piu' pesante e ognuno va al pezzo meno carico (a pari carico, il
+    numero piu' basso), quindi la scelta e' la stessa su ogni macchina."""
+    pesi = PESI_PEZZI if pesi is None else pesi
+    carico, di_chi = [0.0] * n, {}
+    for i, nome in sorted(enumerate(nomi),
+                          key=lambda x: (-pesi.get(x[1], 0.5), x[0])):
+        j = min(range(n), key=lambda q: (carico[q], q))
+        carico[j] += pesi.get(nome, 0.5)
+        di_chi[i] = j
+    return [nome for i, nome in enumerate(nomi) if di_chi[i] == k - 1]
 
 
 def _scelta_da_riga_di_comando(argv, tutte):
@@ -228022,7 +229179,7 @@ def main():
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci, prove_ci_leggera,
-              prove_ci_solo_main,
+              prove_ci_solo_main, prove_ci_a_pezzi,
               prove_elenco_dei_collaudi, prove_collaudi_senza_coincurve,
               prove_servizio_non_root,
               prove_guardiano_ponte,
@@ -228301,6 +229458,7 @@ def main():
               prove_recensioni_nascondibili,
               prove_x_risonanza,
               prove_indirizzo_lightning, prove_grazie_zap,
+              prove_cruscotto_guadagni,
               prove_indirizzo_swap,
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,
@@ -228325,6 +229483,7 @@ def main():
               prove_estensione_barattozon,
               prove_barattozon_onchain,
               prove_intervallo_onchain,
+              prove_resto_intervallo,
               prove_allegati_chat,
               prove_pdf_allegati,
               prove_stampa_e_salti,
@@ -228345,6 +229504,7 @@ def main():
               prove_mancia_venditore,
               prove_raccolte,
               prove_richieste,
+              prove_cerco_canali,
               prove_premi_fedelta,
               prove_app_negozio,
               prove_cassa_solo_negozio,
@@ -228402,8 +229562,17 @@ def main():
               prove_promozioni,
               prove_chat_spunte,
               prove_categorie_delle_prove)
+    k_pezzo, n_pezzi, argomenti = _togli_pezzo(sys.argv[1:])
     sezioni, titolo = _scelta_da_riga_di_comando(
-        _argomenti_della_ci(sys.argv[1:], os.environ), tutte)
+        _argomenti_della_ci(argomenti, os.environ), tutte)
+    if n_pezzi > 1:
+        quante = len(tutte if sezioni is None else sezioni)
+        tra = list(tutte if sezioni is None else sezioni)
+        mie = set(_il_mio_pezzo([f.__name__ for f in tra], k_pezzo, n_pezzi))
+        sezioni = [f for f in tra if f.__name__ in mie]
+        titolo = f"{titolo}, pezzo {k_pezzo} di {n_pezzi}"
+        print(f"  🧩 pezzo {k_pezzo} di {n_pezzi}: {len(sezioni)} sezioni "
+              f"su {quante}")
     if "--mostra" in sys.argv[1:]:
         quali = tutte if sezioni is None else sezioni
         print(f"  Girerebbero {len(quali)} sezioni su {len(tutte)} ({titolo}):")
