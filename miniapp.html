@@ -66894,9 +66894,10 @@ function domandePayload(){
    compra a distanza legge ingredienti, allergeni, peso netto e valori
    nutrizionali PRIMA di pagare. Una tabella uguale per tutti, coi valori
    scritti a mano. Il giudice e' `etichetta_da_payload` nel server.
-   LA TABELLA E' OBBLIGATORIA dal 18 nov 2026 (Andrea; leva
-   ETICHETTA_OBBLIGATORIA): o intera, o «Non dovuta per legge» col suo
-   motivo (ESENZIONI_ETICHETTA, gemello del server). Ingredienti,
+   LA TABELLA OBBLIGATORIA (18 nov 2026, leva ETICHETTA_OBBLIGATORIA):
+   accesa, o intera o «Non dovuta per legge» col suo motivo
+   (ESENZIONI_ETICHETTA, gemello del server). Dal 27 nov 2026 la leva
+   nasce SPENTA: la tabella e' di nuovo facoltativa (Andrea). Ingredienti,
    allergeni e peso restano facoltativi.
    I DUE ELENCHI sono i gemelli di ALLERGENI_UE e NUTRIENTI_UE del
    server: le chiavi sono le sue, qui ci sono i nomi da leggere
@@ -66923,8 +66924,9 @@ let etichettaAttiva = true;
 /* (23 nov 2026) il «🙈 Nascondi dalla vetrina»: nasce SPENTO qui e lo
    accende solo un true del server — un server di ieri non ha la rotta */
 let nascondiAttivo = false;
-/* (18 nov 2026) la tabella obbligatoria, stessa fonte e stesso patto */
-let etichettaObbligatoria = true;
+/* (18 nov 2026) la tabella obbligatoria, stessa fonte; dal 27 nov nasce
+   SPENTA come nel server, e la accende solo un true di /api/me */
+let etichettaObbligatoria = false;
 /* lo stato del form: null = «non la so ancora» (la modifica aspetta la
    scheda, e fino ad allora il salvataggio non la tocca) */
 const etichettaVuota = () => ({ingredienti:'', allergeni:[], peso:'', unita:'g',
@@ -69046,8 +69048,9 @@ async function publish(){
       && !(parseInt(el('sellServDurata')?.value, 10) > 0)) {
     toast('Quanto dura? Scrivi i minuti: è quello che rende la prestazione una cosa precisa'); return;
   }
-  /* LA TABELLA NUTRIZIONALE (18 nov 2026): obbligatoria negli alimenti,
-     anche in modifica — gli annunci di prima si mettono in regola al
+  /* LA TABELLA NUTRIZIONALE (18 nov 2026): con la leva accesa
+     obbligatoria negli alimenti (dal 27 nov spenta di serie), anche in
+     modifica — gli annunci di prima si mettono in regola al
      primo ritocco, come la condizione */
   const manca = etichettaMancante();
   if (manca) {
@@ -127567,7 +127570,7 @@ async function avvia(){
     /* (17 nov 2026) l'etichetta degli alimenti: accesa di serie, e solo
        un false esplicito del server la spegne */
     etichettaAttiva = me.etichetta_alimenti !== false;
-    etichettaObbligatoria = me.etichetta_obbligatoria !== false;
+    etichettaObbligatoria = me.etichetta_obbligatoria === true;
     nascondiAttivo = me.nascondi_annuncio === true;
     renderEtichettaForm();
     aggiornaBottoneMM();

@@ -177766,20 +177766,23 @@ def prove_etichetta_alimenti():
                     "categoria_valida(d.get(\"categoria\"))"))
 
     # --- 3b) LA TABELLA OBBLIGATORIA (18 nov 2026) --------------------------
-    prova("3b) la leva della tabella obbligatoria nasce ACCESA e solo "
-          "False la spegne", [True] * 4,
-          ["except ImportError:\n    ETICHETTA_OBBLIGATORIA = True" in src,
-           "ETICHETTA_OBBLIGATORIA = ETICHETTA_OBBLIGATORIA is not False"
+    # (27 nov 2026, cantiere tabella-facoltativa) Andrea la rivuole
+    # facoltativa: la leva resta, ma nasce SPENTA e solo True l'accende
+    prova("3b) la leva della tabella obbligatoria nasce SPENTA e solo "
+          "True l'accende", [True] * 4,
+          ["except ImportError:\n    ETICHETTA_OBBLIGATORIA = False" in src,
+           "ETICHETTA_OBBLIGATORIA = ETICHETTA_OBBLIGATORIA is True"
            in src,
-           "\nETICHETTA_OBBLIGATORIA = True\n" in es,
+           "\nETICHETTA_OBBLIGATORIA = False\n" in es,
            bool(re.search(r'"ETICHETTA_OBBLIGATORIA", ETICHETTA_OBBLIGATORIA,',
                           src))])
-    prova("...il form la sa da /api/me, e solo un false esplicito la spegne",
-          [True, True],
+    prova("...il form la sa da /api/me, nasce spenta e solo un true "
+          "esplicito l'accende", [True, True, True],
           ['profilo["etichetta_obbligatoria"] = ETICHETTA_OBBLIGATORIA'
            in src,
-           "etichettaObbligatoria = me.etichetta_obbligatoria !== false;"
-           in mini])
+           "etichettaObbligatoria = me.etichetta_obbligatoria === true;"
+           in mini,
+           "let etichettaObbligatoria = false;" in mini])
     m = re.search(r"ESENZIONI_ETICHETTA = \((.*?)\)\n", src, re.S)
     srv_es = re.findall(r'"(\w+)"', m.group(1)) if m else []
     m = re.search(r"const ESENZIONI_ETICHETTA = \[(.*?)\];", mini, re.S)
@@ -177885,7 +177888,7 @@ console.log(JSON.stringify(fuori));
 
     # --- 5) IL CONTROLLO DEL FORM, fatto girare (18 nov 2026) --------------
     corpo = "\n".join([
-        re.search(r"const CAT_ETICHETTA = .*?let etichettaObbligatoria = true;\n",
+        re.search(r"const CAT_ETICHETTA = .*?let etichettaObbligatoria = false;\n",
                   mini, re.S).group(0),
         "let editandoNostr = false, CAT = 'Alimenti e bevande', SCAD = null;",
         "const el = id => id === 'sellCat' ? {value: CAT}"
@@ -177903,6 +177906,8 @@ console.log(JSON.stringify(fuori));
 const fuori = {};
 const tab = {kcal: '304', grassi: '0', saturi: '0', carboidrati: '82',
              zuccheri: '80', proteine: '0', sale: '0'};
+fuori.diSerie = etichettaMancante();
+etichettaObbligatoria = true;
 fuori.vuota = etichettaMancante() !== '';
 etichettaSell.valori = {...tab, sale: ''};
 fuori.meta = etichettaMancante() !== '';
@@ -177945,7 +177950,10 @@ console.log(JSON.stringify(fuori));
     except Exception:
         prova("5) il programma del controllo gira", "", r.stderr[:400])
         return
-    prova("5) negli alimenti il form ferma la tabella vuota o a meta', e "
+    # (27 nov 2026) di serie la leva e' spenta: la tabella vuota passa
+    prova("5) di serie (leva spenta, 27 nov) il form lascia passare un "
+          "alimento senza tabella", "", o.get("diSerie"))
+    prova("...a leva accesa negli alimenti il form ferma la tabella vuota o a meta', e "
           "lascia passare quella intera (l'energia basta in kJ)",
           [True, True, "", ""],
           [o.get("vuota"), o.get("meta"), o.get("intera"), o.get("soloKj")])
