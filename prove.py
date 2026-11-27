@@ -218766,6 +218766,9 @@ console.log(JSON.stringify(r));
               [True, False, False, True, False, False], r["giusto"])
         prova("i due controlli del prezzo nella seconda firma passano da lì", 2,
               _fn_js(mini, "async function onchainCofirma(o, parole){").count("onchainPrezzoGiusto(o, "))
+    prova("il bot non dice «al tuo wallet» a chi ha pagato con «Non hai sats?»: "
+          "i sats vanno al deposito di garanzia del suo ordine (testo approvato)", 2,
+          srv.count("vanno al deposito di garanzia del tuo ordine.\""))
     cof = _fn_js(mini, "async function onchainCofirma(o, parole){")
     prova("la seconda firma di chi riceve: con `via_euro` l'incasso e' il deposito "
           "del SUO ordine, rifatto dalle tre chiavi con la sua dentro", True,

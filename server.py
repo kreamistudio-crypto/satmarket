@@ -127106,7 +127106,9 @@ async def p2p_onchain_proposta(oid: int, req: Request, x_tg_init_data: str = Hea
         "🔓 <b>Sats liberati!</b> Chi vende ha confermato gli euro e ha firmato. "
         f"Compri {_p2p_onchain_quanto(o, netti=True)}.\n\n"
         "Apri lo scambio e tocca «✍️ Metti la seconda firma»: i sats "
-        "arrivano al tuo wallet."
+        + ("vanno al deposito di garanzia del tuo ordine."
+           # (27 nov 2026, via-euro-onchain) pagato con «Non hai sats?»
+           if o["incasso_tipo"] == "via_euro" else "arrivano al tuo wallet.")
         if verso == "venditore" else
         "↩️ <b>Rimborso proposto:</b> chi compra ha rinunciato e ha firmato. "
         f"Era {_p2p_onchain_quanto(o)}.\n\n"
@@ -127660,6 +127662,8 @@ async def p2p_onchain_firma(oid: int, req: Request, x_tg_init_data: str = Header
                                     + ("i bitcoin vanno allo swap, e SATS Routing paga la "
                                        "tua richiesta Lightning dopo una conferma."
                                        if o["incasso_tipo"] == "cambio" else
+                                       "i sats vanno al deposito di garanzia del tuo ordine."
+                                       if o["incasso_tipo"] == "via_euro" else
                                        "i sats arrivano al tuo wallet.")}
     else:
         testi = {o["depositante_id"]: f"↩️ <b>Scambio on-chain annullato:</b> i sats tornano a te. Era {quanto}.",
