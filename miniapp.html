@@ -57206,7 +57206,9 @@ async function onchainLiberaDallOrdine(btn, o){
        dove ricevere, e una firma deve dire a chi vanno i sats. La
        conferma si scrive, chi vende viene avvisato, e questo telefono
        firma da solo alla prima apertura dopo la sua scelta */
-    if (o.role === 'buyer' && oc && (!oc.incasso || !oc.rimborso)) {
+    /* (27 nov 2026, via-euro-onchain) pagato con «Non hai sats?»: il resto
+       non torna a un wallet di chi compra, quindi non lo si aspetta */
+    if (o.role === 'buyer' && oc && (!oc.incasso || (!oc.rimborso && !oc.via_euro_p2p))) {
       /* (28 ott 2026) la conferma la firma il mio seme: il server la
          controlla, e il mio telefono la rilegge prima di firmare da solo */
       const parole = onchainSemeLocale();
@@ -57220,7 +57222,7 @@ async function onchainLiberaDallOrdine(btn, o){
       if (!r.ok) throw new Error(d.detail || 'conferma non salvata');
       /* (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») manca
          il MIO wallet, dove torna il resto: lo dico prima di tutto */
-      if (!oc.rimborso) toast('✅ Confermato. Per liberare i sats scegli prima il tuo wallet, dove torna il resto: Profilo → «₿ On-chain». Poi il tuo telefono firma da solo quando apri la Mini App', 10000);
+      if (!oc.rimborso && !oc.via_euro_p2p) toast('✅ Confermato. Per liberare i sats scegli prima il tuo wallet, dove torna il resto: Profilo → «₿ On-chain». Poi il tuo telefono firma da solo quando apri la Mini App', 10000);
       else toast(oc.modo_venditore && oc.modo_venditore !== 'onchain'
         ? '✅ Confermato. Chi vende riceve in Lightning: l\'abbiamo avvisato, e appena prepara lo swap il tuo telefono mette la seconda firma da solo quando apri la Mini App'
         : '✅ Confermato. Chi vende deve ancora scegliere dove ricevere: l\'abbiamo avvisato, e appena lo fa il tuo telefono firma da solo quando apri la Mini App', 9000);
@@ -78595,6 +78597,14 @@ function onchainUsciteVersoVenditore(o, incasso, piuVb){
   /* (10 nov 2026) il resto torna al wallet di chi ha comprato; se non ne
      ha ancora scelto uno non ha dove andare, e resta alla rete */
   if (resto >= ONCHAIN_POLVERE && o.rimborso) uscite.push([o.rimborso, resto]);
+  /* (27 nov 2026, via-euro-onchain; Andrea: «Al venditore dell'oggetto»)
+     pagato con «Non hai sats?» e senza un wallet di chi compra: il resto va
+     a chi vende insieme al prezzo. Solo verso il SUO incasso: verso uno swap
+     in Lightning la cifra e' fissa, e il resto resta alla rete */
+  if (!o.rimborso && o.via_euro_p2p && incasso === o.incasso) {
+    const avanzo = tot - onchainIncassoSats(o) - quota - Math.ceil(vb(quota ? 2 : 1) * tar);
+    if (avanzo > 0) uscite[0][1] += avanzo;
+  }
   return uscite;
 }
 
@@ -78649,7 +78659,7 @@ async function onchainFirmaProposta(oid, verso){
      essere quello che il SUO seme ha firmato */
   verso = verso || (o.ruolo === 'compratore' ? 'venditore' : 'compratore');
   /* (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») */
-  if (verso === 'venditore' && o.ruolo === 'compratore' && !o.rimborso)
+  if (verso === 'venditore' && o.ruolo === 'compratore' && !o.rimborso && !o.via_euro_p2p)
     throw new Error('prima scegli il tuo wallet, dove torna il resto: Profilo → «₿ On-chain»');
   if (verso === 'venditore' && o.ruolo === 'compratore' && o.rimborso
       && o.rimborso !== await onchainRimborsoAtteso(B, parole, o, io))
@@ -78703,6 +78713,14 @@ function onchainParolePerOrdine(B, parole, o){
   return tutte.find(giusta) || parole;
 }
 
+/* PURA: le uscite verso chi vende sono giuste? Il prezzo esatto; e
+   sull'ordine pagato con «Non hai sats?» senza il wallet di chi compra
+   (27 nov 2026) almeno il prezzo, col resto che va a lui */
+function onchainPrezzoGiusto(o, valori){
+  const p = onchainIncassoSats(o);
+  if (!Array.isArray(valori) || valori.length !== 1) return false;
+  return (o && o.via_euro_p2p && !o.rimborso) ? Number(valori[0]) >= p : Number(valori[0]) === p;
+}
 async function onchainCofirma(o, parole){
   const B = await caricaBitcoin();
   parole = onchainParolePerOrdine(B, parole, o);
@@ -78734,7 +78752,7 @@ async function onchainCofirma(o, parole){
       return 'il resto non tornerebbe al tuo wallet';
     if (!o.incasso) return 'chi vende non ha un incasso';
     if (!onchainFirmataDaChiVende(B, tx, o, w)) return 'la prima firma non è di chi vende';
-    if (uscite.filter(([a]) => a === o.incasso).map(([, v]) => v).join() !== String(onchainIncassoSats(o)))
+    if (!onchainPrezzoGiusto(o, uscite.filter(([a]) => a === o.incasso).map(([, v]) => v)))
       return 'a chi vende non arriva il prezzo';
     const quota = Number(o.quota_sats) || 0;
     if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);
@@ -78745,10 +78763,21 @@ async function onchainCofirma(o, parole){
   } else if (o.proposta.verso === 'venditore') {
     /* il mio incasso: il conto di serie, o il wallet che il MIO seme ha
        firmato come destinazione — mai un indirizzo detto dal solo server */
-    const atteso = await onchainIncassoAtteso(B, parole, o, io);
-    if (o.destinazione && !atteso) return 'la destinazione non è firmata dal tuo seme';
+    let atteso = '';
+    if (o.via_euro && o.via_euro.indirizzo) {
+      /* «NON HAI SATS?» ON-CHAIN (27 nov 2026): l'incasso e' il deposito del
+         MIO ordine del mercatino. Lo rifaccio dalle sue tre chiavi, e una
+         dev'essere la mia: un indirizzo detto dal solo server non passa */
+      const v = await onchainVerificaRiga(parole, {strada: (onchainSrv || {}).strada || onchainRete().strada},
+                                          o.via_euro.indirizzo);
+      atteso = v.mia && v.uguale && v.k && v.k.indirizzo === o.incasso ? o.incasso : '';
+      if (!atteso) return 'il deposito dell\'ordine non è del tuo seme';
+    } else {
+      atteso = await onchainIncassoAtteso(B, parole, o, io);
+      if (o.destinazione && !atteso) return 'la destinazione non è firmata dal tuo seme';
+    }
     if (o.ruolo !== 'venditore' || o.incasso !== atteso) return 'non è il tuo incasso';
-    if (uscite.filter(([a]) => a === atteso).map(([, v]) => v).join() !== String(onchainIncassoSats(o)))
+    if (!onchainPrezzoGiusto(o, uscite.filter(([a]) => a === atteso).map(([, v]) => v)))
       return 'non ti arriva il prezzo';
     const quota = Number(o.quota_sats) || 0;
     if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);
@@ -78776,7 +78805,9 @@ async function onchainCofirma(o, parole){
      chi vende, quando chi ha messo i sats non ha un wallet di rimborso, e'
      senza resto: tutto il versato in piu' va alla rete, come ammette il
      giudice del server. Il prezzo a chi vende resta esatto. */
-  if (o.proposta.barattolo && o.proposta.verso === 'venditore' && !o.rimborso)
+  /* ...e (27 nov 2026, via-euro-onchain) l'ordine pagato con «Non hai sats?»,
+     senza il wallet di chi compra: la stessa regola del server (`senza_resto`) */
+  if ((o.proposta.barattolo || o.via_euro_p2p) && o.proposta.verso === 'venditore' && !o.rimborso)
     tetto = Number(o.margine_sats) + inPiu;
   if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';
   for (let i = 0; i < tx.inputsLength; i++) tx.signIdx(io.firma.privateKey, i);
@@ -78827,7 +78858,7 @@ async function onchainCofirmeInAttesa(parole){
 
 function onchainRilascioDaFirmare(o){
   return o.ruolo === 'compratore' && o.stato === 'pagato' && o.rilascio_chiesto_il
-    && o.incasso && o.rimborso && !o.proposta;
+    && o.incasso && (o.rimborso || o.via_euro_p2p) && !o.proposta;
 }
 
 async function onchainLeggiOrdini(){
@@ -87207,6 +87238,7 @@ function apriGuidaWallet(scopo){
 let myViaEuro = false;      // il cancello, da /api/me
 let myViaEuroMax = 0;       // il tetto in euro, da /api/me (100)
 let myViaEuroTettoSats = 0; // il tetto in sats del giroconto, da /api/me (0 = non detto)
+let myViaEuroOc = false;    // anche gli ordini P2P on-chain (27 nov 2026), da /api/me
 let viaEuroSats = 0;        // il totale dell'ordine dell'ultima porta accesa
 let viaEuroLibroTentato = 0;
 /* i metodi di chi compra senza sats: i VELOCI in euro (25 nov 2026,
@@ -87350,15 +87382,19 @@ function viaEuroOrdiniPrendibili(){
 /* l'offerta di adesso per un ordine da `sats`, col libro che c'e' */
 function viaEuroOfferta(sats){
   if (!viaEuroPerMe() || !p2pLibro || !(sats > 0)) return null;
-  /* oltre il tetto del giroconto la riserva non salda: non si propone */
-  if (myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats) return null;
   const valuta = viaEuroValuta();
   const perSat = viaEuroPerSat(valuta);
   const fee = commissioneVivaP2P();
   if (fee === null) return null;
-  const o = viaEuroScelta(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo,
+  /* oltre il tetto del giroconto la riserva non salda: Lightning no (resta l'on-chain) */
+  const lnOk = !(myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats);
+  /* PRIMA LIGHTNING, POI ON-CHAIN (27 nov 2026, cantiere via-euro-onchain):
+     un ordine Lightning salda il deposito subito, l'on-chain aspetta una
+     conferma; se nel libro c'e' solo l'on-chain, va quello */
+  const o = (lnOk ? viaEuroScelta(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo,
                           valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI,
-                          typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P : null);
+                          typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P : null) : null)
+    || viaEuroOffertaOc(sats, valuta, perSat, fee);
   if (!o) return null;
   /* il tetto in euro vale per gli euro; in franchi non c'e' (Andrea) */
   /* ...e dal 27 nov 2026 il tetto in euro e' tolto di serie (Andrea: «leviamo
@@ -87438,6 +87474,7 @@ async function apriViaEuro(dove){
   /* dal foglio del QR: il foglio della fattura si chiude (il suo ordine
      da 15 minuti lo sostituisce il server col deposito lungo) */
   if (dove === 'qr') closeSheet();
+  viaEuroDove = dove === 'qr' ? 'qr' : 'cassa';
   viaEuroScelto = {id: o.id, euro: o.euro, metodo: o.metodi[0]};
   renderViaEuro();
   el('sheetBg').classList.add('open');
@@ -87520,6 +87557,7 @@ async function viaEuroContinua(){
   const l = currentListing;
   if (!s || !l) return;
   haptic();
+  if (viaEuroOcId(s.id)) return viaEuroContinuaOc(s);
   const offAcc = offertaAccettataPer(l.id, true);
   viaEuroInCorso[s.id] = {
     totale: viaEuroSats,
@@ -87618,10 +87656,14 @@ function viaEuroSegui(id){
     if (!viaEuroSeguo || !f || !f.classList.contains('open')) {
       clearInterval(viaEuroBattito); viaEuroBattito = null; return;
     }
+    /* lo scambio on-chain lo sa il server: si rilegge ogni dieci secondi */
+    if (viaEuroOcId(viaEuroSeguo) && ++viaEuroOcGiri % 5 === 0)
+      leggiMieiOnchainP2P().then(renderViaEuroPasso).catch(() => {});
     renderViaEuroPasso();
   }, 2000);
 }
 function renderViaEuroPasso(){
+  if (viaEuroOcId(viaEuroSeguo)) return renderViaEuroPassoOc();
   const box = el('viaEuroCorpo'), tit = el('viaEuroTit');
   const o = ordiniP2P()[viaEuroSeguo];
   let passo = viaEuroPasso(o);
@@ -87743,6 +87785,178 @@ function viaEuroRiprendiP2P(o){
   const passo = viaEuroPasso(o);
   if (passo !== 'attesa' && passo !== 'paga') return '';
   return '<button type="button" class="btn orange" onclick="viaEuroSegui(\'' + esc(o.id) + '\')">Riprendi il pagamento</button>';
+}
+/* ============ «NON HAI SATS?» ANCHE ON-CHAIN (27 nov 2026, cantiere
+   via-euro-onchain; Andrea: «Abbiamo detto anche quelli on-chain», e «il
+   deposito del mercatino mica si paga solo in Lightning»). Quando nel libro
+   non c'e' un venditore Lightning buono, conta anche chi vende bitcoin
+   ON-CHAIN (stessi metodi veloci, la cifra che ci sta), se quest'oggetto si
+   paga on-chain (un oggetto solo, al prezzo di listino, chi vende ha la sua
+   chiave). Alla cassa nasce l'ordine on-chain dell'oggetto (il suo
+   indirizzo 2-di-3, la cifra con margine e quota), poi la presa dello
+   scambio con `via_euro`: il SERVER mette come incasso dello scambio
+   l'indirizzo del deposito, e allo sblocco i bitcoin di chi vende ci
+   arrivano dritti. Niente swap, niente riserva: da li' e' il deposito
+   on-chain di sempre. Nessuna scritta nuova nei passi: sono quelli del
+   foglio Lightning. ============ */
+let viaEuroDove = 'cassa';   // da dove si e' aperto il foglio: 'cassa' o 'qr'
+let viaEuroOcGiri = 0;
+let viaEuroOcPronto = {};    // venditore -> /onchain/pronto (col margine), e quando
+/* PURA: il numero dello scambio on-chain di un id del foglio ('oc12' -> 12), 0 se Lightning */
+function viaEuroOcId(id){
+  const m = /^oc(\d+)$/.exec(String(id || ''));
+  return m ? Number(m[1]) : 0;
+}
+/* GLI ORDINI ON-CHAIN DEL LIBRO, vestiti come quelli di Lightning per
+   `viaEuroScelta`: chi vende bitcoin a prezzo di mercato, senza cauzione
+   (chi paga in euro sats non ne ha), senza filtro, non miei, non
+   Barattozon. L'intervallo: `euro_min` e' il «Da», `euro` il «Fino a». */
+function viaEuroOrdiniOc(){
+  if (!myViaEuroOc || !p2pOnchainLibro || !Array.isArray(p2pOnchainLibro.eventi)) return [];
+  const miei = Array.isArray(p2pOnchainLibro.miei) ? p2pOnchainLibro.miei : [];
+  const fuori = [];
+  for (const r of p2pOnchainLibro.eventi) {
+    if (!r || r.lato !== 'sell' || r.mercato !== true || r.cauzione_chiesta === true) continue;
+    if (miei.indexOf(String(r.ordine)) >= 0 || Number(r.filtro) > 0 || r.coin) continue;
+    if (typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(r)) continue;
+    const inter = Number(r.euro_min) > 0 && Number(r.euro) > Number(r.euro_min);
+    fuori.push({id: 'oc' + r.id, lato: 'sell', fiat: r.fiat || 'EUR', stato: r.stato || 'pending',
+                euro: inter ? Number(r.euro_min) : Number(r.euro), euroMax: inter ? Number(r.euro) : 0,
+                metodi: Array.isArray(r.metodi) ? r.metodi : [], premium: Number(r.premio) || 0,
+                creato: Number(r.creato) || 0, minuti: Number(r.minuti_pagamento) || 0});
+  }
+  return fuori;
+}
+/* l'offerta on-chain per un oggetto da `sats`: il deposito on-chain chiede
+   il prezzo + la quota + il margine per la rete (`/onchain/pronto` di QUESTO
+   venditore, letto in sottofondo e tenuto dieci minuti). Sotto i 546 sats
+   di commissione si sale alla polvere (la regola del server): la meta' di
+   chi riceve si aggiunge prima dei conti. */
+function viaEuroOffertaOc(sats, valuta, perSat, fee){
+  if (!myViaEuroOc || DEMO || VETRINA || typeof portaOnchainPossibile !== 'function') return null;
+  const l = currentListing;
+  const offAcc = l && typeof offertaAccettataPer === 'function' ? offertaAccettataPer(l.id, true) : null;
+  if (!l || !portaOnchainPossibile(l, offAcc)) return null;
+  const righe = viaEuroOrdiniOc();
+  if (!righe.length) return null;
+  const pr = viaEuroOcPronto[l.sellerId];
+  if (!pr || Date.now() - pr.quando > 10 * 60000) { viaEuroOcChiediPronto(l, sats); return null; }
+  if (!pr.pronto) return null;
+  const chiesti = sats + (Number(pr.quota_sats) || 0) + (Number(pr.margine_sats) || 0);
+  const minimo = Number(p2pOnchainLibro.minSats) || 10000;
+  const polvere = Math.max(0, Math.ceil(ONCHAIN_POLVERE / 2) - Math.floor(chiesti * fee / 2));
+  if (chiesti < minimo) return null;
+  const o = viaEuroScelta(righe, chiesti + polvere, perSat, fee, null, viaEuroNonHo,
+                          valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI,
+                          x => Number(x && x.minuti) || 0);
+  if (o) { o.onchain = true; o.chiesti = chiesti; }
+  return o;
+}
+/* /onchain/pronto di questo venditore, al piu' una volta al minuto: a
+   risposta arrivata si ridisegnano la cassa e il foglio della fattura */
+function viaEuroOcChiediPronto(l, sats){
+  const v = l && l.sellerId;
+  if (!v) return;
+  const prima = viaEuroOcPronto[v];
+  if (prima && (prima.inVolo || Date.now() - (prima.tentato || 0) < 60000)) return;
+  viaEuroOcPronto[v] = Object.assign({}, prima || {}, {inVolo: true, tentato: Date.now()});
+  fetch(`${API_BASE}/onchain/pronto/${v}?sats=${Math.max(0, Math.floor(Number(sats) || 0))}`,
+        {headers: {'X-Tg-Init-Data': authHdr()}})
+    .then(r => r.ok ? r.json() : {pronto: false})
+    .catch(() => ({pronto: false}))
+    .then(x => {
+      viaEuroOcPronto[v] = Object.assign({}, x || {}, {quando: Date.now(), tentato: Date.now()});
+      viaEuroDopoLibro();
+    });
+}
+/* «CONTINUA» SU UN ORDINE ON-CHAIN: l'ordine on-chain dell'oggetto (dal
+   foglio del QR prima si chiude la fattura Lightning, come fa il tasto
+   ⛓️), poi la presa legata. Se la presa non va, l'ordine si annulla: non
+   e' arrivato niente, lo stock torna libero. */
+async function viaEuroContinuaOc(s){
+  const ocId = viaEuroOcId(s.id);
+  chiudiFoglioP2P('viaEuroSheet');
+  const rip = attesaP2P('Sto preparando il pagamento…');
+  let ordine = null;
+  try {
+    if (viaEuroDove === 'qr' && currentOrderId) {
+      const oid = currentOrderId;
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      const r = await fetch(`${API_BASE}/orders/${oid}/annulla`, {method: 'POST', headers: {'X-Tg-Init-Data': authHdr()}});
+      if (!r.ok) {
+        pollTimer = setInterval(() => verificaOrdine(oid), 4000);
+        throw new Error((await r.json().catch(() => ({}))).detail || 'errore');
+      }
+      ordineAnnullatoQui = oid;
+      currentOrderId = null;
+    }
+    const x = await onchainOrdineDallaCassa();
+    ordine = x.o;
+    const riga = (p2pOnchainLibro.eventi || []).find(e => Number(e.id) === ocId);
+    const corpo = {metodo: s.metodo, via_euro: ordine.id};
+    if (riga && Number(riga.euro_min) > 0 && Number(riga.euro) > Number(riga.euro_min))
+      corpo.euro_cent = Math.round(Number(s.euro) * 100);
+    const r = await fetch(`${API_BASE}/p2p/onchain/${ocId}/prendi`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify(corpo)});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || 'errore');
+    await leggiMieiOnchainP2P().catch(() => {});
+    rip();
+    viaEuroSegui(s.id);
+  } catch(e) {
+    rip();
+    if (ordine) fetch(`${API_BASE}/onchain/ordini/${ordine.id}/annulla`, {method: 'POST',
+      headers: {'X-Tg-Init-Data': authHdr()}}).catch(() => {});
+    toast((e && e.message) || 'errore', 8000);
+  }
+}
+/* PURA: a che punto e' lo scambio on-chain, per il foglio (gli stessi
+   passi di `viaEuroPasso`). Lo scambio puo' non essere ancora fra i miei
+   appena preso: si aspetta. */
+function viaEuroPassoOc(o){
+  if (!o) return 'attesa';
+  if (['rilasciato', 'annullato', 'rimborsato', 'scaduto'].indexOf(o.stato) >= 0) return 'fine';
+  if (o.stato === 'disputa' || Number(o.annullo_chiesto_il) > 0 || Number(o.rinuncia_chiesta_il) > 0) return 'pagina';
+  if (o.stato === 'euro_inviati') return 'controllo';
+  if (o.stato === 'depositato') return o.recapito ? 'paga' : 'attesa';
+  if (o.stato === 'preso') return 'attesa';
+  return 'pagina';
+}
+function renderViaEuroPassoOc(){
+  const box = el('viaEuroCorpo'), tit = el('viaEuroTit');
+  const id = viaEuroOcId(viaEuroSeguo);
+  const o = (p2pOnchainMiei || []).find(x => Number(x.id) === id) || null;
+  const passo = viaEuroPassoOc(o);
+  const orma = 'oc:' + passo + ':' + (o ? o.stato + ':' + (o.recapito ? 1 : 0) : '');
+  if (!box || orma === viaEuroOrma) return;
+  viaEuroOrma = orma;
+  if (passo === 'fine' || passo === 'pagina') {
+    viaEuroSeguo = '';
+    chiudiFoglioP2P('viaEuroSheet');
+    /* sbloccato: i bitcoin vanno al deposito dell'ordine, e l'ordine
+       nasce alla prima conferma — si va agli Ordini */
+    if (o && o.stato === 'rilasciato') { loadOrders().then(() => go('affari')).catch(() => go('affari')); return; }
+    if (o && passo === 'pagina') apriDettaglioOnchainP2P(o.id);
+    return;
+  }
+  const nome = (o && o.altro) || 'chi vende i sats';
+  if (passo === 'attesa') {
+    if (tit) tit.textContent = '';
+    box.innerHTML = '<div class="via-euro-attesa">Ordine preso</div>';
+    return;
+  }
+  if (passo === 'paga') {
+    if (tit) tit.textContent = viaEuroPasso1(o, nome);
+    box.innerHTML = riquadroRecapitoP2P(o.recapito, '', o)
+      + (typeof rigaTempoCardOcP2P === 'function' ? rigaTempoCardOcP2P(o) : '')
+      + '<div class="via-euro-sotto">' + esc(viaEuroDi(o, '2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l\'acquisto salta e rischi di perdere gli euro che hai mandato.')) + '</div>'
+      + '<button type="button" class="btn primary" onclick="eseguiGestoOnchainP2P(' + Number(o.id) + ', \'euro-inviati\', {}, this)">'
+      + esc(viaEuroDi(o, 'Ho inviato gli euro')) + '</button>';
+    return;
+  }
+  if (tit) tit.textContent = nome + ' sta controllando il pagamento';
+  box.innerHTML = '<div class="via-euro-sotto">Puoi chiudere l\'app, ti avvisiamo noi.</div>';
 }
 /* ============ CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026, cantiere
    chiedi-al-venditore; Andrea: «il barattolo dovrebbe chiedere prima ad un
@@ -127656,6 +127870,7 @@ async function avvia(){
     myViaEuro = !!me.via_euro;
     myViaEuroMax = Math.max(0, Math.floor(Number(me.via_euro_max_euro) || 0));
     myViaEuroTettoSats = Math.max(0, Math.floor(Number(me.via_euro_tetto_sats) || 0));
+    myViaEuroOc = !!me.via_euro_onchain;
     if (!p2pFiltro && typeof noMoneteRicordateP2P === 'function' && bitcoinOnlyOffertoP2P()) {
       const ric = noMoneteRicordateP2P();
       if (ric.soloBtc || ric.noStable) p2pFiltro = Object.assign(filtroVuotoP2P(), ric);

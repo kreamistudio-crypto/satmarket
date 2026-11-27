@@ -1534,6 +1534,10 @@ GIROCONTO_TETTO_SATS = 150_000
 # in euro dell'ordine pagato cosi'.
 VIA_EURO_SOLO_ADMIN = True
 VIA_EURO_MAX_EURO = 100
+# «Non hai sats?» anche con gli ordini P2P on-chain (27 nov 2026): lo
+# scambio paga dritto il deposito on-chain dell'ordine. Passa comunque da
+# VIA_EURO_SOLO_ADMIN; False = solo Lightning.
+VIA_EURO_ONCHAIN = True
 # Il segreto con cui la RONDA DEL NODO chiede a /api/nodo/pagamenti-noti
 # se un pagamento uscito dal nodo e' un payout di Barattolo (28 set
 # 2026): risponde solo si'/no per ogni hash. Lo stesso valore va sul nodo

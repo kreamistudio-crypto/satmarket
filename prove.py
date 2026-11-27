@@ -51463,7 +51463,9 @@ def prove_prezzo_accordo():
     # si DISEGNA, mai dei soldi. Sono i due preventivi, i due startBuy
     # e il pagamento col wallet: un sesto deve farsi vedere qui. Il sesto
     # (23 nov 2026) e' «Non hai sats?», che compra col giroconto.
-    prova("...e lo scavalcano i sei che parlano col server", 6,
+    # Il settimo (27 nov 2026) e' «Non hai sats?» on-chain, che guarda se
+    # l'oggetto si paga on-chain (`viaEuroOffertaOc`).
+    prova("...e lo scavalcano i sette che parlano col server", 7,
           len([1 for r in mini.split("\n")
                if "offertaAccettataPer(" in r and ", true)" in r]))
 
@@ -166120,6 +166122,8 @@ def _pezzi_verso_lightning_js(mini):
              "function onchainIncassoSats(o){",
              "function onchainQuotaStorta(o){",
              "function onchainUsciteVersoVenditore(o, incasso, piuVb){",
+             # (27 nov 2026, via-euro-onchain) il prezzo che la co-firma rilegge
+             "function onchainPrezzoGiusto(o, valori){",
              "function onchainPsbtFirmata(B, o, io, w, uscite){")
     return "const P2P_OC_META_MAX = 0.025;\n" + "\n".join(
         pezzo_js(mini, f, "\n}\n") + "\n}" for f in firme)
@@ -170232,13 +170236,13 @@ process.stdout.write(JSON.stringify(out));
            "(user[\"id\"], dep, ric, ind_id, margine, prezzo + margine + q_dep," in src,
            # (19 nov 2026, ritorno-nel-libro) ...e dopo il metodo il momento del recapito
            "quota_dove, q_ric, scelto if piu_metodi else \"\",\n" in src,
-           "if [v for d, v in uscite if d == o[\"incasso\"]] != [_onchain_incasso_sats(o)]:" in src,
+           "elif al_venditore != [_onchain_incasso_sats(o)]:" in src,
            "uscite = [(oc[\"incasso\"], _onchain_incasso_sats(oc))]" in src,
            "p = await _onchain_preventivo_cambio(_onchain_incasso_sats(o))" in src])
     cof = pezzo_js(mini, "async function onchainCofirma(o, parole){", "\n}\n")
     prova("...e il telefono che co-firma rilegge l'incasso netto e il tetto, nei due versi, "
           "e lo swap in Lightning si misura sull'incasso", [2, 2, True],
-          [cof.count("String(onchainIncassoSats(o))"), cof.count("if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);"),
+          [cof.count("onchainPrezzoGiusto(o, "), cof.count("if (onchainQuotaStorta(o)) return onchainQuotaStorta(o);"),
            "if (!(rec.mandi > 0 && rec.mandi <= onchainIncassoSats(o))) throw new Error('le cifre dello swap non tornano');" in mini])
     prova("la frase del foglio «Pubblica» on-chain non dice piu' «Barattolo non prende "
           "commissioni»", [False, True],
@@ -218147,7 +218151,7 @@ console.log(JSON.stringify(r));
           rv.index("+ viaEuroRigaTempo(o)") < rv.index("onclick=\"viaEuroContinua()\"")
           and "rigaTempoPagareScambioP2P({stato: 'attivo', lato: 'compro', pagaEntro: 0," in rt
           and "if (!min || typeof rigaTempoPagareScambioP2P !== 'function') return '';" in rt
-          and "minutiPagareOrdineP2P : null);" in mini
+          and "minutiPagareOrdineP2P : null) : null)" in mini
           and "'Avrai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.'" in mini)
 
     # --- i franchi: la valuta dal fuso, la scelta a mano, le parole ---------
@@ -218207,10 +218211,12 @@ console.log(JSON.stringify(r));
               [rc["manda"], rc["tasto"], rc["passo2"], rc["euro"]])
     off = _fn_js(mini, "function viaEuroOfferta(sats){")
     prova("...l'offerta: in franchi i soli TWINT e Revolut, il tetto in euro "
-          "solo per gli euro, e sopra il tetto del giroconto niente", True,
+          "solo per gli euro, e sopra il tetto del giroconto niente Lightning "
+          "(resta l'on-chain, 27 nov 2026)", True,
           "valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI" in off
           and "if (valuta === 'EUR' && myViaEuroMax > 0 && o.euro > myViaEuroMax) return null;" in off
-          and "if (myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats) return null;" in off
+          and "const lnOk = !(myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats);" in off
+          and "(lnOk ? viaEuroScelta(" in off
           and "const VIA_EURO_METODI_CHF = ['TWINT', 'Revolut'];" in mini
           and 'profilo["via_euro_tetto_sats"] = int(GIROCONTO_TETTO_SATS or 0)' in srv
           and "myViaEuroTettoSats = Math.max(0, Math.floor(Number(me.via_euro_tetto_sats) || 0));" in mini)
@@ -218467,6 +218473,304 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           and "await chiamataOrdineP2P(o, 'cancel');" in _fn_js(mini, "async function viaEuroAnnulla(id){")
           and "o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto'" in _fn_js(mini, "function viaEuroPasso(o){"))
 
+
+
+def prove_non_hai_sats_onchain():
+    """«NON HAI SATS?» ANCHE ON-CHAIN (27 nov 2026, cantiere via-euro-onchain;
+    Andrea: «Abbiamo detto anche quelli on-chain», poi «il deposito del
+    mercatino mica si paga solo in Lightning»). Chi non ha sats paga euro a
+    chi vende bitcoin ON-CHAIN, e allo sblocco i bitcoin vanno DRITTI
+    all'indirizzo del deposito on-chain dell'ordine dell'oggetto. Il server:
+    la leva, l'avanzo massimo, il giudice del legame alla presa (sul
+    database), l'esito degli scambi legati (l'ordine si chiude se lo scambio
+    salta, non scade finche' e' vivo, il «Annulla» non lo chiude sotto uno
+    scambio vivo), la vista di chi riceve. Il telefono: gli ordini on-chain
+    vestiti per la scelta, Lightning prima, i passi del foglio, la presa
+    legata e la seconda firma che rifa' l'indirizzo con la propria chiave."""
+    print("\n[non hai sats? anche on-chain]")
+    import json as _js, subprocess as _sp, tempfile as _tf, sqlite3 as _sq
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = _SORGENTE
+
+    prova("la leva: accesa di serie, sotto le leve di «Non hai sats?» (la porta "
+          "di sempre, il P2P on-chain e la cassa on-chain)", [True, True],
+          ["except ImportError:\n    VIA_EURO_ONCHAIN = True\n" in srv,
+           "return bool(VIA_EURO_ONCHAIN and via_euro_ammesso(tg_id)\n"
+           "                and p2p_onchain_ammesso(tg_id) and onchain_ammesso(tg_id))"
+           in pezzo("via_euro_onchain_ammesso")])
+    amb = {"GIROCONTO_AVANZO_PERCENTO": 3, "GIROCONTO_AVANZO_EURO": 1.5,
+           "sqlite3": _sq, "json": json}
+    for n in ("via_euro_oc_avanzo_max", "_via_euro_oc_esito", "_via_euro_oc_giudica"):
+        exec(pezzo(n), amb)
+    A = amb["via_euro_oc_avanzo_max"]
+    prova("l'avanzo massimo: il piu' largo fra il 3% e un euro e mezzo; senza "
+          "cambio il 3%", [3000, 5000, 3000, 3000],
+          [A(100000, 60000.0), A(100000, 30000.0), A(100000, 0), A(100000, "storto")])
+
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    E = amb["_via_euro_oc_esito"]
+    prova("l'esito senza la tabella degli scambi: nessuno", "", E(con, 1))
+    con.executescript("""
+      CREATE TABLE onchain_indirizzi(id INTEGER PRIMARY KEY, indirizzo TEXT);
+      CREATE TABLE onchain_ordini(id INTEGER PRIMARY KEY, indirizzo_id INT, compratore_id INT,
+        stato TEXT, scade INT, visti_sats INT, importo_sats INT);
+      CREATE TABLE p2p_onchain_ordini(id INTEGER PRIMARY KEY, via_euro_ordine INT, stato TEXT);
+      INSERT INTO onchain_indirizzi VALUES (1, 'bc1qdeposito');
+      INSERT INTO onchain_ordini VALUES (7, 1, 111, 'attesa', 5000, 0, 100000);
+    """)
+    prova("...nessuno scambio legato: ''", "", E(con, 7))
+    con.execute("INSERT INTO p2p_onchain_ordini VALUES (1, 7, 'annullato')")
+    prova("...uno finito senza sbloccare: 'fallito'", "fallito", E(con, 7))
+    con.execute("INSERT INTO p2p_onchain_ordini VALUES (2, 7, 'depositato')")
+    prova("...e uno ancora in corsa: 'vivo'", "vivo", E(con, 7))
+    con.execute("UPDATE p2p_onchain_ordini SET stato='rilasciato' WHERE id=2")
+    prova("...e uno che ha sbloccato: 'vivo' (i bitcoin stanno arrivando)", "vivo", E(con, 7))
+    con.execute("DELETE FROM p2p_onchain_ordini")
+
+    amb.update({"via_euro_onchain_ammesso": lambda tg: tg != 666,
+                "p2p_onchain_usdt": lambda o: o.get("usdt", False),
+                "p2p_onchain_coin": lambda o: o.get("coin"),
+                "p2p_onchain_tab_compra": lambda o: False,
+                "_p2p_onchain_campo": lambda o, k, d=None: o.get(k, d)})
+    G = amb["_via_euro_oc_giudica"]
+    O = {"lato": "sell"}
+    prova("il legame buono: l'ordine di chi prende, che aspetta, coi sats che "
+          "coprono la cifra (anche con l'avanzo ammesso)",
+          [("", 7, "bc1qdeposito"), ("", 7, "bc1qdeposito")],
+          [G(con, 7, O, 111, 100000, 60000.0, 1000), G(con, "7", O, 111, 103000, 60000.0, 1000)])
+    prova("i no: id storto, leva spenta, un ordine di chi COMPRA bitcoin, in "
+          "USDT o in moneta, l'ordine di un altro, troppo pochi o troppi sats",
+          ["Ordine del mercatino non valido", "«Non hai sats?» on-chain non è disponibile",
+           "Quest'ordine non va bene per «Non hai sats?»",
+           "Quest'ordine non va bene per «Non hai sats?»",
+           "Quest'ordine non va bene per «Non hai sats?»",
+           "Ordine del mercatino non valido", "Il prezzo è cambiato: riprova",
+           "Il prezzo è cambiato: riprova"],
+          [G(con, "x", O, 111, 100000, 60000.0, 1000)[0],
+           G(con, 7, O, 666, 100000, 60000.0, 1000)[0],
+           G(con, 7, {"lato": "buy"}, 111, 100000, 60000.0, 1000)[0],
+           G(con, 7, {"lato": "sell", "usdt": True}, 111, 100000, 60000.0, 1000)[0],
+           G(con, 7, {"lato": "sell", "coin": {"moneta": "XMR"}}, 111, 100000, 60000.0, 1000)[0],
+           G(con, 7, O, 222, 100000, 60000.0, 1000)[0],
+           G(con, 7, O, 111, 99999, 60000.0, 1000)[0],
+           G(con, 7, O, 111, 103001, 60000.0, 1000)[0]])
+    con.execute("UPDATE onchain_ordini SET visti_sats=5")
+    no_visti = G(con, 7, O, 111, 100000, 60000.0, 1000)[0]
+    con.execute("UPDATE onchain_ordini SET visti_sats=0, scade=500")
+    no_scaduto = G(con, 7, O, 111, 100000, 60000.0, 1000)[0]
+    con.execute("UPDATE onchain_ordini SET scade=5000, stato='pagato'")
+    no_pagato = G(con, 7, O, 111, 100000, 60000.0, 1000)[0]
+    con.execute("UPDATE onchain_ordini SET stato='attesa'")
+    con.execute("INSERT INTO p2p_onchain_ordini VALUES (3, 7, 'preso')")
+    no_doppio = G(con, 7, O, 111, 100000, 60000.0, 1000)[0]
+    con.execute("UPDATE p2p_onchain_ordini SET stato='annullato'")
+    di_nuovo = G(con, 7, O, 111, 100000, 60000.0, 1000)[0]
+    prova("...e l'ordine che non aspetta piu' (sats gia' visti, scaduto, "
+          "pagato), o che un altro scambio vivo paga gia'; uno scambio saltato "
+          "lascia rifare la presa",
+          ["L'ordine del mercatino non aspetta più il pagamento"] * 3
+          + ["Questo ordine lo paga già un altro scambio", ""],
+          [no_visti, no_scaduto, no_pagato, no_doppio, di_nuovo])
+    con.close()
+
+    pr = srv[srv.index('@app.post("/api/p2p/onchain/{oid}/prendi")'):srv.index("P2P_ONCHAIN_AMMANCO_MAX_SATS = 1000")]
+    prova("la presa: il legame giudicato coi sats che arrivano (prezzo meno la "
+          "meta' di chi riceve), l'incasso deciso dal server, la colonna "
+          "scritta con la presa", [True, True, True, True],
+          ["perche, ve_id, ve_dove = _via_euro_oc_giudica(\n"
+           "                con, d.get(\"via_euro\"), o, user[\"id\"], prezzo - q_ric," in pr,
+           "incasso, i_tipo, i_val, i_firma, i_ind = ve_dove, \"via_euro\", ve_dove, \"\", 0" in pr,
+           pr.index("_via_euro_oc_giudica(") < pr.index("UPDATE p2p_onchain_ordini SET stato='preso'"),
+           "con.execute(\"UPDATE p2p_onchain_ordini SET via_euro_ordine=? WHERE id=?\"," in pr])
+    prova("la colonna nasce con le altre, e la rinascita non la copia", [True, True],
+          ['("via_euro_ordine", "INTEGER DEFAULT 0")' in srv,
+           "via_euro_ordine" not in pezzo("_p2p_onchain_rinasci")])
+    per = pezzo("_p2p_onchain_per")
+    prova("la vista di chi riceve: `via_euro` col SUO indirizzo dell'ordine, e "
+          "l'incasso del server non passa per una destinazione firmata",
+          [True, True, True],
+          ['"via_euro": _via_euro_oc_per(con, o, tg_id),' in per,
+           'if o["incasso_tipo"] and o["incasso_tipo"] != "via_euro" else None),' in per,
+           "if not ve or int(o[\"ricevente_id\"] or 0) != int(tg_id):" in pezzo("_via_euro_oc_per")])
+    ctl = srv[srv.index("        elif not utxo and _via_euro_oc_esito(con, o[\"id\"]) == \"fallito\":"):]
+    ctl = ctl[:ctl.index("con.commit()")]
+    prova("la ronda dell'ordine: si chiude se lo scambio salta (e non e' arrivato "
+          "niente), e non scade finche' lo scambio e' vivo", [True, True],
+          ["UPDATE onchain_ordini SET stato='annullato'," in ctl and "visti_sats=0" in ctl,
+           "elif not utxo and adesso > o[\"scade\"] and _via_euro_oc_esito(con, o[\"id\"]) != \"vivo\":" in ctl])
+    ann = srv[srv.index('@app.post("/api/onchain/ordini/{oid}/annulla")'):]
+    ann = ann[:ann.index("\n\n\n")]
+    prova("...e il «Annulla» di chi compra non lo chiude sotto uno scambio vivo",
+          True, 'if _via_euro_oc_esito(con, oid) == "vivo":' in ann)
+    prova("/onchain/pronto dice il margine, /api/me la porta on-chain", [True, True],
+          ['"margine_sats": onchain_margine(await onchain_mempool_tariffa())}' in srv,
+           'profilo["via_euro_onchain"] = via_euro_onchain_ammesso(user["id"])' in srv])
+
+    # --- il telefono, in node ---------------------------------------------
+    prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
+            + _riga_js(mini, "const VIA_EURO_METODI_CHF = ")
+            + _riga_js(mini, "const VIA_EURO_MARGINE = ")
+            + _riga_js(mini, "const VIA_EURO_MINUTI_SERIE = ")
+            + _riga_js(mini, "const ONCHAIN_POLVERE = ")
+            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk, minutiDi){")
+            + _fn_js(mini, "function viaEuroOcId(id){")
+            + _fn_js(mini, "function viaEuroOrdiniOc(){")
+            + _fn_js(mini, "function viaEuroOffertaOc(sats, valuta, perSat, fee){")
+            + _fn_js(mini, "function viaEuroPassoOc(o){")
+            + r"""
+let myViaEuroOc = true, DEMO = false, VETRINA = false, viaEuroNonHo = [];
+let currentListing = {id: 5, sellerId: 222};
+const portaOnchainPossibile = () => true, offertaAccettataPer = () => null;
+let chiesto = 0; const viaEuroOcChiediPronto = () => { chiesto++; };
+let viaEuroOcPronto = {};
+const R = (id, extra) => Object.assign({id, ordine: 'bar-onchain-' + id, lato: 'sell', mercato: true,
+  stato: 'pending', fiat: 'EUR', euro: 100, euro_min: 10, metodi: ['SEPA Instant'], premio: 0,
+  creato: 1, minuti_pagamento: 0, filtro: 0}, extra || {});
+let p2pOnchainLibro = {eventi: [R(1), R(2, {lato: 'buy'}), R(3, {mercato: false}), R(4, {cauzione_chiesta: true}),
+  R(5, {filtro: 3}), R(6), R(7, {coin: {moneta: 'XMR'}}), R(8, {euro_min: 0, euro: 45})],
+  miei: ['bar-onchain-6'], minSats: 10000};
+const r = {};
+r.id = [viaEuroOcId('oc12'), viaEuroOcId('a1b2'), viaEuroOcId(''), viaEuroOcId('oc')];
+r.righe = viaEuroOrdiniOc().map(x => [x.id, x.euro, x.euroMax]);
+r.senzaPronto = viaEuroOffertaOc(40000, 'EUR', 0.001, 0.02); r.chiesto = chiesto;
+viaEuroOcPronto[222] = {pronto: true, quota_sats: 0, margine_sats: 500, quando: Date.now()};
+r.offerta = viaEuroOffertaOc(40000, 'EUR', 0.001, 0.02);
+viaEuroOcPronto[222] = {pronto: false, quando: Date.now()};
+r.chiuso = viaEuroOffertaOc(40000, 'EUR', 0.001, 0.02);
+viaEuroOcPronto[222] = {pronto: true, quota_sats: 0, margine_sats: 500, quando: Date.now()};
+r.piccolo = viaEuroOffertaOc(5000, 'EUR', 0.001, 0.02);
+myViaEuroOc = false; r.leva = viaEuroOffertaOc(40000, 'EUR', 0.001, 0.02); myViaEuroOc = true;
+r.passi = [viaEuroPassoOc(null), viaEuroPassoOc({stato: 'preso'}), viaEuroPassoOc({stato: 'depositato'}),
+  viaEuroPassoOc({stato: 'depositato', recapito: 'IT60X'}), viaEuroPassoOc({stato: 'euro_inviati'}),
+  viaEuroPassoOc({stato: 'rilasciato'}), viaEuroPassoOc({stato: 'annullato'}),
+  viaEuroPassoOc({stato: 'disputa'}), viaEuroPassoOc({stato: 'depositato', recapito: 'x', annullo_chiesto_il: 9})];
+console.log(JSON.stringify(r));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog)
+        nome = f.name
+    try:
+        out = _sp.run(["node", nome], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome)
+    if out.returncode != 0:
+        prova("il telefono on-chain gira in node", "", out.stderr[-400:])
+        return
+    r = _js.loads(out.stdout)
+    prova("l'id del foglio: 'oc12' e' lo scambio on-chain 12, il resto e' Lightning",
+          [12, 0, 0, 0], r["id"])
+    prova("gli ordini on-chain buoni: chi vende bitcoin a mercato, senza "
+          "cauzione, senza filtro, non miei, non in moneta; l'intervallo col "
+          "«Da» e il «Fino a», la cifra unica senza",
+          [["oc1", 10, 100], ["oc8", 45, 0]], r["righe"])
+    prova("senza /onchain/pronto di questo venditore nessuna offerta, e lo si "
+          "chiede in sottofondo", [None, 1], [r["senzaPronto"], r["chiesto"]])
+    # 40.000 + 500 di margine, +0 di polvere (40.500 x 1% = 405 > 273): lordo
+    # ceil(40.500 / 0,99) + 1 = 40.910, x0,001 x1,005 = 41,11 -> 42 €
+    prova("l'offerta on-chain: il prezzo + il margine del deposito, la cifra in "
+          "euro interi", ["oc1", 42, True, 40500],
+          [r["offerta"]["id"], r["offerta"]["euro"], r["offerta"]["onchain"], r["offerta"]["chiesti"]])
+    prova("...niente se il venditore non riceve on-chain, sotto il minimo del P2P "
+          "on-chain, o a leva spenta", [None, None, None], [r["chiuso"], r["piccolo"], r["leva"]])
+    prova("i passi del foglio: «Ordine preso» finche' chi vende non ha "
+          "depositato e scritto dove pagare, poi paga, controllo, la fine; "
+          "disputa e annullo chiesto vanno alla pagina",
+          ["attesa", "attesa", "attesa", "paga", "controllo", "fine", "fine", "pagina", "pagina"],
+          r["passi"])
+
+    off = _fn_js(mini, "function viaEuroOfferta(sats){")
+    prova("Lightning prima, l'on-chain solo se Lightning non c'e'", True,
+          "|| viaEuroOffertaOc(sats, valuta, perSat, fee);" in off)
+    cont = _fn_js(mini, "async function viaEuroContinuaOc(s){")
+    prova("la presa legata: prima l'ordine on-chain dell'oggetto, poi la presa "
+          "con `via_euro`; se non va, l'ordine si annulla; dal QR si chiude "
+          "prima la fattura Lightning", [True, True, True, True],
+          [cont.index("await onchainOrdineDallaCassa();") < cont.index("/prendi`"),
+           "const corpo = {metodo: s.metodo, via_euro: ordine.id};" in cont,
+           "if (ordine) fetch(`${API_BASE}/onchain/ordini/${ordine.id}/annulla`" in cont,
+           "if (viaEuroDove === 'qr' && currentOrderId) {" in cont])
+    prova("«Continua» e il foglio dei passi passano all'on-chain sugli id 'oc…'",
+          [True, True],
+          ["if (viaEuroOcId(s.id)) return viaEuroContinuaOc(s);" in _fn_js(mini, "async function viaEuroContinua(){"),
+           "if (viaEuroOcId(viaEuroSeguo)) return renderViaEuroPassoOc();" in _fn_js(mini, "function renderViaEuroPasso(){")])
+    rp = _fn_js(mini, "function renderViaEuroPassoOc(){")
+    prova("i passi on-chain con le scritte del foglio Lightning: nessuna nuova",
+          [True, True, True, True],
+          ["'<div class=\"via-euro-attesa\">Ordine preso</div>'" in rp,
+           "viaEuroPasso1(o, nome)" in rp,
+           "2. Poi torna qui e tocca «Ho inviato gli euro»: se non lo tocchi in tempo, l\\'acquisto salta e rischi di perdere gli euro che hai mandato." in rp,
+           "' sta controllando il pagamento'" in rp])
+    giu = pezzo("_onchain_psbt_giudica")
+    prova("il rilascio dell'ordine pagato da «Non hai sats?» non aspetta il wallet "
+          "di chi compra: senza resto, il versato in piu' va alla rete (come la "
+          "decisione di un moderatore), nella proposta e nel cambio in Lightning",
+          [True, True, 2, True, True],
+          ["if not o[\"rimborso\"] and not decisa and not senza_resto:" in giu,
+           "if (decisa or senza_resto) and verso == \"venditore\" and not o[\"rimborso\"]:" in giu,
+           srv.count("senza_resto=_via_euro_oc_esito(con, o[\"id\"]) == \"vivo\""),
+           '"via_euro_p2p": _via_euro_oc_esito(con, o["id"]) == "vivo",' in srv,
+           "if (o[\"stato\"] != \"pagato\" or (o[\"incasso\"] and (o[\"rimborso\"] or via_p2p))" in srv])
+    prova("...e il telefono fa lo stesso: la conferma, la prima firma da sola, "
+          "la proposta e il tetto della seconda firma", [True, True, True, True],
+          ["(!oc.incasso || (!oc.rimborso && !oc.via_euro_p2p))" in mini,
+           "&& o.incasso && (o.rimborso || o.via_euro_p2p) && !o.proposta;" in _fn_js(mini, "function onchainRilascioDaFirmare(o){"),
+           "&& !o.rimborso && !o.via_euro_p2p)\n    throw new Error('prima scegli il tuo wallet" in mini,
+           "if ((o.proposta.barattolo || o.via_euro_p2p) && o.proposta.verso === 'venditore' && !o.rimborso)" in mini])
+    prova("il resto al venditore (Andrea: «Al venditore dell'oggetto»): il "
+          "giudice lo accetta solo nella proposta verso il SUO incasso, mai nel "
+          "cambio in Lightning (la cifra dello swap e' fissa)", [True, True, 1, True],
+          ["if senza_resto and resto_al_venditore and not o[\"rimborso\"]:" in giu,
+           "al venditore deve andare almeno il prezzo" in giu,
+           srv.count("resto_al_venditore=True"),
+           "resto_al_venditore: bool = False) -> None:" in srv])
+    prog2 = (_riga_js(mini, "const ONCHAIN_POLVERE = ")
+             + _riga_js(mini, "const ONCHAIN_QUOTA_TETTO = ")
+             + _riga_js(mini, "const P2P_OC_META_MAX = ")
+             + _fn_js(mini, "function onchainIncassoSats(o){")
+             + _fn_js(mini, "function onchainQuotaStorta(o){")
+             + _fn_js(mini, "function onchainUsciteVersoVenditore(o, incasso, piuVb){")
+             + _fn_js(mini, "function onchainPrezzoGiusto(o, valori){")
+             + """
+const O = (x) => Object.assign({utxo: [{value: 41000}], tariffa: 2, quota_sats: 0, prezzo_sats: 40000,
+  incasso: 'bc1qven', rimborso: '', via_euro_p2p: true}, x || {});
+const r = {};
+r.resto = onchainUsciteVersoVenditore(O(), 'bc1qven');
+r.swap = onchainUsciteVersoVenditore(O(), 'bc1qswap');
+r.wallet = onchainUsciteVersoVenditore(O({rimborso: 'bc1qcomp'}), 'bc1qven');
+r.solito = onchainUsciteVersoVenditore(O({via_euro_p2p: false}), 'bc1qven');
+r.giusto = [onchainPrezzoGiusto(O(), [40700]), onchainPrezzoGiusto(O(), [39999]),
+  onchainPrezzoGiusto(O({via_euro_p2p: false}), [40700]), onchainPrezzoGiusto(O({via_euro_p2p: false}), [40000]),
+  onchainPrezzoGiusto(O({rimborso: 'x'}), [40700]), onchainPrezzoGiusto(O(), [40000, 5])];
+console.log(JSON.stringify(r));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(prog2)
+        nome = f.name
+    try:
+        out = _sp.run(["node", nome], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome)
+    if out.returncode != 0:
+        prova("il resto al venditore gira in node", "", out.stderr[-400:])
+    else:
+        r = _js.loads(out.stdout)
+        # 41.000 - 40.000 - ceil((11+105+31) x 2) = 706 in piu' al venditore
+        prova("il telefono: senza wallet di chi compra il resto va a chi vende "
+              "insieme al prezzo; verso uno swap o con un wallet, come sempre",
+              [[["bc1qven", 40706]], [["bc1qswap", 40000]],
+               [["bc1qven", 40000], ["bc1qcomp", 644]], [["bc1qven", 40000]]],
+              [r["resto"], r["swap"], r["wallet"], r["solito"]])
+        prova("la seconda firma: «almeno il prezzo» solo per l'ordine di «Non hai "
+              "sats?» senza wallet, altrove «esattamente»",
+              [True, False, False, True, False, False], r["giusto"])
+        prova("i due controlli del prezzo nella seconda firma passano da lì", 2,
+              _fn_js(mini, "async function onchainCofirma(o, parole){").count("onchainPrezzoGiusto(o, "))
+    cof = _fn_js(mini, "async function onchainCofirma(o, parole){")
+    prova("la seconda firma di chi riceve: con `via_euro` l'incasso e' il deposito "
+          "del SUO ordine, rifatto dalle tre chiavi con la sua dentro", True,
+          "const v = await onchainVerificaRiga(parole, {strada: (onchainSrv || {}).strada || onchainRete().strada}," in cof
+          and "atteso = v.mia && v.uguale && v.k && v.k.indirizzo === o.incasso ? o.incasso : '';" in cof)
 
 
 def prove_intervallo_obbligatorio():
@@ -220070,14 +220374,14 @@ def prove_audit_giro6():
           "tutto il versato in piu' alla rete, le altre restano sotto la polvere",
           True, _in_ordine_g6(gi, "in_piu = _onchain_sats_in_piu(o, monete)",
                               "tetto = int(o[\"margine_sats\"]) + min(in_piu, ONCHAIN_POLVERE - 1)",
-                              "if decisa and verso == \"venditore\" and not o[\"rimborso\"]:",
+                              "if (decisa or senza_resto) and verso == \"venditore\" and not o[\"rimborso\"]:",
                               "tetto = int(o[\"margine_sats\"]) + in_piu",
                               "if not 0 < rete_sats <= tetto:"))
     cf = pezzo_js(mini, "async function onchainCofirma(o, parole){", "\n}\n")
     prova("...e il telefono di chi co-firma fa lo stesso conto, solo sulla "
           "proposta di Barattolo", True,
           _in_ordine_g6(cf, "let tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);",
-                        "if (o.proposta.barattolo && o.proposta.verso === 'venditore' && !o.rimborso)",
+                        "if ((o.proposta.barattolo || o.via_euro_p2p) && o.proposta.verso === 'venditore' && !o.rimborso)",
                         "tetto = Number(o.margine_sats) + inPiu;",
                         "if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';"))
 
@@ -220291,7 +220595,7 @@ def prove_audit_tornata_tutto():
           True, "in_piu = _onchain_sats_in_piu(o, monete)" in pg
           and "min(in_piu, ONCHAIN_POLVERE - 1)" in pg)
     prova("la decisione firmata da Barattolo non aspetta il wallet di rimborso",
-          (True, True), ('if not o["rimborso"] and not decisa:' in pg,
+          (True, True), ('if not o["rimborso"] and not decisa and not senza_resto:' in pg,
                          "decisa=True)" in codice(pezzo("_onchain_psbt_barattolo"))))
     prova("togliere lo swap non cancella una decisione firmata", True,
           "COALESCE(decisione_da, 0)=0" in codice(pezzo("_onchain_cambio_togli")))
@@ -227941,7 +228245,7 @@ CATEGORIE = {
     meta_cauzione_auto intervallo_obbligatorio
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste cerco_canali premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats non_hai_sats_onchain chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste cerco_canali premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina vetrina_reti_punto
@@ -229295,6 +229599,7 @@ def main():
     prove_guida_wallet,
     prove_giroconto_interno,
     prove_non_hai_sats,
+    prove_non_hai_sats_onchain,
     prove_chiedi_al_venditore,
     prove_intervallo_obbligatorio,
     prove_usdt_totale_euro,

@@ -58475,6 +58475,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # il tetto in euro non c'e' (Andrea), ma oltre questo la riserva non
     # salda — il telefono non propone quel che il server rifiuterebbe
     profilo["via_euro_tetto_sats"] = int(GIROCONTO_TETTO_SATS or 0)
+    # ...e gli ordini P2P on-chain per «Non hai sats?» (27 nov 2026,
+    # cantiere via-euro-onchain): i bitcoin vanno al deposito on-chain
+    profilo["via_euro_onchain"] = via_euro_onchain_ammesso(user["id"])
     # dove ricevo on-chain quando vendo ('' = da nessuna parte, e quindi
     # niente on-chain per i miei annunci): la voce di «Completa il
     # profilo» (27 ott 2026). Si legge solo per chi l'on-chain lo vede.
@@ -119165,6 +119168,9 @@ def _onchain_ordine_per(con, o, tg_id: int) -> dict:
         "proposta": proposta, "txid_uscita": o["txid_uscita"],
         # l'ordine di sempre, dalla strada A (0 = un ordine di prima)
         "ordine_id": int(o["ordine_id"] or 0),
+        # (27 nov 2026, via-euro-onchain) l'ha pagato uno scambio P2P per chi
+        # non ha sats: il rilascio non aspetta il wallet di chi compra
+        "via_euro_p2p": _via_euro_oc_esito(con, o["id"]) == "vivo",
         # chi compra ha confermato, e aspetta la scelta di chi vende
         "rilascio_chiesto_il": int(o["rilascio_chiesto_il"] or 0),
         # (28 ott 2026) la conferma firmata dal seme di chi compra: il suo
@@ -119248,7 +119254,19 @@ async def onchain_controlla(oid: int) -> str:
                 # stock scalato qui e i due avvisi «⛓️ Venduto on-chain»
                 # di prima sono morti con lui: sarebbero stati doppi.
                 nuovo_ordine = _onchain_nasce_ordine(con, o)
-        elif not utxo and adesso > o["scade"]:
+        elif not utxo and _via_euro_oc_esito(con, o["id"]) == "fallito":
+            # «NON HAI SATS?» ON-CHAIN (27 nov 2026): lo scambio P2P che
+            # doveva pagare quest'ordine e' finito senza sbloccare, e qui
+            # non e' arrivato niente: l'ordine si chiude e lo stock torna
+            # libero, come col «Annulla» di chi compra
+            cur = con.execute("UPDATE onchain_ordini SET stato='annullato',"
+                              " chiuso_il=?, aggiornato=? WHERE id=? AND"
+                              " stato='attesa' AND visti_sats=0",
+                              (adesso, adesso, o["id"]))
+            stato = "annullato" if cur.rowcount else stato
+        elif not utxo and adesso > o["scade"] and _via_euro_oc_esito(con, o["id"]) != "vivo":
+            # (27 nov 2026) ...e finche' quello scambio e' vivo l'indirizzo
+            # non scade: i bitcoin arriverebbero a un ordine chiuso
             cur = con.execute("UPDATE onchain_ordini SET stato='scaduto',"
                               " chiuso_il=? WHERE id=? AND stato='attesa'",
                               (adesso, o["id"]))
@@ -119297,7 +119315,9 @@ def _onchain_incasso_sats(o) -> int:
 
 
 def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
-                          chiave_firmatario: str, decisa: bool = False) -> None:
+                          chiave_firmatario: str, decisa: bool = False,
+                          senza_resto: bool = False,
+                          resto_al_venditore: bool = False) -> None:
     """Il server legge la proposta prima di passarla all'altro, e dice di
     no se non e' l'uscita che l'ordine permette. Non e' l'unica guardia —
     il telefono di chi co-firma rifa' gli stessi conti — ma e' quella che
@@ -119327,11 +119347,22 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
         # (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») il
         # resto del margine torna al wallet di chi ha messo i sats: finche'
         # non c'e', i sats restano nel 2-di-3
-        if not o["rimborso"] and not decisa:
+        # (27 nov 2026, via-euro-onchain) `senza_resto`: l'ordine l'ha pagato
+        # uno scambio P2P per chi non ha sats (e spesso nemmeno un wallet):
+        # il rilascio non lo aspetta, come la decisione di un moderatore
+        if not o["rimborso"] and not decisa and not senza_resto:
             raise ValueError("chi ha messo i sats non ha ancora scelto dove "
                              "ricevere il resto: il rilascio aspetta il suo "
                              "wallet")
-        if [v for d, v in uscite if d == o["incasso"]] != [_onchain_incasso_sats(o)]:
+        al_venditore = [v for d, v in uscite if d == o["incasso"]]
+        if senza_resto and resto_al_venditore and not o["rimborso"]:
+            # (27 nov 2026, via-euro-onchain; Andrea sulla card: «Al venditore
+            # dell'oggetto») chi ha pagato con «Non hai sats?» non ha un
+            # wallet dove torni il resto: va a chi vende, insieme al prezzo,
+            # come l'arrotondamento del giroconto Lightning. Almeno il prezzo
+            if len(al_venditore) != 1 or al_venditore[0] < _onchain_incasso_sats(o):
+                raise ValueError("al venditore deve andare almeno il prezzo")
+        elif al_venditore != [_onchain_incasso_sats(o)]:
             raise ValueError("al venditore deve andare esattamente il prezzo")
         permessi = (o["incasso"], o["rimborso"])
         # la quota di Barattolo, se l'ordine ne ha una: esatta, una volta
@@ -119366,7 +119397,7 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
     # uscita verso il venditore, anche quella decisa da un moderatore
     in_piu = _onchain_sats_in_piu(o, monete)
     tetto = int(o["margine_sats"]) + min(in_piu, ONCHAIN_POLVERE - 1)
-    if decisa and verso == "venditore" and not o["rimborso"]:
+    if (decisa or senza_resto) and verso == "venditore" and not o["rimborso"]:
         # (27 nov 2026, audit giro 6) l'uscita DECISA verso chi vende,
         # senza il wallet di rimborso, e' senza resto: tutto il versato
         # in piu' va in commissione, come la scrive `_onchain_psbt_barattolo`.
@@ -119635,7 +119666,11 @@ async def onchain_pronto(venditore_id: int, sats: int = 0,
     return {**sopra, "pronto": True, "motivo": "", "io_acceso": io_acceso,
             "solo_onchain": sats > 0 and onchain_solo(int(sats), cambio_noto_ora()),
             "solo_onchain_sopra_euro": onchain_solo_soglia(),
-            "quota_sats": onchain_quota_sats()}
+            "quota_sats": onchain_quota_sats(),
+            # (27 nov 2026, via-euro-onchain) il margine per la rete che
+            # l'ordine chiederebbe adesso: «Non hai sats?» lo somma al
+            # prezzo per contare gli euro prima di far nascere l'ordine
+            "margine_sats": onchain_margine(await onchain_mempool_tariffa())}
 
 
 @app.post("/api/onchain/ordini/{oid}/controlla")
@@ -119700,6 +119735,11 @@ async def onchain_ordine_annulla(oid: int, x_tg_init_data: str = Header(""),
                                      "cieca, riprova fra poco")
     con = _onchain_db_ordini()
     try:
+        # (27 nov 2026, via-euro-onchain) lo sta pagando uno scambio P2P in
+        # corsa: chiuderlo adesso manderebbe i bitcoin a un ordine chiuso
+        if _via_euro_oc_esito(con, oid) == "vivo":
+            raise HTTPException(409, "Lo sta pagando uno scambio P2P in corso: "
+                                     "si chiude da solo se lo scambio salta")
         cur = con.execute(
             "UPDATE onchain_ordini SET stato='annullato', chiuso_il=?,"
             " aggiornato=? WHERE id=? AND stato='attesa' AND visti_sats=0",
@@ -119756,7 +119796,11 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
         # (10 nov 2026, Andrea: «il rilascio aspetta il suo wallet») si
         # aspetta anche quando manca il wallet di chi compra, dove torna
         # il resto del margine
-        if (o["stato"] != "pagato" or (o["incasso"] and o["rimborso"])
+        # (27 nov 2026, via-euro-onchain) pagato da uno scambio P2P per chi
+        # non ha sats: il wallet di chi compra non serve, si aspetta solo
+        # l'incasso di chi vende
+        via_p2p = _via_euro_oc_esito(con, o["id"]) == "vivo"
+        if (o["stato"] != "pagato" or (o["incasso"] and (o["rimborso"] or via_p2p))
                 or o["proposta_psbt"]):
             raise HTTPException(409, "Su questo ordine non c'è niente da "
                                      "mettere in attesa")
@@ -119792,7 +119836,7 @@ async def onchain_rilascio_chiesto(oid: int, req: Request,
             "ricevuto. Apri l'ordine: ti mostriamo quanto costa lo swap "
             "in Lightning e, se confermi, i sats partono."
             + (" Puoi anche riceverli on-chain." if modo == "ogni_volta" else ""))
-    return {"ok": True, "aspetta_wallet": not o["rimborso"],
+    return {"ok": True, "aspetta_wallet": not o["rimborso"] and not via_p2p,
             "aspetta_incasso": not o["incasso"]}
 
 
@@ -119859,7 +119903,9 @@ async def onchain_ordine_proposta(oid: int, req: Request,
                                      "Barattolo: manca solo la seconda firma")
         try:
             _onchain_psbt_giudica(o, verso, psbt_b64,
-                                  ind["chiave_" + parte])
+                                  ind["chiave_" + parte],
+                                  senza_resto=_via_euro_oc_esito(con, o["id"]) == "vivo",
+                                  resto_al_venditore=True)
         except ValueError as e:
             raise HTTPException(400, f"Proposta rifiutata: {e}")
         adesso = int(time.time())
@@ -120463,7 +120509,8 @@ async def onchain_cambio_nasce(oid: int, req: Request,
         giudicato["incasso"] = lockup
         try:
             _onchain_psbt_giudica(giudicato, "venditore", psbt_b64,
-                                  ind["chiave_venditore"])
+                                  ind["chiave_venditore"],
+                                  senza_resto=_via_euro_oc_esito(con, o["id"]) == "vivo")
         except ValueError as e:
             raise HTTPException(400, f"Proposta rifiutata: {e}")
         adesso = int(time.time())
@@ -122705,7 +122752,12 @@ def _p2p_onchain_prepara(con):
                       # pubblica (0 = cifra unica). Restano dopo la presa:
                       # la rinascita rimette l'intervallo intero
                       ("fascia_min_cent", "INTEGER DEFAULT 0"),
-                      ("fascia_max_cent", "INTEGER DEFAULT 0")):
+                      ("fascia_max_cent", "INTEGER DEFAULT 0"),
+                      # 27 nov 2026, cantiere via-euro-onchain: l'ordine
+                      # on-chain del MERCATINO (`onchain_ordini.id`) che
+                      # questo scambio paga per chi non ha sats (0 = uno
+                      # scambio di sempre). L'incasso e' il SUO indirizzo
+                      ("via_euro_ordine", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
     # (19 nov 2026, recapito-nel-tempo) gli scambi gia' depositati senza
@@ -123316,6 +123368,22 @@ def _p2p_onchain_rinato_in(con, o) -> str:
     return str(r["ordine"]) if r else ""
 
 
+def _via_euro_oc_per(con, o, tg_id: int):
+    """Il legame «Non hai sats?» di uno scambio come lo vede `tg_id`: None
+    se non c'e' o se non e' chi riceve; {ordine, indirizzo, stato} sennò."""
+    ve = int(_p2p_onchain_campo(o, "via_euro_ordine", 0) or 0)
+    if not ve or int(o["ricevente_id"] or 0) != int(tg_id):
+        return None
+    r = con.execute("SELECT o.stato, o.importo_sats, o.annuncio_id, i.* FROM onchain_ordini o"
+                    " JOIN onchain_indirizzi i ON i.id=o.indirizzo_id WHERE o.id=?",
+                    (ve,)).fetchone()
+    if not r or int(r["compratore_id"]) != int(tg_id):
+        return None
+    return {"ordine": ve, "stato": r["stato"], "importo_sats": int(r["importo_sats"] or 0),
+            "annuncio": int(r["annuncio_id"] or 0),
+            "indirizzo": onchain_riga_per(r, tg_id)}
+
+
 def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
     """Un ordine come lo vede UNA parte (o un moderatore): la forma di
     `_onchain_ordine_per`, con gli stessi nomi, perche' il codice delle
@@ -123382,9 +123450,18 @@ def _p2p_onchain_per(con, o, tg_id: int, admin: bool = False) -> dict:
                                    "firma": o["rimborso_firma"],
                                    "indice": o["rimborso_indice"]}
                                   if _p2p_onchain_campo(o, "rimborso_tipo", "") else None),
+        # (27 nov 2026, via-euro-onchain) l'incasso deciso dal server per
+        # «Non hai sats?» non e' una destinazione firmata: la prova la porta
+        # `via_euro`, qui sotto
         "destinazione": ({"tipo": o["incasso_tipo"], "valore": o["incasso_valore"],
                           "firma": o["incasso_firma"], "indice": o["incasso_indice"]}
-                         if o["incasso_tipo"] else None),
+                         if o["incasso_tipo"] and o["incasso_tipo"] != "via_euro" else None),
+        # «NON HAI SATS?» ON-CHAIN (27 nov 2026): l'ordine del mercatino che
+        # questo scambio paga, e il SUO indirizzo come lo vede chi compra
+        # (le tre chiavi, il suo numero): il telefono di chi riceve rifa'
+        # l'indirizzo con la propria chiave dentro prima della seconda
+        # firma, e l'incasso deve essere quello. Solo a chi riceve
+        "via_euro": _via_euro_oc_per(con, o, tg_id),
         "quota_sats": int(o["quota_sats"] or 0),
         "quota_indirizzo": o["quota_indirizzo"] or "",
         # (16 nov 2026, p2p-onchain-commissione) la meta' di chi riceve:
@@ -125709,6 +125786,105 @@ async def avvia_cauzioni_onchain():
     asyncio.create_task(_ciclo_cauzioni_onchain())
 
 
+# «NON HAI SATS?» ANCHE ON-CHAIN (27 nov 2026, cantiere via-euro-onchain;
+# Andrea: «Abbiamo detto anche quelli on-chain», poi «il deposito del
+# mercatino mica si paga solo in Lightning»). Chi non ha sats compra la
+# felpa di Anna pagando EURO a Luca, che vende bitcoin ON-CHAIN: allo
+# sblocco i bitcoin di Luca non vanno a un wallet di chi compra, ma DRITTI
+# all'indirizzo 2-di-3 del deposito on-chain dell'ordine di Anna. Niente
+# swap e niente riserva: da li' e' il deposito on-chain di sempre (una
+# conferma, la spedizione, lo sblocco; se Anna vuole Lightning ci pensa il
+# cambio automatico). Il legame lo porta il telefono nella presa
+# (`via_euro`, l'id della riga di `onchain_ordini` appena nata alla cassa)
+# e il server lo giudica DA SOLO: l'ordine e' di chi prende, aspetta
+# ancora i sats e nessuno ci ha versato niente, nessun altro scambio vivo
+# lo paga gia', e i sats che arrivano allo sblocco (il prezzo meno la meta'
+# della commissione di chi riceve) coprono la cifra chiesta senza
+# superarla troppo — lo stesso avanzo del giroconto Lightning (il piu'
+# largo fra il 3% e un euro e mezzo), che va al deposito e torna come
+# resto. Leva: VIA_EURO_ONCHAIN, accesa di serie sotto le leve di «Non hai
+# sats?» (VIA_EURO_SOLO_ADMIN: all'inizio solo i moderatori).
+try:
+    from config import VIA_EURO_ONCHAIN
+    VIA_EURO_ONCHAIN = bool(VIA_EURO_ONCHAIN)
+except ImportError:
+    VIA_EURO_ONCHAIN = True
+
+
+def via_euro_onchain_ammesso(tg_id) -> bool:
+    """«Non hai sats?» puo' usare gli ordini P2P on-chain per QUESTA
+    persona? La porta di sempre, la leva, e le due vie on-chain
+    (il P2P a tre chiavi e la cassa on-chain del mercatino)."""
+    return bool(VIA_EURO_ONCHAIN and via_euro_ammesso(tg_id)
+                and p2p_onchain_ammesso(tg_id) and onchain_ammesso(tg_id))
+
+
+def via_euro_oc_avanzo_max(importo: int, eur_btc: float) -> int:
+    """PURA: quanti sats possono arrivare al deposito OLTRE la cifra
+    chiesta: il piu' largo fra il 3% e un euro e mezzo al cambio dato
+    (le regole del giroconto, GIROCONTO_AVANZO_*). Senza cambio, il 3%."""
+    pct = int(importo) * GIROCONTO_AVANZO_PERCENTO // 100
+    try:
+        c = float(eur_btc or 0)
+    except (TypeError, ValueError):
+        c = 0.0
+    euro = int(round(GIROCONTO_AVANZO_EURO / c * 100_000_000)) if c > 0 else 0
+    return max(pct, euro)
+
+
+def _via_euro_oc_esito(con, ordine_id: int) -> str:
+    """Gli scambi P2P on-chain legati all'ordine on-chain del mercatino
+    `ordine_id`: '' nessuno (o la tabella non c'e' ancora), 'vivo' se uno
+    e' ancora in corsa o ha sbloccato, 'fallito' se tutti sono finiti
+    senza sbloccare. Sulla connessione di chi chiama."""
+    try:
+        righe = con.execute("SELECT stato FROM p2p_onchain_ordini WHERE"
+                            " via_euro_ordine=?", (int(ordine_id),)).fetchall()
+    except sqlite3.OperationalError:
+        return ""
+    if not righe:
+        return ""
+    stati = {str(r["stato"] or "") for r in righe}
+    if stati & {"preso", "depositato", "euro_inviati", "disputa", "rilasciato"}:
+        return "vivo"
+    return "fallito"
+
+
+def _via_euro_oc_giudica(con, ve, o, tg_id: int, arrivano: int,
+                         eur_btc: float, adesso: int) -> tuple:
+    """Il legame fra lo scambio P2P on-chain `o` che `tg_id` sta prendendo
+    e l'ordine on-chain del mercatino `ve`. ('', id, indirizzo) se va,
+    (il perche', 0, '') se no. Sulla connessione della presa."""
+    try:
+        oid = int(ve)
+    except (TypeError, ValueError):
+        return "Ordine del mercatino non valido", 0, ""
+    if oid <= 0:
+        return "Ordine del mercatino non valido", 0, ""
+    if not via_euro_onchain_ammesso(tg_id):
+        return "«Non hai sats?» on-chain non è disponibile", 0, ""
+    if (o["lato"] != "sell" or p2p_onchain_usdt(o) or p2p_onchain_coin(o)
+            or p2p_onchain_tab_compra(o) or str(_p2p_onchain_campo(o, "paycode", "") or "")):
+        return "Quest'ordine non va bene per «Non hai sats?»", 0, ""
+    r = con.execute("SELECT o.*, i.indirizzo AS dove FROM onchain_ordini o"
+                    " JOIN onchain_indirizzi i ON i.id=o.indirizzo_id"
+                    " WHERE o.id=?", (oid,)).fetchone()
+    if not r or int(r["compratore_id"]) != int(tg_id):
+        return "Ordine del mercatino non valido", 0, ""
+    if (r["stato"] != "attesa" or int(r["scade"] or 0) <= int(adesso)
+            or int(r["visti_sats"] or 0) > 0):
+        return "L'ordine del mercatino non aspetta più il pagamento", 0, ""
+    if con.execute("SELECT 1 FROM p2p_onchain_ordini WHERE via_euro_ordine=?"
+                   " AND stato IN ('preso','depositato','euro_inviati',"
+                   "'disputa','rilasciato')", (oid,)).fetchone():
+        return "Questo ordine lo paga già un altro scambio", 0, ""
+    chiesto = int(r["importo_sats"] or 0)
+    if not chiesto or int(arrivano) < chiesto \
+            or int(arrivano) > chiesto + via_euro_oc_avanzo_max(chiesto, eur_btc):
+        return "Il prezzo è cambiato: riprova", 0, ""
+    return "", oid, str(r["dove"] or "")
+
+
 @app.post("/api/p2p/onchain/{oid}/prendi")
 async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Header(""),
                              barattolo_sessione: str = Cookie("")):
@@ -125886,6 +126062,17 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
         quota = q_dep + q_ric
         quota_dove = (onchain_incasso(ind["xpub_barattolo"], ind["numero_barattolo"])
                       if quota else "")
+        # «NON HAI SATS?» ON-CHAIN (27 nov 2026): l'incasso e' l'indirizzo
+        # del deposito on-chain dell'ordine del mercatino, deciso qui dal
+        # server sul legame giudicato — mai un indirizzo scritto dal telefono
+        ve_id = 0
+        if d.get("via_euro"):
+            perche, ve_id, ve_dove = _via_euro_oc_giudica(
+                con, d.get("via_euro"), o, user["id"], prezzo - q_ric,
+                cambio_presa or cambio_noto_ora(), adesso)
+            if perche:
+                raise HTTPException(409, perche)
+            incasso, i_tipo, i_val, i_firma, i_ind = ve_dove, "via_euro", ve_dove, "", 0
         # `prezzo_sats` si scrive QUI, nella stessa riga dell'importo: a
         # mercato e' nato adesso, e da qui in poi ronda, avvisi e giudice
         # dei PSBT leggono quello
@@ -125925,6 +126112,9 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             # scambio e' uno a cifra unica (i due capi restano per la rinascita)
             con.execute("UPDATE p2p_onchain_ordini SET euro_cent=? WHERE id=?",
                         (int(scelta), oid))
+        if cur.rowcount and ve_id:
+            con.execute("UPDATE p2p_onchain_ordini SET via_euro_ordine=? WHERE id=?",
+                        (int(ve_id), oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")

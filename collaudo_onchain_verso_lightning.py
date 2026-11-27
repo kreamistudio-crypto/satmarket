@@ -125,6 +125,7 @@ def pezzi_pagina():
         # della quota, che le uscite e la co-firma chiedono
         "function onchainIncassoSats(o){", "function onchainQuotaStorta(o){",
         "function onchainUsciteVersoVenditore(o, incasso, piuVb){",
+        "function onchainPrezzoGiusto(o, valori){",
         "function onchainPsbtFirmata(B, o, io, w, uscite){",
         "function onchainParolePerOrdine(B, parole, o){",
         "async function onchainRimborsoAtteso(B, parole, o, io){",
