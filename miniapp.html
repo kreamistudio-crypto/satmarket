@@ -65764,8 +65764,9 @@ function boxBadgeLive(){
     </div>
     <div style="margin-top:14px">
       <div class="section-label">Distintivi → Nostr</div>
-      <div class="sub" style="margin-top:6px">Ogni distintivo (🟣 Nostrano, ⭐ Stimato, 🚀 Fulmine...) ha il suo badge: da oggi chi lo guadagna con una npub verificata lo riceve da solo. Questo bottone mette in pari chi l'aveva già prima — si può rilanciare quando si vuole, non duplica mai.</div>
+      <div class="sub" style="margin-top:6px">Su Nostr escono solo due distintivi, perché pochi badge valgono di più: 🫙 Pioniere e 🛡️ Specchiato (25 affari, nessuna disputa persa, almeno 10 feedback con media da 4,5). Chi li guadagna con una npub verificata li riceve da solo; questo bottone mette in pari chi li aveva già. Gli altri distintivi restano nell'app.</div>
       <button class="btn ghost" style="margin-top:8px" onclick="sincronizzaDistintivi()">🔄 Sincronizza i distintivi</button>
+      <button class="btn ghost" style="margin-top:8px" onclick="ritiraDistintiviUsciti(false)">🧹 Ritira da Nostr i badge degli altri distintivi</button>
     </div>
     <div id="badgeDettaglio" style="margin-top:14px"></div>`);
 }
@@ -65828,6 +65829,34 @@ async function sincronizzaDistintivi(){
     const tot = Object.values(d.riepilogo||{}).reduce(
       (s,v) => s + (v.assegnati||0), 0);
     toast(`🔄 ${tot} badge assegnati sui distintivi già guadagnati`);
+    await loadAdminStats();
+  } catch(e) { toast('Rete assente: riprova'); }
+}
+
+/* IL RITIRO DEI BADGE DEI DISTINTIVI USCITI DA NOSTR (27 nov 2026,
+   scelta di Andrea): prima il foglio di conferma, perché è l'unico
+   bottone che pubblica cancellazioni, poi il giro. Rilanciabile: chi
+   non è passato al primo giro passa al secondo. */
+async function ritiraDistintiviUsciti(scrivi){
+  haptic();
+  if (!scrivi) {
+    chiediConferma({
+      titolo: '🧹 Ritira i badge',
+      corpo: 'Si pubblica su Nostr una cancellazione per ogni badge dei distintivi che non escono più '
+        + '(tutti tranne 🫙 Pioniere e 🛡️ Specchiato). I client li nascondono a chi li mostrava. '
+        + 'Nell\'app i distintivi restano. Procedo?',
+      etichetta: 'Ritira', poi: () => ritiraDistintiviUsciti(true)});
+    return;
+  }
+  try {
+    const r = await fetch(`${API_BASE}/admin/live/ritira-distintivi-usciti`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non riuscito', 6000); return; }
+    const v = Object.values(d.riepilogo||{});
+    const tot = v.reduce((s,x) => s + (x.ritirati||0), 0);
+    const ko = v.reduce((s,x) => s + (x.falliti||0), 0);
+    toast(`🧹 ${tot} badge ritirati` + (ko ? `, ${ko} da riprovare: rilancia` : ''), 6000);
     await loadAdminStats();
   } catch(e) { toast('Rete assente: riprova'); }
 }

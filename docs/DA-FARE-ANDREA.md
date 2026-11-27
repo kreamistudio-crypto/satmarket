@@ -1310,3 +1310,14 @@ Il primo giro deve mostrare in Actions undici pezzi che partono insieme
    runner nostro collegato a un repo pubblico è una porta che non serve.
 
 Fatti i tre gesti, questa voce si cancella.
+
+## 37. Ritirare da Nostr i badge dei distintivi usciti (27 nov 2026, cantiere badge-nostr-tre; Andrea: «semplifica i badge su Nostr», poi «Ritirarli da Nostr»)
+
+**Dopo la promozione che lo porta in produzione**, dalla Mini App:
+pannello admin → «🏺 Badge Nostr» → «🧹 Ritira da Nostr i badge degli
+altri distintivi» → «Ritira». Restano su Nostr solo 🫙 Pioniere, 🛡️
+Specchiato e i badge degli eventi. Se il messaggio dice «N da riprovare»,
+ripremi: chi è già ritirato non si tocca. Poi «🔄 Sincronizza i
+distintivi», che dà lo Specchiato a chi ha già 25 affari.
+
+Fatto e con «0 da riprovare», questa voce si cancella.
