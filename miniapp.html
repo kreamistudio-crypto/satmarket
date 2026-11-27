@@ -1973,7 +1973,7 @@
      questa apertura (vedi effettiScoprireHTML); con gli effetti ridotti
      la regola universale li ferma, e la linea, che ferma resterebbe
      accesa, sparisce nel blocco in fondo. */
-  @property --sc-fx-giro{syntax:'<angle>';inherits:false;initial-value:180deg}
+  @property --sc-fx-giro{syntax:'<angle>';inherits:false;initial-value:215deg}
   .sc-fx-codice{position:absolute;inset:0;overflow:hidden;pointer-events:none;
     -webkit-mask-size:100% 100%;mask-size:100% 100%;
     -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
@@ -1999,9 +1999,9 @@
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;
     mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
-    animation:scFxEntra .8s ease-out 0s 1 both,scFxGiro 8s linear 0s 1 both,
-      scFxSvela 2s ease-in 4.8s 1 forwards}
-  @keyframes scFxGiro{from{--sc-fx-giro:180deg}to{--sc-fx-giro:420deg}}
+    animation:scFxEntra .6s ease-out 0s 1 both,scFxGiro 5s linear 0s 1 both,
+      scFxSvela 1.6s ease-in 2.2s 1 forwards}
+  @keyframes scFxGiro{from{--sc-fx-giro:215deg}to{--sc-fx-giro:465deg}}
   @keyframes scFxEntra{from{opacity:0}to{opacity:1}}
   @keyframes scFxSvela{from{opacity:1}to{opacity:0}}
   .sc-fx-polvere{position:absolute;width:1.5px;height:1.5px;border-radius:50%;
@@ -19442,6 +19442,23 @@ document.getElementById('cartello')?.remove();</script>
        del venditore, poi quella di Barattolo — col QR, «Apri nel wallet»
        e «L'ho pagata». Col wallet collegato le due partono da sole.
        Chiude con navIndietro(), il patto del motore di navigazione. -->
+  <!-- ============ SHEET «PRIMA ENTRA NELLA COMUNITA'» (27 nov 2026) ============
+       Prima della pagina d'acquisto, sugli annunci di un negozio che ha
+       il bottone «Entra» (`l.entra`): lo apre apriAcquisto, la
+       riempie apriComunitaPrimaDiComprare. -->
+  <div class="sheet" id="comunitaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="comunitaTitolo">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="comunitaTitolo">Prima di comprare</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="hint" style="margin:0 0 14px">Entra nella comunità del negozio su Telegram, poi torna qui e completa l'acquisto.</div>
+    <div class="entra-scheda" id="comunitaEntra"></div>
+    <button type="button" class="btn orange" onclick="continuaDopoComunita()">Continua all'acquisto</button>
+  </div>
+
   <div class="sheet" id="manciaSheet" role="dialog" aria-modal="true"
        aria-labelledby="manciaTitolo">
     <div class="grab"></div>
@@ -27855,11 +27872,13 @@ function effettiScoprireHTML(v){
   fx += `<span class="sc-fx-riflesso" aria-hidden="true" style="left:${z[0]}%;top:${z[1]}%;width:${z[2]}%;height:${z[3]}%"></span>`;
   if (!(window.CSS && CSS.registerProperty)) return fx;
   fx += '<span class="sc-fx-linea" aria-hidden="true"></span>';
-  /* la polvere: dove passa la linea mentre sfuma (da 4,8 a 6,8 secondi,
-     30 gradi al secondo dai 180 del fondo), un granello per istante */
+  /* la polvere: dove passa la linea mentre sfuma (da 2,2 a 3,8 secondi,
+     50 gradi al secondo dai 215 del fondo, un po' a sinistra del centro:
+     27 nov 2026 mattina, Andrea: «un po' più a sinistra e più veloce»),
+     un granello per istante */
   const W = 272, H = 130;
   for (let n = 0; n < 55; n++){
-    const t = caso(4.8, 6.8), testa = 180 + 30 * t;
+    const t = caso(2.2, 3.8), testa = 215 + 50 * t;
     const ang = (testa - 110 * Math.pow(Math.random(), 1.6)) * Math.PI / 180;
     const dx = Math.sin(ang), dy = -Math.cos(ang);
     const k = Math.min((W / 2) / Math.max(Math.abs(dx), 1e-6), (H / 2) / Math.max(Math.abs(dy), 1e-6));
@@ -31319,6 +31338,9 @@ function bottoneEntra(link0, testo, slug){
    e i numeri escono in /admin, sezione Zap, e in /sponsor. Un errore
    non si vede: il gruppo si apre comunque. */
 function contaEntra(slug){
+  /* ...e il telefono ricorda che e' entrato: il foglio «Prima di
+     comprare» di quel negozio non si riapre (27 nov 2026) */
+  try { localStorage.setItem(COMUNITA_CHIAVE + slug, '1'); } catch(_) {}
   if (DEMO) return;
   try { fetch(`${API_BASE}/entra/${encodeURIComponent(slug)}`,
               {method: 'POST', keepalive: true}).catch(() => {}); } catch(e) {}
@@ -31334,6 +31356,38 @@ function entraScheda(l){
   const e = l && l.entra;
   const b = e ? bottoneEntra(e.link, e.testo, e.slug) : '';
   return b ? `<div class="entra-scheda">${b}</div>` : '';
+}
+/* PRIMA DI COMPRARE, LA COMUNITA' (27 nov 2026, AndreAI, dopo la regola
+   spiegata dal negozio: la percentuale sui corsi va a chi ha portato
+   la persona nel gruppo, e l'ingresso dal link deve venire PRIMA). Chi
+   tocca «Acquista» su un annuncio di un negozio col bottone «Entra»
+   trova prima questo foglio: «Entra» apre il gruppo col nostro link (e
+   conta il tocco, come gli altri bottoni), «Continua all'acquisto» porta
+   alla pagina d'acquisto. Chi ha gia' toccato «Entra» per quel negozio,
+   su questo telefono (qui, sulla pagina o nella scheda: lo segna
+   contaEntra), non lo rivede: il ricordo e' locale e muto (un telefono
+   che non tiene niente rivede il foglio, e basta). Senza uno slug in
+   forma il tocco non si conta e il foglio non nasce. Torna true se il
+   foglio si e' aperto. */
+let comunitaListing = null;
+const COMUNITA_CHIAVE = 'barattolo_comunita_';
+function apriComunitaPrimaDiComprare(l){
+  const e = l && l.entra;
+  if (!e || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(e.slug || '')) return false;
+  const b = bottoneEntra(e.link, e.testo, e.slug);
+  if (!b) return false;
+  try { if (localStorage.getItem(COMUNITA_CHIAVE + e.slug) === '1') return false; } catch(_) {}
+  comunitaListing = l;
+  el('comunitaEntra').innerHTML = b;
+  el('sheetBg').classList.add('open');
+  el('comunitaSheet').classList.add('open');
+  return true;
+}
+function continuaDopoComunita(){
+  const l = comunitaListing;
+  comunitaListing = null;
+  closeSheet();
+  if (l) apriAcquisto(l, true);
 }
 
 /* L'AVVISO DELL'ANTEPRIMA (set 2026): dice lo STATO, cosa manca e porta
@@ -35476,7 +35530,7 @@ function costiVieUguali(strade){
   return false;
 }
 
-function apriAcquisto(l){
+function apriAcquisto(l, dopoComunita){
   haptic();
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
@@ -35491,6 +35545,11 @@ function apriAcquisto(l){
     toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
     return;
   }
+  /* PRIMA LA COMUNITA' (27 nov 2026, AndreAI): sugli annunci di un
+     negozio col bottone «Entra», prima della pagina d'acquisto, il
+     foglio che invita a entrare nel suo gruppo col nostro link (vedi
+     apriComunitaPrimaDiComprare) */
+  if (!dopoComunita && apriComunitaPrimaDiComprare(l)) return;
   currentListing = l;
   /* `tipo` e' QUALE ACQUISTO E' ('mono' | 'set') e nient'altro; il
      tipo di PUNTO sta in `tipoPunto`, come nell'ordine (o.tipoPunto).
@@ -41998,6 +42057,7 @@ function closeSheet(){
   el('serieClassificaSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('manciaSheet').classList.remove('open');
+  el('comunitaSheet').classList.remove('open');
   /* le raccolte (17 nov 2026): i tre fogli, e i battiti che aspettano
      uno zap o un deposito non restano appesi a un foglio chiuso */
   el('raccNuovaSheet').classList.remove('open');
