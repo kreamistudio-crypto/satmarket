@@ -52048,7 +52048,7 @@ async function setCanale(canale){
    dove il browser non ha il push. Sull'iPhone fuori dalla Home una
    riga dice come fare (iOS da' il push solo al sito aggiunto alla
    Home, dal 16.4). La chiave pubblica del timbro arriva da /api/me. ---- */
-let myWebPush = {attivo: false};   // da /api/me: {attivo, chiave}
+let myWebPush = {attivo: false};   // da /api/me: {attivo, chiave, voluto}
 let pushTelefono = '';             // '' non so ancora · 'si' · 'no' · 'bloccate' · 'altro'
 const pushIOSFuoriHome = () => /iP(hone|ad|od)/.test(navigator.userAgent || '')
   && !navigator.standalone
@@ -52154,6 +52154,55 @@ async function pushDiQuestoConto(sub){
     return d.mio !== false;
   } catch(e) { return true; }
 }
+/* il service worker pronto, ma non per sempre: 8 secondi */
+function swPronto(){
+  return Promise.race([navigator.serviceWorker.ready,
+    new Promise((_, no) => setTimeout(() => no(new Error('service worker')), 8000))]);
+}
+/* iscrive QUESTO telefono per QUESTO account (senza iscrizione se ne fa
+   una col timbro di adesso): il gesto comune del tocco e del rientro */
+async function iscriviPushQui(reg, sub){
+  if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true,
+    applicationServerKey: b64uInByte(myWebPush.chiave)});
+  const j = sub.toJSON();
+  const r = await fetch(`${API_BASE}/push/iscrivi`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+     body: JSON.stringify({endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth})});
+  const d = await r.json().catch(()=>({}));
+  return {r, d};
+}
+/* AL RIENTRO TORNANO DA SOLE (27 nov 2026, cantiere push-rientro; un
+   utente: «quando Barattolo mi richiede di accedere devo riattivarle
+   manualmente»). Il telefono che butta i dati del sito butta il login E
+   l'iscrizione; «Esci» toglie l'iscrizione ma non il ricordo. Se
+   l'account le aveva accese (`voluto`, da /api/me) e il permesso c'e'
+   ancora — il permesso si chiede SOLO da un tocco, e qui non si chiede
+   — le rifa' qui. Mai da un altro account: un'iscrizione che suona per
+   un altro account aperto qui resta sua (`libero`), passa solo col
+   tocco. Una volta per apertura, in silenzio se non riesce. */
+let pushRipresa = false;
+async function riprendiPushTelefono(){
+  if (pushRipresa || !myWebPush.voluto || !pushPossibile()) return;
+  if (Notification.permission !== 'granted') return;
+  pushRipresa = true;
+  try {
+    const reg = await swPronto();
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !stessaChiavePush(sub)) { try { await sub.unsubscribe(); } catch(e){} sub = null; }
+    if (sub) {
+      const s = await fetch(`${API_BASE}/push/stato`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+         body: JSON.stringify({endpoint: sub.endpoint})});
+      const st = s.ok ? await s.json().catch(()=>({})) : {};
+      if (st.mio !== false || st.libero !== true) return;
+    }
+    const {r} = await iscriviPushQui(reg, sub);
+    if (!r.ok) return;
+    pushTelefono = 'si';
+    ridisegnaRigaPush();
+    toast('📲 Notifiche attive su questo telefono');
+  } catch(e) {}
+}
 async function attivaPushTelefono(){
   haptic();
   const daAltro = pushTelefono === 'altro';
@@ -52168,17 +52217,10 @@ async function attivaPushTelefono(){
                               : 'Va bene, niente notifiche per ora');
       return;
     }
-    const reg = await Promise.race([navigator.serviceWorker.ready,
-      new Promise((_, no) => setTimeout(() => no(new Error('service worker')), 8000))]);
+    const reg = await swPronto();
     let sub = await reg.pushManager.getSubscription();
     if (sub && !stessaChiavePush(sub)) { try { await sub.unsubscribe(); } catch(e){} sub = null; }
-    if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true,
-      applicationServerKey: b64uInByte(myWebPush.chiave)});
-    const j = sub.toJSON();
-    const r = await fetch(`${API_BASE}/push/iscrivi`,
-      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth})});
-    const d = await r.json().catch(()=>({}));
+    const {r, d} = await iscriviPushQui(reg, sub);
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     pushTelefono = 'si';
     ridisegnaRigaPush();
@@ -52193,11 +52235,13 @@ async function spegniPushTelefono(){
   try {
     const sub = await subPushTelefono();
     if (sub) {
+      /* `spento`: le spegne LUI, e al rientro non tornano da sole */
       await fetch(`${API_BASE}/push/togli`,
         {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-         body: JSON.stringify({endpoint: sub.endpoint})}).catch(() => {});
+         body: JSON.stringify({endpoint: sub.endpoint, spento: true})}).catch(() => {});
       await sub.unsubscribe();
     }
+    myWebPush.voluto = false;
     pushTelefono = 'no';
     ridisegnaRigaPush();
     toast('Notifiche spente su questo telefono');
@@ -127316,6 +127360,7 @@ async function avvia(){
     myCanaleNotifiche = me.canale_notifiche || '';
     myWebPush = (me.web_push && me.web_push.attivo && me.web_push.chiave)
       ? me.web_push : {attivo: false};
+    riprendiPushTelefono();   // le aveva accese? al rientro tornano da sole
     mySuggerimenti = !!me.suggerimenti_annunci;
     /* le offerte dei negozi (14 nov 2026): la chiave assente (un server
        di ieri) vale «attive», il default, e nessun negozio */

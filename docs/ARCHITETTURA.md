@@ -26675,7 +26675,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   qui» invece di «Attive». Senza risposta vale «sì», come prima.
   Chi esce (`esciWeb`, «Esci da tutti»)
   passa da `scordaPushTelefono`; la fusione sposta le righe, la
-  cancellazione le toglie (`CANCELLA_TOGLI`). In MODALITA_COLLAUDO
+  cancellazione le toglie (`CANCELLA_TOGLI`). AL RIENTRO TORNANO DA
+  SOLE (27 nov 2026, cantiere push-rientro): la tabella `push_voluti`
+  (una riga per account) ricorda chi le ha accese; nasce in
+  `push_iscrivi` e se ne va solo con `togli` + `spento: true`, che
+  manda il solo bottone «Attive» (`spegniPushTelefono`), mai l'uscita.
+  `/api/me` aggiunge `web_push.voluto`; dopo `/api/me` la pagina chiama
+  `riprendiPushTelefono`: se `voluto`, `pushPossibile()` e il permesso
+  è ancora `granted` (qui non si chiede mai), rifà l'iscrizione persa
+  — o riprende quella che `stato` dice `libero` (non suona per nessun
+  account: `push_libero`) — col toast di sempre. Un'iscrizione d'altri
+  resta sua. Una volta per apertura. Fusione e cancellazione portano
+  anche `push_voluti`. In MODALITA_COLLAUDO
   non esce niente (riga «📲 [push simulato…]»); sulla vm-2050 sì.
   La leva `WEB_PUSH_ATTIVO` nasce ACCESA (regola di Andrea del 14
   nov) e si cambia anche dal pannello. NON ARRIVA: telefoni senza i

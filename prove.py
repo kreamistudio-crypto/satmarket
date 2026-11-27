@@ -208098,7 +208098,7 @@ def prove_notifiche_telefono():
     percorso = os.path.join(cartella, "p.db")
     schema = "".join(re.search(r"    CREATE TABLE IF NOT EXISTS %s\(.*?\n    \);" % t,
                                src, re.S).group(0) + "\n"
-                     for t in ("push_iscrizioni", "push_timbro"))
+                     for t in ("push_iscrizioni", "push_timbro", "push_voluti"))
     c0 = _sq.connect(percorso)
     c0.executescript(schema)
     c0.close()
@@ -208109,7 +208109,7 @@ def prove_notifiche_telefono():
         return c
     amb["db"] = _db
     for nome in ("push_iscrivi", "push_togli", "_push_iscrizioni_di",
-                 "_push_togli_id", "_push_timbro"):
+                 "_push_togli_id", "_push_timbro", "push_voluto", "push_libero"):
         exec(pezzo(nome), amb)
     isc, tog, di = amb["push_iscrivi"], amb["push_togli"], amb["_push_iscrizioni_di"]
     E = lambda n: f"https://fcm.googleapis.com/fcm/send/t{n}"
@@ -208130,6 +208130,17 @@ def prove_notifiche_telefono():
           [E(9), E(7), E(6), E(5)],
           (isc(6, E(9), UA_PUB, AUTH, vecchio=E(4)) and None) or
           [r["endpoint"] for r in di(6)])
+    # AL RIENTRO TORNANO DA SOLE (27 nov 2026, push-rientro): il ricordo
+    vol, lib = amb["push_voluto"], amb["push_libero"]
+    prova("il ricordo «le aveva accese»: nasce con l'iscrizione, resta "
+          "quando l'iscrizione si toglie uscendo, se ne va solo con «spento»; "
+          "l'indirizzo e' libero solo se non suona per nessuno",
+          [True, False, True, True, False, True, False, True],
+          [vol(6), vol(77), (tog(6, E(9)) and None) or vol(6),
+           lib(E(9)), lib(E(7)),
+           (tog(5, E(7), spento=True) is not None) and vol(6),
+           (tog(6, E(7), spento=True) is not None) and vol(6),
+           lib(E(7))])
     amb["WEB_PUSH_CHIAVE_PRIVATA"] = ""
     t1 = amb["_push_timbro"]()
     amb["_PUSH_TIMBRO"].update(chiave=None, pubblica="")
@@ -208268,6 +208279,18 @@ def prove_notifiche_telefono():
           ['("push_iscrizioni", "tg_id")' in src[src.index("CANCELLA_TOGLI = ("):],
            'con.execute("UPDATE push_iscrizioni SET tg_id=? WHERE tg_id=?",\n'
            '                    (id_telegram, id_nostr))' in pezzo("esegui_fusione")])
+    prova("il ricordo «le aveva accese» (27 nov 2026): se ne va con "
+          "l'account, nella fusione passa alla meta' viva; /api/me lo dice; "
+          "la porta «togli» lo spegne solo con spento=true",
+          [True, True, True, True],
+          ['("push_voluti", "tg_id")' in src[src.index("CANCELLA_TOGLI = ("):],
+           'con.execute("UPDATE OR IGNORE push_voluti SET tg_id=? WHERE tg_id=?",\n'
+           '                    (id_telegram, id_nostr))\n'
+           '        con.execute("DELETE FROM push_voluti WHERE tg_id=?", (id_nostr,))'
+           in pezzo("esegui_fusione"),
+           'profilo["web_push"]["voluto"] = push_voluto(user["id"])' in pezzo("mio_profilo"),
+           'd.get("spento") is True)' in src[src.index('@app.post("/api/push/togli")'):]
+           .split("\n\n\n")[0]])
     rotte = {r: src[src.index(f'@app.post("{r}")'):].split("\n\n\n")[0]
              for r in ("/api/push/iscrivi", "/api/push/togli", "/api/push/prova")}
     prova("le porte: iscriversi e la prova vogliono la leva e la lista, "
@@ -208398,6 +208421,88 @@ globalThis.window = window; globalThis.PushManager = window.PushManager; globalT
               "«Esci da tutti»), resta se era di un altro account aperto qui",
               [0, 1, 2, ["/api/push/togli"] * 3],
               [r.get("altroAccount"), r.get("mio"), r.get("tutti"), r.get("chiamate")])
+    # AL RIENTRO TORNANO DA SOLE (27 nov 2026, push-rientro), in node
+    js_r = r"""
+let DEMO = false, tg = null;
+const el = () => null;
+const API_BASE = '/api';
+const authHdr = () => '';
+const haptic = () => {};
+const TOAST = [];
+const toast = t => TOAST.push(t);
+let SUB = null, STATO = {mio: false, libero: true}, ISCRIVI_OK = true, NUOVE = 0;
+const CHIAMATE = [];
+const fetch = async (url, o) => {
+  CHIAMATE.push([url, JSON.parse(o.body || '{}')]);
+  if (url.endsWith('/push/stato')) return {ok: true, json: async () => STATO};
+  return {ok: ISCRIVI_OK, json: async () => ({ok: ISCRIVI_OK})};
+};
+const sub = e => ({endpoint: e, options: {}, unsubscribe: async () => true,
+  toJSON: () => ({endpoint: e, keys: {p256dh: 'P', auth: 'A'}})});
+const REG = {pushManager: {getSubscription: async () => SUB,
+  subscribe: async () => { NUOVE++; return sub('https://fcm.googleapis.com/fcm/send/nuova'); }}};
+const window = {isSecureContext: true, PushManager: function(){}, Notification: {permission: 'granted'},
+  matchMedia: () => ({matches: false})};
+const navigator = {userAgent: 'Android', serviceWorker: {ready: Promise.resolve(REG),
+  getRegistration: async () => REG}};
+const location = {hostname: 'barattolo.store'};
+const matchMedia = window.matchMedia;
+globalThis.window = window; globalThis.PushManager = window.PushManager;
+globalThis.Notification = window.Notification;
+""" + blocco + r"""
+(async () => {
+  const giro = async (prep) => {
+    pushRipresa = false; NUOVE = 0; CHIAMATE.length = 0; TOAST.length = 0; pushTelefono = '';
+    myWebPush = {attivo: true, chiave: 'BP4z', voluto: true};
+    prep();
+    await riprendiPushTelefono();
+    return {nuove: NUOVE, porte: CHIAMATE.map(c => c[0].split('/').pop()),
+            stato: pushTelefono, toast: TOAST.length};
+  };
+  const fuori = {};
+  fuori.persa = await giro(() => { SUB = null; });
+  fuori.libera = await giro(() => { SUB = sub('https://fcm.googleapis.com/fcm/send/x');
+                                    STATO = {mio: false, libero: true}; });
+  fuori.altro = await giro(() => { STATO = {mio: false, libero: false}; });
+  fuori.mia = await giro(() => { STATO = {mio: true, libero: false}; });
+  fuori.serverIeri = await giro(() => { STATO = {mio: false}; });
+  fuori.nonVoluta = await giro(() => { SUB = null; myWebPush.voluto = false; });
+  fuori.senzaPermesso = await giro(() => { SUB = null; Notification.permission = 'default'; });
+  Notification.permission = 'granted';
+  fuori.telegram = await giro(() => { tg = {initData: 'x'}; });
+  tg = null;
+  fuori.rifiuto = await giro(() => { SUB = null; ISCRIVI_OK = false; });
+  ISCRIVI_OK = true;
+  pushRipresa = false; SUB = null; myWebPush = {attivo: true, chiave: 'BP4z', voluto: true};
+  await riprendiPushTelefono(); NUOVE = 0; await riprendiPushTelefono();
+  fuori.unaVolta = NUOVE;
+  console.log(JSON.stringify(fuori));
+})();
+"""
+    r = _node_banco(js_r)
+    if r is None:
+        salta("le notifiche che tornano al rientro", "manca node")
+    else:
+        nulla = {"nuove": 0, "porte": [], "stato": "", "toast": 0}
+        prova("al rientro: iscrizione persa col permesso ancora dato → rifatta "
+              "e il toast di sempre; iscrizione libera → ripresa; di un altro "
+              "account, gia' mia o server di ieri → non si tocca; mai se non "
+              "le aveva accese, senza permesso, in Telegram; se il server "
+              "rifiuta niente «Attive»; una volta per apertura",
+              {"persa": {"nuove": 1, "porte": ["iscrivi"], "stato": "si", "toast": 1},
+               "libera": {"nuove": 0, "porte": ["stato", "iscrivi"], "stato": "si", "toast": 1},
+               "altro": {"nuove": 0, "porte": ["stato"], "stato": "", "toast": 0},
+               "mia": {"nuove": 0, "porte": ["stato"], "stato": "", "toast": 0},
+               "serverIeri": {"nuove": 0, "porte": ["stato"], "stato": "", "toast": 0},
+               "nonVoluta": nulla, "senzaPermesso": nulla, "telegram": nulla,
+               "rifiuto": {"nuove": 1, "porte": ["iscrivi"], "stato": "", "toast": 0},
+               "unaVolta": 0}, r)
+    prova("il ricordo: /api/me lo porta dentro a myWebPush e la ripresa parte "
+          "da li'; chi spegne col bottone lo dice al server (spento: true)",
+          [True, True],
+          ["? me.web_push : {attivo: false};\n    riprendiPushTelefono();" in mini,
+           "body: JSON.stringify({endpoint: sub.endpoint, spento: true})"
+           in pezzo_js(mini, "async function spegniPushTelefono(){", "\n}\n")])
     prova("la riga sta IN CIMA al cassetto e lo stato lo chiede al browser; "
           "chi esce (uno o tutti) passa da scordaPushTelefono",
           [True, True, True],

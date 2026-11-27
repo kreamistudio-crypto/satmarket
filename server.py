@@ -8247,6 +8247,16 @@ def init_db():
         creato INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_push_iscrizioni_tg ON push_iscrizioni(tg_id);
+    CREATE TABLE IF NOT EXISTS push_voluti(
+        -- CHI LE AVEVA ACCESE (27 nov 2026, cantiere push-rientro): una
+        -- riga per ACCOUNT che ha detto si' a «📲 Notifiche sul telefono»
+        -- almeno una volta e non le ha spente col bottone. Al rientro il
+        -- browser che ha ancora il permesso, ma ha perso l'iscrizione
+        -- (il telefono ha buttato i dati del sito insieme al login, o si
+        -- e' toccato «Esci»), le rifa' da solo: vedi `push_voluto`.
+        tg_id INTEGER PRIMARY KEY,
+        creato INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS push_timbro(
         -- IL TIMBRO DELLE NOTIFICHE (la chiave VAPID, 14 nov 2026): la
         -- crea il server da solo al primo bisogno e resta qui, UNA riga.
@@ -22579,6 +22589,9 @@ def push_iscrivi(tg_id: int, endpoint: str, p256dh: str, auth: str,
             "DELETE FROM push_iscrizioni WHERE tg_id=? AND id NOT IN (SELECT id "
             "FROM push_iscrizioni WHERE tg_id=? ORDER BY creato DESC, id DESC "
             "LIMIT ?)", (int(tg_id), int(tg_id), PUSH_MAX_PER_UTENTE))
+        # ...e l'account le vuole: al rientro tornano da sole
+        con.execute("INSERT OR IGNORE INTO push_voluti(tg_id, creato) "
+                    "VALUES(?,?)", (int(tg_id), adesso))
         con.commit()
         return int(con.execute("SELECT COUNT(*) FROM push_iscrizioni WHERE tg_id=?",
                                (int(tg_id),)).fetchone()[0])
@@ -22603,14 +22616,44 @@ def push_e_mio(tg_id: int, endpoint: str) -> bool:
         con.close()
 
 
-def push_togli(tg_id: int, endpoint: str) -> int:
-    """Toglie un telefono, solo se e' di questo account."""
+def push_togli(tg_id: int, endpoint: str, spento: bool = False) -> int:
+    """Toglie un telefono, solo se e' di questo account. `spento`: le ha
+    spente LUI col bottone, e allora al rientro non tornano piu' da sole
+    (`push_voluto`). Chi esce dall'account non le spegne: il ricordo resta."""
     con = db()
     try:
         n = con.execute("DELETE FROM push_iscrizioni WHERE endpoint=? AND tg_id=?",
                         (str(endpoint or ""), int(tg_id))).rowcount
+        if spento:
+            con.execute("DELETE FROM push_voluti WHERE tg_id=?", (int(tg_id),))
         con.commit()
         return n
+    finally:
+        con.close()
+
+
+def push_voluto(tg_id: int) -> bool:
+    """L'account aveva acceso le notifiche e non le ha spente? (27 nov
+    2026, cantiere push-rientro: «quando Barattolo mi richiede di
+    accedere devo riattivarle manualmente»). Lo dice /api/me, e il
+    browser che ha ancora il permesso le rifa' da solo."""
+    con = db()
+    try:
+        return con.execute("SELECT 1 FROM push_voluti WHERE tg_id=?",
+                           (int(tg_id),)).fetchone() is not None
+    finally:
+        con.close()
+
+
+def push_libero(endpoint: str) -> bool:
+    """Questo indirizzo non suona per NESSUN account? (27 nov 2026) La
+    riattivazione da sola lo prende solo se e' libero: se suona per un
+    altro account aperto qui, resta suo, e passa solo col tocco. Lo sa
+    solo chi ha l'indirizzo, cioe' quel browser."""
+    con = db()
+    try:
+        return con.execute("SELECT 1 FROM push_iscrizioni WHERE endpoint=?",
+                           (str(endpoint or ""),)).fetchone() is None
     finally:
         con.close()
 
@@ -24095,6 +24138,10 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # suoi: la stessa persona, e gli avvisi ora sono della meta' viva
         con.execute("UPDATE push_iscrizioni SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # ...e il ricordo «le aveva accese» (27 nov 2026, push-rientro)
+        con.execute("UPDATE OR IGNORE push_voluti SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM push_voluti WHERE tg_id=?", (id_nostr,))
         # ...e L'ASSISTENZA IN APP (3 nov 2026): la conversazione della
         # meta' Nostr passa a quella Telegram (stessa persona, una
         # conversazione sola, in ordine di id); le righe che la meta'
@@ -58429,6 +58476,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # telefono si iscrive. Quale telefono e' iscritto lo sa il browser.
     profilo["web_push"] = ({"attivo": True, "chiave": _PUSH_TIMBRO["pubblica"]}
                            if push_pronto() else {"attivo": False})
+    # ...e se le aveva accese (27 nov 2026, push-rientro): al rientro il
+    # browser col permesso ancora dato le rifa' da solo
+    if profilo["web_push"]["attivo"]:
+        profilo["web_push"]["voluto"] = push_voluto(user["id"])
     # «📬 I TUOI AVVISI» E IL 10050 (20 ott 2026): solo per chi entra
     # senza Telegram — il conto per la fascia dell'apertura, e lo sguardo
     # in sottofondo ai suoi relay dei messaggi (vedi `_guarda_relay_dm`)
@@ -59517,9 +59568,12 @@ async def push_stato_rotta(req: Request, x_tg_init_data: str = Header(""),
     `push_e_mio`. Non scrive niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    mio = await asyncio.to_thread(push_e_mio, user["id"],
-                                  str(d.get("endpoint") or "").strip()[:1024])
-    return {"ok": True, "mio": mio}
+    endpoint = str(d.get("endpoint") or "").strip()[:1024]
+    mio = await asyncio.to_thread(push_e_mio, user["id"], endpoint)
+    # «libero» (27 nov 2026, push-rientro): non suona per nessuno, e la
+    # riattivazione al rientro lo puo' prendere senza rubarlo a un altro
+    libero = (not mio) and await asyncio.to_thread(push_libero, endpoint)
+    return {"ok": True, "mio": mio, "libero": libero}
 
 
 @app.post("/api/push/togli")
@@ -59529,7 +59583,8 @@ async def push_togli_rotta(req: Request, x_tg_init_data: str = Header(""),
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     n = await asyncio.to_thread(push_togli, user["id"],
-                                str(d.get("endpoint") or "").strip()[:1024])
+                                str(d.get("endpoint") or "").strip()[:1024],
+                                d.get("spento") is True)
     return {"ok": True, "tolti": n}
 
 
@@ -136000,7 +136055,7 @@ CANCELLA_ANONIMIZZA = (
 CANCELLA_TOGLI = (
     ("sessioni", "tg_id"), ("biglietti_collegamento", "tg_id"),
     ("avvisi_app", "tg_id"), ("avvisi_notificati", "tg_id"),
-    ("push_iscrizioni", "tg_id"),
+    ("push_iscrizioni", "tg_id"), ("push_voluti", "tg_id"),
     ("avvisi_ricerca", "tg_id"), ("badge_utente", "tg_id"),
     # «Cerco» (25 nov 2026): le sue richieste, i suoi avvisi, il suo «🔕»
     ("richieste", "tg_id"), ("richieste_avvisati", "tg_id"),
