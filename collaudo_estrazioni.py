@@ -226,8 +226,15 @@ def main():
     prova("a chi regala: il link e il conto, mai chi", (True, 2, False),
           ("link" in a_jj, a_jj["partecipanti"], "Primo" in str(a_jj)))
     anonimo = vista(ps4, None)
-    prova("a chi guarda senza entrare: il conto, niente biglietti", (2, None),
+    prova("a chi guarda senza entrare: il conto, niente biglietto suo", (2, None),
           (anonimo["partecipanti"], anonimo.get("mio")))
+    # la lista pubblica dal primo biglietto (27 nov 2026): righe
+    # «numero:biglietto» in ordine, e nessun id o nome dentro
+    prova("la lista anonima si vede gia' a estrazione aperta",
+          ["1:" + v["mio"]["biglietto"], 2],
+          [anonimo["biglietti"][0], len(anonimo["biglietti"])])
+    prova("...senza id ne' nomi", False,
+          any(x in str(anonimo["biglietti"]) for x in ("111", "333", "Primo")))
 
     # ---- 5) l'annullo -----------------------------------------------
     print("\n[l'annullo]")
@@ -245,7 +252,16 @@ def main():
     con.close()
     banco.DETTO.clear()
     asyncio.run(SRV.giro_estrazioni())
+    # lo stesso giro avvisa i biglietti nuovi e POI chiude la scaduta
+    prova("chi entra col link riceve in chat la ricevuta del suo numero",
+          True, any("Sei dentro" in t and "numero è <b>1</b>" in t
+                    for t in detti_a(111)))
     r = riga(e["id"])
+    prova("alla chiusura ognuno riceve in chat impronta e suo numero", True,
+          all(any("🔒" in t and r["impronta"] in t and f"numero è <b>{k}</b>"
+                  in t for t in detti_a(tg)) for tg, k in ((111, 1), (333, 2))))
+    prova("...e chi regala l'impronta", True,
+          any(r["impronta"] in t for t in detti_a(222)))
     prova("scaduta: la lista si ferma e aspetta il blocco dopo la cima",
           ("attesa_blocco", 2, int(time.time()) // 60 + 1),
           (r["stato"], r["n_partecipanti"], r["blocco_altezza"]))
@@ -288,8 +304,14 @@ def main():
     prova("chi regala sente il numero e il contatto del vincitore", True,
           any(f"numero {atteso}" in t and contatto in t
               for t in detti_a(222)))
-    prova("chi non ha vinto sente com'e' andata", True,
-          any("Non era il tuo" in t for t in detti_a(perdente)))
+    prova("chi non ha vinto sente com'e' andata, col conto e l'hash", True,
+          any("Non era il tuo" in t and h in t for t in detti_a(perdente)))
+    vg = vista(ps4, None)
+    prova("la scheda mostra il conto intero: hash, resto, biglietto vincente",
+          (h, int(h, 16) % 2, atteso),
+          (vg["blocco_hash"], vg["resto"], int(vg["vincitore_numero"])))
+    prova("...e il biglietto vincente e' quello della sua riga", True,
+          f"{atteso}:{vg['vincitore_biglietto']}" in vg["biglietti"])
     vv = vista(ps4, vincitore)
     prova("la scheda del vincitore: ha vinto, e il contatto di chi regala",
           (True, "jj_regala"), (vv["ho_vinto"], vv["contatto"]["username"]))

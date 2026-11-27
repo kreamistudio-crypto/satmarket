@@ -1048,3 +1048,9 @@ frase: Gli ordini P2P a prezzo di mercato ora sono sempre a intervallo: nel fogl
 dove: P2P → + → «2. Quanto» → «Fino a» e «Da».
 leva: nessuna
 pubblico: sì
+
+## 2026-11-27 · estrazione-verificabile
+frase: Le estrazioni ora si controllano da soli: la lista dei biglietti è pubblica già mentre l'estrazione è aperta, senza nomi, e ognuno vede il suo numero al suo posto. Alla chiusura l'impronta della lista arriva in chat a tutti, e a estrazione fatta c'è il conto intero col blocco Bitcoin.
+dove: La scheda di un annuncio «🎁 In palio» → «La lista dei biglietti»; in chat dal bot il tuo numero, l'impronta e il conto finale.
+leva: nessuna
+pubblico: no
