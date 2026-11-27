@@ -478,10 +478,11 @@ FEEDBACK_MODIFICA_GIORNI = 7
 # art. 14). Nasce ACCESA (le leve nuove sono
 # accese di serie): la riga serve per SPEGNERLA, e solo False spegne.
 ETICHETTA_ALIMENTI = True
-# La tabella nutrizionale OBBLIGATORIA (18 nov 2026): un alimento si
-# pubblica solo con la tabella intera o col motivo per cui la legge non
-# la chiede. Nasce ACCESA; False la rende di nuovo facoltativa.
-ETICHETTA_OBBLIGATORIA = True
+# La tabella nutrizionale OBBLIGATORIA (18 nov 2026): accesa, un alimento
+# si pubblica solo con la tabella intera o col motivo per cui la legge
+# non la chiede. Dal 27 nov 2026 nasce SPENTA (facoltativa, decisione di
+# Andrea): solo True la rende obbligatoria.
+ETICHETTA_OBBLIGATORIA = False
 # Nascondere un annuncio solo (23 nov 2026): sulla scheda del proprio
 # annuncio «🙈 Nascondi dalla vetrina», senza scadenza; si rimette da «I
 # tuoi annunci». Nasce ACCESA: la riga serve per SPEGNERLA, e solo False

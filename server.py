@@ -40981,7 +40981,8 @@ def _leve_stato():
                          "comprare",
                   spento="il form non la offre e la scheda non la mostra; "
                          "quelle già scritte restano nel database"),
-            # LA TABELLA OBBLIGATORIA (18 nov 2026): accesa di serie
+            # LA TABELLA OBBLIGATORIA (18 nov 2026): spenta di serie dal
+            # 27 nov (cantiere tabella-facoltativa)
             _leva("Tabella nutrizionale obbligatoria",
                   "ETICHETTA_OBBLIGATORIA", ETICHETTA_OBBLIGATORIA,
                   acceso="un alimento si pubblica (o si modifica) solo con "
@@ -44112,17 +44113,21 @@ try:
 except ImportError:
     ETICHETTA_ALIMENTI = True
 # LA TABELLA OBBLIGATORIA (18 nov 2026, cantiere etichetta-obbligatoria):
-# accesa di serie, e la leva e' l'interruttore d'emergenza — spenta, la
-# tabella torna facoltativa come il 17 nov. Conta solo con
-# ETICHETTA_ALIMENTI accesa: senza etichetta non c'e' niente da esigere.
+# accesa = un alimento passa solo con la tabella intera o col motivo
+# d'esenzione. Conta solo con ETICHETTA_ALIMENTI accesa: senza etichetta
+# non c'e' niente da esigere.
+# DI NUOVO FACOLTATIVA DI SERIE (27 nov 2026, cantiere
+# tabella-facoltativa): Andrea rovescia il 18 nov — «altrimenti nessuno
+# pubblica piu' niente». La leva resta, ma nasce SPENTA e solo True la
+# accende (una riga storta nel config non deve fermare chi vende).
 try:
     from config import ETICHETTA_OBBLIGATORIA
     if not isinstance(ETICHETTA_OBBLIGATORIA, bool):
         print("[etichetta] ETICHETTA_OBBLIGATORIA non e' True/False: "
-              "la tabella nutrizionale resta obbligatoria")
-    ETICHETTA_OBBLIGATORIA = ETICHETTA_OBBLIGATORIA is not False
+              "la tabella nutrizionale resta facoltativa")
+    ETICHETTA_OBBLIGATORIA = ETICHETTA_OBBLIGATORIA is True
 except ImportError:
-    ETICHETTA_OBBLIGATORIA = True
+    ETICHETTA_OBBLIGATORIA = False
 CATEGORIA_ETICHETTA = "Alimenti e bevande"
 # I motivi per cui la legge non chiede la tabella (Reg. UE 1169/2011):
 # chiavi interne, i NOMI li scrive il gemello ESENZIONI_ETICHETTA del
