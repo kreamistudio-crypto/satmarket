@@ -2843,6 +2843,16 @@
   prove.py dal commit dei primi file (prima mancava APPOSTA, il
   precedente di tutto.webp), e il ripiego emoji+testo resta per
   quando l'immagine non arriva.
+  GLI EFFETTI DELLA CARD (27 nov 2026): una pagina del server col suo
+  banner puo' dichiarare `effetti: {"riflesso": [x, y, l, a]}` (in
+  percentuali intere) e avere accanto al banner `<slug>-codice.webp`, la
+  maschera del codice che scorre (trasparente intorno alle scritte). Il
+  giudice e' `effetti_della_card`: zona in forma E file presente, sennò
+  niente. La busta dello spazio porta `effetti`, e la rotta serve la
+  maschera solo con la stretta del banner (`_codice_consigliato`).
+  Il client (`effettiScoprireHTML`) disegna codice, riflesso, linea e
+  polvere tutti in CSS; riflesso e linea solo al primo disegno della card
+  in un'apertura, la linea solo dove c'e' @property.
   IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea in TRE tempi,
   e vanno tenuti tutti: prima il dondolio alla mascotte della card
   intera, ROVESCIATO un'ora dopo — il bottone resta FERMO, bersaglio
@@ -26665,7 +26675,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   qui» invece di «Attive». Senza risposta vale «sì», come prima.
   Chi esce (`esciWeb`, «Esci da tutti»)
   passa da `scordaPushTelefono`; la fusione sposta le righe, la
-  cancellazione le toglie (`CANCELLA_TOGLI`). In MODALITA_COLLAUDO
+  cancellazione le toglie (`CANCELLA_TOGLI`). AL RIENTRO TORNANO DA
+  SOLE (27 nov 2026, cantiere push-rientro): la tabella `push_voluti`
+  (una riga per account) ricorda chi le ha accese; nasce in
+  `push_iscrivi` e se ne va solo con `togli` + `spento: true`, che
+  manda il solo bottone «Attive» (`spegniPushTelefono`), mai l'uscita.
+  `/api/me` aggiunge `web_push.voluto`; dopo `/api/me` la pagina chiama
+  `riprendiPushTelefono`: se `voluto`, `pushPossibile()` e il permesso
+  è ancora `granted` (qui non si chiede mai), rifà l'iscrizione persa
+  — o riprende quella che `stato` dice `libero` (non suona per nessun
+  account: `push_libero`) — col toast di sempre. Un'iscrizione d'altri
+  resta sua. Una volta per apertura. Fusione e cancellazione portano
+  anche `push_voluti`. In MODALITA_COLLAUDO
   non esce niente (riga «📲 [push simulato…]»); sulla vm-2050 sì.
   La leva `WEB_PUSH_ATTIVO` nasce ACCESA (regola di Andrea del 14
   nov) e si cambia anche dal pannello. NON ARRIVA: telefoni senza i
@@ -32411,6 +32432,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    whitelist di tre forme; senza login, noindex, no-store,
    no-referrer, fuori da sitemap e menu; vedi «LA STRADA CHIUSA» e
    CANTIERI, «Il wallet si apre davvero da Telegram per Android»),
+   `/vai/{slug}` (26 nov 2026, cantiere clic-entra: l'indirizzo corto
+   del bottone «Entra in …» di una pagina consigliata, per i post; conta
+   il clic in `sponsor_entrate` — quanti, mai chi — e rimanda con un 302
+   no-store al link del catalogo, SOLO a pagina pubblicata e SOLO se è
+   un invito o un bot di Telegram (`entra_della_pagina`: niente open
+   redirect); slug fuori forma o pagina senza bottone tornano a `/`;
+   vedi CANTIERI, «Quanti toccano "Entra in BitcoinLabs"»),
    `/.well-known/nostr.json` (ott 2026, il NIP-05 di casa: i nomi di
    `NIP05_NOMI` del config con le chiavi PUBBLICHE in hex, `?name=`
    che filtra, CORS aperto, mai un redirect; nato per gli emittenti
@@ -35605,6 +35633,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `chiamato`. La scopa porta via lucchetti bruciati e chiamate con la
   chat dell'ordine; la scorta mai. Le prove:
   `prove_chat_dalla_notifica`, `collaudo_chat_mercatino` sezione 13.
+  I LUCCHETTI A CASO E TOR BROWSER (27 nov 2026, Cantieri «Le chat
+  ritrovate dopo Tor Browser»): lo stato della scorta dice anche `nude`
+  (in scorta, senza seme), e la posa accetta `ritira` — escono PRIMA dei
+  nuovi solo i miei, in scorta, senza seme; storto = 400 intero. Il
+  telefono COL PROFILO li ritira tutti e rifa' la scorta dal profilo
+  quando qualcuno qui non si apre (la memoria buttata) o quando la
+  scorta va riempita; senza profilo non tocca niente. E per un NATIVO
+  NOSTR il profilo delle chat NASCE (`chatMercProfiloP2P` →
+  `nasciProfiloChatP2P`, dopo `adottaProfiloContoP2P` a mani vuote) solo
+  se la lettura della copia ha detto «nessuna copia» con almeno un relay
+  arrivato in fondo (`p2pCopiaLetta.risposti`) e mai dopo un «Dimentica»;
+  resta solo se `assicuraCopiaProfiloP2P` rilegge la sua copia sui
+  relay, altrimenti si toglie e i lucchetti nascono a caso come prima.
+  Prove: `prove_profilo_chat_nostr`, i casi Tor di
+  `prove_chat_dalla_notifica`.
   E TRE CONTORNI (stesso cantiere): il ritorno dal login web porta anche
   la query, in forma stretta (`FORMA_RITORNO_LOGIN`: lettere, cifre,
   `_ - . = &`; `urlRitornoLogin` la manda solo in quella forma, senza
@@ -38915,6 +38958,25 @@ mai il kind 0 di nessuno: regola ferrea 2).
   `apriVideoRacconto` dentro Telegram apre i t.me con
   `openTelegramLink`, gli altri con `openLink`. Il catalogo lo guarda
   `prove_racconti_bozza` con la stessa forma.
+  E L'INVITO A UN GRUPPO (26 nov 2026, JJ): anche `https://t.me/+<8-64
+  lettere, cifre, _ e ->` e niente dopo, la forma di
+  `linkCanaleToccabile`. Il 24 nov era scartato perche' non serviva;
+  adesso la pagina di JJ porta al suo gruppo privato.
+  GLI ORDINI P2P NEL NEGOZIO (26 nov 2026, JJ): `#negozioP2P`, sopra
+  «In vetrina in questo negozio», con le card della fila di Esplora
+  (`cardVetrinaP2P`, `cardVetrinaOnchainP2P`) dei soli ordini di chi
+  vende li'. `negozioOrdiniP2P` chiede la stessa fotografia
+  (`chiediFotoVetrinaP2P`) e la filtra con `ordiniVetrinaP2P` (vivi, non
+  scaduti, non in pausa) e col volto: `negozio` del volto (codice, o
+  username) uguale a quello del negozio. Nessuna rotta nuova e nessun
+  tg_id: i volti arrivano solo a chi ha una sessione, quindi chi guarda
+  da anonimo non vede il riquadro (salvo gli on-chain, che portano il
+  `negozio` nella riga). Senza card il riquadro resta nascosto; con le
+  card e nessun oggetto in vetrina, titolo e «Il barattolo qui è vuoto»
+  spariscono, e «Acquista» del racconto scende alle card. Sul proprio
+  negozio si vedono anche i propri ordini. Non guarda `P2P_IN_VETRINA`:
+  quella leva decide la fila della home; qui decide il server con la
+  leva del P2P (fotografia vuota a P2P spento).
   LA TESTA (23 nov): il megafono `.notizie-testa` (`apriNotizie`,
   `CANALE_NOTIZIE`) al posto del podio; la classifica del mercatino nel
   Profilo (`mercatoClassificaPortaHTML`, sotto la porta della Streak);
@@ -39018,4 +39080,41 @@ mai il kind 0 di nessuno: regola ferrea 2).
   riquadro «Cerco» sotto «Offerte» e «Sconti» (`CERCO_RIQUADRO`, la sua
   etichetta esce dal banner solo se «Sconti» c'è), la vista `cerco`, il
   bottone nella ricerca vuota (`chiediloATutti`), la nota in Vendi
+  (`offertaRichiesta`). Dal 26 nov «Offri» compila il form
+  (`compilaOffertaRichiesta`, solo le caselle vuote): titolo = testo
+  della richiesta, prezzo = budget nella sua valuta (`impostaSellValuta`),
+  e per «Buoni ed esperienze» la consegna digitale e una foto di serie
+  (`fotoDiSerieBuono`: tessera disegnata nella tela col testo, JPEG come
+  quelli di `ridimensiona`, scartata se `jpegVuoto`). Il server non
+  sa niente: riceve un annuncio normale.
+
   (`offertaRichiesta`).
+
+## LE ESTRAZIONI (26 nov 2026, cantiere estrazioni)
+
+Chi vende mette in palio il SUO annuncio. Il giudice e' il server
+(server.py, «LE ESTRAZIONI», prima di `orologio`); il client disegna
+(miniapp.html, «LE ESTRAZIONI»: `caricaEstrazione`, `htmlEstrazione`,
+il foglio `estrazioneSheet`).
+- Tabelle: `estrazioni` (modo 'inviti'|'link', `codice` del link,
+  finestra, stato aperta → attesa_blocco → estratta, oppure vuota o
+  annullata; l'indice unico parziale `idx_estrazione_viva` = una viva
+  per annuncio) e `estrazioni_partecipanti` (PK estrazione+tg_id, UNIQUE
+  estrazione+numero: i due giudici dei biglietti).
+- Rotte: `POST/GET /api/listings/{id}/estrazione`,
+  `POST /api/estrazioni/partecipa`, `POST /api/estrazioni/{id}/annulla`.
+  Nessuna rotta-pagina nuova: il link dedicato e' `/annuncio/<id>` con
+  `?invito=<ref>&estrazione=<codice>`, e il client ricorda il codice
+  sul dispositivo (localStorage `barattolo_estrazione`, legato
+  all'annuncio).
+- Il notaio: impronta sha256 della lista «numero:biglietto» alla
+  chiusura, blocco atteso = cima + 1, vincitore = int(hash) mod N + 1
+  (`estrazione_vincitore`, `estrazione_impronta`, pure). La catena e'
+  quella del mainnet (`ESTRAZIONI_MEMPOOL_API`, di serie mempool.space,
+  si cambia solo nel config); in collaudo e' finta (`_estrazione_mempool`).
+- Privacy: chi regala vede il conto e i biglietti, mai i nomi; il
+  contatto dell'altro esce solo a vincitore e venditore, a estrazione
+  fatta. Solo account Telegram (0 < tg_id < 2^52).
+- In palio non si compra: `guardia_estrazione` nelle quattro porte
+  (compra, set, preventivo, offerta). Il nastro: `in_palio` da
+  `arricchisci_righe_vetrina`.

@@ -16,7 +16,8 @@ annuncio — e si chiedono le cose che solo la filiera intera puo' dire:
   · LA TABELLA E' OBBLIGATORIA (18 nov 2026): un alimento senza tabella
     e senza motivo d'esenzione e' un 400 che non lascia righe, anche dal
     client di ieri che non manda la chiave; col motivo passa, e la scheda
-    lo dice; spenta la leva ETICHETTA_OBBLIGATORIA, torna facoltativa;
+    lo dice; spenta la leva ETICHETTA_OBBLIGATORIA, torna facoltativa
+    — e dal 27 nov 2026 nasce SPENTA (Andrea): qui la si accende a mano;
   · in modifica gli annunci di prima restano in pace finche' il form
     non li ritocca (chiave assente = conserva);
   · una tabella a meta' o storta e' un 400 che non lascia righe;
@@ -228,8 +229,16 @@ def main():
 
     # ---------------------------------------------------------------
     print("\n[obbligatoria: senza tabella non si pubblica (18 nov 2026)]")
-    prova("la leva nasce accesa senza riga nel config", True,
+    # (27 nov 2026) la leva nasce SPENTA: di serie si pubblica senza
+    prova("la leva nasce spenta senza riga nel config (27 nov)", False,
           SRV.ETICHETTA_OBBLIGATORIA)
+    codice, r0 = pubblica("Marmellata senza tabella")
+    prova("...e di serie un alimento senza tabella si pubblica", (200, ""),
+          (codice, colonna(r0["id"], "etichetta")
+           if codice == 200 else None))
+    # da qui in giu' la leva ACCESA a mano, come chi la riaccende nel
+    # config: i blocchi «leva spenta» la rimettono accesa nel finally
+    SRV.ETICHETTA_OBBLIGATORIA = True
     codice, detail = pubblica("Marmellata di fichi")
     prova("il client di ieri (niente chiave): 400 che dice di aggiornare, "
           "nessuna riga", (400, True, 0),

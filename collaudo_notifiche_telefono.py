@@ -256,8 +256,10 @@ def main():
           [(p1.get("web_push") or {}).get("attivo"), len(b64d(chiave)) if chiave else 0,
            b64d(chiave)[0] if chiave else 0, righe_timbro,
            (p2.get("web_push") or {}).get("chiave")])
-    prova("la privata non esce mai da /api/me", True,
-          set((p1.get("web_push") or {})) == {"attivo", "chiave"})
+    prova("la privata non esce mai da /api/me; chi non le ha mai accese "
+          "non le ha «volute» (27 nov 2026, push-rientro)", [True, False],
+          [set((p1.get("web_push") or {})) == {"attivo", "chiave", "voluto"},
+           (p1.get("web_push") or {}).get("voluto")])
     prova("il journal dice che il timbro e' nato, una volta", 1,
           sum("timbro VAPID creato" in r for r in RIGHE))
 
@@ -355,14 +357,15 @@ def main():
     prova("chi l'ha iscritto: mio; l'altro account aperto sullo stesso "
           "telefono: non mio (prima la riga diceva «Attive» a tutti e due); "
           "un indirizzo sconosciuto: non mio; e la domanda non scrive niente",
-          [{"ok": True, "mio": True}, {"ok": True, "mio": False},
-           {"ok": True, "mio": False}, [tel.endpoint]],
+          [{"ok": True, "mio": True, "libero": False},
+           {"ok": True, "mio": False, "libero": False},
+           {"ok": True, "mio": False, "libero": True}, [tel.endpoint]],
           [suo, d_altro, stato("https://fcm.googleapis.com/fcm/send/nessuno"),
            telefoni_di(NOSTR)])
     asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
     prova("«Attiva qui» dall'altro account: il telefono passa a lui, e per "
           "il primo non e' piu' suo (un account alla volta)",
-          [{"ok": True, "mio": True}, []],
+          [{"ok": True, "mio": True, "libero": False}, []],
           [stato(tel.endpoint), telefoni_di(NOSTR)])
     come(NOSTR)
     asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
@@ -380,14 +383,47 @@ def main():
            telefoni_di(NOSTR)])
     SRV.WEB_PUSH_ATTIVO = True
 
+    # ---- 5b) AL RIENTRO TORNANO DA SOLE (27 nov 2026, push-rientro) -------
+    print("\n[5b) il ricordo «le aveva accese»: chi esce lo tiene, chi spegne no]")
+    voluto = lambda: (asyncio.run(profilo()).get("web_push") or {}).get("voluto")
+    v_uscito = voluto()
+    stato_dopo = stato(tel.endpoint)
+    asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
+    come(ALTRO)
+    altro_spegne = asyncio.run(SRV.push_togli_rotta(
+        _Richiesta({"endpoint": tel.endpoint, "spento": True})))
+    v_altro = voluto()
+    come(NOSTR)
+    v_dopo_altro = voluto()
+    spento_testo = asyncio.run(SRV.push_togli_rotta(
+        _Richiesta({"endpoint": tel.endpoint, "spento": "si"})))
+    v_testo = voluto()
+    asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
+    asyncio.run(SRV.push_togli_rotta(_Richiesta({"endpoint": tel.endpoint, "spento": True})))
+    prova("uscito (iscrizione tolta senza «spento»): /api/me dice ancora "
+          "«voluto» e l'indirizzo e' libero, cosi' il browser col permesso le "
+          "rifa' al rientro; un altro account che spegne tocca solo il suo "
+          "ricordo; «spento» vale solo se e' proprio true; il bottone le "
+          "spegne davvero e il ricordo se ne va",
+          [True, {"ok": True, "mio": False, "libero": True},
+           {"ok": True, "tolti": 0}, False, True, {"ok": True, "tolti": 1},
+           True, False, []],
+          [v_uscito, stato_dopo, altro_spegne, v_altro, v_dopo_altro,
+           spento_testo, v_testo, voluto(), telefoni_di(NOSTR)])
+
     # ---- 6) FUSIONE E CANCELLAZIONE ---------------------------------------
     print("\n[6) fusione e cancellazione]")
     asyncio.run(SRV.push_iscrivi_rotta(_Richiesta(tel.iscrizione())))
     esito = SRV.esegui_fusione(TG, NOSTR)
-    prova("nella fusione il telefono passa alla meta' viva", [True, [tel.endpoint], []],
-          [not isinstance(esito, str), telefoni_di(TG), telefoni_di(NOSTR)])
+    voluti = lambda: [x[0] for x in SRV.db().execute(
+        "SELECT tg_id FROM push_voluti ORDER BY tg_id")]
+    prova("nella fusione il telefono passa alla meta' viva, e con lui il "
+          "ricordo «le aveva accese»", [True, [tel.endpoint], [], [TG]],
+          [not isinstance(esito, str), telefoni_di(TG), telefoni_di(NOSTR),
+           [t for t in voluti() if t in (TG, NOSTR)]])
     SRV.esegui_cancellazione(TG)
-    prova("con l'account cancellato i telefoni se ne vanno", [], telefoni_di(TG))
+    prova("con l'account cancellato i telefoni se ne vanno, e il ricordo pure",
+          [[], False], [telefoni_di(TG), TG in voluti()])
 
     # ---- 7) IL PANNELLO -------------------------------------------------
     print("\n[7) la leva nel pannello]")

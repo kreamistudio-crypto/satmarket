@@ -631,8 +631,9 @@ RACCONTI_NEGOZI = {
     # Bitcoin, sicurezza e privacy, coi suoi corsi in sats. I testi sono
     # quelli che ha mandato Carmrain, approvati da Andrea. Il negozio lo
     # apre Carmrain col suo account, e il moderatore lo collega dal
-    # pannello come Piano B. L'ultima foto porta al suo bot
-    # (@ilragiondomobot), col link referral di Barattolo quando c'e'.
+    # pannello come Piano B. L'ultima foto porta al gruppo di
+    # BitcoinLabs col link referral di Barattolo (26 nov 2026: l'invito
+    # che il bot @ilragiondomobot ha dato ad Andrea con /link).
     #   bitcoinlabs-cop.webp  lo scudo col bitcoin, 1360x583
     #   bitcoinlabs-1.webp    Carmrain con la maschera, il quadrato in home
     #   bitcoinlabs-2.webp    Bitcoin, Linux e sicurezza
@@ -651,6 +652,10 @@ RACCONTI_NEGOZI = {
         "foto": True, "logo": True, "banner": True,
         # la foto del quadrato in home (assets/racconti/<slug>-1.webp)
         "quadro": 1,
+        # gli effetti della card in home (27 nov 2026, AndreAI): il
+        # riflesso passa sulla maschera di Carmrain; la maschera del
+        # codice e' assets/scoprire/bitcoinlabs-codice.webp
+        "effetti": {"riflesso": [66, 12, 28, 70]},
         "blocchi": [
             {"t": "punti", "h": "PERCHÉ COMPRARE I CORSI SU BARATTOLO", "voci": [
                 {"e": "🔒", "h": "I tuoi sats sono al sicuro",
@@ -690,14 +695,85 @@ RACCONTI_NEGOZI = {
                    "in privato, è un truffatore con un profilo simile a "
                    "Carmrain o a uno degli admin: segnala e blocca senza "
                    "pensarci due volte.")},
-            # la foto che apre il bot di BitcoinLabs: il link nudo finche'
-            # Andrea non incolla il suo link referral (`?start=...`)
+            # la foto che apre il gruppo di BitcoinLabs col link referral
+            # di Barattolo: conta solo chi entra da QUI (regole del bot)
             {"t": "foto", "n": 3, "etichetta": "la comunità",
              "alt": "La comunità di BitcoinLabs intorno allo scudo col bitcoin",
-             "link": "https://t.me/ilragiondomobot",
-             "link_testo": "Entra in BitcoinLabs"},
+             "link": "https://t.me/+SL62AOghIotkNjE8",
+             "link_testo": "Entra in BitcoinLabs",
+             # il bottone vero, anche in alto accanto ad Acquista (26 nov)
+             "bottone": True},
             {"t": "firma", "h": "Bitcoin è accessibile a tutti.",
              "p": "Carmrain, BitcoinLabs"},
+        ],
+    },
+    # JJ (26 nov 2026, cantiere jj-p2p): JJ gestisce un gruppo Telegram
+    # privato dove si scambiano bitcoin in contanti, di persona, e porta
+    # gli stessi scambi sul P2P di Barattolo. Nel negozio non vende
+    # oggetti: sotto la pagina ci sono i suoi ordini P2P aperti (vedi
+    # `negozioOrdiniP2P` in miniapp.html). Testi approvati da Andrea; il
+    # moderatore collega il negozio dal pannello, come Piano B.
+    # Lo slug e' «jj-bitcoin» e non «jj»: «jj» sta gia' dentro miniapp.html
+    # (la prova «il testo non viaggia nel client» guarda anche lo slug).
+    #   jj-bitcoin-cop.webp  la stretta di mano in piazza, 1360x583
+    #   jj-bitcoin-1.webp    l'Italia di notte, le citta' collegate
+    #   jj-bitcoin-2.webp    il lucchetto col bitcoin fra due telefoni
+    #   jj-bitcoin-3.webp    il quadro del mercato dei fiori, apre il gruppo
+    "jj-bitcoin": {
+        "negozio": "",
+        "collega_dal_pannello": True,
+        "emoji": "🤝",
+        "titolo": "JJ · Bitcoin, vicino a te",
+        "in_breve": "Bitcoin in contanti, vicino a te",
+        "sottotitolo": ("Scambia bitcoin in contanti con JJ, di persona, col "
+                        "P2P di Barattolo."),
+        "intro": ("JJ gestisce un gruppo Telegram privato con più di 1.400 "
+                  "iscritti, dove si scambiano bitcoin in contanti, di "
+                  "persona. Ora i suoi scambi passano dal P2P di Barattolo: "
+                  "qui sotto trovi i suoi ordini aperti."),
+        "foto": True, "logo": False, "banner": True,
+        # la foto del quadrato in home (assets/racconti/<slug>-3.webp)
+        "quadro": 3,
+        "blocchi": [
+            {"t": "punti", "h": "PERCHÉ SCAMBIARE CON JJ SU BARATTOLO", "voci": [
+                {"e": "🔒", "h": "I sats restano bloccati fino alla fine",
+                 "p": "Finché chi vende non ha ricevuto i contanti, i sats restano bloccati sul Lightning."},
+                {"e": "💶", "h": "Contanti, di persona",
+                 "p": "Vi vedete nella tua città, nel posto che scegliete insieme."},
+                {"e": "⭐", "h": "La reputazione si vede",
+                 "p": "Stelline, scambi completati e recensioni stanno sul suo profilo, come per chiunque su Barattolo."},
+                {"e": "⚖️", "h": "Se qualcosa va storto, non sei solo",
+                 "p": "Apri una disputa e un moderatore guarda le prove."},
+            ]},
+            {"t": "foto", "n": 1, "etichetta": "tutta Italia",
+             "alt": "L'Italia di notte, con le città collegate"},
+            {"t": "testo", "h": "CHI È JJ",
+             "p": ("JJ gestisce il gruppo Telegram «Compra / vendita ₿itcoin "
+                   "& CRYPTO», dove più di 1.400 persone si scambiano "
+                   "bitcoin, coi feedback di ognuno in un canale pubblico. "
+                   "Su Barattolo porta gli stessi scambi, con i sats bloccati "
+                   "finché lo scambio non è fatto.")},
+            {"t": "foto", "n": 2, "etichetta": "i sats bloccati",
+             "alt": "Un lucchetto col bitcoin fra due telefoni"},
+            {"t": "tappe", "h": "COME FUNZIONA", "voci": [
+                {"h": "Scegli un suo ordine",
+                 "p": "Qui sotto o nel P2P. «Compra BTC» se vuoi i sats, «Vendi BTC» se vuoi i contanti."},
+                {"h": "Blocchi una piccola cauzione",
+                 "p": "Chi prende un ordine in contanti la blocca, e gli torna a fine scambio."},
+                {"h": "Vi accordate sul posto",
+                 "p": "Chi vende scrive nello scambio dove e quando vedervi."},
+                {"h": "Contanti in mano",
+                 "p": "Chi compra consegna i contanti e tocca «Ho consegnato i contanti»."},
+                {"h": "I sats partono",
+                 "p": "Chi vende conta i contanti e tocca «Ricevuti: libera i sats», lì davanti."},
+            ]},
+            # la foto che apre il gruppo di JJ, col suo link d'invito
+            {"t": "foto", "n": 3, "etichetta": "il gruppo",
+             "alt": "Un mercato dei fiori davanti a una chiesa, in un quadro dell'Ottocento",
+             "link": "https://t.me/+DJW8nm1B0xRlMTNk",
+             "link_testo": "Entra nel gruppo di JJ"},
+            {"t": "firma", "h": "La libertà di Bitcoin, più vicina a te.",
+             "p": "JJ"},
         ],
     },
 }

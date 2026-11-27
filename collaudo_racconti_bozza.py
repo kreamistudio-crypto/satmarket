@@ -143,6 +143,17 @@ def giro_collegato(c, SRV, SLUG):
     cod = con.execute("SELECT negozio FROM utenti WHERE tg_id=4242"
                       ).fetchone()["negozio"]
     con.close()
+    # ...E COL LINK DELLO USERNAME (26 nov 2026, cantiere jj-p2p: il
+    # negozio di JJ era /negozio/Nojobact): si collega al suo CODICE
+    con = SRV.db()
+    con.execute("UPDATE utenti SET username='PianoProvaUser' WHERE tg_id=4242")
+    con.commit()
+    con.close()
+    r = collega("https://barattolo.store/negozio/pianoprovauser")
+    prova("il link con lo username lo collega al codice del negozio",
+          (200, cod), (r.status_code, r.json().get("negozio")))
+    SRV.scrivi_impostazione(f"racconto_negozio:{SLUG}", "")
+    SRV.applica_negozi_collegati()
     r = collega(f" https://barattolo.store/negozio/{cod}/?x=1#su ")
     prova("il link intero del negozio la collega", (200, cod),
           (r.status_code, r.json().get("negozio")))

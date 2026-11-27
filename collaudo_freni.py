@@ -164,6 +164,22 @@ def main():
         st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 50,
                                          "metodo": "Contanti al tabacchino", "premio": 25})
         prova("...mentre il Barattozon tiene il suo 400 fuori scala", 400, st)
+        # L'INTERVALLO (26 nov 2026, un utente via Tappo): «💶 da 20 a 100 €»
+        # sulla riga dell'euro; un massimo storto o non sopra il minimo non
+        # e' un 400 e il post dice il minimo, come ieri
+        st, ok, dove, cap = posta(4401, {"lato": "vendo", "euro": 20,
+                                         "euro_max": 100, "metodo": "SEPA"})
+        prova("un ordine a intervallo: il post dice «💶 da 20,00 a 100,00 €»", (200, True),
+              (st, "\n💶 da 20,00 a 100,00 €\n" in cap))
+        esiti = []
+        for storto in ("cento", True, 10, 20, 10 ** 9, None):
+            corpo = {"lato": "vendo", "euro": 20, "metodo": "SEPA"}
+            if storto is not None:
+                corpo["euro_max"] = storto
+            st, ok, dove, cap = posta(4401, corpo)
+            esiti.append((st, "\n💶 20,00 €\n" in cap))
+        prova("...un massimo storto, sotto o pari al minimo, oltre l'argine o assente: 200 e il solo minimo",
+              [(200, True)] * 6, esiti)
         st, ok, dove, cap = posta(4402, {"lato": "vendo", "euro": 50, "metodo": "SEPA"})
         prova("Telegram senza @username: in casa e su BitcoinPodcast, non su Subito Crypto",
               (200, True, ["@casa", "@podcast"]), (st, ok, dove))

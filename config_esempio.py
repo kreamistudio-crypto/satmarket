@@ -478,10 +478,11 @@ FEEDBACK_MODIFICA_GIORNI = 7
 # art. 14). Nasce ACCESA (le leve nuove sono
 # accese di serie): la riga serve per SPEGNERLA, e solo False spegne.
 ETICHETTA_ALIMENTI = True
-# La tabella nutrizionale OBBLIGATORIA (18 nov 2026): un alimento si
-# pubblica solo con la tabella intera o col motivo per cui la legge non
-# la chiede. Nasce ACCESA; False la rende di nuovo facoltativa.
-ETICHETTA_OBBLIGATORIA = True
+# La tabella nutrizionale OBBLIGATORIA (18 nov 2026): accesa, un alimento
+# si pubblica solo con la tabella intera o col motivo per cui la legge
+# non la chiede. Dal 27 nov 2026 nasce SPENTA (facoltativa, decisione di
+# Andrea): solo True la rende obbligatoria.
+ETICHETTA_OBBLIGATORIA = False
 # Nascondere un annuncio solo (23 nov 2026): sulla scheda del proprio
 # annuncio «🙈 Nascondi dalla vetrina», senza scadenza; si rimette da «I
 # tuoi annunci». Nasce ACCESA: la riga serve per SPEGNERLA, e solo False
@@ -1026,6 +1027,11 @@ SWAP_FORNITORI_IN_PIU = []
 # (la VM di collaudo), dove un mempool pubblico non c'e'. Una voce di
 # SWAP_FORNITORI_IN_PIU puo' portare la sua chiave "mempool".
 SWAP_MEMPOOL_API = ""
+# LE ESTRAZIONI (26 nov 2026): da dove si leggono la cima della catena e
+# l'hash del blocco che sceglie il vincitore. SEMPRE il mainnet, anche
+# sulla prova: e' il blocco pubblico a fare da notaio. In collaudo la
+# catena e' finta e questa riga non si legge.
+ESTRAZIONI_MEMPOOL_API = "https://mempool.space/api"
 # IL CAMBIO LIBERO (27 ott 2026, cantiere cambio-libero, decisione di
 # Andrea): dalla pagina «Cambio» chi passa il cancello cambia i SUOI sats
 # senza un ordine di mezzo — Lightning -> il suo indirizzo bitcoin (e,
@@ -1758,6 +1764,13 @@ P2P_ONCHAIN_AVVISO_INCASSO = True
 # moderatori, il libro, Nostr, gli avvisi o il journal). Acceso di serie;
 # False lo rimette solo via Lightning.
 P2P_ONCHAIN_BARATTOZON = True
+# L'INTERVALLO «DA… A…» ANCHE ON-CHAIN (27 nov 2026, «Ordini p2p ad
+# intervalli anche su onchain», ok di Andrea alla proposta). Chi pubblica
+# a prezzo di mercato in euro, franchi o USDT scrive un minimo e un
+# massimo; chi prende sceglie la cifra, e il 2-di-3 (e la cauzione) nasce
+# su quella. Mai a prezzo fisso, nelle monete o con Barattozon. Acceso di
+# serie; False torna alla cifra unica (il minimo si ignora).
+P2P_ONCHAIN_INTERVALLO = True
 # GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf,
 # Andrea: «abbiamo stretto una collaborazione con Lugano»). Accanto agli
 # ordini in euro e in USDT, ordini Mostro in CHF: la garanzia resta la

@@ -174,6 +174,21 @@ function paginaBz(percorso){
   return '';
 }
 
+/* PURA (27 nov 2026, audit giro 6): le pagine dove SCRIVONO ALTRI —
+   prodotto (titoli, recensioni, domande), carrello (i consigliati),
+   ricerca, recensioni, domande e risposte, vetrine e profili dei
+   venditori. Li' il PayCode non si legge: una frase «PayCode 111-222-333»
+   in una recensione non deve diventare l'ordine di chi la guarda. Il
+   PayCode vero sta sulle pagine dell'ordine, che restano tutte aperte
+   (la pagina vera non e' ancora vista: un elenco di permessi la
+   rischierebbe, uno di divieti no) */
+function paginaDiAltriBz(percorso){
+  const p = String(percorso || '');
+  const tipo = paginaBz(p);
+  if (tipo === 'prodotto' || tipo === 'carrello') return true;
+  return /^\/(?:[^/]+\/)?(?:s|product-reviews|ask|stores|sp|gp\/aw\/s|gp\/customer-reviews|gp\/profile|gp\/help\/seller|shops|b|gp\/browse\.html|gp\/bestsellers|gp\/new-releases|gp\/goldbox|deals)(?:[/?.]|$)/.test(p);
+}
+
 /* PURA: la riga del pagamento in contanti, dalla sua frase (Amazon la
    scrive «Paga in Contanti nel Punto Vendita più vicino»; mai una parola
    sola: «contanti» sta anche nelle note legali) */
@@ -215,6 +230,9 @@ function ponteBz(msg){
   function guarda(){
     attesa = 0;
     if (!document.body) return;
+    /* (27 nov 2026, audit giro 6) sulle pagine dove scrivono altri no:
+       si guarda a ogni giro, perche' Amazon cambia pagina senza ricaricare */
+    if (paginaDiAltriBz(location.pathname)) return;
     const hrefs = [...document.querySelectorAll('a[href*="' + PDF_HOST + '"]')].map(a => a.href);
     if (!hrefs.length && !/paycode/i.test(document.body.textContent || '')) return;
     const testo = document.body.innerText || '';

@@ -1018,3 +1018,27 @@ frase: «Non hai sats?» funziona anche in franchi svizzeri: se il telefono è i
 dove: la cassa di un oggetto → «Non hai sats?»; Profilo → Incassi e pagamenti → «💱 Paga senza sats».
 leva: VIA_EURO_SOLO_ADMIN (oggi solo moderatori) e il P2P in franchi (P2P_CHF_ATTIVO)
 pubblico: no
+
+## 2026-11-26 · vetrina-tendine
+frase: Nella scheda di un annuncio compaiono due tendine: «Info di spedizione», che dice per ogni strada (indirizzo, locker, ritiro a mano) dove spedisce il venditore e a che prezzo, e «Altri articoli del negozio», coi primi 10 articoli e il tasto «Vedi tutto il negozio». Anche nel P2P i metodi di pagamento accettati stanno in una tendina nella pagina dell'ordine.
+dove: La scheda di un annuncio, sotto la descrizione («Info di spedizione») e in fondo («Altri articoli del negozio»); P2P → Libro ordini → un ordine → «Metodi di pagamento accettati».
+leva: nessuna
+pubblico: sì
+
+## 2026-11-26 · negozio-ordini-p2p
+frase: Nel negozio di chi scambia sul P2P compare «I suoi ordini P2P»: le card dei suoi ordini aperti, come nella fila della home. Un ordine scaduto o preso sparisce da solo. Il primo è JJ, che porta su Barattolo gli scambi in contanti del suo gruppo Telegram.
+dove: Il negozio di un venditore, sopra «In vetrina in questo negozio».
+leva: nessuna
+pubblico: sì
+
+## 2026-11-26 · estrazioni
+frase: Puoi mettere in palio un tuo annuncio con «🎁 Apri un'estrazione»: partecipa chi apre un link nuovo dedicato, oppure chi si iscrive col tuo link d'invito. Ognuno riceve un numero, e alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza: nessuno lo può truccare. Partecipano solo account Telegram.
+dove: La scheda di un tuo annuncio → «🎁 Apri un'estrazione»; in vetrina l'annuncio porta il nastro «🎁 In palio».
+leva: nessuna
+pubblico: no
+
+## 2026-11-27 · intervallo-onchain
+frase: Anche gli ordini P2P on-chain possono avere un intervallo, «da 20 a 100 €», come quelli Lightning: chi pubblica a prezzo di mercato scrive due cifre, e chi prende sceglie quanto. Con un intervallo il tuo ordine viene preso molto più spesso.
+dove: P2P → + → «On-chain» → l'importo, secondo campo; nel libro la card «da … a …, scegli tu» → «Scegli» → «Quanto vuoi scambiare?».
+leva: P2P_ONCHAIN_INTERVALLO (accesa di serie)
+pubblico: sì

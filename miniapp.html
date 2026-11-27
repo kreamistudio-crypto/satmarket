@@ -1957,6 +1957,58 @@
     gap:4px;color:#FAF4E4;font-size:13px;font-weight:800}
   .sc-riserva .sc-emoji{font-size:30px;line-height:1}
   .scoprire-card img + .sc-riserva{display:none}
+  /* GLI EFFETTI DELLA CARD GRANDE (27 nov 2026, AndreAI, scelti dopo sei
+     prove in video): solo sulla card di una pagina che li dichiara (il
+     server manda `effetti`). Tre strati sopra il disegno, tutti CSS:
+     - il CODICE 0/1 che scende piano a sinistra, dentro una maschera
+       (`<slug>-codice.webp`) trasparente intorno alle scritte: le scritte
+       restano davanti e il codice passa «dietro» (Andrea: «le scritte del
+       titolo devono stare in primo piano rispetto al codice»);
+     - il RIFLESSO che attraversa la foto UNA volta, un secondo e mezzo
+       dopo l'apertura dell'app, mai in giro (Andrea: «non in loop»);
+     - la LINEA del bordo che parte dal basso, sale dal lato sinistro e
+       sfuma in una polvere leggera in alto MENTRE ancora gira (Andrea:
+       «più che si ferma sparisce mentre continua a muoversi»).
+     Riflesso, linea e polvere nascono solo al PRIMO disegno della card in
+     questa apertura (vedi effettiScoprireHTML); con gli effetti ridotti
+     la regola universale li ferma, e la linea, che ferma resterebbe
+     accesa, sparisce nel blocco in fondo. */
+  @property --sc-fx-giro{syntax:'<angle>';inherits:false;initial-value:215deg}
+  .sc-fx-codice{position:absolute;inset:0;overflow:hidden;pointer-events:none;
+    -webkit-mask-size:100% 100%;mask-size:100% 100%;
+    -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+  .sc-fx-codice b{position:absolute;top:-100%;color:#FF9A4A;
+    font:600 7px/8px ui-monospace,Menlo,Consolas,monospace;
+    animation:scFxCade linear infinite}
+  @keyframes scFxCade{from{transform:translateY(0)}to{transform:translateY(200%)}}
+  .sc-fx-riflesso{position:absolute;overflow:hidden;pointer-events:none;
+    mix-blend-mode:screen;
+    -webkit-mask-image:radial-gradient(60% 55% at 55% 45%,#000 40%,transparent 75%);
+    mask-image:radial-gradient(60% 55% at 55% 45%,#000 40%,transparent 75%)}
+  .sc-fx-riflesso::before{content:'';position:absolute;top:-30%;bottom:-30%;
+    width:35%;left:-60%;transform:skewX(-20deg);
+    background:linear-gradient(100deg,rgba(255,255,255,0) 0%,
+      rgba(255,255,255,.35) 48%,rgba(255,255,255,.6) 50%,
+      rgba(255,255,255,.35) 52%,rgba(255,255,255,0) 100%);
+    animation:scFxLampo 2.6s ease-in-out 1.5s 1 both}
+  @keyframes scFxLampo{from{left:-60%}to{left:130%}}
+  .sc-fx-linea{position:absolute;inset:0;border-radius:inherit;padding:2px;
+    pointer-events:none;
+    background:conic-gradient(from var(--sc-fx-giro),transparent 0deg,
+      transparent 250deg,#FF7A2F 320deg,#FFD29A 350deg,transparent 360deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+    animation:scFxEntra .6s ease-out 0s 1 both,scFxGiro 5s linear 0s 1 both,
+      scFxSvela 1.6s ease-in 2.2s 1 forwards}
+  @keyframes scFxGiro{from{--sc-fx-giro:215deg}to{--sc-fx-giro:465deg}}
+  @keyframes scFxEntra{from{opacity:0}to{opacity:1}}
+  @keyframes scFxSvela{from{opacity:1}to{opacity:0}}
+  .sc-fx-polvere{position:absolute;width:1.5px;height:1.5px;border-radius:50%;
+    background:#FFC58A;box-shadow:0 0 2px rgba(255,138,61,.6);opacity:0;
+    pointer-events:none;animation:scFxPolvere var(--d) ease-out var(--r) 1 both}
+  @keyframes scFxPolvere{0%{opacity:0;transform:translate(0,0) scale(1)}
+    15%{opacity:.55}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(.3)}}
   /* IL TITOLO LO SCRIVE L'APP, FERMO SOPRA IL DISEGNO CHE SI MUOVE
      (ago 2026, decisione di Andrea che ROVESCIA il testo-nel-disegno
      della nascita): e' un FRATELLO dell'img e mai un suo involucro —
@@ -2085,7 +2137,19 @@
        sezioni intorno */
     #scoprireSez{margin-bottom:-12px}
     #catSez{margin-top:-10px}
+    /* +10px PER LATO (26 nov 2026, Andrea dal telefono: «la card in alto
+       non è centrata rispetto al telefono»): le card hanno `margin:0
+       -10px`, e la PRIMA, a fila ferma all'inizio, stava 10px a sinistra
+       del centro — lo scatto non la poteva riportare, che sotto lo zero
+       non si scorre. Con una card sola (To The Mooon spenta) si vedeva
+       sempre; con due solo prima di toccare la fila.
+       ...MA SOLO CON UNA CARD SOLA (stessa sera, Andrea: «se c'è più di
+       una card, la prima lasciamela così, cioè tutta a sinistra. Così si
+       vede anche una porzione a destra […] centrata solamente quando c'è
+       solo una card»): con due o piu' la fila resta com'era, e la classe
+       `sc-sola` (renderScoprire) accende il +10px e la chiude simmetrica */
     #scoprireStrip{padding-left:calc((100vw - 240px) / 2);padding-right:calc((100vw - 114.7px) / 2)}
+    #scoprireStrip.sc-sola{padding-left:calc((100vw - 240px) / 2 + 10px);padding-right:calc((100vw - 240px) / 2 + 10px)}
     #scoprireStrip .scoprire-card{width:240px}
     #scoprireStrip .sc-titolo{left:12.4px;width:84.7px;font-size:15px}
     #scoprireStrip .sc-lancio{font-size:14.1px}
@@ -2114,6 +2178,8 @@
     #scoprireStrip{--sc-larga:min(345px, calc((100vw - 14px) / 1.1));
       padding-left:calc((100vw - var(--sc-larga)) / 2);
       padding-right:calc((100vw - var(--sc-larga) * .4778) / 2)}
+    #scoprireStrip.sc-sola{padding-left:calc((100vw - var(--sc-larga)) / 2 + 10px);
+      padding-right:calc((100vw - var(--sc-larga)) / 2 + 10px)}
     #scoprireStrip .scoprire-card{width:var(--sc-larga)}
     #scoprireStrip .sc-titolo{left:calc(var(--sc-larga) * .0516);width:calc(var(--sc-larga) * .3528);
       font-size:calc(var(--sc-larga) * .0627)}
@@ -2243,6 +2309,19 @@
     padding:3px 9px;font-size:11.5px;font-weight:800;
     display:flex;align-items:center;gap:5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
   .card.in-asta{outline:1.5px solid var(--asta);outline-offset:-1.5px}
+  /* LE ESTRAZIONI (26 nov 2026): il nastro della card e il riquadro
+     della scheda, coi colori dell'asta (anche lei e' una gara) */
+  .estrazione-box{margin-top:12px;padding:12px 14px;border-radius:14px;
+    border:1.5px solid var(--asta);background:var(--card);line-height:1.45;
+    font-size:14px}
+  .estrazione-box h4{margin:0 0 6px;font-size:15px}
+  .estrazione-box .mono{word-break:break-all}
+  .estrazione-box details{margin-top:8px;font-size:13px;color:var(--muted)}
+  .estrazione-box .btn{margin-top:10px}
+  .estr-modo{display:flex;gap:8px;margin:6px 0 10px}
+  .estr-modo button{flex:1;padding:10px;border-radius:12px;font-weight:800;
+    border:1.5px solid var(--line, #ccc);background:var(--card);color:inherit}
+  .estr-modo button.on{border-color:var(--asta);outline:1.5px solid var(--asta)}
   /* la targhetta prezzo di un'asta: quel numero e' la puntata in
      corso, non un prezzo — parla il blu FISSO del token tag (la
      carta del cartellino non cambia di notte) */
@@ -10470,6 +10549,41 @@
      respiro sotto lo porta gia' il padding del blocco */
   .altri-promo{margin:6px 0 0}
   .altri-griglia{padding-left:0;padding-right:0;padding-top:4px}
+  /* LE TENDINE DELLA SCHEDA (26 nov 2026, richiesta di Andrea): «Info
+     di spedizione», «Altri articoli del negozio» e, nel P2P, «Metodi
+     di pagamento accettati» sono <details> nativi, CHIUSI di serie, col
+     vestito del cassetto dell'internazionale (.sped-intl): un summary a
+     tutta larghezza con la freccina `.vt-fr` che ruota all'apertura.
+     Colori solo dalle variabili di casa, quindi chiaro e scuro vanno da
+     soli. Il summary NON e' flex (Safari ci ha litigato a lungo): il
+     flex sta nel div dentro, `.vt-sum`. `.vt-box` e' la versione
+     incorniciata; «Altri articoli» no, e' una sezione e tiene la sua
+     etichetta puntinata (.section-label). */
+  .vt-tendina>summary{cursor:pointer;list-style:none}
+  .vt-tendina>summary::-webkit-details-marker{display:none}
+  .vt-sum{display:flex;align-items:center;gap:8px;justify-content:space-between}
+  .vt-fr{font-style:normal;color:var(--muted);order:3;flex:none;line-height:1}
+  .vt-tendina[open]>summary .vt-fr{transform:rotate(180deg)}
+  .vt-box{margin:12px 0;border:1px solid var(--line);border-radius:12px;
+    padding:10px 12px;background:var(--card)}
+  /* `.vt-nuda`: la stessa tendina SENZA cornice, per dove sta gia'
+     dentro una carta (la sezione dei metodi del P2P, .p2p-sez) */
+  .vt-box>summary,.vt-nuda>summary{font-size:13px;font-weight:800;color:var(--ink)}
+  .vt-box>summary .vt-conta,.vt-nuda>summary .vt-conta{font-weight:700;color:var(--sats-deep);margin-left:6px}
+  .vt-box[open]>summary,.vt-nuda[open]>summary{margin-bottom:8px}
+  .p2p-metodi-letto{margin-top:4px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .vt-corpo-altri{padding-bottom:4px}
+  .altri-tutto{margin:12px 0 4px}
+  /* le righe di «Info di spedizione»: una per strada, col DOVE e il
+     QUANTO sotto il nome della strada */
+  .isp-righe{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+  .isp-righe li{font-size:13px;line-height:1.45;color:var(--ink-soft);font-weight:600}
+  .isp-t{font-weight:800;color:var(--ink)}
+  .isp-t .ico-locker{vertical-align:-3px}
+  .isp-d{display:flex;justify-content:space-between;gap:10px}
+  .isp-d span:last-child{text-align:right;white-space:nowrap;color:var(--ink)}
+  .isp-d b{color:var(--ink)}
+  .isp-nota{font-size:12px;color:var(--muted);font-weight:600}
   /* (Il foglio del set — #setLista, .set-riga, .set-check — non esiste
      piu', e nemmeno la pagina del riepilogo che l'aveva sostituito: il
      carrello si paga nella CASSA, vedi il suo blocco CSS accanto a
@@ -11225,6 +11339,30 @@
      l'arancio si prenderebbe la riga e il link scenderebbe sotto. */
   .rac-acquista{width:auto;padding:9px 18px;font-size:14px;
     margin:0}
+  /* il bottone della foto in alto (entraInAlto): una riga sua, sotto
+     Acquista, pieno e luminoso in DUE colori presi dalle copertine dei
+     corsi, viola e blu (tre erano troppi), con l'alone intorno e il
+     riflesso fermo in alto. Niente luccichio che passa: provato e
+     tolto (Andrea, 26 nov: «il colore va bene», l'effetto no) */
+  .btn.rac-entra{flex-basis:100%;margin:0;text-align:center;text-decoration:none;
+    /* ROSSO MATTONE (26 nov 2026 sera, Andrea): prima viola-blu, poi i
+       colori di «Promuovi» («ci stava bene col marrone»), ma accanto ad
+       «Acquista» si confondeva («troppo simile») — e la scelta e' la 3 */
+    background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(100deg,#D2381F 0%,#8E1C10 100%),#8E1C10;
+    background-origin:border-box;border:1px solid rgba(255,255,255,.22);
+    color:#FFFFFF;text-shadow:0 1px 2px rgba(60,8,0,.6);font-weight:800;letter-spacing:.3px;
+    box-shadow:0 6px 18px -6px rgba(160,30,15,.7)}
+  /* nella scheda dell'annuncio sta in cima, fra la foto e il titolo */
+  .entra-scheda{display:flex;margin:0 0 14px}
+  /* ...e sotto la foto la scritta diventa lo stesso bottone pieno */
+  .rac-video .rac-video-eti.rac-bottone{width:max-content;max-width:100%;
+    margin:14px auto 0;padding:12px 24px;border-radius:14px;
+    background:radial-gradient(120% 140% at 0% 0%,rgba(255,255,255,.14) 0%,rgba(255,255,255,0) 55%),
+      linear-gradient(100deg,#D2381F 0%,#8E1C10 100%),#8E1C10;
+    background-origin:border-box;border:1px solid rgba(255,255,255,.22);
+    color:#FFFFFF;text-shadow:0 1px 2px rgba(60,8,0,.6);font-size:16px;font-weight:800;letter-spacing:.3px;
+    box-shadow:0 6px 18px -6px rgba(160,30,15,.7)}
   /* IL CASSETTO: chiuso non occupa un pixel, e non e' una max-height
      da indovinare — `display:none` e basta. Qui dentro non c'e'
      niente che debba transizionare: la storia si legge, non si
@@ -14533,6 +14671,9 @@
   html.fx-ridotti.p2p-sfocata #app > nav{filter:none}
   html.fx-ridotti .btn.orange.in-evidenza{
     box-shadow:var(--b-sh),0 0 0 4px rgba(247,147,26,.35)}
+  /* 4) la linea del bordo della card grande (27 nov 2026): ferma
+        resterebbe accesa in fondo alla card, quindi non c'e' */
+  html.fx-ridotti .sc-fx-linea{display:none}
 
   /* ---------- L'ARRIVO SECCO (23 set 2026) ----------
      Quando Chrome ha gia' fatto vedere la pagina d'arrivo con la sua
@@ -15684,8 +15825,9 @@ document.getElementById('cartello')?.remove();</script>
        sale a filo dello schermo, da hero immersiva -->
   <div class="view" id="view-dettaglio">
     <div id="detailContent"></div>
-    <!-- La sentinella dello scroll infinito di «Altri oggetti del
-         venditore». Sta FUORI da #detailContent apposta: openDetail ne
+    <!-- La sentinella che fu dello scroll infinito di «Altri articoli
+         del negozio» (dal 26 nov 2026 e' una tendina da 10 articoli e
+         la sentinella tace da sola: nessun cursore da chiedere). Sta FUORI da #detailContent apposta: openDetail ne
          riscrive l'innerHTML a ogni apertura, e una sentinella li'
          dentro morirebbe a ogni giro portandosi via il suo
          osservatore. Qui e' armata una volta per sempre, e una vista
@@ -15712,6 +15854,14 @@ document.getElementById('cartello')?.remove();</script>
          schermata. Le porte verso «Il pagamento protetto» scendono a
          DUE — la riga di Esplora (che e' anche la tappa del tour) e il
          bottone in fondo al Profilo — e nessuna delle due era questa. -->
+    <!-- GLI ORDINI P2P DEL NEGOZIO (26 nov 2026, cantiere jj-p2p): una
+         fila come quella di Esplora, con i soli ordini aperti di chi
+         vende qui. Nasce nascosta e la accende `negozioOrdiniP2P` solo
+         se trova almeno una card: un ordine scaduto o preso non c'e'. -->
+    <div id="negozioP2P" class="negozio-p2p" style="display:none">
+      <div class="section-label">I suoi ordini P2P</div>
+      <div class="p2p-vt-fila" id="negozioP2PFila"></div>
+    </div>
     <div class="section-label" id="negozioVetrinaTit">In vetrina in questo negozio</div>
     <!-- LE DUE PROMESSE DEL NEGOZIO stanno QUI dall'ago 2026
          (decisione di Andrea): erano in testata, sopra il nome del
@@ -19292,6 +19442,23 @@ document.getElementById('cartello')?.remove();</script>
        del venditore, poi quella di Barattolo — col QR, «Apri nel wallet»
        e «L'ho pagata». Col wallet collegato le due partono da sole.
        Chiude con navIndietro(), il patto del motore di navigazione. -->
+  <!-- ============ SHEET «PRIMA ENTRA NELLA COMUNITA'» (27 nov 2026) ============
+       Prima della pagina d'acquisto, sugli annunci di un negozio che ha
+       il bottone «Entra» (`l.entra`): lo apre apriAcquisto, la
+       riempie apriComunitaPrimaDiComprare. -->
+  <div class="sheet" id="comunitaSheet" role="dialog" aria-modal="true"
+       aria-labelledby="comunitaTitolo">
+    <div class="grab"></div>
+    <div class="sheet-testa">
+      <h3 id="comunitaTitolo">Prima di comprare</h3>
+      <button type="button" class="pacco-x" onclick="navIndietro()"
+              title="Chiudi" aria-label="Chiudi">✕</button>
+    </div>
+    <div class="hint" style="margin:0 0 14px">Entra nella comunità del negozio su Telegram, poi torna qui e completa l'acquisto.</div>
+    <div class="entra-scheda" id="comunitaEntra"></div>
+    <button type="button" class="btn orange" onclick="continuaDopoComunita()">Continua all'acquisto</button>
+  </div>
+
   <div class="sheet" id="manciaSheet" role="dialog" aria-modal="true"
        aria-labelledby="manciaTitolo">
     <div class="grab"></div>
@@ -19591,6 +19758,28 @@ document.getElementById('cartello')?.remove();</script>
     <div id="scortaNota" style="font-size:12.5px;font-weight:700;margin-top:8px;min-height:18px"></div>
     <button class="btn orange" id="scortaInvia" style="margin-top:12px" onclick="aggiungiScorta(this)">🔑 Aggiungi i codici</button>
     <button class="btn ghost" id="scortaTogli" style="margin-top:8px" hidden onclick="togliScorta(this)">Togli i codici non consegnati</button>
+  </div>
+  <!-- ============ SHEET: APRI UN'ESTRAZIONE (26 nov 2026) ============
+       Chi partecipa (i propri invitati o un link nuovo), quanti giorni,
+       e una riga di regolamento. Lo apre apriEstrazione(). -->
+  <div class="sheet" id="estrazioneSheet">
+    <div class="grab"></div>
+    <h3>🎁 Apri un'estrazione</h3>
+    <div class="hint" style="margin-bottom:8px">Metti in palio questo annuncio: finché l'estrazione è aperta non si compra. Alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza, e nessuno può truccarlo. Partecipano solo account Telegram.</div>
+    <b style="font-size:13.5px">Chi partecipa</b>
+    <div class="estr-modo" id="estrModo">
+      <button type="button" data-modo="link" class="on" onclick="estrScegliModo('link')">🔗 Link nuovo</button>
+      <button type="button" data-modo="inviti" onclick="estrScegliModo('inviti')">🎟 I miei invitati</button>
+    </div>
+    <div id="estrModoNota" style="font-size:13px;color:var(--muted);font-weight:600;margin-bottom:10px"></div>
+    <div class="qta-riga"><span class="qta-lab">Quanti giorni dura</span></div>
+    <div class="field" style="display:flex;gap:10px;align-items:center">
+      <input id="estrGiorni" type="text" inputmode="numeric" autocomplete="off" value="30" style="flex:1">
+      <span style="font-weight:800;color:var(--muted)">giorni</span>
+    </div>
+    <div class="field"><textarea id="estrRegole" rows="3" maxlength="600" placeholder="Regolamento (facoltativo): per esempio «spedizione in Italia a mio carico»"></textarea></div>
+    <button class="btn orange" style="margin-top:12px" onclick="inviaEstrazione(this)">🎁 Apri l'estrazione</button>
+    <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
   <div class="sheet" id="rifornisciSheet">
     <div class="grab"></div>
@@ -20736,6 +20925,19 @@ const guscioVetrina = new Promise(sciogli => { vetrinaDisegnata = sciogli; });
 let arrivoP2PFatto = () => {};
 const guscioArrivoP2P = /^\/p2p\/?$/.test(location.pathname)
   ? new Promise(sciogli => { arrivoP2PFatto = sciogli; }) : Promise.resolve();
+/* ...E L'ANNUNCIO DEL LINK, uguale (26 nov 2026, Andrea dal telefono, il
+   «🛒 Acquista» del post nel canale: «per un attimo si vede la home e poi
+   si va nella card»). `annuncio_<id>` diventa `/annuncio/<id>` piu' in
+   alto (`arrivoDaStartapp`), e `apriAnnuncioDaUrl` gira dopo la vetrina
+   disegnata, chiedendo l'annuncio al server se non e' fra le pagine
+   caricate: in mezzo, a velo sceso, c'era la home. Il velo aspetta anche
+   lui; lo scioglie `apriAnnuncioDaUrl` a dettaglio aperto (o col toast
+   «non c'e' piu'»), e `spegniLinkDaUrl` sulla ricarica. Le reti sono le
+   stesse del P2P: il tetto dei due secondi alza il velo comunque. */
+let arrivoAnnuncioFatto = () => {};
+const guscioArrivoAnnuncio = /^\/annuncio\/\d+/.test(location.pathname)
+  ? new Promise(sciogli => { arrivoAnnuncioFatto = sciogli; }) : Promise.resolve();
+const guscioArrivo = Promise.all([guscioArrivoP2P, guscioArrivoAnnuncio]);
 let guscioVia = false;
 /* IL GUSCIO E' IN VISTA? (set 2026) Lo chiede `applicaTema`, che
    finche' c'e' il guscio lascia la barra di stato del suo arancio (il
@@ -21705,6 +21907,12 @@ function mapListing(a){
     /* la spunta «non spedisco nel mio paese» (18 set 2026): l'unica
        cosa che chiude la strada di casa — vedi zonaOfferta */
     noSpedCasa:!!a.non_spedisce_casa,
+    /* le reti di locker/punti a cui il venditore consegna davvero (26 nov
+       2026): le giudica il SERVER (`reti_punto`, il giudice della cassa)
+       e qui si mostrano soltanto. Assente = server di ieri = nessuna
+       riga «punto» nella tendina «Info di spedizione». */
+    retiPunto:Array.isArray(a.venditore_reti_punto)
+      ? a.venditore_reti_punto.filter(x => typeof x === 'string' && x) : [],
     zoneSped:(()=>{ try {
         const m = JSON.parse(a.spedizione_zone||'{}');
         return (m && typeof m === 'object') ? m : {};
@@ -21736,6 +21944,9 @@ function mapListing(a){
        scaffale degli esauriti in fondo al negozio: la vetrina serve
        comunque solo gli attivi */
     stato:a.stato||'attivo',
+    /* IN PALIO (26 nov 2026, cantiere estrazioni): c'e' un'estrazione
+       viva — nastro 🎁 sulla card e niente «Acquista» nella scheda */
+    inPalio:!!a.in_palio,
     /* i pezzi disponibili (cantiere stock): 1 per gli annunci di ieri */
     quantita:a.quantita||1,
     /* «ne resta uno e ne ha avuti piu' d'uno»: il flag arriva GIA'
@@ -21850,6 +22061,13 @@ function mapListing(a){
        conosce il server: la modifica li rimanda per dire «questa resta,
        qui» (vedi salvaModifica). */
     didascalie:(Array.isArray(a.didascalie) && a.didascalie) || [],
+    /* il bottone della pagina del negozio anche qui (26 nov 2026,
+       vedi entraScheda): {link, testo} dal server, o null */
+    entra:(a.venditore_entra && typeof a.venditore_entra === 'object'
+           && typeof a.venditore_entra.link === 'string'
+           && typeof a.venditore_entra.testo === 'string')
+          ? {link: a.venditore_entra.link, testo: a.venditore_entra.testo,
+             slug: typeof a.venditore_entra.slug === 'string' ? a.venditore_entra.slug : ''} : null,
     fotoNomi};
 }
 function mapOrder(o){
@@ -27620,6 +27838,59 @@ const OCCASIONI = [
      in un indirizzo e in un attributo.
      L'ID PORTA LO SLUG (`sponsor-<slug>`): due card sponsor devono potersi
      distinguere al tocco e nella firma della fila. */
+/* GLI EFFETTI DELLA CARD GRANDE (27 nov 2026, AndreAI): la busta del
+   server, `{riflesso: [sinistra, alto, larghezza, altezza]}` in
+   percentuali intere; qualunque altra forma vale «niente effetti» */
+function effettiValidi(e){
+  const z = e && Array.isArray(e.riflesso) ? e.riflesso : null;
+  return z && z.length === 4 && z.every(n => Number.isInteger(n) && n >= 0 && n <= 100)
+    ? {riflesso: z.slice()} : null;
+}
+/* ...e il loro markup. Il codice c'e' sempre; riflesso, linea e polvere
+   solo al PRIMO disegno della card in questa apertura dell'app: la fila
+   si ridisegna quando cambia (una busta nuova, il barattolo), e il
+   riflesso ripartirebbe da capo (Andrea: «solo la prima volta che apri
+   l'app»). La linea vuole @property per girare: dove manca (Safari
+   prima della 16.4) non nasce, invece di restare ferma in basso.
+   Le posizioni si scrivono in percentuali: la card cambia larghezza col
+   telefono, il rapporto 272/130 no. */
+const scoprireFxVisti = new Set();
+function effettiScoprireHTML(v){
+  const z = v.effetti && v.effetti.riflesso;
+  if (!z || !/^[a-z0-9-]{2,40}$/.test(v.slug || '')) return '';
+  const caso = (a, b) => a + Math.random() * (b - a);
+  let colonne = '';
+  for (let i = 0; i < 17; i++){
+    const cifre = Array.from({length: 40}, () => Math.random() < .5 ? '0' : '1');
+    colonne += `<b style="left:${(1.5 + i * 3.6).toFixed(1)}%;animation-duration:${caso(16, 26).toFixed(1)}s;`
+      + `animation-delay:-${caso(0, 26).toFixed(1)}s;opacity:${caso(.10, .28).toFixed(2)}">${cifre.join('<br>')}</b>`;
+  }
+  const maschera = `url('/assets/scoprire/${v.slug}-codice.webp')`;
+  let fx = `<span class="sc-fx-codice" aria-hidden="true" style="-webkit-mask-image:${maschera};mask-image:${maschera}">${colonne}</span>`;
+  if (scoprireFxVisti.has(v.id)) return fx;
+  scoprireFxVisti.add(v.id);
+  fx += `<span class="sc-fx-riflesso" aria-hidden="true" style="left:${z[0]}%;top:${z[1]}%;width:${z[2]}%;height:${z[3]}%"></span>`;
+  if (!(window.CSS && CSS.registerProperty)) return fx;
+  fx += '<span class="sc-fx-linea" aria-hidden="true"></span>';
+  /* la polvere: dove passa la linea mentre sfuma (da 2,2 a 3,8 secondi,
+     50 gradi al secondo dai 215 del fondo, un po' a sinistra del centro:
+     27 nov 2026 mattina, Andrea: «un po' più a sinistra e più veloce»),
+     un granello per istante */
+  const W = 272, H = 130;
+  for (let n = 0; n < 55; n++){
+    const t = caso(2.2, 3.8), testa = 215 + 50 * t;
+    const ang = (testa - 110 * Math.pow(Math.random(), 1.6)) * Math.PI / 180;
+    const dx = Math.sin(ang), dy = -Math.cos(ang);
+    const k = Math.min((W / 2) / Math.max(Math.abs(dx), 1e-6), (H / 2) / Math.max(Math.abs(dy), 1e-6));
+    const x = W / 2 + dx * k, y = H / 2 + dy * k;
+    const vx = (x < W / 2 ? 1 : -1) * caso(2, 7) + caso(-2, 4);
+    const vy = (y < H / 2 ? 1 : -1) * caso(2, 6) - caso(3, 9);
+    fx += `<i class="sc-fx-polvere" aria-hidden="true" style="left:${(Math.min(Math.max(x, 1), W - 2) / W * 100).toFixed(1)}%;`
+      + `top:${(Math.min(Math.max(y, 1), H - 2) / H * 100).toFixed(1)}%;--x:${vx.toFixed(1)}px;--y:${vy.toFixed(1)}px;`
+      + `--d:${caso(1.6, 2.8).toFixed(2)}s;--r:${t.toFixed(2)}s"></i>`;
+  }
+  return fx;
+}
 function vociSponsor(){
   /* la foto del quadrato: un numero da 1 a 9 (una foto della storia) o
      'logo' (il ritratto della card «Consigliati»), e nient'altro */
@@ -27642,6 +27913,14 @@ function vociSponsor(){
          dei quadratini di AndreAI e To The Moon) */
       quadro: quadroSponsor(slug, casa && casa.quadro != null ? casa.quadro : s.quadro),
       testo: String((casa ? casa.titolo : s.titolo) || ''),
+      /* gli effetti della card (27 nov 2026): solo per le pagine del
+         server che li dichiarano, con la zona del riflesso in forma */
+      effetti: casa ? null : effettiValidi(s.effetti),
+      /* (il bottone «Entra» sulla card grande e' stato TOLTO, 26 nov
+         2026 a tarda sera, AndreAI: «alla fine non mi piace lì», dopo
+         averlo provato a destra e poi in fondo a sinistra. Il server
+         manda ancora il suo «entra»: qui non si legge; il bottone resta
+         sulla pagina e nelle schede dei corsi) */
       vivo: () => !!negozio, accesa: () => false,
       /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
       tocca: () => apriNegozioDaScoprire(negozio, true, 'sponsor:' + slug)});
@@ -27837,9 +28116,12 @@ function renderScoprire(){
       <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
+      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}${effettiScoprireHTML(v)}
     </div>`;
   }).join('');
+  /* una card sola sta al centro; con due o piu' la prima resta a
+     sinistra e si vede un pezzo della seconda (26 nov 2026, Andrea) */
+  el('scoprireStrip').classList.toggle('sc-sola', vive.length === 1);
   aggiornaFrecce('scoprireStrip');
   armaScorriScoprire();
 }
@@ -29748,6 +30030,8 @@ const cardHTML = l => {
     : asta
     ? `<div class="card-asta">🔨 ${astaViva(l) ? astaResta(l.astaFine)
                                                : 'conclusa'}</div>`
+    /* l'estrazione (26 nov 2026): come l'asta, una cosa che ACCADE */
+    : l.inPalio ? `<div class="card-asta card-palio">🎁 In palio</div>`
     : lampo ? `<div class="card-lampo">⚡ −${l.lampoPct}%</div>`
     /* il badge dello sconto: la forma della lampo SENZA il fulmine
        (decisione di Andrea) — ⚡ vuol dire «a tempo», e questo non
@@ -30346,8 +30630,10 @@ function negozioInAttesa(chi){
   negozioBozzaMod = false;
   el('negozioHeader').innerHTML = '<div class="negozio-attesa" role="status"'
     + ' aria-label="Carico il negozio"><span class="attesa-anello"></span></div>';
-  ['negozioFeedback', 'negozioPromesse', 'negozioGrid', 'negozioEsauriti']
+  ['negozioFeedback', 'negozioPromesse', 'negozioGrid', 'negozioEsauriti', 'negozioP2PFila']
     .forEach(id => { const n = el(id); if (n) n.innerHTML = ''; });
+  const p2p = el('negozioP2P');
+  if (p2p) p2p.style.display = 'none';
   const tit = el('negozioVetrinaTit');
   if (tit) tit.style.display = 'none';
 }
@@ -30419,8 +30705,10 @@ function apriNegozioDaScoprire(chi, aperto, da){
    la testata resta spenta. `negozioInVolo` tiene la testata per il giro
    sincrono della chiamata, come nel volo (vedi apriNegozio). */
 function conTestata(chi, id, apri){
+  /* ...e anche col banner (26 nov 2026 sera, vedi IL NEGOZIO CHE HA GIA'
+     L'INSEGNA in voloNegozio): la card prende il suo posto */
   const pronto = negozioPronto(chi);
-  const img = id && pronto && !bannerNegozio(pronto.venditore)
+  const img = id && pronto
     ? document.querySelector(`#scoprireStrip .scoprire-card[data-id="${CSS.escape(id)}"] img`) : null;
   const src = img ? (img.currentSrc || img.src) : '';
   if (!src) return apri();
@@ -30495,7 +30783,15 @@ function preparaNegoziScoprire(codici){
    SUL BANNER — che resta com'era, col suo link e il dominio sotto. Il
    posto vero si misura quando la pagina c'e' (a VOLO_APRI_MS), e la copia
    ci scivola negli ultimi 160 ms; si toglie quando la foto del banner e'
-   pronta (al piu' 400 ms dopo), mai su un riquadro vuoto. */
+   pronta (al piu' 400 ms dopo), mai su un riquadro vuoto.
+   ...ROVESCIATO (26 nov 2026 sera, Andrea dal telefono sulla card di una pagina:
+   «va sopra all'altro banner e poi sparisce […] la card della home va a
+   sostituire il banner quando schiaccio lì dentro»): il banner di
+   quel negozio e' un'altra immagine, e la card che atterrava sopra e poi
+   spariva sembrava un errore. Ora dal volo la testata c'e' SEMPRE, e il
+   banner del negozio non si disegna (`renderNegozio`): la stessa foto due
+   volte non torna, perche' di foto in cima ce n'e' una sola. Il banner
+   resta per ogni altra strada nel negozio (il link, il nome del venditore). */
 let cardToccata = '', scopertaToccata = '', negozioInVolo = false;
 let negozioTestataDi = {chi: '', src: ''};
 function testataNegozio(chi){
@@ -30507,7 +30803,6 @@ function testataNegozio(chi){
     onerror="this.parentNode.hidden=true">` : '';
 }
 const VOLO_MS = 420, VOLO_APRI_MS = 260, VOLO_ATTESA_MS = 1500;
-let scartoInsegna = 48;
 function voloNegozio(card, chi, aperto, da){
   const img = card.querySelector('img');
   const src = img && (img.currentSrc || img.src);
@@ -30518,18 +30813,14 @@ function voloNegozio(card, chi, aperto, da){
   const vw = document.documentElement.clientWidth;
   /* una card fuori dallo schermo non vola: si vedrebbe partire dal nulla */
   if (r.right <= 0 || r.left >= vw || !r.width) return false;
-  const pronto = negozioPronto(chi);
-  const insegna = !!bannerNegozio(pronto && pronto.venditore);
   const pad = parseFloat(getComputedStyle(document.documentElement)
     .getPropertyValue('--pad')) || 16;
   /* l'arrivo: dove la testata stara' a pagina in cima — la cima delle
-     viste (sono sorelle) piu' il suo margine. Col banner si mira gia' al
-     suo posto (3:1, sotto «← Torna»): lo scarto e' quello misurato
-     all'ultimo volo, e la prima volta quello del telefono di prova */
-  const w = vw - 2 * pad, h = insegna ? w / 3 : w * 130 / 272;
+     viste (sono sorelle) piu' il suo margine */
+  const w = vw - 2 * pad, h = w * 130 / 272;
   const cima = casa.getBoundingClientRect().top + window.scrollY
     + (parseFloat(getComputedStyle(v).paddingTop) || 0);
-  const top = cima + (insegna ? scartoInsegna : 10);
+  const top = cima + 10;
   const nav = document.querySelector('nav');
   const velo = document.createElement('div');
   velo.className = 'negozio-velo';
@@ -30548,7 +30839,7 @@ function voloNegozio(card, chi, aperto, da){
     {duration: VOLO_MS, easing: curva, fill: 'forwards'});
   setTimeout(() => {
     /* il negozio si apre sotto la copia, che finisce la sua corsa */
-    negozioTestataDi = insegna ? {chi: '', src: ''} : {chi, src};
+    negozioTestataDi = {chi, src};
     negozioInVolo = true;
     let disegno;
     try { disegno = apriNegozio(chi, aperto, undefined, da); } finally { negozioInVolo = false; }
@@ -30581,12 +30872,11 @@ function voloNegozio(card, chi, aperto, da){
     velo.remove();
     card.style.visibility = '';
     const t = el('negozioTestata');
-    /* dove atterra: la testata, o il banner del negozio */
-    const meta = insegna ? v.querySelector('.negozio-banner') : t;
+    /* dove atterra: la testata */
+    const meta = t;
     const fine = meta && meta.getBoundingClientRect();
     if (meta) meta.style.visibility = 'hidden';
     if (fine && fine.width) {
-      if (insegna) scartoInsegna = fine.top - cima;
       const ora = vola.getBoundingClientRect();
       const ombra = getComputedStyle(vola).boxShadow;
       corsa.cancel();
@@ -30951,10 +31241,14 @@ function raccontoNegozio(v){
          scritta sotto viene dal catalogo, come ogni testo della pagina. */
       const video = linkVideoRacconto(x.link);
       if (!video) return guscio;
+      /* la foto col bottone (`bottone: true`) conta il tocco come il
+         bottone in alto (contaEntra), lo slug ripassa dalla sua forma */
+      const conta = x.bottone === true && /^[a-z0-9][a-z0-9-]{0,39}$/.test(r.slug || '')
+        ? `contaEntra('${r.slug}');` : '';
       return `<a class="rac-video" href="${video}" target="_blank" ` +
              `rel="noopener noreferrer" ` +
-             `onclick="return apriVideoRacconto(this.href)">${guscio}` +
-             (x.link_testo ? `<span class="rac-video-eti">${esc(x.link_testo)}</span>` : '') +
+             `onclick="${conta}return apriVideoRacconto(this.href)">${guscio}` +
+             (x.link_testo ? `<span class="rac-video-eti${x.bottone === true ? ' rac-bottone' : ''}">${esc(x.link_testo)}</span>` : '') +
              (x.link_sotto ? `<span class="rac-video-sotto">${esc(x.link_sotto)}</span>` : '') +
              `</a>`;
     }
@@ -31003,6 +31297,7 @@ function raccontoNegozio(v){
             raccontoAperto ? 'Chiudi' : 'Leggi la storia ›'}</button>
           <button class="btn orange rac-acquista"
                   onclick="acquistaDalRacconto()">Acquista</button>
+          ${entraInAlto(r)}
         </div>
       </div>
       <div class="rac-corpo${raccontoAperto ? ' aperto' : ''}">${
@@ -31013,6 +31308,86 @@ function raccontoNegozio(v){
         ${blocchi}
       </div>
     </div>`;
+}
+
+/* IL BOTTONE DELLA FOTO, ANCHE IN ALTO (26 nov 2026, AndreAI: «mettilo
+   anche sopra, vicino ad Acquista»): una foto del catalogo con
+   `bottone: true` mostra la sua scritta come un bottone vero, sotto la
+   foto e accanto ad Acquista. Il link passa dallo stesso giudice della
+   foto (linkVideoRacconto) e la scritta e' quella del catalogo: niente
+   link o niente scritta, niente bottone. */
+function entraInAlto(r){
+  const x = ((r && r.blocchi) || []).find(b => b && b.t === 'foto' && b.bottone === true);
+  return x ? bottoneEntra(x.link, x.link_testo, r.slug) : '';
+}
+/* lo stesso bottone, dal link e dalla scritta: lo usano la pagina
+   (entraInAlto) e la scheda degli annunci del negozio (entraScheda).
+   Con lo slug della pagina il tocco si CONTA (contaEntra), e il gruppo
+   si apre lo stesso, subito */
+function bottoneEntra(link0, testo, slug){
+  const link = linkVideoRacconto(link0);
+  if (!link || !testo || typeof testo !== 'string') return '';
+  const s = (typeof slug === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(slug)) ? slug : '';
+  return `<a class="btn rac-entra" href="${link}" target="_blank" ` +
+         `rel="noopener noreferrer" ` +
+         `onclick="${s ? `contaEntra('${s}');` : ''}return apriVideoRacconto(this.href)">${esc(testo)}</a>`;
+}
+/* IL CONTATORE DEI CLIC (26 nov 2026, AndreAI: «c'è un modo per sapere
+   in quanti cliccano?»): un colpo al server, senza aspettare e senza
+   dire chi (niente initData): il server conta per pagina e per giorno,
+   e i numeri escono in /admin, sezione Zap, e in /sponsor. Un errore
+   non si vede: il gruppo si apre comunque. */
+function contaEntra(slug){
+  /* ...e il telefono ricorda che e' entrato: il foglio «Prima di
+     comprare» di quel negozio non si riapre (27 nov 2026) */
+  try { localStorage.setItem(COMUNITA_CHIAVE + slug, '1'); } catch(_) {}
+  if (DEMO) return;
+  try { fetch(`${API_BASE}/entra/${encodeURIComponent(slug)}`,
+              {method: 'POST', keepalive: true}).catch(() => {}); } catch(e) {}
+}
+/* ...E NELLA SCHEDA DI OGNI ANNUNCIO DEL NEGOZIO (26 nov 2026, AndreAI:
+   «sì, fallo»): chi compra dalla card non passa dalla pagina, e nel
+   gruppo del negozio non entra da solo. `l.entra` lo manda il server
+   (`venditore_entra`, solo pagina pubblicata e solo sul negozio suo);
+   qui il link ripassa dal giudice di sempre. In cima, fra la foto e
+   il titolo, dove sta «Promuovi» (Andrea: «proprio sotto la foto prima
+   del titolo»). */
+function entraScheda(l){
+  const e = l && l.entra;
+  const b = e ? bottoneEntra(e.link, e.testo, e.slug) : '';
+  return b ? `<div class="entra-scheda">${b}</div>` : '';
+}
+/* PRIMA DI COMPRARE, LA COMUNITA' (27 nov 2026, AndreAI, dopo la regola
+   spiegata dal negozio: la percentuale sui corsi va a chi ha portato
+   la persona nel gruppo, e l'ingresso dal link deve venire PRIMA). Chi
+   tocca «Acquista» su un annuncio di un negozio col bottone «Entra»
+   trova prima questo foglio: «Entra» apre il gruppo col nostro link (e
+   conta il tocco, come gli altri bottoni), «Continua all'acquisto» porta
+   alla pagina d'acquisto. Chi ha gia' toccato «Entra» per quel negozio,
+   su questo telefono (qui, sulla pagina o nella scheda: lo segna
+   contaEntra), non lo rivede: il ricordo e' locale e muto (un telefono
+   che non tiene niente rivede il foglio, e basta). Senza uno slug in
+   forma il tocco non si conta e il foglio non nasce. Torna true se il
+   foglio si e' aperto. */
+let comunitaListing = null;
+const COMUNITA_CHIAVE = 'barattolo_comunita_';
+function apriComunitaPrimaDiComprare(l){
+  const e = l && l.entra;
+  if (!e || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(e.slug || '')) return false;
+  const b = bottoneEntra(e.link, e.testo, e.slug);
+  if (!b) return false;
+  try { if (localStorage.getItem(COMUNITA_CHIAVE + e.slug) === '1') return false; } catch(_) {}
+  comunitaListing = l;
+  el('comunitaEntra').innerHTML = b;
+  el('sheetBg').classList.add('open');
+  el('comunitaSheet').classList.add('open');
+  return true;
+}
+function continuaDopoComunita(){
+  const l = comunitaListing;
+  comunitaListing = null;
+  closeSheet();
+  if (l) apriAcquisto(l, true);
 }
 
 /* L'AVVISO DELL'ANTEPRIMA (set 2026): dice lo STATO, cosa manca e porta
@@ -31044,7 +31419,12 @@ function linkVideoRacconto(u){
   if (m) return `https://www.youtube.com/watch?v=${m[1]}`;
   const t = /^https:\/\/t\.me\/([A-Za-z][A-Za-z0-9_]{4,31})(\?start=[A-Za-z0-9_-]{1,64})?$/
     .exec(String(u || ''));
-  return t ? `https://t.me/${t[1]}${t[2] || ''}` : '';
+  if (t) return `https://t.me/${t[1]}${t[2] || ''}`;
+  /* E L'INVITO A UN GRUPPO (26 nov 2026, cantiere jj-p2p, Andrea per la
+     pagina di JJ: il link al suo gruppo privato). La forma e' quella di
+     `linkCanaleToccabile`: `+` e 8-64 caratteri, niente dopo */
+  const g = /^https:\/\/t\.me\/\+([A-Za-z0-9_-]{8,64})$/.exec(String(u || ''));
+  return g ? `https://t.me/+${g[1]}` : '';
 }
 /* dentro Telegram il link esce dalla Mini App col suo openLink (come i
    link dei banner), e quello di Telegram con openTelegramLink, che apre
@@ -31127,7 +31507,11 @@ function annuncioAbbonamentoNegozio(){
 function acquistaDalRacconto(){
   const abbo = annuncioAbbonamentoNegozio();
   if (abbo) { openDetail(abbo); return; }
-  const t = el('negozioVetrinaTit');
+  /* un negozio di soli scambi P2P (26 nov 2026, cantiere jj-p2p): si
+     scende ai suoi ordini, perche' la vetrina degli oggetti e' vuota */
+  const p2p = el('negozioP2P');
+  const t = p2p && p2p.style.display !== 'none'
+    && !document.querySelector('#negozioGrid .card') ? p2p : el('negozioVetrinaTit');
   if (t) t.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth',
                            block: 'start'});
 }
@@ -31467,8 +31851,11 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   const tondi = !segui ? ponti
     : ponti ? ponti.replace('<div class="tondi">', '<div class="tondi">' + segui)
     : `<div class="tondi">${segui}</div>`;
+  /* sotto la testata del volo il banner non si disegna: la card ne ha
+     preso il posto (26 nov 2026 sera, vedi voloNegozio) */
+  const testataSu = !!negozioTestataDi.src && negozioTestataDi.chi === v.negozio;
   el('negozioHeader').innerHTML = `
-    ${bannerNegozio(v)}
+    ${testataSu ? '' : bannerNegozio(v)}
     ${raccontoNegozio(v)}
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       ${voltoHTML({nome: v.nome, avatar: v.avatar, negozio: v.negozio,
@@ -31515,6 +31902,9 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       <div class="section-label" style="margin-top:16px">Esauriti di recente</div>
       <div class="grid" style="margin-top:12px">${fin.map(cardHTML).join('')}</div>`;
   }
+  /* gli ordini P2P di chi vende qui (26 nov 2026, cantiere jj-p2p):
+     arrivano dopo, dalla fotografia del libro */
+  negozioOrdiniP2P(v);
   armaViste();
   go('negozio');
 }
@@ -33179,6 +33569,80 @@ function spedBadge(l){
   return `<span class="pill${spedGratisOra(l) ? ' pill-trust' : ''}"
     data-sped>${testoSpedBadge(l)}</span>`;
 }
+/* «INFO DI SPEDIZIONE» (26 nov 2026, richiesta di Andrea): una TENDINA
+   nella scheda, chiusa di serie, subito dopo descrizione ed etichetta e
+   prima del riquadro del venditore. Una riga per STRADA, col DOVE e il
+   QUANTO — le pillole di sopra dicono solo che la strada c'e'.
+   ⚠️ A LUGLIO IL COSTO ERA STATO TOLTO DALLE PILLOLE («una cifra sciolta
+   si legge come un prezzo»), e quella decisione resta: qui lo rimette
+   Andrea di suo pugno, DENTRO una tendina e con l'etichetta di ogni
+   strada, che e' proprio quel che mancava alla cifra sciolta.
+   LE CIFRE NELLA VALUTA NATIVA DELLA TARIFFA (euro con la virgola se il
+   venditore l'ha scritta in euro, sats se in sats; 0 = «gratuita»): il
+   toggle €/₿ della scheda NON le segue — convertirle vorrebbe dire un
+   ridisegno a ogni `setValuta` e un «≈» dove la tariffa e' esatta, e
+   il conto vero lo dice comunque la cassa. Compromesso dichiarato.
+   SULL'ASTA NIENTE CIFRE: le strade sono incluse, e un prezzo vicino a
+   una puntata si leggerebbe come una seconda cifra da pagare.
+   Il PUNTO c'e' solo se il server dice che il venditore consegna a una
+   rete di punti (`retiPunto`, da `venditore_reti_punto`), e solo nel
+   paese di casa: stessa regola della cassa. La tariffa del punto e'
+   quella dichiarata (`spedPuntoDich`) o, come alla cassa, la stessa
+   della casa (la retrocompat di `_tariffa_dichiarata`). I punti
+   Barattolo oggi sono spenti: il server non li manda, ed e' giusto. */
+function cifraSpedInfo(tar){
+  if (tar.eur > 0) return `${fmtEur(tar.eur)} €`;
+  if (tar.sats > 0) return `${fmt(tar.sats)} sats`;
+  return '<b>gratuita</b>';
+}
+function righeInfoSpedizione(l){
+  const asta = astaE(l);
+  const prezzo = tar => asta ? 'inclusa' : cifraSpedInfo(tar);
+  const riga = (titolo, voci, nota) => `<li><div class="isp-t">${titolo}</div>`
+    + voci.map(v => `<div class="isp-d"><span>${v[0]}</span><span>${v[1]}</span></div>`).join('')
+    + (nota ? `<div class="isp-nota">${nota}</div>` : '') + '</li>';
+  const out = [];
+  const paeseDom = l.paeseDom || DOM_DEFAULT;
+  if (spedisce(l)) {
+    /* la strada a un indirizzo: la casa (salvo la spunta) e le zone
+       estere dichiarate, nell'ordine dei continenti di casa */
+    const voci = [];
+    if (zonaOfferta(l, 'dom'))
+      voci.push([esc(nomePaese(paeseDom) || paeseDom), prezzo(tariffaZona(l, 'dom'))]);
+    for (const z of ZONE_INTL)
+      if (zonaOfferta(l, z))
+        voci.push([esc(etichettaZona(z, paeseDom)), prezzo(tariffaZona(l, z))]);
+    const extra = (l.spedExtraEur > 0 || l.spedExtra > 0) && !asta
+      ? `+ ${cifraSpedInfo({sats: l.spedExtra, eur: l.spedExtraEur})} per ogni pezzo in più` : '';
+    if (voci.length) out.push(riga(nomeVia('casa'), voci, extra));
+    /* il locker / punto: solo se il venditore ci consegna davvero, e
+       solo a casa */
+    if (zonaOfferta(l, 'dom') && l.retiPunto && l.retiPunto.length) {
+      const tarPunto = l.spedPuntoDich
+        ? {sats: l.spedPunto, eur: l.spedPuntoEur} : tariffaZona(l, 'dom');
+      out.push(riga(nomeVia('punto'),
+        [[esc(nomePaese(paeseDom) || paeseDom), prezzo(tarPunto)]],
+        'Reti: ' + esc(l.retiPunto.join(', '))));
+    }
+  }
+  if (l.consegna === 'ritiro' || l.consegna === 'entrambe')
+    out.push(riga('🤝 Ritiro a mano',
+      [[l.comune ? luogoTesto(l) : 'In zona', asta ? 'incluso' : '<b>gratuito</b>']]));
+  /* la promessa del negozio, a fondo tendina: la stessa etichetta della
+     scheda e di «Altri articoli» (un testo solo, i due non divergono) */
+  const sg = (spedisce(l) && !asta)
+    ? regolaSpedGratis(l.spedGratisSats, l.spedGratisEur, l.spedGratisValuta) : null;
+  if (out.length && sg) out.push(`<li>${etichettaSpedGratis(sg)}</li>`);
+  return out;
+}
+function infoSpedizioneScheda(l){
+  if (!l || !(spedisce(l) || l.consegna === 'ritiro' || l.consegna === 'entrambe')) return '';
+  const righe = righeInfoSpedizione(l);
+  if (!righe.length) return '';
+  return `<details class="vt-tendina vt-box info-sped" id="infoSpedizione">
+    <summary><div class="vt-sum"><span>🚚 Info di spedizione</span><i class="vt-fr" aria-hidden="true">▾</i></div></summary>
+    <ul class="isp-righe">${righe.join('')}</ul></details>`;
+}
 /* SU QUESTO ACQUISTO LA SPEDIZIONE E' GRATIS? Il giudice del badge
    della scheda, e ne servono TRE cose insieme — il testo, il colore
    del guscio e il riallineamento a ogni ± dello stepper — quindi vive
@@ -34467,20 +34931,27 @@ function aggiornaBarraCompra(view){
    conosce gia' quegli id. Fail-open totale: senza nulla da mostrare
    (o con la rete storta) la sezione non nasce e il dettaglio resta
    quello di sempre.
-   DALL'AGO 2026 SI VEDE TUTTO IL NEGOZIO, a scorrimento continuo come
-   la vetrina: la prima pagina e' ALTRI_PAGINA, le altre le chiede la
-   sentinella #altriSentinella. Il tetto vero e' sempre stato il limit
-   della fetch — il vecchio `slice(0,8)` non ha mai morso, si
-   chiedevano sette card e se ne mostravano sei o sette, e la promessa
-   delle «quattro righe piene» del commento non e' mai arrivata —
-   quindi il tetto se n'e' andato insieme al limit.
+   DALL'AGO AL 26 NOV 2026 SI VEDEVA TUTTO IL NEGOZIO, a scorrimento
+   continuo come la vetrina (ALTRI_PAGINA a pagina, il resto lo chiedeva
+   la sentinella #altriSentinella). DAL 26 NOV 2026 E' UNA TENDINA,
+   «Altri articoli del negozio», chiusa di serie (richiesta di Andrea):
+   dentro AL MASSIMO ALTRI_PAGINA = 10 articoli — il tetto e' il limit
+   della fetch, come sempre — e in fondo «Vedi tutto il negozio ›» se
+   il negozio ne ha di piu'. Niente pagina 2: la sentinella resta
+   armata (e' una per sempre, vive fuori dal dettaglio) ma tace da
+   sola, perche' `altriPag.cursore` qui si azzera subito dopo aver
+   letto «c'e' altro?» — vedi sezioneAltriOggetti. `caricaAltriOggetti`
+   resta com'e', dormiente: la sua guardia `!altriPag.cursore` e' quella
+   che la tiene ferma, e toglierla vorrebbe dire toccare `osservaSentinella`.
+   (Il vecchio `slice(0,8)` non ha mai morso: si chiedevano sette card
+   e se ne mostravano sei o sette.)
    IL GIRO SERVE, ed e' la regola gia' pagata in vetrina: il dettaglio
    si svuota a ogni apertura, e le card di QUESTA sezione ne aprono un
    altro restando nella stessa vista — una pagina 2 del venditore di
    prima, arrivata in ritardo, si appiccicherebbe alla griglia del
    venditore nuovo. Il controllo d'identita' sull'annuncio non basta:
    lo stesso annuncio si puo' riaprire. */
-const ALTRI_PAGINA = 12;
+const ALTRI_PAGINA = 10;   // il tetto della tendina (26 nov 2026): prima era la pagina dello scroll infinito
 let altriPag = {id:null, chi:null, cursore:null, caricando:false};
 let altriGiro = 0;
 
@@ -34493,6 +34964,7 @@ async function sezioneAltriOggetti(l){
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
   if (mio) return;
   let altri = [];
+  let haAltri = false;      // il negozio ha altri articoli oltre ai primi ALTRI_PAGINA
   if (DEMO) {
     altri = listings.filter(x=>x.seller===l.seller && x.id!==l.id
                               && x.stato==='attivo');
@@ -34517,6 +34989,12 @@ async function sezioneAltriOggetti(l){
         && !(l.famiglia && x.famiglia===l.famiglia));
       altriPag.chi = chi;
       altriPag.cursore = d.cursore || null;
+      /* UNA PAGINA SOLA (26 nov 2026): il cursore serve a sapere se il
+         negozio ha ALTRO (→ «Vedi tutto il negozio ›»), poi si azzera
+         — la sentinella guarda altriPag.cursore e senza niente da
+         chiedere non fa piu' nulla */
+      haAltri = !!altriPag.cursore;
+      altriPag.cursore = null;
       inCatalogo(altri);
     } catch(e) { return; }
   }
@@ -34531,18 +35009,17 @@ async function sezioneAltriOggetti(l){
      della sezione e da li' si incolla in cima mentre si scorre — e'
      il CSS a farlo (.altri-azione), qui non serve nessun listener.
      Niente piu' vestito di cartone: e' il ghost di casa come tutti
-     gli altri secondari. Il tetto non c'e' piu': si vede tutto il
-     negozio, una pagina alla volta. */
+     gli altri secondari. (Dal 26 nov 2026 il tetto e' tornato, 10
+     articoli dentro la tendina, e il resto sta dietro «Vedi tutto il
+     negozio ›».) */
   /* Se il venditore ha SOLO articoli digitali il carrello non esiste
      per lui: i digitali si comprano singolarmente (la regola della
      griglia del carrello), e la sezione non deve portarci. IL
      GIUDIZIO E' SULLA PRIMA PAGINA — l piu' i primi ALTRI_PAGINA — e
-     NON si rifa' quando ne arrivano altre: rifarlo vorrebbe dire far
-     comparire il blocco appiccicato a meta' scorsa, che e' peggio del
-     caso che cura. IMPERFEZIONE DICHIARATA, e col tetto tolto ora si
-     puo' VEDERE invece di restare teorica: un venditore di soli
-     digitali col primo pezzo fisico oltre il dodicesimo tiene il
-     bottone nascosto anche quando quel pezzo compare scorrendo. Chi
+     dalla tendina (26 nov 2026) NON ne arrivano altre, quindi non si
+     rifa' mai. IMPERFEZIONE DICHIARATA: un venditore di soli
+     digitali col primo pezzo fisico oltre il decimo tiene il
+     bottone nascosto, e quel pezzo sta dietro «Vedi tutto». Chi
      compra quel pezzo trova comunque il carrello nel SUO dettaglio,
      dove il giudizio riparte da lui. */
   const tuttoDigitale = l.consegna==='digitale'
@@ -34597,12 +35074,24 @@ async function sezioneAltriOggetti(l){
      negozio — l'occhio impara UNA fila. */
   const badge = (sgOk ? `<span class="pill">${etichettaSpedGratis(sgOk)}</span>` : '')
               + (scOk.length ? `<span class="pill">${etichettaSconto(scOk)}</span>` : '');
+  /* LA TENDINA (26 nov 2026): <details> chiuso di serie, il titolo
+     resta l'etichetta puntinata di sempre (dentro il summary) col conto
+     accanto — «10+» se il negozio ne ha di piu' — e la freccina.
+     SUL DESKTOP LARGO (3 colonne, foto | dettagli | altri) la terza
+     colonna vuota col details chiuso sarebbe un buco: li' si APRE di
+     serie, con la stessa media query del CSS delle tre colonne (la via
+     piu' semplice: niente CSS nuovo, chi lo chiude lo chiude). */
+  const largo = document.documentElement.classList.contains('fuori-telegram')
+    && window.matchMedia('(min-width:1600px) and (hover:hover) and (pointer:fine)').matches;
   corpo.insertAdjacentHTML('beforeend', `
-    <div class="altri-sez">
-      <div class="section-label altri-tit">Altri oggetti del venditore</div>
+    <details class="altri-sez vt-tendina"${largo ? ' open' : ''}>
+      <summary><div class="section-label altri-tit"><span>Altri articoli del negozio</span><span class="conta">${altri.length}${haAltri ? '+' : ''}</span><i class="vt-fr" aria-hidden="true">▾</i></div></summary>
+      <div class="vt-corpo-altri">
       ${promoOk ? `<div class="altri-azione"><button class="btn ghost" onclick="apriPacco()">🛒 Aggiungi al carrello</button>${badge ? `<div class="pills altri-promo fila-promesse">${badge}</div>` : ''}</div>` : ''}
       <div class="grid altri-griglia">${altri.map(cardHTML).join('')}</div>
-    </div>`);
+      ${haAltri ? `<button class="btn ghost altri-tutto" onclick="apriNegozioDaAnnuncio()">Vedi tutto il negozio ›</button>` : ''}
+      </div>
+    </details>`);
   armaViste();
 }
 
@@ -35041,7 +35530,7 @@ function costiVieUguali(strade){
   return false;
 }
 
-function apriAcquisto(l){
+function apriAcquisto(l, dopoComunita){
   haptic();
   if (VETRINA) {
     invitoTelegram('Per comprare in sicurezza serve l\'app vera dentro '
@@ -35056,6 +35545,11 @@ function apriAcquisto(l){
     toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
     return;
   }
+  /* PRIMA LA COMUNITA' (27 nov 2026, AndreAI): sugli annunci di un
+     negozio col bottone «Entra», prima della pagina d'acquisto, il
+     foglio che invita a entrare nel suo gruppo col nostro link (vedi
+     apriComunitaPrimaDiComprare) */
+  if (!dopoComunita && apriComunitaPrimaDiComprare(l)) return;
   currentListing = l;
   /* `tipo` e' QUALE ACQUISTO E' ('mono' | 'set') e nient'altro; il
      tipo di PUNTO sta in `tipoPunto`, come nell'ordine (o.tipoPunto).
@@ -39107,6 +39601,7 @@ function openDetail(id){
            si compra) e solo a cassa aperta, che un bottone verso un muro
            e' peggio di nessun bottone. */''}${mio && !asta && !esa && promoAttive && !inFerie(l) && !DEMO && !VETRINA
         ? `<button class="btn promo-porta in-cima" onclick="apriPromuovi(${l.id})">${ICONA_PROMO.porta}Promuovi</button>` : ''}
+      ${entraScheda(l)}
       ${dataRiga(l)}
       <h2>${titoloConCondizione(l)}</h2>
       ${luogoRiga(l)}
@@ -39179,6 +39674,7 @@ function openDetail(id){
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
       ${etichettaScheda(l)}
+      ${infoSpedizioneScheda(l)}
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
         ${voltoHTML({nome: l.seller, avatar: l.avatar, negozio: l.negozio,
                      ignoto: true}, 'avatar', {tag: 'div'})}
@@ -39227,6 +39723,10 @@ function openDetail(id){
                 il doppione che la deduplica esiste per togliere. E'
                 la stessa guardia del rifornimento, un rigo piu' giu'. -->
            ${l.nostr ? '' : `<button class="btn ghost" onclick="duplicaAnnuncio(${l.id})">📄 Duplica questo annuncio</button>`}
+           ${/* L'ESTRAZIONE (26 nov 2026): un pezzo solo, attivo, nato
+                qui e non all'asta — le stesse guardie del server, che
+                resta il giudice */''}${(!l.nostr && !asta && !esa && !l.inPalio && !l.abbonamento && (l.quantita||1) <= 1 && !DEMO)
+             ? `<button class="btn ghost" onclick="apriEstrazione(${l.id})">🎁 Apri un'estrazione</button>` : ''}
            <!-- LA PORTA DELLO STOCK SULL'ANNUNCIO ATTIVO (ago 2026), ed
                 e' obbligatoria: le tre strade che aprivano il foglio
                 erano tutte gatate sull'esaurito, quindi senza questa
@@ -39280,6 +39780,8 @@ function openDetail(id){
            venduti — ma se un domani servisse un 'rimosso' al link
            condiviso, senza questa riga la scheda gli disegnerebbe il
            bottone. Due righe contro un buco silenzioso. */
+        : l.inPalio
+            ? `<div class="trust-note">🎁 <span><b>Questo oggetto è in palio.</b> Non si compra: si vince con l'estrazione qui sotto.</span></div>`
         : (l.stato||'attivo') !== 'attivo'
             ? `<div class="trust-note">🔒 <span>Questo annuncio non è più disponibile.</span></div>`
         : `<div class="escrow-zone">
@@ -39330,6 +39832,7 @@ function openDetail(id){
            proprietario, l'altro di chi modera l'altrui) — ma due
            bottoni che fanno la stessa cosa non possono avere due
            forme, o la seconda diventa quella che si dimentica. -->
+      <div id="estrazioneBox"></div>
       ${(!DEMO && isAdmin && !mio)
         ? `<button class="btn allarme" onclick="rimuoviModerazione(${l.id})">🛡 Rimuovi (moderazione)</button>` : ''}
     </div>`;
@@ -39337,6 +39840,8 @@ function openDetail(id){
   /* lo stato personale dell'asta arriva dopo, dal server: il recinto
      intanto esiste gia' col bottone generico */
   if (asta && !mio && !DEMO && !VETRINA) caricaAsta(l.id);
+  /* l'estrazione (26 nov 2026): il riquadro arriva dal server */
+  if (!DEMO) caricaEstrazione(l.id);
   /* La riga di onboarding appesa alla scheda dell'annuncio appena
      pubblicato: una volta sola, e solo su QUEL annuncio */
   if (hintPubblicazione) {
@@ -39553,9 +40058,11 @@ function scelteScheda(l){
    indietro riporta da dove si era arrivati, non attraverso ogni taglia
    provata. La sorella che non e' ancora in catalogo si chiede al
    server (e' un annuncio come un altro). */
+let giroVariante = 0;   // l'ultimo tocco vince (vedi LA SCHEDA RESTA DOV'E')
 async function scegliVariante(id){
   if (!currentListing || currentListing.id === id) return;
   haptic();
+  const giro = ++giroVariante;
   if (!listings.find(x => x.id === id)) {
     try {
       const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
@@ -39566,8 +40073,33 @@ async function scegliVariante(id){
       inCatalogo([m]);
     } catch(e) { toast('Rete assente: riprova fra poco'); return; }
   }
+  /* LA SCHEDA RESTA DOV'E' (27 nov 2026, Andrea dal telefono: «guarda
+     cosa succede quando seleziono colori e varianti»). openDetail passa
+     da go('dettaglio'), che riporta in cima come ogni ingresso nuovo:
+     a ogni colore la pagina tornava alla foto, e la foto stessa restava
+     vuota un istante (l'<img> nuova non era ancora scaricata). Ora i
+     bottoncini restano sotto il dito, alla stessa altezza di schermo, e
+     la prima foto della sorella si scarica PRIMA dello scambio — al piu'
+     mezzo secondo, poi si scambia comunque (fail-open). */
+  const prima = (listings.find(x => x.id === id)?.photos || [])[0];
+  if (prima) {
+    const img = new Image();
+    img.src = prima;
+    await Promise.race([img.decode().catch(() => {}),
+                        new Promise(r => setTimeout(r, 500))]);
+  }
+  /* nell'attesa (la rete, la foto) si puo' essere usciti dalla scheda,
+     o aver toccato un altro bottoncino: allora questo tocco non vale */
+  if (giro !== giroVariante || !currentListing
+      || document.querySelector('.view.active')?.id !== 'view-dettaglio') return;
+  const box = el('famigliaScelta');
+  const sottoIlDito = box ? box.getBoundingClientRect().top : null;
   navSostituisci = true;
   openDetail(id);
+  const dopo = el('famigliaScelta');
+  if (sottoIlDito !== null && dopo)
+    window.scrollTo(0, Math.max(0, Math.round(window.scrollY
+      + dopo.getBoundingClientRect().top - sottoIlDito)));
 }
 
 /* ---------------- lightbox: foto a tutto schermo con zoom ----------------
@@ -41383,6 +41915,10 @@ async function fatturaAnnullataAltrove(oid){
    chiave rimetterebbe «Telegram» davanti a chi su Telegram non ci
    puo' andare — meglio una frase piu' povera che una falsa. */
 const INVITO_ONION = {
+  /* l'estrazione (26 nov 2026): solo account del bot, che da Tor non
+     si raggiunge — il foglio lo dice invece di promettere una chiave */
+  estrazione:'Da qui, su Tor, alle estrazioni non si partecipa: si '
+         + 'entra dall\'app di Barattolo.',
   compra:  'Per comprare in sicurezza serve un account: i tuoi sats '
          + 'restano al sicuro fino alla consegna.',
   carrello:'Per riempire il carrello serve un account: i tuoi sats '
@@ -41521,6 +42057,7 @@ function closeSheet(){
   el('serieClassificaSheet').classList.remove('open');
   el('offertaSheet').classList.remove('open');
   el('manciaSheet').classList.remove('open');
+  el('comunitaSheet').classList.remove('open');
   /* le raccolte (17 nov 2026): i tre fogli, e i battiti che aspettano
      uno zap o un deposito non restano appesi a un foglio chiuso */
   el('raccNuovaSheet').classList.remove('open');
@@ -41570,6 +42107,7 @@ function closeSheet(){
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
+  el('estrazioneSheet').classList.remove('open');
   el('scortaSheet').classList.remove('open');
   el('spedStdSheet').classList.remove('open');
   el('mmSheet').classList.remove('open');
@@ -44837,9 +45375,22 @@ function cercoScade(sec){
   return g === 1 ? 'ancora 1 giorno' : 'scade oggi';
 }
 function cardRichiesta(r){
-  const budget = r.budget_eur
-    ? `<div class="cerco-budget">fino a <b class="mono">${fmtEur(Number(r.budget_eur))}</b> €</div>`
-    : r.budget_sats ? `<div class="cerco-budget">fino a <b class="mono">${fmt(r.budget_sats)}</b> sats</div>` : '';
+  /* IL BUDGET DETTO PER INTERO (26 nov 2026, Andrea: «la gente magari
+     non capisce… ti invio fino a 85 € circa X satoshi, sempre
+     aggiornati», poi la scritta sua: «Ti paga fino a 85 € · X sats»).
+     Accanto alla cifra, l'altra valuta al cambio di adesso (`eurPerSat`,
+     quello che il resto dell'app tiene aggiornato); senza cambio la
+     seconda meta' tace. Niente «fino a» (Andrea: «nessuno fara' mai
+     un'offerta piu' bassa di quella»). «Ti paga» e' per chi vende:
+     sulle proprie richieste resta la cifra sola. */
+  const cambio = typeof eurPerSat === 'number' && eurPerSat > 0 ? eurPerSat : 0;
+  const eur = Number(r.budget_eur) || 0, sats = Number(r.budget_sats) || 0;
+  const apre = r.mia ? '' : 'Ti paga ';
+  const budget = eur
+    ? `<div class="cerco-budget">${apre}<b class="mono">${fmtEur(eur)}</b> €${cambio
+        ? ` · circa <b class="mono">${fmt(Math.round(eur / cambio))}</b> sats` : ''}</div>`
+    : sats ? `<div class="cerco-budget">${apre}<b class="mono">${fmt(sats)}</b> sats${cambio
+        ? ` · circa <b class="mono">${fmtEur(sats * cambio)}</b> €` : ''}</div>` : '';
   const conto = r.offerte ? ` · 📬 ${r.offerte} ${r.offerte === 1 ? 'offerta' : 'offerte'}` : '';
   let piede;
   if (r.mia) {
@@ -44929,6 +45480,142 @@ function offriPerRichiesta(id){
     PICKER.sellCat.poi();
   }
   vestiOffertaRichiesta();
+  compilaOffertaRichiesta(r);
+}
+/* «OFFRI» GIA' COMPILATO (26 nov 2026, Andrea: «alcune opzioni si
+   dovrebbero compilare in automatico… deve essere facilitata la
+   cosa»). Dalla richiesta: il titolo e' quel che si cerca, il prezzo e'
+   il budget nella SUA valuta (85 € resta 85 €, i sats restano sats). Per
+   i buoni anche la consegna «Invio del codice online» e una foto di
+   serie disegnata qui (`fotoDiSerieBuono`): per un codice non c'e'
+   niente da fotografare. SOLO LE CASELLE VUOTE: chi aveva gia' scritto
+   qualcosa nel form non se lo vede ricoprire, e tutto resta da
+   ritoccare prima di «Pubblica». */
+const CATEGORIA_BUONI = 'Buoni ed esperienze';
+/* LA MEMORIA DI QUEL CHE HO MESSO IO (26 nov 2026, Andrea: «Offri» su
+   «Buono Amazon» dopo «Cerco Mac M1» teneva il titolo «Mac M1»). «Solo
+   le caselle vuote» non bastava: la casella piena l'avevo riempita io,
+   con la richiesta di prima. Qui il form ricorda cosa ci ha scritto, e
+   una casella che dice ancora quello si riscrive (o si svuota) per la
+   richiesta nuova; quel che ha toccato la persona resta suo. */
+let offertaPosata = {titolo: '', prezzo: '', foto: '', dig: false};
+async function compilaOffertaRichiesta(r){
+  const prima = offertaPosata;
+  offertaPosata = {titolo: '', prezzo: '', foto: '', dig: false};
+  const mia = (v, posato) => !String(v || '').trim() || (posato && v === posato);
+  const t = el('sellTitle');
+  if (t && mia(t.value, prima.titolo)){
+    t.value = titoloDaRichiesta(r.testo).slice(0, 120);
+    offertaPosata.titolo = t.value;
+  }
+  const p = el('sellPrice');
+  if (p && mia(p.value, prima.prezzo)){
+    p.value = '';
+    const eur = Number(r.budget_eur) || 0, sats = Number(r.budget_sats) || 0;
+    if (eur > 0 || sats > 0){
+      const v = eur > 0 ? 'eur' : 'sats';
+      if (sellValuta !== v && !astaAccesa()) impostaSellValuta(v);
+      if (sellValuta === v){
+        p.value = String(eur > 0 ? eur : sats);
+        offertaPosata.prezzo = p.value;
+      }
+    }
+    p.dispatchEvent(new Event('input'));
+  }
+  // la consegna e la foto della richiesta di prima, se nessuno le ha toccate
+  if (prima.dig && el('sellConsDig')?.checked && r.categoria !== CATEGORIA_BUONI){
+    el('sellConsDig').checked = false;
+    aggiornaConsegnaForm();
+  }
+  if (prima.foto && sellFoto.length === 1 && sellFoto[0] === prima.foto){
+    sellFoto = [];
+    renderFotoPreview();
+  }
+  if (r.categoria !== CATEGORIA_BUONI) return;
+  const consegne = ['sellConsSped', 'sellConsRitiro', 'sellConsDig'].map(el).filter(Boolean);
+  if (el('sellConsDig') && !consegne.some(c => c.checked)){
+    el('sellConsDig').checked = true;
+    aggiornaConsegnaForm();
+    offertaPosata.dig = true;
+  } else if (prima.dig && el('sellConsDig')?.checked) offertaPosata.dig = true;
+  if (sellFoto.length || (fotoAttuali && fotoAttuali.length)) return;
+  const foto = fotoDiSerieBuono(r.testo);
+  /* un telefono che non sa disegnare nella tela da' un JPEG piatto: meglio
+     niente foto (resta il riquadro «aggiungi») che un rettangolo nero */
+  if (!foto || await jpegVuoto(foto)) return;
+  if (!offertaRichiesta || offertaRichiesta.id !== r.id || sellFoto.length) return;
+  sellFoto.push(foto);
+  offertaPosata.foto = foto;
+  renderFotoPreview();
+}
+/* IL TITOLO E' L'OGGETTO, NON LA DOMANDA (26 nov 2026, Andrea: «cerco
+   Mac M1… dovrebbe rimanere il titolo, non la domanda»). Via il «Cerco»
+   in testa (e i suoi parenti: cercasi, cerchiamo, compro, vorrei, mi
+   serve), poi l'articolo che gli restava attaccato («un Mac» → «Mac»), e
+   la prima lettera maiuscola. Se togliendo non resta niente, il testo
+   com'era. */
+function titoloDaRichiesta(testo){
+  const t = String(testo || '').trim();
+  const via = t.replace(/^(cerco|cercasi|cerchiamo|compro|vorrei|mi serve|mi servono)\b[\s:,.\-–]*/i, '')
+               .replace(/^(un|una|uno|dei|delle|degli)\s+|^un['’]\s*/i, '').trim();
+  const fuori = via || t;
+  return fuori.charAt(0).toUpperCase() + fuori.slice(1);
+}
+/* LA FOTO DI SERIE DEL BUONO: una tessera arancione su fondo bruno, col
+   biglietto 🎟️ e le parole della richiesta. Niente marchi (un logo
+   Amazon non e' nostro da disegnare): il nome del buono lo dice il testo
+   di chi cerca. Un JPEG come quelli che escono da `ridimensiona`. */
+function fotoDiSerieBuono(testo){
+  try {
+    const W = 1200, H = 900;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    if (!g) return '';
+    const fondo = g.createRadialGradient(W / 2, H * 0.4, 80, W / 2, H / 2, W * 0.75);
+    fondo.addColorStop(0, '#4a3020'); fondo.addColorStop(1, '#1c120b');
+    g.fillStyle = fondo; g.fillRect(0, 0, W, H);
+    // la tessera
+    const x = 190, y = 170, w = W - 380, h = 470, rr = 38;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = 50; g.shadowOffsetY = 18;
+    const tess = g.createLinearGradient(x, y, x + w, y + h);
+    tess.addColorStop(0, '#ffb547'); tess.addColorStop(1, '#f7931a');
+    g.fillStyle = tess;
+    g.beginPath();
+    g.moveTo(x + rr, y); g.arcTo(x + w, y, x + w, y + h, rr); g.arcTo(x + w, y + h, x, y + h, rr);
+    g.arcTo(x, y + h, x, y, rr); g.arcTo(x, y, x + w, y, rr); g.closePath(); g.fill();
+    g.restore();
+    // i due tagli del biglietto, del colore del fondo
+    g.fillStyle = '#2b1c12';
+    for (const cx of [x, x + w]) { g.beginPath(); g.arc(cx, y + h / 2, 34, 0, Math.PI * 2); g.fill(); }
+    // la riga tratteggiata
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 5; g.setLineDash([18, 14]);
+    g.beginPath(); g.moveTo(x + 300, y + 40); g.lineTo(x + 300, y + h - 40); g.stroke();
+    g.setLineDash([]);
+    g.font = '170px system-ui, "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('🎟️', x + 150, y + h / 2 + 6);
+    // le parole, su piu' righe se servono, piu' piccole se sono tante
+    const parole = String(testo || '').trim().split(/\s+/).filter(Boolean);
+    const larg = w - 300 - 90, cx = x + 300 + (w - 300) / 2;
+    let corpo = 64, righe = [];
+    for (; corpo >= 34; corpo -= 4){
+      g.font = `800 ${corpo}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+      righe = []; let r = '';
+      for (const p of parole){
+        const prova = r ? r + ' ' + p : p;
+        if (g.measureText(prova).width > larg && r) { righe.push(r); r = p; } else r = prova;
+      }
+      if (r) righe.push(r);
+      if (righe.length * corpo * 1.18 <= h - 90 && righe.every(x => g.measureText(x).width <= larg)) break;
+    }
+    righe = righe.slice(0, 5);
+    g.fillStyle = '#2b1505';
+    const alto = righe.length * corpo * 1.18;
+    righe.forEach((riga, i) => g.fillText(riga, cx, y + h / 2 - alto / 2 + corpo * 0.59 + i * corpo * 1.18));
+    return c.toDataURL('image/jpeg', 0.9);
+  } catch (e) { return ''; }
 }
 function vestiOffertaRichiesta(){
   const n = el('cercoNotaVendi');
@@ -51361,7 +52048,7 @@ async function setCanale(canale){
    dove il browser non ha il push. Sull'iPhone fuori dalla Home una
    riga dice come fare (iOS da' il push solo al sito aggiunto alla
    Home, dal 16.4). La chiave pubblica del timbro arriva da /api/me. ---- */
-let myWebPush = {attivo: false};   // da /api/me: {attivo, chiave}
+let myWebPush = {attivo: false};   // da /api/me: {attivo, chiave, voluto}
 let pushTelefono = '';             // '' non so ancora · 'si' · 'no' · 'bloccate' · 'altro'
 const pushIOSFuoriHome = () => /iP(hone|ad|od)/.test(navigator.userAgent || '')
   && !navigator.standalone
@@ -51467,6 +52154,55 @@ async function pushDiQuestoConto(sub){
     return d.mio !== false;
   } catch(e) { return true; }
 }
+/* il service worker pronto, ma non per sempre: 8 secondi */
+function swPronto(){
+  return Promise.race([navigator.serviceWorker.ready,
+    new Promise((_, no) => setTimeout(() => no(new Error('service worker')), 8000))]);
+}
+/* iscrive QUESTO telefono per QUESTO account (senza iscrizione se ne fa
+   una col timbro di adesso): il gesto comune del tocco e del rientro */
+async function iscriviPushQui(reg, sub){
+  if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true,
+    applicationServerKey: b64uInByte(myWebPush.chiave)});
+  const j = sub.toJSON();
+  const r = await fetch(`${API_BASE}/push/iscrivi`,
+    {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+     body: JSON.stringify({endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth})});
+  const d = await r.json().catch(()=>({}));
+  return {r, d};
+}
+/* AL RIENTRO TORNANO DA SOLE (27 nov 2026, cantiere push-rientro; un
+   utente: «quando Barattolo mi richiede di accedere devo riattivarle
+   manualmente»). Il telefono che butta i dati del sito butta il login E
+   l'iscrizione; «Esci» toglie l'iscrizione ma non il ricordo. Se
+   l'account le aveva accese (`voluto`, da /api/me) e il permesso c'e'
+   ancora — il permesso si chiede SOLO da un tocco, e qui non si chiede
+   — le rifa' qui. Mai da un altro account: un'iscrizione che suona per
+   un altro account aperto qui resta sua (`libero`), passa solo col
+   tocco. Una volta per apertura, in silenzio se non riesce. */
+let pushRipresa = false;
+async function riprendiPushTelefono(){
+  if (pushRipresa || !myWebPush.voluto || !pushPossibile()) return;
+  if (Notification.permission !== 'granted') return;
+  pushRipresa = true;
+  try {
+    const reg = await swPronto();
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !stessaChiavePush(sub)) { try { await sub.unsubscribe(); } catch(e){} sub = null; }
+    if (sub) {
+      const s = await fetch(`${API_BASE}/push/stato`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+         body: JSON.stringify({endpoint: sub.endpoint})});
+      const st = s.ok ? await s.json().catch(()=>({})) : {};
+      if (st.mio !== false || st.libero !== true) return;
+    }
+    const {r} = await iscriviPushQui(reg, sub);
+    if (!r.ok) return;
+    pushTelefono = 'si';
+    ridisegnaRigaPush();
+    toast('📲 Notifiche attive su questo telefono');
+  } catch(e) {}
+}
 async function attivaPushTelefono(){
   haptic();
   const daAltro = pushTelefono === 'altro';
@@ -51481,17 +52217,10 @@ async function attivaPushTelefono(){
                               : 'Va bene, niente notifiche per ora');
       return;
     }
-    const reg = await Promise.race([navigator.serviceWorker.ready,
-      new Promise((_, no) => setTimeout(() => no(new Error('service worker')), 8000))]);
+    const reg = await swPronto();
     let sub = await reg.pushManager.getSubscription();
     if (sub && !stessaChiavePush(sub)) { try { await sub.unsubscribe(); } catch(e){} sub = null; }
-    if (!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true,
-      applicationServerKey: b64uInByte(myWebPush.chiave)});
-    const j = sub.toJSON();
-    const r = await fetch(`${API_BASE}/push/iscrivi`,
-      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth})});
-    const d = await r.json().catch(()=>({}));
+    const {r, d} = await iscriviPushQui(reg, sub);
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     pushTelefono = 'si';
     ridisegnaRigaPush();
@@ -51506,11 +52235,13 @@ async function spegniPushTelefono(){
   try {
     const sub = await subPushTelefono();
     if (sub) {
+      /* `spento`: le spegne LUI, e al rientro non tornano da sole */
       await fetch(`${API_BASE}/push/togli`,
         {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-         body: JSON.stringify({endpoint: sub.endpoint})}).catch(() => {});
+         body: JSON.stringify({endpoint: sub.endpoint, spento: true})}).catch(() => {});
       await sub.unsubscribe();
     }
+    myWebPush.voluto = false;
     pushTelefono = 'no';
     ridisegnaRigaPush();
     toast('Notifiche spente su questo telefono');
@@ -61236,6 +61967,198 @@ async function togliScorta(btn){
     nota.textContent = e.message || 'Rete assente: riprova';
   } finally { ripristina(); }
 }
+/* ══ LE ESTRAZIONI (26 nov 2026, cantiere estrazioni) ══════════════
+   Chi vende mette in palio il SUO annuncio («🎁 Apri un'estrazione»):
+   partecipano i suoi invitati della finestra o chi apre un link nuovo
+   e preme «Partecipo»; alla chiusura il primo blocco Bitcoin dopo la
+   scadenza sceglie il numero vincente. Il giudice e' il server (vedi
+   «LE ESTRAZIONI» in server.py): qui si disegna e si chiede.
+   IL CODICE DEL LINK si ricorda sul dispositivo, legato all'annuncio,
+   come quello d'invito: chi entra col widget di Telegram torna sulla
+   pagina senza la query, e il «Partecipo» deve esserci lo stesso. */
+const ESTRAZIONE_CHIAVE = 'barattolo_estrazione';
+(() => {
+  try {
+    const m = location.search.match(/[?&]estrazione=([A-Za-z0-9]{10})(?:&|$)/);
+    const a = location.pathname.match(/^\/annuncio\/(\d+)/);
+    if (m && a) localStorage.setItem(ESTRAZIONE_CHIAVE,
+      JSON.stringify({c: m[1].toUpperCase(), a: Number(a[1]), t: Date.now()}));
+  } catch(e){}
+})();
+function codiceEstrazionePer(id){
+  try {
+    const d = JSON.parse(localStorage.getItem(ESTRAZIONE_CHIAVE));
+    if (d && d.a === id && typeof d.c === 'string'
+        && Date.now() - (Number(d.t) || 0) < 60 * 86400000) return d.c;
+  } catch(e){}
+  return '';
+}
+let estrAnnuncio = 0, estrModo = 'link', estrCorrente = null;
+const ESTR_MODO_NOTA = {
+  link: 'Ti diamo un link solo per questa estrazione: partecipa chi lo apre e preme «Partecipo», già iscritto o nuovo. Chi è nuovo diventa anche tuo invitato.',
+  inviti: 'Partecipa chi si iscrive a Barattolo col tuo link d\'invito di sempre, da adesso alla chiusura. Gli iscritti di prima non contano.'
+};
+function estrScegliModo(m){
+  haptic();
+  estrModo = m === 'inviti' ? 'inviti' : 'link';
+  document.querySelectorAll('#estrModo button').forEach(b =>
+    b.classList.toggle('on', b.dataset.modo === estrModo));
+  el('estrModoNota').textContent = ESTR_MODO_NOTA[estrModo];
+}
+function apriEstrazione(id){
+  haptic();
+  if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  estrAnnuncio = id;
+  estrScegliModo('link');
+  el('estrGiorni').value = '30';
+  el('estrRegole').value = '';
+  el('sheetBg').classList.add('open');
+  el('estrazioneSheet').classList.add('open');
+}
+async function inviaEstrazione(btn){
+  haptic();
+  const giorni = parseInt(el('estrGiorni').value, 10);
+  if (!(giorni >= 1 && giorni <= 60)) { toast('La durata va da 1 a 60 giorni'); return; }
+  const ripristina = bottoneInAttesa(btn, '🎁 Apro…');
+  try {
+    const r = await fetch(`${API_BASE}/listings/${estrAnnuncio}/estrazione`, {
+      method:'POST', headers:{'X-Tg-Init-Data':authHdr(), 'Content-Type':'application/json'},
+      body: JSON.stringify({modo: estrModo, giorni, regolamento: el('estrRegole').value.trim()})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { ripristina(); toast(d.detail || 'Operazione non riuscita'); return; }
+    ripristina();
+    navIndietro();
+    for (const lista of [listings, myListings])
+      (lista || []).forEach(x => { if (x.id === estrAnnuncio) x.inPalio = true; });
+    toast('🎁 Estrazione aperta: condividi il link');
+    openDetail(estrAnnuncio);
+  } catch(e) { ripristina(); toast('Rete assente: riprova'); }
+}
+function estrQuando(t){
+  try {
+    return new Date(t * 1000).toLocaleString('it-IT',
+      {day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'});
+  } catch(e) { return ''; }
+}
+function estrContatto(c){
+  if (!c) return '';
+  return c.username
+    ? `<a href="${esc(c.link)}" target="_blank" rel="noopener">@${esc(c.username)}</a>`
+    : `<b>${esc(c.nome || 'senza nome')}</b> (non ha uno username Telegram: se non riuscite a trovarvi, scrivete all'assistenza)`;
+}
+function htmlEstrazione(e, id){
+  const n = e.partecipanti || 0;
+  const chi = `${n} partecipant${n === 1 ? 'e' : 'i'}`;
+  const regole = e.regolamento
+    ? `<div style="margin-top:6px"><b>Regolamento:</b> ${esc(e.regolamento)}</div>` : '';
+  const mio = e.mio
+    ? `<div style="margin-top:8px">✅ <b>Sei dentro:</b> numero <b>${e.mio.numero}</b> · biglietto <span class="mono">${esc(e.mio.biglietto)}</span></div>` : '';
+  const prova = e.biglietti ? `<details><summary>Come si controlla</summary>
+      <div style="margin-top:6px">La lista dei biglietti si è fermata alla chiusura, con questa impronta (sha256 delle righe «numero:biglietto», una per riga): <span class="mono">${esc(e.impronta)}</span>.
+      Il numero vincente è l'hash del blocco ${e.blocco_altezza} letto come numero, diviso per ${e.biglietti.length}: il resto più uno.</div>
+      <div class="mono" style="margin-top:6px;max-height:160px;overflow:auto">${e.biglietti.map(esc).join('<br>')}</div></details>` : '';
+  if (e.stato === 'aperta') {
+    const come = e.modo === 'link'
+      ? 'Partecipa chi apre il link dell\'estrazione e preme «Partecipo».'
+      : 'Partecipa chi si iscrive a Barattolo col link d\'invito di chi lo regala, entro la chiusura.';
+    const codice = codiceEstrazionePer(id);
+    const partecipa = (!e.mia && !e.mio && e.modo === 'link' && codice)
+      ? `<div style="margin-top:8px;font-size:13px;color:var(--muted)">Partecipano solo account Telegram. Se vinci, chi regala riceve il tuo contatto Telegram per la consegna.</div>
+         <button class="btn orange" onclick="partecipaEstrazione(this, ${id})">🎟 Partecipo</button>` : '';
+    const mia = e.mia
+      ? `<div style="margin-top:8px;font-size:13px">${e.modo === 'link'
+            ? 'Il link di questa estrazione: chi lo apre e preme «Partecipo» riceve un numero.'
+            : 'Il tuo link d\'invito: chi si iscrive con questo entro la chiusura riceve un numero.'}</div>
+         <div class="mono" style="font-size:12px;margin-top:4px">${esc(e.link || '')}</div>
+         <button class="btn orange" onclick="condividiEstrazione()">📤 Condividi il link</button>
+         ${n === 0 ? `<button class="btn ghost" onclick="annullaEstrazione(${e.id}, ${id})">Annulla l'estrazione</button>` : ''}` : '';
+    return `<h4>🎁 In palio · si chiude il ${estrQuando(e.chiude_il)}</h4>
+      <div>${come} Finora: <b>${chi}</b>. Alla chiusura il vincitore lo sceglie il primo blocco Bitcoin minato dopo la scadenza.</div>
+      ${regole}${mio}${partecipa}${mia}`;
+  }
+  if (e.stato === 'attesa_blocco') {
+    return `<h4>🎁 Estrazione chiusa: si aspetta il blocco</h4>
+      <div>La lista si è fermata con <b>${chi}</b>. Il numero vincente lo sceglie il blocco Bitcoin <b>${e.blocco_altezza}</b>: appena è minato (di solito una decina di minuti) lo leggiamo e avvisiamo tutti.</div>
+      ${mio}${prova}`;
+  }
+  if (e.stato === 'estratta') {
+    const blocco = e.blocco_link
+      ? `<a href="${esc(e.blocco_link)}" target="_blank" rel="noopener">blocco ${e.blocco_altezza}</a>`
+      : `blocco ${e.blocco_altezza}${e.simulato ? ' (simulato)' : ''}`;
+    const tuo = e.ho_vinto
+      ? `<div style="margin-top:8px">🎉 <b>Hai vinto!</b> Per la consegna scrivi a chi lo regala: ${estrContatto(e.contatto)}</div>`
+      : e.mia ? `<div style="margin-top:8px">Scrivi al vincitore per la consegna: ${estrContatto(e.contatto)}</div>` : '';
+    return `<h4>🎉 Ha vinto il numero ${e.vincitore_numero}</h4>
+      <div>Su ${chi}, estratto dal ${blocco}.</div>
+      ${tuo}${mio}${prova}`;
+  }
+  if (e.stato === 'vuota') {
+    return `<h4>🎁 Estrazione chiusa senza partecipanti</h4>
+      <div>Nessuno ha preso un biglietto: l'annuncio è tornato in vendita.</div>`;
+  }
+  return '';
+}
+async function caricaEstrazione(id){
+  const box = el('estrazioneBox');
+  if (!box) return;
+  try {
+    const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
+    const r = await fetch(`${API_BASE}/listings/${id}/estrazione`, opz);
+    if (!r.ok) return;
+    const d = await r.json();
+    /* la scheda puo' essere cambiata mentre si aspettava */
+    if (!currentListing || currentListing.id !== id || el('estrazioneBox') !== box) return;
+    estrCorrente = d.estrazione;
+    if (!estrCorrente) { box.innerHTML = ''; box.className = ''; return; }
+    const html = htmlEstrazione(estrCorrente, id);
+    box.className = html ? 'estrazione-box' : '';
+    box.innerHTML = html;
+  } catch(e) {}
+}
+async function partecipaEstrazione(btn, id){
+  haptic();
+  /* chi guarda senza essere entrato: prima si entra (il codice resta
+     ricordato sul dispositivo, e al ritorno il bottone c'e' ancora) */
+  if (VETRINA) {
+    invitoTelegram('Per partecipare all\'estrazione entra con Telegram: '
+      + 'al ritorno trovi il bottone «Partecipo» qui.', 'estrazione');
+    return;
+  }
+  const ripristina = bottoneInAttesa(btn, '🎟 Un attimo…');
+  try {
+    const r = await fetch(`${API_BASE}/estrazioni/partecipa`, {
+      method:'POST', headers:{'X-Tg-Init-Data':authHdr(), 'Content-Type':'application/json'},
+      body: JSON.stringify({codice: codiceEstrazionePer(id)})});
+    const d = await r.json().catch(()=>({}));
+    ripristina();
+    if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+    toast(`🎟 Sei dentro: numero ${d.estrazione.mio ? d.estrazione.mio.numero : ''}`);
+    caricaEstrazione(id);
+  } catch(e) { ripristina(); toast('Rete assente: riprova'); }
+}
+function condividiEstrazione(){
+  if (!estrCorrente || !estrCorrente.link || !currentListing) return;
+  condividiLink(estrCorrente.link,
+    `🎁 Metto in palio «${currentListing.title}» su Barattolo: partecipa da qui!`,
+    'Estrazione su Barattolo');
+}
+function annullaEstrazione(eid, id){
+  haptic();
+  chiediConferma({
+    titolo: 'Annullare l\'estrazione?',
+    corpo: 'Nessuno ha ancora un biglietto: l\'annuncio torna in vendita come prima.',
+    etichetta: 'Annulla l\'estrazione',
+    poi: async () => {
+      const r = await fetch(`${API_BASE}/estrazioni/${eid}/annulla`,
+        {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
+      for (const lista of [listings, myListings])
+        (lista || []).forEach(x => { if (x.id === id) x.inPalio = false; });
+      toast('Estrazione annullata');
+      openDetail(id);
+    }});
+}
 function apriRifornisci(id){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
@@ -65971,9 +66894,10 @@ function domandePayload(){
    compra a distanza legge ingredienti, allergeni, peso netto e valori
    nutrizionali PRIMA di pagare. Una tabella uguale per tutti, coi valori
    scritti a mano. Il giudice e' `etichetta_da_payload` nel server.
-   LA TABELLA E' OBBLIGATORIA dal 18 nov 2026 (Andrea; leva
-   ETICHETTA_OBBLIGATORIA): o intera, o «Non dovuta per legge» col suo
-   motivo (ESENZIONI_ETICHETTA, gemello del server). Ingredienti,
+   LA TABELLA OBBLIGATORIA (18 nov 2026, leva ETICHETTA_OBBLIGATORIA):
+   accesa, o intera o «Non dovuta per legge» col suo motivo
+   (ESENZIONI_ETICHETTA, gemello del server). Dal 27 nov 2026 la leva
+   nasce SPENTA: la tabella e' di nuovo facoltativa (Andrea). Ingredienti,
    allergeni e peso restano facoltativi.
    I DUE ELENCHI sono i gemelli di ALLERGENI_UE e NUTRIENTI_UE del
    server: le chiavi sono le sue, qui ci sono i nomi da leggere
@@ -66000,8 +66924,9 @@ let etichettaAttiva = true;
 /* (23 nov 2026) il «🙈 Nascondi dalla vetrina»: nasce SPENTO qui e lo
    accende solo un true del server — un server di ieri non ha la rotta */
 let nascondiAttivo = false;
-/* (18 nov 2026) la tabella obbligatoria, stessa fonte e stesso patto */
-let etichettaObbligatoria = true;
+/* (18 nov 2026) la tabella obbligatoria, stessa fonte; dal 27 nov nasce
+   SPENTA come nel server, e la accende solo un true di /api/me */
+let etichettaObbligatoria = false;
 /* lo stato del form: null = «non la so ancora» (la modifica aspetta la
    scheda, e fino ad allora il salvataggio non la tocca) */
 const etichettaVuota = () => ({ingredienti:'', allergeni:[], peso:'', unita:'g',
@@ -68123,8 +69048,9 @@ async function publish(){
       && !(parseInt(el('sellServDurata')?.value, 10) > 0)) {
     toast('Quanto dura? Scrivi i minuti: è quello che rende la prestazione una cosa precisa'); return;
   }
-  /* LA TABELLA NUTRIZIONALE (18 nov 2026): obbligatoria negli alimenti,
-     anche in modifica — gli annunci di prima si mettono in regola al
+  /* LA TABELLA NUTRIZIONALE (18 nov 2026): con la leva accesa
+     obbligatoria negli alimenti (dal 27 nov spenta di serie), anche in
+     modifica — gli annunci di prima si mettono in regola al
      primo ritocco, come la condizione */
   const manca = etichettaMancante();
   if (manca) {
@@ -77796,7 +78722,13 @@ async function onchainCofirma(o, parole){
      audit); il telefono no, e rifiutava una proposta gia' accettata. */
   const chiesto = Number(o.importo_sats) || 0;
   const inPiu = chiesto > 0 ? Math.max(0, tot - chiesto) : 0;
-  const tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);
+  let tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);
+  /* (27 nov 2026, audit giro 6) l'uscita DECISA da un moderatore verso
+     chi vende, quando chi ha messo i sats non ha un wallet di rimborso, e'
+     senza resto: tutto il versato in piu' va alla rete, come ammette il
+     giudice del server. Il prezzo a chi vende resta esatto. */
+  if (o.proposta.barattolo && o.proposta.verso === 'venditore' && !o.rimborso)
+    tetto = Number(o.margine_sats) + inPiu;
   if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';
   for (let i = 0; i < tx.inputsLength; i++) tx.signIdx(io.firma.privateKey, i);
   tx.finalize();
@@ -78333,7 +79265,10 @@ function vistaOrdinamentoOcP2P(o){
   return {oc: o, id: 'oc-' + Number(o.id), lato: o.lato,
           premioOc: o.mercato ? (Number(o.premio) || 0) : null,
           /* in moneta l'importo e' il controvalore in euro (`euroNodo`) */
-          creato: Number(o.creato) || 0, euro: Number(o.euroNodo || o.euro) || 0, euroMax: 0};
+          creato: Number(o.creato) || 0, euro: Number(o.euroNodo || o.euro) || 0, euroMax: 0,
+          /* l'intervallo (27 nov 2026) coi nomi di Lightning: i due capi */
+          ...(typeof intervalloOcP2P === 'function' && intervalloOcP2P(o)
+            ? {euro: Number(o.euro_min), euroMax: Number(o.euro)} : {})};
 }
 
 
@@ -79377,6 +80312,11 @@ function apriOnchainP2P(id, modo){
   if (typeof backupOnchainPrima === 'function' && !backupOnchainPrima(() => apriOnchainP2P(id, modo))) return;
   const conTasti = typeof reteOcPresaPossibileP2P === 'function' && reteOcPresaPossibileP2P(vendeLui);
   const bzC = typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o);
+  /* L'INTERVALLO (27 nov 2026): prima la cifra, poi il conto su di lei */
+  const intOc = typeof intervalloOcP2P === 'function' && intervalloOcP2P(o);
+  const sceltoOc = intOc ? sceltoOcP2P(o) : 0;
+  const oS = sceltoOc ? conSceltaOcP2P(o) : o;
+  const fasciaOc = Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)});
   chiediConferma({
     /* lo stesso cappello del dettaglio Lightning, con la rete sotto
        (20:24, Andrea): era «⛓️ Compri bitcoin on-chain» */
@@ -79430,7 +80370,7 @@ function apriOnchainP2P(id, modo){
          «Contanti» fra piu' metodi le pillole, e zona, regola e cauzione
          compaiono scegliendolo (`metodiPresaOcHtmlP2P`, che si ridisegna) */
       + (typeof metodiPresaOcHtmlP2P === 'function'
-        ? '<div id="p2pOcPresaMetodi">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'
+        ? '<div id="p2pOcPresaMetodi">' + metodiPresaOcHtmlP2P(oS, vendeLui) + '</div>'
         : (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
           + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
             ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
@@ -79449,9 +80389,13 @@ function apriOnchainP2P(id, modo){
          «🧾 Il tuo PayCode», come la' */
       + (bzC ? contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),
                               'Scrivi i dati del tuo PayCode Amazon per vedere il dettaglio')
+        /* l'intervallo senza cifra: la fascia e la frase di Lightning (27 nov 2026) */
+        : intOc && !sceltoOc ? contoAttesaP2P(fasciaOc,
+                                 'Scegli quanto vuoi ' + (vendeLui ? 'inviare' : 'ricevere') + ' per vedere il dettaglio')
         : typeof contoOnchainP2P === 'function'
-        ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '" id="p2pOcPresaConto">'
-          + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo',
+        ? (sceltoOc ? rigaImportoSceltoP2P(fasciaOc, sceltoOc, 'cambiaSceltaOcP2P(' + Number(o.id) + ')') : '')
+          + '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '" id="p2pOcPresaConto">'
+          + contoOnchainP2P({...oS, parte: vendeLui ? 'compro' : 'vendo',
                              swap: conTasti ? swapOcPresaP2P(o.id, vendeLui) : null}) + '</div>' : ''),
     /* in USDT le stesse frasi, con la rete (2 nov 2026); e col tasto
        «⚡ Lightning» scelto la frase dice Lightning (`corpoPresaOcP2P`) */
@@ -79464,10 +80408,13 @@ function apriOnchainP2P(id, modo){
     /* Barattozon in «Compra BTC»: «🧾 Il tuo PayCode» arancio, che apre il
        foglio dei dati come su Lightning (18 nov 2026). Il seguito parte a
        foglio chiuso e col bottone gia' rimesso (`eseguiConferma`) */
-    etichetta: bzC ? '🧾 Il tuo PayCode' : vendeLui ? 'Compra' : 'Vendi',
-    vestito: bzC ? '' : vendeLui ? 'compro-oc' : 'vendo-oc',
+    /* ...e sull'intervallo senza cifra «Scegli», come su Lightning, che
+       apre «Quanto vuoi scambiare?» a foglio chiuso (27 nov 2026) */
+    etichetta: bzC ? '🧾 Il tuo PayCode' : intOc && !sceltoOc ? 'Scegli' : vendeLui ? 'Compra' : 'Vendi',
+    vestito: bzC || (intOc && !sceltoOc) ? '' : vendeLui ? 'compro-oc' : 'vendo-oc',
     reteLn: conTasti && (p2pOcPresaRete[o.id] || {}).rete === 'ln',
     poi: () => bzC ? void setTimeout(() => apriPayCodeBzOcP2P(Number(o.id)), 350)
+      : intOc && !sceltoOc ? void setTimeout(() => apriQuantoP2P('oc-' + Number(o.id)), 350)
       : prendiOnchainP2P(Number(o.id))});
 }
 
@@ -79483,6 +80430,54 @@ function apriOnchainP2P(id, modo){
 let p2pOcBzPresa = {};
 function bzOcInCompraP2P(o){
   return !!o && o.lato === 'buy' && tabacchinoP2P(o.metodi) && Number(o.euro_min) > 0;
+}
+/* ══ L'INTERVALLO «DA… A…» ANCHE ON-CHAIN (27 nov 2026, cantiere
+   intervallo-onchain, Andrea: «Ordini p2p ad intervalli anche su
+   onchain») ══
+   Come nel dettaglio di Lightning: finche' la cifra non c'e' il foglio
+   della presa mostra la fascia e la frase, il bottone dice «Scegli» e
+   apre il foglio «Quanto vuoi scambiare?» (lo stesso di Lightning, con
+   una riga fatta dall'ordine on-chain: `rigaQuantoOcP2P`); scelta la
+   cifra, il foglio si riapre col conto di QUELLA cifra, «Importo scelto»
+   con «Cambia», e «Compra»/«Vendi». La cifra va al server con la presa e
+   con la cauzione, che si conta su di lei (decisione di Andrea). */
+let p2pOcScelto = {id: 0, euro: 0};
+/* la leva del server, per il secondo campo del foglio Pubblica */
+function intervalloOcAccesoP2P(){
+  return typeof p2pOnchainLibro === 'object' && !!p2pOnchainLibro && p2pOnchainLibro.intervallo === true;
+}
+/* PURA: un ordine on-chain a intervallo ancora nel libro (non Barattozon) */
+function intervalloOcP2P(o){
+  return !!o && Number(o.euro_min) > 0 && Number(o.euro) > Number(o.euro_min)
+    && !(typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o));
+}
+/* la cifra scelta per QUEST'ordine (0 = non ancora) */
+function sceltoOcP2P(o){
+  return intervalloOcP2P(o) && Number(p2pOcScelto.id) === Number(o.id) ? Number(p2pOcScelto.euro) || 0 : 0;
+}
+/* PURA sull'ordine: con la cifra scelta l'ordine diventa quello a cifra
+   unica di QUELLA cifra — gli euro, e la stima dei sats in proporzione
+   (stesso cambio, stesso premio: la formula del server e' una retta) */
+function conSceltaOcP2P(o){
+  const s = sceltoOcP2P(o);
+  if (!s) return o;
+  const max = Number(o.euro) || 0;
+  const stima = Number(o.stima) > 0 && max > 0 ? Math.round(Number(o.stima) * s / max) : 0;
+  return Object.assign({}, o, {euro: s, euro_min: 0, stima: stima, stima_min: 0});
+}
+/* la riga del foglio «Quanto» fatta da un ordine on-chain: i nomi di
+   quella di Lightning (`euro` il primo capo, `euroMax` l'ultimo) */
+function rigaQuantoOcP2P(n){
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +n);
+  if (!intervalloOcP2P(o)) return null;
+  return {id: 'oc-' + Number(o.id), lato: o.lato, euro: Number(o.euro_min), euroMax: Number(o.euro),
+          premium: Number(o.premio) || 0, fiat: o.fiat, metodi: o.metodi || [], onchain: true};
+}
+/* «Cambia»: il foglio della presa si chiude e si riapre «Quanto» */
+function cambiaSceltaOcP2P(n){
+  haptic();
+  navIndietro();
+  setTimeout(() => apriQuantoP2P('oc-' + Number(n)), 350);
 }
 /* IL FOGLIO «🧾 IL TUO PAYCODE AMAZON» (18 nov 2026, cantiere
    barattozon-oc-carta, Andrea: «deve essere uguale al lighting»): i campi
@@ -79813,8 +80808,10 @@ function ridisegnaReteOcPresaP2P(id){
   const corpo = el('confCorpo');
   if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
   const conto = el('p2pOcPresaConto');
+  /* (27 nov 2026) sull'intervallo il conto e' quello della cifra scelta */
+  const oS = o && typeof conSceltaOcP2P === 'function' ? conSceltaOcP2P(o) : o;
   if (box && o && conto && typeof contoOnchainP2P === 'function')
-    conto.innerHTML = contoOnchainP2P({...o, parte: o.lato === 'sell' ? 'compro' : 'vendo',
+    conto.innerHTML = contoOnchainP2P({...oS, parte: o.lato === 'sell' ? 'compro' : 'vendo',
                                        swap: swapOcPresaP2P(o.id, o.lato === 'sell')});
 }
 async function scegliReteOcPresaP2P(id, rete){
@@ -79823,7 +80820,8 @@ async function scegliReteOcPresaP2P(id, rete){
   if (!o) return;
   const vendeLui = o.lato === 'sell';
   if (rete !== 'ln') { p2pOcPresaRete[id] = {rete: 'oc'}; return ridisegnaReteOcPresaP2P(id); }
-  const sats = satsOcPresaP2P(o, vendeLui);
+  /* (27 nov 2026) lo swap sulla cifra scelta, sull'intervallo */
+  const sats = satsOcPresaP2P(typeof conSceltaOcP2P === 'function' ? conSceltaOcP2P(o) : o, vendeLui);
   p2pOcPresaRete[id] = {rete: 'ln', stato: 'leggo', sats};
   ridisegnaReteOcPresaP2P(id);
   let d;
@@ -79951,7 +80949,11 @@ function metodiPresaOcHtmlP2P(o, vendeLui){
     && (scelta ? m === 'Contanti' : (o.metodi || []).length === 1)
     ? regolaContantiFoglioP2P([m], typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
                               vendeLui ? 'compro' : 'vendo') : '';
-  return pillole + zona + regola + (cauzioneOcServeP2P(o) ? rigaCauzioneOcP2P(o, p2pOnchainLibro.cauzione) : '');
+  /* sull'intervallo (27 nov 2026) la cauzione della cifra scelta; senza
+     cifra la regola, come quando la stima non c'e' */
+  const oC = typeof conSceltaOcP2P === 'function' ? conSceltaOcP2P(o) : o;
+  const oCauz = typeof intervalloOcP2P === 'function' && intervalloOcP2P(oC) ? Object.assign({}, oC, {stima: 0}) : oC;
+  return pillole + zona + regola + (cauzioneOcServeP2P(o) ? rigaCauzioneOcP2P(oCauz, p2pOnchainLibro.cauzione) : '');
 }
 function scegliMetodoPresaOcP2P(id, m){
   haptic();
@@ -79999,11 +81001,14 @@ function copiaCauzioneOcP2P(){
   if (c && c.bolt11) copiaLink(c.bolt11, 'Richiesta di pagamento copiata 📋');
 }
 async function leggiCauzioneOcP2P(id, metodo){
+  /* sull'intervallo (27 nov 2026) la cauzione si conta sulla cifra scelta */
+  const rigaC = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  const sceltaC = rigaC && typeof sceltoOcP2P === 'function' ? sceltoOcP2P(rigaC) : 0;
   /* senza metodo si CHIEDE a che punto e' (GET); col metodo si crea, o torna quella viva (POST) */
   const r = await fetch(`${API_BASE}/p2p/onchain/${id}/cauzione`, metodo == null
     ? {headers: {'X-Tg-Init-Data': authHdr()}}
     : {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-       body: JSON.stringify({metodo})});
+       body: JSON.stringify(Object.assign({metodo}, sceltaC ? {euro_cent: Math.round(sceltaC * 100)} : {}))});
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.detail || 'la cauzione adesso non si può chiedere');
   return d.cauzione || null;
@@ -80149,6 +81154,11 @@ async function prendiOnchainP2P(id, extra){
     toast('Scegli prima come paghi: tocca un metodo', 4000);
     return apriOnchainP2P(id);
   }
+  /* L'INTERVALLO (27 nov 2026): senza la cifra si torna al foglio, che la
+     chiede; con la cifra, quella parte con la presa */
+  const sceltaOc = riga && typeof sceltoOcP2P === 'function' ? sceltoOcP2P(riga) : 0;
+  if (riga && typeof intervalloOcP2P === 'function' && intervalloOcP2P(riga) && !sceltaOc)
+    return apriOnchainP2P(id);
   /* IL BANNER DEL TEMPO PER PAGARE anche sull'on-chain (19 nov 2026), a
      chi prende COMPRANDO, una volta per ordine: le sue parole dicono la
      disputa, perche' qui allo scadere non scade niente da solo */
@@ -80172,7 +81182,8 @@ async function prendiOnchainP2P(id, extra){
     const r = await fetch(`${API_BASE}/p2p/onchain/${id}/prendi`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
       /* `extra`: il PayCode di Barattozon in «Compra BTC» (17 nov 2026 sera) */
-      body: JSON.stringify(Object.assign(metodo ? {metodo} : {}, extra || {}))});
+      body: JSON.stringify(Object.assign(metodo ? {metodo} : {},
+                                         sceltaOc ? {euro_cent: Math.round(sceltaOc * 100)} : {}, extra || {}))});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       /* il PayCode rifiutato dal server: il foglio torna coi dati scritti */
@@ -80180,6 +81191,7 @@ async function prendiOnchainP2P(id, extra){
       throw new Error(d.detail || 'non si è potuto prendere');
     }
     if (extra && extra.tabacchino) delete p2pOcBzPresa[id];
+    if (sceltaOc) p2pOcScelto = {id: 0, euro: 0};
     await applicaReteOcPresaP2P(id, d.ruolo);
     await leggiMieiOnchainP2P();
     apriDettaglioOnchainP2P(id);
@@ -81929,6 +82941,14 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
     const barre = giudizioBarrePayCodeP2P(tB.barre, tB.ordine);
     corpo.tabacchino = {paycode: payCodeP2P(tB.ordine).replace(/-/g, ''),
       scade: scadeDaCampoP2P(tB.scade), barre: barre.stato === 'buono' ? barre.numero : ''};
+  }
+  /* L'INTERVALLO «DA… A…» (27 nov 2026, cantiere intervallo-onchain): a
+     mercato, a euro interi come su Lightning, mai in moneta ne' col
+     PayCode; il server lo rigiudica e, a leva spenta, lo ignora */
+  if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > 0
+      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {
+    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;
+    corpo.euro_cent = interoP2P(campi.euroMax).n * 100;
   }
   /* BARATTOZON IN «COMPRA BTC» (17 nov 2026 sera): la fascia a euro
      interi, a mercato; il PayCode lo porta chi prende */
@@ -83919,8 +84939,10 @@ function cambiaReteP2P(rete){
   if (oc) {
     const vale = metodiOnchainP2P(p2pLato);
     p2pNuovoMetodi = p2pNuovoMetodi.filter(m => vale.indexOf(m) >= 0);
-    /* la fascia resta solo a Barattozon in «Compra BTC» */
-    if (!(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
+    /* la fascia resta a Barattozon in «Compra BTC», e dal 27 nov 2026
+       l'intervallo a tutti, a leva accesa (cantiere intervallo-onchain) */
+    if (!(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')
+        && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
     const porta = el('p2pNuovoPorta');
     if (porta) porta.hidden = true;
   }
@@ -86194,8 +87216,11 @@ let viaEuroNonHo = [];
    nostro, e con un sat in meno il deposito non si salda (il server ne
    ammette in piu' fino al 3% o a un euro e mezzo, l'euro intero compreso) */
 const VIA_EURO_MARGINE = 0.005;
+/* ANCHE A CHI HA UN WALLET (27 nov 2026, Andrea: «metti il tasto visibile
+   anche se hai gia' un wallet registrato»): fino a ieri solo a chi nel
+   profilo non aveva ne' Lightning address ne' wallet on-chain */
 function viaEuroPerMe(){
-  return !!myViaEuro && !myLnAddress && !myOnchainIncasso && !DEMO && !VETRINA;
+  return !!myViaEuro && !DEMO && !VETRINA;
 }
 /* PURA. L'offerta piu' conveniente del libro per avere `sats` nel
    deposito: chi VENDE sats in euro, a prezzo di mercato (di un prezzo
@@ -86264,7 +87289,9 @@ function viaEuroOfferta(sats){
                           valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI);
   if (!o) return null;
   /* il tetto in euro vale per gli euro; in franchi non c'e' (Andrea) */
-  if (valuta === 'EUR' && (!(myViaEuroMax > 0) || o.euro > myViaEuroMax)) return null;
+  /* ...e dal 27 nov 2026 il tetto in euro e' tolto di serie (Andrea: «leviamo
+     il tetto massimo dei 100 euro»): 0 = nessun tetto, una riga lo rimette */
+  if (valuta === 'EUR' && myViaEuroMax > 0 && o.euro > myViaEuroMax) return null;
   return o;
 }
 /* il libro, se manca o e' vecchio, si legge in sottofondo e poi si
@@ -86666,7 +87693,7 @@ function viaEuroFissi(ordini, sats, perSat, fee, miei, nonHo){
   return fuori.slice(0, 50).map(c => ({id: c.id, euro: c.euro, tot: c.tot}));
 }
 function viaEuroFissiOra(sats){
-  if (!viaEuroPerMe() || !p2pLibro || !(sats > 0) || !(myViaEuroMax > 0)) return [];
+  if (!viaEuroPerMe() || !p2pLibro || !(sats > 0)) return [];
   const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
   const fee = commissioneVivaP2P();
   if (fee === null) return [];
@@ -91438,7 +92465,10 @@ function leggiCopiaProfiloP2P(){
       const ev = viva.ev;
       if (!ev) {
         console.log('🔑 [p2p] copia sui relay: ' + (viva.tolta ? 'e\' stata tolta' : 'nessuna copia'));
-        p2pCopiaLetta = {mazzo: null, tolta: viva.tolta};
+        /* `risposti` (27 nov 2026): quanti relay sono arrivati in fondo. Zero
+           vuol dire «nessuno ha risposto», non «non c'e' niente» — e la
+           nascita del profilo per le chat lo deve sapere */
+        p2pCopiaLetta = {mazzo: null, tolta: viva.tolta, risposti: (letti.risposti || []).length};
         return null;
       }
       if (!NT.verifyEvent(ev)) return null;
@@ -91471,6 +92501,62 @@ async function riprendiCopiaProfiloP2P(){
   p2pCopiaEsito = 'copia';
   console.log('🔑 [p2p] profilo: ripreso dalla copia cifrata sui relay');
   return mazzoMostro();
+}
+/* IL PROFILO CHE NASCE PER LE CHAT DEL MERCATINO (27 nov 2026, cantiere
+   bunker-dopo-chiusura, ok di Andrea). DAL CAMPO: un utente entrava con
+   Nostr Connect da Tor Browser, che a ogni chiusura cancella tutto; al
+   rientro la chat del suo ordine diceva «aperta su un altro dispositivo»
+   e i messaggi di prima non si leggevano piu'. Il perche': chi entra da
+   Telegram ha il profilo dal seme del suo account, e i lucchetti della
+   chat nascono da li' (ogni dispositivo li ricalcola); un nativo Nostr
+   senza profilo di scambio li faceva nascere A CASO, con la chiave
+   segreta solo in questa memoria — e Tor la butta.
+   ORA, per un nativo Nostr col firmatario che sa cifrare (bunker,
+   estensione, nsec), il profilo NASCE qui e va SUBITO sui relay come
+   copia cifrata verso la sua stessa chiave (`assicuraCopiaProfiloP2P`, la
+   strada che il P2P usa dall'11 ott): al rientro, anche da un browser
+   vuoto, `riprendiCopiaProfiloP2P` lo riporta, e con lui lucchetti,
+   chiavi d'ordine e chat. Il server non vede niente (regola ferrea 2).
+   TRE GUARDIE, ed e' tutto il rischio:
+   1) SOLO SE LA LETTURA HA DETTO «NESSUNA COPIA» DAVVERO: firmatario che
+      ha risposto, almeno un relay arrivato in fondo (`risposti`), e una
+      copia mai tolta col «Dimentica» — un silenzio dei relay non e' un
+      posto libero, e un profilo nuovo scritto sopra la copia di uno
+      vecchio sarebbe un'identita' distrutta;
+   2) IL PROFILO RESTA SOLO SE LA COPIA C'E' (qualcuno la rilegge): senza,
+      si toglie da qui e i lucchetti nascono a caso come prima — un
+      profilo che sparisce con la memoria non salverebbe niente;
+   3) MAI SOPRA UN PROFILO CHE C'E', e mai per chi entra da Telegram (il
+      suo ha gia' la sua strada). Una volta per pagina, dalle chat. */
+let p2pNascitaChat = null;
+function nasciProfiloChatP2P(){
+  if (DEMO || VETRINA || !(numeroConto(myTgId) < 0)) return Promise.resolve(null);
+  if (mazzoMostro()) return Promise.resolve(mazzoMostro());
+  if (!p2pNascitaChat) p2pNascitaChat = (async () => {
+    await leggiCopiaProfiloP2P();
+    const letta = p2pCopiaLetta;
+    if (!letta || letta.mazzo || letta.tolta || !((letta.risposti | 0) > 0)) return null;
+    if (mazzoMostro()) return mazzoMostro();     /* nato nel frattempo: non si tocca */
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const sk = NT.utils.bytesToHex(NT.generateSecretKey());
+    const nuovo = {sk, pub: NT.getPublicKey(NT.utils.hexToBytes(sk)), indice: 0,
+                   creato: Math.floor(Date.now() / 1000), backupFatto: false,
+                   origine: '', versione: 0};
+    ricordaMazzo(nuovo);
+    const esito = await assicuraCopiaProfiloP2P({gesto: true});
+    const ora = mazzoMostro();
+    if (!ora || ora.sk !== nuovo.sk) return ora || null;   /* un gesto ha deciso nel frattempo */
+    if (esito !== 'copia') {
+      scordaMazzoLocale();
+      console.log('🔑 [p2p] profilo per le chat: la copia sui relay non c\'e\' (' + esito + '), non nasce');
+      return null;
+    }
+    await registraChiaviP2P([nuovo.pub]);
+    console.log('🔑 [p2p] profilo per le chat: nato, con la copia cifrata sui relay');
+    return mazzoMostro();
+  })().catch(() => null).finally(() => { p2pNascitaChat = null; });
+  return p2pNascitaChat;
 }
 /* ============ LA RETE DI SICUREZZA PRIMA DELLA PRIMA PRESA (11 ott 2026,
    cantiere «tor-chiavi-scambio», terzo strato) ============
@@ -97087,6 +98173,11 @@ function ripuliCifreP2P(inp){
    chiave bruciata e' un no pagato troppo caro. */
 let p2pQuantoOrdine = '';
 function rigaLibroP2P(id){
+  /* (27 nov 2026, cantiere intervallo-onchain) «oc-N» e' un ordine on-chain
+     a intervallo, vestito da riga del libro per il foglio «Quanto»: gli id
+     di Mostro sono UUID e non cominciano mai cosi' */
+  const s = String(id || '');
+  if (s.indexOf('oc-') === 0) return typeof rigaQuantoOcP2P === 'function' ? rigaQuantoOcP2P(Number(s.slice(3))) : null;
   return ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id) || null;
 }
 function apriQuantoP2P(id){
@@ -97138,7 +98229,8 @@ function renderQuantoP2P(){
     '<div class="campo-pre"><span class="pre' + (segno.length > 1 ? ' pre-parola' : '') + '">' + segno + '</span>' +
     /* chi torna a cambiare la cifra ritrova la sua; la prima volta niente */
     '<input id="p2pQuantoInp" type="text" inputmode="numeric" value="' +
-      esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || '')) +
+      (riga.onchain ? esc(String((Number(p2pOcScelto.id) === Number(String(riga.id).slice(3)) && p2pOcScelto.euro) || ''))
+                    : esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || ''))) +
       '" onbeforeinput="soloCifreP2P(event)"' +
       /* il segnaposto sta attaccato al segno: «€50 – 276», non «€da 50 a 276» */
       ' oninput="stimaQuantoP2P()" placeholder="' + esc(String(riga.euro)) + ' \u2013 ' +
@@ -97220,13 +98312,26 @@ function confermaQuantoP2P(){
      parla — lo rifa' la conferma del dettaglio, col metodo in mano */
   /* in franchi il tetto tradotto e il suo segno (14 nov 2026, p2p-chf) */
   const codPresa = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(riga) : 'EUR';
-  const troppo = giudiceContantiP2P(g.euro, p2pDettMetodo ? [p2pDettMetodo]
+  /* sull'on-chain il metodo scelto e' quello delle pillole della presa */
+  const metQ = riga.onchain ? metodoPresaOcP2P({id: Number(String(riga.id).slice(3)), metodi: riga.metodi}) : p2pDettMetodo;
+  const troppo = giudiceContantiP2P(g.euro, metQ ? [metQ]
                                       : ((riga.metodi || []).length === 1 ? riga.metodi : []),
                                     maxEuroContantiP2P(), codPresa);
   if (troppo) { toast(troppo); return; }
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
   p2pQuantoOrdine = '';
+  /* L'ON-CHAIN (27 nov 2026): la cifra scelta torna al foglio della presa,
+     che si riapre col conto di QUELLA cifra; lo swap gia' chiesto su
+     Lightning si richiede sulla cifra nuova */
+  if (riga.onchain) {
+    const n = Number(String(id).slice(3));
+    p2pOcScelto = {id: n, euro: g.euro};
+    const lnPrima = (p2pOcPresaRete[n] || {}).rete === 'ln';
+    if (lnPrima) delete p2pOcPresaRete[n];
+    setTimeout(() => { apriOnchainP2P(n); if (lnPrima) scegliReteOcPresaP2P(n, 'ln'); }, 350);
+    return;
+  }
   /* ⚠️ NON SI PRENDE PIU' DA QUI (7 ott 2026, decisione di Andrea): la
      cifra scelta torna al foglio del libro, che c'e' ancora sotto, e il
      conto a una colonna si disegna su QUELLA cifra — e' il bottone
@@ -97455,6 +98560,7 @@ function rigaPresaBzP2P(bz){
    a chi volesse dettarlo al telefono a una persona. */
 let p2pDettOrdine = '';     // l'id dell'ordine aperto nel dettaglio
 let p2pDettMetodo = '';     // il metodo scelto con le pillole, prima della presa
+let p2pDettMetodiAperta = false;  // (26 nov 2026) la tendina «Metodi di pagamento accettati»: sopravvive al ridisegno
 let p2pDettImporto = 0;     // su un intervallo, la cifra scelta col foglio «Quanto»
 let p2pDettOnchain = '';    // (24 nov 2026) l'ordine per cui chi compra ha scelto «Ricevi on-chain» prima della presa
 
@@ -98350,8 +99456,8 @@ function metodiDettP2P(o){
      nella riga dell'importo. */
   if (metodi.length === 1)
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
-      corpo: '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
-        + marchioMetodoP2P(metodi[0]) + '</b>' + zona});
+      corpo: tendinaMetodiP2P(o, metodi, '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
+        + marchioMetodoP2P(metodi[0]) + '</b>' + zona)});
   /* LA DOMANDA SOPRA LE PILLOLE (9 ott 2026, cantiere prendi-metodo):
      la frase che stava in fondo, rossa, accanto al bottone spento, sale
      qui dove si risponde, e si vede quando serve — al tocco di
@@ -98378,12 +99484,45 @@ function metodiDettP2P(o){
     : zonaDettP2P(Object.assign({}, o, {metodi: p2pDettMetodo ? [p2pDettMetodo] : []}));
   return sezioneNuovoP2P({
     ico: 'metodi', titolo: titolo,
-    corpo: domanda + '<div class="p2p-metodi">' + metodi.map(m =>
+    corpo: tendinaMetodiP2P(o, metodi, domanda + '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
       + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
-      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta
+      + marchioMetodoP2P(m) + '</button>').join('') + '</div>' + fisso + zonaScelta)
   });
+}
+/* LA TENDINA DEI METODI (26 nov 2026, richiesta di Andrea: «anche nel P2P
+   metti metodi di pagamento accettati e sotto un drop down menu»): il
+   corpo della sezione diventa un <details> col summary «Metodi di
+   pagamento accettati · N». Il titolo della sezione ESCE INVARIATO
+   («Metodo di pagamento — come invii gli euro»): dice da che parte va
+   il denaro, e quella e' una decisione di Andrea di settembre.
+   - CHIUSA DI SERIE, e il summary dice da solo quel che serve senza
+     aprirla: con UN metodo solo il metodo stesso (non c'e' niente da
+     scegliere, ma si legge), con piu' metodi il metodo SCELTO, se c'e'.
+   - CHI PRENDE DEVE POTER SCEGLIERE: `chiediMetodoDettP2P` (Compra
+     premuto senza metodo) la APRE da sola, perche' la domanda vive
+     dentro.
+   - LO STATO SOPRAVVIVE AL RIDISEGNO (`ridisegnaSeCambiaP2P`, la
+     scelta di una pillola, il libro che si aggiorna): lo tiene
+     `p2pDettMetodiAperta`, scritta dall'evento `toggle` e riletta qui
+     per rimettere `open`. Si azzera all'apertura di un altro ordine.
+   Sul MIO ordine e' la stessa tendina: dentro i metodi che ho
+   pubblicato e nessuna domanda (nessuno sceglie niente), e nel summary
+   solo il conto. */
+function tendinaMetodiP2P(o, metodi, corpo){
+  const n = metodi.length;
+  /* cosa si legge nel summary a tendina chiusa */
+  const letto = n === 1 ? metodi[0] : (o.mio ? '' : p2pDettMetodo);
+  return '<details class="vt-tendina vt-nuda p2p-metodi-tendina" id="p2pDettMetodiTendina"'
+    + (p2pDettMetodiAperta ? ' open' : '')
+    + ' ontoggle="p2pDettMetodiAperta = this.open">'
+    + '<summary><div class="vt-sum"><span>Metodi di pagamento accettati'
+    + '<span class="vt-conta">' + n + '</span></span>'
+    + '<i class="vt-fr" aria-hidden="true">&#9662;</i></div>'
+    + (letto ? '<div class="p2p-metodi-letto">' + (n === 1 ? '' : 'Scelto: ') + marchioMetodoP2P(letto) + '</div>' : '')
+    + '</summary>'
+    + corpo + '</details>';
 }
 /* la frase, scritta una volta: la legge il dettaglio sotto le pillole e
    «Info P2P» nella voce della cauzione (una prova le tiene uguali) */
@@ -98442,6 +99581,9 @@ function chiediMetodoDettP2P(){
   const sez = d && d.closest('.p2p-sez');
   if (!sez) return false;
   d.hidden = false;
+  /* la domanda sta dentro la tendina dei metodi: se e' chiusa si apre */
+  const tendina = d.closest('details');
+  if (tendina) { tendina.open = true; p2pDettMetodiAperta = true; }
   try {
     sez.scrollIntoView({block: 'center',
                         behavior: tourRidotto() ? 'auto' : 'smooth'});
@@ -98472,6 +99614,7 @@ function apriDettaglioP2P(id){
      chiedere, e il bottone non deve restare spento per una domanda che
      nessuno ha posto */
   p2pDettMetodo = (riga.metodi && riga.metodi.length === 1) ? riga.metodi[0] : '';
+  p2pDettMetodiAperta = false;   // la tendina dei metodi riparte chiusa su ogni ordine
   renderDettaglioP2P();
   el('sheetBg').classList.add('open');
   el('p2pDettSheet').classList.add('open');
@@ -98850,14 +99993,15 @@ function contoAttesaP2P(o, frase){
 }
 /* PURA: la riga della cifra scelta, sopra il conto — la cifra, la sua
    fascia e «Cambia», che riapre «Quanto» con dentro quella cifra */
-function rigaImportoSceltoP2P(o, scelto){
+function rigaImportoSceltoP2P(o, scelto, azione){
   const segno = segnoMonetaP2P(o);
   return '<div class="conto-scelto" id="p2pDettScelto" tabindex="-1">'
     + '<span>Importo scelto: <b>' + esc(fmtEur(scelto)) + ' ' + segno + '</b> '
     + '<span class="conto-scelto-fascia">(' + capiP2P(esc(fmtSoldiP2P(o.euro, o)), esc(fmtSoldiP2P(o.euroMax, o)))
     + ' ' + segno + ')</span></span>'
     + '<button type="button" class="btn mini" aria-label="Cambia l\'importo scelto"'
-    + ' onclick="apriQuantoP2P(p2pDettOrdine)">Cambia</button>'
+    /* (27 nov 2026) sull'on-chain «Cambia» riapre «Quanto» dal foglio della presa */
+    + ' onclick="' + (azione || 'apriQuantoP2P(p2pDettOrdine)') + '">Cambia</button>'
     + '</div>';
 }
 /* IL «COMPRA» E' LA CONFERMA, e da qui in poi la strada e' quella di
@@ -111677,16 +112821,22 @@ function scegliValutaP2P(cod){
 const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.';
 function spintaIntervalloP2P(){
   if (p2pLato === 'compro' || p2pNuovoFisso) return false;
-  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return false;
+  /* on-chain anche lei, con l'intervallo acceso (27 nov 2026, Andrea:
+     «ricordati di inserire la scritta») */
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
+      && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) return false;
   if (tabacchinoP2P(p2pNuovoMetodi)) return false;
   return valutaFoglioP2P() === 'EUR';
 }
 function svelaSecondoImportoP2P(){
-  /* a rete on-chain l'importo e' uno solo: il 2-di-3 blocca una cifra.
+  /* a rete on-chain l'importo era uno solo: il 2-di-3 blocca una cifra.
      Barattozon in «Compra BTC» no (17 nov 2026 sera): la fascia la stringe
-     il PayCode di chi prende, e il 2-di-3 nasce su quello */
+     il PayCode di chi prende, e il 2-di-3 nasce su quello. Dal 27 nov 2026
+     (cantiere intervallo-onchain) nessuno, a leva accesa: la cifra la
+     sceglie chi prende, e il 2-di-3 nasce su quella, come per Barattozon */
   if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
-      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')) return;
+      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')
+      && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) return;
   if (p2pNuovoDue || p2pNuovoFisso || (tabacchinoP2P(p2pNuovoMetodi) && p2pLato !== 'compro')) return;
   /* ...e in una moneta pure (16 nov 2026, p2p-monete-valute) */
   if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(valutaFoglioP2P())) return;
@@ -111964,7 +113114,9 @@ async function inviaNuovoOrdineP2P(confermato){
      ⚠️ SU UN INTERVALLO IL POST DICE IL MINIMO, ed e' un mezzo vero
      DICHIARATO: la rotta vuole un intero e «20–100» non ci passa. Il
      capo basso e' il prezzo d'ingresso, quindi non e' una bugia — ma
-     racconta meno dell'ordine. Chi tocca quella rotta lo sistemi la'. */
+     racconta meno dell'ordine. Chi tocca quella rotta lo sistemi la'.
+     SISTEMATO IL 26 NOV 2026 (un utente via Tappo): il capo alto viaggia
+     a parte, `euro_max`, e il post dice «💶 da 20 a 100 €». */
   /* IN MONETA (16 nov 2026, p2p-monete-valute) la rotta vuole lo stesso
      un intero in euro — il controvalore del filo — e la cifra viaggia a
      parte; le cinque reti di USDe si dicono in breve, che il metodo del
@@ -112024,7 +113176,10 @@ async function inviaNuovoOrdineP2P(confermato){
                       /* la valuta dei franchi (14 nov 2026, cantiere p2p-chf) */
                       coinOrd ? coinOrd.cod : typeof chfP2P === 'function' && chfP2P(agg) ? 'CHF' : '',
                       /* ...e la cifra della moneta (16 nov 2026) */
-                      coinOrd ? testoQuantoCoinP2P(ord.euro, coinOrd.cod) : '');
+                      coinOrd ? testoQuantoCoinP2P(ord.euro, coinOrd.cod) : '',
+                      /* ...e il capo alto dell'intervallo (26 nov 2026): in
+                         moneta no, la' il post dice la cifra della moneta */
+                      coinOrd ? 0 : ord.euroMax);
     /* LA SPUNTA: il coordinatore ha risposto, l'ordine e' nel libro.
        Si ridisegna PRIMA la pagina sotto, cosi' quando il velo scende
        dice gia' «Ordine pubblicato» anche lei. */
@@ -116129,7 +117284,15 @@ function haOrdiniViviP2P(){
    a nord (5,8 e 47,9) e la scatola e' cresciuta (970 x 1250). Gli stessi
    numeri del generatore: una prova li tiene uguali. */
 const MAPPA_P2P_PROIEZIONE = { lon0: 5.8, lat1: 47.9, k: 100, cos: 0.7431, largo: 970, alto: 1250 };
-const MAPPA_P2P_RAGGIO_PX = 18;      // il pallino di un'offerta sola, in pixel
+/* I PALLINI PIU' PICCOLI (26 nov 2026, cantiere pallini-mappa, Andrea:
+   «i pallini arancioni troppo giganti, non si vede piu' la mappa»): con
+   la Svizzera la sagoma sta nella stessa scatola ma piu' piccola, e i
+   pallini da 18 px (fino a 30 coi grappoli) coprivano il Nord intero.
+   Ora 10 px, e un grappolo cresce di 0,75 px per annuncio in piu' fino
+   a 16: il numero ci sta ancora, la mappa si vede. Valgono per il libro
+   P2P e per il mercatino (stesso disegno). */
+const MAPPA_P2P_RAGGIO_PX = 10;      // il pallino di un'offerta sola, in pixel
+const MAPPA_P2P_CRESCITA_PX = 0.75;  // quanto cresce per ogni offerta in piu' (al piu' 8)
 const MAPPA_P2P_ZOOM = 2.5;          // quanto si avvicina un tocco o il ＋
 const MAPPA_P2P_LARGO_MIN = 40;      // la vista piu' stretta: ~50 km
 let p2pPosti = {};                   // ordine -> [lat, lon, «Nome (SIGLA)»], dal server
@@ -116423,7 +117586,7 @@ function disegnaMappaP2P(mostrati){
     + Math.min(6, 6 * upp).toFixed(2) + '" d="' + sagoma + '"/>' : '';
   p2pMappaGrappoli.forEach((g, i) => {
     const n = g.ids.length;
-    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * 1.5) * upp;
+    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * MAPPA_P2P_CRESCITA_PX) * upp;
     const scelto = g.comuni.length === 1 && g.comuni[0] === p2pMappaComune;
     const titolo = g.comuni.length === 1
       ? g.comuni[0] + ': ' + n + (n === 1 ? ' offerta' : ' offerte')
@@ -116431,11 +117594,11 @@ function disegnaMappaP2P(mostrati){
     dentro += '<g class="p2p-mappa-pin' + (scelto ? ' scelto' : '') + (g.comuni.length > 1 ? ' grappolo' : '')
       + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + esc(titolo) + '">'
       + '<circle cx="' + g.x.toFixed(1) + '" cy="' + g.y.toFixed(1) + '" r="' + rg.toFixed(2)
-      + '" stroke-width="' + (2.5 * upp).toFixed(2) + '"/>'
-      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (13 * upp).toFixed(2)
+      + '" stroke-width="' + (1.5 * upp).toFixed(2) + '"/>'
+      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (10 * upp).toFixed(2)
       + '" dy=".35em">' + n + '</text>'
       + ((vicino || g.comuni.length === 1 && p2pMappaGrappoli.length <= 6)
-        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 13 * upp).toFixed(1)
+        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 11 * upp).toFixed(1)
           + '" font-size="' + (12 * upp).toFixed(2) + '" stroke-width="' + (3 * upp).toFixed(2) + '">'
           + esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])
                 : nomeCortoMappaP2P(g.comuni[0]) + ' e ' + (g.comuni.length - 1) + ' vicin' + (g.comuni.length === 2 ? 'o' : 'i'))
@@ -116778,7 +117941,7 @@ function disegnaMappaMerc(){
     + Math.min(6, 6 * upp).toFixed(2) + '" d="' + sagoma + '"/>' : '';
   mercMappaGrappoli.forEach((g, i) => {
     const n = g.ids.length;
-    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * 1.5) * upp;
+    const rg = (MAPPA_P2P_RAGGIO_PX + Math.min(n - 1, 8) * MAPPA_P2P_CRESCITA_PX) * upp;
     const scelto = g.comuni.length === 1 && g.comuni[0] === mercMappaComune;
     const titolo = g.comuni.length === 1
       ? g.comuni[0] + ': ' + n + (n === 1 ? ' annuncio' : ' annunci')
@@ -116786,11 +117949,11 @@ function disegnaMappaMerc(){
     dentro += '<g class="p2p-mappa-pin' + (scelto ? ' scelto' : '') + (g.comuni.length > 1 ? ' grappolo' : '')
       + '" data-i="' + i + '" role="button" tabindex="0" aria-label="' + esc(titolo) + '">'
       + '<circle cx="' + g.x.toFixed(1) + '" cy="' + g.y.toFixed(1) + '" r="' + rg.toFixed(2)
-      + '" stroke-width="' + (2.5 * upp).toFixed(2) + '"/>'
-      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (13 * upp).toFixed(2)
+      + '" stroke-width="' + (1.5 * upp).toFixed(2) + '"/>'
+      + '<text x="' + g.x.toFixed(1) + '" y="' + g.y.toFixed(1) + '" font-size="' + (10 * upp).toFixed(2)
       + '" dy=".35em">' + n + '</text>'
       + ((vicino || g.comuni.length === 1 && mercMappaGrappoli.length <= 6)
-        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 13 * upp).toFixed(1)
+        ? '<text class="p2p-mappa-nome" x="' + g.x.toFixed(1) + '" y="' + (g.y + rg + 11 * upp).toFixed(1)
           + '" font-size="' + (12 * upp).toFixed(2) + '" stroke-width="' + (3 * upp).toFixed(2) + '">'
           + esc(g.comuni.length === 1 ? nomeCortoMappaP2P(g.comuni[0])
                 : nomeCortoMappaP2P(g.comuni[0]) + ' e ' + (g.comuni.length - 1) + ' vicin' + (g.comuni.length === 2 ? 'o' : 'i'))
@@ -118041,6 +119204,60 @@ function renderVetrinaP2P(){
   if (firma === p2pVetrinaFirma) return;
   p2pVetrinaFirma = firma;
   filaCardP2P(html, via, attesa);
+}
+/* GLI ORDINI P2P NEL NEGOZIO (26 nov 2026, cantiere jj-p2p, Andrea per
+   la pagina di JJ: «possiamo mettere una card sua che ha pubblicato nel
+   peer to peer o più card», e «quando scade l'annuncio peer to peer
+   potrebbe essere un problema»). Le card sono quelle della fila di
+   Esplora, dalla STESSA fotografia (`chiediFotoVetrinaP2P`) e con le
+   STESSE regole (`ordiniVetrinaP2P`: vivi, non scaduti, non in pausa),
+   quindi un ordine scaduto o preso sparisce da solo, e senza card il
+   riquadro non c'e'. Di chi e' un ordine lo dice il volto che il server
+   gli attacca (`negozio`: il codice, o lo username), che arriva solo a
+   chi ha una sessione, come nella fila: nessuna rotta nuova.
+   PURA: legge solo i volti in memoria. Sul proprio negozio si vedono
+   anche i propri, a differenza della fila (li' sono tolti perche' non si
+   possono prendere): qui il negozio si guarda com'e'. */
+function ordiniP2PNegozio(v, foto, lib, adesso){
+  const chi = String((v && (v.negozio || v.username)) || '');
+  if (!chi) return [];
+  const suo = f => !!f && String(f.negozio || '') === chi;
+  const ln = ordiniVetrinaP2P(foto, adesso, id => !suo(p2pFacce[id]))
+    .map(o => [Number(o.creato) || 0, cardVetrinaP2P(o)]);
+  const oc = (lib && typeof ordiniOnchainVetrinaP2P === 'function'
+      ? ordiniOnchainVetrinaP2P(Object.assign({}, lib, {miei: []}), adesso) : [])
+    .filter(o => suo(o))
+    .map(o => [Number(o.creato) || 0, cardVetrinaOnchainP2P(o)]);
+  return ln.concat(oc).sort((a, b) => b[0] - a[0])
+    .slice(0, P2P_VETRINA_MAX).map(x => x[1]);
+}
+async function negozioOrdiniP2P(v){
+  const box = el('negozioP2P'), fila = el('negozioP2PFila');
+  if (!box || !fila) return;
+  box.style.display = 'none';
+  fila.innerHTML = '';
+  const titV = el('negozioVetrinaTit');
+  if (titV) titV.style.display = '';
+  if (DEMO || !v || !(v.negozio || v.username)) return;
+  try { await chiediFotoVetrinaP2P(); } catch(e) { return; }
+  /* nel frattempo si e' aperto un altro negozio: il suo disegno e' suo */
+  if (negozioCorrente !== v) return;
+  const foto = p2pVetrinaFoto && Array.isArray(p2pVetrinaFoto.eventi) && p2pVetrinaFoto.eventi.length
+    ? Object.assign({}, p2pVetrinaFoto, {ordini: libroDaEventi(p2pVetrinaFoto.eventi).ordini})
+    : p2pVetrinaFoto;
+  const html = ordiniP2PNegozio(v, foto,
+    typeof p2pOnchainLibro !== 'undefined' ? p2pOnchainLibro : null);
+  if (!html.length) return;
+  fila.innerHTML = html.join('');
+  box.style.display = '';
+  /* SENZA OGGETTI IN VETRINA, niente «Il barattolo qui è vuoto» sotto le
+     card: il negozio non e' vuoto, vende sats. Titolo e griglia tornano a
+     ogni apertura (`apriNegozio`, `renderNegozio`) */
+  if (!document.querySelector('#negozioGrid .card')) {
+    const tit = el('negozioVetrinaTit'), grid = el('negozioGrid');
+    if (tit) tit.style.display = 'none';
+    if (grid) grid.innerHTML = '';
+  }
 }
 /* LA FOTOGRAFIA PER LA FILA: una GET leggera, che il server serve dalla
    memoria (cache privata di 30 s: un rientro in Esplora subito dopo non
@@ -122212,13 +123429,17 @@ function convenienzaCanaleP2P(ord){
   const p = Number(ord.premium);
   return Number.isFinite(p) ? Math.round(p) : null;
 }
-async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra){
+async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine, valuta, cifra, euroMax){
   if (DEMO || VETRINA || !myTgId) return;
   /* `premio`: per Barattozon il premio scelto (26 set 2026), che a
      prezzo fisso non sta in nessun campo del libro; dal 10 nov 2026
      anche la convenienza di ogni altro ordine (`convenienzaCanaleP2P`).
      Quando non si sa la chiave non c'e' e il post tace */
   const corpo = {lato: lato, euro: euro, metodo: metodo};
+  /* IL CAPO ALTO DI UN INTERVALLO (26 nov 2026, un utente via Tappo: la
+     vetrina diceva solo il minimo): il post scrive «💶 da 20 a 100 €»,
+     sulla stessa riga. Senza intervallo la chiave non c'e' */
+  if (Number(euroMax) > Number(euro)) corpo.euro_max = Number(euroMax);
   if (Number.isInteger(premio)) corpo.premio = premio;
   /* la valuta, solo per i franchi (14 nov 2026, cantiere p2p-chf): il
      server scrive «CHF» invece di «€», e senza resta l'euro di sempre */
@@ -122821,12 +124042,28 @@ function chatScortaP2P(forza){
     const vivi = Array.isArray(d.vivi) ? d.vivi : [];
     let cambiata = false;
     for (const pub of Object.keys(loc)) if (vivi.indexOf(pub) < 0) { delete loc[pub]; cambiata = true; }
-    const manca = (d.piena | 0) - (d.quante | 0);
-    if ((d.quante | 0) >= (d.ricarica | 0) || manca <= 0) {
+    /* I LUCCHETTI NATI A CASO CHE QUI NON SI APRONO (27 nov 2026, cantiere
+       bunker-dopo-chiusura): `nude` sono quelli in scorta senza seme. Se
+       la loro chiave segreta qui non c'e' — Tor Browser l'ha buttata alla
+       chiusura — il prossimo ordine nascerebbe con una chat che nessuno
+       apre. Col profilo in mano si RITIRANO tutti (anche quelli che qui si
+       aprono: dal profilo ogni dispositivo li ricalcola, a caso no) e la
+       scorta si rifa' dal profilo. Senza profilo non si tocca niente: un
+       lucchetto morto qui puo' essere vivo su un altro dispositivo. */
+    const nude = Array.isArray(d.nude) ? d.nude.filter(p => /^[0-9a-f]{64}$/.test(p)) : [];
+    const morti = nude.filter(p => !(p in loc));
+    if (((d.quante | 0) >= (d.ricarica | 0) || (d.piena | 0) <= (d.quante | 0)) && !morti.length) {
       if (cambiata) chatScortaScriviP2P(loc);
       return d;
     }
     const mz = await chatMercProfiloP2P();
+    const ritira = (mz && mz.sk) ? nude : [];
+    const quante = (d.quante | 0) - ritira.length;
+    const manca = (d.piena | 0) - quante;
+    if (!ritira.length && (quante >= (d.ricarica | 0) || manca <= 0)) {
+      if (cambiata) chatScortaScriviP2P(loc);
+      return d;
+    }
     const lucchetti = [];
     for (let i = 0; i < manca; i++) {
       if (mz && mz.sk) {
@@ -122841,7 +124078,13 @@ function chatScortaP2P(forza){
       }
     }
     chatScortaScriviP2P(loc);
-    d = await chatScFetch('scorta', {lucchetti: lucchetti});
+    d = await chatScFetch('scorta', {lucchetti: lucchetti, ritira: ritira});
+    /* i ritirati se ne vanno anche da qui: il server non li tiene piu' */
+    if (ritira.length && Array.isArray(d && d.vivi)) {
+      const ora = chatScortaLocaleP2P();
+      for (const pub of Object.keys(ora)) if (d.vivi.indexOf(pub) < 0) delete ora[pub];
+      chatScortaScriviP2P(ora);
+    }
     return d;
   })().catch(() => null).finally(() => { p2pChatScortaInVolo = null; });
   return p2pChatScortaInVolo;
@@ -122855,12 +124098,17 @@ function chatMercChiaveP2P(o){
 /* IL PROFILO DI SCAMBIO, se c'e': quello di questo dispositivo, o quello
    che si RITROVA (per chi entra da Telegram, dal suo account; per chi
    entra con Nostr, dalla nsec o dalla copia sui relay —
-   `adottaProfiloContoP2P`, che non ne fa mai nascere uno a caso). UNA
+   `adottaProfiloContoP2P`, che non ne fa mai nascere uno a caso; a
+   nascere, col suo posto sui relay, ci pensa `nasciProfiloChatP2P`). UNA
    volta per pagina: un 409 qui e' una risposta, non un guasto. */
 function chatMercProfiloP2P(){
   if (typeof mazzoMostro === 'function' && mazzoMostro()) return Promise.resolve(mazzoMostro());
   if (typeof adottaProfiloContoP2P !== 'function') return Promise.resolve(null);
-  if (!p2pChatMercProfilo) p2pChatMercProfilo = adottaProfiloContoP2P().catch(() => null);
+  /* ...e se non si ritrova, per un nativo Nostr NASCE con la sua copia
+     sui relay (27 nov 2026: `nasciProfiloChatP2P`, che dice il perche') */
+  if (!p2pChatMercProfilo) p2pChatMercProfilo = adottaProfiloContoP2P()
+    .then(m => m || (typeof nasciProfiloChatP2P === 'function' ? nasciProfiloChatP2P() : null))
+    .catch(() => null);
   return p2pChatMercProfilo;
 }
 /* LA CHIAVE DELL'ORDINE SI DICHIARA: dopo un ritiro, se questo
@@ -125238,7 +126486,9 @@ async function apriAnnuncioDaUrl(){
       if (r.ok) inCatalogo([mapListing(await r.json())]);
     } catch(e) {}
   }
-  openDetail(id);
+  /* il velo d'apertura scende a dettaglio aperto, mai prima (vedi
+     guscioArrivoAnnuncio): `finally`, che un guasto non lo tenga su */
+  try { openDetail(id); } finally { arrivoAnnuncioFatto(); }
 }
 
 /* /sicurezza — il link condivisibile della pagina «Il pagamento
@@ -125836,6 +127086,7 @@ function spegniLinkDaUrl(){
   /* ...e la porta del P2P non si aprira': il velo d'apertura non la
      aspetta (vedi IL LINK DEL P2P SENZA IL LAMPO DELLA HOME) */
   arrivoP2PFatto();
+  arrivoAnnuncioFatto();   /* ...ne' l'annuncio del link */
 }
 
 const BOZZA_URL = (location.search.match(/[?&]bozza=([a-z0-9-]{2,40})(?:&|$)/) || [])[1] || '';
@@ -126123,6 +127374,7 @@ async function avvia(){
     myCanaleNotifiche = me.canale_notifiche || '';
     myWebPush = (me.web_push && me.web_push.attivo && me.web_push.chiave)
       ? me.web_push : {attivo: false};
+    riprendiPushTelefono();   // le aveva accese? al rientro tornano da sole
     mySuggerimenti = !!me.suggerimenti_annunci;
     /* le offerte dei negozi (14 nov 2026): la chiave assente (un server
        di ieri) vale «attive», il default, e nessun negozio */
@@ -126323,7 +127575,7 @@ async function avvia(){
     /* (17 nov 2026) l'etichetta degli alimenti: accesa di serie, e solo
        un false esplicito del server la spegne */
     etichettaAttiva = me.etichetta_alimenti !== false;
-    etichettaObbligatoria = me.etichetta_obbligatoria !== false;
+    etichettaObbligatoria = me.etichetta_obbligatoria === true;
     nascondiAttivo = me.nascondi_annuncio === true;
     renderEtichettaForm();
     aggiornaBottoneMM();
@@ -126865,8 +128117,8 @@ tinteVociP2P();   /* le voci della barra P2P si accendono con uno strato */
    aspetta lei (un ordine condiviso si apre un attimo dopo la fine
    dell'avvio). Su ogni altro indirizzo `guscioArrivoP2P` e' gia'
    sciolta e la catena e' quella di ieri. */
-Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivoP2P]),
-                                  avvia().then(() => guscioArrivoP2P)]),
+Promise.allSettled([Promise.race([Promise.all([guscioVetrina, guscioArrivo]),
+                                  avvia().then(() => guscioArrivo)]),
                     document.fonts?.ready])
   .then(() => immaginiPronte())
   .finally(() => togliGuscio());
