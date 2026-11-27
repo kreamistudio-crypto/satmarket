@@ -97365,3 +97365,10 @@ merito). PROVATO: `prove_badge_nostr` con la parte 10 nuova (catalogo,
 soglie dello Specchiato una per una, rotta del ritiro). NON provato dal
 vivo: il ritiro sui relay veri, che è il gesto di Andrea in produzione.
 I numeri di quanti avevano i badge stanno nel database del VPS.
+
+## La leva dell'intervallo on-chain che non arrivava al telefono (27 nov 2026 pomeriggio, cantiere intervallo-oc-busta; Andrea in produzione: «Non vedo gli ordini a intervalli in un ordine on chain»)
+COSA. Dopo l'ottava promozione (788ef679) il foglio Pubblica on-chain non mostrava mai il «Da»: l'ordine on-chain partiva sempre a cifra unica, e quindi niente ordini a intervallo nel libro on-chain.
+PERCHÉ. Il server metteva `intervallo` nella busta del libro (`_p2p_onchain_libro`), ma `accogliLibroOnchainP2P` rifà `p2pOnchainLibro` da capo campo per campo e quel campo non l'avevo copiato: `intervalloOcAccesoP2P()` leggeva sempre undefined, cioè leva spenta. Le prove non potevano vederlo: il banco node del cantiere intervallo-onchain scriveva `p2pOnchainLibro` a mano, e il collaudo guarda solo il server.
+CURA. Una riga, `intervallo: busta.intervallo === true`, accanto a `barattozon`. LEZIONE: un banco che finge lo stato a mano non prova il filo che lo riempie; per una leva nuova nella busta il banco passa dalla funzione che legge la busta.
+PROVATO. In `prove_intervallo_onchain` un banco con la `accogliLibroOnchainP2P` vera: accesa solo con true (false, assente o «si» = spenta); controprova senza la riga, quattro false come in produzione.
+DA GUARDARE. Dopo la promozione, dal telefono: Pubblica → on-chain → «Fino a» e «Da»; gli ordini on-chain già nel libro restano a cifra unica (sono nati così).
