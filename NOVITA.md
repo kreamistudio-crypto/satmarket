@@ -1042,3 +1042,9 @@ frase: Anche gli ordini P2P on-chain possono avere un intervallo, «da 20 a 100 
 dove: P2P → + → «On-chain» → l'importo, secondo campo; nel libro la card «da … a …, scegli tu» → «Scegli» → «Quanto vuoi scambiare?».
 leva: P2P_ONCHAIN_INTERVALLO (accesa di serie)
 pubblico: sì
+
+## 2026-11-27 · intervallo-obbligatorio
+frase: Gli ordini P2P a prezzo di mercato ora sono sempre a intervallo: nel foglio Pubblica scrivi «Fino a» quanto vuoi scambiare, e accanto il «Da» parte già da 10 €. Se non vuoi ordini piccoli lo alzi tu. Più ampio è l'intervallo, più spesso il tuo ordine viene preso. Vale in Compra e in Vendi, su Lightning e on-chain; a prezzo fisso, con Barattozon e nelle monete l'importo resta uno solo.
+dove: P2P → + → «2. Quanto» → «Fino a» e «Da».
+leva: nessuna
+pubblico: sì

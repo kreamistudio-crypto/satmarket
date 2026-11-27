@@ -85246,7 +85246,10 @@ def prove_p2p_pubblica():
             # DAL 23 SET 2026 L'ORDINE E' ROVESCIATO: la prima
             # occorrenza e' la generica (la sezione dell'importo), la
             # seconda sta nel passo 2 del percorso Barattozon
-            _i2 = mini.index('id="%s"' % _id, _i + 1)
+            # (27 nov 2026, intervallo obbligatorio) la sezione dell'importo
+            # ha due vesti, «Fino a / Da» e la riga unica: quella del
+            # percorso e' l'ULTIMA occorrenza
+            _i2 = mini.rindex('id="%s"' % _id)
             # (9 ott 2026, sera) nel percorso e' la riga che apre il foglio
             # dell'importo, e il filtro dei centesimi e' il tastierino
             _tag2 = mini[_i2:_i2 + 400]
@@ -85255,8 +85258,8 @@ def prove_p2p_pubblica():
                   # (16 nov 2026) due decimali di serie, sei in ETH e XMR
                   and "if (i >= 0) return (b.length - i - 1 >= (Number(decimali) > 0 ? Number(decimali) : 2)) ? b : b + tasto;"
                   in pezzo_js(mini, "function tastoEuroTabP2P(bozza, tasto, interi, decimali){", "\n}\n"))
-            prova("...e la seconda occorrenza e' la sola: non ce n'e' una terza", -1,
-                  mini.find('id="p2pNuovoEuro"', _i2 + 1))
+            prova("...e le occorrenze sono tre: «Da», la riga unica e il percorso", 3,
+                  mini.count('id="p2pNuovoEuro"'))
             continue
         prova("il campo %s e' testo filtrato, non un number" % _id, True,
               'type="text"' in _tag and 'type="number"' not in _tag
@@ -200731,7 +200734,8 @@ def prove_intervallo_onchain():
           "all'intervallo anche on-chain, e i due capi partono solo a mercato, fuori da monete e PayCode",
           [3, 1],
           [mini.count("!(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())"),
-           mini.count("if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > 0\n"
+           # (27 nov 2026, intervallo obbligatorio) «Fino a» sopra il «Da»
+           mini.count("if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > interoP2P(campi.euro).n\n"
                       "      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {\n"
                       "    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;")])
 
@@ -217390,6 +217394,113 @@ console.log(JSON.stringify([a, viaEuroOrdiniPrendibili()]));
           and "o.stato === 'annullo_proposto' || o.stato === 'annullo_chiesto'" in _fn_js(mini, "function viaEuroPasso(o){"))
 
 
+
+def prove_intervallo_obbligatorio():
+    """GLI ORDINI P2P SEMPRE A INTERVALLO (27 nov 2026, Andrea: «obblighiamo
+    la gente nel peer to peer ad inserire solamente ordini ad intervallo…
+    dappertutto, Lightning, on-chain»). A prezzo di mercato, Compra e
+    Vendi, in euro, franchi o USDT: «Fino a» grande a sinistra (l'unico
+    che serve), «Da» piccolo a destra e gia' pieno col minimo (10). Restano a cifra unica il prezzo fisso, Barattozon e le
+    monete; on-chain solo a leva accesa. La scatola arancione resta, con
+    la frase nuova; il banner al primo tocco se ne va."""
+    import subprocess as _sp, tempfile as _tf, json as _js
+    print("\n[ordini P2P sempre a intervallo]")
+    mini = open(os.path.join(QUI, "miniapp.html"), encoding="utf-8").read()
+    prova("la frase nuova nella scatola arancione, con la cifra fissa sotto, e il minimo 10", True,
+          "const P2P_SPINTA_INTERVALLO = '💡 Più ampio è l\\'intervallo, più spesso il tuo ordine viene preso.';" in mini
+          and "const P2P_MINIMO_INTERVALLO = 10;" in mini
+          and "'<div class=\"p2p-spinta-intervallo\" id=\"p2pNuovoNotaDue\">' + esc(P2P_SPINTA_INTERVALLO)" in mini
+          and "const P2P_INTERVALLO_FISSA = 'Per una cifra fissa, scrivi lo stesso numero nei due campi.';" in mini
+          and "'<small class=\"p2p-spinta-fissa\">' + esc(P2P_INTERVALLO_FISSA)" in mini)
+    ob = _fn_js(mini, "function intervalloObbligatorioP2P(){")
+    prova("vale a mercato, anche in Compra e in ogni valuta; fuori il prezzo "
+          "fisso, Barattozon, le monete e l'on-chain a leva spenta", True,
+          "if (p2pNuovoFisso) return false;" in ob
+          and "if (tabacchinoP2P(p2pNuovoMetodi)) return false;" in ob
+          and "valutaCoinP2P(" in ob and "intervalloOcAccesoP2P()" in ob
+          and "p2pLato" not in ob and "'EUR'" in ob and "=== 'EUR'" not in ob)
+    ae = _fn_js(mini, "function apriEuroTabP2P(modo){")
+    prova("niente piu' banner al primo tocco; il foglio dice «Fino a» e "
+          "«Da»", True,
+          "p2pSpintaIntervallo" not in mini and "spintaIntervalloP2P" not in mini
+          and "'💶 Fino a'" in ae and "'💶 Da'" in ae and "facoltativo" not in ae)
+    rn = _fn_js(mini, "function renderNuovoOrdineP2P(){")
+    prova("il foglio: «Fino a» a sinistra e «Da» a destra, gia' pieno, coi soliti id", True,
+          "riempiDaP2P();" in rn and "intervalloObbligatorioP2P()" in rn
+          and rn.index("<small>Fino a</small>") < rn.index("<small>Da</small>")
+          and rn.index("id=\"p2pNuovoEuroMax\"") < rn.index("<small>Da</small>")
+          and "Da (facoltativo)" not in rn)
+    oc = pezzo_js(mini, "  /* L'INTERVALLO «DA… A…» (27 nov 2026, cantiere intervallo-onchain)", "\n  }\n")
+    prova("on-chain l'intervallo parte solo se «Fino a» supera il «Da»", True,
+          "interoP2P(campi.euroMax).n > interoP2P(campi.euro).n" in oc)
+    tp = _fn_js(mini, "function cambiaTipoPrezzoP2P(){")
+    prova("a prezzo fisso il «Fino a» diventa l'importo unico, e torna «Fino a» "
+          "tornando a mercato", True,
+          "if (interoP2P(p2pNuovoEuroMax).n > 0) p2pNuovoEuro = p2pNuovoEuroMax;" in tp
+          and "p2pNuovoEuroMax = String(interoP2P(p2pNuovoEuro).n); p2pNuovoEuro = '';" in tp)
+
+    prog = (
+        "const fmt = n => String(n);\n"
+        "const P2P_TABACCHINO = 'Barattozon';\n"
+        "const metodoBaseP2P = m => m;\n"
+        "const contantiAManoP2P = () => false;\n"
+        + _riga_js(mini, "const P2P_MINIMO_INTERVALLO = ")
+        + _fn_js(mini, "function interoP2P(testo){")
+        + _fn_js(mini, "function centesimiP2P(testo){")
+        + _fn_js(mini, "function tabacchinoP2P(metodi){")
+        + _fn_js(mini, "function giudiceContantiP2P(euro, metodi, tetto, cod){")
+        + _fn_js(mini, "function valeNuovoOrdineP2P(v){")
+        + _fn_js(mini, "function modoEuroP2P(m){")
+        + _fn_js(mini, "function giudizioEuroFoglioP2P(bozza, campi, modo){")
+        + r"""
+const B = {euro: '10', euroMax: '', metodi: ['SEPA'], lato: 'vendo', valuta: 'EUR', fisso: false,
+  intervallo: true, maxEuro: 0, maxEuroContanti: 0};
+const g = x => { const r = valeNuovoOrdineP2P(Object.assign({}, B, x)); return [r.ok, r.manca, r.campo]; };
+const f = (b, x, m) => giudizioEuroFoglioP2P(b, Object.assign({}, B, x), m).stato;
+const r = {
+  vuoto: g({}), chf: g({valuta: 'CHF'}), usdt: g({valuta: 'USDT', metodi: []}),
+  mille: g({euroMax: '1000'}), uguali: g({euroMax: '10'}), sotto: g({euroMax: '5'}),
+  daSotto: g({euro: '5', euroMax: '100'}), daSopra: g({euro: '500', euroMax: '100'}),
+  daAlto: g({euro: '500', euroMax: '1000'}), chfSotto: g({valuta: 'CHF', euroMax: '9'}),
+  vecchio: [valeNuovoOrdineP2P(Object.assign({}, B, {intervallo: false, euro: '30', euroMax: '30'})).manca,
+            valeNuovoOrdineP2P(Object.assign({}, B, {intervallo: false, euro: '5'})).ok],
+  foglio: [f('', {}, 'max'), f('', {}, 'min'), f('1000', {}, 'max'), f('5', {}, 'max'),
+           f('', {intervallo: false}, 'max'), f('', {intervallo: false}, 'min'),
+           f('10', {euroMax: '10'}, 'min'), f('20', {euroMax: '10'}, 'min')],
+};
+console.log(JSON.stringify(r));
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as fh:
+        fh.write(prog)
+        nome = fh.name
+    try:
+        out = _sp.run(["node", nome], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(nome)
+    if out.returncode != 0:
+        prova("il giudice dell'intervallo gira in node", "", out.stderr[-400:])
+        return
+    r = _js.loads(out.stdout)
+    prova("«Fino a» vuoto: la frase di sempre, sul campo «Fino a»", 
+          [False, "Scrivi l'importo in euro", "p2pNuovoEuroMax"], r["vuoto"])
+    prova("...in franchi e in USDT la sua valuta",
+          ["Scrivi l'importo in franchi", "Scrivi l'importo in USDT"], [r["chf"][1], r["usdt"][1]])
+    prova("da 10 a 1000 passa (il giudice va avanti ai metodi)", True, r["mille"][0])
+    prova("«Fino a» uguale al «Da» e' un importo solo, e passa", True, r["uguali"][0])
+    prova("sotto i 10, da una parte o dall'altra: «Troppo pochi: il minimo è 10 €»",
+          [[False, "Troppo pochi: il minimo è 10 €", "p2pNuovoEuroMax"],
+           [False, "Troppo pochi: il minimo è 10 €", "p2pNuovoEuro"],
+           "Troppo pochi: il minimo è 10 CHF"],
+          [r["sotto"], r["daSotto"], r["chfSotto"][1]])
+    prova("il «Da» sopra il «Fino a» e' storto; alzato sotto il «Fino a» va bene",
+          [[False, "L'importo massimo deve superare il primo", "p2pNuovoEuroMax"], True],
+          [r["daSopra"], r["daAlto"][0]])
+    prova("fuori dall'intervallo obbligatorio (prezzo fisso, monete) tutto come prima",
+          ["L'importo massimo deve superare il primo", True], r["vecchio"])
+    prova("il foglio: «Fino a» vuoto non si conferma, il «Da» vuoto si' (torna 10); "
+          "fuori regola com'era; il «Da» uguale al «Fino a» va, sopra no",
+          ["vuoto", "buono", "buono", "storto", "buono", "vuoto", "buono", "storto"], r["foglio"])
+
 def prove_chiedi_al_venditore():
     """CHIEDERE A CHI VENDE A CIFRA FISSA (24 nov 2026, cantiere
     chiedi-al-venditore; Andrea: uno alla volta, 10 minuti a testa,
@@ -217525,18 +217636,8 @@ def prove_chiedi_al_venditore():
           "if not canale_abbo:\n        await notifica(o[\"venditore_id\"], msg,\n"
           "                       (BOTTONE_ORDINE_VENDUTO," in inc_v
           and "elif entro:\n        await notifica(o[\"venditore_id\"]" not in inc_v)
-    sp = _fn_js(mini, "function spintaIntervalloP2P(){")
-    ae = _fn_js(mini, "function apriEuroTabP2P(modo){")
-    prova("la spinta all'intervallo: la frase di Andrea, solo a chi vende "
-          "sats in euro a prezzo di mercato, sempre in vista sotto "
-          "l'importo e in cima al foglio al primo tocco (26 nov 2026)", True,
-          "const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo "
-          "ordine viene preso molto più spesso.';" in mini
-          and "if (p2pLato === 'compro' || p2pNuovoFisso) return false;" in sp
-          and "return valutaFoglioP2P() === 'EUR';" in sp
-          and "'<div class=\"p2p-spinta-intervallo\" id=\"p2pNuovoNotaDue\">' + esc(P2P_SPINTA_INTERVALLO)" in mini
-          and "m.nome === 'min' && spintaIntervalloP2P()" in ae
-          and "localStorage.setItem('p2pSpintaIntervallo', '1')" in ae)
+    # la spinta del 26 nov e' diventata l'intervallo obbligatorio (27 nov
+    # 2026): la guarda `prove_intervallo_obbligatorio`
     asp = _fn_js(mini, "function viaEuroAspetta(){")
     prova("il foglio che aspetta va avanti da solo quando il match arriva nel "
           "libro", True, "if (viaEuroOfferta(viaEuroSats)) {" in asp
@@ -226746,7 +226847,7 @@ CATEGORIE = {
     riprendi_scaduto_onchain
     ritorno_da_solo_onchain
     conto_alla_rovescia_p2p conto_chi_aspetta
-    meta_cauzione_auto
+    meta_cauzione_auto intervallo_obbligatorio
     """.split(),
     "mercatino": """
     guida_wallet giroconto_interno non_hai_sats chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste premi_fedelta app_negozio cassa_solo_negozio
@@ -228038,6 +228139,7 @@ def main():
     prove_giroconto_interno,
     prove_non_hai_sats,
     prove_chiedi_al_venditore,
+    prove_intervallo_obbligatorio,
     prove_usdt_totale_euro,
     prove_indirizzo_resta_dove_sta,
     prove_scelta_rete_mercatino,
