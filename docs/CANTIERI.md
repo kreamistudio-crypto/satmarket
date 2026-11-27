@@ -97092,3 +97092,26 @@ rilascio, lo dice la prova dal vivo (DA-FARE, voce 35).
 Da guardare: la prova in produzione con Andrea e Alan, Lightning (Vendi e
 Compra) e on-chain; poi `P2P_RESTO_INTERVALLO_SOLO_ADMIN = False`, e allora
 la voce in NOVITA e in `assistente/sapere.md`.
+
+## Il menu del venditore nella scheda, in icone (27 nov 2026)
+
+Andrea: «semplifica il menu. Per modificare un articolo vicino al tasto
+share dovrebbe esserci la matitina… il tasto di copia che fa da duplica
+o occhio barrato per nascondere l'annuncio. Così in basso deve rimanere
+solo Lancia un'offerta lampo, oppure Apri un'estrazione. Widget per il
+web lo metterei come ulteriore icona sempre in alto». Fatto: in
+`openDetail` la fila `foto-azioni` in alto a destra porta, sul proprio
+annuncio normale (`azioniMie`), matita, duplica, occhio barrato e </>
+prima del condividi: cerchietti di carta da 44 come lui, cinque in 244px
+a 360 (40px sotto i 340). Guardie identiche ai bottoni di ieri (niente
+duplica e nascondi sull'importato, il nascondi solo a leva accesa;
+asta ed esaurito tengono i loro blocchi). In basso: lampo, estrazione,
+una riga leggera (`mio-altro`) con «🔄 Aggiorna i pezzi» e «🔑 Codici
+pronti», e l'uscita rossa.
+SCELTO E DETTO AD ANDREA: «Elimina» resta il bottone rosso in fondo (la
+sua decisione di ago 2026: il testuale spariva fra i ghost, proprio sul
+gesto che non torna indietro), e lo stock con i codici diventano una
+riga piccola invece che icone (sei cerchietti non stanno a 360 accanto
+all'indietro). PROVATO: giro dal vivo in Chromium a 390px, chiaro e
+scuro, nessun errore JavaScript; la prova del nascondi emendata alla
+fila in alto; suite severa.
