@@ -10152,6 +10152,25 @@ def init_db():
         data TEXT PRIMARY KEY,       -- 'AAAA-MM-GG', UTC
         prezzo_eur REAL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS cassa_movimenti(
+        -- LE VOCI A MANO DEI SOLDI (27 nov 2026, cantiere
+        -- cruscotto-guadagni): le entrate che non hanno un flusso da
+        -- leggere (Bitcoin Labs, altro) e le SPESE (abbonamenti, server,
+        -- API). `importo` in sats o in CENTESIMI di euro, secondo
+        -- `valuta`; `ricorrenza` una | mese | anno, da `giorno` fino a
+        -- `fine` ('' = ancora attiva). `da_chi` l'admin che l'ha scritta.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        verso TEXT NOT NULL,             -- entrata | spesa
+        fonte TEXT DEFAULT '',           -- bitcoin_labs | altro (entrate)
+        voce TEXT NOT NULL,
+        importo INTEGER NOT NULL,
+        valuta TEXT NOT NULL,            -- sats | eur
+        ricorrenza TEXT NOT NULL DEFAULT 'una',
+        giorno TEXT NOT NULL,            -- 'AAAA-MM-GG'
+        fine TEXT DEFAULT '',
+        creato INTEGER,
+        da_chi INTEGER DEFAULT 0
+    );
     CREATE TABLE IF NOT EXISTS fee_dinamica_stato(
         -- Lo split di OGGI fra compratore e venditore (set 2026), riga
         -- singola (id=1): il sentiment si ricalcola una volta al
@@ -39896,6 +39915,287 @@ async def cruscotto_admin(x_tg_init_data: str = Header(""),
             "swap": await dati_swap_cruscotto(),
             # il volume della pagina Cambio (11 nov 2026, volume-cambio)
             "cambi": dati_cambi_cruscotto(), "salute": dati_salute()}
+
+
+# --- I GUADAGNI E LE SPESE (27 nov 2026, cantiere cruscotto-guadagni) ---
+# Andrea: «vorrei immediatamente vedere i guadagni, cosa fondamentale. E
+# anche monitorare le spese». Sotto le tre domande del cruscotto, una
+# sezione sola coi soldi: quanto entra, da dove, e quanto esce.
+# LE FONTI AUTOMATICHE, nessuna nuova: il MERCATINO dagli ordini
+# 'released' (protezione + commissione: quel che resta a noi del
+# prezzo, `netto_venditore` con la commissione di OGGI — una stima per
+# gli ordini di quando era un'altra), il P2P dal registro `p2p_conti`
+# e dal 2-di-3 (le commissioni LORDE, come «Scambi P2P»), SATS ROUTING
+# dalla quota del wallet «swap» e gli ZAP dal salvadanaio. Ogni cosa
+# per il giorno in cui e' arrivata (UTC, come `_giorno`).
+# LE FONTI A MANO: Bitcoin Labs (la partnership del 27 nov, che non ha
+# un flusso nostro da leggere) e «altro», e le SPESE. Una riga per voce
+# in `cassa_movimenti`, in sats o in euro, una volta sola o ripetuta
+# ogni mese / ogni anno fino a quando la si ferma. Gli euro diventano
+# sats al prezzo DI QUEL GIORNO (`prezzo_storico`), o a quello di
+# adesso dove manca. Le vedono e le scrivono solo gli AMMINISTRATORI
+# (`vede_statistiche_p2p`): sono i conti, come quelli del P2P.
+FONTI_GUADAGNI = ("mercatino", "p2p", "sats_routing", "zap",
+                  "bitcoin_labs", "altro")
+FONTI_CASSA_A_MANO = ("bitcoin_labs", "altro")
+VERSI_CASSA = ("entrata", "spesa")
+RICORRENZE_CASSA = ("una", "mese", "anno")
+VALUTE_CASSA = ("sats", "eur")
+CASSA_MAX_SATS = 10 ** 12          # un tetto contro i refusi, non un limite vero
+CASSA_MAX_CENT = 10 ** 10          # 100 milioni di euro, idem
+
+
+def _date_ricorrenza_cassa(giorno: str, ricorrenza: str, fine: str,
+                           oggi: str) -> list:
+    """PURA: i giorni in cui una voce cade, da `giorno` fino a `fine`
+    (compreso; '' = mai fermata) e mai oltre `oggi`. Ogni mese lo
+    stesso numero del giorno, che nei mesi corti diventa l'ultimo (il 31
+    di febbraio e' il 28 o il 29); ogni anno uguale."""
+    from datetime import date
+    import calendar
+    try:
+        d0 = date.fromisoformat(giorno)
+        ultimo = date.fromisoformat(oggi)
+        if fine:
+            ultimo = min(ultimo, date.fromisoformat(fine))
+    except (TypeError, ValueError):
+        return []
+    if d0 > ultimo:
+        return []
+    if ricorrenza not in ("mese", "anno"):
+        return [d0.isoformat()]
+    out, passo = [], 1 if ricorrenza == "mese" else 12
+    for i in range(0, 12 * 200, passo):
+        a, m = d0.year + (d0.month - 1 + i) // 12, (d0.month - 1 + i) % 12 + 1
+        d = date(a, m, min(d0.day, calendar.monthrange(a, m)[1]))
+        if d > ultimo:
+            break
+        out.append(d.isoformat())
+    return out
+
+
+def serie_guadagni(mercatino: list, p2p: list, routing: list, zap: list,
+                   movimenti: list, prezzi: dict, eur_ora: float,
+                   oggi: str) -> dict:
+    """PURA: le serie GIORNALIERE della sezione «💰 Guadagni».
+    `mercatino` e `p2p` sono (giorno, volume, commissione); `routing` e
+    `zap` (giorno, sats); `movimenti` le righe di `cassa_movimenti`;
+    `prezzi` gli euro per bitcoin del giorno. Torna una riga per giorno
+    con qualcosa dentro: [giorno, volume mercatino, volume P2P,
+    commissioni mercatino, commissioni P2P, SATS Routing, zap, Bitcoin
+    Labs, altro, spese] — tutto in sats. `senza_cambio` conta le
+    rate in euro che non si sono potute convertire (nessun prezzo,
+    nemmeno quello di adesso): restano fuori, e la pagina lo dice."""
+    righe, senza = {}, 0
+
+    def riga(g):
+        return righe.setdefault(g, [0] * 9)
+    for g, vol, comm in mercatino:
+        r = riga(g)
+        r[0] += int(vol)
+        r[2] += int(comm)
+    for g, vol, comm in p2p:
+        r = riga(g)
+        r[1] += int(vol)
+        r[3] += int(comm)
+    for g, s in routing:
+        riga(g)[4] += int(s)
+    for g, s in zap:
+        riga(g)[5] += int(s)
+    for m in movimenti:
+        for g in _date_ricorrenza_cassa(m["giorno"], m["ricorrenza"],
+                                        m.get("fine") or "", oggi):
+            if m["valuta"] == "eur":
+                p = float(prezzi.get(g) or 0) or float(eur_ora or 0)
+                if p <= 0:
+                    senza += 1
+                    continue
+                sats = int(round(int(m["importo"]) / 100 / p * 1e8))
+            else:
+                sats = int(m["importo"])
+            r = riga(g)
+            if m["verso"] == "spesa":
+                r[8] += sats
+            else:
+                r[6 if m["fonte"] == "bitcoin_labs" else 7] += sats
+    return {"giorni": [[g, *righe[g]] for g in sorted(righe)],
+            "senza_cambio": senza}
+
+
+def _fonti_guadagni(con, adesso: int) -> tuple:
+    """Le quattro fonti automatiche, lette dai loro database: (mercatino,
+    p2p, routing, zap) nella forma di `serie_guadagni`. Un database che
+    manca (un server senza P2P, senza zap) vale una lista vuota."""
+    mercatino = []
+    for o in con.execute(
+            "SELECT creato, prezzo_sats, COALESCE(protezione_sats,0) AS pr "
+            "FROM ordini WHERE stato='released' AND COALESCE(prova,0)=0"):
+        prezzo = int(o["prezzo_sats"] or 0)
+        nostro = max(0, prezzo - netto_venditore(prezzo - int(o["pr"])))
+        mercatino.append((_giorno(o["creato"] or 0), prezzo, nostro))
+    p2p = []
+    try:
+        _consolida_conti_p2p(con, adesso)
+        righe = [dict(r) for r in con.execute(
+            "SELECT chiuso, sats, sats_venditore, sats_compratore FROM "
+            "p2p_conti WHERE esito='completato'")]
+    except sqlite3.OperationalError:
+        righe = []
+    try:
+        righe += [r for r in _conti_onchain_p2p(
+            con, _leggi_onchain_conti_p2p())["righe"]
+            if r["esito"] == "completato"]
+    except Exception as e:
+        print(f"⚠️ Guadagni: il P2P on-chain non si legge ({e})")
+    for r in righe:
+        v, c = int(r["sats_venditore"] or 0), int(r["sats_compratore"] or 0)
+        comm = v - c if v > 0 and c > 0 and v >= c else 0
+        p2p.append((_giorno(r["chiuso"] or 0), int(r["sats"] or 0), comm))
+    routing, zap = [], []
+    for apri, tabella, dove in ((_swap_db, "swap_quota", routing),
+                                (_zap_db, "zap", zap)):
+        try:
+            c2 = apri()
+        except Exception:
+            continue
+        try:
+            dove.extend((_giorno(r["pagato_il"] or 0), int(r["sats"] or 0))
+                        for r in c2.execute(
+                            f"SELECT pagato_il, sats FROM {tabella} "
+                            "WHERE stato='pagato'"))
+        except sqlite3.OperationalError:
+            pass
+        finally:
+            c2.close()
+    return mercatino, p2p, routing, zap
+
+
+def _movimenti_cassa(con) -> list:
+    return [dict(r) for r in con.execute(
+        "SELECT id, verso, fonte, voce, importo, valuta, ricorrenza, giorno, "
+        "COALESCE(fine,'') AS fine, creato FROM cassa_movimenti "
+        "ORDER BY giorno DESC, id DESC")]
+
+
+def _solo_amministratori(x_tg_init_data, barattolo_sessione) -> dict:
+    """Il controllo delle rotte dei soldi: il PRIMO gesto, prima del
+    database. Lo stesso giudice dei conti del P2P."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not vede_statistiche_p2p(user["id"]):
+        raise HTTPException(403, "Riservato agli amministratori")
+    return user
+
+
+@app.get("/api/admin/guadagni")
+async def guadagni_admin(x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: le serie della sezione «💰 Guadagni» di
+    `/admin` e le voci scritte a mano. A raggruppare e a scegliere il
+    periodo ci pensa la pagina, come per gli iscritti."""
+    _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    try:
+        eur_ora = await cambio_btc_eur()
+    except Exception:
+        eur_ora = cambio_noto_ora()
+    adesso = int(time.time())
+    con = db()
+    try:
+        fonti = _fonti_guadagni(con, adesso)
+        movimenti = _movimenti_cassa(con)
+        prezzi = {r["data"]: float(r["prezzo_eur"] or 0) for r in
+                  con.execute("SELECT data, prezzo_eur FROM prezzo_storico")}
+    finally:
+        con.close()
+    dati = serie_guadagni(*fonti, movimenti, prezzi, eur_ora, _giorno(adesso))
+    dati.update(movimenti=movimenti, eur_per_btc=eur_ora,
+                commissione_percento=float(COMMISSIONE_PERCENTO or 0),
+                generato=adesso)
+    return JSONResponse(dati, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/admin/cassa")
+async def cassa_aggiungi_admin(req: Request,
+                               x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: una voce nuova, entrata a mano (Bitcoin Labs,
+    altro) o spesa. Tutto passa da un vocabolario o da una forma: la voce
+    e' testo di un admin ma la pagina la scrive sempre con `esc`."""
+    user = _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    from datetime import date
+    verso = str(d.get("verso") or "")
+    fonte = str(d.get("fonte") or "altro") if verso == "entrata" else ""
+    valuta = str(d.get("valuta") or "")
+    ricorrenza = str(d.get("ricorrenza") or "una")
+    voce = " ".join(str(d.get("voce") or "").split())[:60]
+    giorno = str(d.get("giorno") or "")
+    if (verso not in VERSI_CASSA or valuta not in VALUTE_CASSA
+            or ricorrenza not in RICORRENZE_CASSA
+            or (verso == "entrata" and fonte not in FONTI_CASSA_A_MANO)):
+        raise HTTPException(400, "Voce non valida")
+    if not voce:
+        raise HTTPException(400, "Scrivi di cosa si tratta")
+    try:
+        date.fromisoformat(giorno)
+    except ValueError:
+        raise HTTPException(400, "Data non valida")
+    try:
+        importo = float(str(d.get("importo") or "").replace(",", "."))
+    except ValueError:
+        raise HTTPException(400, "Importo non valido")
+    importo = int(round(importo * 100)) if valuta == "eur" else int(importo)
+    if importo <= 0 or importo > (CASSA_MAX_CENT if valuta == "eur"
+                                  else CASSA_MAX_SATS):
+        raise HTTPException(400, "Importo non valido")
+    con = db()
+    try:
+        con.execute(
+            "INSERT INTO cassa_movimenti(verso, fonte, voce, importo, valuta, "
+            "ricorrenza, giorno, fine, creato, da_chi) "
+            "VALUES (?,?,?,?,?,?,?,'',?,?)",
+            (verso, fonte, voce, importo, valuta, ricorrenza, giorno,
+             int(time.time()), int(user["id"])))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
+
+
+@app.post("/api/admin/cassa/{mid}/ferma")
+def cassa_ferma_admin(mid: int, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: una voce che si ripete smette da OGGI (la
+    disdetta di un abbonamento). Le rate gia' cadute restano nei conti."""
+    _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        n = con.execute("UPDATE cassa_movimenti SET fine=? WHERE id=? AND "
+                        "ricorrenza!='una' AND COALESCE(fine,'')=''",
+                        (_giorno(time.time()), int(mid))).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(404, "Voce non trovata o già ferma")
+    return {"ok": True}
+
+
+@app.delete("/api/admin/cassa/{mid}")
+def cassa_cancella_admin(mid: int, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO AMMINISTRATORI: via una voce sbagliata, con tutta la sua
+    storia (per una disdetta c'e' «Ferma», che la storia la tiene)."""
+    _solo_amministratori(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        n = con.execute("DELETE FROM cassa_movimenti WHERE id=?",
+                        (int(mid),)).rowcount
+        con.commit()
+    finally:
+        con.close()
+    if not n:
+        raise HTTPException(404, "Voce non trovata")
+    return {"ok": True}
 
 
 @app.get("/api/admin/stats")

@@ -126343,6 +126343,54 @@ def prove_indirizzo_lightning():
           and "/.well-known/lnurlp/zap" in prod)
 
 
+def prove_cruscotto_guadagni():
+    """💰 I GUADAGNI E LE SPESE nel cruscotto (27 nov 2026, cantiere
+    cruscotto-guadagni): le date delle voci che si ripetono, le serie per
+    fonte, gli euro al prezzo del giorno, e le rotte dei soldi chiuse a
+    chi non vede i conti."""
+    print("\n💰 Il cruscotto: guadagni per fonte e spese a mano")
+    amb = {}
+    exec(pezzo("_date_ricorrenza_cassa") + "\n\n" + pezzo("serie_guadagni"), amb)
+    d = amb["_date_ricorrenza_cassa"]
+    prova("ogni mese: il 31 diventa l'ultimo dei mesi corti, mai oltre oggi",
+          ["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"],
+          d("2026-01-31", "mese", "", "2026-05-02"))
+    prova("...ogni anno fino al giorno in cui la si ferma",
+          ["2024-02-29", "2025-02-28", "2026-02-28"],
+          d("2024-02-29", "anno", "2026-03-01", "2026-11-27"))
+    prova("...una voce nel futuro non cade ancora", [],
+          d("2026-12-01", "una", "", "2026-11-27"))
+    sg = amb["serie_guadagni"](
+        [("2026-11-01", 1000, 20)], [("2026-11-01", 5000, 50)],
+        [("2026-11-02", 7)], [("2026-11-03", 9)],
+        [{"verso": "spesa", "fonte": "", "importo": 2000, "valuta": "eur",
+          "ricorrenza": "una", "giorno": "2026-10-15", "fine": ""},
+         {"verso": "entrata", "fonte": "bitcoin_labs", "importo": 500,
+          "valuta": "sats", "ricorrenza": "una", "giorno": "2026-11-03",
+          "fine": ""}],
+        {"2026-10-15": 80000.0}, 90000.0, "2026-11-27")
+    prova("le colonne per giorno: volumi, commissioni, SATS Routing, zap, "
+          "Bitcoin Labs, altro, spese (20 € al prezzo DI QUEL GIORNO)",
+          [["2026-10-15", 0, 0, 0, 0, 0, 0, 0, 0, 25000],
+           ["2026-11-01", 1000, 5000, 20, 50, 0, 0, 0, 0, 0],
+           ["2026-11-02", 0, 0, 0, 0, 7, 0, 0, 0, 0],
+           ["2026-11-03", 0, 0, 0, 0, 0, 9, 500, 0, 0]], sg["giorni"])
+    for rotta in ("guadagni_admin", "cassa_aggiungi_admin",
+                  "cassa_ferma_admin", "cassa_cancella_admin"):
+        r = pezzo(rotta)
+        prova(f"{rotta}: il controllo degli amministratori e' il primo gesto",
+              True, "_solo_amministratori(" in r
+              and r.index("_solo_amministratori(") < r.find("db()"))
+    prova("...e il giudice e' quello dei conti P2P", True,
+          "vede_statistiche_p2p(user" in pezzo("_solo_amministratori"))
+    pagina = open("admin.html", encoding="utf-8").read()
+    prova("la pagina: la voce scritta a mano passa da esc(), e la sezione "
+          "nasce solo per chi vede i conti", True,
+          "esc(m.voce)" in pagina
+          and "if (!D || !D.p2p_statistiche) return '';" in pagina
+          and "if (D.p2p_statistiche) caricaGuadagni();" in pagina)
+
+
 def prove_grazie_zap():
     """IL GRAZIE A CHI CI FA UNO ZAP (25 nov 2026, cantiere grazie-zap).
     Andrea: il grazie «a tutti, anche chi ci manda 1 sat», il premio
@@ -133088,10 +133136,14 @@ def prove_cruscotto_semplice():
                        "<h2>Fee di routing</h2>", "<h2>I canali del nodo</h2>",
                        "${cardZap(D.zap)}", "${cardDisputeP2P(D.dispute_p2p)}")
            if pagina.find(x) < altro])      # -1 = sparita: rosso, non un'eccezione
-    prova("in cima, nell'ordine: da fare, salute, settimana, grafico", True,
+    # dal 27 nov 2026 (cantiere cruscotto-guadagni) sotto le tre domande
+    # ci sono i guadagni, e il grafico ordini P2P / prezzo e' in «Altro»
+    prova("in cima, nell'ordine: da fare, salute, settimana, guadagni; il "
+          "grafico P2P in «Altro»", True,
           pagina.index("${sezioneDaFare()}") < pagina.index("${sezioneSalute(L)}")
-          < pagina.index("${sezioneSettimana()}") < pagina.index("${sezioneGrafico()}")
-          < altro)
+          < pagina.index("${sezioneSettimana()}")
+          < pagina.index('<div id="sezGuadagni">${sezioneGuadagni()}</div>')
+          < altro < pagina.index("${sezioneGrafico()}"))
     prova("la sezione degli Scambi P2P nasce nascosta e si mostra solo DOPO "
           "il controllo del 403", True,
           'id="p2pBox" hidden' in pagina
@@ -229382,6 +229434,7 @@ def main():
               prove_recensioni_nascondibili,
               prove_x_risonanza,
               prove_indirizzo_lightning, prove_grazie_zap,
+              prove_cruscotto_guadagni,
               prove_indirizzo_swap,
               prove_logo_compra_vendi,
               prove_avviso_dm_nostr,
