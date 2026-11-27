@@ -1399,6 +1399,10 @@ Pubblica lo stesso
 ✕
  sats
 💰 Offri
+## Prima di comprare
+✕
+Entra nella comunità del negozio su Telegram, poi torna qui e completa l'acquisto.
+Continua all'acquisto
 ## 🎁 Lascia una mancia
 ✕
  sats
@@ -1444,6 +1448,10 @@ I tuoi articoli
 Incassa
 🧾 Le vendite della cassa, in «Ordini»
 💡 Chi compra inquadra il QR con qualsiasi wallet: non serve un account. I sats vanno dritti al tuo wallet, senza deposito di garanzia e senza commissioni: è un pagamento di persona, come al banco.
+
+<!-- pezzo schermata-041 | schermata -->
+## Schermata «On-chain e finestre della Mini App» · Incassa sats (3/5)
+
 ## Incassa sats
 chi paga inquadra il QR col suo wallet, o tocca il testo per copiarlo
 🔁 Gira verso il cliente
@@ -1453,10 +1461,6 @@ Annulla il conto
 🏪 Torna alla cassa
 ✕
  sats
-
-<!-- pezzo schermata-041 | schermata -->
-## Schermata «On-chain e finestre della Mini App» · 💰 Offri per tutto il carrello (3/5)
-
 ## 💰 Offri per tutto il carrello
 €
 ₿
