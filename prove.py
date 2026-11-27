@@ -200866,6 +200866,35 @@ def prove_intervallo_onchain():
            mini.count("if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > interoP2P(campi.euro).n\n"
                       "      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {\n"
                       "    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;")])
+    # LA LEVA CHE NON ARRIVAVA (27 nov 2026 pomeriggio, Andrea in produzione:
+    # «Non vedo gli ordini a intervalli in un ordine on chain»). Il server
+    # mandava `intervallo` nella busta, ma `accogliLibroOnchainP2P` rifaceva
+    # p2pOnchainLibro da capo senza copiarlo: il «Da» on-chain non compariva
+    # MAI. Il banco di sopra scriveva p2pOnchainLibro a mano e non poteva
+    # vederlo; questo passa dalla funzione vera che legge la busta.
+    accogli = pezzo_js(mini, "function accogliLibroOnchainP2P(busta){", "\n}\n") + "\n}\n"
+    leva = pezzo_js(mini, "function intervalloOcAccesoP2P(){", "\n}\n") + "\n}\n"
+    banco_leva = ("let p2pOnchainLibro = {eventi: [], miei: [], quando: 0};\n"
+                  "let p2pOnchainLetto = 0;\n"
+                  "const vestiOcP2P = o => o, onchainRete = () => ({nome: 'signet'});\n")
+    giro_leva = ("const f = [];\n"
+                 "accogliLibroOnchainP2P({eventi: [], intervallo: true}); f.push(intervalloOcAccesoP2P());\n"
+                 "accogliLibroOnchainP2P({eventi: [], intervallo: false}); f.push(intervalloOcAccesoP2P());\n"
+                 "accogliLibroOnchainP2P({eventi: []}); f.push(intervalloOcAccesoP2P());\n"
+                 "accogliLibroOnchainP2P({eventi: [], intervallo: 'si'}); f.push(intervalloOcAccesoP2P());\n"
+                 "console.log(JSON.stringify(f));\n")
+    out_leva = _node_banco(banco_leva + accogli + leva + giro_leva)
+    rotto_leva = accogli.replace("    intervallo: busta.intervallo === true,\n", "")
+    out_rotto = _node_banco(banco_leva + rotto_leva + leva + giro_leva)
+    if out_leva is None:
+        salta("la leva dell'intervallo letta dalla busta vera", "node non installato")
+    else:
+        prova("la leva dell'intervallo arriva al foglio passando dalla busta vera: accesa solo "
+              "con un true (server di ieri o storta = spenta)",
+              [True, False, False, False], out_leva)
+        prova("controprova: senza la riga in accogliLibroOnchainP2P il «Da» on-chain non "
+              "compare mai, come in produzione il 27 nov",
+              [True, [False, False, False, False]], [rotto_leva != accogli, out_rotto])
 
 
 def prove_resto_intervallo():

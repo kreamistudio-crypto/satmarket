@@ -78989,6 +78989,10 @@ function accogliLibroOnchainP2P(busta){
     lnPossibile: !!busta.lnPossibile, depositoLnPossibile: !!busta.depositoLnPossibile,
     /* Barattozon anche on-chain (17 nov 2026): la leva del server */
     barattozon: busta.barattozon !== false,
+    /* l'intervallo «da… a…» anche on-chain (27 nov 2026): la leva del
+       server. Mancava qui e il foglio Pubblica non mostrava mai il «Da»
+       on-chain (Andrea in produzione, 27 nov 15:30) */
+    intervallo: busta.intervallo === true,
     /* la cauzione di chi prende in contanti (17 nov 2026 sera): la leva
        e la regola del server; null = spenta, o server di ieri */
     cauzione: busta.cauzione && busta.cauzione.accesa === true
