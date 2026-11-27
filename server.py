@@ -138593,6 +138593,22 @@ async def _bitpost_catalogo() -> dict:
     return d
 
 
+def bitpost_pagamento_con_indirizzo(p) -> dict:
+    """PURA: il pagamento di Bitpost con l'`address` sempre scritto. La API
+    vera (27 nov 2026) manda solo `destination`, un link
+    «bitcoin:<indirizzo>?amount=...»: l'indirizzo si ricava da li', perche'
+    l'app lo mostra e lo copia a parte."""
+    p = dict(p or {})
+    if not p.get("address"):
+        dest = str(p.get("destination") or "")
+        if dest.lower().startswith("bitcoin:"):
+            dest = dest[8:]
+        indirizzo = dest.split("?", 1)[0].strip()
+        if re.fullmatch(r"[A-Za-z0-9]{14,90}", indirizzo):
+            p["address"] = indirizzo
+    return p
+
+
 def bitpost_minimo_bitcoin(catalogo: dict) -> int:
     """PURA: il minimo in centesimi della rete Bitcoin (0 se non c'e')."""
     for n in (catalogo or {}).get("networks") or []:
@@ -138770,7 +138786,10 @@ async def bitpost_crea(req: Request, x_tg_init_data: str = Header(""),
              "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
              "denomination": int(d["taglio"]), "quantity": int(d["quanti"]),
              "selected_fee": int(quota),
-             "expected_published_fee": BITPOST_QUOTA_TOTALE}
+             "expected_published_fee": BITPOST_QUOTA_TOTALE,
+             # la rete va DETTA: senza, Bitpost sceglie Liquid (visto dal
+             # vivo il 27 nov 2026), con un'altra commissione e niente 2-di-3
+             "network": "Bitcoin"}
     o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
     adesso = int(time.time())
     con = _bitpost_db()
@@ -138873,7 +138892,8 @@ async def bitpost_ordine(oid: int, x_tg_init_data: str = Header(""),
     except (TypeError, ValueError):
         fuori["carta"] = {}
     if ruolo == "compratore" and st == 2:
-        fuori["pagamento"] = await _bitpost_chiama("GET", f"/orders/{oid}/payment")
+        fuori["pagamento"] = bitpost_pagamento_con_indirizzo(
+            await _bitpost_chiama("GET", f"/orders/{oid}/payment"))
     if st in BITPOST_INCASSABILI or st == 10:
         p = await _bitpost_chiama("GET", f"/orders/{oid}/payouts")
         fuori["incasso"] = next((x for x in p.get("payouts") or []
@@ -139388,7 +139408,10 @@ async def bitpost_offerta_compra(fid: int, req: Request,
              "webhook_url": URL_PUBBLICO.rstrip("/") + "/api/bitpost/webhook",
              "denomination": int(d["taglio"]), "quantity": int(d["quanti"]),
              "selected_fee": BITPOST_QUOTA_TOTALE - int(f["quota"]),
-             "expected_published_fee": BITPOST_QUOTA_TOTALE}
+             "expected_published_fee": BITPOST_QUOTA_TOTALE,
+             # la rete va DETTA: senza, Bitpost sceglie Liquid (visto dal
+             # vivo il 27 nov 2026), con un'altra commissione e niente 2-di-3
+             "network": "Bitcoin"}
     try:
         o = await _bitpost_chiama("POST", "/shoppycode/orders", corpo)
     except HTTPException:
