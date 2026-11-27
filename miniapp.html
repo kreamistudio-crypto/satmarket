@@ -87216,8 +87216,11 @@ let viaEuroNonHo = [];
    nostro, e con un sat in meno il deposito non si salda (il server ne
    ammette in piu' fino al 3% o a un euro e mezzo, l'euro intero compreso) */
 const VIA_EURO_MARGINE = 0.005;
+/* ANCHE A CHI HA UN WALLET (27 nov 2026, Andrea: «metti il tasto visibile
+   anche se hai gia' un wallet registrato»): fino a ieri solo a chi nel
+   profilo non aveva ne' Lightning address ne' wallet on-chain */
 function viaEuroPerMe(){
-  return !!myViaEuro && !myLnAddress && !myOnchainIncasso && !DEMO && !VETRINA;
+  return !!myViaEuro && !DEMO && !VETRINA;
 }
 /* PURA. L'offerta piu' conveniente del libro per avere `sats` nel
    deposito: chi VENDE sats in euro, a prezzo di mercato (di un prezzo
@@ -87286,7 +87289,9 @@ function viaEuroOfferta(sats){
                           valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI);
   if (!o) return null;
   /* il tetto in euro vale per gli euro; in franchi non c'e' (Andrea) */
-  if (valuta === 'EUR' && (!(myViaEuroMax > 0) || o.euro > myViaEuroMax)) return null;
+  /* ...e dal 27 nov 2026 il tetto in euro e' tolto di serie (Andrea: «leviamo
+     il tetto massimo dei 100 euro»): 0 = nessun tetto, una riga lo rimette */
+  if (valuta === 'EUR' && myViaEuroMax > 0 && o.euro > myViaEuroMax) return null;
   return o;
 }
 /* il libro, se manca o e' vecchio, si legge in sottofondo e poi si
@@ -87688,7 +87693,7 @@ function viaEuroFissi(ordini, sats, perSat, fee, miei, nonHo){
   return fuori.slice(0, 50).map(c => ({id: c.id, euro: c.euro, tot: c.tot}));
 }
 function viaEuroFissiOra(sats){
-  if (!viaEuroPerMe() || !p2pLibro || !(sats > 0) || !(myViaEuroMax > 0)) return [];
+  if (!viaEuroPerMe() || !p2pLibro || !(sats > 0)) return [];
   const perSat = (cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
   const fee = commissioneVivaP2P();
   if (fee === null) return [];
