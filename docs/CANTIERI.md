@@ -97387,3 +97387,12 @@ PROVATO: le due sezioni di prove.py qui sopra, verdi; la pagina disegnata in Chr
 
 DA GUARDARE: se un referral di Bitcoin Labs arriva sull'indirizzo degli zap, sta già fra gli Zap (la nota della pagina dice di non scriverlo due volte); il mercatino on-chain, se un giorno avrà una fee, passa dagli stessi ordini 'released'.
 SEGUITO, lo stesso giorno (Andrea: «volumi e guadagni dovrebbero stare nello stesso grafico con un selettore per semplificare»): i due riquadri diventano uno, con in cima il selettore «Guadagni» | «Volumi e commissioni» (`vistaGU`, di serie Guadagni). «Da dove arrivano» resta sotto la vista Guadagni. Provato in Chromium a 390 px, le due viste.
+
+### 27 nov 2026 · «Non hai sats?»: il tempo stretto si vede, e vince l'ordine con più tempo (cantiere via-euro-tempo)
+Andrea: «deve essere molto chiaro che comunque il tempo per quell'ordine è molto stringente», pensando agli ordini P2P a 15 minuti. Scelta sua sulla card: «Riquadro ⏱ + ordine con più tempo».
+
+DECISO. (1) `viaEuroScelta` prende un nono argomento, `minutiDi` (dal client `minutiPagareOrdineP2P`), e fra gli ordini che vanno bene preferisce quello con PIÙ minuti per pagare: 0 vale 24 ore (`VIA_EURO_MINUTI_SERIE = 1440`), poi la cifra più bassa, poi il più recente come prima. Così un ordine a 15 minuti esce solo se è l'unico. (2) Nel riquadro «Non hai sats?», prima di «Continua», se l'ordine scelto ha un tempo corto compare il riquadro del tempo che lo scambio usa già (`rigaTempoPagareScambioP2P` nello stato «fermo»: «⏱ Avrai X per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.»). Nessuna scritta nuova: è il testo già approvato dello scambio. A 24 ore non compare niente.
+
+SCARTATE: escludere del tutto gli ordini a tempo corto (meno venditori trovati, e Andrea ha scelto di mostrarli); una frase nuova solo per «Non hai sats?» (le scritte nuove vogliono il suo ok, quella dello scambio c'era già).
+
+PROVATO: `prove_non_hai_sats` con tre casi nuovi (sceglie quello con più tempo; fra due corti quello più lungo, minuti 60; senza `minutiDi` come prima) e la sentinella del riquadro prima di «Continua»; suite severa e collaudi nel cloud. NON provato dal vivo: si guarda alla prima offerta vera su un ordine a 15–30 minuti.
