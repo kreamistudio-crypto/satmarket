@@ -116593,6 +116593,80 @@ def prove_famiglie():
           True, "navSostituisci = true;\n  openDetail(id);" in mini
           and "const sostituisci = navSostituisci; navSostituisci = false;"
           in mini)
+    # LA SCHEDA RESTA DOV'E' (27 nov 2026, Andrea dal telefono: a ogni
+    # colore la scheda tornava in cima e la foto restava vuota un attimo).
+    # Il tocco si GIRA in node con un DOM di cartone: i bottoncini restano
+    # alla stessa altezza di schermo anche se sopra il titolo cresce, la
+    # foto della sorella e' gia' scaricata quando si scambia, una foto
+    # che non arriva non ferma lo scambio oltre il mezzo secondo, e un
+    # tocco vecchio (o la scheda lasciata) non vince su quel che c'e' ora.
+    scelta = pezzo_js(mini, "let giroVariante = 0;", "\n\n")
+    banco = "\n".join([
+        "let scroll = 600, A = 860, vista = 'view-dettaglio', navSostituisci = false;",
+        "let currentListing = {id: 1};",
+        "const aperti = [], pronte = new Set(), lente = {};",
+        "const window = {get scrollY(){ return scroll; }, scrollTo(x, y){ scroll = y; }};",
+        "const el = id => id === 'famigliaScelta'"
+        " ? {getBoundingClientRect: () => ({top: A - scroll})} : null;",
+        "const document = {querySelector: () => ({id: vista})};",
+        "class Image { set src(u){ this.u = u; } get src(){ return this.u; }",
+        "  decode(){ const ms = lente[this.u]; if (ms === -1) return new Promise(() => {});",
+        "    return new Promise(r => setTimeout(() => { pronte.add(this.u); r(); }, ms || 10)); } }",
+        "const listings = [{id: 2, photos: ['p2.jpg']}, {id: 3, photos: ['p3.jpg']},"
+        " {id: 4, photos: []}, {id: 5, photos: ['p5.jpg']}];",
+        "const haptic = () => {}, toast = () => {}, VETRINA = true, API_BASE = '';",
+        "/* openDetail di cartone: come go('dettaglio') riporta in cima, e il"
+        " titolo nuovo spinge giu' i bottoncini di 40px */",
+        "function openDetail(id){ aperti.push({id, foto: pronte.has(`p${id}.jpg`),"
+        " sost: navSostituisci}); navSostituisci = false; currentListing = {id};"
+        " scroll = 0; A += 40; }",
+        scelta,
+        "const out = {};",
+        "(async () => {",
+        "  await scegliVariante(2);",
+        "  out.uno = {aperti: aperti.slice(), top: A - scroll};",
+        "  aperti.length = 0; lente['p5.jpg'] = -1; const t0 = Date.now();",
+        "  await scegliVariante(5);",
+        "  out.lenta = {aperti: aperti.map(a => a.id), ms: Date.now() - t0};",
+        "  aperti.length = 0; currentListing = {id: 1}; lente['p3.jpg'] = 200;",
+        "  const vecchio = scegliVariante(3); await scegliVariante(2); await vecchio;",
+        "  out.due_tocchi = aperti.map(a => a.id);",
+        "  aperti.length = 0; currentListing = {id: 1}; lente['p3.jpg'] = 50;",
+        "  const via = scegliVariante(3); vista = 'view-esplora'; await via;",
+        "  out.uscito = aperti.length; vista = 'view-dettaglio';",
+        "  currentListing = {id: 1}; scegliVariante(4);",
+        "  out.senza_foto = aperti.map(a => a.id);",
+        "  console.log(JSON.stringify(out));",
+        "})();"])
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(banco)
+        p = f.name
+    try:
+        rs = subprocess.run(["node", p], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        rs = None
+    os.unlink(p)
+    if rs is None:
+        salta("il tocco su una variante gira in node", "node assente")
+    elif rs.returncode != 0:
+        prova("il tocco su una variante gira in node", "", rs.stderr[-300:])
+    else:
+        o = json.loads(rs.stdout)
+        prova("un colore toccato: la scheda della sorella, la foto gia' "
+              "scaricata, la cronologia sostituita",
+              [{"id": 2, "foto": True, "sost": True}], o["uno"]["aperti"])
+        prova("...e i bottoncini restano alla stessa altezza di schermo "
+              "(non si torna in cima)", 260, o["uno"]["top"])
+        prova("una foto che non arriva non ferma lo scambio oltre il mezzo "
+              "secondo", ([5], True),
+              (o["lenta"]["aperti"], 450 <= o["lenta"]["ms"] < 1500))
+        prova("due tocchi di fila: vince l'ultimo, non la foto piu' lenta",
+              [2], o["due_tocchi"])
+        prova("scheda lasciata mentre la foto arrivava: non si riapre", 0,
+              o["uscito"])
+        prova("una sorella senza foto si apre subito", [4], o["senza_foto"])
     sorelle = []
     k = 0
     for num in ("01/21", "10/21", "02/21"):
