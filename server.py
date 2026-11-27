@@ -4352,6 +4352,13 @@ def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
                       and x.get("bottone") is True), None) if link else None
             if b and isinstance(b.get("link_testo"), str) and b["link_testo"]:
                 voce["entra"] = {"link": link, "testo": b["link_testo"]}
+            # GLI EFFETTI DELLA CARD (27 nov 2026, AndreAI): il codice
+            # che scorre, il riflesso e la linea del bordo. Escono solo
+            # col file della maschera del codice e con la zona del
+            # riflesso in forma; senza, la card resta ferma com'era.
+            fx = effetti_della_card(s)
+            if fx:
+                voce["effetti"] = fx
             fuori.append(voce)
     except Exception as e:
         print(f"⚠️ [sponsor] la fila non si legge: {e}")
@@ -129508,10 +129515,43 @@ def _banner_consigliato(nome: str) -> bool:
                 and racconto_stato(slug) == "pubblicato")
 
 
+# GLI EFFETTI DELLA CARD IN HOME (27 nov 2026, AndreAI, dopo sei prove
+# in video): sulla card grande di una pagina del server, tre cose che si
+# muovono piano — il codice 0/1 che scorre a sinistra, un riflesso che
+# passa UNA volta sulla foto a ogni apertura dell'app, e una linea che
+# parte dal basso, sale dal lato sinistro e sfuma in polvere in alto
+# mentre ancora gira. Le scritte stanno davanti al codice: la maschera
+# `<slug>-codice.webp` (nella cartella del banner, e con le sue misure in
+# proporzione) e' trasparente intorno a ogni scritta e verso destra, e il
+# codice si vede solo dove lei e' piena. La pagina dichiara la zona del
+# riflesso, `effetti: {"riflesso": [sinistra, alto, larghezza, altezza]}`
+# in percentuali intere della card; senza file o con la zona storta non
+# esce niente, e la card resta ferma (fail-closed: e' un ornamento).
+def effetti_della_card(slug: str) -> dict:
+    r = RACCONTI_NEGOZI.get(slug) or {}
+    fx = r.get("effetti")
+    z = fx.get("riflesso") if isinstance(fx, dict) else None
+    if not (isinstance(z, list) and len(z) == 4
+            and all(type(n) is int and 0 <= n <= 100 for n in z)):
+        return {}
+    if not os.path.exists(os.path.join("assets", "scoprire",
+                                       slug + "-codice.webp")):
+        return {}
+    return {"riflesso": list(z)}
+
+
+# ...e la maschera si serve con la stretta del banner: pagina pubblicata
+# col suo banner e coi suoi effetti dichiarati, e nessun altro nome
+def _codice_consigliato(nome: str) -> bool:
+    slug = nome[:-12] if nome.endswith("-codice.webp") else ""
+    return bool(slug and _banner_consigliato(slug + ".webp")
+                and effetti_della_card(slug))
+
+
 @app.get("/assets/scoprire/{nome}")
 def asset_scoprire(nome: str, if_none_match: str = Header("")):
     if nome not in FILE_SCOPRIRE:
-        if not _banner_consigliato(nome):
+        if not (_banner_consigliato(nome) or _codice_consigliato(nome)):
             raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "scoprire", nome)
     if not os.path.exists(percorso):

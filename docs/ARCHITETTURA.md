@@ -2843,6 +2843,16 @@
   prove.py dal commit dei primi file (prima mancava APPOSTA, il
   precedente di tutto.webp), e il ripiego emoji+testo resta per
   quando l'immagine non arriva.
+  GLI EFFETTI DELLA CARD (27 nov 2026): una pagina del server col suo
+  banner puo' dichiarare `effetti: {"riflesso": [x, y, l, a]}` (in
+  percentuali intere) e avere accanto al banner `<slug>-codice.webp`, la
+  maschera del codice che scorre (trasparente intorno alle scritte). Il
+  giudice e' `effetti_della_card`: zona in forma E file presente, sennò
+  niente. La busta dello spazio porta `effetti`, e la rotta serve la
+  maschera solo con la stretta del banner (`_codice_consigliato`).
+  Il client (`effettiScoprireHTML`) disegna codice, riflesso, linea e
+  polvere tutti in CSS; riflesso e linea solo al primo disegno della card
+  in un'apertura, la linea solo dove c'e' @property.
   IL DISEGNO SI MUOVE, LA CARD NO (decisione di Andrea in TRE tempi,
   e vanno tenuti tutti: prima il dondolio alla mascotte della card
   intera, ROVESCIATO un'ora dopo — il bottone resta FERMO, bersaglio

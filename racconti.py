@@ -652,6 +652,10 @@ RACCONTI_NEGOZI = {
         "foto": True, "logo": True, "banner": True,
         # la foto del quadrato in home (assets/racconti/<slug>-1.webp)
         "quadro": 1,
+        # gli effetti della card in home (27 nov 2026, AndreAI): il
+        # riflesso passa sulla maschera di Carmrain; la maschera del
+        # codice e' assets/scoprire/bitcoinlabs-codice.webp
+        "effetti": {"riflesso": [66, 12, 28, 70]},
         "blocchi": [
             {"t": "punti", "h": "PERCHÉ COMPRARE I CORSI SU BARATTOLO", "voci": [
                 {"e": "🔒", "h": "I tuoi sats sono al sicuro",
