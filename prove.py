@@ -48095,8 +48095,9 @@ def prove_fogli_di_casa():
           "foto scelti; e «🔗 Collega il negozio» di una pagina in bozza; dal 24 nov "
           "«Mandi l'immagine incollata?» della chat; dal 26 nov la scelta "
           "dell'annuncio da promuovere dal Profilo, e «Annullare "
-          "l'estrazione?» di chi regala, a lista vuota)",
-          148, solo_codice(mini).count("chiediConferma({"))
+          "l'estrazione?» di chi regala, a lista vuota; dal 27 nov "
+          "«🧹 Ritira i badge» dei distintivi non più su Nostr)",
+          149, solo_codice(mini).count("chiediConferma({"))
     # ...e il foglio della fee dinamica non torna (14 nov 2026,
     # fee-mercatino-info): ne' la funzione ne' la ⓘ accanto a «Fee
     # Barattolo» nel conto del mercatino.
@@ -227935,7 +227936,7 @@ CATEGORIE = {
     dettaglio_ordine card_ordini righe_ordine niente_ai_nella_ricerca
     tracking_corretto tracking_venditore tracking_facoltativo
     posta_senza_traccia spedisci_entro
-    vantaggi_livelli stradina cruscotto_admin cruscotto_semplice buoni_cumulabili
+    vantaggi_livelli stradina cruscotto_admin cruscotto_semplice cruscotto_guadagni buoni_cumulabili
     barattolo savers_proprietario visualizzazioni barattolo_in_striscia
     interesse barattolo_filtra barattolo_condiviso notifica_fail_open
     messaggio_admin avviso_contatto forma_tracking bip353 conta_feedback
