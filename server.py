@@ -5146,6 +5146,23 @@ def _slug_negozio_libero(con, slug: str, tg_id: int) -> bool:
 # in pubblico escono TUTTI i guadagnati, e il flag decide solo la
 # precedenza: i fiducia stanno in testa al catalogo, quindi in testa
 # alla sfilza — quando il dettaglio annuncio tronca a «+N», restano.
+#
+# SU NOSTR NE ESCONO SOLO DUE (27 nov 2026, Andrea: «pochi e molto
+# importanti, se no si inflazionano»). Fino a ieri OGNI distintivo
+# diventava da solo un badge NIP-58: tredici badge, quasi tutti alla
+# portata di chiunque in una settimana, e un badge che hanno tutti non
+# dice piu' niente a chi lo guarda. Adesso a dire «questo esce su
+# Nostr» e' la chiave `nostr`, un criterio SUO (puo' essere piu' severo
+# di quello dell'app: vedi Specchiato). Senza la chiave il distintivo
+# resta tutto nell'app e su Nostr non va. I due: 🫙 Pioniere (la coorte
+# e' chiusa, non ne nascono piu') e 🛡️ Specchiato con l'asticella alta
+# (assorbe ⭐ Stimato e 🏪 Venditore rodato). Il terzo badge sono gli
+# eventi, assegnati a mano (sezione «BADGE NOSTR NIP-58 (LE LIVE)»).
+# I badge gia' dati dei distintivi usciti si RITIRANO con un gesto
+# dell'admin (ritira_badge_distintivi_usciti), scelta di Andrea.
+SPECCHIATO_NOSTR_AFFARI = 25
+SPECCHIATO_NOSTR_FEEDBACK = 10
+SPECCHIATO_NOSTR_MEDIA = 4.5
 
 DISTINTIVI = [
     dict(id="nostrano", emoji="🟣", nome="Nostrano", fiducia=True,
@@ -5159,7 +5176,14 @@ DISTINTIVI = [
          descrizione="Almeno 10 affari conclusi senza mai perdere "
                      "una disputa",
          criterio=lambda d: d["vendite"] + d["acquisti"] >= 10
-                            and d["dispute_perse"] == 0),
+                            and d["dispute_perse"] == 0,
+         # su Nostr con l'asticella alta: tanti affari veri, nessuna
+         # disputa persa E la stima di chi ci ha avuto a che fare
+         nostr=lambda d: (d["vendite"] + d["acquisti"]
+                          >= SPECCHIATO_NOSTR_AFFARI
+                          and d["dispute_perse"] == 0
+                          and d["fb_ricevuti"] >= SPECCHIATO_NOSTR_FEEDBACK
+                          and d["fb_media"] >= SPECCHIATO_NOSTR_MEDIA)),
     # SEGUE LA COORTE E NON PIU' LA POSIZIONE (26 set 2026): la
     # posizione si ricalcolava a ogni giro e dopo una fusione — una riga
     # cancellata davanti, tutti avanti di uno — il 101° prendeva questo
@@ -5167,7 +5191,8 @@ DISTINTIVI = [
     # e' uno solo, la coorte congelata; vedi COORTI_CHIUSE.
     dict(id="pioniere", emoji="🫙", nome="Pioniere", fiducia=False,
          descrizione="Tra i primi 100 iscritti del Barattolo",
-         criterio=lambda d: d["coorte"] == "pioniere"),
+         criterio=lambda d: d["coorte"] == "pioniere",
+         nostr=lambda d: d["coorte"] == "pioniere"),
     dict(id="primo_acquisto", emoji="⚡", nome="Primo acquisto",
          fiducia=False,
          descrizione="Il primo acquisto concluso col deposito di garanzia",
@@ -5325,6 +5350,14 @@ def controlla_distintivi(con, tg_id: int) -> list[str]:
             if r.rowcount:
                 nuovi.append(dd["id"])
     return nuovi
+
+
+def merita_su_nostr(dd: dict, d: dict | None) -> bool:
+    """Il giudice unico di «questo distintivo esce su Nostr per questa
+    persona» (27 nov 2026): solo chi ha la chiave `nostr` nel catalogo,
+    e solo se il SUO criterio e' vero sui dati di adesso."""
+    f = dd.get("nostr")
+    return bool(d and f and f(d))
 
 
 # ---------------------- LE COORTI (ago 2026) -------------------------
@@ -23668,17 +23701,32 @@ async def premia_distintivi(tg_id: int):
                        f"🏅 <b>Nuovo distintivo: {dd['emoji']} "
                        f"{dd['nome']}!</b>\n{dd['descrizione']}. "
                        f"Lo trovi nel tuo Profilo. 🫙")
-        # Il gemello su Nostr (set 2026): fail-open anche qui, un giro
-        # in piu' oltre a quello gia' dentro _premia_distintivo — un
-        # intoppo su Nostr non deve MAI intaccare un flusso che stava
-        # gia' premiando un distintivo vero (login, un ordine appena
-        # concluso, un feedback lasciato: nessuno di questi aspetta
-        # un relay per finire il suo lavoro).
+    # Il gemello su Nostr (set 2026; dal 27 nov 2026 SOLO i distintivi
+    # con la chiave `nostr`, vedi DISTINTIVI). Si guarda a OGNI giro e
+    # non solo sui `nuovi`: lo Specchiato su Nostr chiede piu' di
+    # quello dell'app, e il giorno che si arriva a 25 affari l'app non
+    # ha niente di nuovo da dare. _premia_distintivo non duplica mai.
+    # Fail-open anche qui: un intoppo su Nostr non deve MAI intaccare
+    # un flusso che stava gia' premiando un distintivo vero (login, un
+    # ordine appena concluso, un feedback lasciato: nessuno di questi
+    # aspetta un relay per finire il suo lavoro).
+    try:
+        con = db()
+        d = _dati_distintivi(con, tg_id)
+        con.close()
+    except Exception as e:
+        print(f"⚠️ Badge Nostr dei distintivi saltati per {tg_id}: {e}")
+        return
+    if not d or not d["npub_verificata"]:
+        return
+    for dd in DISTINTIVI:
+        if not merita_su_nostr(dd, d):
+            continue
         try:
             await _premia_distintivo(dd, tg_id)
         except Exception as e:
             print(f"⚠️ Badge Nostr del distintivo saltato per {tg_id}/"
-                  f"{did}: {e}")
+                  f"{dd['id']}: {e}")
 
 
 # ---------------- IL CAMPANELLO DEL BOT (webhook) --------------------
@@ -92790,7 +92838,9 @@ async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
     if not _NOSTR:
         raise HTTPException(503, "Nostr è spento sul server")
     riepilogo = {}
-    for dist in DISTINTIVI:
+    # dal 27 nov 2026 solo i distintivi che escono su Nostr (la chiave
+    # `nostr` di DISTINTIVI), e per ognuno col SUO criterio
+    for dist in [x for x in DISTINTIVI if x.get("nostr")]:
         live = await _assicura_badge_distintivo(dist)
         if not live["evento_id"]:
             riepilogo[dist["id"]] = {"errore": "definizione non pubblicata"}
@@ -92801,6 +92851,10 @@ async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
             "ON u.tg_id=b.tg_id WHERE b.badge_id=? AND u.npub_verificata=1",
             (dist["id"],)).fetchall()
         con.close()
+        con = db()
+        candidati = [r for r in candidati
+                     if merita_su_nostr(dist, _dati_distintivi(con, r["tg_id"]))]
+        con.close()
         assegnati, falliti = 0, 0
         for r in candidati:
             if await _premia_distintivo(dist, r["tg_id"]):
@@ -92810,6 +92864,79 @@ async def sincronizza_badge_distintivi(x_tg_init_data: str = Header(""),
             await asyncio.sleep(0.3)
         riepilogo[dist["id"]] = {"assegnati": assegnati, "falliti": falliti,
                                  "candidati": len(candidati)}
+    return {"ok": True, "riepilogo": riepilogo}
+
+
+def _lapide_definizione_badge(live_id: str, evento_def_id: str) -> dict:
+    """La NIP-09 (kind 5) che ritira la DEFINIZIONE di un badge nostro
+    (kind 30009): gemella di _lapide_badge, che ritira un premio."""
+    return firma_evento(5, [
+        ["e", evento_def_id],
+        ["a", f"30009:{_NOSTR[1]}:{live_id}"],
+        ["k", "30009"]],
+        "Badge non piu' assegnato da Barattolo")
+
+
+@app.post("/api/admin/live/ritira-distintivi-usciti")
+async def ritira_badge_distintivi_usciti(x_tg_init_data: str = Header(""),
+                                         barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: ritira da Nostr i badge dei distintivi che non escono
+    piu' (27 nov 2026, scelta di Andrea: «ritirarli», non congelarli).
+    Per ogni distintivo SENZA la chiave `nostr` in DISTINTIVI: una NIP-09
+    per ogni premio ancora in piedi (come ritira_badge_live, si segna
+    ritirato SOLO se un relay accetta), e quando non ne resta nessuno
+    anche la lapide della definizione, e la riga esce dal pannello.
+    Un gesto e non un automatismo: e' l'unico punto del cantiere che
+    pubblica cancellazioni, e parte quando lo preme l'admin. Si puo'
+    rilanciare: chi non e' passato al primo giro passa al secondo, e
+    chi e' gia' ritirato non si tocca. I distintivi nell'app restano."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not _NOSTR:
+        raise HTTPException(503, "Nostr è spento sul server")
+    riepilogo = {}
+    for dist in [x for x in DISTINTIVI if not x.get("nostr")]:
+        live_id = f"distintivo-{dist['id']}"
+        con = db()
+        live = con.execute("SELECT * FROM nostr_badge_live WHERE live_id=?",
+                           (live_id,)).fetchone()
+        premi = con.execute(
+            "SELECT pubkey, premiato_evento FROM nostr_badge_partecipanti "
+            "WHERE live_id=? AND premiato_evento<>''", (live_id,)).fetchall()
+        con.close()
+        if not live:
+            continue
+        ritirati, falliti = 0, 0
+        for r in premi:
+            ok = await _spedisci_ai_relay(
+                _lapide_badge(live_id, r["pubkey"], r["premiato_evento"]))
+            if ok:
+                con = db()
+                con.execute(
+                    "UPDATE nostr_badge_partecipanti SET premiato_evento='', "
+                    "premiato_il=0, ritirato=1 WHERE live_id=? AND pubkey=?",
+                    (live_id, r["pubkey"]))
+                con.commit()
+                con.close()
+                ritirati += 1
+            else:
+                falliti += 1
+            await asyncio.sleep(0.3)
+        definizione = "restata (premi ancora da ritirare)"
+        if not falliti:
+            if live["evento_id"] and not await _spedisci_ai_relay(
+                    _lapide_definizione_badge(live_id, live["evento_id"])):
+                definizione = "restata (nessun relay ha accettato)"
+            else:
+                con = db()
+                con.execute("DELETE FROM nostr_badge_live WHERE live_id=?",
+                            (live_id,))
+                con.commit()
+                con.close()
+                definizione = "ritirata"
+        riepilogo[dist["id"]] = {"ritirati": ritirati, "falliti": falliti,
+                                 "definizione": definizione}
     return {"ok": True, "riepilogo": riepilogo}
 
 

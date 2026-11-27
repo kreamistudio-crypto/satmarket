@@ -97333,6 +97333,39 @@ Da guardare: il primo post vero nei canali (Andrea: un Cerco di prova da un
 account con @username) e come Telegram mostra le tendine su desktop e
 iPhone; se i post di Cerco sono troppi per Subito Crypto (il freno è
 settimanale per persona, non per canale).
+## Su Nostr solo tre badge: Pioniere, Specchiato alzato, gli eventi (27 nov 2026, cantiere badge-nostr-tre; Andrea: «semplifica i badge su Nostr, vorrei che fossero pochi e molto importanti, se no si inflazionano e rischiano di perdere valore»)
+
+Fino a ieri OGNI distintivo dell'app (tredici) diventava da solo un badge
+NIP-58 per chi aveva la npub verificata (`_premia_distintivo`, set 2026):
+quasi tutti alla portata di chiunque in una settimana (Primo acquisto,
+Bottega avviata, Pronto a incassare...), e un badge che hanno tutti non
+dice niente. DECISO con Andrea (proposta nel thread, poi la sua scelta
+sulla card): su Nostr escono 🫙 Pioniere (coorte chiusa, non ne nascono
+più) e 🛡️ Specchiato con un criterio SUO, più severo di quello dell'app:
+25 affari conclusi, zero dispute perse, almeno 10 feedback con media da
+4,5 (assorbe ⭐ Stimato e 🏪 Venditore rodato). Il terzo badge restano gli
+eventi assegnati a mano (la sezione delle live, invariata). Nell'app i
+distintivi non cambiano: a dire «esce su Nostr» è la chiave `nostr` di
+`DISTINTIVI`, giudicata da `merita_su_nostr`. Il gancio di
+`premia_distintivi` guarda a OGNI giro e non solo sui distintivi nuovi,
+perché il giorno dei 25 affari l'app non ha niente di nuovo da dare. Chi
+ha già lo Specchiato su Nostr con la regola vecchia lo tiene (il
+catalogo non revoca, e il ritiro tocca solo i distintivi usciti).
+I BADGE GIÀ DATI DEGLI ALTRI UNDICI SI RITIRANO (scelta di Andrea:
+«Ritirarli da Nostr», non congelarli con «edizione chiusa»): rotta
+`POST /api/admin/live/ritira-distintivi-usciti` e bottone «🧹 Ritira da
+Nostr i badge degli altri distintivi» nel pannello «Badge Nostr», col
+foglio di conferma. Una NIP-09 per premio (ritirato solo se un relay
+accetta), poi la lapide della definizione e la riga esce dal pannello;
+rilanciabile. Un gesto e non un automatismo al riavvio: è l'unico punto
+che pubblica cancellazioni, e parte quando lo preme l'admin (DA-FARE 37).
+SCARTATE: alzare lo Specchiato anche nell'app (Andrea ha chiesto Nostr,
+l'app resta com'è); un badge per il Punto di ritiro (è un ruolo, non un
+merito). PROVATO: `prove_badge_nostr` con la parte 10 nuova (catalogo,
+soglie dello Specchiato una per una, rotta del ritiro). NON provato dal
+vivo: il ritiro sui relay veri, che è il gesto di Andrea in produzione.
+I numeri di quanti avevano i badge stanno nel database del VPS.
+
 ## La leva dell'intervallo on-chain che non arrivava al telefono (27 nov 2026 pomeriggio, cantiere intervallo-oc-busta; Andrea in produzione: «Non vedo gli ordini a intervalli in un ordine on chain»)
 COSA. Dopo l'ottava promozione (788ef679) il foglio Pubblica on-chain non mostrava mai il «Da»: l'ordine on-chain partiva sempre a cifra unica, e quindi niente ordini a intervallo nel libro on-chain.
 PERCHÉ. Il server metteva `intervallo` nella busta del libro (`_p2p_onchain_libro`), ma `accogliLibroOnchainP2P` rifà `p2pOnchainLibro` da capo campo per campo e quel campo non l'avevo copiato: `intervalloOcAccesoP2P()` leggeva sempre undefined, cioè leva spenta. Le prove non potevano vederlo: il banco node del cantiere intervallo-onchain scriveva `p2pOnchainLibro` a mano, e il collaudo guarda solo il server.

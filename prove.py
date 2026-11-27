@@ -136520,8 +136520,12 @@ def prove_badge_nostr():
     vero2.close()
 
     corpo_sync = pezzo("sincronizza_badge_distintivi")
-    prova("la sincronizzazione scorre TUTTI i distintivi", True,
-          "for dist in DISTINTIVI:" in corpo_sync)
+    prova("la sincronizzazione scorre SOLO i distintivi che escono su "
+          "Nostr (27 nov 2026)", True,
+          'for dist in [x for x in DISTINTIVI if x.get("nostr")]:'
+          in corpo_sync)
+    prova("...e per ognuno col SUO criterio, non quello dell'app", True,
+          "merita_su_nostr(dist, _dati_distintivi(" in corpo_sync)
     prova("...prende chi ce l'ha gia' con npub verificata", True,
           "badge_id=? AND u.npub_verificata=1" in
           " ".join(corpo_sync.split()))
@@ -136529,11 +136533,55 @@ def prove_badge_nostr():
           'await _premia_distintivo(dist, r["tg_id"])' in corpo_sync)
 
     corpo_gancio = pezzo("premia_distintivi")
-    prova("premia_distintivi aggancia il badge Nostr per ogni "
-          "distintivo nuovo", True,
-          "await _premia_distintivo(dd, tg_id)" in corpo_gancio)
-    prova("...ma un intoppo su Nostr non rompe il resto (due try, non "
-          "uno solo)", 2, corpo_gancio.count("try:"))
+    prova("premia_distintivi aggancia il badge Nostr solo a chi lo "
+          "merita su Nostr", True,
+          "await _premia_distintivo(dd, tg_id)" in corpo_gancio
+          and "if not merita_su_nostr(dd, d):" in corpo_gancio)
+    prova("...ma un intoppo su Nostr non rompe il resto (tre try, non "
+          "uno solo)", 3, corpo_gancio.count("try:"))
+
+    # --- 10) su Nostr solo tre badge (27 nov 2026, Andrea) -------------
+    i = _SORGENTE.index("SPECCHIATO_NOSTR_AFFARI = ")
+    amb10 = {}
+    exec(_SORGENTE[i:_SORGENTE.index("\n]\n", i) + 3], amb10)
+    exec(pezzo("merita_su_nostr"), amb10)
+    cat = {x["id"]: x for x in amb10["DISTINTIVI"]}
+    prova("escono su Nostr SOLO Pioniere e Specchiato",
+          ["pioniere", "specchiato"],
+          sorted(k for k, x in cat.items() if x.get("nostr")))
+    base = dict(vendite=20, acquisti=5, dispute_perse=0, fb_ricevuti=10,
+                fb_media=4.5, coorte="")
+    mer = amb10["merita_su_nostr"]
+    prova("Specchiato su Nostr: 25 affari, 0 dispute, 10 feedback da "
+          "4,5 bastano", True, mer(cat["specchiato"], base))
+    prova("...24 affari no (nell'app si', da 10)", (False, True),
+          (mer(cat["specchiato"], {**base, "vendite": 19}),
+           cat["specchiato"]["criterio"]({**base, "vendite": 19})))
+    prova("...una disputa persa no", False,
+          mer(cat["specchiato"], {**base, "dispute_perse": 1}))
+    prova("...9 feedback no", False,
+          mer(cat["specchiato"], {**base, "fb_ricevuti": 9}))
+    prova("...media 4,4 no", False,
+          mer(cat["specchiato"], {**base, "fb_media": 4.4}))
+    prova("Pioniere su Nostr segue la coorte", (True, False),
+          (mer(cat["pioniere"], {**base, "coorte": "pioniere"}),
+           mer(cat["pioniere"], base)))
+    prova("un distintivo senza la chiave non esce mai", False,
+          mer(cat["primo_acquisto"], {**base, "acquisti": 99}))
+    prova("...e senza dati nemmeno", False, mer(cat["pioniere"], None))
+
+    corpo_rit = pezzo("ritira_badge_distintivi_usciti")
+    prova("il ritiro e' riservato ai moderatori", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in corpo_rit
+          and 'if not e_admin(user["id"]):' in corpo_rit)
+    prova("...tocca SOLO i distintivi senza la chiave nostr", True,
+          'for dist in [x for x in DISTINTIVI if not x.get("nostr")]:'
+          in corpo_rit)
+    prova("...segna ritirato SOLO se un relay accetta", True,
+          "if ok:" in corpo_rit and "ritirato=1" in corpo_rit)
+    prova("...e la definizione si ritira solo a premi tutti ritirati",
+          True, "if not falliti:" in corpo_rit
+          and "_lapide_definizione_badge(" in corpo_rit)
 
 
 def prove_foglio_tastiera_iphone():
