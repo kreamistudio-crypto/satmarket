@@ -24005,7 +24005,17 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                                         "depositante_id", "ricevente_id")),
                 ("swap_pagamenti", ("venditore_id",)),
                 ("cambi_liberi", ("tg_id",)),
-                ("cambi_p2p", ("tg_id",))):
+                ("cambi_p2p", ("tg_id",)),
+                # (27 nov 2026, audit giro 6) le tabelle nate dopo: le
+                # raccolte e i loro depositi e zap, le vendite della
+                # cassa, le mance. Restando sull'id Nostr, nessuno poteva
+                # piu' firmare l'uscita di un deposito o vedere una vendita
+                ("raccolte", ("autore_id", "approvata_da")),
+                ("raccolta_depositi", ("compratore_id", "venditore_id",
+                                       "proposta_da", "decisione_da")),
+                ("raccolta_zap", ("sostenitore_id", "autore_id")),
+                ("cassa_vendite", ("venditore_id",)),
+                ("mance", ("compratore_id", "venditore_id"))):
             ci_sono = _colonne_di(con, tab)
             for col in colonne:
                 if col in ci_sono:
@@ -24025,6 +24035,13 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                 con.execute(f"UPDATE OR IGNORE {_t} SET utente=? "
                             "WHERE utente=?", (id_telegram, id_nostr))
                 con.execute(f"DELETE FROM {_t} WHERE utente=?", (id_nostr,))
+        if "tg_id" in _colonne_di(con, "raccolta_segnalazioni"):
+            # (27 nov 2026, audit giro 6) una segnalazione per persona e
+            # raccolta: se l'hanno fatta tutt'e due le meta', ne resta una
+            con.execute("UPDATE OR IGNORE raccolta_segnalazioni SET tg_id=? "
+                        "WHERE tg_id=?", (id_telegram, id_nostr))
+            con.execute("DELETE FROM raccolta_segnalazioni WHERE tg_id=?",
+                        (id_nostr,))
         if "tg_id" in _colonne_di(con, "swap_auto_preferenze"):
             con.execute("UPDATE OR IGNORE swap_auto_preferenze SET tg_id=? "
                         "WHERE tg_id=?", (id_telegram, id_nostr))
@@ -69676,6 +69693,26 @@ def _riconcilia_parti_p2p(con, ordine: str, adesso: int) -> list:
                         "AND tg_id=?", (ordine, maker))
         except sqlite3.OperationalError:
             pass                  # un database senza la colonna: nessun tempo
+        # (27 nov 2026, audit giro 6) e con lui TUTTO quel che il posto
+        # provvisorio aveva scritto sull'ordine: zona dei contanti, filtro
+        # sugli scambi completati, cambio di Barattozon, paracadute e
+        # ripubblica. Erano parole di chi non l'ha pubblicato: restando,
+        # nascondevano o limitavano l'ordine di un altro, e l'autore vero
+        # non poteva piu' scrivere le sue (la prima parola resta)
+        if tg_id:
+            for colonna, vuoto in (("zona", "''"), ("min_completati", "0"),
+                                   ("cambio_pub", "0")):
+                try:
+                    con.execute(f"UPDATE p2p_ordini SET {colonna}={vuoto} "
+                                "WHERE ordine=?", (ordine,))
+                except sqlite3.OperationalError:
+                    pass          # un database senza la colonna
+            for tabella in ("p2p_paracadute", "p2p_ripubblica"):
+                try:
+                    con.execute(f"DELETE FROM {tabella} WHERE ordine=? "
+                                "AND tg_id=?", (ordine, tg_id))
+                except sqlite3.OperationalError:
+                    pass          # la tabella non e' ancora nata
         righe.append(f"⛔ Libro P2P: {ordine[:8]} era intestato a {tg_id} ma per mostrod "
                      f"l'ha pubblicato {maker or 'un altro client'}: intestazione "
                      f"{'corretta' if maker else 'tolta'}")
@@ -97575,6 +97612,24 @@ def swap_auto_proposta(tg_id) -> dict | None:
             "indice": indice}
 
 
+def _swap_auto_proposta_vecchia(proposta: dict, scritto: str) -> bool:
+    """(27 nov 2026, audit giro 6) Vero se `scritto` e' un indirizzo della
+    STESSA xpub del Profilo con un indice gia' passato (le ultime 50): e'
+    la proposta di una carta aperta prima, non un indirizzo scritto a
+    mano. Falso per gli indirizzi fissi e per tutto il resto."""
+    if not scritto or proposta.get("tipo") != "xpub" or \
+            int(proposta.get("indice", -1)) <= 0:
+        return False
+    fine = int(proposta["indice"])
+    try:
+        for i in range(max(0, fine - 50), fine):
+            if onchain_indirizzo_esterno("xpub", proposta["valore"], i) == scritto:
+                return True
+    except Exception:
+        return False
+    return False
+
+
 def _swap_auto_no(ordine_id: int, motivo: str, detto: str = "") -> dict:
     """Un no PRIMA di creare o pagare: non e' partito niente."""
     print(f"🔁 Swap automatico dell'ordine #{int(ordine_id)}: no — {motivo}"
@@ -97622,6 +97677,12 @@ async def swap_auto_incassa(venditore_id: int, ordine_id: int,
         proposta = swap_auto_proposta(venditore_id)
         if proposta and scritto in ("", proposta["indirizzo"]):
             dest = proposta
+        elif proposta and _swap_auto_proposta_vecchia(proposta, scritto):
+            # (27 nov 2026, audit giro 6) la carta mostrava una proposta di
+            # prima, e intanto quel `/0/i` e' andato a un'altra vendita (la
+            # cassa, un incasso): stesso wallet, si passa al prossimo
+            # libero invece di dare due volte lo stesso indirizzo
+            dest = proposta
         elif scritto:
             if not _swap_script_destinazione(scritto, chi["rete"]):
                 return _swap_auto_no(ordine_id, "indirizzo",
@@ -97643,6 +97704,16 @@ async def swap_auto_incassa(venditore_id: int, ordine_id: int,
             return _swap_auto_no(ordine_id, "parole", str(e))
         if nato["stato"] != SWAP_AUTO_NATO:
             return _swap_auto_no(ordine_id, nato["stato"], nato["perche"])
+        if int(dest["indice"]) >= 0:
+            # (27 nov 2026, audit giro 6) IL `/0/i` SI RILEGGE QUI, dopo le
+            # attese col fornitore e prima di scriverlo, senza altre attese
+            # in mezzo: in quei secondi la cassa o un incasso P2P potevano
+            # aver preso lo stesso indice, e il pagamento dello swap sarebbe
+            # sembrato quello di un'altra vendita. Stesso wallet, indice nuovo.
+            fresca = swap_auto_proposta(venditore_id)
+            if fresca and fresca["valore"] == dest["valore"] and \
+                    int(fresca["indice"]) != int(dest["indice"]):
+                dest = fresca
         con = db()
         try:
             con.execute("UPDATE swap_auto SET destinazione=?, ricevi=?, "
@@ -117798,7 +117869,8 @@ def _onchain_riempi_incassi(con, venditore_id: int) -> list:
              if onchain_modo_ordine(con, x) == "onchain"]
     fatti = []
     for o in righe:
-        indice = (_onchain_prossimo_esterno(con, venditore_id, dest["valore"])
+        # (27 nov 2026, audit giro 6) la fila intera: anche P2P e swap automatici
+        indice = (_p2p_onchain_prossimo_esterno(con, venditore_id, dest["valore"])
                   if dest["tipo"] == "xpub" else 0)
         cur = con.execute(
             "UPDATE onchain_ordini SET incasso=?, incasso_tipo=?,"
@@ -118090,7 +118162,8 @@ async def _onchain_compra(user, a, richiesti: int, prezzo: int,
             dest = None
         if dest:
             d_tipo, d_valore, d_firma = dest["tipo"], dest["valore"], dest["firma"]
-            d_indice = (_onchain_prossimo_esterno(con, venditore, d_valore)
+            # (27 nov 2026, audit giro 6) la fila intera: anche P2P e swap automatici
+            d_indice = (_p2p_onchain_prossimo_esterno(con, venditore, d_valore)
                         if d_tipo == "xpub" else 0)
             incasso = onchain_indirizzo_esterno(d_tipo, d_valore, d_indice)
         else:
@@ -118388,8 +118461,15 @@ def _onchain_psbt_giudica(o, verso: str, psbt_b64: str,
     # polvere non possono tornare indietro (la rete non trasmette l'uscita),
     # e senza questo un deposito di qualche sats in piu' bloccava ogni
     # uscita verso il venditore, anche quella decisa da un moderatore
-    tetto = int(o["margine_sats"]) + min(_onchain_sats_in_piu(o, monete),
-                                         ONCHAIN_POLVERE - 1)
+    in_piu = _onchain_sats_in_piu(o, monete)
+    tetto = int(o["margine_sats"]) + min(in_piu, ONCHAIN_POLVERE - 1)
+    if decisa and verso == "venditore" and not o["rimborso"]:
+        # (27 nov 2026, audit giro 6) l'uscita DECISA verso chi vende,
+        # senza il wallet di rimborso, e' senza resto: tutto il versato
+        # in piu' va in commissione, come la scrive `_onchain_psbt_barattolo`.
+        # Prima il tetto ne lasciava passare solo sotto la polvere, e chi
+        # versava 546 sats in piu' bloccava la decisione del moderatore
+        tetto = int(o["margine_sats"]) + in_piu
     if not 0 < rete_sats <= tetto:
         raise ValueError("la commissione di rete non sta nel margine")
     for i in p.inputs:
@@ -119551,7 +119631,8 @@ async def onchain_incasso_ora(oid: int, x_tg_init_data: str = Header(""),
         if not dest:
             raise HTTPException(409, "Prima scegli dove ricevere on-chain "
                                      "(Profilo → «Incassi on-chain»)")
-        indice = (_onchain_prossimo_esterno(con, user["id"], dest["valore"])
+        # (27 nov 2026, audit giro 6) la fila intera: anche P2P e swap automatici
+        indice = (_p2p_onchain_prossimo_esterno(con, user["id"], dest["valore"])
                   if dest["tipo"] == "xpub" else 0)
         cur = con.execute(
             "UPDATE onchain_ordini SET incasso=?, incasso_tipo=?,"
@@ -122534,10 +122615,13 @@ def _p2p_onchain_prossimo_esterno(con, tg_id: int, valore: str) -> int:
     gli incassi del mercatino: la stessa fila di `_onchain_prossimo_
     esterno`, perche' un indirizzo non si dia due volte fra i due libri."""
     a = _onchain_prossimo_esterno(con, tg_id, valore)
-    r = con.execute("SELECT MAX(incasso_indice) FROM p2p_onchain_ordini WHERE "
-                    "ricevente_id=? AND incasso_tipo='xpub' AND incasso_valore=?",
-                    (int(tg_id), valore)).fetchone()
-    b = 0 if r[0] is None else int(r[0]) + 1
+    try:
+        r = con.execute("SELECT MAX(incasso_indice) FROM p2p_onchain_ordini WHERE "
+                        "ricevente_id=? AND incasso_tipo='xpub' AND incasso_valore=?",
+                        (int(tg_id), valore)).fetchone()
+        b = 0 if r[0] is None else int(r[0]) + 1
+    except sqlite3.OperationalError:
+        b = 0                     # (27 nov 2026) la tabella non e' ancora nata
     # (2 nov 2026, swap-auto) e gli indirizzi dati ai cambi automatici
     try:
         r = con.execute("SELECT MAX(s.dest_indice) FROM swap_auto s JOIN "
@@ -136050,6 +136134,18 @@ CANCELLA_ANONIMIZZA = (
     # riga resta, perche' il post va tolto quando l'ordine esce dal libro,
     # il nome no
     ("post_p2p_canale", "tg_id"),
+    # (27 nov 2026, audit giro 6) le tabelle nate dopo la lista: raccolte,
+    # depositi e zap delle raccolte, vendite della cassa, mance. Le righe
+    # restano (un deposito vivo deve poter uscire dal 2-di-3, i conti di
+    # chi vende tornare), il numero dell'account no
+    ("raccolte", "autore_id"), ("raccolte", "approvata_da"),
+    ("raccolta_depositi", "compratore_id"),
+    ("raccolta_depositi", "venditore_id"),
+    ("raccolta_depositi", "proposta_da"),
+    ("raccolta_depositi", "decisione_da"),
+    ("raccolta_zap", "sostenitore_id"), ("raccolta_zap", "autore_id"),
+    ("cassa_vendite", "venditore_id"),
+    ("mance", "compratore_id"), ("mance", "venditore_id"),
 )
 # (tabella, colonna): cio' che era SUO e se ne va con lui
 CANCELLA_TOGLI = (
@@ -136105,6 +136201,8 @@ CANCELLA_TOGLI = (
     ("gioco_tappo_attrezzi", "tg_id"), ("gioco_tappo_sfide", "tg_id"),
     ("gioco_tappo_mondo", "tg_id"), ("gioco_tappo_evidenza", "tg_id"),
     ("gioco_tappo_missioni", "tg_id"),
+    # (27 nov 2026, audit giro 6) le sue segnalazioni di una raccolta
+    ("raccolta_segnalazioni", "tg_id"),
 )
 # Le colonne personali di chi COMPRA, svuotate negli ordini chiusi che
 # restano: l'indirizzo, l'email per il corriere, la busta di ritiro, il

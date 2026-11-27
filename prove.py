@@ -200975,6 +200975,13 @@ r.pagine = ['/Pampers-Baby-Dry-Pannolini/dp/B0FQCDRHFQ/ref=sr_1_6', '/dp/B0FQCDR
             '/gp/cart/view.html', '/cart/smart-wagon', '/cart', '/checkout/entry/cart', '/gp/buy/spc/handlers/display.html',
             '/gp/buy/thankyou/handlers/display.html', '/checkout/p/p-123/thankyou', '/ap/signin', '/s', '/',
             '/dp/corto', '/gp/css/order-details', '/cartoni/dp'].map(paginaBz);
+/* (27 nov 2026, audit giro 6) le pagine dove scrivono altri: li' il PayCode non si legge */
+r.altri = ['/Pampers/dp/B0FQCDRHFQ', '/gp/cart/view.html', '/s', '/product-reviews/B0FQCDRHFQ',
+           '/ask/questions/asin/B0FQCDRHFQ', '/stores/Pampers/page/1', '/sp', '/gp/customer-reviews/R1',
+           '/gp/profile/amzn1.account', '/b', '/gp/bestsellers/', '/Pampers/s',
+           '/gp/buy/thankyou/handlers/display.html', '/checkout/p/p-123/thankyou', '/gp/css/order-details',
+           '/your-orders/order-details', '/gp/your-account/order-details', '/', '/spedizioni',
+           '/checkout/entry/cart', '/basta'].map(paginaDiAltriBz);
 r.contanti = ['Paga in Contanti nel Punto Vendita più vicino', 'paga  in contanti', 'Contanti',
               'pagamento in contanti non disponibile', ''].map(rigaContantiBz);
 r.dogana = [datiBzDaFrammentoP2P('#barattozon?paycode=479868518&importo=39.99&scade=1792326720'),
@@ -201077,6 +201084,12 @@ console.log(JSON.stringify(r));
     prova("le pagine di Amazon dal percorso: prodotto, carrello, cassa, grazie; il resto niente",
           ["prodotto", "prodotto", "prodotto", "carrello", "carrello", "carrello", "cassa", "cassa",
            "grazie", "grazie", "", "", "", "", "", ""], out["pagine"])
+    prova("(audit giro 6) il PayCode non si legge dove scrivono altri; le pagine dell'ordine restano aperte",
+          [True] * 12 + [False] * 9, out["altri"])
+    _guarda_pc = pezzo_js(ext_codice, "  function guarda(){\n    attesa = 0;", "\n  }\n")
+    prova("...e il lettore del PayCode lo chiede a ogni giro, prima di guardare link e testo", True,
+          _in_ordine(_guarda_pc, "if (paginaDiAltriBz(location.pathname)) return;",
+                     "document.querySelectorAll('a[href*=\"' + PDF_HOST"))
     prova("la riga del contanti dalla frase «Paga in contanti», mai dalla parola sola",
           [True, True, False, False, False], out["contanti"])
     prova("gli importi: centesimi con la virgola, il € tollerato, il resto vuoto",
@@ -218855,6 +218868,129 @@ def prove_audit_pagamenti_3():
           "\nP2P_CHAT_PESO_PERSONA = 200 * 1024 * 1024\n" in sc)
 
 
+def prove_audit_giro6():
+    """IL SESTO GIRO DELL'AUDIT, LE CORREZIONI INVISIBILI (27 nov 2026,
+    Andrea: «Vai.»). Porte chiuse dietro le quinte, senza niente di nuovo
+    da vedere: l'uscita decisa verso chi vende senza resto, l'indirizzo
+    dello swap automatico riletto, la fila unica degli indirizzi `/0/i`,
+    il posto provvisorio del libro P2P ripulito, la cancellazione e
+    l'unione che conoscono raccolte, cassa e mance."""
+    import sqlite3 as _sq
+    print("\n[sesto audit: le correzioni invisibili]")
+    sc = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 5. l'uscita decisa verso chi vende, senza resto ----------------
+    gi = codice(pezzo("_onchain_psbt_giudica"))
+    prova("il giudice: l'uscita decisa verso chi vende senza rimborso lascia "
+          "tutto il versato in piu' alla rete, le altre restano sotto la polvere",
+          True, _in_ordine_g6(gi, "in_piu = _onchain_sats_in_piu(o, monete)",
+                              "tetto = int(o[\"margine_sats\"]) + min(in_piu, ONCHAIN_POLVERE - 1)",
+                              "if decisa and verso == \"venditore\" and not o[\"rimborso\"]:",
+                              "tetto = int(o[\"margine_sats\"]) + in_piu",
+                              "if not 0 < rete_sats <= tetto:"))
+    cf = pezzo_js(mini, "async function onchainCofirma(o, parole){", "\n}\n")
+    prova("...e il telefono di chi co-firma fa lo stesso conto, solo sulla "
+          "proposta di Barattolo", True,
+          _in_ordine_g6(cf, "let tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);",
+                        "if (o.proposta.barattolo && o.proposta.verso === 'venditore' && !o.rimborso)",
+                        "tetto = Number(o.margine_sats) + inPiu;",
+                        "if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';"))
+
+    # ---- 6. lo swap automatico non riusa un `/0/i` gia' dato ------------
+    amb = {"onchain_indirizzo_esterno": lambda tipo, v, i: f"{v}/{i}"}
+    exec(pezzo("_swap_auto_proposta_vecchia"), amb)
+    vecchia = amb["_swap_auto_proposta_vecchia"]
+    pr = {"tipo": "xpub", "valore": "xp", "indice": 7, "indirizzo": "xp/7"}
+    prova("una proposta di prima della stessa xpub si riconosce; un indirizzo "
+          "scritto a mano, uno fisso o troppo vecchio no",
+          [True, True, False, False, False, False, False],
+          [vecchia(pr, "xp/6"), vecchia(pr, "xp/0"), vecchia(pr, "xp/7"),
+           vecchia(pr, "altro/6"), vecchia(pr, ""),
+           vecchia(dict(pr, tipo="indirizzo"), "xp/6"),
+           vecchia(dict(pr, indice=80), "xp/10")])
+    si = codice(pezzo("swap_auto_incassa"))
+    prova("...e il `/0/i` si rilegge dopo le attese col fornitore, subito "
+          "prima di scriverlo", True,
+          _in_ordine_g6(si, "elif proposta and _swap_auto_proposta_vecchia(proposta, scritto):",
+                        "nato = await swap_auto_crea(chi, ordine_id, p)",
+                        "fresca = swap_auto_proposta(venditore_id)",
+                        "if fresca and fresca[\"valore\"] == dest[\"valore\"] and",
+                        "con.execute(\"UPDATE swap_auto SET destinazione=?"))
+    prova("...senza attese fra la rilettura e la scrittura", True,
+          "await" not in si[si.index("fresca = swap_auto_proposta(venditore_id)"):
+                            si.index("con.execute(\"UPDATE swap_auto SET destinazione=?")])
+
+    # ---- 7. una fila sola di indirizzi per tutto il wallet ---------------
+    chiamate = re.findall(r"(?<!_p2p)(?<!def )_onchain_prossimo_esterno\(con", sc)
+    prova("ogni indirizzo `/0/i` nasce dalla fila intera (mercatino, P2P, "
+          "swap): la fila corta la chiama solo lei", 1, len(chiamate))
+    for nome in ("_onchain_riempi_incassi", "_onchain_compra", "onchain_incasso_ora"):
+        prova(f"...anche {nome}", True,
+              "_p2p_onchain_prossimo_esterno(con, " in codice(pezzo(nome)))
+    pe = codice(pezzo("_p2p_onchain_prossimo_esterno"))
+    prova("...e regge un database dove il libro P2P on-chain non e' ancora nato",
+          True, _in_ordine_g6(pe, "try:", "FROM p2p_onchain_ordini WHERE",
+                              "except sqlite3.OperationalError:", "b = 0"))
+
+    # ---- 8. il posto provvisorio del libro P2P lascia l'ordine pulito ----
+    rp = codice(pezzo("_riconcilia_parti_p2p"))
+    prova("un ordine intestato a chi non l'ha pubblicato: via zona, filtro, "
+          "cambio, paracadute e ripubblica scritti da lui", True,
+          _in_ordine_g6(rp, "for colonna, vuoto in ((\"zona\", \"''\"), (\"min_completati\", \"0\"),",
+                        "(\"cambio_pub\", \"0\")):",
+                        "for tabella in (\"p2p_paracadute\", \"p2p_ripubblica\"):",
+                        "AND tg_id=?\", (ordine, tg_id))"))
+
+    # ---- 9 e 3. cancellazione e unione conoscono raccolte, cassa e mance --
+    amb = {}
+    i = sc.index("\nCANCELLA_ANONIMIZZA = (") + 1
+    exec(sc[i:sc.index("\n)\n", sc.index("\nCANCELLA_TOGLI = (")) + 3], amb)
+    attese = {("raccolte", "autore_id"), ("raccolte", "approvata_da"),
+              ("raccolta_depositi", "compratore_id"), ("raccolta_depositi", "venditore_id"),
+              ("raccolta_depositi", "proposta_da"), ("raccolta_depositi", "decisione_da"),
+              ("raccolta_zap", "sostenitore_id"), ("raccolta_zap", "autore_id"),
+              ("cassa_vendite", "venditore_id"), ("mance", "compratore_id"),
+              ("mance", "venditore_id")}
+    prova("la cancellazione anonimizza le righe di raccolte, depositi, zap, "
+          "cassa e mance (le righe restano, il numero no)", set(),
+          attese - set(amb["CANCELLA_ANONIMIZZA"]))
+    prova("...e toglie le sue segnalazioni di una raccolta", True,
+          ("raccolta_segnalazioni", "tg_id") in amb["CANCELLA_TOGLI"])
+    ec = codice(pezzo("esegui_cancellazione"))
+    prova("...solo dove la colonna c'e' (le tabelle nascono quando servono)",
+          True, "_colonne_di(con, " in ec)
+    fu = codice(pezzo("esegui_fusione"))
+    for tab, col in sorted(attese):
+        prova(f"l'unione degli account passa {tab}.{col} all'account che resta",
+              True, re.search(r'\("' + tab + r'", \([^)]*"' + col + r'"', fu) is not None)
+    prova("...e le segnalazioni: una per persona e raccolta", True,
+          _in_ordine_g6(fu, "UPDATE OR IGNORE raccolta_segnalazioni SET tg_id=?",
+                        "DELETE FROM raccolta_segnalazioni WHERE tg_id=?"))
+    cc = _sq.connect(":memory:")
+    cc.execute("CREATE TABLE raccolta_segnalazioni(raccolta_id INTEGER, tg_id INTEGER, "
+               "UNIQUE(raccolta_id, tg_id))")
+    cc.executemany("INSERT INTO raccolta_segnalazioni VALUES(?,?)",
+                   [(1, 500), (1, 900), (2, 900)])
+    cc.execute("UPDATE OR IGNORE raccolta_segnalazioni SET tg_id=? WHERE tg_id=?", (500, 900))
+    cc.execute("DELETE FROM raccolta_segnalazioni WHERE tg_id=?", (900,))
+    prova("...al banco: due meta' sulla stessa raccolta ne lasciano una",
+          [(1, 500), (2, 500)],
+          cc.execute("SELECT * FROM raccolta_segnalazioni ORDER BY 1").fetchall())
+    cc.close()
+
+
+def _in_ordine_g6(testo, *pezzi):
+    """Ogni pezzo c'e', dopo il precedente."""
+    i = 0
+    for p in pezzi:
+        j = testo.find(p, i)
+        if j < 0:
+            return False
+        i = j + len(p)
+    return True
+
+
 def prove_audit_tornata_tutto():
     """IL GIRO «CORREGGI TUTTO» DELL'AUDIT (14 nov 2026, Andrea: «perche'
     non correggi tutto quello che c'e' da correggere?»). Le falle rimaste
@@ -218968,8 +219104,8 @@ def prove_audit_tornata_tutto():
            amb["_onchain_sats_in_piu"]({"importo_sats": 0}, [{"value": 5}])))
     pg = codice(pezzo("_onchain_psbt_giudica"))
     prova("...e sotto la polvere vanno in commissione: l'uscita non si blocca",
-          True, "min(_onchain_sats_in_piu(o, monete),\n" in pg
-          and "ONCHAIN_POLVERE - 1)" in pg)
+          True, "in_piu = _onchain_sats_in_piu(o, monete)" in pg
+          and "min(in_piu, ONCHAIN_POLVERE - 1)" in pg)
     prova("la decisione firmata da Barattolo non aspetta il wallet di rimborso",
           (True, True), ('if not o["rimborso"] and not decisa:' in pg,
                          "decisa=True)" in codice(pezzo("_onchain_psbt_barattolo"))))
@@ -226673,7 +226809,7 @@ CATEGORIE = {
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
     etichetta_alimenti fotografia_annuncio
-    audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto
+    audit_pagamenti_2 audit_pagamenti_3 audit_tornata_tutto audit_giro6
     """.split(),
     "infrastruttura": """
     categorie_delle_prove widget_prova widget_ordini quadro_servizi
@@ -228121,6 +228257,7 @@ def main():
               prove_audit_pagamenti_2,
               prove_audit_pagamenti_3,
               prove_audit_tornata_tutto,
+              prove_audit_giro6,
               prove_ripubblica_p2p,
               prove_connettori_categoria,
               prove_scelte_negozio,

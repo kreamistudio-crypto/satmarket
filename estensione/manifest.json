@@ -3,7 +3,7 @@
   "name": "Barattolo per Amazon",
   "short_name": "Barattolo",
   "description": "Compra su amazon.it con Barattozon: i contanti scelti alla cassa, il PayCode portato su Barattolo nella tua sessione, l'ordine creato chiedendoti solo la commissione.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "homepage_url": "https://barattolo.store",
   "icons": {
     "16": "icone/16.png",

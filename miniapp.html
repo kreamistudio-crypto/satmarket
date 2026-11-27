@@ -78719,7 +78719,13 @@ async function onchainCofirma(o, parole){
      audit); il telefono no, e rifiutava una proposta gia' accettata. */
   const chiesto = Number(o.importo_sats) || 0;
   const inPiu = chiesto > 0 ? Math.max(0, tot - chiesto) : 0;
-  const tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);
+  let tetto = Number(o.margine_sats) + Math.min(inPiu, ONCHAIN_POLVERE - 1);
+  /* (27 nov 2026, audit giro 6) l'uscita DECISA da un moderatore verso
+     chi vende, quando chi ha messo i sats non ha un wallet di rimborso, e'
+     senza resto: tutto il versato in piu' va alla rete, come ammette il
+     giudice del server. Il prezzo a chi vende resta esatto. */
+  if (o.proposta.barattolo && o.proposta.verso === 'venditore' && !o.rimborso)
+    tetto = Number(o.margine_sats) + inPiu;
   if (rete <= 0 || rete > tetto) return 'la commissione esce dal margine';
   for (let i = 0; i < tx.inputsLength; i++) tx.signIdx(io.firma.privateKey, i);
   tx.finalize();
