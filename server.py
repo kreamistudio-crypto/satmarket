@@ -18208,10 +18208,12 @@ except ImportError:
 # Il tetto in euro dell'ordine pagato cosi' (100 €, deciso il 23 nov
 # 2026): lo guarda il telefono per mostrare i tasti; sotto c'e' sempre
 # il tetto in sats del giroconto, che e' quello che fa fede.
+# TOLTO DI SERIE (27 nov 2026, Andrea: «leviamo il tetto massimo dei 100
+# euro»): 0 = nessun tetto; restano il massimo del P2P e la riserva.
 try:
     from config import VIA_EURO_MAX_EURO
 except ImportError:
-    VIA_EURO_MAX_EURO = 100
+    VIA_EURO_MAX_EURO = 0
 
 
 def giroconto_cifra_giusta(totale: int, sats: int, eur_btc: float = 0.0) -> bool:
@@ -18821,7 +18823,7 @@ async def chiedi_via_euro(req: Request, x_tg_init_data: str = Header(""),
     except (TypeError, ValueError):
         annuncio = 0
     fila = [c for c in _candidati_via_euro(d.get("candidati"))
-            if c[1] <= int(VIA_EURO_MAX_EURO or 0)]
+            if not int(VIA_EURO_MAX_EURO or 0) or c[1] <= int(VIA_EURO_MAX_EURO)]
     if annuncio <= 0 or not fila:
         raise HTTPException(400, "Niente da chiedere")
     adesso = int(time.time())

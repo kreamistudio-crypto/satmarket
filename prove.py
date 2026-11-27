@@ -216931,14 +216931,15 @@ def prove_non_hai_sats():
     srv = _SORGENTE
 
     prova("il server: la leva sola per i moderatori di serie, e il tetto in "
-          "euro, in /api/me", True,
-          "VIA_EURO_SOLO_ADMIN = True" in srv and "VIA_EURO_MAX_EURO = 100" in srv
+          "euro in /api/me, tolto di serie dal 27 nov 2026 (0 = nessuno)", True,
+          "VIA_EURO_SOLO_ADMIN = True" in srv and "    VIA_EURO_MAX_EURO = 0\n" in srv
           and 'profilo["via_euro"] = via_euro_ammesso(user["id"])' in srv
           and "if not giroconto_attivo() or not bool(_p2p_per(tg_id)[\"attivo\"]):" in pezzo("via_euro_ammesso"))
     per_me = _fn_js(mini, "function viaEuroPerMe(){")
-    prova("il telefono: solo senza Lightning address ne' wallet on-chain, con la "
-          "leva", True,
-          "!!myViaEuro && !myLnAddress && !myOnchainIncasso" in per_me)
+    prova("il telefono: con la leva, ANCHE a chi ha un wallet nel profilo "
+          "(27 nov 2026, Andrea)", True,
+          "return !!myViaEuro && !DEMO && !VETRINA;" in per_me
+          and "myLnAddress" not in per_me)
     prova("i due tasti: arancioni, «Non hai sats?» e «Non hai sats? Paga in "
           "altri modi» (26 nov 2026, Andrea: niente euro, chi e' di Lugano "
           "paga in franchi), mai «paga in euro»", True,
@@ -217130,7 +217131,7 @@ console.log(JSON.stringify(r));
     prova("...l'offerta: in franchi i soli TWINT e Revolut, il tetto in euro "
           "solo per gli euro, e sopra il tetto del giroconto niente", True,
           "valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI" in off
-          and "if (valuta === 'EUR' && (!(myViaEuroMax > 0) || o.euro > myViaEuroMax)) return null;" in off
+          and "if (valuta === 'EUR' && myViaEuroMax > 0 && o.euro > myViaEuroMax) return null;" in off
           and "if (myViaEuroTettoSats > 0 && sats > myViaEuroTettoSats) return null;" in off
           and "const VIA_EURO_METODI_CHF = ['TWINT', 'Revolut'];" in mini
           and 'profilo["via_euro_tetto_sats"] = int(GIROCONTO_TETTO_SATS or 0)' in srv
@@ -217478,7 +217479,7 @@ def prove_chiedi_al_venditore():
     prova("la rotta di Mario: la leva, la fila pulita sotto il tetto in euro, "
           "una ricerca viva per persona", True,
           "if not via_euro_ammesso(user[\"id\"]):" in pezzo("chiedi_via_euro")
-          and "if c[1] <= int(VIA_EURO_MAX_EURO or 0)]" in pezzo("chiedi_via_euro")
+          and "if not int(VIA_EURO_MAX_EURO or 0) or c[1] <= int(VIA_EURO_MAX_EURO)]" in pezzo("chiedi_via_euro")
           and "WHERE compratore=? AND stato IN (?, ?)\", (adesso, user[\"id\"], *VIA_EURO_VIVE))" in pezzo("chiedi_via_euro"))
     rs = pezzo("rispondi_via_euro")
     prova("la rotta delle risposte: solo il venditore chiesto risponde, solo "

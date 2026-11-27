@@ -96940,3 +96940,24 @@ DECISO. Andrea rovescia il cantiere etichetta-obbligatoria del 18 nov (lo sa e l
 STRADE SCARTATE. Togliere la leva o il codice dell'obbligo (resta l'interruttore se un giorno serve di nuovo: una riga `ETICHETTA_OBBLIGATORIA = True` nel config); spegnerla solo con una riga nel config del VPS (Andrea la vuole facoltativa di serie, e le leve si spengono in emergenza, non per decisione).
 PROVATO. `collaudo_etichetta_alimenti` (server vero, 58 prove, venv senza coincurve): di serie la leva è spenta e un alimento senza tabella si pubblica; riaccesa a mano, tutte le prove dell'obbligo del 18 nov restano verdi. Controprova: rimesso `True` di serie, le due prove nuove diventano rosse. `prove.py` sezione 3b riscritta sul nuovo verso (nasce spenta, solo True accende, client spento finché /api/me non dice true).
 DA GUARDARE. Il config del VPS: se porta una riga `ETICHETTA_OBBLIGATORIA = True` esplicita, vince sul codice e la tabella resta obbligatoria anche dopo la promozione (`grep -n "^ETICHETTA_OBBLIGATORIA" /srv/barattolo/config.py`). Il post del 18 nov in NOVITA.md resta com'è (storia): un post nuovo solo se Andrea lo chiede.
+
+## «Non hai sats?» anche a chi ha un wallet, e senza i 100 € (27 nov 2026)
+
+Andrea, provando dal suo account (che ha la Lightning address): «metti il
+tasto visibile anche se hai già un wallet registrato... e poi leviamo il
+tetto massimo dei 100 euro».
+- `viaEuroPerMe` guarda solo la leva (e DEMO/VETRINA). La regola del 23
+  nov («solo a chi non ha ne' Lightning address ne' wallet on-chain»)
+  cade per sua decisione: anche chi un wallet ce l'ha puo' non avere i
+  sats. Un rimborso, a lui, va alla sua Lightning address come sempre.
+- `VIA_EURO_MAX_EURO` di serie a 0 = nessun tetto (telefono, e la rotta
+  della richiesta a chi vende a cifra fissa, oggi non raggiunta). Restano
+  il massimo del P2P in beta e il saldo della riserva (il tetto in sats
+  del giroconto e' gia' 0 dal 26 nov). Una riga nel config li rimette.
+CHIARITO CON ANDREA: un «Vendi BTC» a cifra unica (es. 200 €) accende il
+tasto solo se l'oggetto costa quella cifra (al piu' un euro sotto): un
+ordine a cifra unica si prende intero, e il P2P non ne vende un pezzo.
+PROVATO: `prove_non_hai_sats`, `prove_chiedi_al_venditore`,
+`prove_giroconto_interno`, suite severa e collaudi.
+DA GUARDARE: sul VPS una riga esplicita `VIA_EURO_MAX_EURO` terrebbe il
+tetto (grep prima del deploy).
