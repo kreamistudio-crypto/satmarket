@@ -1284,3 +1284,29 @@ il telefono.
 
 Andata bene, si apre a tutti con UNA riga nel config del VPS e il riavvio:
 `P2P_RESTO_INTERVALLO_SOLO_ADMIN = False`. Fatta, questa voce si cancella.
+
+## 36. La CI a pezzi: dopo la promozione, guardare `pronto` e spegnere il runner della VM (27 nov 2026, cantiere ci-a-pezzi; Andrea: «sistema la questione delle CI troppo lente»)
+
+**Alla promozione che la porta**: è un commit che cambia
+`.github/workflows/prove.yml`, quindi `pronto` potrebbe restare indietro.
+A CI verde si guarda (sola lettura, dal PC):
+`git ls-remote origin refs/heads/pronto refs/heads/main` — i due sha
+devono essere uguali. Se `pronto` è rimasto indietro:
+`git push origin origin/main:refs/heads/pronto`.
+
+Il primo giro deve mostrare in Actions undici pezzi che partono insieme
+(«pezzo delle prove 1/5» … «pezzo dei collaudi 6/6»), poi `prove` e
+`pronto`: in tutto circa 6 minuti invece di 39.
+
+**Poi, quando vuoi (niente fretta, non rompe niente se resta):**
+1. GitHub → Settings → Secrets and variables → Actions → Variables:
+   cancella `RUNNER_PROVE` (non la legge più nessuno).
+2. Sulla vm-2050, da `debian` con sudo, spegni il runner (libera
+   processore e memoria al bot di collaudo):
+   `sudo systemctl disable --now ci-runner-vm-2050`
+   e controlla: `systemctl is-active ci-runner-vm-2050` deve dire
+   `inactive`.
+3. GitHub → Settings → Actions → Runners: togli `vm-2050` (Remove). Un
+   runner nostro collegato a un repo pubblico è una porta che non serve.
+
+Fatti i tre gesti, questa voce si cancella.

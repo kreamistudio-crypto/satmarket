@@ -48,7 +48,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prove:
+  # LA CI A PEZZI (27 nov 2026, cantiere ci-a-pezzi, Andrea: «sistema
+  # la questione delle CI troppo lente»). Fino a qui un job solo, `prove`,
+  # sulla vm-2050 (2 processori): prove.py ~17 minuti e poi i collaudi
+  # ~21, in fila, ~39 minuti a promozione. Adesso le prove in CINQUE
+  # pezzi e i collaudi in SEI, undici macchine di GitHub che partono
+  # insieme col controllo dei segreti, e il job `prove` in fondo e' il
+  # giudice: verde solo se lo sono tutti i pezzi. Il nome `prove` resta
+  # quello che chiede il giudice del VPS (giudice_deploy.py), e i pezzi
+  # hanno nomi che non gli somigliano.
+  # PERCHE' DI NUOVO SU GITHUB: la vm-2050 era stata scelta il 20 ott per
+  # non pagare minuti; dal 17 nov il repo e' PUBBLICO e i runner di
+  # GitHub per un repo pubblico non si pagano (e hanno quattro
+  # processori). Una macchina nostra che fa girare il codice di un repo
+  # pubblico era anche il rischio da non tenere. Il giorno che il repo
+  # tornasse privato, i pezzi costerebbero minuti: si riguarda qui.
+  # Numeri, strade scartate e come si torna: docs/CANTIERI.md, «La CI a
+  # pezzi».
+  prove-a-pezzi:
+    name: pezzo delle prove ${{ matrix.pezzo }}/5
+    # `fail-fast: false`: un pezzo rosso non ferma gli altri, cosi' il
+    # giro dice TUTTI i rossi in una volta sola.
+    strategy:
+      fail-fast: false
+      matrix:
+        pezzo: [1, 2, 3, 4, 5]
     # La CI legge e basta: compila, prova, guarda. Non commenta, non
     # committa, non pubblica niente. Dirlo qui vuol dire che il token
     # del workflow resta in sola lettura anche se un domani il default
@@ -56,36 +80,17 @@ jobs:
     permissions:
       contents: read
     # L'immagine del runner col NUMERO, non `ubuntu-latest` (12 ott
-    # 2026): un'etichetta mobile si sposta da sola — dal 19 ott 2026
-    # GitHub la porta a Ubuntu 26.04, a ondate, fino al 19 nov — e con
-    # lei cambiano git, grep, bash e il resto dell'immagine, senza un
-    # commit nostro a cui dare la colpa di un rosso. E' lo stesso
-    # perche' delle action inchiodate allo sha: un aggiornamento e' un
-    # gesto, non un'eredita'. I TRE job stanno sulla stessa immagine,
-    # e una sentinella di prove.py (`prove_runner_fisso`) lo tiene.
-    # Quando e come salire a Ubuntu 26.04, con una prova su un ramo
-    # prima: docs/CANTIERI.md, "Il runner della CI col numero".
-    #
-    # LA MACCHINA DI QUESTO JOB, DA UNA VARIABILE (20 ott 2026, cantiere
-    # runner-vm, decisione di Andrea): su main `prove` gira dove dice la
-    # variabile del repo RUNNER_PROVE — `vm-2050`, il runner nostro sulla
-    # VM di collaudo, che costa zero minuti — e se e' vuota sull'immagine
-    # di GitHub qui in fondo. Il ripiego e' un gesto in Settings → Variables,
-    # SENZA commit: VM spenta, si svuota la variabile e la CI torna qui.
-    # Sui rami (i lanci a mano) gira SEMPRE su GitHub: sulla VM passa solo
-    # codice gia' su main, e la guardia della VM (deploy/ci-vm/solo-main.sh)
-    # lo pretende anche se un ramo riscrive questa riga. `segreti` e
-    # `pronto` restano su GitHub col numero scritto per esteso: chi
-    # cerca i segreti e chi alza la bandierina non stanno su una macchina
-    # nostra (`prove_runner_vm`). Come si sposta e come si torna:
-    # docs/PRODUZIONE.md, «IL RUNNER DELLA CI SULLA VM-2050».
-    runs-on: ${{ github.ref == 'refs/heads/main' && vars.RUNNER_PROVE || 'ubuntu-24.04' }}
-    # IL TETTO DEL GIRO (16 ott 2026, ci-leggera): di serie GitHub ne
-    # aspetta 360, e un giro appeso li paga tutti mentre la coda qui
-    # sopra tiene fermi i push dopo di lui. Oggi il job ne dura ~20 (in
-    # fila) e il tetto e' il triplo abbondante: chi lo tocca, lo tocca
-    # perche' la suite e' cresciuta davvero, non per far passare un giro.
-    timeout-minutes: 60
+    # 2026): un'etichetta mobile si sposta da sola, e con lei cambiano
+    # git, grep, bash e il resto dell'immagine, senza un commit nostro a
+    # cui dare la colpa di un rosso. Tutti i job stanno sulla stessa
+    # immagine, e una sentinella di prove.py (`prove_runner_fisso`) lo
+    # tiene. Quando e come salire a Ubuntu 26.04: docs/CANTIERI.md, "Il
+    # runner della CI col numero".
+    runs-on: ubuntu-24.04
+    # IL TETTO DEL PEZZO: un pezzo dura ~3-4 minuti, il tetto e' largo
+    # (un giro appeso tiene ferma la coda); chi lo tocca, lo tocca perche'
+    # la suite e' cresciuta davvero, non per far passare un giro.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
 
@@ -117,13 +122,13 @@ jobs:
           package-manager-cache: false
 
       # L'AMBIENTE USA-E-GETTA (20 ott 2026, cantiere runner-vm). Sulla
-      # macchina nostra la dispensa di Python e /tmp restano da un giro
-      # all'altro: senza questo passo fastapi, che i collaudi installano
-      # in fondo, sarebbe gia' li' per il prove.py del giro DOPO, che
-      # deve girare apposta senza. Quindi ogni pip di questo job va in un
-      # venv dentro $RUNNER_TEMP, che il runner svuota a ogni job, e
-      # TMPDIR punta li' (i file temporanei delle prove muoiono col
-      # giro). Su GitHub non cambia niente: tre secondi.
+      # macchina nostra la dispensa di Python e /tmp restavano da un giro
+      # all'altro, e fastapi dei collaudi sarebbe stato gia' li' per il
+      # prove.py del giro dopo. Dal 27 nov 2026 i job girano su GitHub,
+      # macchine nuove a ogni job, e il passo resta perche' costa tre
+      # secondi e tiene vera la stessa cosa il giorno che un job tornasse
+      # su una macchina nostra: ogni pip in un venv dentro $RUNNER_TEMP,
+      # e TMPDIR li'.
       - name: Un ambiente usa-e-getta
         run: |
           python -m venv "$RUNNER_TEMP/venv"
@@ -174,7 +179,8 @@ jobs:
         run: npm install --silent --no-save --no-package-lock --no-audit --no-fund
              --prefix "$RUNNER_TEMP/nostr-tools" nostr-tools@2.25.2
 
-      # Primo scalino: tutto compila. Banale e imbattibile — becca il
+      # Primo scalino: tutto compila. Una volta sola, nel primo pezzo:
+      # la compilazione non dipende dal pezzo. Banale e imbattibile — becca il
       # refuso prima che arrivi sul VPS, che e' esattamente il modo
       # in cui il mercatino potrebbe restare giu' per una virgola.
       #
@@ -188,15 +194,20 @@ jobs:
       # che ogni riga sia un file che c'e' e che ogni .py della radice
       # ci sia).
       - name: Tutto compila
+        if: matrix.pezzo == 1
         run: python -m compileall -q -i ci/compila.txt
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
       - name: Il config d'esempio e' leggibile
+        if: matrix.pezzo == 1
         run: python -c "import ast,sys; ast.parse(open('config_esempio.py',
              encoding='utf-8').read())"
 
-      # Terzo scalino: le prove vere.
+      # Terzo scalino: le prove vere, il pezzo di questa macchina
+      # (`--pezzo=K/5`: le sezioni divise coi pesi di PESI_PEZZI, ognuna
+      # in un pezzo solo; il 5 e' quante voci ha la matrice qui sopra, e
+      # `prove_ci_a_pezzi` li tiene uguali).
       #
       # PROVE_SEVERE e' la cintura del passo qui sopra: aggiungere
       # Pillow ripara oggi, questa riga ripara il giorno che qualcuno
@@ -209,7 +220,82 @@ jobs:
         env:
           PROVE_SEVERE: "1"
           IDENTITA_NODE_MODULES: ${{ runner.temp }}/nostr-tools
-        run: python prove.py
+        run: python prove.py --pezzo=${{ matrix.pezzo }}/5
+
+  collaudi-a-pezzi:
+    name: pezzo dei collaudi ${{ matrix.pezzo }}/6
+    # `fail-fast: false`: un pezzo rosso non ferma gli altri, cosi' il
+    # giro dice TUTTI i rossi in una volta sola.
+    strategy:
+      fail-fast: false
+      matrix:
+        pezzo: [1, 2, 3, 4, 5, 6]
+    # La CI legge e basta: compila, prova, guarda. Non commenta, non
+    # committa, non pubblica niente. Dirlo qui vuol dire che il token
+    # del workflow resta in sola lettura anche se un domani il default
+    # del repo diventasse piu' largo.
+    permissions:
+      contents: read
+    # L'immagine del runner col NUMERO, non `ubuntu-latest` (12 ott
+    # 2026): un'etichetta mobile si sposta da sola, e con lei cambiano
+    # git, grep, bash e il resto dell'immagine, senza un commit nostro a
+    # cui dare la colpa di un rosso. Tutti i job stanno sulla stessa
+    # immagine, e una sentinella di prove.py (`prove_runner_fisso`) lo
+    # tiene. Quando e come salire a Ubuntu 26.04: docs/CANTIERI.md, "Il
+    # runner della CI col numero".
+    runs-on: ubuntu-24.04
+    # IL TETTO DEL PEZZO: un pezzo dura ~3-4 minuti, il tetto e' largo
+    # (un giro appeso tiene ferma la coda); chi lo tocca, lo tocca perche'
+    # la suite e' cresciuta davvero, non per far passare un giro.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: "3.12"
+
+      # Node col NUMERO, come Python (12 ott 2026). Fin qui veniva
+      # dall'immagine del runner, cioe' cambiava con lei: sulla 26.04
+      # il node di serie e' il 24. Lo chiamano decine di prove (il
+      # JavaScript VERO della pagina, girato da `node`) e il passo di
+      # nostr-tools qui sotto, quindi il giorno della salita a Ubuntu
+      # 26.04 sarebbero cambiate due cose insieme, e un rosso non
+      # avrebbe detto quale. Si fissa la MAGGIORE, "22", quella che
+      # l'immagine ubuntu-24.04 da' oggi di serie (22.23.3) — come
+      # Python e' "3.12" e non "3.12.3" (scelta di Andrea). Finche'
+      # GitHub tiene la 22 nella dispensa del runner (oggi c'e', sulla
+      # 24.04 e sulla 26.04) non si scarica niente, e dentro la 22 ci
+      # si muove con l'immagine. I tre numeri per esteso avrebbero
+      # voluto uno scarico da GitHub a OGNI giro dal giorno che
+      # l'immagine va avanti di un passo. Salire alla 24 e' un gesto:
+      # si cambia questo numero.
+      # `package-manager-cache: false`: nel repo non c'e' un
+      # package.json e non deve nascere una cache che nessuno ha
+      # chiesto. Vedi docs/CANTIERI.md, "Node della CI col numero".
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      # L'AMBIENTE USA-E-GETTA (20 ott 2026, cantiere runner-vm). Sulla
+      # macchina nostra la dispensa di Python e /tmp restavano da un giro
+      # all'altro, e fastapi dei collaudi sarebbe stato gia' li' per il
+      # prove.py del giro dopo. Dal 27 nov 2026 i job girano su GitHub,
+      # macchine nuove a ogni job, e il passo resta perche' costa tre
+      # secondi e tiene vera la stessa cosa il giorno che un job tornasse
+      # su una macchina nostra: ogni pip in un venv dentro $RUNNER_TEMP,
+      # e TMPDIR li'.
+      - name: Un ambiente usa-e-getta
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      # Le stesse del job delle prove: i collaudi girano il server, che le
+      # importa (embit alla versione di requirements.txt, come sopra).
+      - name: Installa il minimo indispensabile
+        run: pip install --quiet websocket-client pillow cryptography snowballstemmer "$(grep -E '^embit==' requirements.txt)"
 
       # Quarto scalino (22 set 2026): i COLLAUDI, cioe' il server vero
       # su un database usa-e-getta. `prove.py` guarda i pezzi estratti;
@@ -218,10 +304,11 @@ jobs:
       # tre giorni per il `riga=` di `paga_venditore` perche' non lo
       # girava nessuno.
       #
-      # LE DIPENDENZE DEL SERVER SI INSTALLANO QUI, DOPO LE PROVE, e
-      # non nello scalino di sopra: `prove.py` gira apposta senza
-      # httpx ne' fastapi (vedi collaudo_verita_lnd.py), e allargargli
-      # l'ambiente cambierebbe cosa prova senza che nessuno lo decida.
+      # LE DIPENDENZE DEL SERVER SI INSTALLANO SOLO QUI, nel job dei
+      # collaudi e mai in quello delle prove: `prove.py` gira apposta
+      # senza httpx ne' fastapi (vedi collaudo_verita_lnd.py), e
+      # allargargli l'ambiente cambierebbe cosa prova senza che nessuno
+      # lo decida. Due job, due macchine: la separazione e' gratis.
       #
       # L'ELENCO E' SCRITTO A MANO, uno per nome, e non e' un glob:
       # entra solo un collaudo GUARDATO — config di cartone installato
@@ -244,28 +331,51 @@ jobs:
       # nome qui dentro arrossisce in prove.py
       # (`prove_elenco_dei_collaudi`).
       #
-      # `!cancelled()` e non il default: i collaudi parlano anche se le
-      # prove sono rosse — la lezione del job dei segreti, un rosso
-      # prima non deve zittire le domande dopo. Il job resta rosso lo
-      # stesso, e con lui il semaforo del deploy.
+      # I collaudi parlano anche se le prove sono rosse — la lezione del
+      # job dei segreti, un rosso prima non deve zittire le domande dopo:
+      # dal 27 nov 2026 stanno in un job loro, quindi lo fanno da soli.
       # uvicorn (17 nov 2026, la promozione rossa della sentinella):
       # `collaudo_sentinella` fa nascere un server vero in un processo
       # figlio, come sul VPS; senza, il figlio muore all'import.
       - name: Le dipendenze del server, per i collaudi
-        if: ${{ !cancelled() }}
         run: pip install --quiet fastapi uvicorn httpx anthropic "$(grep -E '^embit==' requirements.txt)"
 
-      # LE DUE OPZIONI DELLA CI LEGGERA (16 ott 2026), che cambiano
-      # QUANDO e COME girano i collaudi e mai QUALI (il perche' sta in
-      # collaudi_ci.py e in docs/CANTIERI.md, «La CI leggera»):
-      # `--paralleli 2`, due alla volta, quanti sono i processori del
-      # runner; `--salvo-solo-documenti-da pronto`, niente collaudi se
+      # LE OPZIONI DELLA CI LEGGERA (16 ott 2026) E DEI PEZZI (27 nov),
+      # che cambiano QUANDO e COME girano i collaudi e mai QUALI (il
+      # perche' sta in collaudi_ci.py e in docs/CANTIERI.md, «La CI
+      # leggera» e «La CI a pezzi»): `--pezzo K/6`, uno dei sei pezzi
+      # che girano INSIEME su sei macchine; `--paralleli 3`, tre alla
+      # volta sui quattro processori che GitHub da' a un repo pubblico;
+      # `--salvo-solo-documenti-da pronto`, niente collaudi se
       # l'albero differisce da quello di `pronto` solo per dei .md — il
       # confronto e' con `pronto` e non col push prima, e se non riesce
       # si gira tutto.
       - name: I collaudi, senza rete
-        if: ${{ !cancelled() }}
-        run: python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2 --salvo-solo-documenti-da pronto
+        run: python collaudi_ci.py --elenco ci/collaudi.txt --pezzo ${{ matrix.pezzo }}/6 --paralleli 3 --salvo-solo-documenti-da pronto
+
+  # IL GIUDICE DEI PEZZI: e' lui il job `prove` che il giudice del VPS
+  # chiede (e `pronto` aspetta). Verde solo se TUTTI i pezzi delle prove
+  # e dei collaudi sono verdi; `!cancelled()` perche' parli anche quando
+  # un pezzo e' rosso (sennò resterebbe «skipped» e non direbbe quale),
+  # ma non quando il giro e' stato sostituito dalla coda.
+  prove:
+    if: ${{ !cancelled() }}
+    needs: [prove-a-pezzi, collaudi-a-pezzi]
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Tutti i pezzi verdi
+        env:
+          PROVE: ${{ needs.prove-a-pezzi.result }}
+          COLLAUDI: ${{ needs.collaudi-a-pezzi.result }}
+        run: |
+          echo "pezzi delle prove: $PROVE · pezzi dei collaudi: $COLLAUDI"
+          if [ "$PROVE" != success ] || [ "$COLLAUDI" != success ]; then
+            echo "::error::non tutti i pezzi sono verdi (prove: $PROVE, collaudi: $COLLAUDI)"
+            exit 1
+          fi
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.
@@ -282,7 +392,8 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
-    # dura ~1 minuto e mezzo (la cronologia intera): il tetto e' largo
+    # dura ~3-4 minuti (la cronologia intera, due guardate insieme): il
+    # tetto e' largo
     timeout-minutes: 15
     env:
       # Le forme dei segreti, scritte UNA volta: le guardano sia i file
@@ -523,12 +634,20 @@ jobs:
       # di scriverlo qui invece di far finta che la copertura sia
       # completa.
       - name: E nemmeno nella cronologia
+        # LE DUE GUARDATE INSIEME (27 nov 2026, cantiere ci-a-pezzi): ognuna
+        # rifà le patch di TUTTA la storia (~3 minuti l'una su GitHub, ~6
+        # in locale) e prima giravano in fila: col resto della CI a pezzi
+        # erano diventate il job piu' lungo. Ognuna in una sottoshell in
+        # sottofondo, sui quattro processori del runner; il passo aspetta
+        # TUTTE E DUE e fa rosso se anche una sola ha trovato qualcosa.
+        # I comandi sono quelli di prima, parola per parola.
         run: |
-          if git log --all -p --no-color | grep -a '^+' \
+          ( if git log --all -p --no-color | grep -a '^+' \
                | grep -aE "$FORME" | grep -avE "$SEGNAPOSTI" ; then
             echo "::error::Un segreto e' passato dalla repo in passato: va RUOTATO"
             exit 1
-          fi
+          fi ) &
+          UNA=$!
           # E la stessa domanda per l'esadecimale nudo, che fino ad ago
           # 2026 la cronologia non la faceva: era il buco piu' largo dei
           # due, perche' l'albero di lavoro si ripulisce con un commit e
@@ -546,7 +665,7 @@ jobs:
           # che un commit dopo non ripulisce. Il perche' di ognuna sta
           # sul controllo di sopra, in un posto solo: due copie di quel
           # ragionamento divergono.
-          if git log --all --full-history -p --no-color -- . ':!vendor/' \
+          ( if git log --all --full-history -p --no-color -- . ':!vendor/' \
                ':!deploy/relay/Dockerfile' \
                ':!deploy/relay/strfry.conf' \
                ':!deploy/relay/policy/chi-scrive.py' \
@@ -555,7 +674,12 @@ jobs:
                | grep -aE "$FORMA_HEX" ; then
             echo "::error::Una chiave esadecimale nuda e' passata dalla repo: va RUOTATA"
             exit 1
-          fi
+          fi ) &
+          DUE=$!
+          ROSSO=0
+          wait "$UNA" || ROSSO=1
+          wait "$DUE" || ROSSO=1
+          [ "$ROSSO" = 0 ] || exit 1
           echo "cronologia pulita"
   # ---------------- IL SEMAFORO DEL DEPLOY (ago 2026) ---------------
   #

@@ -38,6 +38,8 @@ Uso:  python collaudi_ci.py --elenco ci/collaudi.txt     (quel che fa la CI)
       python collaudi_ci.py collaudo_porta_timer collaudo_... [...]
 Opzioni (16 ott 2026, la CI leggera; senza, si gira come sempre):
       --paralleli N                 N collaudi alla volta (la CI: 2)
+      --pezzo K/N                   solo il pezzo K di N, a giro (la CI
+                                    ne gira N insieme, 27 nov 2026)
       --salvo-solo-documenti-da R   niente collaudi se HEAD differisce
                                     dal ramo R di origin solo per dei .md;
                                     e dal 17 nov solo i collaudi che VEDONO
@@ -540,6 +542,39 @@ def togli_opzioni(argv):
     return paralleli, base, resto
 
 
+# I PEZZI (27 nov 2026, cantiere ci-a-pezzi, richiesta di Andrea: «sistema
+# la questione delle CI troppo lente»). La CI divide i collaudi in N
+# macchine di GitHub che girano INSIEME: `--pezzo 2/4` tiene il secondo
+# di quattro, a giro (il 2°, il 6°, il 10°... dell'elenco GIA' scelto),
+# che sui tempi veri del 27 nov sta entro il ±12 % dalla media. Senza
+# l'opzione si gira tutto, come prima. Il perche' e i numeri:
+# docs/CANTIERI.md, «La CI a pezzi».
+def togli_pezzo(argv):
+    """`--pezzo K/N` tolto da argv. Torna (k, n, resto); (1, 1, argv)
+    senza l'opzione; None se e' storta — e chi chiama si ferma, come per
+    `--paralleli`: un pezzo letto male lascerebbe collaudi mai girati."""
+    resto, k, n, i = [], 1, 1, 0
+    while i < len(argv):
+        if argv[i] == "--pezzo":
+            if i + 1 >= len(argv):
+                return None
+            m = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})", argv[i + 1])
+            if not m or not 1 <= int(m.group(1)) <= int(m.group(2)):
+                return None
+            k, n = int(m.group(1)), int(m.group(2))
+            i += 2
+            continue
+        resto.append(argv[i])
+        i += 1
+    return k, n, resto
+
+
+def il_mio_pezzo(nomi, k, n):
+    """Il pezzo K di N, a giro: l'unione dei pezzi e' l'elenco intero,
+    ogni nome in un pezzo solo."""
+    return list(nomi)[k - 1::n]
+
+
 def racconta(nome, ok, secondi, uscita, bussate):
     """Il blocco di un collaudo finito: la riga, e se e' rosso la coda,
     le righe rosse e le annotazioni. Lo stampa un filo solo (il
@@ -575,6 +610,11 @@ def racconta(nome, ok, secondi, uscita, bussate):
 def main(nomi):
     # la console di Windows parla cp1252, e una ✓ la farebbe esplodere
     sys.stdout.reconfigure(encoding="utf-8")
+    pezzo = togli_pezzo(nomi)
+    if pezzo is None:
+        print("::error::opzione storta: --pezzo vuole K/N, con 1 <= K <= N")
+        return 2
+    k_pezzo, n_pezzi, nomi = pezzo
     opzioni = togli_opzioni(nomi)
     if opzioni is None:
         print("::error::opzione storta: --paralleli vuole un numero da 1 a "
@@ -649,6 +689,15 @@ def main(nomi):
                 print(f"::notice::{len(scelti)} collaudi su {len(nomi)}: "
                       f"rispetto a {base} gli altri non vedono i file cambiati")
                 nomi = scelti
+    if n_pezzi > 1:
+        tutti = len(nomi)
+        nomi = il_mio_pezzo(nomi, k_pezzo, n_pezzi)
+        print(f"🧩 pezzo {k_pezzo} di {n_pezzi}: {len(nomi)} collaudi su "
+              f"{tutti}", flush=True)
+        if not nomi:
+            print(f"::notice::pezzo {k_pezzo}/{n_pezzi}: nessun collaudo "
+                  "da girare in questo pezzo")
+            return 0
     gabbia = tempfile.mkdtemp(prefix="gabbia-collaudi-")
     with open(os.path.join(gabbia, "sitecustomize.py"), "w",
               encoding="utf-8") as f:
