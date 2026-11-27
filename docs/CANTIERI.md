@@ -97115,3 +97115,30 @@ riga piccola invece che icone (sei cerchietti non stanno a 360 accanto
 all'indietro). PROVATO: giro dal vivo in Chromium a 390px, chiaro e
 scuro, nessun errore JavaScript; la prova del nascondi emendata alla
 fila in alto; suite severa.
+
+## Gift card: la simulazione vera con Bitpost, la rete Bitcoin detta e l'indirizzo dal link (27 nov 2026, cantiere gift-card-rete; Andrea: «simula pure tu delle richieste per capire se il flusso con bitpost e le loro API funziona davvero», poi «procedi con la simulazione»)
+
+COSA. Un giro sulla beta vera di Bitpost dalla sessione cloud (chiave come
+segreto di rete, mai letta): crea, aggancia con una seconda xpub, legge il
+pagamento, annulla con `{"party": "buyer"}` (va anche dopo l'aggancio).
+Nessun sats mosso. Due errori nostri trovati e corretti: (1) senza
+`network` Bitpost sceglie LIQUID, con la sua commissione (8% invece del 5%
+di Bitcoin: col nostro `expected_published_fee` ogni ordine tornava 409
+«fee_changed"): ora entrambe le porte d'ordine mandano
+`"network": "Bitcoin"`; (2) il pagamento arriva come link
+`bitcoin:<indirizzo>?amount=…` senza `address` a parte, e l'app lasciava
+vuota la riga dell'indirizzo e il «Copia»: `bitpost_pagamento_con_indirizzo`
+lo ricava dal link (solo se ha la forma di un indirizzo). Il Bitpost finto
+del collaudo ora risponde come quello vero.
+
+DA SAPERE. La beta è TESTNET (indirizzi `tb1q`, confermato da Andrea) pur
+accettando una xpub mainnet; le commissioni in beta sono spente (tornano
+0); il minimo Bitcoin lo leggiamo vivo dal catalogo (oggi 14,02 €), quindi
+nessun numero da cambiare. Durante il giro ho annullato anche il #586 (21
+nov, su Liquid, fermo da allora): non l'avevo creato in questa sessione,
+va chiesto prima.
+
+PROVATO. `prove_bitpost_gift_card` 6-quater, `collaudo_bitpost_gift_card`
+(la rete detta, l'indirizzo dal link), e il giro vero ripetuto col corpo
+corretto: ordine #591 nato su Bitcoin, agganciato, indirizzo `tb1q…`
+ricavato, annullato.

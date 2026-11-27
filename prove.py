@@ -225828,6 +225828,23 @@ console.log(JSON.stringify(fuori));
     prova("...la ronda rilegge il catalogo, e lo stato lo porta all'app",
           [True, True], ["await _shoppy_rileggi()" in pezzo("_orologio_bitpost"),
                          '"carte": shoppy_carte_per_chi(shoppy_carte_lette(), catalogo)' in pezzo("bitpost_stato")])
+    # --- 6-quater) LA SIMULAZIONE VERA (27 nov 2026, beta di Bitpost):
+    # senza `network` Bitpost sceglie Liquid; il pagamento arriva come link
+    # «bitcoin:» senza `address` a parte. -------------------------------
+    _amb_p = {"re": re}
+    exec(pezzo("bitpost_pagamento_con_indirizzo"), _amb_p)
+    _pi = _amb_p["bitpost_pagamento_con_indirizzo"]
+    prova("6-quater) l'indirizzo dal link bitcoin:, quello gia' scritto resta, "
+          "un link storto non inventa niente",
+          ["tb1q3fla7k7m2q9e0wp97prl25ajfs0wlrg6djknqrrhqsvx248fy5rsucu4hw",
+           "bc1qgia", None, None],
+          [_pi({"destination": "bitcoin:tb1q3fla7k7m2q9e0wp97prl25ajfs0wlrg6djknqrrhqsvx248fy5rsucu4hw?amount=0.00035644"}).get("address"),
+           _pi({"address": "bc1qgia", "destination": "bitcoin:bc1qaltro"}).get("address"),
+           _pi({"destination": "bitcoin:<script>?amount=1"}).get("address"),
+           _pi(None).get("address")])
+    prova("...tutte e due le porte d'ordine dicono la rete Bitcoin", [True, True],
+          ['"network": "Bitcoin"}' in pezzo("bitpost_crea"),
+           '"network": "Bitcoin"}' in pezzo("bitpost_offerta_compra")])
     prova("i gruppi del pannello in ordine alfabetico, senza l'emoji davanti",
           True, 'key=lambda g: g["gruppo"].split(" ", 1)[-1].casefold())'
           in pezzo("_leve_stato"))
