@@ -35622,6 +35622,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `chiamato`. La scopa porta via lucchetti bruciati e chiamate con la
   chat dell'ordine; la scorta mai. Le prove:
   `prove_chat_dalla_notifica`, `collaudo_chat_mercatino` sezione 13.
+  I LUCCHETTI A CASO E TOR BROWSER (27 nov 2026, Cantieri «Le chat
+  ritrovate dopo Tor Browser»): lo stato della scorta dice anche `nude`
+  (in scorta, senza seme), e la posa accetta `ritira` — escono PRIMA dei
+  nuovi solo i miei, in scorta, senza seme; storto = 400 intero. Il
+  telefono COL PROFILO li ritira tutti e rifa' la scorta dal profilo
+  quando qualcuno qui non si apre (la memoria buttata) o quando la
+  scorta va riempita; senza profilo non tocca niente. E per un NATIVO
+  NOSTR il profilo delle chat NASCE (`chatMercProfiloP2P` →
+  `nasciProfiloChatP2P`, dopo `adottaProfiloContoP2P` a mani vuote) solo
+  se la lettura della copia ha detto «nessuna copia» con almeno un relay
+  arrivato in fondo (`p2pCopiaLetta.risposti`) e mai dopo un «Dimentica»;
+  resta solo se `assicuraCopiaProfiloP2P` rilegge la sua copia sui
+  relay, altrimenti si toglie e i lucchetti nascono a caso come prima.
+  Prove: `prove_profilo_chat_nostr`, i casi Tor di
+  `prove_chat_dalla_notifica`.
   E TRE CONTORNI (stesso cantiere): il ritorno dal login web porta anche
   la query, in forma stretta (`FORMA_RITORNO_LOGIN`: lettere, cifre,
   `_ - . = &`; `urlRitornoLogin` la manda solo in quella forma, senza
