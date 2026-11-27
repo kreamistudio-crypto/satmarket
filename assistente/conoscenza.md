@@ -417,6 +417,7 @@ Scambi P2P on-chain (se nei NUMERI DI OGGI «Scambi P2P in bitcoin on-chain» è
 - Nel libro uno scambio on-chain si riconosce dalla moneta arancio ₿ (quelli di Lightning hanno il fulmine). Sopra le card c'è il rettangolo arancio «On-Chain» con la scritta «Novità», che apre la pagina «Scambi on-chain»: lì si pubblica («Pubblica uno scambio on-chain») e si seguono i propri.
 - Per pubblicare si può anche toccare il + di «Compra BTC» o «Vendi BTC» e scegliere «On-chain» invece di «Lightning». Serve aver preparato Profilo → «₿ On-chain» (le 12 parole e la loro copia: vedi «Bitcoin on-chain»). Un ordine resta nel libro 7 giorni (dal 16 novembre 2026; prima 24 ore); il tetto per ordine è quello on-chain dei NUMERI DI OGGI e del paragrafo sui limiti.
 - L'intervallo anche on-chain (dal 27 novembre 2026, dopo la promozione): come su Lightning, un ordine on-chain a prezzo di mercato (col premio di chi pubblica) può avere due cifre, «da 20 a 100 €»; si scrive il secondo importo nel foglio Pubblica, in euro, franchi o USDT (mai a prezzo fisso, mai in ETH, Monero o USDe, mai col PayCode di Barattozon). Chi prende tocca «Scegli», scrive la cifra in «Quanto vuoi scambiare?» e poi vede il conto di quella cifra: i sats si fissano al cambio del momento della presa. La cauzione del contanti si conta sulla cifra scelta, non sul massimo, e dopo non si può prendere per una cifra più alta di quella della cauzione. Se lo scambio salta, l'ordine torna nel libro con l'intervallo intero.
+- Ordini sempre a intervallo (dal 27 novembre 2026, dopo la promozione): a prezzo di mercato, in Compra e in Vendi, su Lightning e on-chain, nel foglio Pubblica si scrive «Fino a» (il campo grande a sinistra, l'unico che serve); a destra c'è «Da», già pieno con 10 €: chi non vuole ordini piccoli lo alza. Il minimo è 10 € (o 10 CHF, 10 USDT). Se «Fino a» è uguale al «Da» l'ordine ha un importo solo. A prezzo fisso, con Barattozon e in ETH, Monero o USDe l'importo resta uno solo. Il perché: più è ampio l'intervallo, più spesso l'ordine viene preso, e chi paga in euro dal mercatino («Non hai sats?») trova sempre un venditore.
 
 <!-- pezzo libro-048 | libro -->
 ## Libro · Lo scambio P2P: comprare e vendere bitcoin per euro (18/25)
@@ -2973,4 +2974,12 @@ pubblico: no
 frase: Anche gli ordini P2P on-chain possono avere un intervallo, «da 20 a 100 €», come quelli Lightning: chi pubblica a prezzo di mercato scrive due cifre, e chi prende sceglie quanto. Con un intervallo il tuo ordine viene preso molto più spesso.
 dove: P2P → + → «On-chain» → l'importo, secondo campo; nel libro la card «da … a …, scegli tu» → «Scegli» → «Quanto vuoi scambiare?».
 leva: P2P_ONCHAIN_INTERVALLO (accesa di serie)
+pubblico: sì
+
+<!-- pezzo novita-168 | novita -->
+## Novità · 2026-11-27 · intervallo-obbligatorio
+
+frase: Gli ordini P2P a prezzo di mercato ora sono sempre a intervallo: nel foglio Pubblica scrivi «Fino a» quanto vuoi scambiare, e accanto il «Da» parte già da 10 €. Se non vuoi ordini piccoli lo alzi tu. Più ampio è l'intervallo, più spesso il tuo ordine viene preso. Vale in Compra e in Vendi, su Lightning e on-chain; a prezzo fisso, con Barattozon e nelle monete l'importo resta uno solo.
+dove: P2P → + → «2. Quanto» → «Fino a» e «Da».
+leva: nessuna
 pubblico: sì
