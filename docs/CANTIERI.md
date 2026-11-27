@@ -97386,3 +97386,4 @@ NIENTE SI TOGLIE (la lezione del 15 ott): il grafico «Ordini P2P e prezzo» non
 PROVATO: le due sezioni di prove.py qui sopra, verdi; la pagina disegnata in Chromium a 390 px con dati finti, chiaro e scuro, senza errori nuovi. NON provato: col server vero e un database vero (lo fa la CI alla promozione e la vm-2050).
 
 DA GUARDARE: se un referral di Bitcoin Labs arriva sull'indirizzo degli zap, sta già fra gli Zap (la nota della pagina dice di non scriverlo due volte); il mercatino on-chain, se un giorno avrà una fee, passa dagli stessi ordini 'released'.
+SEGUITO, lo stesso giorno (Andrea: «volumi e guadagni dovrebbero stare nello stesso grafico con un selettore per semplificare»): i due riquadri diventano uno, con in cima il selettore «Guadagni» | «Volumi e commissioni» (`vistaGU`, di serie Guadagni). «Da dove arrivano» resta sotto la vista Guadagni. Provato in Chromium a 390 px, le due viste.

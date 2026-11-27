@@ -1131,6 +1131,9 @@ function disegnaP2P(){
    conti P2P): a chi non lo e' la sezione non nasce. Le voci a mano
    (Bitcoin Labs, le spese) si scrivono qui sotto. */
 let GU = null, erroreGU = '', periodoGU = 30, cancellaGU = 0;
+/* UN GRAFICO SOLO col selettore (27 nov 2026, Andrea: «volumi e guadagni
+   dovrebbero stare nello stesso grafico con un selettore per semplificare») */
+let vistaGU = 'guadagni';
 const FONTI_GU = [
   [3, 'Mercatino', '--f-merc'], [4, 'P2P', '--f-p2p'], [5, 'SATS Routing', '--f-rout'],
   [6, 'Zap', '--f-zap'], [7, 'Bitcoin Labs', '--f-labs'], [8, 'Altro', '--f-altro']];
@@ -1195,7 +1198,11 @@ function sezioneGuadagni(){
     ${carta((netto < 0 ? '−' : '') + breve(Math.abs(netto)) + ' sats', `guadagni meno spese ${euroGU(Math.abs(netto)) ? '· ' + (netto < 0 ? '−' : '') + euroGU(Math.abs(netto)) : ''}`, netto < 0 ? 'urgente' : netto > 0 ? 'bene' : '')}
   </div>
   <div class="riquadro" style="margin-top:10px">
-    <div style="font-weight:800">Guadagni per ${granGU()}</div>
+    <div class="scelte" role="group" aria-label="Cosa mostra il grafico" style="margin:0 0 6px">
+      ${[['guadagni', 'Guadagni'], ['volumi', 'Volumi e commissioni']].map(([v, t]) =>
+        `<button aria-pressed="${v === vistaGU}" onclick="vistaGU='${v}';ridisegnaGuadagni()">${t}</button>`).join('')}
+    </div>
+    ${vistaGU === 'guadagni' ? `<div style="font-weight:800">Guadagni per ${granGU()}</div>
     ${legenda(FONTI_GU.map(([, nome, col]) => ({nome, colore: colore(col)})))}
     <div class="grafico" id="gGuadagni"></div>
     <div style="font-weight:800;margin-top:12px">Da dove arrivano</div>
@@ -1203,13 +1210,11 @@ function sezioneGuadagni(){
       <span class="pezzo" style="background:${col}"></span><b>${esc(nome)}</b>
       <span>${fmt(s)} sats <span class="sub">${entrate ? fmtd(s / entrate * 100, 0) + '%' : '—'}</span></span>
       <div class="barra" style="grid-column:1/-1"><b style="width:${entrate ? s / entrate * 100 : 0}%;background:${col}"></b></div></div>`).join('')}</div>
-    <div class="nota">Mercatino: protezione e commissione degli ordini conclusi (la commissione di oggi è ${fmtd(GU.commissione_percento, 2)}%). P2P: le commissioni lorde degli scambi conclusi, Lightning e on-chain. SATS Routing: la quota arrivata a swap@. Zap: il salvadanaio. Bitcoin Labs e «altro» si scrivono a mano qui sotto: se un referral arriva già sull'indirizzo degli zap, non scriverlo due volte.</div>
-  </div>
-  <div class="riquadro" style="margin-top:10px">
-    <div style="font-weight:800">Volumi e commissioni per ${granGU()}</div>
+    <div class="nota">Mercatino: protezione e commissione degli ordini conclusi (la commissione di oggi è ${fmtd(GU.commissione_percento, 2)}%). P2P: le commissioni lorde degli scambi conclusi, Lightning e on-chain. SATS Routing: la quota arrivata a swap@. Zap: il salvadanaio. Bitcoin Labs e «altro» si scrivono a mano qui sotto: se un referral arriva già sull'indirizzo degli zap, non scriverlo due volte.</div>`
+    : `<div style="font-weight:800">Volumi e commissioni per ${granGU()}</div>
     ${legenda([{nome: 'Volume mercatino', colore: colore('--f-merc')}, {nome: 'Volume P2P', colore: colore('--f-p2p')}, {nome: 'Commissioni (asse destro)', colore: colore('--sats')}])}
     <div class="grafico" id="gVolumiGU"></div>
-    <div class="nota">Volume ${esc(periodo)}: ${fmt(tot[0] + tot[1])} sats (${fmt(tot[0])} mercatino · ${fmt(tot[1])} P2P). Commissioni: ${fmt(tot[2] + tot[3])} sats${tot[0] + tot[1] ? ', il ' + fmtd((tot[2] + tot[3]) / (tot[0] + tot[1]) * 100, 2) + '% del volume' : ''}.</div>
+    <div class="nota">Volume ${esc(periodo)}: ${fmt(tot[0] + tot[1])} sats (${fmt(tot[0])} mercatino · ${fmt(tot[1])} P2P). Commissioni: ${fmt(tot[2] + tot[3])} sats${tot[0] + tot[1] ? ', il ' + fmtd((tot[2] + tot[3]) / (tot[0] + tot[1]) * 100, 2) + '% del volume' : ''}.</div>`}
   </div>
   ${sezioneSpese()}`;
 }
@@ -1270,11 +1275,11 @@ async function cancellaCassa(id, b){
   await caricaGuadagni();
 }
 function graficiGuadagni(){
+  if (!GU) return;
   const g = el('gGuadagni');
-  if (!g || !GU) return;
   const ks = secchiGU(), modo = granGU(), per = sommaGU();
   const val = {}; Object.keys(per).forEach(k => val[k] = FONTI_GU.map(([c]) => per[k][c - 1]));
-  barre(g, ks, FONTI_GU.map(([, nome, col]) => ({nome, colore: colore(col)})), val, (k, v) => {
+  if (g) barre(g, ks, FONTI_GU.map(([, nome, col]) => ({nome, colore: colore(col)})), val, (k, v) => {
     const parti = FONTI_GU.map(([, nome], i) => v[i] ? `${nome} ${fmt(v[i])}` : '').filter(Boolean);
     return `${esc(etichetta(k, modo))} · ${fmt(v.reduce((a, b) => a + b, 0))} sats${parti.length ? '<br>' + parti.map(esc).join(' · ') : ''}`;
   }, modo);
