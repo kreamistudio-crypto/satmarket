@@ -75456,19 +75456,34 @@ def _chat_scorta_stato(cc, io: int) -> dict:
     quelli miei che il server tiene — in scorta o bruciati per un ordine
     ancora aperto. Il telefono butta le chiavi segrete di quelli che qui
     non ci sono piu'."""
-    righe = cc.execute("SELECT pub, ordine FROM scorta WHERE tg_id=?",
+    righe = cc.execute("SELECT pub, ordine, seme FROM scorta WHERE tg_id=?",
                        (int(io),)).fetchall()
+    # `nude` (27 nov 2026, cantiere bunker-dopo-chiusura): quelli in scorta
+    # nati A CASO, senza seme. Un dispositivo col profilo di scambio li puo'
+    # ritirare (`_chat_scorta_posa`, `ritira`): la loro chiave segreta vive
+    # in una memoria sola, e Tor Browser la butta a ogni chiusura.
     return {"quante": sum(1 for r in righe if not r["ordine"]),
-            "vivi": [r["pub"] for r in righe]}
+            "vivi": [r["pub"] for r in righe],
+            "nude": [r["pub"] for r in righe if not r["ordine"] and not r["seme"]]}
 
 
-def _chat_scorta_posa(cc, io: int, lucchetti, adesso: int) -> tuple:
+def _chat_scorta_posa(cc, io: int, lucchetti, adesso: int, ritira=None) -> tuple:
     """I LUCCHETTI ENTRANO IN SCORTA (20 ott 2026). Pura sulla connessione
     del cassetto. Torna `(200, stato)` o `(codice, perche')`. Solo parti
     pubbliche, nella loro forma; un lucchetto gia' visto (di chiunque, in
     scorta o gia' chiave d'ordine) non rientra; e la scorta non passa
-    `CHAT_SCORTA_PIENA`: un client ritoccato non riempie il cassetto."""
+    `CHAT_SCORTA_PIENA`: un client ritoccato non riempie il cassetto.
+    `ritira` (27 nov 2026, cantiere bunker-dopo-chiusura): le parti
+    pubbliche di lucchetti MIEI, ancora in scorta e nati a caso, che
+    escono PRIMA che entrino i nuovi. Solo quelli: un lucchetto gia'
+    bruciato per un ordine e' la chiave di una chat e non si tocca, uno
+    col seme si ricalcola ovunque, uno di un altro non e' mio. Storto =
+    rifiutata intera, come i lucchetti."""
     if not isinstance(lucchetti, list) or len(lucchetti) > CHAT_SCORTA_PIENA:
+        return (400, "Richiesta non valida")
+    ritira = [] if ritira is None else ritira
+    if not isinstance(ritira, list) or len(ritira) > CHAT_SCORTA_PIENA \
+            or not all(isinstance(p, str) and FORMA_PUBKEY_P2P.fullmatch(p) for p in ritira):
         return (400, "Richiesta non valida")
     puliti = []
     for x in lucchetti:
@@ -75478,6 +75493,9 @@ def _chat_scorta_posa(cc, io: int, lucchetti, adesso: int) -> tuple:
         if not FORMA_PUBKEY_P2P.fullmatch(pub) or (seme and not FORMA_SEME_SCORTA.fullmatch(seme)):
             return (400, "Richiesta non valida")
         puliti.append((pub, seme))
+    for pub in ritira:
+        cc.execute("DELETE FROM scorta WHERE pub=? AND tg_id=? AND ordine='' AND seme=''",
+                   (pub, int(io)))
     for pub, seme in puliti:
         quante = int(cc.execute("SELECT COUNT(*) FROM scorta WHERE tg_id=? AND ordine=''",
                                 (int(io),)).fetchone()[0] or 0)
@@ -76347,7 +76365,7 @@ async def chat_scorta_p2p(req: Request, x_tg_init_data: str = Header(""),
     cc = db_chat()
     try:
         codice, corpo = _chat_scorta_posa(cc, user["id"], (d or {}).get("lucchetti") or [],
-                                          int(time.time()))
+                                          int(time.time()), (d or {}).get("ritira") or [])
     finally:
         cc.close()
     if codice != 200:

@@ -88632,7 +88632,9 @@ def prove_p2p_conto_dispositivo():
     # chiedono anche loro «e' un nativo?» (e il testo: «deriva dalla nsec?»)
     # VENTUNO dal 17 nov 2026 («chiavi-dalle-parole»): la via per
     # riprendere le chiavi dice la casa delle 12 parole, Telegram o Nostr
-    prova("...e i giudici e il testo usano numeroConto", 21,
+    # VENTIDUE dal 27 nov 2026 («bunker-dopo-chiusura»): il profilo che
+    # nasce per le chat lo chiede anche lui, solo per un nativo
+    prova("...e i giudici e il testo usano numeroConto", 22,
           blocco_mazzo.count("numeroConto(m.conto)")
           + blocco_mazzo.count("numeroConto(d.conto)")
           + blocco_mazzo.count("numeroConto(myTgId)"))
@@ -95089,7 +95091,9 @@ def prove_p2p_campanello():
     # DODICI dal 17 nov 2026 («chiavi-dalle-parole»): il passaggio con la
     # pensione e il gesto dalle parole registrano la pubblica del profilo
     # delle 12 parole, come la gamba dell'app
-    prova("i chiamanti di registraChiaviP2P sono dodici", 12, len(_reg))
+    # TREDICI dal 27 nov 2026 («bunker-dopo-chiusura»): il profilo che nasce
+    # per le chat di un nativo Nostr registra la sua pubblica, come il gesto
+    prova("i chiamanti di registraChiaviP2P sono tredici", 13, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
@@ -103259,7 +103263,7 @@ def prove_chat_scambio():
            ("novita", "ordini: ids"),
            # (20 ott 2026) la scorta: la domanda vuota, e i lucchetti (solo
            # parti pubbliche e semi: lo guarda `prove_chat_dalla_notifica`)
-           ("scorta", "lucchetti: []"), ("scorta", "lucchetti: lucchetti")],
+           ("scorta", "lucchetti: []"), ("scorta", "lucchetti: lucchetti, ritira: ritira")],
           sorted((a, b.strip()) for a, b in chiamate))
     prova("...e nessuna porta una chiave segreta o un testo", [],
           [b for _, b in chiamate if re.search(r"\bsk\b|testo|\.msgs", b)])
@@ -188758,7 +188762,8 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
     prova("chi legge la copia passa dal giudice della copia VIVA, con le cancellazioni verificate", True,
           "await leggiDaRelayP2P(relays, filtriCopiaP2P(pub), P2P_COPIA_MS);" in lc
           and "copiaVivaP2P(letti.map(x => x.ev).filter(e => e && (e.kind !== 5 || NT.verifyEvent(e))), pub);" in lc
-          and "p2pCopiaLetta = {mazzo: null, tolta: viva.tolta};" in lc)
+          # (27 nov 2026, bunker-dopo-chiusura) ...e dice quanti relay sono arrivati in fondo
+          and "p2pCopiaLetta = {mazzo: null, tolta: viva.tolta, risposti: (letti.risposti || []).length};" in lc)
     prova("...la copia nuova nasce DOPO l'ultima rimozione vista, e una copia riuscita chiude il sospeso", True,
           "eventoCopiaProfiloP2P(cifrato, Math.max(Math.floor(Date.now() / 1000), dopoTolta))"
           in fn("async function pubblicaCopiaProfiloP2P(m, auto){")
@@ -202988,6 +202993,11 @@ fetch = async (url, opz) => {
   const rispondi = (codice, d) => ({ok: codice === 200, status: codice, json: async () => d});
   if (url.endsWith('/scorta')) {
     srv.chiamate.push({url, corpo: opz.body});
+    /* (27 nov 2026) il ritiro: solo i miei, in scorta, nati a caso */
+    for (const p of (corpo.ritira || [])) {
+      const i = MERC.scorta.findIndex(s => s.pub === p && s.tg === io && !s.ordine && !s.seme);
+      if (i >= 0) MERC.scorta.splice(i, 1);
+    }
     for (const l of (corpo.lucchetti || [])) {
       if (MERC.scorta.filter(s => s.tg === io && !s.ordine).length >= 20) break;
       if (!/^[0-9a-f]{64}$/.test(l.pub || '') || MERC.scorta.some(s => s.pub === l.pub)) continue;
@@ -202995,6 +203005,7 @@ fetch = async (url, opz) => {
     }
     const mie = MERC.scorta.filter(s => s.tg === io);
     return rispondi(200, {ok: true, quante: mie.filter(s => !s.ordine).length, vivi: mie.map(s => s.pub),
+                          nude: mie.filter(s => !s.ordine && !s.seme).map(s => s.pub),
                           piena: 20, ricarica: 5});
   }
   const o = corpo.ordine || '';
@@ -203066,6 +203077,31 @@ out.scortaPota = [Object.keys(chatScortaLocaleP2P()).length, !(diN[0].pub in cha
 const domandeFreno = srv.chiamate.length;
 await chatScortaP2P();
 out.scortaFreno = srv.chiamate.length - domandeFreno;
+/* TOR BROWSER (27 nov 2026, cantiere bunker-dopo-chiusura): venti lucchetti nati a caso, poi la
+   memoria buttata alla chiusura. Senza profilo non si tocca niente (puo' essere vivo altrove);
+   col profilo ritrovato i morti escono e la scorta rinasce dal profilo */
+dispositivo('T', 555, null);
+suM('T'); await chatScortaP2P(true);
+const nudiT = MERC.scorta.filter(s => s.tg === 555).map(s => s.pub);
+disp.T.magazzino = {};
+const domandeT = srv.chiamate.length;
+await chatScortaP2P(true);
+out.torSenzaProfilo = [MERC.scorta.filter(s => s.tg === 555 && !s.seme).length,
+                       srv.chiamate.slice(domandeT).map(c => c.corpo)];
+disp.T.mazzo = mazzo();
+await chatScortaP2P(true);
+const diT = MERC.scorta.filter(s => s.tg === 555);
+out.torColProfilo = [diT.length, diT.filter(s => !s.seme).length,
+                     diT.every(s => /^[0-9a-f]{32}$/.test(s.seme) && chiaveScortaP2P(disp.T.mazzo.sk, s.seme).pub === s.pub),
+                     (JSON.parse(srv.chiamate[srv.chiamate.length - 1].corpo).ritira || []).sort().join() === nudiT.slice().sort().join(),
+                     Object.keys(chatScortaLocaleP2P()).length];
+/* ...e chi ha il profilo e lucchetti a caso VIVI qui li ritira solo quando la scorta va riempita */
+dispositivo('V', 666, null);
+suM('V'); await chatScortaP2P(true);
+disp.V.mazzo = mazzo();
+const domandeV = srv.chiamate.length;
+await chatScortaP2P(true);
+out.vivoNonRitira = [MERC.scorta.filter(s => s.tg === 666 && !s.seme).length, srv.chiamate.length - domandeV];
 
 /* ===== 2) DUE ORDINI DELLA STESSA PERSONA, CHE NON HA MAI APERTO LA PAGINA ===== */
 dispositivo('B1', 111, mazzo()); dispositivo('B2', 333, mazzo());
@@ -203202,6 +203238,25 @@ def prove_chat_dalla_notifica():
     st2 = posa(cc, 333, [{"pub": K(1)}, {"pub": K(500)}, {"pub": K(600)}], 3)[1]
     prova("...un lucchetto gia' visto (di un altro, o gia' chiave d'ordine) non rientra", (1, [K(600)]),
           (st2["quante"], st2["vivi"]))
+    # IL RITIRO DEI LUCCHETTI NATI A CASO (27 nov 2026, cantiere bunker-dopo-chiusura): su un
+    # altro conto, per non toccare i numeri di qui sotto
+    stz = amb["_chat_scorta_stato"]
+    posa(cc, 777, [{"pub": K(900 + i)} for i in range(3)] + [{"pub": K(910), "seme": "b" * 32}], 4)
+    cc.execute("UPDATE scorta SET ordine='m77', giro=0 WHERE pub=?", (K(902),))
+    prova("LO STATO dice quali lucchetti in scorta sono nati a caso (`nude`): non quelli col seme, "
+          "non quelli gia' bruciati per un ordine", [K(900), K(901)], sorted(stz(cc, 777)["nude"]))
+    prova("IL RITIRO: storto = rifiutato intero, e non tocca niente", [400, 400, 400, 400, 3],
+          [posa(cc, 777, [], 5, "non una lista")[0], posa(cc, 777, [], 5, ["x" * 64])[0],
+           posa(cc, 777, [], 5, [K(i) for i in range(21)])[0], posa(cc, 777, [], 5, [None])[0],
+           stz(cc, 777)["quante"]])
+    rit = posa(cc, 777, [{"pub": K(920), "seme": "c" * 32}], 6, [K(900), K(901), K(902), K(910), K(3)])
+    prova("...esce SOLO il lucchetto mio, in scorta, nato a caso: quello bruciato per un ordine, quello "
+          "col seme e quello di un altro restano, e il nuovo entra",
+          (200, [], sorted([K(902), K(910), K(920)]), True),
+          (rit[0], rit[1]["nude"], sorted(rit[1]["vivi"]),
+           cc.execute("SELECT 1 FROM scorta WHERE pub=? AND tg_id=222", (K(3),)).fetchone() is not None))
+    prova("...senza `ritira` la posa e' quella di ieri", 200, posa(cc, 777, [], 7)[0])
+    cc.execute("DELETE FROM scorta WHERE tg_id=777")
     p1 = assegna(cc, "m1", 0, 222, 10)
     p2 = assegna(cc, "m2", 0, 222, 11)
     righe = {r["pub"]: (r["ordine"], r["seme"]) for r in cc.execute("SELECT pub, ordine, seme FROM scorta WHERE tg_id=222")}
@@ -203425,7 +203480,8 @@ console.log(JSON.stringify(c));
           (len(re.findall(r"lucchetti\.push\(\{pub: [^}]+, seme: [^}]+\}\)", sc)),
            # nessun oggetto spedito ha una chiave `sk:` (quella del profilo serve solo a ricavare)
            len(re.findall(r"lucchetti\.push\(\{[^\n]*\bsk:", sc)),
-           sc.find("chatScortaScriviP2P(loc);\n    d = await chatScFetch('scorta', {lucchetti: lucchetti});") > 0))
+           # (27 nov 2026) il corpo porta anche `ritira`: solo parti pubbliche, quelle che il server ha detto
+           sc.find("chatScortaScriviP2P(loc);\n    d = await chatScFetch('scorta', {lucchetti: lucchetti, ritira: ritira});") > 0))
 
     # --- 4) IL BANCO: il motore VERO, la scorta, due ordini, il moderatore ---
     i = mini.index("/* ═══ LA CHAT NELLO SCAMBIO (12 ott 2026, cantiere chat-nello-scambio,")
@@ -203451,6 +203507,11 @@ console.log(JSON.stringify(c));
           o["scortaSenzaProfilo"])
     prova("...e quella di un lucchetto che il server non tiene piu' se ne va", [19, True], o["scortaPota"])
     prova("...il freno: senza `forza` la domanda non riparte prima di dieci minuti", 0, o["scortaFreno"])
+    prova("TOR BROWSER, MEMORIA BUTTATA E NESSUN PROFILO: i lucchetti a caso restano (possono essere vivi "
+          "altrove), una domanda vuota e basta", [20, ['{"lucchetti":[]}']], o["torSenzaProfilo"])
+    prova("...COL PROFILO RITROVATO: i venti morti si ritirano e la scorta rinasce dal profilo, ognuno "
+          "ricalcolabile, niente chiave segreta in memoria", [20, 0, True, True, 0], o["torColProfilo"])
+    prova("...lucchetti a caso VIVI qui e scorta piena: niente ritiro, una domanda sola", [20, 1], o["vivoNonRitira"])
     prova("CHI COMPRA SCRIVE SUBITO, anche se chi vende non ha MAI aperto la pagina: per il suo lucchetto",
           ["scrivi", True, False], o["b1Subito"])
     prova("DUE ORDINI DELLA STESSA PERSONA, DUE LUCCHETTI DIVERSI, tutti e due bruciati", [True, ["m1", "m2"], 18, True],
@@ -203475,6 +203536,109 @@ console.log(JSON.stringify(c));
     prova("...e il moderatore lo legge col pacco di chi apre la disputa",
           [["vende: Ti scrivo prima che tu apra lo scambio"], 0], o["p2pMod"])
 
+
+
+def prove_profilo_chat_nostr():
+    """IL PROFILO CHE NASCE PER LE CHAT (27 nov 2026, cantiere bunker-dopo-
+    chiusura, ok di Andrea). Dal campo: Nostr Connect da Tor Browser, che a
+    ogni chiusura butta tutto; al rientro la chat dell'ordine del mercatino
+    era «aperta su un altro dispositivo». Per un nativo Nostr col firmatario
+    che cifra, il profilo di scambio nasce con la sua copia cifrata sui
+    relay, e le chat si ritrovano. Qui il giudice della nascita, su un banco
+    node di cartone: nasce SOLO se la lettura ha detto «nessuna copia» da un
+    relay che ha risposto, mai dopo un «Dimentica», mai per chi entra da
+    Telegram, mai sopra un profilo che c'e'; e resta SOLO se la copia c'e'."""
+    print("\n[il profilo che nasce per le chat del mercatino, con la copia sui relay]")
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    fn = pezzo_js(mini, "let p2pNascitaChat = null;\nfunction nasciProfiloChatP2P(){", "\n}\n") + "\n}\n"
+    prof = pezzo_js(mini, "function chatMercProfiloP2P(){", "\n}\n")
+    prova("LE CHAT CHIEDONO PRIMA DI RITROVARE, POI DI NASCERE: `nasciProfiloChatP2P` solo se "
+          "`adottaProfiloContoP2P` torna a mani vuote", True,
+          "p2pChatMercProfilo = adottaProfiloContoP2P()\n    .then(m => m || (typeof nasciProfiloChatP2P === 'function' ? nasciProfiloChatP2P() : null))" in prof)
+    prova("LA LETTURA DELLA COPIA dice quanti relay sono arrivati in fondo (`risposti`)", True,
+          "p2pCopiaLetta = {mazzo: null, tolta: viva.tolta, risposti: (letti.risposti || []).length};"
+          in pezzo_js(mini, "function leggiCopiaProfiloP2P(){", "\n}\n"))
+    banco = r"""
+const crypto = require('crypto');
+const window = {NostrTools: {generateSecretKey: () => crypto.randomBytes(32),
+  getPublicKey: b => crypto.createHash('sha256').update(Buffer.from(b)).digest('hex'),
+  utils: {bytesToHex: b => Buffer.from(b).toString('hex'), hexToBytes: h => Buffer.from(h, 'hex')}}};
+let DEMO = false, VETRINA = false, myTgId = -5, MZ = null, p2pCopiaLetta = null, LETTA = null;
+let ESITO = 'copia', REG = [], COPIE = [], LETTE = 0, SCAMBIA = null;
+function numeroConto(x){ return Number(x) || 0; }
+function mazzoMostro(){ return MZ; }
+function ricordaMazzo(m){ MZ = Object.assign({}, m); }
+function scordaMazzoLocale(){ MZ = null; }
+async function caricaNostrTools(){}
+async function leggiCopiaProfiloP2P(){ LETTE++; p2pCopiaLetta = LETTA; return LETTA && LETTA.mazzo; }
+async function assicuraCopiaProfiloP2P(o){
+  COPIE.push(!!(o && o.gesto));
+  if (SCAMBIA) MZ = SCAMBIA;            /* un gesto del P2P ha deciso nel frattempo */
+  if (ESITO === 'copia' && MZ) MZ.copiaRelay = 1;
+  return ESITO;
+}
+async function registraChiaviP2P(l){ REG.push(...l); return true; }
+const _log = console.log; console.log = () => {};
+__FN__
+const out = {};
+async function caso(nome, imposta){
+  myTgId = -5; MZ = null; p2pCopiaLetta = null; LETTA = {mazzo: null, tolta: 0, risposti: 1};
+  ESITO = 'copia'; REG = []; COPIE = []; LETTE = 0; SCAMBIA = null;
+  imposta();
+  const prima = MZ;
+  const r = await nasciProfiloChatP2P();
+  out[nome] = [!!r, !!MZ && MZ !== prima && !!MZ.sk, REG.length, COPIE, LETTE];
+}
+(async () => {
+  await caso('nasce', () => {});
+  out.nasceRegistra = [REG[0] === (MZ && MZ.pub), (MZ && MZ.copiaRelay) | 0, MZ && MZ.origine];
+  await caso('copiaMuta', () => { ESITO = 'muto'; });
+  await caso('rifiutata', () => { ESITO = 'rifiutata'; });
+  await caso('nessunRelay', () => { LETTA = {mazzo: null, tolta: 0, risposti: 0}; });
+  await caso('tolta', () => { LETTA = {mazzo: null, tolta: 1700000000, risposti: 2}; });
+  await caso('copiaCe', () => { LETTA = {mazzo: {sk: 'a'.repeat(64), pub: 'b'.repeat(64)}}; });
+  await caso('senzaFirmatario', () => { LETTA = null; });
+  await caso('telegram', () => { myTgId = 222; });
+  await caso('demo', () => { DEMO = true; });
+  DEMO = false;
+  const vecchio = {sk: 'c'.repeat(64), pub: 'd'.repeat(64)};
+  await caso('ceGia', () => { MZ = vecchio; });
+  out.ceGiaIntatto = MZ === vecchio;
+  const gesto = {sk: 'e'.repeat(64), pub: 'f'.repeat(64)};
+  await caso('gestoNelFrattempo', () => { SCAMBIA = gesto; });
+  out.gestoTenuto = MZ === gesto;
+  /* due chiamate insieme: UNA nascita */
+  myTgId = -5; MZ = null; LETTA = {mazzo: null, tolta: 0, risposti: 1}; ESITO = 'copia'; REG = []; COPIE = [];
+  SCAMBIA = null;
+  const [a, b] = await Promise.all([nasciProfiloChatP2P(), nasciProfiloChatP2P()]);
+  out.insieme = [a === b, REG.length, COPIE.length];
+  _log(JSON.stringify(out));
+})();
+"""
+    f = _node_banco(banco.replace("__FN__", fn))
+    if f is None:
+        salta("il banco node della nascita del profilo per le chat", "node non c'e'")
+        return
+    prova("NASCE: lettura «nessuna copia» da un relay che risponde, copia scritta e riletta col gesto "
+          "(una volta), profilo tenuto e registrato", [True, True, 1, [True], 1], f.get("nasce"))
+    prova("...registrato con la SUA chiave d'identita', la copia segnata, nato come quello del gesto P2P",
+          [True, 1, ""], f.get("nasceRegistra"))
+    prova("LA COPIA NON C'E' (nessun relay la rilegge, o il firmatario dice di no): il profilo se ne va, "
+          "niente registrato — i lucchetti nascono a caso come prima",
+          ([False, False, 0, [True], 1], [False, False, 0, [True], 1]), (f.get("copiaMuta"), f.get("rifiutata")))
+    prova("NESSUN RELAY HA RISPOSTO alla lettura: non e' «nessuna copia», non nasce niente e non si scrive",
+          [False, False, 0, [], 1], f.get("nessunRelay"))
+    prova("LA COPIA TOLTA COL «DIMENTICA»: non rinasce da sola", [False, False, 0, [], 1], f.get("tolta"))
+    prova("LA COPIA C'E' (la ritrova `adottaProfiloContoP2P`): qui non nasce un secondo profilo",
+          [False, False, 0, [], 1], f.get("copiaCe"))
+    prova("NESSUN FIRMATARIO CHE CIFRI: niente", [False, False, 0, [], 1], f.get("senzaFirmatario"))
+    prova("CHI ENTRA DA TELEGRAM (ha il seme del conto) e la demo: non si chiede nemmeno",
+          ([False, False, 0, [], 0], [False, False, 0, [], 0]), (f.get("telegram"), f.get("demo")))
+    prova("UN PROFILO CHE C'E' non si tocca: torna lui", ([True, False, 0, [], 0], True),
+          (f.get("ceGia"), f.get("ceGiaIntatto")))
+    prova("UN GESTO DEL P2P ARRIVATO NEL FRATTEMPO vince: il suo profilo resta, niente registrato da qui",
+          ([True, True, 0, [True], 1], True), (f.get("gestoNelFrattempo"), f.get("gestoTenuto")))
+    prova("DUE CHIAMATE INSIEME, UNA NASCITA", [True, 1, 1], f.get("insieme"))
 
 
 def prove_journal_senza_buffer():
@@ -226129,7 +226293,7 @@ CATEGORIE = {
     servizio_senza_corriere gesti_ordine backfill_annullo_venditore
     annullata_pagata accordo_una_volta allegati_chat pdf_allegati
     modifica_massiva
-    venduto_canale esauriti_eliminabili nascondi_annuncio scorta_codici chat_mercatino chat_dalla_notifica
+    venduto_canale esauriti_eliminabili nascondi_annuncio scorta_codici chat_mercatino chat_dalla_notifica profilo_chat_nostr
     modifica_massiva_foto miniature_leggere leva_mercato_lavoro
     allegati_da_telegram domande_compratore incasso_annuncio
     etichetta_alimenti fotografia_annuncio
@@ -227546,7 +227710,7 @@ def main():
               prove_venduto_canale,
               prove_vetrina_pulita,
               prove_chat_mercatino,
-              prove_chat_dalla_notifica,
+              prove_chat_dalla_notifica, prove_profilo_chat_nostr,
               prove_journal_senza_buffer,
               prove_modifica_massiva_foto,
               prove_istanza_prova,

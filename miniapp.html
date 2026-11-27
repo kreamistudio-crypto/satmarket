@@ -92317,7 +92317,10 @@ function leggiCopiaProfiloP2P(){
       const ev = viva.ev;
       if (!ev) {
         console.log('🔑 [p2p] copia sui relay: ' + (viva.tolta ? 'e\' stata tolta' : 'nessuna copia'));
-        p2pCopiaLetta = {mazzo: null, tolta: viva.tolta};
+        /* `risposti` (27 nov 2026): quanti relay sono arrivati in fondo. Zero
+           vuol dire «nessuno ha risposto», non «non c'e' niente» — e la
+           nascita del profilo per le chat lo deve sapere */
+        p2pCopiaLetta = {mazzo: null, tolta: viva.tolta, risposti: (letti.risposti || []).length};
         return null;
       }
       if (!NT.verifyEvent(ev)) return null;
@@ -92350,6 +92353,62 @@ async function riprendiCopiaProfiloP2P(){
   p2pCopiaEsito = 'copia';
   console.log('🔑 [p2p] profilo: ripreso dalla copia cifrata sui relay');
   return mazzoMostro();
+}
+/* IL PROFILO CHE NASCE PER LE CHAT DEL MERCATINO (27 nov 2026, cantiere
+   bunker-dopo-chiusura, ok di Andrea). DAL CAMPO: un utente entrava con
+   Nostr Connect da Tor Browser, che a ogni chiusura cancella tutto; al
+   rientro la chat del suo ordine diceva «aperta su un altro dispositivo»
+   e i messaggi di prima non si leggevano piu'. Il perche': chi entra da
+   Telegram ha il profilo dal seme del suo account, e i lucchetti della
+   chat nascono da li' (ogni dispositivo li ricalcola); un nativo Nostr
+   senza profilo di scambio li faceva nascere A CASO, con la chiave
+   segreta solo in questa memoria — e Tor la butta.
+   ORA, per un nativo Nostr col firmatario che sa cifrare (bunker,
+   estensione, nsec), il profilo NASCE qui e va SUBITO sui relay come
+   copia cifrata verso la sua stessa chiave (`assicuraCopiaProfiloP2P`, la
+   strada che il P2P usa dall'11 ott): al rientro, anche da un browser
+   vuoto, `riprendiCopiaProfiloP2P` lo riporta, e con lui lucchetti,
+   chiavi d'ordine e chat. Il server non vede niente (regola ferrea 2).
+   TRE GUARDIE, ed e' tutto il rischio:
+   1) SOLO SE LA LETTURA HA DETTO «NESSUNA COPIA» DAVVERO: firmatario che
+      ha risposto, almeno un relay arrivato in fondo (`risposti`), e una
+      copia mai tolta col «Dimentica» — un silenzio dei relay non e' un
+      posto libero, e un profilo nuovo scritto sopra la copia di uno
+      vecchio sarebbe un'identita' distrutta;
+   2) IL PROFILO RESTA SOLO SE LA COPIA C'E' (qualcuno la rilegge): senza,
+      si toglie da qui e i lucchetti nascono a caso come prima — un
+      profilo che sparisce con la memoria non salverebbe niente;
+   3) MAI SOPRA UN PROFILO CHE C'E', e mai per chi entra da Telegram (il
+      suo ha gia' la sua strada). Una volta per pagina, dalle chat. */
+let p2pNascitaChat = null;
+function nasciProfiloChatP2P(){
+  if (DEMO || VETRINA || !(numeroConto(myTgId) < 0)) return Promise.resolve(null);
+  if (mazzoMostro()) return Promise.resolve(mazzoMostro());
+  if (!p2pNascitaChat) p2pNascitaChat = (async () => {
+    await leggiCopiaProfiloP2P();
+    const letta = p2pCopiaLetta;
+    if (!letta || letta.mazzo || letta.tolta || !((letta.risposti | 0) > 0)) return null;
+    if (mazzoMostro()) return mazzoMostro();     /* nato nel frattempo: non si tocca */
+    await caricaNostrTools();
+    const NT = window.NostrTools;
+    const sk = NT.utils.bytesToHex(NT.generateSecretKey());
+    const nuovo = {sk, pub: NT.getPublicKey(NT.utils.hexToBytes(sk)), indice: 0,
+                   creato: Math.floor(Date.now() / 1000), backupFatto: false,
+                   origine: '', versione: 0};
+    ricordaMazzo(nuovo);
+    const esito = await assicuraCopiaProfiloP2P({gesto: true});
+    const ora = mazzoMostro();
+    if (!ora || ora.sk !== nuovo.sk) return ora || null;   /* un gesto ha deciso nel frattempo */
+    if (esito !== 'copia') {
+      scordaMazzoLocale();
+      console.log('🔑 [p2p] profilo per le chat: la copia sui relay non c\'e\' (' + esito + '), non nasce');
+      return null;
+    }
+    await registraChiaviP2P([nuovo.pub]);
+    console.log('🔑 [p2p] profilo per le chat: nato, con la copia cifrata sui relay');
+    return mazzoMostro();
+  })().catch(() => null).finally(() => { p2pNascitaChat = null; });
+  return p2pNascitaChat;
 }
 /* ============ LA RETE DI SICUREZZA PRIMA DELLA PRIMA PRESA (11 ott 2026,
    cantiere «tor-chiavi-scambio», terzo strato) ============
@@ -123809,12 +123868,28 @@ function chatScortaP2P(forza){
     const vivi = Array.isArray(d.vivi) ? d.vivi : [];
     let cambiata = false;
     for (const pub of Object.keys(loc)) if (vivi.indexOf(pub) < 0) { delete loc[pub]; cambiata = true; }
-    const manca = (d.piena | 0) - (d.quante | 0);
-    if ((d.quante | 0) >= (d.ricarica | 0) || manca <= 0) {
+    /* I LUCCHETTI NATI A CASO CHE QUI NON SI APRONO (27 nov 2026, cantiere
+       bunker-dopo-chiusura): `nude` sono quelli in scorta senza seme. Se
+       la loro chiave segreta qui non c'e' — Tor Browser l'ha buttata alla
+       chiusura — il prossimo ordine nascerebbe con una chat che nessuno
+       apre. Col profilo in mano si RITIRANO tutti (anche quelli che qui si
+       aprono: dal profilo ogni dispositivo li ricalcola, a caso no) e la
+       scorta si rifa' dal profilo. Senza profilo non si tocca niente: un
+       lucchetto morto qui puo' essere vivo su un altro dispositivo. */
+    const nude = Array.isArray(d.nude) ? d.nude.filter(p => /^[0-9a-f]{64}$/.test(p)) : [];
+    const morti = nude.filter(p => !(p in loc));
+    if (((d.quante | 0) >= (d.ricarica | 0) || (d.piena | 0) <= (d.quante | 0)) && !morti.length) {
       if (cambiata) chatScortaScriviP2P(loc);
       return d;
     }
     const mz = await chatMercProfiloP2P();
+    const ritira = (mz && mz.sk) ? nude : [];
+    const quante = (d.quante | 0) - ritira.length;
+    const manca = (d.piena | 0) - quante;
+    if (!ritira.length && (quante >= (d.ricarica | 0) || manca <= 0)) {
+      if (cambiata) chatScortaScriviP2P(loc);
+      return d;
+    }
     const lucchetti = [];
     for (let i = 0; i < manca; i++) {
       if (mz && mz.sk) {
@@ -123829,7 +123904,13 @@ function chatScortaP2P(forza){
       }
     }
     chatScortaScriviP2P(loc);
-    d = await chatScFetch('scorta', {lucchetti: lucchetti});
+    d = await chatScFetch('scorta', {lucchetti: lucchetti, ritira: ritira});
+    /* i ritirati se ne vanno anche da qui: il server non li tiene piu' */
+    if (ritira.length && Array.isArray(d && d.vivi)) {
+      const ora = chatScortaLocaleP2P();
+      for (const pub of Object.keys(ora)) if (d.vivi.indexOf(pub) < 0) delete ora[pub];
+      chatScortaScriviP2P(ora);
+    }
     return d;
   })().catch(() => null).finally(() => { p2pChatScortaInVolo = null; });
   return p2pChatScortaInVolo;
@@ -123843,12 +123924,17 @@ function chatMercChiaveP2P(o){
 /* IL PROFILO DI SCAMBIO, se c'e': quello di questo dispositivo, o quello
    che si RITROVA (per chi entra da Telegram, dal suo account; per chi
    entra con Nostr, dalla nsec o dalla copia sui relay —
-   `adottaProfiloContoP2P`, che non ne fa mai nascere uno a caso). UNA
+   `adottaProfiloContoP2P`, che non ne fa mai nascere uno a caso; a
+   nascere, col suo posto sui relay, ci pensa `nasciProfiloChatP2P`). UNA
    volta per pagina: un 409 qui e' una risposta, non un guasto. */
 function chatMercProfiloP2P(){
   if (typeof mazzoMostro === 'function' && mazzoMostro()) return Promise.resolve(mazzoMostro());
   if (typeof adottaProfiloContoP2P !== 'function') return Promise.resolve(null);
-  if (!p2pChatMercProfilo) p2pChatMercProfilo = adottaProfiloContoP2P().catch(() => null);
+  /* ...e se non si ritrova, per un nativo Nostr NASCE con la sua copia
+     sui relay (27 nov 2026: `nasciProfiloChatP2P`, che dice il perche') */
+  if (!p2pChatMercProfilo) p2pChatMercProfilo = adottaProfiloContoP2P()
+    .then(m => m || (typeof nasciProfiloChatP2P === 'function' ? nasciProfiloChatP2P() : null))
+    .catch(() => null);
   return p2pChatMercProfilo;
 }
 /* LA CHIAVE DELL'ORDINE SI DICHIARA: dopo un ritiro, se questo
