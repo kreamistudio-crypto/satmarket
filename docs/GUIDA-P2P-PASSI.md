@@ -705,13 +705,19 @@ le sezioni in quest'ordine:
    ott 2026, lo stesso di Barattozon): «Euro interi, senza centesimi.»
    (più «Fase beta: max <cifra>.» se c'è un tetto), la cifra grande con
    «€», il tastierino (1-9, 0, ⌫: niente virgola), «Conferma» e
-   «Annulla». **Fisso o intervallo:** toccando il primo campo compare il
-   secondo, «Importo massimo», preceduto da «a», con il suggerimento «💡
-   Tocca il secondo campo solo se vuoi creare un ordine a intervallo»;
-   il secondo apre lo stesso foglio, «💶 L'importo massimo»: «Il massimo
-   dell'intervallo, più del primo importo. Vuoto, l'ordine ha un importo
-   solo.». Lasciato vuoto = ordine a importo fisso; scritto = intervallo
-   «da… a…». Oltre un limite il foglio dice la frase di sempre — «Troppi:
+   «Annulla». **Sempre a intervallo (dal 27 nov 2026), a prezzo di
+   mercato:** a sinistra, grande, «Fino a» con la riga «Importo» (l'unico
+   campo che serve, foglio «💶 Fino a»); a destra, piccolo, «Da» già pieno
+   con «10 €» (foglio «💶 Da»: chi non vuole ordini piccoli lo alza; vuoto
+   torna 10). Sotto, la scatola
+   arancione «💡 Più ampio è l'intervallo, più spesso il tuo ordine viene
+   preso.» e sotto, più piccola, «Per una cifra fissa, scrivi lo stesso
+   numero nei due campi.». Sotto i 10: «Troppo pochi: il minimo è 10 €» (CHF, USDT);
+   «Fino a» uguale al «Da» = un importo solo. Vale in Compra e in Vendi,
+   Lightning e on-chain; a prezzo fisso, con Barattozon e in ETH, Monero o
+   USDe resta la riga «Importo» unica di prima, e Barattozon in Compra
+   tiene la sua fascia coi due campi di prima, «Importo» e «Importo
+   massimo» (foglio «💶 L'importo massimo»). Oltre un limite il foglio dice la frase di sempre — «Troppi:
    il massimo è <cifra> €», «L'importo massimo deve superare il primo»,
    quella dei contanti — e «Conferma» resta spento. Se c'è un tetto, sotto
    la riga resta «Fase beta: max <cifra>». A **prezzo fisso** la riga

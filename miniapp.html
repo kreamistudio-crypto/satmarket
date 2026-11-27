@@ -11739,12 +11739,25 @@
   .via-euro-sotto{font-size:13px;font-weight:600;color:var(--muted);text-align:center;margin:0 0 14px}
   .via-euro-metodi{display:flex;gap:10px;margin:0 0 14px}
   /* LA SPINTA ALL'INTERVALLO (26 nov 2026, Andrea: «mettila bene in
-     evidenza»): una scatola arancio sotto l'importo di chi vende sats, e
-     la stessa in cima al foglio dell'importo al primo tocco */
+     evidenza»): una scatola arancio sotto l'importo. Dal 27 nov 2026
+     (intervallo obbligatorio) sotto «Fino a» / «Da», per chi compra e per
+     chi vende, e niente piu' banner al primo tocco: l'intervallo c'e'
+     sempre (Andrea: «lasciala cosi' come colori») */
   .p2p-spinta-intervallo{background:var(--sats-soft);border:1.5px solid var(--sats);
     color:var(--ink);border-radius:12px;padding:10px 12px;margin:8px 0 4px;
     font-size:14px;font-weight:800;line-height:1.35}
-  .p2p-spinta-intervallo.in-cima{margin:0 0 12px}
+  .p2p-spinta-fissa{display:block;margin-top:4px;font-size:13px;font-weight:600}
+  /* «FINO A» GRANDE A SINISTRA, «DA» PICCOLO A DESTRA (27 nov 2026, Andrea:
+     «compare fino a e poi a destra da») */
+  .p2p-finoda{display:flex;gap:14px}
+  .p2p-finoda > div{min-width:0;display:flex;flex-direction:column}
+  .p2p-finoda .p2p-tendina{margin-top:auto}
+  .p2p-finoda .p2p-fino{flex:3 1 0}
+  .p2p-finoda .p2p-da{flex:2 1 0}
+  .p2p-finoda small{display:block;font-size:12px;font-weight:700;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p2p-finoda .p2p-fino .p2p-tendina{font-size:20px}
+  .p2p-finoda .p2p-da .p2p-tendina{font-size:14px}
   .via-euro-metodi > .btn{flex:1;min-width:0}
   .via-euro-attesa{display:flex;align-items:center;justify-content:center;gap:10px;
     font-size:15px;font-weight:700;color:var(--ink);padding:24px 0}
@@ -82945,7 +82958,7 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
   /* L'INTERVALLO «DA… A…» (27 nov 2026, cantiere intervallo-onchain): a
      mercato, a euro interi come su Lightning, mai in moneta ne' col
      PayCode; il server lo rigiudica e, a leva spenta, lo ignora */
-  if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > 0
+  if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > interoP2P(campi.euro).n
       && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {
     corpo.euro_min_cent = interoP2P(campi.euro).n * 100;
     corpo.euro_cent = interoP2P(campi.euroMax).n * 100;
@@ -84942,7 +84955,11 @@ function cambiaReteP2P(rete){
     /* la fascia resta a Barattozon in «Compra BTC», e dal 27 nov 2026
        l'intervallo a tutti, a leva accesa (cantiere intervallo-onchain) */
     if (!(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')
-        && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
+        && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) {
+      /* il «Fino a» diventa l'importo unico (27 nov 2026, intervallo obbligatorio) */
+      if (String(p2pNuovoEuroMax || '').trim()) p2pNuovoEuro = p2pNuovoEuroMax;
+      p2pNuovoEuroMax = ''; p2pNuovoDue = false;
+    }
     const porta = el('p2pNuovoPorta');
     if (porta) porta.hidden = true;
   }
@@ -109815,11 +109832,25 @@ function valeNuovoOrdineP2P(v){
   const inChf = String(v.valuta || '').toUpperCase() === 'CHF';
   const segno = inUsdt ? 'USDT' : inChf ? 'CHF' : '€';
   const retiUsdt = typeof P2P_METODI_USDT !== 'undefined' ? P2P_METODI_USDT : [];
+  /* L'INTERVALLO OBBLIGATORIO (27 nov 2026, Andrea): «Fino a» e' il campo
+     che serve, coi suoi «Scrivi l'importo…»; sotto il minimo, da una parte
+     o dall'altra, «Troppo pochi» (frase approvata, come per i sats). Il
+     «Fino a» uguale al «Da» e' un importo solo, e passa. */
+  if (v.intervallo && !tab) {
+    const minimo = typeof P2P_MINIMO_INTERVALLO !== 'undefined' ? P2P_MINIMO_INTERVALLO : 10;
+    if (!(max > 0))
+      return {ok: false, manca: inUsdt ? 'Scrivi l\'importo in USDT' : inChf ? 'Scrivi l\'importo in franchi'
+                                       : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuroMax'};
+    if (max < minimo)
+      return {ok: false, manca: 'Troppo pochi: il minimo è ' + fmt(minimo) + ' ' + segno, campo: 'p2pNuovoEuroMax'};
+    if (euro > 0 && euro < minimo)
+      return {ok: false, manca: 'Troppo pochi: il minimo è ' + fmt(minimo) + ' ' + segno, campo: 'p2pNuovoEuro'};
+  }
   if (!(euro > 0))
     return {ok: false, manca: tab ? 'Scrivi l\'importo dell\'ordine Amazon, coi centesimi se servono'
                                   : inUsdt ? 'Scrivi l\'importo in USDT' : inChf ? 'Scrivi l\'importo in franchi'
                                   : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
-  if (!x.vuoto && !(max > euro))
+  if (!x.vuoto && (v.intervallo && !tab ? max < euro : !(max > euro)))
     return {ok: false, manca: 'L\'importo massimo deve superare il primo',
             campo: 'p2pNuovoEuroMax'};
   /* IL TETTO IN EURO DI BARATTOLO (set 2026): la leva P2P_MAX_EURO
@@ -110024,8 +110055,11 @@ function valeNuovoOrdineP2P(v){
 /* quel che c'e' nei campi adesso: un posto solo a leggerlo, cosi' il
    giudizio del bottone e quel che si spedisce non possono divergere */
 function campiNuovoP2P(){
+  const obbl = typeof intervalloObbligatorioP2P === 'function' && intervalloObbligatorioP2P();
   return {
-    euro: p2pNuovoEuro,
+    /* con l'intervallo obbligatorio il «Da» vuoto vale il minimo (27 nov 2026) */
+    euro: (obbl && !(interoP2P(p2pNuovoEuro).n > 0)) ? String(P2P_MINIMO_INTERVALLO) : p2pNuovoEuro,
+    intervallo: obbl,
     /* in una moneta l'importo e' uno solo (16 nov 2026, p2p-monete-valute) */
     euroMax: (p2pNuovoFisso || (typeof valutaCoinP2P === 'function'
       && valutaCoinP2P(typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR'))) ? '' : p2pNuovoEuroMax,
@@ -110592,6 +110626,9 @@ function renderNuovoOrdineP2P(){
   /* COL TABACCHINO L'IMPORTO STA NEL PERCORSO (23 set 2026): e' il
      passo 2 di `percorsoTabacchinoP2P`, con lo stesso `id` del campo,
      cosi' la rete dei centesimi e l'avviso «manca» lo trovano uguale */
+  /* L'INTERVALLO OBBLIGATORIO (27 nov 2026): vedi `intervalloObbligatorioP2P` */
+  if (typeof riempiDaP2P === 'function') riempiDaP2P();
+  const obbl = !tab && !bzCompro && typeof intervalloObbligatorioP2P === 'function' && intervalloObbligatorioP2P();
   const importo = tab ? '' : sezioneNuovoP2P({
     ico: 'importo',
     titolo: 'Inserisci l\'importo in ' + esc(sigla) + ' che vuoi ' +
@@ -110612,7 +110649,29 @@ function renderNuovoOrdineP2P(){
        di sempre. Tengono l'id e un `value` che `cambiaCampoNuovoP2P`
        rilegge come leggeva i campi. Il primo tocco svela il secondo
        come faceva il fuoco (`apriEuroTabP2P('min')`). */
-    corpo: '<div class="p2p-duecampi">' +
+    corpo: (obbl
+      /* «FINO A» A SINISTRA, GRANDE; «DA» A DESTRA, PICCOLO E GIA' PIENO
+         (27 nov 2026, Andrea: «compare fino a e poi a destra da»; dopo la
+         nota di Alan via solo la parola «facoltativo», e per un momento il
+         «Da» e' passato a sinistra, poi e' tornato qui). Gli id restano
+         quelli di sempre: il massimo e' «Fino a», il primo importo e' «Da» */
+      ? '<div class="p2p-finoda">' +
+        '<div class="p2p-fino"><small>Fino a</small>' +
+        '<button type="button" id="p2pNuovoEuroMax" class="p2p-tendina' +
+        (interoP2P(p2pNuovoEuroMax).n > 0 ? '' : ' vuota') + '" ' +
+        'value="' + esc(p2pNuovoEuroMax) + '" aria-haspopup="dialog" ' +
+        'onclick="apriEuroTabP2P(\'max\')">' +
+        /* vuoto dice «Importo»: «Fino a» sta gia' sopra */
+        '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuroMax, val.segno, 'min')) + '</span>' +
+        '<i aria-hidden="true">▾</i></button></div>' +
+        '<div class="p2p-da"><small>Da</small>' +
+        '<button type="button" id="p2pNuovoEuro" class="p2p-tendina" ' +
+        'value="' + esc(p2pNuovoEuro) + '" aria-haspopup="dialog" ' +
+        'onclick="apriEuroTabP2P(\'min\')">' +
+        '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuro, val.segno, 'min')) + '</span>' +
+        '<i aria-hidden="true">▾</i></button></div>' +
+        '</div>'
+      : '<div class="p2p-duecampi">' +
       '<button type="button" id="p2pNuovoEuro" class="p2p-tendina' +
           ((valCoin ? quantoCoinP2P(p2pNuovoEuro, valCoin.cod).n : interoP2P(p2pNuovoEuro).n) > 0 ? '' : ' vuota') + '" ' +
           'value="' + esc(p2pNuovoEuro) + '" aria-haspopup="dialog" ' +
@@ -110630,7 +110689,7 @@ function renderNuovoOrdineP2P(){
         'onclick="apriEuroTabP2P(\'max\')">' +
         '<span>' + esc(etichettaEuroFoglioP2P(p2pNuovoEuroMax, val.segno, 'max')) + '</span>' +
         '<i aria-hidden="true">▾</i></button>') +
-      '</div>' +
+      '</div>') +
       /* perche' il campo e' vuoto, se a svuotarlo e' stato un cambio
          di metodo: attaccata al campo, prima di ogni altra riga */
       rigaEuroViaP2P() +
@@ -110655,8 +110714,9 @@ function renderNuovoOrdineP2P(){
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
         /* chi vende sats: la spinta, sempre in vista, al posto del «solo se»
            (26 nov 2026) — tiene l'id della nota, che il primo tocco svela */
-        : (typeof spintaIntervalloP2P === 'function' && spintaIntervalloP2P())
-        ? '<div class="p2p-spinta-intervallo" id="p2pNuovoNotaDue">' + esc(P2P_SPINTA_INTERVALLO) + '</div>'
+        : obbl
+        ? '<div class="p2p-spinta-intervallo" id="p2pNuovoNotaDue">' + esc(P2P_SPINTA_INTERVALLO)
+          + '<small class="p2p-spinta-fissa">' + esc(P2P_INTERVALLO_FISSA) + '</small></div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
   });
@@ -112230,7 +112290,9 @@ function giudizioEuroFoglioP2P(bozza, campi, modo){
   const m = modoEuroP2P(modo);
   if (m.nome === 'tab') return giudizioTappaTabP2P(2, Object.assign({}, campi, {euro: bozza}));
   const b = String(bozza == null ? '' : bozza), max = m.nome === 'max';
-  if (!b) return {stato: max ? 'buono' : 'vuoto', frase: ''};
+  /* con l'intervallo obbligatorio (27 nov 2026) e' il contrario: «Fino a»
+     vuoto non basta, e il «Da» vuoto torna il minimo */
+  if (!b) return {stato: (max !== !!campi.intervallo) ? 'buono' : 'vuoto', frase: ''};
   /* I SATS (9 ott 2026, notte): il loro controllo, nel giudice, viene
      DOPO l'importo e i metodi — un euro ancora vuoto lo nasconderebbe.
      Si chiede allo stesso giudice con l'importo e i metodi resi neutri
@@ -112249,7 +112311,8 @@ function giudizioEuroFoglioP2P(bozza, campi, modo){
      un massimo vuoto non ha frasi, e non cambia niente. */
   const suo = g.campo === m.campo
     || (!max && g.campo === 'p2pNuovoEuroMax' && !interoP2P(campi.euroMax).vuoto
-        && !(interoP2P(campi.euroMax).n > interoP2P(b).n));
+        && (campi.intervallo ? interoP2P(campi.euroMax).n < interoP2P(b).n
+                             : !(interoP2P(campi.euroMax).n > interoP2P(b).n)));
   return suo ? {stato: 'storto', frase: g.manca} : {stato: 'buono', frase: ''};
 }
 /* PURA: la riga dei limiti sopra la cifra. Negli ordini normali il
@@ -112269,7 +112332,7 @@ function limitiEuroFoglioP2P(campi, modo){
     return 'Sats interi.' + (lo > 0 && hi > 0 ? ' Da ' + fmt(lo) + ' a ' + fmt(hi) + ' sats.'
       : hi > 0 ? ' Fino a ' + fmt(hi) + ' sats.' : lo > 0 ? ' Almeno ' + fmt(lo) + ' sats.' : '');
   }
-  return (m.nome === 'max'
+  return ((m.nome === 'max' && !campi.intervallo)
       ? 'Il massimo dell\'intervallo, più del primo importo. Vuoto, l\'ordine ha un importo solo.'
       : 'Euro interi, senza centesimi.')
     + (campi.tettoTesto ? ' Fase beta: max ' + campi.tettoTesto + '.' : '');
@@ -112468,22 +112531,17 @@ function apriEuroTabP2P(modo){
   p2pEuroTrigger = el(m.campo);
   p2pEuroBozza = String((m.nome === 'max' ? p2pNuovoEuroMax : m.nome === 'sats' ? p2pNuovoSats : p2pNuovoEuro) || '');
   const tit = el('p2pEuroTit');
-  if (tit) tit.textContent = m.titolo + (m.nome === 'coin' ? ' in ' + segnoValutaTabP2P() : '');
+  /* con l'intervallo obbligatorio (27 nov 2026) le parole dei due campi */
+  const obbl = (m.nome === 'min' || m.nome === 'max') && intervalloObbligatorioP2P();
+  if (tit) tit.textContent = obbl ? (m.nome === 'max' ? '💶 Fino a' : '💶 Da')
+    : m.titolo + (m.nome === 'coin' ? ' in ' + segnoValutaTabP2P() : '');
   const box = el('p2pEuroCorpo');
   if (box) box.innerHTML = corpoEuroTabP2P(p2pEuroBozza,
     Object.assign(campiNuovoP2P(), {tettoTesto: maxTestoP2P()}), m.unita || segnoValutaTabP2P(), m.nome);
   /* AL PRIMO TOCCO, IL BANNER (26 nov 2026, Andrea: «quando clicca li'
-     sopra la prima volta gli esce fuori un banner che lo informa»): una
-     volta per telefono, in cima al foglio */
-  if (box && m.nome === 'min' && spintaIntervalloP2P()) {
-    let visto = false;
-    try { visto = localStorage.getItem('p2pSpintaIntervallo') === '1'; } catch(e) {}
-    if (!visto) {
-      box.insertAdjacentHTML('afterbegin',
-        '<div class="p2p-spinta-intervallo in-cima">' + esc(P2P_SPINTA_INTERVALLO) + '</div>');
-      try { localStorage.setItem('p2pSpintaIntervallo', '1'); } catch(e) {}
-    }
-  }
+     sopra la prima volta gli esce fuori un banner che lo informa»): tolto
+     il 27 nov 2026, con l'intervallo obbligatorio — la scatola sotto i
+     campi lo dice gia', ogni volta */
   el('sheetBg').classList.add('open');
   el('p2pEuroSheet').classList.add('open');
 }
@@ -112510,7 +112568,10 @@ function confermaEuroTabP2P(){
   const g = aggiornaEuroTabP2P(true);
   if (g.stato !== 'buono') return;
   haptic();
-  const m = modoEuroP2P(p2pEuroModo), v = p2pEuroBozza;
+  const m = modoEuroP2P(p2pEuroModo);
+  const v = (m.nome === 'min' && p2pEuroBozza === '' && intervalloObbligatorioP2P())
+    ? String(P2P_MINIMO_INTERVALLO) : p2pEuroBozza;
+  if (v !== p2pEuroBozza) p2pEuroBozza = v;
   vestiRigaTendinaTabP2P(m.campo, v, etichettaEuroFoglioP2P(v, m.unita || segnoValutaTabP2P(), m.nome), v !== '');
   /* la funzione dei campi di ieri: la rete (centesimi con Barattozon,
      cifre negli altri ordini), la frase del cambio di metodo che se ne
@@ -112646,8 +112707,20 @@ function cambiaTipoPrezzoP2P(){
   /* tornando a mercato il secondo campo riparte CHIUSO: il massimo se
      n'e' andato col passaggio a prezzo fisso, e una casella vuota gia'
      aperta direbbe che li' c'era qualcosa */
-  if (p2pNuovoFisso) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
-  else p2pNuovoSats = '';
+  /* CON L'INTERVALLO OBBLIGATORIO (27 nov 2026) la cifra che conta e' il
+     «Fino a»: passando a prezzo fisso diventa l'importo unico, e tornando
+     a mercato l'importo unico torna «Fino a», col «Da» dal minimo */
+  if (p2pNuovoFisso) {
+    if (interoP2P(p2pNuovoEuroMax).n > 0) p2pNuovoEuro = p2pNuovoEuroMax;
+    p2pNuovoEuroMax = ''; p2pNuovoDue = false;
+  }
+  else {
+    p2pNuovoSats = '';
+    if (typeof intervalloObbligatorioP2P === 'function' && intervalloObbligatorioP2P()
+        && interoP2P(p2pNuovoEuro).n > 0 && !(interoP2P(p2pNuovoEuroMax).n > 0)) {
+      p2pNuovoEuroMax = String(interoP2P(p2pNuovoEuro).n); p2pNuovoEuro = '';
+    }
+  }
   renderNuovoOrdineP2P();
 }
 /* IL PREMIO SI MISURA DAL CENTRO, non dal capo (ritocco di Andrea che
@@ -112818,15 +112891,35 @@ function scegliValutaP2P(cod){
    sempre — una cifra fissa quasi mai). La vede chi VENDE sats in euro a
    prezzo di mercato, dove l'intervallo si puo' fare: non a prezzo fisso,
    non on-chain, non col tabacchino, non in una moneta. Scritta di Andrea. */
-const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.';
-function spintaIntervalloP2P(){
-  if (p2pLato === 'compro' || p2pNuovoFisso) return false;
-  /* on-chain anche lei, con l'intervallo acceso (27 nov 2026, Andrea:
-     «ricordati di inserire la scritta») */
+/* L'INTERVALLO OBBLIGATORIO (27 nov 2026, Andrea: «obblighiamo la gente
+   nel peer to peer ad inserire solamente ordini ad intervallo… dappertutto,
+   Lightning, on-chain»): a PREZZO DI MERCATO ogni ordine, Compra e Vendi,
+   in euro, franchi o USDT, si scrive «Fino a» (l'unico campo che serve) e
+   «Da», gia' pieno col minimo. Restano a cifra unica il prezzo fisso in
+   sats (un intervallo non fissa i sats: card «Teniamolo, solo a cifra
+   unica»), Barattozon (ha il suo percorso) e le monete. On-chain solo a
+   leva P2P_ONCHAIN_INTERVALLO accesa: spenta, il server lo ignorerebbe.
+   IL MINIMO E' 10 (Andrea: «metti il minimo di 10 dai»), e il «Da» parte
+   da li': chi non vuole ordini piccoli lo alza (card «Col minimo del
+   P2P»). «Fino a» uguale al «Da» = un importo solo, e va bene. */
+const P2P_MINIMO_INTERVALLO = 10;
+const P2P_SPINTA_INTERVALLO = '💡 Più ampio è l\'intervallo, più spesso il tuo ordine viene preso.';
+/* ...e la cifra fissa, detta sotto (card di Andrea «Una riga nella scatola») */
+const P2P_INTERVALLO_FISSA = 'Per una cifra fissa, scrivi lo stesso numero nei due campi.';
+function intervalloObbligatorioP2P(){
+  if (p2pNuovoFisso) return false;
+  if (tabacchinoP2P(p2pNuovoMetodi)) return false;
+  if (typeof valutaCoinP2P === 'function'
+      && valutaCoinP2P(typeof valutaFoglioP2P === 'function' ? valutaFoglioP2P() : 'EUR')) return false;
   if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
       && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) return false;
-  if (tabacchinoP2P(p2pNuovoMetodi)) return false;
-  return valutaFoglioP2P() === 'EUR';
+  return true;
+}
+/* il «Da» vuoto vale il minimo: si riempie qui, prima di disegnare */
+function riempiDaP2P(){
+  if (!intervalloObbligatorioP2P()) return;
+  p2pNuovoDue = true;
+  if (!(interoP2P(p2pNuovoEuro).n > 0)) p2pNuovoEuro = String(P2P_MINIMO_INTERVALLO);
 }
 function svelaSecondoImportoP2P(){
   /* a rete on-chain l'importo era uno solo: il 2-di-3 blocca una cifra.

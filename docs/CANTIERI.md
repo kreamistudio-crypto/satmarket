@@ -96961,3 +96961,59 @@ PROVATO: `prove_non_hai_sats`, `prove_chiedi_al_venditore`,
 `prove_giroconto_interno`, suite severa e collaudi.
 DA GUARDARE: sul VPS una riga esplicita `VIA_EURO_MAX_EURO` terrebbe il
 tetto (grep prima del deploy).
+
+## Gli ordini P2P sempre a intervallo: «Fino a» e «Da» (27 nov 2026)
+
+Andrea, dalla prova di «Non hai sats?»: chi paga in euro dal mercatino trova
+un venditore solo se la sua cifra sta dentro un ordine, e un ordine a cifra
+fissa la prende quasi mai (il libro vero aveva quasi solo «vendo 200 €»).
+La richiesta a chi vende a cifra fissa NON si rimette (card «No, solo match
+pronti»): «obblighiamo la gente nel peer to peer ad inserire solamente ordini
+ad intervallo… dappertutto, Lightning, on-chain».
+
+Deciso (card e messaggi del thread «Non hai sats?», 27 nov mattina):
+- vale a PREZZO DI MERCATO, Compra e Vendi, Lightning e on-chain, in euro,
+  franchi e USDT (`intervalloObbligatorioP2P`); restano a cifra unica il
+  prezzo fisso in sats (un intervallo non fissa i sats: card «Teniamolo,
+  solo a cifra unica»), Barattozon (ha il suo percorso; in Compra era già
+  una fascia) e le monete ETH/XMR/USDe; on-chain solo a leva
+  P2P_ONCHAIN_INTERVALLO accesa, perché spenta il server lo ignora;
+- la forma: a SINISTRA, grande, «Fino a» (l'unico campo che serve); a
+  DESTRA, piccolo, «Da» già pieno. Alan aveva notato che «i numeri si
+  leggono da sinistra a destra» e che «facoltativo» non va (di serie si
+  parte da 10 €): la parola se n'è andata, il «Da» è passato a sinistra per
+  qualche minuto e poi è tornato a destra (Andrea: «compare fino a e poi a
+  destra da»), perché il campo da scrivere è il primo che si vede. Gli id
+  non cambiano:
+  «Fino a» è `p2pNuovoEuroMax`, «Da» è `p2pNuovoEuro`, così il giudice, il
+  filo di Lightning (`ordineDaCampiP2P`) e quello on-chain restano quelli;
+- il «Da» parte dal MINIMO (card «Col minimo del P2P», non dalla stessa
+  cifra del «Fino a»: partendo uguale quasi nessuno lo toccherebbe e gli
+  ordini tornerebbero a cifra unica); chi non vuole ordini piccoli lo alza;
+- il minimo è 10 (Andrea prima 20, poi «metti il minimo di 10 dai»; a 1 €
+  nessuno fa un bonifico): `P2P_MINIMO_INTERVALLO`, sotto il giudice dice
+  «Troppo pochi: il minimo è 10 €» (la frase dei sats, col segno della
+  valuta). Prima c'era solo il minimo del nodo, in sats, che vale pochi euro;
+- «Fino a» uguale al «Da» è un importo solo e passa (10–10 = un ordine da
+  10 €): su Lightning `ordineDaCampiP2P` lo fa già cifra unica, on-chain
+  l'intervallo parte solo con «Fino a» sopra il «Da»;
+- la scatola arancione RESTA, coi suoi colori (Andrea: «lasciala così come
+  colori»), con la frase nuova approvata: «💡 Più ampio è l'intervallo, più
+  spesso il tuo ordine viene preso.», e sotto, più piccola (card «Una riga
+  nella scatola», non un tasto che spingerebbe verso la cifra fissa): «Per
+  una cifra fissa, scrivi lo stesso numero nei due campi.»; il banner al primo tocco se ne va
+  (l'intervallo c'è sempre, e la scatola lo dice ogni volta);
+- passando a prezzo fisso il «Fino a» diventa l'importo unico, e tornando a
+  mercato l'importo unico torna «Fino a» col «Da» dal minimo.
+
+Scartato: obbligare anche il server on-chain a rifiutare un ordine a mercato
+senza intervallo (una frase nuova per un telefono vecchio in cache, per
+poche ore: il giudice del telefono basta). Lightning non passa dal server.
+
+Provato: `prove_intervallo_obbligatorio` (il giudice e il foglio in node:
+vuoto, 10–1000, 10–10, sotto i 10 dalle due parti, «Da» sopra il «Fino a»,
+franchi, USDT, e fuori regola tutto come prima), suite severa e collaudi;
+foto della schermata mandate ad Andrea prima del push
+(/mnt/project-files/intervallo-obbligatorio/). Da guardare dopo la
+promozione: il primo ordine nuovo nel libro e un «Non hai sats?» che lo
+trova.
