@@ -87293,7 +87293,14 @@ function viaEuroPerMe(){
    euro / perSat × (1 − premio)), all'indietro, con meta' commissione a
    chi compra (`nettoLatoP2P`). A parita' di cifra, il piu' recente: e'
    piu' probabile che sia al telefono. null = niente da proporre. */
-function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk){
+/* PIU' TEMPO PRIMA (27 nov 2026, Andrea: «stare attenti a quegli ordini
+   peer to peer che hanno un tempo veloce tipo 15 minuti»; card «Riquadro ⏱
+   + ordine con piu' tempo»): `minutiDi(o)` dice i minuti per pagare di un
+   ordine, 0 = le 24 ore di serie. Fra quelli che vanno bene vince chi da'
+   PIU' TEMPO, poi la cifra piu' bassa, poi il piu' recente. Senza
+   `minutiDi` tutti contano 24 ore, e la scelta e' quella di prima. */
+const VIA_EURO_MINUTI_SERIE = 1440;
+function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk, minutiDi){
   const no = Array.isArray(nonHo) ? nonHo : [];
   /* (26 nov 2026) anche in franchi: la valuta dell'ordine e i suoi metodi */
   const fiat = valuta || 'EUR';
@@ -87315,11 +87322,14 @@ function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk)
                                  : (o.euro >= euro && o.euro <= euro + 1);
     if (!dentro) continue;
     const cifra = o.euroMax > 0 ? euro : o.euro;
-    if (!meglio || cifra < meglio.euro
-        || (cifra === meglio.euro && (o.creato || 0) > meglio.creato))
+    const m0 = typeof minutiDi === 'function' ? Number(minutiDi(o)) || 0 : 0;
+    const tempo = m0 > 0 ? m0 : VIA_EURO_MINUTI_SERIE;
+    if (!meglio || tempo > meglio.tempo
+        || (tempo === meglio.tempo && (cifra < meglio.euro
+            || (cifra === meglio.euro && (o.creato || 0) > meglio.creato))))
       meglio = {id: o.id, euro: cifra, metodi: metodi, fiat: fiat,
                 premium: Number(o.premium) || 0, creato: o.creato || 0,
-                intervallo: o.euroMax > 0};
+                intervallo: o.euroMax > 0, tempo: tempo, minuti: m0 > 0 ? m0 : 0};
   }
   return meglio;
 }
@@ -87347,7 +87357,8 @@ function viaEuroOfferta(sats){
   const fee = commissioneVivaP2P();
   if (fee === null) return null;
   const o = viaEuroScelta(viaEuroOrdiniPrendibili(), sats, perSat, fee, ordiniP2P(), viaEuroNonHo,
-                          valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI);
+                          valuta, valuta === 'CHF' ? VIA_EURO_METODI_CHF : VIA_EURO_METODI,
+                          typeof minutiPagareOrdineP2P === 'function' ? minutiPagareOrdineP2P : null);
   if (!o) return null;
   /* il tetto in euro vale per gli euro; in franchi non c'e' (Andrea) */
   /* ...e dal 27 nov 2026 il tetto in euro e' tolto di serie (Andrea: «leviamo
@@ -87456,9 +87467,22 @@ function renderViaEuro(){
     + '<div class="via-euro-sotto">prezzo ' + centesimiTestoP2P(prezzo) + ' ' + segno + ' + '
     + centesimiTestoP2P(cambio) + ' ' + segno + ' di cambio</div>'
     + metodi
+    + viaEuroRigaTempo(o)
     + '<button type="button" class="btn primary" onclick="viaEuroContinua()">Continua</button>'
     + '<button type="button" class="btn ghost" onclick="viaEuroNonHoMetodo()">Non ho '
     + esc(VIA_EURO_NOMI[viaEuroScelto.metodo] || viaEuroScelto.metodo) + '</button>';
+}
+/* IL TEMPO PRIMA DI «CONTINUA» (27 nov 2026, card «Riquadro ⏱ + ordine con
+   piu' tempo»): l'ordine scelto ha un tempo per pagare corto (sotto le 24
+   ore), e chi paga in euro e' un principiante. Il riquadro e la frase sono
+   quelli dello scambio prima del recapito (`rigaTempoPagareScambioP2P`,
+   «Avrai 15 minuti per inviare gli euro: il tempo parte quando chi vende
+   ti dice dove mandarli.»): nessuna scritta nuova. */
+function viaEuroRigaTempo(o){
+  const min = o && Number(o.minuti) > 0 ? Number(o.minuti) : 0;
+  if (!min || typeof rigaTempoPagareScambioP2P !== 'function') return '';
+  return rigaTempoPagareScambioP2P({stato: 'attivo', lato: 'compro', pagaEntro: 0,
+                                    recapitoEntro: 0, minutiPagare: min});
 }
 /* «NON HO REVOLUT» (25 nov 2026, Andrea): quel metodo si toglie e si
    propone l'offerta dopo, fra i metodi che restano. Senza piu' match

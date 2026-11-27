@@ -218064,7 +218064,8 @@ console.log(JSON.stringify([7, 8, 9, 10, 0, 11].map(n => (viaEuroScambioDellOrdi
     # --- la scelta, in node ------------------------------------------------
     prog = (_riga_js(mini, "const VIA_EURO_METODI = ")
             + _riga_js(mini, "const VIA_EURO_MARGINE = ")
-            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk){")
+            + _riga_js(mini, "const VIA_EURO_MINUTI_SERIE = ")
+            + _fn_js(mini, "function viaEuroScelta(ordini, sats, perSat, fee, miei, nonHo, valuta, metodiOk, minutiDi){")
             + r"""
 const O = (id, extra) => Object.assign({id, lato: 'sell', fiat: 'EUR', stato: 'pending',
   euro: 10, euroMax: 100, sats: 0, premium: 0, metodi: ['SEPA Instant'], creato: 1}, extra || {});
@@ -218089,6 +218090,12 @@ const CHF = ['TWINT', 'Revolut'];
 r.chf = viaEuroScelta([O('a', {metodi: ['TWINT']}), O('b', {fiat: 'CHF', metodi: ['Bonifico CH', 'Wise']}),
   O('c', {fiat: 'CHF', metodi: ['Bonifico CH', 'TWINT', 'Revolut'], premium: 3})], 40000, per, 0.02, {}, [], 'CHF', CHF);
 r.chfNoEuro = viaEuroScelta([O('a', {metodi: ['SEPA Instant']})], 40000, per, 0.02, {}, [], 'CHF', CHF);
+// (27 nov 2026) piu' tempo prima: 'a' costa meno ma da' 15 minuti, 'b' le 24 ore
+const MIN = {a: 15, c: 60, d: 30};
+const md = o => MIN[o.id] || 0;
+r.tempo = viaEuroScelta([O('a'), O('b', {premium: 3})], 40000, per, 0.02, {}, [], 'EUR', null, md);
+r.tempoCorti = viaEuroScelta([O('a'), O('c', {premium: 3}), O('d', {premium: 1})], 40000, per, 0.02, {}, [], 'EUR', null, md);
+r.senzaMinuti = viaEuroScelta([O('a'), O('b', {premium: 3})], 40000, per, 0.02, {});
 console.log(JSON.stringify(r));
 """)
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
@@ -218126,6 +218133,22 @@ console.log(JSON.stringify(r));
           ["c", ["TWINT", "Revolut"], "CHF", None],
           [r["chf"]["id"], r["chf"]["metodi"], r["chf"]["fiat"], r["chfNoEuro"]])
     prova("...e in euro l'offerta lo dice", "EUR", r["base"]["fiat"])
+    prova("piu' tempo prima (27 nov 2026): fra chi va bene vince chi da' piu' "
+          "minuti per pagare (le 24 ore di serie battono i 15 minuti anche "
+          "costando di piu'), fra due corti il piu' lungo; l'offerta porta i "
+          "minuti (0 = 24 ore); senza minuti la scelta di prima",
+          [["b", 0], ["c", 60], "a"],
+          [[r["tempo"]["id"], r["tempo"]["minuti"]], [r["tempoCorti"]["id"], r["tempoCorti"]["minuti"]],
+           r["senzaMinuti"]["id"]])
+    rv = _fn_js(mini, "function renderViaEuro(){")
+    rt = _fn_js(mini, "function viaEuroRigaTempo(o){")
+    prova("...e prima di «Continua» il riquadro ⏱ dello scambio, con la sua "
+          "frase di sempre, solo per un ordine a tempo corto", True,
+          rv.index("+ viaEuroRigaTempo(o)") < rv.index("onclick=\"viaEuroContinua()\"")
+          and "rigaTempoPagareScambioP2P({stato: 'attivo', lato: 'compro', pagaEntro: 0," in rt
+          and "if (!min || typeof rigaTempoPagareScambioP2P !== 'function') return '';" in rt
+          and "minutiPagareOrdineP2P : null);" in mini
+          and "'Avrai <b>' + minutiPagareDetteP2P(min) + '</b> per inviare gli euro: il tempo parte quando chi vende ti dice dove mandarli.'" in mini)
 
     # --- i franchi: la valuta dal fuso, la scelta a mano, le parole ---------
     prog_chf = ("let _ls = {}; const localStorage = {getItem: k => _ls[k] || null, "
