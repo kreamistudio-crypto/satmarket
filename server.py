@@ -82667,7 +82667,10 @@ def _accoda_onchain_nuovo_p2p(o, cambio: float, adesso: int) -> int:
     conv = _convenienza_nuovo_p2p(o["lato"], o["premio"], o["prezzo_sats"], euro,
                                   cambio_noto_ora("usd") if usdt
                                   else cambio_noto_ora("chf") if chf else cambio)
-    euro_txt = _euro_libro([euro])
+    # l'intervallo (27 nov 2026) si dice «da 20,00 a 100,00 €» come quelli
+    # di Lightning; la convenienza resta sul massimo
+    capi = globals().get("p2p_onchain_intervallo_libro", lambda x: ())(o)
+    euro_txt = _euro_libro([capi[0] / 100, capi[1] / 100] if capi else [euro])
     if usdt and euro_txt.endswith(" €"):
         euro_txt = euro_txt[:-2] + " USDT"
     if chf and euro_txt.endswith(" €"):
@@ -120813,6 +120816,107 @@ def p2p_onchain_giudica_tab_presa(o, tab, adesso: int) -> tuple:
     return perche, dati, (cent if dati else 0)
 
 
+# L'INTERVALLO «DA… A…» ANCHE ON-CHAIN (27 nov 2026, Andrea: «Ordini p2p
+# ad intervalli anche su onchain»). Come su Lightning: chi pubblica scrive
+# due capi, chi prende sceglie la cifra, e i sats nascono alla presa al
+# cambio di quel momento, col premio di chi ha pubblicato. Per questo SOLO
+# A MERCATO (a prezzo fisso i sats sono scritti, e non si possono fissare
+# su una cifra che non c'e' ancora) e mai in una moneta (ETH, XMR, USDe:
+# la cifra e' gia' nella moneta, come su Lightning) ne' col PayCode (in
+# «Vendi BTC» l'importo e' quello del codice; in «Compra BTC» Barattozon ha
+# gia' la sua fascia, `tab_min_cent`, che resta com'e').
+# DUE COLONNE, NON `tab_min_cent`: quella dice «Barattozon» alla rinascita,
+# agli invii mancati e al tempo del deposito. `fascia_min_cent` e
+# `fascia_max_cent` sono i due capi come li ha scritti chi pubblica, e
+# restano anche dopo la presa: nel libro `euro_cent` e' il massimo (tetti,
+# contanti, avvisi lo leggono gia' cosi'), alla presa diventa la cifra
+# scelta (da li' lo scambio e' identico a uno a cifra unica), e se lo
+# scambio salta l'ordine rinasce col suo intervallo intero.
+# LA CAUZIONE SULLA CIFRA SCELTA (Andrea, stesso giorno): chi prende 20 €
+# da un ordine 20–999 € non blocca la cauzione dei 999. La cifra si scrive
+# sulla riga della cauzione (`base_cent`) e alla presa non si alza.
+# Leva accesa di serie: spenta, il server ignora il primo capo come prima
+# (l'ordine nasce a cifra unica) e il foglio non mostra il secondo campo.
+try:
+    from config import P2P_ONCHAIN_INTERVALLO
+except ImportError:
+    P2P_ONCHAIN_INTERVALLO = True
+if not isinstance(P2P_ONCHAIN_INTERVALLO, bool):
+    print("[p2p] P2P_ONCHAIN_INTERVALLO non e' True/False: l'intervallo "
+          "on-chain resta spento", flush=True)
+    P2P_ONCHAIN_INTERVALLO = False
+
+
+def p2p_onchain_giudica_intervallo(metodi, euro_min_cent, euro_cent,
+                                   mercato: bool, coin: bool) -> tuple:
+    """PURA: i due capi di un ordine nuovo, `(min, max)` in centesimi, o
+    None se l'ordine e' a cifra unica: nessun primo capo, leva spenta, a
+    prezzo fisso, in moneta, col tabacchino, o capi storti (il foglio li
+    giudica prima: qui una richiesta a mano non trova frasi, trova
+    l'ordine di prima, a cifra unica)."""
+    if P2P_ONCHAIN_INTERVALLO is not True or not mercato or coin:
+        return None
+    if isinstance(metodi, list) and any(
+            "Contanti al tabacchino" in str(m or "") for m in metodi):
+        return None
+    if isinstance(euro_min_cent, bool) or isinstance(euro_cent, bool):
+        return None
+    try:
+        lo, hi = int(euro_min_cent or 0), int(euro_cent or 0)
+    except (TypeError, ValueError):
+        return None
+    return (lo, hi) if 0 < lo < hi else None
+
+
+def p2p_onchain_intervallo(o) -> tuple:
+    """PURA: i due capi di un ordine a intervallo `(min, max)` in
+    centesimi, come li ha scritti chi pubblica; () se e' a cifra unica.
+    Valgono anche dopo la presa (la rinascita li rimette nel libro)."""
+    try:
+        lo = int(_p2p_onchain_campo(o, "fascia_min_cent", 0) or 0)
+        hi = int(_p2p_onchain_campo(o, "fascia_max_cent", 0) or 0)
+    except (TypeError, ValueError):
+        return ()
+    return (lo, hi) if 0 < lo < hi else ()
+
+
+def p2p_onchain_intervallo_libro(o) -> tuple:
+    """PURA: i due capi finche' l'ordine e' nel libro (la cifra non e'
+    ancora scelta); () dopo la presa o se e' a cifra unica."""
+    if str(_p2p_onchain_campo(o, "stato", "") or "") != "pending":
+        return ()
+    return p2p_onchain_intervallo(o)
+
+
+def p2p_onchain_giudica_scelta(o, euro_cent) -> tuple:
+    """PURA: la cifra scelta da chi prende un ordine a intervallo, in
+    centesimi: `(perche, cent)`. Dentro i due capi, come la giudica il
+    foglio «Quanto vuoi scambiare?» (`quantoValeP2P`), con la sua frase.
+    Su un ordine a cifra unica ('', 0): la cifra e' quella dell'ordine."""
+    capi = p2p_onchain_intervallo_libro(o)
+    if not capi:
+        return "", 0
+    lo, hi = capi
+    try:
+        cent = 0 if isinstance(euro_cent, bool) else int(euro_cent or 0)
+    except (TypeError, ValueError):
+        cent = 0
+    if not lo <= cent <= hi:
+        segno = {"USDT": "USDT", "CHF": "CHF"}.get(p2p_onchain_valuta(o), "€")
+        return (f"Scegli una cifra fra {_fmt_eur(lo / 100)} e {_fmt_eur(hi / 100)} "
+                f"{segno}"), 0
+    return "", cent
+
+
+def p2p_onchain_testo_oltre_cauzione(o, base_cent: int) -> str:
+    """PURA: la cifra scelta supera quella su cui chi prende ha bloccato
+    la cauzione (l'ha alzata dopo): si sceglie sotto."""
+    segno = {"USDT": "USDT", "CHF": "CHF"}.get(p2p_onchain_valuta(o), "€")
+    cifra = f"{_fmt_eur(int(base_cent) / 100)} {segno}"
+    return (f"La tua cauzione su quest'ordine copre fino a {cifra}: scegli una "
+            f"cifra fino a {cifra}")
+
+
 def p2p_onchain_scade_libro(adesso: int, tab_scade: int) -> int:
     """PURA: fino a quando un ordine nuovo sta nel libro: la vita di
     sempre, o col PayCode il suo limite (la scadenza meno le 6 ore del
@@ -121496,7 +121600,13 @@ def _p2p_onchain_prepara(con):
                       # uno scambio mancato per colpa di chi aveva preso
                       # (0 = pubblicato a mano). Fa anche l'idempotenza:
                       # uno scambio rinasce una volta sola
-                      ("rinato_da", "INTEGER DEFAULT 0")):
+                      ("rinato_da", "INTEGER DEFAULT 0"),
+                      # 27 nov 2026, cantiere intervallo-onchain: i due capi
+                      # di un ordine a intervallo come li ha scritti chi
+                      # pubblica (0 = cifra unica). Restano dopo la presa:
+                      # la rinascita rimette l'intervallo intero
+                      ("fascia_min_cent", "INTEGER DEFAULT 0"),
+                      ("fascia_max_cent", "INTEGER DEFAULT 0")):
         if col not in gia:
             con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
     # (19 nov 2026, recapito-nel-tempo) gli scambi gia' depositati senza
@@ -121538,8 +121648,11 @@ def _p2p_onchain_prepara(con):
     gia_c = {r[1] for r in con.execute("PRAGMA table_info(p2p_onchain_cauzioni)")}
     # `meta_rimborso_id` (19 nov 2026) = la riga «da riscuotere» con cui
     # Barattolo manda la meta' da solo (0 = a mano, come prima)
+    # `base_cent` (27 nov 2026, intervallo-onchain) = su un ordine a
+    # intervallo la cifra scelta su cui e' contata (0 = l'ordine intero)
     for col in ("saldando_il", "persa_da", "meta_sats", "meta_a",
-                "meta_mandata_il", "meta_mandata_da", "meta_rimborso_id"):
+                "meta_mandata_il", "meta_mandata_da", "meta_rimborso_id",
+                "base_cent"):
         if col not in gia_c:
             con.execute(f"ALTER TABLE p2p_onchain_cauzioni ADD COLUMN {col} "
                         "INTEGER NOT NULL DEFAULT 0")
@@ -121706,7 +121819,10 @@ def p2p_onchain_tags(o, adesso: int = None) -> list:
             ["s", P2P_ONCHAIN_STATO_LIBRO.get(stato, "canceled")],
             ["amt", str(int(o["prezzo_sats"]))],
             ["fa", *([_p2p_onchain_euro_testo(_p2p_onchain_campo(o, "tab_min_cent", 0))]
-                     if p2p_onchain_tab_compra(o) else []),
+                     if p2p_onchain_tab_compra(o) else
+                     # (27 nov 2026) l'intervallo, finche' e' nel libro
+                     [_p2p_onchain_euro_testo(p2p_onchain_intervallo_libro(o)[0])]
+                     if p2p_onchain_intervallo_libro(o) else []),
              _p2p_onchain_euro_testo(o["euro_cent"])],
             ["pm", *[str(m) for m in metodi]],
             # a mercato il premio di chi pubblica (e `amt` 0 finche' i sats
@@ -121840,6 +121956,12 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
     # fascia, finche' nessuno l'ha preso (`euro` e' il massimo)
     if p2p_onchain_tab_compra(o):
         d["euro_min"] = int(_p2p_onchain_campo(o, "tab_min_cent", 0)) / 100
+    # ...e il primo capo di un ordine a intervallo (27 nov 2026, cantiere
+    # intervallo-onchain), finche' nessuno ha scelto la cifra: la card dice
+    # «da X a Y, scegli tu» come quella di Lightning
+    capi = p2p_onchain_intervallo_libro(o)
+    if capi:
+        d["euro_min"] = capi[0] / 100
     if mercato and not int(o["prezzo_sats"] or 0):
         d["stima"] = p2p_onchain_sats_mercato(p2p_onchain_cent_mercato(o), d["premio"],
                                               _p2p_onchain_cambio(o))
@@ -121847,8 +121969,8 @@ def _p2p_onchain_foglio(o, pubblico: bool = False) -> dict:
         # card di Lightning (18 nov 2026, cantiere barattozon-oc-carta)
         if "euro_min" in d:
             d["stima_min"] = p2p_onchain_sats_mercato(
-                int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0), d["premio"],
-                _p2p_onchain_cambio(o))
+                capi[0] if capi else int(_p2p_onchain_campo(o, "tab_min_cent", 0) or 0),
+                d["premio"], _p2p_onchain_cambio(o))
     if not pubblico:
         d["paracadute"] = int(_p2p_onchain_campo(o, "paracadute", 0) or 0)
         # ...e le sue due soglie, una per verso (17 nov 2026)
@@ -122006,7 +122128,10 @@ def _p2p_onchain_libro(chi: int) -> dict:
              # Lightning; lo giudica il foglio Pubblica, 0 = spento
              "maxEuro": int(P2P_ONCHAIN_MAX_EURO or 0),
              # Barattozon anche on-chain (17 nov 2026): la leva, per il foglio
-             "barattozon": bool(P2P_ONCHAIN_BARATTOZON)}
+             "barattozon": bool(P2P_ONCHAIN_BARATTOZON),
+             # l'intervallo «da… a…» anche on-chain (27 nov 2026): la leva,
+             # per il secondo campo del foglio
+             "intervallo": P2P_ONCHAIN_INTERVALLO is True}
     if chi:
         fuori["miei"] = miei
         # I DUE TASTI DELLA RETE NEL FOGLIO DI CHI PRENDE (16 nov 2026, Andrea:
@@ -122661,7 +122786,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
     2026 (il foglio di Lightning) `tipo` ('fisso' | 'mercato', di serie
     fisso), `premio` (a mercato), `filtro` (1, 3, 5: chi puo' prendere) e
     `paracadute` (`{su, giu}`, ognuna 5, 10, 20 o 0, solo a leva accesa;
-    un numero solo vale nei due versi). Chi pubblica
+    un numero solo vale nei due versi), e dal 27 nov 2026 `euro_min_cent`
+    (a mercato il primo capo dell'intervallo, `euro_cent` il massimo:
+    `p2p_onchain_giudica_intervallo`). Chi pubblica
     deve avere la sua chiave on-chain (la xpub dedicata): e' una delle
     tre del 2-di-3 che nascera' alla presa, e senza non c'e' niente da
     promettere. Il tetto in euro e' quello dell'on-chain
@@ -122737,6 +122864,20 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             lato, metodi, euro_cent, "USDT" if usdt else "CHF" if chf else
             (coin[0] if coin else "EUR"), d.get("tabacchino"), int(time.time()),
             BARATTOZON_MIN_EURO)
+    # L'INTERVALLO «DA… A…» (27 nov 2026, cantiere intervallo-onchain): il
+    # massimo e' `euro_cent`, gia' giudicato coi tetti qui sopra; il primo
+    # capo passa dallo stesso giudice, che a mercato guarda che al cambio di
+    # adesso non stia sotto il minimo di sats (chi sceglie il minimo deve
+    # poter prendere). Col PayCode o la fascia di Barattozon, niente
+    intervallo = None
+    if not perche and not tab and not fascia:
+        intervallo = p2p_onchain_giudica_intervallo(
+            metodi, d.get("euro_min_cent"), euro_cent, tipo == "mercato", bool(coin))
+        if intervallo:
+            perche = p2p_onchain_giudica_nuovo(
+                lato, d.get("sats"), intervallo[0], metodi, recapito, tetto,
+                tetto_sats_prova(), tipo, premio, cambio,
+                "USDT" if usdt else "CHF" if chf else "EUR")
     # IL CONTANTI DI PERSONA (17 nov 2026, cantiere onchain-contanti): il
     # suo tetto e la zona di scambio, come su Lightning. La zona si tiene
     # SOLO con «Contanti» fra i metodi
@@ -122818,8 +122959,9 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
             " euro_cent, metodi, recapito, scade, creato, aggiornato,"
             " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
             " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
-            " tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il,"
+            " fascia_min_cent, fascia_max_cent)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (ordine, lato, user["id"], sats, int(euro_cent),
              json.dumps(metodi, ensure_ascii=False), recapito,
              p2p_onchain_scade_libro(adesso, tab["scade"] if tab else 0),
@@ -122829,7 +122971,8 @@ async def p2p_onchain_pubblica_rotta(req: Request, x_tg_init_data: str = Header(
              rip[0] if rip else 0, rip[1] if rip else 0, "CHF" if chf else "",
              json.dumps(tab) if tab else "", zona, para_su, para_giu,
              fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,
-             adesso if recapito else 0))
+             adesso if recapito else 0,
+             intervallo[0] if intervallo else 0, intervallo[1] if intervallo else 0))
         con.commit()
         oid = cur.lastrowid
         riga = _p2p_onchain_carica(con, oid)
@@ -123961,13 +124104,15 @@ async def _p2p_onchain_cauzione_persa_da_sola(o, r, motivo: str, adesso: int) ->
     return True
 
 
-def _p2p_onchain_cauzione_base_sats(o) -> int:
+def _p2p_onchain_cauzione_base_sats(o, scelta: int = 0) -> int:
     """I sats su cui si conta la cauzione: quelli dell'ordine, o a
-    prezzo di mercato quelli al cambio di ADESSO (0 = il cambio non c'e')."""
+    prezzo di mercato quelli al cambio di ADESSO (0 = il cambio non c'e').
+    Su un ordine a intervallo (27 nov 2026) quelli della cifra `scelta`
+    da chi prende, in centesimi, al cambio di adesso."""
     if not _p2p_onchain_mercato(o):
         return int(o["prezzo_sats"] or 0)
     cambio = cambio_noto_ora(_p2p_onchain_metro(o))
-    cent = p2p_onchain_cent_mercato(o)
+    cent = int(scelta or 0) or p2p_onchain_cent_mercato(o)
     if not cambio > 0 or not cent > 0:
         return 0
     return int(p2p_onchain_sats_mercato(cent, o["premio"], cambio) or 0)
@@ -124003,10 +124148,20 @@ async def p2p_onchain_cauzione_chiedi(oid: int, req: Request,
         perche = _p2p_onchain_porta_presa(con, o, user["id"], adesso)
         if perche:
             raise HTTPException(409, perche)
+        # L'INTERVALLO (27 nov 2026, Andrea): la cauzione sulla cifra
+        # SCELTA da chi prende, non sul massimo dell'ordine
+        perche, scelta = p2p_onchain_giudica_scelta(o, d.get("euro_cent"))
+        if perche:
+            raise HTTPException(400, perche)
         viva = _p2p_onchain_cauzione_viva(con, oid, user["id"])
         if viva and (viva["stato"] == "tenuta" or adesso <= int(viva["scade"]) - 60):
+            # una cauzione viva contata su una cifra piu' piccola non copre
+            # quella di adesso: la si dice, e la cifra si sceglie sotto
+            base = int(_p2p_onchain_campo(viva, "base_cent", 0) or 0)
+            if scelta and 0 < base < scelta:
+                raise HTTPException(409, p2p_onchain_testo_oltre_cauzione(o, base))
             return {"ok": True, "cauzione": _p2p_onchain_cauzione_fuori(viva, adesso)}
-        sats = p2p_onchain_cauzione_sats(_p2p_onchain_cauzione_base_sats(o))
+        sats = p2p_onchain_cauzione_sats(_p2p_onchain_cauzione_base_sats(o, scelta))
         if not sats > 0:
             raise HTTPException(503, "Il cambio di adesso non c'è: è un ordine a "
                                      "prezzo di mercato, riprova fra un minuto")
@@ -124027,9 +124182,10 @@ async def p2p_onchain_cauzione_chiedi(oid: int, req: Request,
     try:
         con.execute(
             "INSERT INTO p2p_onchain_cauzioni(ordine_id, tg_id, hash, preimage,"
-            " bolt11, sats, stato, creata, scade) VALUES(?,?,?,?,?,?,'attesa',?,?)",
+            " bolt11, sats, stato, creata, scade, base_cent)"
+            " VALUES(?,?,?,?,?,?,'attesa',?,?,?)",
             (int(oid), int(user["id"]), hash_bytes.hex(), preimage.hex(), bolt11,
-             sats, adesso, adesso + P2P_ONCHAIN_CAUZIONE_FINESTRA_S))
+             sats, adesso, adesso + P2P_ONCHAIN_CAUZIONE_FINESTRA_S, int(scelta or 0)))
         con.commit()
         riga = _p2p_onchain_cauzione_viva(con, oid, user["id"])
         return {"ok": True, "cauzione": _p2p_onchain_cauzione_fuori(riga, adesso)}
@@ -124527,6 +124683,19 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
                 o, d.get("tabacchino"), adesso)
             if perche:
                 raise HTTPException(400, perche)
+        # L'INTERVALLO (27 nov 2026, cantiere intervallo-onchain): chi prende
+        # sceglie la cifra dentro i due capi, e i sats si contano su quella.
+        # Con la cauzione, mai oltre la cifra su cui l'ha bloccata
+        perche, scelta = p2p_onchain_giudica_scelta(o, d.get("euro_cent"))
+        if perche:
+            raise HTTPException(400, perche)
+        if scelta:
+            cent_presa = scelta
+            base = con.execute("SELECT base_cent FROM p2p_onchain_cauzioni WHERE id=?",
+                               (int(cauzione_id),)).fetchone() if cauzione_id else None
+            if base and 0 < int(base["base_cent"] or 0) < scelta:
+                raise HTTPException(409, p2p_onchain_testo_oltre_cauzione(
+                    o, int(base["base_cent"])))
         prezzo, cambio_presa = int(o["prezzo_sats"]), 0.0
         if not _p2p_onchain_mercato(o):
             # A PREZZO FISSO IL CAMBIO DELLA PRESA SI TIMBRA LO STESSO (18 nov
@@ -124649,6 +124818,11 @@ async def p2p_onchain_prendi(oid: int, req: Request, x_tg_init_data: str = Heade
             # PayCode, e il PayCode sta nella sua colonna
             con.execute("UPDATE p2p_onchain_ordini SET euro_cent=?, paycode=? WHERE id=?",
                         (int(cent_presa), json.dumps(tab_presa), oid))
+        elif cur.rowcount and scelta:
+            # (27 nov 2026) ...e sull'intervallo la cifra scelta: da qui lo
+            # scambio e' uno a cifra unica (i due capi restano per la rinascita)
+            con.execute("UPDATE p2p_onchain_ordini SET euro_cent=? WHERE id=?",
+                        (int(scelta), oid))
         con.commit()
         if not cur.rowcount:
             raise HTTPException(409, "Qualcun altro l'ha preso un attimo fa")
@@ -125866,16 +126040,20 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
     para_da = cambio_noto_ora() if para else 0.0
     para_da = para_da if para_da > 0 else 0.0
     para_letto = int(_cambio_cache["quando"] or 0) if para_da else 0
+    # L'INTERVALLO (27 nov 2026): l'ordine rinasce coi suoi due capi, non
+    # con la cifra scelta da chi l'aveva preso
+    capi = p2p_onchain_intervallo(o) if mercato else ()
     ordine = P2P_ONCHAIN_PREFISSO + secrets.token_hex(8)
     cur = con.execute(
         "INSERT INTO p2p_onchain_ordini(ordine, lato, maker_id, prezzo_sats,"
         " euro_cent, metodi, recapito, scade, creato, aggiornato,"
         " prezzo_tipo, premio, filtro, paracadute, para_partenza, para_lettura,"
         " rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,"
-        " tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il, rinato_da)"
-        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        " tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il, rinato_da,"
+        " fascia_min_cent, fascia_max_cent)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (ordine, lato, maker, 0 if mercato else int(o["prezzo_sats"]),
-         int(o["euro_cent"]), o["metodi"], recapito,
+         capi[1] if capi else int(o["euro_cent"]), o["metodi"], recapito,
          p2p_onchain_scade_libro(adesso, tab_scade), adesso, adesso,
          "mercato" if mercato else "fisso",
          int(_p2p_onchain_campo(o, "premio", 0) or 0) if mercato else 0,
@@ -125889,7 +126067,8 @@ def _p2p_onchain_rinasci(con, o, adesso: int) -> int:
          int(_p2p_onchain_campo(o, "para_giu", -1)), 0,
          int(_p2p_onchain_campo(o, "minuti_pagare", 0) or 0),
          int(_p2p_onchain_campo(o, "cauzione_chiesta", 0) or 0),
-         adesso if recapito else 0, vecchio))
+         adesso if recapito else 0, vecchio,
+         capi[0] if capi else 0, capi[1] if capi else 0))
     con.commit()
     return int(cur.lastrowid)
 

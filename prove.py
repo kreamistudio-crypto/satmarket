@@ -73438,7 +73438,7 @@ console.log(JSON.stringify(out));
         "function metodoSceltoP2P(o){",
         # (7 ott 2026) l'intervallo si sceglie prima del conto
         "function contoAttesaP2P(o, frase){",
-        "function rigaImportoSceltoP2P(o, scelto){",
+        "function rigaImportoSceltoP2P(o, scelto, azione){",
         # (13 nov 2026, usdt-foglio-presa) segno e nome della moneta del
         # foglio «Quanto»: senza, il banco esplode su `quantoSegnoP2P`
         "function quantoSegnoP2P(riga){",
@@ -168595,7 +168595,9 @@ def prove_p2p_onchain():
     for _n in ("_p2p_onchain_metodi", "p2p_onchain_metodi_usdt", "p2p_onchain_usdt",
                "p2p_onchain_chf", "p2p_onchain_valuta",
                # (17 nov 2026 sera) un Barattozon in «Compra BTC» dice la fascia
-               "p2p_onchain_tab_dati", "p2p_onchain_tab_compra"):
+               "p2p_onchain_tab_dati", "p2p_onchain_tab_compra",
+               # (27 nov 2026, intervallo-onchain) ...e un intervallo i suoi due capi
+               "p2p_onchain_intervallo", "p2p_onchain_intervallo_libro"):
         exec(pezzo(_n), amb)
     exec(pezzo("p2p_onchain_tags"), amb)
     o = {"ordine": "bar-onchain-abc", "lato": "sell", "stato": "pending",
@@ -169932,7 +169934,8 @@ process.stdout.write(JSON.stringify(out));
     # dice il CONTO, che c'e' sempre; resta nella frase solo di Barattozon
     prova("IL FOGLIO DI CHI PRENDE porta il conto, come il dettaglio Lightning, e le "
           "frasi corte lasciano la commissione al conto", [True, True, True, False, True],
-          ["contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo'," in presa,
+          # (27 nov 2026, intervallo-onchain) l'ordine con la cifra scelta, `oS`
+          ["contoOnchainP2P({...oS, parte: vendeLui ? 'compro' : 'vendo'," in presa,
            "corpo: corpoPresaOcP2P(o, vendeLui)," in presa,
            "più la tua metà della commissione e il margine di rete" in frase,
            "meno la tua metà della commissione" in frase,
@@ -170046,7 +170049,9 @@ def prove_p2p_onchain_valute():
            # (18 nov 2026, tempo-pagamento) ...e dopo la fascia il tempo per pagare
            '"CHF" if chf else "",\n             json.dumps(tab) if tab else "", zona, para_su, '
            'para_giu,\n             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,\n'
-           '             adesso if recapito else 0))' in pub
+           '             adesso if recapito else 0,\n'
+           # (27 nov 2026, intervallo-onchain) ...e in fondo i due capi dell'intervallo
+           '             intervallo[0] if intervallo else 0, intervallo[1] if intervallo else 0))' in pub
            and '("fiat", "TEXT DEFAULT \'\'")' in pezzo("_p2p_onchain_prepara"),
            'if coin_o and not p2p_coin_ammesso(user["id"]):' in pre
            and 'if p2p_onchain_chf(o) and not p2p_chf_ammesso(user["id"]):' in pre,
@@ -172673,8 +172678,10 @@ console.log(JSON.stringify(out));
           ("(daScegliere ? (bz ? '🧾 Il tuo PayCode' : 'Scegli') : '<span class=\"p2p-invia-ico\">⚡</span>' + (compro ? 'Compra' : 'Vendi'))" in mini,
            # (18 nov 2026, barattozon-oc-carta) col Barattozon in «Compra
            # BTC» il primo tocco e' «🧾 Il tuo PayCode» arancio, come la'
-           "etichetta: bzC ? '🧾 Il tuo PayCode' : vendeLui ? 'Compra' : 'Vendi',\n"
-           "    vestito: bzC ? '' : vendeLui ? 'compro-oc' : 'vendo-oc'," in _oc_presa,
+           # (27 nov 2026, intervallo-onchain) e su un intervallo senza cifra
+           # scelta «Scegli», neutro come il PayCode
+           "etichetta: bzC ? '🧾 Il tuo PayCode' : intOc && !sceltoOc ? 'Scegli' : vendeLui ? 'Compra' : 'Vendi',\n"
+           "    vestito: bzC || (intOc && !sceltoOc) ? '' : vendeLui ? 'compro-oc' : 'vendo-oc'," in _oc_presa,
            "ok.className = 'btn ' + (c.vestito === 'compro-oc' ? 'primary' : 'rosso') + ' p2p-ico-3d';" in _conf,
            # dal 16 nov (cantiere ricevi-mercato) l'icona la sceglie
            # iconaPresaOcP2P, che col tasto «⚡ Lightning» mette il fulmine
@@ -172967,8 +172974,10 @@ console.log(JSON.stringify(out));
           # l'intervallo: il secondo importo non si svela
           ("(oc ? metodiOnchainP2P(compro ? 'compro' : 'vendo') : metodiPubblicabiliP2P(" in nuovo,
            # (17 nov 2026 sera) Barattozon in «Compra BTC» on-chain tiene la fascia
+           # (27 nov 2026, intervallo-onchain) ...e a leva accesa tutti
            "  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc\n"
-           "      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')) return;\n"
+           "      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')\n"
+           "      && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) return;\n"
            "  if (p2pNuovoDue || p2pNuovoFisso || (tabacchinoP2P(p2pNuovoMetodi) && p2pLato !== 'compro')) return;"
            in pezzo_js(mini, "function svelaSecondoImportoP2P(){", "\n}\n"),
            # (17 nov 2026, onchain-contanti) la zona c'e' anche on-chain
@@ -200237,7 +200246,8 @@ def prove_barattozon_onchain():
           [False, False, True],
           ["paycode" in pezzo("_p2p_onchain_riga_pubblica"),
            "tabacchino" in pezzo("_p2p_onchain_riga_pubblica"),
-           '"barattozon": bool(P2P_ONCHAIN_BARATTOZON)}' in pezzo("_p2p_onchain_libro")])
+           # (27 nov 2026, intervallo-onchain) seguita dalla leva dell'intervallo
+           '"barattozon": bool(P2P_ONCHAIN_BARATTOZON),' in pezzo("_p2p_onchain_libro")])
     pub = src[src.index('@app.post("/api/p2p/onchain/pubblica")'):src.index('@app.post("/api/p2p/onchain/{oid}/annulla")')]
     prova("la pubblicazione: il giudice del PayCode, niente ripubblica ne' paracadute ne' recapito, "
           "la vita del libro dal PayCode, e la colonna `paycode`",
@@ -200254,7 +200264,9 @@ def prove_barattozon_onchain():
            # (18 nov 2026, tempo-pagamento) ...e dopo la fascia il tempo per pagare
            # (19 nov 2026, ritorno-nel-libro) ...e in fondo l'ora del recapito
            'json.dumps(tab) if tab else "", zona, para_su, para_giu,\n             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,\n'
-           '             adesso if recapito else 0))' in pub,
+           '             adesso if recapito else 0,\n'
+           # (27 nov 2026, intervallo-onchain) ...e in fondo i due capi dell'intervallo
+           '             intervallo[0] if intervallo else 0, intervallo[1] if intervallo else 0))' in pub,
            '("paycode", "TEXT DEFAULT \'\'")' in src])
     prova("il recapito di un Barattozon non si scrive, e un Barattozon in pausa si prende lo stesso",
           [True, True, True],
@@ -200463,6 +200475,257 @@ console.log(JSON.stringify([
            ["Chi compra paga in contanti al tabacchino il tuo PayCode Amazon" in out[1],
             "ti manda" in out[1]],
            ["al tabacchino" in out[2], "I sats restano nel deposito finché chi vende non li libera." in out[2]]])
+
+
+def prove_intervallo_onchain():
+    """L'INTERVALLO «DA… A…» ANCHE ON-CHAIN (27 nov 2026, cantiere
+    intervallo-onchain, Andrea: «Ordini p2p ad intervalli anche su
+    onchain»). Il server: il giudice dei due capi (solo a mercato, mai in
+    moneta ne' col PayCode, leva spenta = cifra unica come prima), la
+    cifra scelta alla presa dentro la fascia, la cauzione contata sulla
+    cifra scelta e mai superata alla presa, la rinascita con l'intervallo
+    intero (sul database), il libro, Nostr e gli avvisi del bot coi due
+    capi. Il telefono: la riga del foglio «Quanto» fatta dall'ordine
+    on-chain, la cifra scelta che rifa' euro e stima, e i pezzi che la
+    portano al server; il secondo campo e la spinta di Pubblica a leva
+    accesa. Con le controprove."""
+    print("\n[L'intervallo anche on-chain]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    amb = {"json": json, "P2P_ONCHAIN_INTERVALLO": True,
+           "p2p_onchain_valuta": lambda o: str(o.get("fiat") or "EUR") if isinstance(o, dict) else "EUR"}
+    for n in ("_p2p_onchain_campo", "_fmt_eur", "p2p_onchain_giudica_intervallo",
+              "p2p_onchain_intervallo", "p2p_onchain_intervallo_libro",
+              "p2p_onchain_giudica_scelta", "p2p_onchain_testo_oltre_cauzione"):
+        exec(pezzo(n), amb)
+    prova("la leva: accesa di serie, e una riga storta nel config la spegne",
+          [True, True],
+          ["except ImportError:\n    P2P_ONCHAIN_INTERVALLO = True\n" in src,
+           "if not isinstance(P2P_ONCHAIN_INTERVALLO, bool):" in src])
+    G = amb["p2p_onchain_giudica_intervallo"]
+    MET = ["Revolut", "SEPA"]
+    prova("i due capi buoni a mercato: (min, max) in centesimi, anche coi contanti",
+          [(2000, 10000), (2000, 10000)],
+          [G(MET, 2000, 10000, True, False), G(["Contanti"], 2000, 10000, True, False)])
+    prova("cifra unica (None): senza primo capo, a prezzo fisso, in moneta, col tabacchino, "
+          "capi uguali o rovesci, un capo storto o booleano",
+          [None] * 9,
+          [G(MET, 0, 10000, True, False), G(MET, None, 10000, True, False),
+           G(MET, 2000, 10000, False, False), G(MET, 2000, 10000, True, True),
+           G(["Contanti al tabacchino"], 2000, 10000, True, False),
+           G(MET, 10000, 10000, True, False), G(MET, 12000, 10000, True, False),
+           G(MET, "venti", 10000, True, False), G(MET, True, 10000, True, False)])
+    amb["P2P_ONCHAIN_INTERVALLO"] = False
+    prova("a leva spenta il primo capo si ignora: l'ordine nasce a cifra unica, come prima",
+          None, G(MET, 2000, 10000, True, False))
+    amb["P2P_ONCHAIN_INTERVALLO"] = True
+    I, IL = amb["p2p_onchain_intervallo"], amb["p2p_onchain_intervallo_libro"]
+    o = {"id": 9, "stato": "pending", "fascia_min_cent": 2000, "fascia_max_cent": 10000,
+         "euro_cent": 10000, "fiat": "EUR"}
+    prova("i capi della riga: nel libro e dopo la presa (per la rinascita); nel libro solo "
+          "finche' e' pending; una riga senza colonne, a cifra unica o storta non ne ha",
+          [(2000, 10000), (2000, 10000), (2000, 10000), (), (), (), ()],
+          [I(o), I(dict(o, stato="preso")), IL(o), IL(dict(o, stato="preso")),
+           I({"stato": "pending"}), I(dict(o, fascia_min_cent=0)),
+           I(dict(o, fascia_min_cent=10000))])
+    S = amb["p2p_onchain_giudica_scelta"]
+    prova("la cifra scelta dentro i capi passa, capi compresi; su un ordine a cifra unica o "
+          "gia' preso non c'e' niente da scegliere",
+          [("", 2000), ("", 5000), ("", 10000), ("", 0), ("", 0)],
+          [S(o, 2000), S(o, 5000), S(o, 10000), S(dict(o, fascia_min_cent=0), 1),
+           S(dict(o, stato="preso"), 1)])
+    prova("fuori dai capi, o senza cifra, la frase del foglio «Quanto» di Lightning, nella "
+          "valuta dell'ordine",
+          ["Scegli una cifra fra 20,00 e 100,00 €", "Scegli una cifra fra 20,00 e 100,00 €",
+           "Scegli una cifra fra 20,00 e 100,00 €", "Scegli una cifra fra 20,00 e 100,00 CHF"],
+          [S(o, 1999)[0], S(o, 10001)[0], S(o, None)[0], S(dict(o, fiat="CHF"), 1)[0]])
+    prova("la frase della cauzione che non copre la cifra (testo nuovo, da approvare)",
+          "La tua cauzione su quest'ordine copre fino a 30,00 €: scegli una cifra fino a 30,00 €",
+          amb["p2p_onchain_testo_oltre_cauzione"](o, 3000))
+    # --- le rotte, per forma ---
+    pub = src[src.index('@app.post("/api/p2p/onchain/pubblica")'):src.index('@app.post("/api/p2p/onchain/{oid}/annulla")')]
+    prova("la pubblicazione: i capi dopo il PayCode, il primo capo rigiudicato (minimo di sats "
+          "al cambio di adesso), e le due colonne in coda",
+          [True, True, True, True],
+          ["if not perche and not tab and not fascia:\n        intervallo = p2p_onchain_giudica_intervallo(\n"
+           "            metodi, d.get(\"euro_min_cent\"), euro_cent, tipo == \"mercato\", bool(coin))" in pub,
+           "perche = p2p_onchain_giudica_nuovo(\n                lato, d.get(\"sats\"), intervallo[0]," in pub,
+           "\" fascia_min_cent, fascia_max_cent)\"" in pub,
+           "intervallo[0] if intervallo else 0, intervallo[1] if intervallo else 0))" in pub])
+    pr = src[src.index('@app.post("/api/p2p/onchain/{oid}/prendi")'):src.index("P2P_ONCHAIN_AMMANCO_MAX_SATS = 1000")]
+    prova("la presa: la cifra giudicata, i sats su quella, mai oltre la cauzione, e `euro_cent` "
+          "riscritto nella stessa scrittura della presa",
+          [True, True, True, True],
+          ['perche, scelta = p2p_onchain_giudica_scelta(o, d.get("euro_cent"))' in pr,
+           "cent_presa = scelta" in pr and "cent = cent_presa or p2p_onchain_cent_mercato(o)" in pr,
+           'if base and 0 < int(base["base_cent"] or 0) < scelta:' in pr,
+           "elif cur.rowcount and scelta:" in pr
+           and pr.index("elif cur.rowcount and scelta:") < pr.index("con.commit()\n        if not cur.rowcount:")])
+    ca = src[src.index('@app.post("/api/p2p/onchain/{oid}/cauzione")'):src.index('@app.post("/api/p2p/onchain/{oid}/cauzione/brucia")')]
+    prova("la cauzione: contata sulla cifra scelta, scritta sulla riga, e una viva su una cifra "
+          "piu' piccola non si riusa",
+          [True, True, True, True],
+          ['perche, scelta = p2p_onchain_giudica_scelta(o, d.get("euro_cent"))' in ca,
+           "p2p_onchain_cauzione_sats(_p2p_onchain_cauzione_base_sats(o, scelta))" in ca,
+           "int(scelta or 0)))" in ca and "scade, base_cent)" in ca,
+           "if scelta and 0 < base < scelta:" in ca])
+    amb2 = {"cambio_noto_ora": lambda v: 50000.0, "_p2p_onchain_metro": lambda o: "eur",
+            "p2p_onchain_cent_mercato": lambda o: int(o["euro_cent"]),
+            "_p2p_onchain_mercato": lambda o: True}
+    exec(pezzo("p2p_onchain_sats_mercato"), amb2)
+    exec(pezzo("_p2p_onchain_cauzione_base_sats"), amb2)
+    B = amb2["_p2p_onchain_cauzione_base_sats"]
+    prova("i sats della cauzione: sulla cifra scelta (20 € a 50.000 €/BTC = 40.000 sats), "
+          "senza scelta sull'ordine intero (100 € = 200.000)",
+          [40000, 200000], [B({"euro_cent": 10000, "premio": 0}, 2000),
+                            B({"euro_cent": 10000, "premio": 0})])
+    prova("la colonna `base_cent` delle cauzioni e le due dell'ordine nascono da sole",
+          [True, True, True],
+          ['"meta_mandata_il", "meta_mandata_da", "meta_rimborso_id",\n                "base_cent"):' in src,
+           '("fascia_min_cent", "INTEGER DEFAULT 0")' in pezzo("_p2p_onchain_prepara"),
+           '("fascia_max_cent", "INTEGER DEFAULT 0")' in pezzo("_p2p_onchain_prepara")])
+    prova("il libro e Nostr: `euro_min` e la stima del primo capo finche' e' nel libro, il `fa` "
+          "coi due capi, la leva nella busta, e gli avvisi del bot «da … a …»",
+          [True, True, True, True, True],
+          ["capi = p2p_onchain_intervallo_libro(o)\n    if capi:\n        d[\"euro_min\"] = capi[0] / 100" in pezzo("_p2p_onchain_foglio"),
+           "capi[0] if capi else int(_p2p_onchain_campo(o, \"tab_min_cent\", 0) or 0)," in pezzo("_p2p_onchain_foglio"),
+           "[_p2p_onchain_euro_testo(p2p_onchain_intervallo_libro(o)[0])]" in src,
+           '"intervallo": P2P_ONCHAIN_INTERVALLO is True}' in pezzo("_p2p_onchain_libro"),
+           "euro_txt = _euro_libro([capi[0] / 100, capi[1] / 100] if capi else [euro])" in pezzo("_accoda_onchain_nuovo_p2p")])
+    # --- la rinascita, sul database ---
+    amb3 = {"json": json, "sqlite3": sqlite3, "time": time, "secrets": __import__("secrets"),
+            "cambio_noto_ora": lambda *a: 60000.0, "_cambio_cache": {"quando": 777},
+            "print": lambda *a, **k: None}
+    for nome in ("P2P_ONCHAIN_PREFISSO", "P2P_ONCHAIN_ORE_LIBRO", "P2P_ONCHAIN_ORE_DEPOSITO",
+                 "P2P_ONCHAIN_TAB_MARGINE_S"):
+        j = src.index(f"\n{nome} = ") + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb3)
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_mercato", "p2p_onchain_scade_libro",
+              "p2p_onchain_intervallo", "_p2p_onchain_rinasci"):
+        exec(pezzo(f), amb3)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_onchain_ordini(")
+    con.execute(src[i:src.index('aggiornato INTEGER NOT NULL)"""', i)] + "aggiornato INTEGER NOT NULL)")
+    k = src.index("PRAGMA table_info(p2p_onchain_ordini)")
+    a = src.index("for col, tipo in (", k) + len("for col, tipo in ")
+    for col, tipo in eval(src[a:src.index(":\n        if col not in gia:", a)]):
+        con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+    con.execute("CREATE TABLE onchain_xpub(tg_id INTEGER)")
+    con.execute("INSERT INTO onchain_xpub VALUES(111)")
+
+    def riga(**kw):
+        d = {"ordine": "bar-onchain-int" + str(next(_NOMI_FINTI)), "lato": "sell", "maker_id": 111,
+             "taker_id": 222, "prezzo_sats": 50000, "euro_cent": 3000, "metodi": '["Revolut"]',
+             "recapito": "IT60", "stato": "annullato", "scade": 10, "creato": 1, "aggiornato": 1,
+             "prezzo_tipo": "mercato", "premio": 2, "fascia_min_cent": 2000,
+             "fascia_max_cent": 10000}
+        d.update(kw)
+        cur = con.execute(f"INSERT INTO p2p_onchain_ordini({','.join(d)}) VALUES("
+                          f"{','.join('?' * len(d))})", list(d.values()))
+        return con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (cur.lastrowid,)).fetchone()
+    Rn = amb3["_p2p_onchain_rinasci"]
+    nid = Rn(con, riga(), 100000)
+    n = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (nid,)).fetchone()
+    prova("LA RINASCITA: lo scambio preso a 30 € salta, l'ordine torna nel libro col suo "
+          "intervallo intero (massimo in `euro_cent`, i due capi), a mercato, sats a zero",
+          ["pending", 10000, 2000, 10000, "mercato", 0, 2],
+          [n["stato"], n["euro_cent"], n["fascia_min_cent"], n["fascia_max_cent"],
+           n["prezzo_tipo"], n["prezzo_sats"], n["premio"]])
+    nid2 = Rn(con, riga(fascia_min_cent=0, fascia_max_cent=0, euro_cent=4500), 100000)
+    n2 = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (nid2,)).fetchone()
+    prova("...e un ordine a cifra unica rinasce con la sua cifra, senza capi",
+          [4500, 0, 0], [n2["euro_cent"], n2["fascia_min_cent"], n2["fascia_max_cent"]])
+    rotto = pezzo("_p2p_onchain_rinasci").replace(
+        "capi[1] if capi else int(o[\"euro_cent\"])", "int(o[\"euro_cent\"])", 1)
+    amb4 = dict(amb3)
+    exec(rotto, amb4)
+    nid3 = amb4["_p2p_onchain_rinasci"](con, riga(), 100000)
+    prova("controprova: senza il massimo dei capi l'ordine rinascerebbe con la cifra scelta "
+          "da chi l'aveva preso (30 €)",
+          [True, 3000],
+          [rotto != pezzo("_p2p_onchain_rinasci"),
+           con.execute("SELECT euro_cent FROM p2p_onchain_ordini WHERE id=?", (nid3,)).fetchone()[0]])
+    # controprove sui giudici
+    rottoS = pezzo("p2p_onchain_giudica_scelta").replace("if not lo <= cent <= hi:", "if cent <= 0:", 1)
+    ambS = dict(amb)
+    exec(rottoS, ambS)
+    prova("controprova: senza i capi nel giudice, 500 € passerebbero su un ordine 20–100 €",
+          [True, ("", 50000)],
+          [rottoS != pezzo("p2p_onchain_giudica_scelta"), ambS["p2p_onchain_giudica_scelta"](o, 50000)])
+    rottoG = pezzo("p2p_onchain_giudica_intervallo").replace(" or not mercato", "", 1)
+    ambG = dict(amb)
+    exec(rottoG, ambG)
+    prova("controprova: senza il «solo a mercato» un ordine a prezzo fisso diventerebbe un intervallo",
+          [True, (2000, 10000)],
+          [rottoG != pezzo("p2p_onchain_giudica_intervallo"),
+           ambG["p2p_onchain_giudica_intervallo"](MET, 2000, 10000, False, False)])
+    # --- il telefono ---
+    blocco = mini[mini.index("let p2pOcScelto = {id: 0, euro: 0};"):mini.index("function cambiaSceltaOcP2P(n){")]
+    prog = ("const p2pOnchainLibro = {intervallo: true, eventi: [\n"
+            " {id: 5, lato: 'sell', euro: 100, euro_min: 20, stima: 200000, stima_min: 40000, premio: 2, fiat: 'EUR', metodi: ['Revolut']},\n"
+            " {id: 6, lato: 'buy', euro: 50, stima: 100000, premio: 0, fiat: 'CHF', metodi: ['TWINT']},\n"
+            " {id: 7, lato: 'buy', euro: 250, euro_min: 25, stima: 1, metodi: ['Contanti al tabacchino']}]};\n"
+            "function tabacchinoP2P(m){ return (m || []).some(x => String(x).indexOf('tabacchino') >= 0); }\n"
+            "function bzOcInCompraP2P(o){ return !!o && o.lato === 'buy' && tabacchinoP2P(o.metodi) && Number(o.euro_min) > 0; }\n"
+            "const p2pLibro = {ordini: [{id: 'ln1'}]};\n"
+            + blocco + "\n"
+            + pezzo_js(mini, "function rigaLibroP2P(id){") + "\n"
+            "const E = p2pOnchainLibro.eventi, f = {};\n"
+            "f.acceso = intervalloOcAccesoP2P();\n"
+            "f.int = E.map(intervalloOcP2P);\n"
+            "f.prima = sceltoOcP2P(E[0]);\n"
+            "f.ugualePrima = conSceltaOcP2P(E[0]) === E[0];\n"
+            "p2pOcScelto = {id: 5, euro: 30};\n"
+            "f.scelto = [sceltoOcP2P(E[0]), sceltoOcP2P(E[1])];\n"
+            "const c = conSceltaOcP2P(E[0]);\n"
+            "f.con = [c.euro, c.euro_min, c.stima, E[0].euro, intervalloOcP2P(c)];\n"
+            "f.riga = rigaLibroP2P('oc-5');\n"
+            "f.righe = [rigaLibroP2P('oc-6'), rigaLibroP2P('oc-7'), rigaLibroP2P('ln1')];\n"
+            "console.log(JSON.stringify(f));\n")
+    out = _node_banco(prog)
+    if out is None:
+        salta("i pezzi del telefono per l'intervallo on-chain", "node non installato")
+    else:
+        prova("il telefono: la leva dalla busta; un intervallo solo dove c'e' la fascia e non e' "
+              "Barattozon; nessuna cifra prima della scelta",
+              [True, [True, False, False], 0, True],
+              [out.get("acceso"), out.get("int"), out.get("prima"), out.get("ugualePrima")])
+        prova("scelti 30 € su 20–100: euro 30, niente piu' fascia, la stima in proporzione "
+              "(200.000 × 30/100 = 60.000), l'ordine del libro intatto; la scelta vale solo "
+              "per quell'ordine",
+              [[30, 0], [30, 0, 60000, 100, False]], [out.get("scelto"), out.get("con")])
+        prova("la riga del foglio «Quanto» fatta dall'ordine on-chain, coi nomi di Lightning; "
+              "niente riga per un ordine a cifra unica o Barattozon, e quelle di Lightning "
+              "restano del suo libro",
+              [{"id": "oc-5", "lato": "sell", "euro": 20, "euroMax": 100, "premium": 2,
+                "fiat": "EUR", "metodi": ["Revolut"], "onchain": True},
+               [None, None, {"id": "ln1"}]],
+              [out.get("riga"), out.get("righe")])
+    prova("il foglio della presa: la fascia con la frase di Lightning, «Scegli» che apre "
+          "«Quanto», «Importo scelto» con «Cambia», il conto sulla cifra",
+          [1, 1, 1, 1, 1],
+          [mini.count(": intOc && !sceltoOc ? contoAttesaP2P(fasciaOc,\n"
+                      "                                 'Scegli quanto vuoi ' + (vendeLui ? 'inviare' : 'ricevere') + ' per vedere il dettaglio')"),
+           mini.count("etichetta: bzC ? '🧾 Il tuo PayCode' : intOc && !sceltoOc ? 'Scegli' : vendeLui ? 'Compra' : 'Vendi',"),
+           mini.count(": intOc && !sceltoOc ? void setTimeout(() => apriQuantoP2P('oc-' + Number(o.id)), 350)"),
+           mini.count("rigaImportoSceltoP2P(fasciaOc, sceltoOc, 'cambiaSceltaOcP2P(' + Number(o.id) + ')')"),
+           mini.count("contoOnchainP2P({...oS, parte: vendeLui ? 'compro' : 'vendo',")])
+    prova("la cifra al server: con la presa e con la cauzione; senza cifra la presa riapre il "
+          "foglio; il foglio «Quanto» la rimanda alla presa",
+          [1, 2, 1, 1],
+          [mini.count("sceltaOc ? {euro_cent: Math.round(sceltaOc * 100)} : {}, extra || {}))});"),
+           mini.count("euro_cent: Math.round(scelta"),
+           mini.count("if (riga && typeof intervalloOcP2P === 'function' && intervalloOcP2P(riga) && !sceltaOc)\n    return apriOnchainP2P(id);"),
+           mini.count("p2pOcScelto = {id: n, euro: g.euro};")])
+    prova("Pubblica: il secondo campo resta e si svela on-chain a leva accesa, la spinta "
+          "all'intervallo anche on-chain, e i due capi partono solo a mercato, fuori da monete e PayCode",
+          [3, 1],
+          [mini.count("!(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())"),
+           mini.count("if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > 0\n"
+                      "      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {\n"
+                      "    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;")])
 
 
 def prove_estensione_barattozon():
@@ -215328,7 +215591,9 @@ def prove_onchain_contanti():
            "\" rip_minimo, rip_massimo, fiat, paycode, zona, para_su, para_giu,\"" in rotta
            # (18 nov 2026, tempo-pagamento) e in coda il tempo per pagare
            # (19 nov 2026, ritorno-nel-libro) e il momento del recapito
-           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu,\n             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,\n             adesso if recapito else 0))" in rotta,
+           and "json.dumps(tab) if tab else \"\", zona, para_su, para_giu,\n             fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,\n             adesso if recapito else 0,\n"
+           # (27 nov 2026, intervallo-onchain) e in fondo i due capi dell'intervallo
+           "             intervallo[0] if intervallo else 0, intervallo[1] if intervallo else 0))" in rotta,
            "tetto_c = p2p_onchain_tetto_usdt(tetto_c, cambio_noto_ora(\"eur\"), cambio)" in rotta))
     prova("la colonna nasce da sola, e la zona esce nel libro e nella scheda dello scambio",
           (True, True, True),
@@ -215348,7 +215613,8 @@ def prove_onchain_contanti():
            and riga.index("${paga}") < riga.index("${zona}") < riga.index("${filtro}"),
            # (17 nov 2026 sera, terzo pezzo) zona e regola stanno nel riquadro
            # dei metodi, che si ridisegna scegliendo «Contanti»
-           "'<div id=\"p2pOcPresaMetodi\">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'" in apri
+           # (27 nov 2026, intervallo-onchain) con la cifra scelta, `oS`
+           "'<div id=\"p2pOcPresaMetodi\">' + metodiPresaOcHtmlP2P(oS, vendeLui) + '</div>'" in apri
            and "zonaDettP2P({metodi: perZona, zona: o.zona})"
            in _fn_js(mini, "function metodiPresaOcHtmlP2P(o, vendeLui){"),
            "(scelta ? m === 'Contanti' : (o.metodi || []).length === 1)\n    ? regolaContantiFoglioP2P([m],"
@@ -215778,7 +216044,8 @@ def prove_onchain_cauzione():
           ('cauzione_chiesta = 1 if (d.get("cauzione") is True and lato == "sell"' in pubblica
            and 'p2p_onchain_cauzione_accesa(user["id"])) else 0' in pubblica,
            pubblica.index("cauzione_chiesta = 0") > pubblica.index("if tab or fascia:"),
-           '" tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il)"' in pubblica
+           # (27 nov 2026, intervallo-onchain) ...e dopo, i due capi dell'intervallo
+           '" tab_min_cent, minuti_pagare, cauzione_chiesta, recapito_il,"' in pubblica
            and "fascia[0] if fascia else 0, minuti_pagare, cauzione_chiesta,\n" in pubblica,
            '("cauzione_chiesta", "INTEGER DEFAULT 0")' in src))
     prova("...e il foglio di «Rinuncio» lo dice prima della firma: il server sa se rinunciando "
@@ -216022,7 +216289,9 @@ def prove_onchain_cauzione():
            prendi.index("if (riga && !conCauzione && cauzioneOcServeP2P(riga)) return apriCauzioneOcP2P(id, metodo);")
            < prendi.index("/prendi`"),
            # (17 nov 2026 sera) con il PayCode di un Barattozon in «Compra BTC» accanto
-           "body: JSON.stringify(Object.assign(metodo ? {metodo} : {}, extra || {}))});" in prendi))
+           # (27 nov 2026, intervallo-onchain) ...e la cifra scelta di un intervallo
+           "body: JSON.stringify(Object.assign(metodo ? {metodo} : {},\n"
+           "                                         sceltaOc ? {euro_cent: Math.round(sceltaOc * 100)} : {}, extra || {}))});" in prendi))
     prova("il foglio della cauzione: il QR della richiesta, il battito che si ferma a foglio "
           "chiuso, e a cauzione tenuta chiude e prende da solo",
           (True, True, True, True),
@@ -223295,7 +223564,9 @@ def prove_ritorno_nel_libro_onchain():
     exec(src[j:src.index("\n}\n", j) + 3], amb)
     for f in ("_p2p_onchain_campo", "_p2p_onchain_mercato", "p2p_onchain_scade_libro",
               "p2p_onchain_rinasce_perche", "_p2p_onchain_rinasci", "p2p_onchain_testo_rinato",
-              "_p2p_onchain_depositi_mancati", "_p2p_onchain_rinato_in"):
+              "_p2p_onchain_depositi_mancati", "_p2p_onchain_rinato_in",
+              # (27 nov 2026, intervallo-onchain) la rinascita rimette l'intervallo
+              "p2p_onchain_intervallo"):
         exec(pezzo(f), amb)
     R = amb["p2p_onchain_rinasce_perche"]
 
@@ -223500,7 +223771,7 @@ def prove_ritorno_nel_libro_onchain():
     prova("IL MOMENTO DEL RECAPITO si timbra: alla pubblicazione, alla presa, alla rotta del "
           "recapito (una volta: cambiarlo non rifa' partire il tempo, cancellarlo lo ferma)",
           [True, True, True],
-          ["adesso if recapito else 0))" in pezzo("p2p_onchain_pubblica_rotta"),
+          ["adesso if recapito else 0,\n" in pezzo("p2p_onchain_pubblica_rotta"),
            '" recapito_il=?"' in pezzo("p2p_onchain_prendi"),
            "WHEN COALESCE(recapito_il, 0)>0 THEN recapito_il ELSE ? END" in pezzo("p2p_onchain_recapito")])
     prova("...i promemoria a chi paga contano dallo stesso inizio del termine, e la pagina "
@@ -226209,7 +226480,7 @@ CATEGORIE = {
     logo_compra_vendi tempo_di_chi_pubblica tempo_pubblica_app
     disputa_automatica_p2p pausa_in_vista paracadute_p2p paracadute_app
     selettore_di_casa ordine_in_pausa relay_per_mostro
-    notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain importo_copia
+    notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain intervallo_onchain importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
     presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain chat_spunte onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
@@ -227701,6 +227972,7 @@ def main():
               prove_barre_paycode,
               prove_estensione_barattozon,
               prove_barattozon_onchain,
+              prove_intervallo_onchain,
               prove_allegati_chat,
               prove_pdf_allegati,
               prove_stampa_e_salti,

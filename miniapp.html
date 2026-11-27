@@ -79212,7 +79212,10 @@ function vistaOrdinamentoOcP2P(o){
   return {oc: o, id: 'oc-' + Number(o.id), lato: o.lato,
           premioOc: o.mercato ? (Number(o.premio) || 0) : null,
           /* in moneta l'importo e' il controvalore in euro (`euroNodo`) */
-          creato: Number(o.creato) || 0, euro: Number(o.euroNodo || o.euro) || 0, euroMax: 0};
+          creato: Number(o.creato) || 0, euro: Number(o.euroNodo || o.euro) || 0, euroMax: 0,
+          /* l'intervallo (27 nov 2026) coi nomi di Lightning: i due capi */
+          ...(typeof intervalloOcP2P === 'function' && intervalloOcP2P(o)
+            ? {euro: Number(o.euro_min), euroMax: Number(o.euro)} : {})};
 }
 
 
@@ -80256,6 +80259,11 @@ function apriOnchainP2P(id, modo){
   if (typeof backupOnchainPrima === 'function' && !backupOnchainPrima(() => apriOnchainP2P(id, modo))) return;
   const conTasti = typeof reteOcPresaPossibileP2P === 'function' && reteOcPresaPossibileP2P(vendeLui);
   const bzC = typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o);
+  /* L'INTERVALLO (27 nov 2026): prima la cifra, poi il conto su di lei */
+  const intOc = typeof intervalloOcP2P === 'function' && intervalloOcP2P(o);
+  const sceltoOc = intOc ? sceltoOcP2P(o) : 0;
+  const oS = sceltoOc ? conSceltaOcP2P(o) : o;
+  const fasciaOc = Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)});
   chiediConferma({
     /* lo stesso cappello del dettaglio Lightning, con la rete sotto
        (20:24, Andrea): era «⛓️ Compri bitcoin on-chain» */
@@ -80309,7 +80317,7 @@ function apriOnchainP2P(id, modo){
          «Contanti» fra piu' metodi le pillole, e zona, regola e cauzione
          compaiono scegliendolo (`metodiPresaOcHtmlP2P`, che si ridisegna) */
       + (typeof metodiPresaOcHtmlP2P === 'function'
-        ? '<div id="p2pOcPresaMetodi">' + metodiPresaOcHtmlP2P(o, vendeLui) + '</div>'
+        ? '<div id="p2pOcPresaMetodi">' + metodiPresaOcHtmlP2P(oS, vendeLui) + '</div>'
         : (typeof zonaDettP2P === 'function' ? zonaDettP2P({metodi: o.metodi || [], zona: o.zona}) : '')
           + (typeof regolaContantiFoglioP2P === 'function' && (o.metodi || []).length === 1
             ? regolaContantiFoglioP2P(o.metodi, typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
@@ -80328,9 +80336,13 @@ function apriOnchainP2P(id, modo){
          «🧾 Il tuo PayCode», come la' */
       + (bzC ? contoAttesaP2P(Object.assign({}, o, {euro: Number(o.euro_min), euroMax: Number(o.euro)}),
                               'Scrivi i dati del tuo PayCode Amazon per vedere il dettaglio')
+        /* l'intervallo senza cifra: la fascia e la frase di Lightning (27 nov 2026) */
+        : intOc && !sceltoOc ? contoAttesaP2P(fasciaOc,
+                                 'Scegli quanto vuoi ' + (vendeLui ? 'inviare' : 'ricevere') + ' per vedere il dettaglio')
         : typeof contoOnchainP2P === 'function'
-        ? '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '" id="p2pOcPresaConto">'
-          + contoOnchainP2P({...o, parte: vendeLui ? 'compro' : 'vendo',
+        ? (sceltoOc ? rigaImportoSceltoP2P(fasciaOc, sceltoOc, 'cambiaSceltaOcP2P(' + Number(o.id) + ')') : '')
+          + '<div class="p2p-ord lato-' + (vendeLui ? 'compro' : 'vendo') + '" id="p2pOcPresaConto">'
+          + contoOnchainP2P({...oS, parte: vendeLui ? 'compro' : 'vendo',
                              swap: conTasti ? swapOcPresaP2P(o.id, vendeLui) : null}) + '</div>' : ''),
     /* in USDT le stesse frasi, con la rete (2 nov 2026); e col tasto
        «⚡ Lightning» scelto la frase dice Lightning (`corpoPresaOcP2P`) */
@@ -80343,10 +80355,13 @@ function apriOnchainP2P(id, modo){
     /* Barattozon in «Compra BTC»: «🧾 Il tuo PayCode» arancio, che apre il
        foglio dei dati come su Lightning (18 nov 2026). Il seguito parte a
        foglio chiuso e col bottone gia' rimesso (`eseguiConferma`) */
-    etichetta: bzC ? '🧾 Il tuo PayCode' : vendeLui ? 'Compra' : 'Vendi',
-    vestito: bzC ? '' : vendeLui ? 'compro-oc' : 'vendo-oc',
+    /* ...e sull'intervallo senza cifra «Scegli», come su Lightning, che
+       apre «Quanto vuoi scambiare?» a foglio chiuso (27 nov 2026) */
+    etichetta: bzC ? '🧾 Il tuo PayCode' : intOc && !sceltoOc ? 'Scegli' : vendeLui ? 'Compra' : 'Vendi',
+    vestito: bzC || (intOc && !sceltoOc) ? '' : vendeLui ? 'compro-oc' : 'vendo-oc',
     reteLn: conTasti && (p2pOcPresaRete[o.id] || {}).rete === 'ln',
     poi: () => bzC ? void setTimeout(() => apriPayCodeBzOcP2P(Number(o.id)), 350)
+      : intOc && !sceltoOc ? void setTimeout(() => apriQuantoP2P('oc-' + Number(o.id)), 350)
       : prendiOnchainP2P(Number(o.id))});
 }
 
@@ -80362,6 +80377,54 @@ function apriOnchainP2P(id, modo){
 let p2pOcBzPresa = {};
 function bzOcInCompraP2P(o){
   return !!o && o.lato === 'buy' && tabacchinoP2P(o.metodi) && Number(o.euro_min) > 0;
+}
+/* ══ L'INTERVALLO «DA… A…» ANCHE ON-CHAIN (27 nov 2026, cantiere
+   intervallo-onchain, Andrea: «Ordini p2p ad intervalli anche su
+   onchain») ══
+   Come nel dettaglio di Lightning: finche' la cifra non c'e' il foglio
+   della presa mostra la fascia e la frase, il bottone dice «Scegli» e
+   apre il foglio «Quanto vuoi scambiare?» (lo stesso di Lightning, con
+   una riga fatta dall'ordine on-chain: `rigaQuantoOcP2P`); scelta la
+   cifra, il foglio si riapre col conto di QUELLA cifra, «Importo scelto»
+   con «Cambia», e «Compra»/«Vendi». La cifra va al server con la presa e
+   con la cauzione, che si conta su di lei (decisione di Andrea). */
+let p2pOcScelto = {id: 0, euro: 0};
+/* la leva del server, per il secondo campo del foglio Pubblica */
+function intervalloOcAccesoP2P(){
+  return typeof p2pOnchainLibro === 'object' && !!p2pOnchainLibro && p2pOnchainLibro.intervallo === true;
+}
+/* PURA: un ordine on-chain a intervallo ancora nel libro (non Barattozon) */
+function intervalloOcP2P(o){
+  return !!o && Number(o.euro_min) > 0 && Number(o.euro) > Number(o.euro_min)
+    && !(typeof bzOcInCompraP2P === 'function' && bzOcInCompraP2P(o));
+}
+/* la cifra scelta per QUEST'ordine (0 = non ancora) */
+function sceltoOcP2P(o){
+  return intervalloOcP2P(o) && Number(p2pOcScelto.id) === Number(o.id) ? Number(p2pOcScelto.euro) || 0 : 0;
+}
+/* PURA sull'ordine: con la cifra scelta l'ordine diventa quello a cifra
+   unica di QUELLA cifra — gli euro, e la stima dei sats in proporzione
+   (stesso cambio, stesso premio: la formula del server e' una retta) */
+function conSceltaOcP2P(o){
+  const s = sceltoOcP2P(o);
+  if (!s) return o;
+  const max = Number(o.euro) || 0;
+  const stima = Number(o.stima) > 0 && max > 0 ? Math.round(Number(o.stima) * s / max) : 0;
+  return Object.assign({}, o, {euro: s, euro_min: 0, stima: stima, stima_min: 0});
+}
+/* la riga del foglio «Quanto» fatta da un ordine on-chain: i nomi di
+   quella di Lightning (`euro` il primo capo, `euroMax` l'ultimo) */
+function rigaQuantoOcP2P(n){
+  const o = (p2pOnchainLibro.eventi || []).find(x => +x.id === +n);
+  if (!intervalloOcP2P(o)) return null;
+  return {id: 'oc-' + Number(o.id), lato: o.lato, euro: Number(o.euro_min), euroMax: Number(o.euro),
+          premium: Number(o.premio) || 0, fiat: o.fiat, metodi: o.metodi || [], onchain: true};
+}
+/* «Cambia»: il foglio della presa si chiude e si riapre «Quanto» */
+function cambiaSceltaOcP2P(n){
+  haptic();
+  navIndietro();
+  setTimeout(() => apriQuantoP2P('oc-' + Number(n)), 350);
 }
 /* IL FOGLIO «🧾 IL TUO PAYCODE AMAZON» (18 nov 2026, cantiere
    barattozon-oc-carta, Andrea: «deve essere uguale al lighting»): i campi
@@ -80692,8 +80755,10 @@ function ridisegnaReteOcPresaP2P(id){
   const corpo = el('confCorpo');
   if (box && o && corpo) corpo.textContent = corpoPresaOcP2P(o, o.lato === 'sell');
   const conto = el('p2pOcPresaConto');
+  /* (27 nov 2026) sull'intervallo il conto e' quello della cifra scelta */
+  const oS = o && typeof conSceltaOcP2P === 'function' ? conSceltaOcP2P(o) : o;
   if (box && o && conto && typeof contoOnchainP2P === 'function')
-    conto.innerHTML = contoOnchainP2P({...o, parte: o.lato === 'sell' ? 'compro' : 'vendo',
+    conto.innerHTML = contoOnchainP2P({...oS, parte: o.lato === 'sell' ? 'compro' : 'vendo',
                                        swap: swapOcPresaP2P(o.id, o.lato === 'sell')});
 }
 async function scegliReteOcPresaP2P(id, rete){
@@ -80702,7 +80767,8 @@ async function scegliReteOcPresaP2P(id, rete){
   if (!o) return;
   const vendeLui = o.lato === 'sell';
   if (rete !== 'ln') { p2pOcPresaRete[id] = {rete: 'oc'}; return ridisegnaReteOcPresaP2P(id); }
-  const sats = satsOcPresaP2P(o, vendeLui);
+  /* (27 nov 2026) lo swap sulla cifra scelta, sull'intervallo */
+  const sats = satsOcPresaP2P(typeof conSceltaOcP2P === 'function' ? conSceltaOcP2P(o) : o, vendeLui);
   p2pOcPresaRete[id] = {rete: 'ln', stato: 'leggo', sats};
   ridisegnaReteOcPresaP2P(id);
   let d;
@@ -80830,7 +80896,11 @@ function metodiPresaOcHtmlP2P(o, vendeLui){
     && (scelta ? m === 'Contanti' : (o.metodi || []).length === 1)
     ? regolaContantiFoglioP2P([m], typeof maxEuroContantiP2P === 'function' ? maxEuroContantiP2P() : 0,
                               vendeLui ? 'compro' : 'vendo') : '';
-  return pillole + zona + regola + (cauzioneOcServeP2P(o) ? rigaCauzioneOcP2P(o, p2pOnchainLibro.cauzione) : '');
+  /* sull'intervallo (27 nov 2026) la cauzione della cifra scelta; senza
+     cifra la regola, come quando la stima non c'e' */
+  const oC = typeof conSceltaOcP2P === 'function' ? conSceltaOcP2P(o) : o;
+  const oCauz = typeof intervalloOcP2P === 'function' && intervalloOcP2P(oC) ? Object.assign({}, oC, {stima: 0}) : oC;
+  return pillole + zona + regola + (cauzioneOcServeP2P(o) ? rigaCauzioneOcP2P(oCauz, p2pOnchainLibro.cauzione) : '');
 }
 function scegliMetodoPresaOcP2P(id, m){
   haptic();
@@ -80878,11 +80948,14 @@ function copiaCauzioneOcP2P(){
   if (c && c.bolt11) copiaLink(c.bolt11, 'Richiesta di pagamento copiata 📋');
 }
 async function leggiCauzioneOcP2P(id, metodo){
+  /* sull'intervallo (27 nov 2026) la cauzione si conta sulla cifra scelta */
+  const rigaC = (p2pOnchainLibro.eventi || []).find(x => +x.id === +id);
+  const sceltaC = rigaC && typeof sceltoOcP2P === 'function' ? sceltoOcP2P(rigaC) : 0;
   /* senza metodo si CHIEDE a che punto e' (GET); col metodo si crea, o torna quella viva (POST) */
   const r = await fetch(`${API_BASE}/p2p/onchain/${id}/cauzione`, metodo == null
     ? {headers: {'X-Tg-Init-Data': authHdr()}}
     : {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-       body: JSON.stringify({metodo})});
+       body: JSON.stringify(Object.assign({metodo}, sceltaC ? {euro_cent: Math.round(sceltaC * 100)} : {}))});
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.detail || 'la cauzione adesso non si può chiedere');
   return d.cauzione || null;
@@ -81028,6 +81101,11 @@ async function prendiOnchainP2P(id, extra){
     toast('Scegli prima come paghi: tocca un metodo', 4000);
     return apriOnchainP2P(id);
   }
+  /* L'INTERVALLO (27 nov 2026): senza la cifra si torna al foglio, che la
+     chiede; con la cifra, quella parte con la presa */
+  const sceltaOc = riga && typeof sceltoOcP2P === 'function' ? sceltoOcP2P(riga) : 0;
+  if (riga && typeof intervalloOcP2P === 'function' && intervalloOcP2P(riga) && !sceltaOc)
+    return apriOnchainP2P(id);
   /* IL BANNER DEL TEMPO PER PAGARE anche sull'on-chain (19 nov 2026), a
      chi prende COMPRANDO, una volta per ordine: le sue parole dicono la
      disputa, perche' qui allo scadere non scade niente da solo */
@@ -81051,7 +81129,8 @@ async function prendiOnchainP2P(id, extra){
     const r = await fetch(`${API_BASE}/p2p/onchain/${id}/prendi`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
       /* `extra`: il PayCode di Barattozon in «Compra BTC» (17 nov 2026 sera) */
-      body: JSON.stringify(Object.assign(metodo ? {metodo} : {}, extra || {}))});
+      body: JSON.stringify(Object.assign(metodo ? {metodo} : {},
+                                         sceltaOc ? {euro_cent: Math.round(sceltaOc * 100)} : {}, extra || {}))});
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
       /* il PayCode rifiutato dal server: il foglio torna coi dati scritti */
@@ -81059,6 +81138,7 @@ async function prendiOnchainP2P(id, extra){
       throw new Error(d.detail || 'non si è potuto prendere');
     }
     if (extra && extra.tabacchino) delete p2pOcBzPresa[id];
+    if (sceltaOc) p2pOcScelto = {id: 0, euro: 0};
     await applicaReteOcPresaP2P(id, d.ruolo);
     await leggiMieiOnchainP2P();
     apriDettaglioOnchainP2P(id);
@@ -82808,6 +82888,14 @@ async function pubblicaOnchainDalFoglioP2P(confermato){
     const barre = giudizioBarrePayCodeP2P(tB.barre, tB.ordine);
     corpo.tabacchino = {paycode: payCodeP2P(tB.ordine).replace(/-/g, ''),
       scade: scadeDaCampoP2P(tB.scade), barre: barre.stato === 'buono' ? barre.numero : ''};
+  }
+  /* L'INTERVALLO «DA… A…» (27 nov 2026, cantiere intervallo-onchain): a
+     mercato, a euro interi come su Lightning, mai in moneta ne' col
+     PayCode; il server lo rigiudica e, a leva spenta, lo ignora */
+  if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > 0
+      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {
+    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;
+    corpo.euro_cent = interoP2P(campi.euroMax).n * 100;
   }
   /* BARATTOZON IN «COMPRA BTC» (17 nov 2026 sera): la fascia a euro
      interi, a mercato; il PayCode lo porta chi prende */
@@ -84798,8 +84886,10 @@ function cambiaReteP2P(rete){
   if (oc) {
     const vale = metodiOnchainP2P(p2pLato);
     p2pNuovoMetodi = p2pNuovoMetodi.filter(m => vale.indexOf(m) >= 0);
-    /* la fascia resta solo a Barattozon in «Compra BTC» */
-    if (!(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
+    /* la fascia resta a Barattozon in «Compra BTC», e dal 27 nov 2026
+       l'intervallo a tutti, a leva accesa (cantiere intervallo-onchain) */
+    if (!(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')
+        && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) { p2pNuovoEuroMax = ''; p2pNuovoDue = false; }
     const porta = el('p2pNuovoPorta');
     if (porta) porta.hidden = true;
   }
@@ -98025,6 +98115,11 @@ function ripuliCifreP2P(inp){
    chiave bruciata e' un no pagato troppo caro. */
 let p2pQuantoOrdine = '';
 function rigaLibroP2P(id){
+  /* (27 nov 2026, cantiere intervallo-onchain) «oc-N» e' un ordine on-chain
+     a intervallo, vestito da riga del libro per il foglio «Quanto»: gli id
+     di Mostro sono UUID e non cominciano mai cosi' */
+  const s = String(id || '');
+  if (s.indexOf('oc-') === 0) return typeof rigaQuantoOcP2P === 'function' ? rigaQuantoOcP2P(Number(s.slice(3))) : null;
   return ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id) || null;
 }
 function apriQuantoP2P(id){
@@ -98076,7 +98171,8 @@ function renderQuantoP2P(){
     '<div class="campo-pre"><span class="pre' + (segno.length > 1 ? ' pre-parola' : '') + '">' + segno + '</span>' +
     /* chi torna a cambiare la cifra ritrova la sua; la prima volta niente */
     '<input id="p2pQuantoInp" type="text" inputmode="numeric" value="' +
-      esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || '')) +
+      (riga.onchain ? esc(String((Number(p2pOcScelto.id) === Number(String(riga.id).slice(3)) && p2pOcScelto.euro) || ''))
+                    : esc(String((p2pDettOrdine === riga.id && p2pDettImporto) || ''))) +
       '" onbeforeinput="soloCifreP2P(event)"' +
       /* il segnaposto sta attaccato al segno: «€50 – 276», non «€da 50 a 276» */
       ' oninput="stimaQuantoP2P()" placeholder="' + esc(String(riga.euro)) + ' \u2013 ' +
@@ -98158,13 +98254,26 @@ function confermaQuantoP2P(){
      parla — lo rifa' la conferma del dettaglio, col metodo in mano */
   /* in franchi il tetto tradotto e il suo segno (14 nov 2026, p2p-chf) */
   const codPresa = typeof valutaOrdineP2P === 'function' ? valutaOrdineP2P(riga) : 'EUR';
-  const troppo = giudiceContantiP2P(g.euro, p2pDettMetodo ? [p2pDettMetodo]
+  /* sull'on-chain il metodo scelto e' quello delle pillole della presa */
+  const metQ = riga.onchain ? metodoPresaOcP2P({id: Number(String(riga.id).slice(3)), metodi: riga.metodi}) : p2pDettMetodo;
+  const troppo = giudiceContantiP2P(g.euro, metQ ? [metQ]
                                       : ((riga.metodi || []).length === 1 ? riga.metodi : []),
                                     maxEuroContantiP2P(), codPresa);
   if (troppo) { toast(troppo); return; }
   const id = p2pQuantoOrdine;
   chiudiFoglioP2P('p2pQuantoSheet');
   p2pQuantoOrdine = '';
+  /* L'ON-CHAIN (27 nov 2026): la cifra scelta torna al foglio della presa,
+     che si riapre col conto di QUELLA cifra; lo swap gia' chiesto su
+     Lightning si richiede sulla cifra nuova */
+  if (riga.onchain) {
+    const n = Number(String(id).slice(3));
+    p2pOcScelto = {id: n, euro: g.euro};
+    const lnPrima = (p2pOcPresaRete[n] || {}).rete === 'ln';
+    if (lnPrima) delete p2pOcPresaRete[n];
+    setTimeout(() => { apriOnchainP2P(n); if (lnPrima) scegliReteOcPresaP2P(n, 'ln'); }, 350);
+    return;
+  }
   /* ⚠️ NON SI PRENDE PIU' DA QUI (7 ott 2026, decisione di Andrea): la
      cifra scelta torna al foglio del libro, che c'e' ancora sotto, e il
      conto a una colonna si disegna su QUELLA cifra — e' il bottone
@@ -99826,14 +99935,15 @@ function contoAttesaP2P(o, frase){
 }
 /* PURA: la riga della cifra scelta, sopra il conto — la cifra, la sua
    fascia e «Cambia», che riapre «Quanto» con dentro quella cifra */
-function rigaImportoSceltoP2P(o, scelto){
+function rigaImportoSceltoP2P(o, scelto, azione){
   const segno = segnoMonetaP2P(o);
   return '<div class="conto-scelto" id="p2pDettScelto" tabindex="-1">'
     + '<span>Importo scelto: <b>' + esc(fmtEur(scelto)) + ' ' + segno + '</b> '
     + '<span class="conto-scelto-fascia">(' + capiP2P(esc(fmtSoldiP2P(o.euro, o)), esc(fmtSoldiP2P(o.euroMax, o)))
     + ' ' + segno + ')</span></span>'
     + '<button type="button" class="btn mini" aria-label="Cambia l\'importo scelto"'
-    + ' onclick="apriQuantoP2P(p2pDettOrdine)">Cambia</button>'
+    /* (27 nov 2026) sull'on-chain «Cambia» riapre «Quanto» dal foglio della presa */
+    + ' onclick="' + (azione || 'apriQuantoP2P(p2pDettOrdine)') + '">Cambia</button>'
     + '</div>';
 }
 /* IL «COMPRA» E' LA CONFERMA, e da qui in poi la strada e' quella di
@@ -112653,16 +112763,22 @@ function scegliValutaP2P(cod){
 const P2P_SPINTA_INTERVALLO = '💡 Con un intervallo (es. 20–250 €) il tuo ordine viene preso molto più spesso.';
 function spintaIntervalloP2P(){
   if (p2pLato === 'compro' || p2pNuovoFisso) return false;
-  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc) return false;
+  /* on-chain anche lei, con l'intervallo acceso (27 nov 2026, Andrea:
+     «ricordati di inserire la scritta») */
+  if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
+      && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) return false;
   if (tabacchinoP2P(p2pNuovoMetodi)) return false;
   return valutaFoglioP2P() === 'EUR';
 }
 function svelaSecondoImportoP2P(){
-  /* a rete on-chain l'importo e' uno solo: il 2-di-3 blocca una cifra.
+  /* a rete on-chain l'importo era uno solo: il 2-di-3 blocca una cifra.
      Barattozon in «Compra BTC» no (17 nov 2026 sera): la fascia la stringe
-     il PayCode di chi prende, e il 2-di-3 nasce su quello */
+     il PayCode di chi prende, e il 2-di-3 nasce su quello. Dal 27 nov 2026
+     (cantiere intervallo-onchain) nessuno, a leva accesa: la cifra la
+     sceglie chi prende, e il 2-di-3 nasce su quella, come per Barattozon */
   if (typeof p2pNuovoOc !== 'undefined' && p2pNuovoOc
-      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')) return;
+      && !(tabacchinoP2P(p2pNuovoMetodi) && p2pLato === 'compro')
+      && !(typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P())) return;
   if (p2pNuovoDue || p2pNuovoFisso || (tabacchinoP2P(p2pNuovoMetodi) && p2pLato !== 'compro')) return;
   /* ...e in una moneta pure (16 nov 2026, p2p-monete-valute) */
   if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(valutaFoglioP2P())) return;

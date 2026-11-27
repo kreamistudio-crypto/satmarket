@@ -158,6 +158,7 @@ collaudo_p2p_onchain
 collaudo_p2p_onchain_usdt
 collaudo_p2p_onchain_commissione
 collaudo_p2p_onchain_barattozon
+collaudo_intervallo_onchain
 collaudo_leve_pannello
 collaudo_id_utenti
 collaudo_certificati_relay

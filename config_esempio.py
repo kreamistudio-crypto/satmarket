@@ -1763,6 +1763,13 @@ P2P_ONCHAIN_AVVISO_INCASSO = True
 # moderatori, il libro, Nostr, gli avvisi o il journal). Acceso di serie;
 # False lo rimette solo via Lightning.
 P2P_ONCHAIN_BARATTOZON = True
+# L'INTERVALLO «DA… A…» ANCHE ON-CHAIN (27 nov 2026, «Ordini p2p ad
+# intervalli anche su onchain», ok di Andrea alla proposta). Chi pubblica
+# a prezzo di mercato in euro, franchi o USDT scrive un minimo e un
+# massimo; chi prende sceglie la cifra, e il 2-di-3 (e la cauzione) nasce
+# su quella. Mai a prezzo fisso, nelle monete o con Barattozon. Acceso di
+# serie; False torna alla cifra unica (il minimo si ignora).
+P2P_ONCHAIN_INTERVALLO = True
 # GLI ORDINI P2P IN FRANCHI SVIZZERI (14 nov 2026, cantiere p2p-chf,
 # Andrea: «abbiamo stretto una collaborazione con Lugano»). Accanto agli
 # ordini in euro e in USDT, ordini Mostro in CHF: la garanzia resta la

@@ -190,6 +190,7 @@ collaudo_p2p_onchain.py
 collaudo_p2p_onchain_usdt.py
 collaudo_p2p_onchain_commissione.py
 collaudo_p2p_onchain_barattozon.py
+collaudo_intervallo_onchain.py
 collaudo_leve_pannello.py
 collaudo_id_utenti.py
 cartone_satsrouting.py
