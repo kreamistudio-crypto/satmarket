@@ -97142,3 +97142,96 @@ PROVATO. `prove_bitpost_gift_card` 6-quater, `collaudo_bitpost_gift_card`
 (la rete detta, l'indirizzo dal link), e il giro vero ripetuto col corpo
 corretto: ordine #591 nato su Bitcoin, agganciato, indirizzo `tb1q…`
 ricavato, annullato.
+
+## La CI a pezzi: undici macchine di GitHub insieme, e niente prove su develop (27 nov 2026, cantiere ci-a-pezzi; Andrea: «sii un esperto di DevOps e sistema la questione delle CI troppo lente. Inoltre in collaudo si possono saltare, solo quando si portano in prod si fanno e poi si fixano eventualmente i bug»)
+
+**I NUMERI DI PARTENZA** (gli ultimi 15 giri di main, `gh run list` +
+`gh run view --json jobs`): ~39 minuti a giro, tutti uguali. Il job
+`prove` girava sulla vm-2050 (2 vCPU, `CPUWeight=50` accanto al bot di
+collaudo): prove.py 1005 s in fila su un processore solo, poi i collaudi
+1258 s due alla volta (178 collaudi, 2511 s di lavoro). `segreti` 380 s
+su GitHub, `pronto` 55 s. La CI mirata del 17 nov non salvava niente in
+pratica: sul giro del 27 nov `--dai-file` ha detto «687 sezioni su 687»
+(i commit veri toccano sempre server.py, miniapp.html o i documenti che
+33 sezioni leggono), e i collaudi erano 178 su 178.
+
+**LA LEVA GROSSA: LA MACCHINA.** La vm-2050 era stata scelta il 20 ott
+per non pagare minuti (Cantieri, «Il runner della CI sulla vm-2050»).
+Dal 17 nov il repo è PUBBLICO (Cantieri, la voce della licenza AGPL):
+i runner standard di GitHub per un repo pubblico non si pagano e hanno
+quattro processori. Il perché della VM non c'è più, e in più un runner
+nostro che fa girare il codice di un repo pubblico era una porta da non
+tenere (la guardia `solo-main.sh` la stringeva, ma è meglio non averla).
+Quindi tutto torna su GitHub, e su GitHub si può essere in tanti.
+
+**COSA C'È.**
+- `prove.py --pezzo=K/N`: le sezioni già scelte (con `--dai-file` come
+  prima) divise in N pezzi. Non a giro: il motore P2P da solo vale 104 s
+  e a giro un pezzo ne prendeva 266 contro 78. Coi pesi delle venti
+  sezioni più lente (`PESI_PEZZI`, misurati oggi; le altre mezzo
+  secondo) ognuna va al pezzo meno carico, e i cinque pezzi stanno fra
+  121 e 137 s su questa macchina. L'ordine dentro il pezzo resta quello
+  di `tutte`. Un peso vecchio sbilancia e basta, non perde sezioni.
+- `collaudi_ci.py --pezzo K/N`: a giro sull'elenco già scelto (lì i
+  tempi sono piatti: entro ±12 % dalla media sui tempi veri del runner).
+- Il workflow: `prove-a-pezzi` (matrice 1..5) e `collaudi-a-pezzi`
+  (matrice 1..6, `--paralleli 3` sui quattro processori), `fail-fast:
+  false` perché un giro dica tutti i rossi insieme; il job `prove` è il
+  GIUDICE DEI PEZZI (`needs` su tutti e due, `!cancelled()`, verde solo
+  se entrambi `success`), così il giudice del VPS e `pronto` leggono lo
+  stesso nome di sempre. prove.py e collaudi stanno su macchine diverse:
+  fastapi fuori dalle prove è gratis. Il compileall gira nel solo pezzo
+  1. Tutti i job su `ubuntu-24.04`, nessuna variabile.
+- `segreti`: le due guardate della cronologia (ognuna rifà le patch di
+  3.821 commit) partono insieme in due sottoshell e il passo aspetta
+  tutte e due; i comandi sono quelli di prima, parola per parola.
+- La regola nuova (CLAUDE.md, Andrea): su develop si pusha SENZA suite
+  né collaudi; le prove le fa la CI alla promozione, e un rosso si fixa
+  dopo con un commit nuovo. Il collaudo sulla vm-2050 seguiva già
+  develop senza aspettare niente (`deploy/collaudo/segui.sh`), quindi
+  lato VM non cambia nulla.
+
+**SCARTATO.**
+- Più processi dentro UN job: avrebbe funzionato (cinque pezzi sulla
+  stessa macchina da 4 processori: 149 s invece di 658), ma undici
+  macchine danno più processori di una, e un pezzo rosso si vede per
+  nome nella pagina del giro.
+- Restare sulla VM coi pezzi: due processori, i pezzi si metterebbero in
+  fila.
+- La cronologia dei segreti a partire da `pronto` (molto più corta):
+  `pronto` a volte lo sposta Andrea a mano, e un commit mai guardato
+  passerebbe. Il parallelo dimezza senza cambiare cosa si guarda.
+- Cache di pip/npm: rimisurata, le installazioni durano ~15 s.
+
+**PROVATO.**
+- prove.py intero in fila, su questa macchina: 654 s di sezioni (658 s
+  in tutto), 32.093 prove. Gli stessi in cinque pezzi lanciati INSIEME
+  sulla stessa macchina (ognuno col suo TMPDIR): 2.941 + 7.304 + 7.364 +
+  7.497 + 6.987 = 32.093 passate, 0 fallite, in 149 s. Le cinque liste
+  di `--mostra` sono disgiunte e fanno 687.
+- Le sentinelle della CI aggiornate e verdi: `prove_runner_fisso`,
+  `prove_runner_vm` (la parte del workflow: tutti su GitHub, venv in
+  ogni job a pezzi; i file della VM restano provati finché il runner non
+  è smontato), `prove_collaudi_in_ci` (la catena collaudi → giudice →
+  semaforo), `prove_ci_solo_main`, `prove_ci_leggera`, `prove_node_fisso`;
+  e una nuova, `prove_ci_a_pezzi` (matrice = /N, la partizione in tutti e
+  due i lanciatori, il pezzo storto che esce col 2, i pesi di sezioni
+  che ci sono, il giudice dei pezzi). Sull'albero finale, di nuovo i
+  cinque pezzi insieme: 2.478 + 6.801 + 7.915 + 6.966 + 7.958 = 32.118
+  passate, 0 fallite, in 143 s.
+- I collaudi della CI in sei pezzi lanciati INSIEME su questa macchina
+  (uno alla volta per pezzo, col controllo dei segreti che girava
+  accanto): 30+30+30+30+29+29 = 178 verdi, 0 rossi, in 371 s.
+- Il passo dei segreti estratto dal workflow e girato con `bash -e` sul
+  repo intero (3.821 commit): «cronologia pulita» in 357 s con le due
+  guardate insieme, contro ~6 minuti l'una in fila; e con una nsec finta
+  infilata nella prima guardata esce rosso, dopo aver aspettato anche la
+  seconda.
+
+**DA GUARDARE** (DA-FARE-ANDREA, voce 36): al primo giro su main, che
+`pronto` si sposti (il commit tocca il workflow); i tempi veri dei
+pezzi; poi la variabile `RUNNER_PROVE` da cancellare e il runner della
+vm-2050 da spegnere e togliere da GitHub. Se un pezzo resta molto più
+lungo degli altri, si rimisurano i pesi (`PESI_PEZZI`). Se il repo
+tornasse privato, undici macchine costerebbero minuti: si riguarda
+questa voce.

@@ -1471,6 +1471,13 @@ il percorso si scrive per esteso: `/home/debian/nodo/mostro/mostro.db`.
   ogni altra modifica a `.github/workflows/` (una action aggiornata, un
   passo nuovo, una forma in più fra le `FORME` dei segreti): lì si
   guarda come sempre, e `pronto` si sposta a mano col via di Andrea.
+- ⚠️ DAL 27 NOV 2026 LA CI NON USA PIÙ LA VM-2050 (cantiere ci-a-pezzi;
+  CANTIERI, «La CI a pezzi»): il repo è pubblico, i runner di GitHub non
+  si pagano, e la CI gira in undici pezzi insieme su GitHub (~6 minuti
+  invece di ~39). La variabile `RUNNER_PROVE` non la legge più nessuno;
+  il runner sulla VM si spegne e si toglie da GitHub (DA-FARE-ANDREA,
+  voce 36). Il resto di questa voce resta per la storia e per il giorno
+  che il repo tornasse privato.
 - IL RUNNER DELLA CI SULLA VM-2050 (20 ott 2026, cantiere runner-vm;
   perché e limiti in CANTIERI, «Il runner della CI sulla vm-2050»). Il
   job `prove` di main può girare sulla VM di collaudo

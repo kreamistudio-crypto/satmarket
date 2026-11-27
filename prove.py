@@ -57588,25 +57588,34 @@ def prove_collaudi_senza_coincurve():
 
 
 def prove_collaudi_in_ci():
-    """I COLLAUDI IN CI (22 set 2026). Lo step che li gira sta nel job
-    `prove` — non in un job suo, perche' il giudice del VPS chiede il
-    verde di `prove` e `segreti` PER NOME, e un job terzo rosso non
-    fermerebbe nessun deploy. E la gabbia della rete si prova MORDERE,
-    non solo esistere: un sitecustomize che non si carica piu' lascia
-    passare tutto senza dire niente."""
+    """I COLLAUDI IN CI (22 set 2026). Il giudice del VPS chiede il verde
+    di `prove` e `segreti` PER NOME, e un job terzo rosso da solo non
+    fermerebbe nessun deploy: fino al 27 nov 2026 lo step stava DENTRO
+    `prove`. Dal 27 nov (cantiere ci-a-pezzi) i collaudi girano in sei
+    pezzi, nel job `collaudi-a-pezzi`, e `prove` e' il giudice dei pezzi:
+    lo aspetta (`needs`) ed e' verde solo se il risultato dei collaudi e'
+    `success`. Qui si tiene quella catena. E la gabbia della rete si
+    prova MORDERE, non solo esistere: un sitecustomize che non si carica
+    piu' lascia passare tutto senza dire niente."""
     print("\n[i collaudi in CI]")
     import subprocess
     import tempfile
     wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
-    job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    job = wf[wf.index("\n  collaudi-a-pezzi:"):wf.index("\n  prove:")]
+    giudice = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
     i = job.find("python collaudi_ci.py")
-    prova("lo step dei collaudi sta nel job `prove`", True, i > 0)
+    prova("lo step dei collaudi sta nel job dei pezzi dei collaudi", True, i > 0)
+    prova("...e `prove` li aspetta e chiede che siano verdi", [True, True, True],
+          ["needs: [prove-a-pezzi, collaudi-a-pezzi]" in giudice,
+           "COLLAUDI: ${{ needs.collaudi-a-pezzi.result }}" in giudice,
+           '[ "$COLLAUDI" != success ]' in giudice])
     # L'ELENCO STA IN ci/collaudi.txt (13 ott 2026): il passo dice solo
     # DOVE, con la riga esatta — vedi `prove_elenco_dei_collaudi`. Le
     # due opzioni in coda sono della CI leggera (16 ott 2026), e le
     # guarda `prove_ci_leggera`.
     prova("...e legge l'elenco dal suo file, fuori dal workflow",
-          "python collaudi_ci.py --elenco ci/collaudi.txt --paralleli 2 "
+          "python collaudi_ci.py --elenco ci/collaudi.txt "
+          "--pezzo ${{ matrix.pezzo }}/6 --paralleli 3 "
           "--salvo-solo-documenti-da pronto",
           job[i:job.find("\n", i)].strip() if i > 0 else None)
     elenco = _collaudi_della_ci()
@@ -57621,8 +57630,11 @@ def prove_collaudi_in_ci():
     # che si potesse leggere e non che dicesse il vero
     prova("...e c'e' la classifica, che stava nel solo compileall", True,
           "collaudo_classifica" in elenco)
-    prova("...e parla anche quando le prove sono rosse", True,
-          "!cancelled()" in job[job.rfind("- name:", 0, i):i])
+    # parla anche quando le prove sono rosse: e' un job suo, senza
+    # `needs`, e il giudice dei pezzi parla anche lui quando un pezzo e'
+    # rosso (`!cancelled()`), sennò resterebbe «skipped»
+    prova("...e parla anche quando le prove sono rosse", [False, True],
+          ["\n    needs:" in job, "if: ${{ !cancelled() }}" in giudice])
 
     # la gabbia, fatta girare: un nome che non esiste per costruzione
     # (.invalid non si risolve mai), quindi anche a gabbia rotta non
@@ -57805,32 +57817,132 @@ def prove_ci_solo_main():
           [False, False, False],
           ["pull_request" in senza_commenti, "schedule:" in senza_commenti,
            "branches-ignore" in senza_commenti])
-    lavori = _re.findall(r"(?m)^  ([a-z_]+):\n", senza_commenti.split("\njobs:\n", 1)[1])
-    prova("i tre lavori, coi nomi che il giudice del VPS chiede",
-          ["prove", "segreti", "pronto"], lavori)
+    lavori = _re.findall(r"(?m)^  ([a-z_-]+):\n", senza_commenti.split("\njobs:\n", 1)[1])
+    prova("i lavori, coi nomi che il giudice del VPS chiede (dal 27 nov anche i pezzi)",
+          ["prove-a-pezzi", "collaudi-a-pezzi", "prove", "segreti", "pronto"], lavori)
     job_pronto = wf[wf.index("\n  pronto:"):]
     prova("`pronto` si alza SOLO su un push a main: un giro a mano non lo sposta",
           1, job_pronto.count(
               "if: github.ref == 'refs/heads/main' && github.event_name == 'push'"))
     prima_di_pronto = wf[:wf.index("\n  pronto:")]
-    # L'UNICA ECCEZIONE (20 ott 2026, cantiere runner-vm): la riga
-    # `runs-on` di `prove` guarda il ramo per scegliere la MACCHINA (sui
-    # rami sempre GitHub), mai per saltare il job. Si toglie quella riga,
-    # esatta, e il resto deve restare senza condizioni come prima.
-    riga_macchina = "    runs-on: " + RUNS_ON_PROVE
-    resto = "\n".join(r for r in prima_di_pronto.splitlines()
-                      if not _re.fullmatch(riga_macchina, r))
+    # DAL 27 NOV 2026 (cantiere ci-a-pezzi) non c'e' piu' nemmeno la riga
+    # che sceglieva la macchina di `prove` guardando il ramo: tutti i job
+    # stanno su GitHub, e nessuno guarda ne' il ramo ne' l'evento. L'unica
+    # condizione prima di `pronto` e' il `!cancelled()` del giudice dei
+    # pezzi, che non guarda nessuno dei due.
     prova("...e prove e segreti non guardano ne' il ramo ne' l'evento: a mano provano tutto",
-          [False, False],
-          ["github.event_name" in resto, "github.ref ==" in resto])
-    prova("...salvo la riga che sceglie la macchina di `prove`, una e sola", 1,
-          sum(1 for r in prima_di_pronto.splitlines() if _re.fullmatch(riga_macchina, r)))
+          [False, False, False],
+          ["github.event_name" in prima_di_pronto, "github.ref ==" in prima_di_pronto,
+           "vars." in prima_di_pronto])
     prova("il salto dei soli documenti resta, contro `pronto`", 1,
           senza_commenti.count("--salvo-solo-documenti-da pronto"))
     claude = open("CLAUDE.md", encoding="utf-8").read().replace("\r\n", "\n")
-    prova("CLAUDE.md lo dice alle sessioni cloud", True,
-          "LE SESSIONI CLOUD NON ASPETTANO PIÙ LA CI SUL RAMO" in claude
-          and "la loro prova è suite e collaudi locali" in claude)
+    # e dal 27 nov 2026 (regola di Andrea) nemmeno le sessioni girano la
+    # suite prima di develop: le prove le fa la CI alla promozione
+    prova("CLAUDE.md lo dice alle sessioni", True,
+          "LE PROVE SI FANNO SOLO ALLA PROMOZIONE" in claude
+          and "SENZA SUITE NÉ COLLAUDI" in claude)
+
+
+def prove_ci_a_pezzi():
+    """LA CI A PEZZI (27 nov 2026, cantiere ci-a-pezzi, Andrea: «sistema la
+    questione delle CI troppo lente»). Le prove in cinque pezzi e i
+    collaudi in sei, undici macchine di GitHub insieme, e il job `prove`
+    giudice dei pezzi. Qui si tiene: (1) che il numero dei pezzi scritto
+    nel lanciatore sia quello della matrice — una matrice da 4 con un
+    `/5` lascerebbe un pezzo intero di sezioni MAI girato, verde; (2) che
+    la divisione sia una PARTIZIONE (ogni nome in un pezzo solo, nessuno
+    perso, l'ordine di partenza tenuto, la stessa su ogni macchina), in
+    prove.py e in collaudi_ci.py; (3) che un pezzo storto fermi tutto col
+    2; (4) che i pesi parlino di sezioni che ci sono; (5) che il giudice
+    dei pezzi aspetti tutti e due i job e chieda `success` a entrambi.
+    Il perche' e i numeri: docs/CANTIERI.md, «La CI a pezzi»."""
+    print("\n[la CI a pezzi]")
+    wf = open(os.path.join(".github", "workflows", "prove.yml"),
+              encoding="utf-8").read().replace("\r\n", "\n")
+    vivo = "\n".join(r for r in wf.splitlines() if not r.lstrip().startswith("#"))
+
+    def job(nome):
+        j = vivo[vivo.index(f"\n  {nome}:"):]
+        m = re.search(r"\n  [\w-]+:\n", j[3:])
+        return j if not m else j[:m.start() + 3]
+
+    for nome, lancio in (("prove-a-pezzi", r"run: python prove\.py --pezzo=\$\{\{ matrix\.pezzo \}\}/(\d+)\s*$"),
+                         ("collaudi-a-pezzi", r"run: python collaudi_ci\.py .*--pezzo \$\{\{ matrix\.pezzo \}\}/(\d+) .*$")):
+        j = job(nome)
+        matrice = re.search(r"(?m)^        pezzo: \[([0-9, ]+)\]\s*$", j)
+        voci = [int(x) for x in matrice.group(1).split(",")] if matrice else []
+        n = re.search(r"(?m)" + lancio, j)
+        prova(f"{nome}: la matrice e' 1..N e il lanciatore dice /N",
+              [True, True], [bool(voci) and voci == list(range(1, len(voci) + 1)),
+                             bool(n) and int(n.group(1)) == len(voci)])
+        prova(f"...piu' di un pezzo, e un rosso non ferma gli altri ({nome})", [True, True],
+              [len(voci) > 1, "fail-fast: false" in j])
+    giudice = job("prove")
+    prova("il giudice `prove` aspetta i due job a pezzi, parla anche sul rosso",
+          [True, True, False],
+          ["needs: [prove-a-pezzi, collaudi-a-pezzi]" in giudice,
+           "if: ${{ !cancelled() }}" in giudice, "always()" in giudice])
+    prova("...e chiede `success` a tutti e due", [True, True, True, True],
+          ["PROVE: ${{ needs.prove-a-pezzi.result }}" in giudice,
+           "COLLAUDI: ${{ needs.collaudi-a-pezzi.result }}" in giudice,
+           '[ "$PROVE" != success ]' in giudice, "exit 1" in giudice])
+    prova("...e `pronto` aspetta il giudice e i segreti, come prima", True,
+          "needs: [prove, segreti]" in job("pronto"))
+    prova("fastapi solo nei collaudi: prove.py gira senza", [False, True],
+          ["fastapi" in job("prove-a-pezzi"), "fastapi" in job("collaudi-a-pezzi")])
+    prova("il compileall gira una volta sola, nel primo pezzo", True,
+          bool(re.search(r"- name: Tutto compila\n        if: matrix\.pezzo == 1\n",
+                         job("prove-a-pezzi"))))
+
+    # LA PARTIZIONE, in prove.py
+    nomi = [f"prove_x{i}" for i in range(40)] + ["prove_p2p_motore", "prove_lingua_inglese"]
+    pesi = {"prove_x3": 50, "prove_x7": 20, "prove_x8": 20}
+    for n in (1, 2, 5, 7):
+        pezzi = [_il_mio_pezzo(nomi, k, n, pesi) for k in range(1, n + 1)]
+        tutti = [x for pz in pezzi for x in pz]
+        prova(f"prove.py, {n} pezzi: ognuno in un pezzo solo, nessuno perso, l'ordine tenuto",
+              [True, True, True],
+              [sorted(tutti) == sorted(nomi), len(tutti) == len(set(tutti)),
+               all(pz == [x for x in nomi if x in pz] for pz in pezzi)])
+    prova("...la stessa divisione a ogni giro", True,
+          _il_mio_pezzo(nomi, 2, 5, pesi) == _il_mio_pezzo(list(nomi), 2, 5, dict(pesi)))
+    prova("...la sezione piu' pesante va da sola nel primo pezzo", True,
+          "prove_x3" in _il_mio_pezzo(nomi, 1, 5, pesi))
+    prova("...piu' pezzi che sezioni: i pezzi in piu' restano vuoti", [["prove_x0"], []],
+          [_il_mio_pezzo(["prove_x0"], 1, 2), _il_mio_pezzo(["prove_x0"], 2, 2)])
+    prova("il pezzo dagli argomenti: =, spazio, e via dal resto",
+          [(2, 5, ["--mostra"]), (3, 3, []), (1, 1, ["--categoria=p2p"])],
+          [_togli_pezzo(["--pezzo=2/5", "--mostra"]), _togli_pezzo(["--pezzo", "3/3"]),
+           _togli_pezzo(["--categoria=p2p"])])
+    storti = []
+    for v in (["--pezzo=6/5"], ["--pezzo=0/5"], ["--pezzo=due"], ["--pezzo"], ["--pezzo=1/"]):
+        try:
+            _togli_pezzo(v)
+            storti.append(None)
+        except SystemExit as e:
+            storti.append(e.code)
+    prova("...un pezzo storto ferma col 2 (6/5, 0/5, due, vuoto, 1/)", [2] * 5, storti)
+    prova("i pesi parlano di sezioni che ci sono", [],
+          [n for n in PESI_PEZZI if not callable(globals().get(n))])
+
+    # LA PARTIZIONE, in collaudi_ci.py
+    amb = {"__file__": "collaudi_ci.py"}
+    exec(open("collaudi_ci.py", encoding="utf-8").read().split("\ndef racconta(")[0], amb)
+    tp, mio = amb.get("togli_pezzo"), amb.get("il_mio_pezzo")
+    prova("collaudi_ci.py ha il pezzo", [True, True], [callable(tp), callable(mio)])
+    if callable(tp) and callable(mio):
+        el = [f"collaudo_{i}" for i in range(17)]
+        pezzi = [mio(el, k, 6) for k in range(1, 7)]
+        tutti = [x for pz in pezzi for x in pz]
+        prova("...sei pezzi: ognuno in un pezzo solo, nessuno perso", [True, True],
+              [sorted(tutti) == sorted(el), len(tutti) == len(set(tutti))])
+        prova("...e l'opzione si legge ovunque stia, il resto resta com'e'",
+              [(2, 6, ["--elenco", "ci/collaudi.txt", "--paralleli", "3"]), (1, 1, ["collaudo_x"])],
+              [tp(["--elenco", "ci/collaudi.txt", "--pezzo", "2/6", "--paralleli", "3"]),
+               tp(["collaudo_x"])])
+        prova("...e una storta torna None (il lanciatore esce col 2)", [None] * 4,
+              [tp(["--pezzo", "7/6"]), tp(["--pezzo", "0/6"]), tp(["--pezzo"]), tp(["--pezzo", "x"])])
 
 
 def prove_ci_leggera():
@@ -57848,6 +57960,10 @@ def prove_ci_leggera():
     import tempfile
     wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
     testa = wf.split("\njobs:", 1)[0]
+    # dal 27 nov 2026 (ci-a-pezzi) le prove e i collaudi stanno nei job a
+    # pezzi, e `prove` e' il loro giudice
+    job_pezzi_prove = wf[wf.index("\n  prove-a-pezzi:"):wf.index("\n  collaudi-a-pezzi:")]
+    job_pezzi_collaudi = wf[wf.index("\n  collaudi-a-pezzi:"):wf.index("\n  prove:")]
     job_prove = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
     job_segreti = wf[wf.index("\n  segreti:"):wf.index("\n  pronto:")]
     job_pronto = wf[wf.index("\n  pronto:"):]
@@ -57861,13 +57977,15 @@ def prove_ci_leggera():
           _re.search(r"cancel-in-progress:\s*true", senza_commenti) is not None)
     # 2. I TETTI, uno per job
     prova("ogni job ha il suo tetto di minuti",
-          ["60", "15", "10"],
+          ["20", "20", "5", "15", "10"],
           [(_re.search(r"(?m)^    timeout-minutes: (\d+)\s*$", j) or [None, None])[1]
-           for j in (job_prove, job_segreti, job_pronto)])
+           for j in (job_pezzi_prove, job_pezzi_collaudi, job_prove,
+                     job_segreti, job_pronto)])
     # 3. IL SALTO DEI DOCUMENTI tocca SOLO i collaudi: prove.py e i
     # segreti girano interi a ogni giro, senza condizioni nuove
-    passo_prove = job_prove[job_prove.index("- name: Le prove\n"):]
-    passo_prove = passo_prove[:passo_prove.index("\n      - name:", 1)]
+    passo_prove = job_pezzi_prove[job_pezzi_prove.index("- name: Le prove\n"):]
+    fine = passo_prove.find("\n      - name:", 1)
+    passo_prove = passo_prove if fine < 0 else passo_prove[:fine]
     prova("il passo di prove.py resta senza condizioni: la scelta la fa "
           "prove.py da se' (ci-mirata, `_argomenti_della_ci`)",
           [False, True],
@@ -158336,19 +158454,17 @@ def prove_runner_fisso():
     # posto si guarda l'immagine del ripiego
     con_variabile = [(n, r) for n, r in runner
                      if re.fullmatch(RUNS_ON_PROVE, r)]
-    wf = open(os.path.join(cartella, "prove.yml"), encoding="utf-8").read()
-    job_prove = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
-    prova("la macchina da una variabile: UNA riga sola, quella del job `prove`",
-          [1, True], [len(con_variabile),
-                      re.search(r"(?m)^    runs-on: (.*?)\s*$", job_prove) is not None
-                      and re.fullmatch(RUNS_ON_PROVE, re.search(
-                          r"(?m)^    runs-on: (.*?)\s*$", job_prove)[1]) is not None])
+    # DAL 27 NOV 2026 (cantiere ci-a-pezzi) nessun job sceglie piu' la
+    # macchina da una variabile: il repo e' pubblico, GitHub non si paga,
+    # e i pezzi girano tutti sulle sue macchine
+    prova("nessun job sceglie la macchina da una variabile (dal 27 nov 2026)",
+          [0, []], [len(con_variabile), [r for _n, r in runner if "vars." in r]])
     immagini = [(n, re.fullmatch(RUNS_ON_PROVE, r)[1]
                  if re.fullmatch(RUNS_ON_PROVE, r) else r) for n, r in runner]
     prova("nessun runner e' un'etichetta mobile: tutti `ubuntu-NN.NN`", [],
           [r for r in immagini
            if not re.fullmatch(r"ubuntu-\d\d\.\d\d", r[1])])
-    prova("...e tutti i job girano sulla stessa immagine (per `prove`, il ripiego)", 1,
+    prova("...e tutti i job girano sulla stessa immagine", 1,
           len({r[1] for r in immagini}))
 
 
@@ -158371,33 +158487,37 @@ def prove_runner_vm():
     wf = open(os.path.join(".github", "workflows", "prove.yml"),
               encoding="utf-8").read().replace("\r\n", "\n")
     vivo = "\n".join(r for r in wf.splitlines() if not r.lstrip().startswith("#"))
-    job_prove = vivo[vivo.index("\n  prove:"):vivo.index("\n  segreti:")]
-    job_segreti = vivo[vivo.index("\n  segreti:"):vivo.index("\n  pronto:")]
-    job_pronto = vivo[vivo.index("\n  pronto:"):]
-    macchina = lambda j: (re.search(r"(?m)^    runs-on: (.*?)\s*$", j) or [None, None])[1]
-    prova("`prove`: su main la variabile, sennò e sui rami GitHub", True,
-          re.fullmatch(RUNS_ON_PROVE, macchina(job_prove) or "") is not None)
-    prova("`segreti` e `pronto` su GitHub col numero, mai la variabile", [True, True, False, False],
-          [bool(re.fullmatch(r"ubuntu-\d\d\.\d\d", macchina(job_segreti) or "")),
-           bool(re.fullmatch(r"ubuntu-\d\d\.\d\d", macchina(job_pronto) or "")),
-           "vars." in job_segreti, "vars." in job_pronto])
+    # DAL 27 NOV 2026 (cantiere ci-a-pezzi) nessun job gira piu' sulla
+    # vm-2050: il repo e' pubblico, GitHub non si paga, e undici pezzi in
+    # parallelo vanno piu' veloci di una VM da due processori. Si tiene
+    # che TUTTI i job stiano su GitHub col numero, e che i file della VM
+    # (sotto) restino sani finche' il runner non e' smontato.
+    macchine = re.findall(r"(?m)^    runs-on: (.*?)\s*$", vivo)
+    prova("tutti i job su GitHub col numero, nessuno dalla variabile", [True, False],
+          [len(macchine) >= 5 and all(re.fullmatch(r"ubuntu-\d\d\.\d\d", m) for m in macchine),
+           "vars." in vivo])
     prova("...e da nessuna parte un'etichetta della macchina nostra scritta a mano",
           [False, False], ["self-hosted" in vivo, "vm-2050" in vivo])
-    # L'AMBIENTE USA-E-GETTA: prima di ogni pip e di prove.py
-    passo = re.search(r"- name: Un ambiente usa-e-getta\n((?:        .*\n)+)", job_prove + "\n")
-    corpo = passo.group(1) if passo else ""
-    prova("il passo dell'ambiente usa-e-getta: venv, PATH e TMPDIR in $RUNNER_TEMP", [True, True, True, False],
-          ['python -m venv "$RUNNER_TEMP/venv"' in corpo,
-           'echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"' in corpo,
-           'echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"' in corpo,
-           "if:" in corpo])
-    dopo = [job_prove.find(s) for s in ("actions/setup-python@",)]
-    prima = [m.start() for m in re.finditer(r"pip install", job_prove)] \
-        + [job_prove.find("run: python prove.py")]
-    prova("...dopo setup-python e PRIMA di ogni pip e di prove.py", True,
-          bool(passo) and all(0 <= d < passo.start() for d in dopo)
-          and len(prima) >= 3 and all(passo.start() < p for p in prima))
-    prova("...una volta sola", 1, job_prove.count("- name: Un ambiente usa-e-getta"))
+    # L'AMBIENTE USA-E-GETTA: in ogni job a pezzi, prima di ogni pip e
+    # del lanciatore
+    for nome_job, lancio in (("prove-a-pezzi", "run: python prove.py"),
+                             ("collaudi-a-pezzi", "run: python collaudi_ci.py")):
+        job = vivo[vivo.index(f"\n  {nome_job}:"):]
+        job = job[:re.search(r"\n  [\w-]+:\n", job[3:]).start() + 3]
+        passo = re.search(r"- name: Un ambiente usa-e-getta\n((?:        .*\n)+)", job + "\n")
+        corpo = passo.group(1) if passo else ""
+        prova(f"{nome_job}: il passo dell'ambiente usa-e-getta: venv, PATH e TMPDIR in $RUNNER_TEMP",
+              [True, True, True, False],
+              ['python -m venv "$RUNNER_TEMP/venv"' in corpo,
+               'echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"' in corpo,
+               'echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"' in corpo,
+               "if:" in corpo])
+        dopo = [job.find("actions/setup-python@")]
+        prima = [m.start() for m in re.finditer(r"pip install", job)] + [job.find(lancio)]
+        prova(f"...dopo setup-python e PRIMA di ogni pip e del lanciatore ({nome_job})", True,
+              bool(passo) and all(0 <= d < passo.start() for d in dopo)
+              and len(prima) >= 2 and all(passo.start() < q for q in prima))
+        prova(f"...una volta sola ({nome_job})", 1, job.count("- name: Un ambiente usa-e-getta"))
 
     # I FILE DELLA VM
     cartella = os.path.join("deploy", "ci-vm")
@@ -158485,13 +158605,14 @@ def prove_node_fisso():
     print("\n[node della CI col numero]")
     wf = open(os.path.join(".github", "workflows", "prove.yml"),
               encoding="utf-8").read()
-    job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    # dal 27 nov 2026 (ci-a-pezzi) le prove girano nei pezzi
+    job = wf[wf.index("\n  prove-a-pezzi:"):wf.index("\n  collaudi-a-pezzi:")]
     righe = [r for r in job.splitlines() if not r.lstrip().startswith("#")]
     vivo = "\n".join(righe)
     passo = re.search(r"- uses: actions/setup-node@\S+.*\n"
                       r"((?:[ ]{8,}\S.*\n)+)", vivo)
     corpo = passo.group(1) if passo else ""
-    prova("il job `prove` mette node con setup-node", True, bool(passo))
+    prova("il job dei pezzi delle prove mette node con setup-node", True, bool(passo))
     prova("...a una versione col numero: N, N.N o N.N.N", True,
           bool(re.search(r'(?m)^\s+node-version: "\d+(\.\d+){0,2}"\s*$',
                          corpo)))
@@ -227229,7 +227350,7 @@ CATEGORIE = {
     npub_una_casa accesso_di_casa parole_che_avvisano leve relay_leva relay_di_barattolo posta_relay
     backup_prima_del_deploy backup_database_occupato sbirciata anteprime
     seo onion cookie_onion script_nel_workflow deploy giudice_deploy
-    collaudi_in_ci ci_leggera ci_solo_main elenco_dei_collaudi
+    collaudi_in_ci ci_leggera ci_solo_main ci_a_pezzi elenco_dei_collaudi
     collaudi_senza_coincurve servizio_non_root guardiano_ponte
     guardia_liquidita canale_admin gruppo_admin_coda deploy_nel_gruppo
     bussola tetto_claude_md novita_md conoscenza_tappo annotazioni_negli_ambienti nwc_cifratura
@@ -227614,6 +227735,72 @@ def _argomenti_della_ci(argv, env):
             and env.get("GITHUB_REF") == "refs/heads/main"):
         return ["--dai-file=origin/pronto"] + list(argv)
     return list(argv)
+
+
+# I PEZZI (27 nov 2026, cantiere ci-a-pezzi, richiesta di Andrea: «sistema
+# la questione delle CI troppo lente»). La CI divide le sezioni fra N
+# macchine di GitHub che girano INSIEME: `--pezzo=2/5` gira il secondo di
+# cinque pezzi delle sezioni GIA' scelte, divise coi pesi qui sotto, cosi'
+# ogni sezione sta in un pezzo solo e l'unione dei pezzi e' il giro intero.
+# Ogni pezzo e' un processo suo, con le sue PASSATE e FALLITE: il giudice
+# e' il job `prove` del workflow, che e' verde solo se lo sono tutti.
+# Senza l'opzione si gira tutto, come prima. Il perche' e i numeri:
+# docs/CANTIERI.md, «La CI a pezzi».
+def _togli_pezzo(argv):
+    """`--pezzo=K/N` (o `--pezzo K/N`) tolto da argv: torna (k, n, resto),
+    (1, 1, argv) senza. Esce col 2 se e' storto: un pezzo letto male
+    lascerebbe sezioni mai girate, e nessuno se ne accorgerebbe."""
+    resto, k, n = [], 1, 1
+    argv = list(argv)
+    while argv:
+        a = argv.pop(0)
+        if a == "--pezzo" or a.startswith("--pezzo="):
+            v = a.split("=", 1)[1] if "=" in a else (argv.pop(0) if argv else "")
+            m = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})", v)
+            if not m or not 1 <= int(m.group(1)) <= int(m.group(2)):
+                print(f"  pezzo storto: «{v}» (vuole K/N, con 1 <= K <= N)")
+                sys.exit(2)
+            k, n = int(m.group(1)), int(m.group(2))
+        else:
+            resto.append(a)
+    return k, n, resto
+
+
+# I PESI DEI PEZZI: le sezioni piu' lente, in secondi, misurate il 27 nov
+# 2026 su una macchina sola (giro intero 654 s). Le altre valgono mezzo
+# secondo. Con i pesi i pezzi si riempiono dal piu' leggero (il primo
+# libero prende la sezione piu' pesante rimasta), e cinque pezzi stanno
+# fra 121 e 137 s; a giro, senza pesi, uno ne avrebbe preso 266 per colpa
+# del solo motore P2P. Un peso vecchio sbilancia e basta: ogni sezione
+# gira comunque in un pezzo solo. Un nome che non c'e' piu' lo trova
+# `prove_categorie_delle_prove`.
+PESI_PEZZI = {
+    "prove_p2p_motore": 104, "prove_backup_prima_del_deploy": 30,
+    "prove_lingua_inglese": 22, "prove_banner_fee_personale": 22,
+    "prove_avviso_dm_nostr": 22, "prove_backup_database_occupato": 17,
+    "prove_contanti_a_mano": 12, "prove_lettore_negozi_in_tempo": 11,
+    "prove_annullo_in_disputa": 10, "prove_config_esempio": 10,
+    "prove_giro_guidato_p2p": 10, "prove_p2p_ascolto": 10,
+    "prove_certificati_relay": 10, "prove_relay_per_mostro": 9,
+    "prove_notifiche_telefono": 8, "prove_cartone_submarine": 8,
+    "prove_tor_chiavi_scambio": 7, "prove_stampa_e_salti": 7,
+    "prove_logout_apk": 7, "prove_canale_bot": 6,
+}
+
+
+def _il_mio_pezzo(nomi, k, n, pesi=None):
+    """I nomi del pezzo K di N, nell'ordine in cui stanno in `nomi`.
+    Ogni nome finisce in un pezzo solo e l'unione e' `nomi`: si scorre
+    dal piu' pesante e ognuno va al pezzo meno carico (a pari carico, il
+    numero piu' basso), quindi la scelta e' la stessa su ogni macchina."""
+    pesi = PESI_PEZZI if pesi is None else pesi
+    carico, di_chi = [0.0] * n, {}
+    for i, nome in sorted(enumerate(nomi),
+                          key=lambda x: (-pesi.get(x[1], 0.5), x[0])):
+        j = min(range(n), key=lambda q: (carico[q], q))
+        carico[j] += pesi.get(nome, 0.5)
+        di_chi[i] = j
+    return [nome for i, nome in enumerate(nomi) if di_chi[i] == k - 1]
 
 
 def _scelta_da_riga_di_comando(argv, tutte):
@@ -228320,7 +228507,7 @@ def main():
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci, prove_ci_leggera,
-              prove_ci_solo_main,
+              prove_ci_solo_main, prove_ci_a_pezzi,
               prove_elenco_dei_collaudi, prove_collaudi_senza_coincurve,
               prove_servizio_non_root,
               prove_guardiano_ponte,
@@ -228701,8 +228888,17 @@ def main():
               prove_promozioni,
               prove_chat_spunte,
               prove_categorie_delle_prove)
+    k_pezzo, n_pezzi, argomenti = _togli_pezzo(sys.argv[1:])
     sezioni, titolo = _scelta_da_riga_di_comando(
-        _argomenti_della_ci(sys.argv[1:], os.environ), tutte)
+        _argomenti_della_ci(argomenti, os.environ), tutte)
+    if n_pezzi > 1:
+        quante = len(tutte if sezioni is None else sezioni)
+        tra = list(tutte if sezioni is None else sezioni)
+        mie = set(_il_mio_pezzo([f.__name__ for f in tra], k_pezzo, n_pezzi))
+        sezioni = [f for f in tra if f.__name__ in mie]
+        titolo = f"{titolo}, pezzo {k_pezzo} di {n_pezzi}"
+        print(f"  🧩 pezzo {k_pezzo} di {n_pezzi}: {len(sezioni)} sezioni "
+              f"su {quante}")
     if "--mostra" in sys.argv[1:]:
         quali = tutte if sezioni is None else sezioni
         print(f"  Girerebbero {len(quali)} sezioni su {len(tutte)} ({titolo}):")
