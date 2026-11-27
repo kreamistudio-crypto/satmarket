@@ -30868,13 +30868,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`get_fiat_amount_requested`): fuori fascia risponde
   `OutOfRangeSatsAmount`. Su un ordine normale non si manda affatto —
   la cifra la mette lui dal libro.
-  ⚠️ IL RESTO DI UN INTERVALLO NON SI RIPUBBLICA, ed è dichiarato: il
-  figlio nasce solo se chi ha creato manda `Payload::NextTrade` (chiave
-  e indice del prossimo scambio) col rilascio, e senza quel pezzo
-  mostrod «salta il resto» invece di dare errore. Non si manda perché
-  farebbe nascere un ordine con una chiave che il client non sa ancora
-  governare. Il perché per esteso in CANTIERI, «Il foglio «Pubblica»
-  ridisegnato».
+  IL RESTO DI UN INTERVALLO TORNA NEL LIBRO (dal 27 nov 2026, leva
+  `P2P_RESTO_INTERVALLO` con la porticina `_SOLO_ADMIN`; fino ad allora
+  si chiudeva alla prima presa): il figlio nasce solo se chi ha creato
+  manda `Payload::NextTrade` (`{"next_trade": [pub, indice]}`) col
+  rilascio (ordine di vendita) o con `fiat-sent` (ordine di acquisto:
+  mostrod la tiene per il rilascio dell'altro); senza, mostrod «salta il
+  resto». Il resto è quello di `get_child_order`: stesso «Da», «Fino a»
+  meno la cifra presa, niente sotto il «Da», cifra unica se uguale. Il
+  telefono (`payloadRestoP2P`, dentro `chiamataOrdineP2P`) prenota
+  l'indice come una pubblicazione (mazzo e cloud prima del gesto,
+  `restoIndice` sulla riga: un «Riprova» manda la stessa chiave), registra
+  la chiave, e al rilascio (il mio, o quello dell'altro su un ordine
+  d'acquisto: `nasceRigaRestoP2P`) scrive la riga provvisoria `nuovo:N`
+  coi patti dell'ordine (`restoDi`) e la ascolta: il `new-order` di mostrod la rinomina, e se si
+  perde la rinomina l'adozione per indice. La riga di un figlio mai nato
+  se ne va un quarto d'ora dopo il rilascio (`togliRestiMancatiP2P`).
+  I capi della presa si ricordano in `fasciaMin`/`fasciaMax`, perché
+  `euro` collassa sulla cifra scelta. On-chain lo fa il server a scambio
+  `rilasciato` (`_p2p_onchain_resto_nel_libro`, che riusa
+  `_p2p_onchain_rinasci` col parametro `resto`). Il perché in CANTIERI,
+  «Il resto dell'intervallo torna nel libro».
   Fail-closed: nel dubbio si omette, e chi aveva
   bisogno dell'id lo sente da una porta che si chiude A VOCE
   (`chiamataOrdineP2P` alza invece di spedire un messaggio che verrebbe

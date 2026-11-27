@@ -78940,6 +78940,10 @@ let myP2POnchain = false;
 /* ...e gli ordini P2P in USDT (1 nov 2026, cantiere p2p-usdt): il cancello
    del server, `p2p_usdt` di /api/me. Vedi il blocco «GLI ORDINI IN USDT». */
 let myP2PUsdt = false;
+/* ...e il resto dell'intervallo che torna nel libro (27 nov 2026):
+   `p2p_resto_intervallo` di /api/me, la leva P2P_RESTO_INTERVALLO con la
+   sua porticina. Vedi «IL RESTO DELL'INTERVALLO TORNA NEL LIBRO». */
+let myP2PResto = false;
 /* ...e gli ordini P2P in franchi svizzeri (14 nov 2026, cantiere p2p-chf):
    `p2p_chf` di /api/me. Vedi il blocco «I FRANCHI SVIZZERI». */
 let myP2PChf = false;
@@ -91614,7 +91618,7 @@ function allineaContoP2P(){
    lo riceve, che rilegge il mazzo prima di scrivere. */
 function azzeraSessioneP2P(){
   p2pRegistrato = false; p2pAdozione = false; p2pPavimento = null;
-  p2pMieiOrdini = null; p2pMieiChiesto = false;
+  p2pMieiOrdini = null; p2pMieiChiesto = false; p2pMieiQuando = 0;
   p2pChiaviNote = null; p2pChiaviGiro = null;
   mazzoNuvola = ''; mazzoNuvolaAltro = null;
   p2pOrdiniRegistrati = new Set(); p2pStatoChiesto = false; p2pAutoTentati = {};
@@ -95680,6 +95684,7 @@ function ordiniUdibiliP2P(){
    prima di rispondere. La scrive renderP2P, una volta per sessione. */
 let p2pPavimento = null;
 let p2pMieiOrdini = null;      // {id: {indice, stato}} — null = mai chiesto
+let p2pMieiQuando = 0;         // ...e quando la restore ha risposto (27 nov 2026, il resto)
 let p2pMieiGiro = null;        // la promessa in volo
 /* la cintura del 9 set 2026: si e' gia' TENTATO in questa sessione.
    E' un'altra cosa da «si sa la risposta» — un giro caduto lascia
@@ -96050,6 +96055,7 @@ async function chiediMieiOrdiniP2P(){
       return p2pMieiOrdini;
     }
     p2pMieiOrdini = trovati;
+    p2pMieiQuando = Math.floor(Date.now() / 1000);
     diarioP2P('restore: ' + Object.keys(trovati).map(k => k.slice(0, 8) + '='
               + trovati[k].stato).join(' ') + ' (identita\' chieste: ' + esiti.length + ')');
     console.log('🔁 [p2p] i miei ordini: ' + Object.keys(trovati).length
@@ -96477,6 +96483,16 @@ function avanzaOrdineP2P(ordine, azione, payload){
        della sua risposta. Senza questa riga la pagina dello scambio
        continuerebbe a mostrare «20–100 €» su uno scambio che vale 30. */
     const quantoCoin = (typeof valutaCoinP2P === 'function' && valutaCoinP2P(o.fiat)) ? o.euro : null;
+    /* ...MA I DUE CAPI SI RICORDANO (27 nov 2026, il resto dell'intervallo):
+       servono al rilascio, per sapere se e quanto resto torna nel libro
+       (`restoIntervalloP2P`). Prima quelli del filo — il coordinatore li
+       porta sull'ordine preso, ed e' la sua regola a fare il figlio — e se
+       mancano quelli della riga. Una volta sola: la prima presa li dice. */
+    if (!(o.fasciaMax > 0) && quantoCoin === null) {
+      const lo = Math.floor(Number(ord.min_amount) || 0) || Math.floor(Number(o.euro) || 0);
+      const hi = Math.floor(Number(ord.max_amount) || 0) || Math.floor(Number(o.euroMax) || 0);
+      if (lo > 0 && hi > lo) { o.fasciaMin = lo; o.fasciaMax = hi; }
+    }
     if (Number(ord.fiat_amount) > 0) { o.euro = Number(ord.fiat_amount); o.euroMax = 0; }
     const pm = ord.payment_method;
     if (Array.isArray(pm)) o.metodi = pm.map(String).filter(Boolean);
@@ -97841,6 +97857,12 @@ function applicaMessaggioP2P(ord, dentro){
        aperture (vedi `intestaOrdiniP2P`) */
     intestaOrdiniP2P([nuovo.id], true).catch(() => {});
   } else scriviOrdineP2P(nuovo);
+  /* IL RESTO DI UN MIO ORDINE D'ACQUISTO (27 nov 2026): la chiave e' partita
+     con «Ho inviato», e il figlio nasce adesso che l'altro ha liberato */
+  if (nuovo.restoIndice > 0 && nuovo.stato !== prima
+      && (nuovo.stato === 'rilasciato' || nuovo.stato === 'concluso')
+      && typeof nasceRigaRestoP2P === 'function')
+    nasceRigaRestoP2P(nuovo).catch(() => {});
   /* IL RITIRATO VA SOTTO «ANNULLATI» (26 set 2026, decisione di Andrea
      che rovescia il «ritirato = sparito» di set 2026): la riga resta,
      la card esce subito dal libro (`archiviaRitiratoP2P`), e la notizia
@@ -100459,6 +100481,136 @@ function payloadPresaP2P(riga, scelta, metodo, sulMetodo){
 /* la chiamata di uno scambio gia' preso: la chiave si deriva al volo
    dal profilo, l'indice si manda solo dove il coordinatore lo valida
    (prendere e creare un ordine) */
+/* ═══ IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026) ═══════════
+   Andrea: «se l'ordine da 10.000 euro e uno ti compra 10 euro... c'e' un
+   altro 9.990 euro di liquidita' disponibili». mostrod lo sa gia' fare
+   (`handle_child_order` di release.rs): a scambio concluso rimette nel
+   libro un ordine FIGLIO con lo stesso «Da» e il «Fino a» abbassato della
+   cifra presa — sotto il «Da» niente, uguale al «Da» a cifra unica — MA
+   solo se chi ha pubblicato gli da' la chiave del prossimo scambio
+   (`NextTrade`): col rilascio se l'ordine era di vendita, con «Ho inviato»
+   se era di acquisto (fiat_sent.rs la tiene per il rilascio dell'altro).
+   Senza, «salta il resto». Fino a oggi non la si mandava, ed era scritto
+   (vedi «L'INTERVALLO SI CHIUDE ALLA PRIMA PRESA»): il figlio sarebbe nato
+   con una chiave che la pagina non sapeva governare. Da settembre la sa
+   governare — l'adozione ricostruisce dalla restore e dal libro la riga
+   di un mio ordine che qui non c'e' (`adottaOrdiniAltroveP2P`) — e questo
+   blocco fa il resto:
+   • l'indice si PRENOTA come in `inviaNuovoOrdineP2P` (mazzo e cloud
+     scritti PRIMA che parta qualcosa: l'indice conta le chiavi bruciate),
+     e si ricorda sulla riga dello scambio (`restoIndice`): un «Riprova»
+     manda la STESSA chiave, mai una seconda;
+   • nasce la riga provvisoria `nuovo:N` coi patti dell'ordine (metodi,
+     premio, zona, filtro, tempo per pagare, paracadute, ripubblica), cosi'
+     il messaggio `new-order` che mostrod manda alla chiave nuova la trova
+     e la rinomina (`applicaMessaggioP2P`), e col nome vero si intesta al
+     server come un ordine pubblicato a mano;
+   • se quel messaggio si perde, la rinomina la fa l'adozione per indice;
+     se il figlio non nasce, la riga provvisoria se ne va da sola
+     (`togliRestiMancatiP2P`).
+   Solo dove l'intervallo c'e': la riga e' MIA, aveva due capi, e non e'
+   in una moneta ne' Barattozon. Dietro la leva del server (`myP2PResto`). */
+const P2P_RESTO_ATTESA_S = 15 * 60;
+function restoIntervalloP2P(o, azione){
+  if (!o || !o.mio) return null;
+  if (!((azione === 'release' && o.lato === 'vendo') || (azione === 'fiat-sent' && o.lato === 'compro')))
+    return null;
+  if (o.tabacchino) return null;
+  if (typeof valutaCoinP2P === 'function' && valutaCoinP2P(o.fiat)) return null;
+  const lo = Math.floor(Number(o.fasciaMin) || 0);
+  const hi = Math.floor(Number(o.fasciaMax) || 0);
+  const preso = Math.floor(Number(o.euro) || 0);
+  if (!(lo > 0 && hi > lo) || !(preso >= lo && preso <= hi)) return null;
+  const resto = hi - preso;
+  if (resto < lo) return null;
+  return {min: lo, max: resto};
+}
+async function payloadRestoP2P(o, azione, mz){
+  if (!myP2PResto || !mz) return null;
+  const r = restoIntervalloP2P(o, azione);
+  if (!r) return null;
+  const NT = window.NostrTools;
+  if (!NT || !NT.schnorr) return null;
+  /* solo col mazzo VIVO: e' lui a contare gli indici. Lo scambio di un
+     profilo in pensione si chiude come prima, senza resto */
+  const vivo = mazzoMostro();
+  if (!vivo || vivo.sk !== mz.sk) return null;
+  let indice = o.restoIndice | 0;
+  if (!(indice > 0)) {
+    indice = (Number(vivo.indice) || 0) + 1;
+    ricordaMazzo(Object.assign({}, vivo, {indice: indice}));
+    await cloudScrivi(CLOUD_MAZZO, mazzoSerializza(mazzoMostro()));
+  }
+  const agg = ordiniP2P()[o.id] || o;
+  Object.assign(agg, {restoIndice: indice, restoMin: r.min, restoMax: r.max});
+  scriviOrdineP2P(agg);
+  Object.assign(o, {restoIndice: indice, restoMin: r.min, restoMax: r.max});
+  const tk = chiaveScambio(vivo.sk, indice);
+  /* la chiave nuova al server (gli avvisi) PRIMA del gesto; la riga e
+     l'orecchio subito se il figlio nasce adesso (il mio rilascio), sennò
+     quando l'altro libera i sats (vedi `nasceRigaRestoP2P`) */
+  registraChiaviP2P([tk.pub]).catch(() => {});
+  if (azione === 'release') await nasceRigaRestoP2P(agg);
+  return {next_trade: [tk.pub, indice]};
+}
+/* LA RIGA PROVVISORIA DEL RESTO, coi patti dell'ordine: nasce al MIO
+   rilascio (ordine di vendita) o, se l'ordine era d'acquisto, quando la
+   riga dello scambio arriva a «rilasciato» (`applicaMessaggioP2P`): prima
+   direbbe «Sto pubblicando l'ordine…» per tutto il tempo in cui l'altro
+   controlla gli euro. Una volta sola per indice. */
+async function nasceRigaRestoP2P(o){
+  const indice = o ? (o.restoIndice | 0) : 0;
+  const vivo = mazzoMostro();
+  if (!(indice > 0) || !vivo || !(o.restoMin > 0)) return false;
+  const tutti = ordiniP2P();
+  if (Object.keys(tutti).some(k => tutti[k] && tutti[k].mio && (tutti[k].indice | 0) === indice)) return false;
+  const tk = chiaveScambio(vivo.sk, indice);
+  const adesso = Math.floor(Date.now() / 1000);
+  const figlio = {
+    id: nomeProvvisorioP2P(indice), lato: o.lato, indice: indice, pubTrade: tk.pub, mio: true,
+    stato: 'pubblico', euro: o.restoMin, euroMax: o.restoMax > o.restoMin ? o.restoMax : 0,
+    sats: 0, satsNetti: 0, importoScelto: 0, fiat: o.fiat,
+    metodi: (o.metodi || []).slice(), premium: o.premium || 0, peer: '',
+    hold: null, contattato: true, cantDo: '', errore: '', votabile: false,
+    creato: adesso, aggiornato: adesso, restoDi: String(o.id)
+  };
+  for (const k of ['zona', 'filtro', 'minutiPagare', 'paracadute', 'ripubblica'])
+    if (o[k]) figlio[k] = o[k];
+  scriviOrdineP2P(figlio);
+  diarioP2P('resto ' + String(o.id).slice(0, 8) + ': ' + o.restoMin + '–' + o.restoMax
+            + ' torna nel libro con l\'indice ' + indice);
+  /* l'orecchio sulla chiave nuova: il `new-order` del figlio arriva su di lei */
+  try { await mostroRiascolta(); } catch(e) {}
+  return true;
+}
+/* LA RIGA PROVVISORIA DI UN RESTO CHE NON E' NATO si toglie: lo scambio
+   da cui veniva e' passato dal rilascio (o e' finito annullato), e la
+   restore fatta almeno un quarto d'ora dopo non conosce il suo indice,
+   cioe' mostrod non ha fatto il figlio. Prima del rilascio si aspetta
+   sempre: con «Ho inviato» di chi compra il figlio nasce solo quando
+   l'altro libera i sats, magari ore dopo. Resta un ricordo nel diario.
+   Toglie con `cancellaRigaP2P`, la porta di sempre. */
+const P2P_RESTO_DOPO = ['rilasciato', 'pagamento_ritentato', 'concluso', 'annullato', 'rifiutato'];
+function togliRestiMancatiP2P(mieiOrdini, quando){
+  if (!mieiOrdini || !(quando > 0)) return 0;
+  const noti = new Set(Object.keys(mieiOrdini).map(k => (mieiOrdini[k] && mieiOrdini[k].indice) | 0));
+  const tutti = ordiniP2P();
+  let tolti = 0;
+  for (const k of Object.keys(tutti)) {
+    const p = tutti[k];
+    if (!p || !p.restoDi || !provvisorioP2P(k)) continue;
+    if (noti.has(p.indice | 0)) continue;
+    const padre = tutti[p.restoDi];
+    if (padre && P2P_RESTO_DOPO.indexOf(padre.stato) < 0) continue;
+    const da = Math.max(Number(p.creato) || 0, padre ? (Number(padre.ultimaMossa || padre.aggiornato) || 0) : 0);
+    if (quando < da + P2P_RESTO_ATTESA_S) continue;
+    if (!cancellaRigaP2P(k)) continue;
+    tolti++;
+    diarioP2P('resto ' + String(p.restoDi).slice(0, 8) + ': il figlio (indice ' + (p.indice | 0)
+              + ') non e\' nato, la riga provvisoria si toglie');
+  }
+  return tolti;
+}
 async function chiamataOrdineP2P(o, azione, payload){
   let mz = mazzoMostro();
   if (!mz) throw new Error('Il profilo di scambio non si trova');
@@ -100497,6 +100649,13 @@ async function chiamataOrdineP2P(o, azione, payload){
   const reput = !!(NT && NT.schnorr) && o.indice > 0;
   const conIndice = (azione === 'take-sell' || azione === 'take-buy' || azione === 'new-order');
   const tk = chiaveScambio(mz.sk, o.indice);
+  /* IL RESTO DELL'INTERVALLO (27 nov 2026): col rilascio o con «Ho inviato»
+     di chi ha pubblicato, la chiave del prossimo scambio. Fail-open: se
+     qui qualcosa va storto il gesto parte come prima, senza resto */
+  if (!payload && (azione === 'release' || azione === 'fiat-sent')) {
+    try { payload = await payloadRestoP2P(o, azione, mz); }
+    catch(e) { payload = null; diarioP2P('resto ' + String(o.id).slice(0, 8) + ': saltato (' + (e && e.message || e) + ')'); }
+  }
   const msg = messaggioMostro(azione, {
     requestId: nuovaRichiestaP2P(),
     indice: (reput && conIndice) ? o.indice : null,
@@ -103832,16 +103991,15 @@ async function mossaOrdineP2P(id, azione, fatto, sto){
    • `check_range_order_limits` vuole `min < max` e `amount` a ZERO.
      Quindi un intervallo NON puo' fissare i sats, e col prezzo fisso
      il secondo campo dell'importo sparisce.
-   ⚠️ L'INTERVALLO SI CHIUDE ALLA PRIMA PRESA, ed e' un limite
-   DICHIARATO e non un difetto: il resto di un range si ripubblica
-   solo se chi ha creato manda `NextTrade` (chiave e indice del
-   prossimo scambio) insieme al rilascio, e mostrod senza quel pezzo
+   ⚠️ L'INTERVALLO SI CHIUDEVA ALLA PRIMA PRESA: il resto di un range si
+   ripubblica solo se chi ha creato manda `NextTrade` (chiave e indice
+   del prossimo scambio) insieme al rilascio, e mostrod senza quel pezzo
    «salta il resto» invece di dare errore (`release.rs`: handle_child_order
-   failed → skipping remainder). Mandarlo vorrebbe dire far nascere un
-   ordine FIGLIO con una chiave che questa pagina non sa ancora
-   governare, cioe' rifare il difetto degli «ordini ingovernabili»
-   appena chiuso. Si dice a chi pubblica, e il pezzo mancante ha il suo
-   cantiere. */
+   failed → skipping remainder). Mandarlo voleva dire far nascere un
+   ordine FIGLIO con una chiave che questa pagina non sapeva ancora
+   governare (gli «ordini ingovernabili» di set 2026). DAL 27 NOV 2026 SI
+   MANDA, dietro la leva: vedi «IL RESTO DELL'INTERVALLO TORNA NEL LIBRO»,
+   accanto a `chiamataOrdineP2P`. */
 
 /* LE VALUTE, e per ora ce n'e' una. La lista sta qui e non dentro il
    render perche' aggiungerne una — USDT, il giorno che il
@@ -110716,6 +110874,7 @@ function renderNuovoOrdineP2P(){
            (26 nov 2026) — tiene l'id della nota, che il primo tocco svela */
         : obbl
         ? '<div class="p2p-spinta-intervallo" id="p2pNuovoNotaDue">' + esc(P2P_SPINTA_INTERVALLO)
+          + (myP2PResto ? '<small class="p2p-spinta-fissa">' + esc(P2P_RESTO_TESTO) + '</small>' : '')
           + '<small class="p2p-spinta-fissa">' + esc(P2P_INTERVALLO_FISSA) + '</small></div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
@@ -112906,6 +113065,10 @@ const P2P_MINIMO_INTERVALLO = 10;
 const P2P_SPINTA_INTERVALLO = '💡 Più ampio è l\'intervallo, più spesso il tuo ordine viene preso.';
 /* ...e la cifra fissa, detta sotto (card di Andrea «Una riga nella scatola») */
 const P2P_INTERVALLO_FISSA = 'Per una cifra fissa, scrivi lo stesso numero nei due campi.';
+/* ...e il resto che torna nel libro (27 nov 2026, card di Andrea «Il resto
+   torna nel libro»): sotto la spinta, solo a chi la leva vale
+   (`myP2PResto`), Lightning e on-chain */
+const P2P_RESTO_TESTO = 'Se ne prendono solo una parte, il resto torna da solo nel libro.';
 function intervalloObbligatorioP2P(){
   if (p2pNuovoFisso) return false;
   if (tabacchinoP2P(p2pNuovoMetodi)) return false;
@@ -116714,6 +116877,10 @@ function adottaOrdiniAltroveP2P(locali){
   /* la controparte puo' essere arrivata da qui, senza il messaggio del
      coordinatore: il metodo scelto riparte se non e' ancora partito
      (13 nov 2026, vedi «LA SCELTA RIPARTE FINCHE' NON E' ARRIVATA») */
+  /* la riga provvisoria di un resto che mostrod non ha fatto nascere se ne
+     va (27 nov 2026, vedi «IL RESTO DELL'INTERVALLO») */
+  if (typeof togliRestiMancatiP2P === 'function')
+    nati += togliRestiMancatiP2P(p2pMieiOrdini, p2pMieiQuando);
   if (typeof pianificaMetodiP2P === 'function') pianificaMetodiP2P();
   return nati;
 }
@@ -127412,6 +127579,8 @@ async function avvia(){
     myP2POnchain = !!me.p2p_onchain;
     /* ...e gli ordini in USDT (1 nov 2026) */
     myP2PUsdt = !!me.p2p_usdt;
+    /* ...e il resto dell'intervallo che torna nel libro (27 nov 2026) */
+    myP2PResto = !!me.p2p_resto_intervallo;
     /* ...e quelli in franchi (14 nov 2026, cantiere p2p-chf) */
     myP2PChf = !!me.p2p_chf;
     myP2POnchainUsdt = !!me.p2p_onchain_usdt;

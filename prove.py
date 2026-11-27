@@ -95096,7 +95096,9 @@ def prove_p2p_campanello():
     # delle 12 parole, come la gamba dell'app
     # TREDICI dal 27 nov 2026 («bunker-dopo-chiusura»): il profilo che nasce
     # per le chat di un nativo Nostr registra la sua pubblica, come il gesto
-    prova("i chiamanti di registraChiaviP2P sono tredici", 13, len(_reg))
+    # QUATTORDICI dal 27 nov 2026 («resto-intervallo»): la trade key del
+    # resto che torna nel libro, come quella di un ordine pubblicato a mano
+    prova("i chiamanti di registraChiaviP2P sono quattordici", 14, len(_reg))
     for _arg in _reg:
         prova(f"...e `{_arg}` non e' una chiave della chat", True,
               not any(s in _arg.lower() for s in ("conv", "firma", "chat")))
@@ -200649,7 +200651,7 @@ def prove_intervallo_onchain():
     prova("...e un ordine a cifra unica rinasce con la sua cifra, senza capi",
           [4500, 0, 0], [n2["euro_cent"], n2["fascia_min_cent"], n2["fascia_max_cent"]])
     rotto = pezzo("_p2p_onchain_rinasci").replace(
-        "capi[1] if capi else int(o[\"euro_cent\"])", "int(o[\"euro_cent\"])", 1)
+        "capi[1] if capi else cifra", "cifra", 1)
     amb4 = dict(amb3)
     exec(rotto, amb4)
     nid3 = amb4["_p2p_onchain_rinasci"](con, riga(), 100000)
@@ -200738,6 +200740,280 @@ def prove_intervallo_onchain():
            mini.count("if (!tabOc && !bzOcCompro && !campi.fisso && !vcP && interoP2P(campi.euroMax).n > interoP2P(campi.euro).n\n"
                       "      && typeof intervalloOcAccesoP2P === 'function' && intervalloOcAccesoP2P()) {\n"
                       "    corpo.euro_min_cent = interoP2P(campi.euro).n * 100;")])
+
+
+def prove_resto_intervallo():
+    """IL RESTO DELL'INTERVALLO TORNA NEL LIBRO (27 nov 2026, cantiere
+    resto-intervallo, Andrea: «se l'ordine da 10.000 euro e uno ti compra
+    10 euro... c'e' un altro 9.990 euro di liquidita' disponibili»). Il
+    server: la regola del resto (quella di mostrod), la leva con la
+    porticina dei moderatori, il resto on-chain a scambio rilasciato sul
+    database. Il telefono: la chiave del prossimo scambio col rilascio o
+    con «Ho inviato» di chi ha pubblicato, l'indice prenotato una volta,
+    la riga provvisoria coi patti, il messaggio canonico, la riga che se
+    ne va se il figlio non nasce, la scritta nella scatola. Con le
+    controprove."""
+    print("\n[Il resto dell'intervallo torna nel libro]")
+    import sqlite3
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read().replace("\r\n", "\n")
+    # --- la regola del resto ---
+    amb = {}
+    exec(pezzo("p2p_resto_intervallo_capi"), amb)
+    C = amb["p2p_resto_intervallo_capi"]
+    prova("il resto: 10–10.000 preso 10 → 10–9.990; 10–100 preso 20 → 10–80; preso 90 → "
+          "cifra unica 10; preso 95 → niente; a cifra unica, fuori fascia o storto → niente",
+          [(10, 9990), (10, 80), (10, 10), (), (), (), (), (), ()],
+          [C(10, 10000, 10), C(10, 100, 20), C(10, 100, 90), C(10, 100, 95),
+           C(0, 100, 20), C(10, 100, 101), C(10, 100, 5), C(10, "cento", 20), C(10, 100, True)])
+    rottoC = pezzo("p2p_resto_intervallo_capi").replace("if resto >= lo else ()", "if resto > 0 else ()", 1)
+    ambC = {}
+    exec(rottoC, ambC)
+    prova("controprova: senza il «sotto il Da niente» un resto di 5 € su un «Da» di 10 tornerebbe",
+          [True, (10, 5)], [rottoC != pezzo("p2p_resto_intervallo_capi"),
+                            ambC["p2p_resto_intervallo_capi"](10, 100, 95)])
+    # --- la leva ---
+    prova("la leva: accesa di serie, porticina dei moderatori chiusa di serie, una riga storta "
+          "resta chiusa, nel pannello e in /api/me",
+          [True, True, True, True, True],
+          ["except ImportError:\n    P2P_RESTO_INTERVALLO = True\n" in src,
+           "except ImportError:\n    P2P_RESTO_INTERVALLO_SOLO_ADMIN = True\n" in src,
+           "P2P_RESTO_INTERVALLO_SOLO_ADMIN = P2P_RESTO_INTERVALLO_SOLO_ADMIN is not False" in src,
+           '"P2P_RESTO_INTERVALLO", P2P_RESTO_INTERVALLO,' in src
+           and '"P2P_RESTO_INTERVALLO_SOLO_ADMIN",' in src,
+           'profilo["p2p_resto_intervallo"] = p2p_resto_intervallo_per(user["id"])' in src])
+    ambL = {"e_admin": lambda t: t == 999, "P2P_RESTO_INTERVALLO": True,
+            "P2P_RESTO_INTERVALLO_SOLO_ADMIN": True}
+    exec(pezzo("p2p_resto_intervallo_per"), ambL)
+    L = ambL["p2p_resto_intervallo_per"]
+    a = [L(999), L(111), L(0), L("x")]
+    ambL["P2P_RESTO_INTERVALLO_SOLO_ADMIN"] = False
+    a += [L(111)]
+    ambL["P2P_RESTO_INTERVALLO"] = False
+    a += [L(999)]
+    prova("per persona: a porticina chiusa solo il moderatore, aperta tutti, leva spenta nessuno",
+          [True, False, False, False, True, False], a)
+    # --- on-chain, sul database ---
+    amb3 = {"json": json, "sqlite3": sqlite3, "time": time, "secrets": __import__("secrets"),
+            "cambio_noto_ora": lambda *a: 60000.0, "_cambio_cache": {"quando": 777},
+            "print": lambda *a, **k: None}
+    for nome in ("P2P_ONCHAIN_PREFISSO", "P2P_ONCHAIN_ORE_LIBRO", "P2P_ONCHAIN_ORE_DEPOSITO",
+                 "P2P_ONCHAIN_TAB_MARGINE_S"):
+        j = src.index(f"\n{nome} = ") + 1
+        exec(src[j:src.index("\n", j)].split("  #")[0], amb3)
+    for f in ("_p2p_onchain_campo", "_p2p_onchain_mercato", "p2p_onchain_scade_libro",
+              "p2p_onchain_intervallo", "p2p_resto_intervallo_capi", "p2p_onchain_capi_resto",
+              "_p2p_onchain_rinasci"):
+        exec(pezzo(f), amb3)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    i = src.index("CREATE TABLE IF NOT EXISTS p2p_onchain_ordini(")
+    con.execute(src[i:src.index('aggiornato INTEGER NOT NULL)"""', i)] + "aggiornato INTEGER NOT NULL)")
+    k = src.index("PRAGMA table_info(p2p_onchain_ordini)")
+    a = src.index("for col, tipo in (", k) + len("for col, tipo in ")
+    for col, tipo in eval(src[a:src.index(":\n        if col not in gia:", a)]):
+        con.execute(f"ALTER TABLE p2p_onchain_ordini ADD COLUMN {col} {tipo}")
+    con.execute("CREATE TABLE onchain_xpub(tg_id INTEGER)")
+    con.execute("INSERT INTO onchain_xpub VALUES(111)")
+
+    def riga(**kw):
+        d = {"ordine": "bar-onchain-resto" + str(next(_NOMI_FINTI)), "lato": "sell", "maker_id": 111,
+             "taker_id": 222, "prezzo_sats": 50000, "euro_cent": 2000, "metodi": '["Revolut"]',
+             "recapito": "IT60", "stato": "rilasciato", "scade": 10, "creato": 1, "aggiornato": 1,
+             "prezzo_tipo": "mercato", "premio": 2, "fascia_min_cent": 1000,
+             "fascia_max_cent": 10000, "zona": "Milano"}
+        d.update(kw)
+        cur = con.execute(f"INSERT INTO p2p_onchain_ordini({','.join(d)}) VALUES("
+                          f"{','.join('?' * len(d))})", list(d.values()))
+        return con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (cur.lastrowid,)).fetchone()
+    CR = amb3["p2p_onchain_capi_resto"]
+    prova("i capi del resto on-chain: rilasciato 10–100 € preso 20 → 10–80; preso 90 → 10; "
+          "non rilasciato, col PayCode, Barattozon, a prezzo fisso o a cifra unica → niente",
+          [(1000, 8000), (1000, 1000), (), (), (), (), ()],
+          [CR(riga()), CR(riga(euro_cent=9000)), CR(riga(stato="annullato")),
+           CR(riga(paycode='{"scade": 9}')), CR(riga(tab_min_cent=2500)),
+           CR(riga(prezzo_tipo="fisso")), CR(riga(fascia_min_cent=0, fascia_max_cent=0))])
+    Rn = amb3["_p2p_onchain_rinasci"]
+    vecchio = riga()
+    nid = Rn(con, vecchio, 100000, CR(vecchio))
+    n = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?", (nid,)).fetchone()
+    prova("IL RESTO NEL LIBRO: lo scambio da 20 € su 10–100 € si chiude, nasce un ordine nel "
+          "libro 10–80 € (massimo in `euro_cent`), stessi patti, figlio dello scambio",
+          ["pending", 8000, 1000, 8000, "mercato", 2, "Milano", "IT60", int(vecchio["id"])],
+          [n["stato"], n["euro_cent"], n["fascia_min_cent"], n["fascia_max_cent"],
+           n["prezzo_tipo"], n["premio"], n["zona"], n["recapito"], n["rinato_da"]])
+    prova("...e una volta sola: lo stesso scambio non fa due resti",
+          0, Rn(con, vecchio, 100001, CR(vecchio)))
+    v2 = riga(euro_cent=9000)
+    n2 = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                     (Rn(con, v2, 100000, CR(v2)),)).fetchone()
+    prova("...un resto uguale al «Da» torna a cifra unica (10 €, senza capi)",
+          [1000, 0, 0], [n2["euro_cent"], n2["fascia_min_cent"], n2["fascia_max_cent"]])
+    v3 = riga(prezzo_tipo="fisso")
+    prova("...a prezzo fisso un resto passato a mano non nasce", 0, Rn(con, v3, 100000, (1000, 8000)))
+    v4 = riga(stato="annullato", euro_cent=3000)
+    n4 = con.execute("SELECT * FROM p2p_onchain_ordini WHERE id=?",
+                     (Rn(con, v4, 100000),)).fetchone()
+    prova("...e la rinascita di sempre (senza resto) rimette l'intervallo intero",
+          [10000, 1000, 10000], [n4["euro_cent"], n4["fascia_min_cent"], n4["fascia_max_cent"]])
+    rotto = pezzo("_p2p_onchain_rinasci").replace("        cifra = int(resto[1])\n", "", 1)
+    amb4 = dict(amb3)
+    exec(rotto, amb4)
+    v5 = riga(euro_cent=9000)
+    nid5 = amb4["_p2p_onchain_rinasci"](con, v5, 100000, (1000, 1000))
+    prova("controprova: senza la cifra del resto, il resto a cifra unica nascerebbe coi 90 € "
+          "dello scambio appena chiuso",
+          [True, 9000], [rotto != pezzo("_p2p_onchain_rinasci"),
+                         con.execute("SELECT euro_cent FROM p2p_onchain_ordini WHERE id=?",
+                                     (nid5,)).fetchone()[0]])
+    cf = src[src.index('stato = "rilasciato" if verso == "venditore" else "rimborsato"'):
+             src.index('@app.post("/api/p2p/onchain/{oid}/disputa")')]
+    rs = pezzo("_p2p_onchain_resto_nel_libro", fine="\n\n\nasync def ")
+    prova("la chiusura on-chain: solo se rilasciato, dopo la rinascita, e dietro la leva di "
+          "chi ha pubblicato; fail-open, nessun avviso",
+          [True, True, True, True, False],
+          ['if stato == "rilasciato":\n        await _p2p_onchain_resto_nel_libro(dict(o, stato="rilasciato"))' in cf,
+           cf.index("_p2p_onchain_rinasci_e_di(") < cf.index("_p2p_onchain_resto_nel_libro("),
+           'if not p2p_resto_intervallo_per(int(o["maker_id"] or 0)):' in rs,
+           "except Exception as e:" in rs, "_notifica_p2p_onchain" in rs])
+    # --- il telefono ---
+    prova("il telefono: la leva da /api/me, i capi ricordati alla presa, la chiave nella porta "
+          "dei gesti, la pulizia dopo l'adozione, la riga del resto d'acquisto al rilascio",
+          [True, True, True, True, True],
+          ["myP2PResto = !!me.p2p_resto_intervallo;" in mini,
+           "if (lo > 0 && hi > lo) { o.fasciaMin = lo; o.fasciaMax = hi; }" in pezzo_js(mini, "function avanzaOrdineP2P(ordine, azione, payload){", "\n}\n"),
+           "try { payload = await payloadRestoP2P(o, azione, mz); }" in pezzo_js(mini, "async function chiamataOrdineP2P(o, azione, payload){", "\n}\n"),
+           "nati += togliRestiMancatiP2P(p2pMieiOrdini, p2pMieiQuando);" in pezzo_js(mini, "function adottaOrdiniAltroveP2P(locali){", "\n}\n"),
+           "&& (nuovo.stato === 'rilasciato' || nuovo.stato === 'concluso')\n" in pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")])
+    prova("la scritta approvata nella scatola, solo a chi la leva vale, sotto la spinta",
+          [True, True],
+          ["const P2P_RESTO_TESTO = 'Se ne prendono solo una parte, il resto torna da solo nel libro.';" in mini,
+           "+ (myP2PResto ? '<small class=\"p2p-spinta-fissa\">' + esc(P2P_RESTO_TESTO) + '</small>' : '')\n"
+           "          + '<small class=\"p2p-spinta-fissa\">' + esc(P2P_INTERVALLO_FISSA)" in mini])
+    j0 = mini.index("const CAMPI_MOSTRO = {")
+    campi = mini[j0:mini.index("\n};\n", j0) + 4]
+    banco = (
+        "let myP2PResto = true;\nconst window = {NostrTools: {schnorr: true}};\n"
+        "const CLOUD_MAZZO = 'm';\nlet MAZZO = {sk: 'aa', pub: 'id', indice: 7};\nlet cloud = [];\n"
+        "function mazzoMostro(){ return MAZZO; }\nfunction ricordaMazzo(m){ MAZZO = m; }\n"
+        "function mazzoSerializza(m){ return JSON.stringify(m); }\n"
+        "async function cloudScrivi(k, v){ cloud.push(JSON.parse(v).indice); }\n"
+        "function chiaveScambio(sk, i){ return {sk: sk + i, pub: 'pub' + i, indice: i}; }\n"
+        "let RIGHE = {};\nfunction ordiniP2P(){ return JSON.parse(JSON.stringify(RIGHE)); }\n"
+        "function scriviOrdineP2P(o){ RIGHE[o.id] = JSON.parse(JSON.stringify(o)); }\n"
+        "const localStorage = {setItem(k, v){ RIGHE = JSON.parse(v); }};\n"
+        "function chiaveP2P(k){ return k; }\nconst MOSTRO_ORDINI_CHIAVE = 'o';\n"
+        "function diarioP2P(){}\nlet chiavi = [];\nasync function registraChiaviP2P(l){ chiavi.push(l[0]); }\n"
+        "let ascolti = 0;\nasync function mostroRiascolta(){ ascolti++; }\n"
+        "function cancellaRigaP2P(id){ if (!RIGHE[id]) return false; delete RIGHE[id]; return true; }\n"
+        "function valutaCoinP2P(v){ return v === 'ETH'; }\n"
+        + pezzo_js(mini, "function nomeProvvisorioP2P(indice){", "\n") + "\n"
+        + pezzo_js(mini, "function provvisorioP2P(id){", "\n") + "\n"
+        + "const P2P_RESTO_ATTESA_S = 15 * 60;\n"
+        + mini[mini.index("const P2P_RESTO_DOPO = "):mini.index("\n", mini.index("const P2P_RESTO_DOPO = "))] + "\n"
+        + pezzo_js(mini, "function restoIntervalloP2P(o, azione){", "\n}\n") + "\n}" + "\n"
+        + pezzo_js(mini, "async function payloadRestoP2P(o, azione, mz){", "\n}\n") + "\n}" + "\n"
+        + pezzo_js(mini, "async function nasceRigaRestoP2P(o){", "\n}\n") + "\n}" + "\n"
+        + pezzo_js(mini, "function togliRestiMancatiP2P(mieiOrdini, quando){", "\n}\n") + "\n}" + "\n"
+        + campi
+        + pezzo_js(mini, "function canonicoMostro(campi, o){") + "\n"
+        + pezzo_js(mini, "function idMostroVero(id){") + "\n"
+        + pezzo_js(mini, "function messaggioMostro(azione, opz){") + "\n"
+        + r"""
+(async () => {
+const f = {};
+const base = {id: 'a1', mio: true, lato: 'vendo', euro: 20, euroMax: 0, fasciaMin: 10, fasciaMax: 100,
+  fiat: 'EUR', metodi: ['SEPA', 'Revolut'], premium: 2, zona: 'Milano', filtro: 3, minutiPagare: 60,
+  ripubblica: {si: 1}, paracadute: 0, indice: 5, pubTrade: 'pub5'};
+const R = (x, az) => restoIntervalloP2P(Object.assign({}, base, x), az);
+f.regola = [R({}, 'release'), R({lato: 'compro'}, 'fiat-sent'), R({euro: 90}, 'release'),
+  R({euro: 95}, 'release'), R({lato: 'compro'}, 'release'), R({}, 'fiat-sent'),
+  R({mio: false}, 'release'), R({fasciaMax: 0}, 'release'), R({fiat: 'ETH'}, 'release'),
+  R({tabacchino: {ordine: 1}}, 'release'), R({}, 'cancel')];
+RIGHE.a1 = Object.assign({}, base);
+const p1 = await payloadRestoP2P(RIGHE.a1, 'release', MAZZO);
+f.primo = [p1, MAZZO.indice, cloud.slice(), RIGHE.a1.restoIndice, chiavi.slice(), ascolti];
+const fg = RIGHE['nuovo:8'];
+f.figlio = fg && [fg.stato, fg.mio, fg.lato, fg.indice, fg.pubTrade, fg.euro, fg.euroMax,
+  fg.metodi, fg.premium, fg.zona, fg.filtro, fg.minutiPagare, fg.ripubblica, 'paracadute' in fg, fg.restoDi, fg.contattato];
+/* il «Riprova»: stessa chiave, nessun indice nuovo, nessuna riga in piu' */
+const p2 = await payloadRestoP2P(RIGHE.a1, 'release', MAZZO);
+f.riprova = [p2, MAZZO.indice, cloud.length, Object.keys(RIGHE).length];
+/* il messaggio sul filo, canonico */
+f.filo = JSON.stringify(messaggioMostro('release', {requestId: 4, indice: null,
+  id: '11111111-2222-3333-4444-555555555555', payload: p1}));
+/* l'ordine d'acquisto: la chiave parte con «Ho inviato», la riga nasce al
+   rilascio dell'altro */
+RIGHE.c1 = Object.assign({}, base, {id: 'c1', lato: 'compro'});
+const p3 = await payloadRestoP2P(RIGHE.c1, 'fiat-sent', MAZZO);
+f.compro = [p3, RIGHE.c1.restoIndice, !!RIGHE['nuovo:9'], ascolti];
+const nato = await nasceRigaRestoP2P(Object.assign({}, RIGHE.c1, {stato: 'rilasciato'}));
+const due = await nasceRigaRestoP2P(Object.assign({}, RIGHE.c1, {stato: 'concluso'}));
+f.compro.push(nato, due, RIGHE['nuovo:9'] && [RIGHE['nuovo:9'].lato, RIGHE['nuovo:9'].euroMax, RIGHE['nuovo:9'].restoDi], ascolti);
+delete RIGHE['nuovo:9']; delete RIGHE.c1;
+/* leva spenta, o un mazzo in pensione: niente */
+myP2PResto = false;
+f.spenta = await payloadRestoP2P(Object.assign({}, base, {id: 'b'}), 'release', MAZZO);
+myP2PResto = true;
+f.pensione = await payloadRestoP2P(Object.assign({}, base, {id: 'c'}), 'release', {sk: 'zz', indice: 3});
+/* la riga provvisoria che non nasce se ne va; quella nota, troppo giovane
+   o col padre non ancora rilasciato resta */
+RIGHE['nuovo:20'] = {id: 'nuovo:20', indice: 20, mio: true, restoDi: 'x', creato: 1000};
+RIGHE['nuovo:21'] = {id: 'nuovo:21', indice: 21, mio: true, creato: 1000};
+RIGHE['nuovo:22'] = {id: 'nuovo:22', indice: 22, mio: true, restoDi: 'p', creato: 1000};
+RIGHE.p = {id: 'p', stato: 'euro_inviati', aggiornato: 1000};
+const prima = Object.keys(RIGHE).sort();
+f.giovane = togliRestiMancatiP2P({}, 1000 + 60);
+f.noto = togliRestiMancatiP2P({k: {indice: 8}, j: {indice: 20}}, 1000 + 3600);
+f.tolto = togliRestiMancatiP2P({k: {indice: 5}}, 1000 + 3600);
+f.padreVivo = !!RIGHE['nuovo:22'];
+RIGHE.p = {id: 'p', stato: 'concluso', aggiornato: 5000};
+f.padreFresco = togliRestiMancatiP2P({}, 5000 + 60);
+f.padreFinito = togliRestiMancatiP2P({}, 5000 + 3600);
+f.dopo = [prima.length, Object.keys(RIGHE).sort()];
+console.log(JSON.stringify(f));
+})();
+""")
+    out = _node_banco(banco)
+    if out is None:
+        salta("i pezzi del telefono per il resto dell'intervallo", "node non installato")
+        return
+    prova("la regola del telefono: vendo al rilascio, compro con «Ho inviato»; cifra unica al "
+          "«Da»; niente sotto il «Da», sul gesto sbagliato, se non e' mio, senza capi, in moneta, "
+          "con Barattozon o su un altro gesto",
+          [{"min": 10, "max": 80}, {"min": 10, "max": 80}, {"min": 10, "max": 10}] + [None] * 8,
+          out["regola"])
+    prova("al rilascio: la chiave del prossimo scambio, l'indice prenotato (mazzo e cloud) e "
+          "ricordato sulla riga, la chiave al server, e (al mio rilascio) la riga e l'orecchio",
+          [{"next_trade": ["pub8", 8]}, 8, [8], 8, ["pub8"], 1], out["primo"])
+    prova("la riga provvisoria del resto: «nuovo:8», mia, coi patti dell'ordine (metodi, premio, "
+          "zona, filtro, tempo, ripubblica), 10–80 €, figlia dello scambio",
+          ["pubblico", True, "vendo", 8, "pub8", 10, 80, ["SEPA", "Revolut"], 2, "Milano", 3, 60,
+           {"si": 1}, False, "a1", True], out["figlio"])
+    prova("...un secondo tocco manda la STESSA chiave: nessun indice bruciato, nessuna riga in piu'",
+          [{"next_trade": ["pub8", 8]}, 8, 1, 2], out["riprova"])
+    prova("sul filo il payload e' quello di mostro-core (`Payload::NextTrade`, snake_case)",
+          '{"order":{"version":2,"request_id":4,"trade_index":null,'
+          '"id":"11111111-2222-3333-4444-555555555555","action":"release",'
+          '"payload":{"next_trade":["pub8",8]}}}', out["filo"])
+    prova("l'ordine d'acquisto: la chiave (indice 9) parte con «Ho inviato» senza riga; la riga "
+          "nasce al rilascio dell'altro, una volta sola, e allora si ascolta",
+          [{"next_trade": ["pub9", 9]}, 9, False, 1, True, False, ["compro", 80, "c1"], 2],
+          out["compro"])
+    prova("a leva spenta o con un profilo in pensione il gesto parte come prima, senza resto",
+          [None, None], [out["spenta"], out["pensione"]])
+    prova("la riga di un resto mai nato se ne va un quarto d'ora dopo il rilascio; una nota alla "
+          "restore, troppo giovane, col padre fermo a «Ho inviato» o non di un resto resta",
+          [0, 0, 1, True, 0, 1, [6, ["a1", "nuovo:21", "nuovo:8", "p"]]],
+          [out["giovane"], out["noto"], out["tolto"], out["padreVivo"], out["padreFresco"],
+           out["padreFinito"], out["dopo"]])
+    # controprova sul telefono: senza la prenotazione ricordata, il «Riprova» brucerebbe una chiave
+    buonoJ = pezzo_js(mini, "async function payloadRestoP2P(o, azione, mz){", "\n}\n") + "\n}"
+    rottoJ = buonoJ.replace("let indice = o.restoIndice | 0;", "let indice = 0;", 1)
+    out2 = _node_banco(banco.replace(buonoJ, rottoJ))
+    prova("controprova: senza l'indice ricordato sulla riga, il secondo tocco prenoterebbe "
+          "un'altra chiave (9) e un secondo resto",
+          [True, 9], [rottoJ != buonoJ, out2 and out2["riprova"][1]])
 
 
 def prove_estensione_barattozon():
@@ -226831,7 +227107,7 @@ CATEGORIE = {
     logo_compra_vendi tempo_di_chi_pubblica tempo_pubblica_app
     disputa_automatica_p2p pausa_in_vista paracadute_p2p paracadute_app
     selettore_di_casa ordine_in_pausa relay_per_mostro
-    notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain intervallo_onchain importo_copia
+    notifica_porta_allo_scambio barre_paycode estensione_barattozon barattozon_onchain intervallo_onchain resto_intervallo importo_copia
     barattozon_in_compra cambio_p2p cambio_onchain_p2p deposito_ln_p2p
     presa_ln_p2p mappa_contanti p2p_usdt p2p_chf usdt_due_reti usdt_moderatori novita_usdt_p2p novita_coin_p2p novita_45_giorni p2p_monete_valute icone_valute_filtro p2p_onchain_commissione p2p_onchain_valute tasti_rete_foglio ritocchi_sera_p2p usdt_foglio_presa rete_scelta_p2p prezzo_btc_libro card_p2p_monete usdt_cifra_copia convenienza_monete onchain_come_lightning premio_conto_onchain mercato_conto_onchain onchain_esiti_recuperati onchain_promemoria onchain_txid_moneta chat_onchain chat_spunte onchain_rimborso_liscio onchain_tempo_bonifico onchain_ritiro onchain_contanti onchain_contanti_scambio onchain_cauzione usdt_totale_euro
     sconto_fisso_decimale
@@ -228325,6 +228601,7 @@ def main():
               prove_estensione_barattozon,
               prove_barattozon_onchain,
               prove_intervallo_onchain,
+              prove_resto_intervallo,
               prove_allegati_chat,
               prove_pdf_allegati,
               prove_stampa_e_salti,
