@@ -39890,9 +39890,11 @@ function scelteScheda(l){
    indietro riporta da dove si era arrivati, non attraverso ogni taglia
    provata. La sorella che non e' ancora in catalogo si chiede al
    server (e' un annuncio come un altro). */
+let giroVariante = 0;   // l'ultimo tocco vince (vedi LA SCHEDA RESTA DOV'E')
 async function scegliVariante(id){
   if (!currentListing || currentListing.id === id) return;
   haptic();
+  const giro = ++giroVariante;
   if (!listings.find(x => x.id === id)) {
     try {
       const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
@@ -39903,8 +39905,33 @@ async function scegliVariante(id){
       inCatalogo([m]);
     } catch(e) { toast('Rete assente: riprova fra poco'); return; }
   }
+  /* LA SCHEDA RESTA DOV'E' (27 nov 2026, Andrea dal telefono: «guarda
+     cosa succede quando seleziono colori e varianti»). openDetail passa
+     da go('dettaglio'), che riporta in cima come ogni ingresso nuovo:
+     a ogni colore la pagina tornava alla foto, e la foto stessa restava
+     vuota un istante (l'<img> nuova non era ancora scaricata). Ora i
+     bottoncini restano sotto il dito, alla stessa altezza di schermo, e
+     la prima foto della sorella si scarica PRIMA dello scambio — al piu'
+     mezzo secondo, poi si scambia comunque (fail-open). */
+  const prima = (listings.find(x => x.id === id)?.photos || [])[0];
+  if (prima) {
+    const img = new Image();
+    img.src = prima;
+    await Promise.race([img.decode().catch(() => {}),
+                        new Promise(r => setTimeout(r, 500))]);
+  }
+  /* nell'attesa (la rete, la foto) si puo' essere usciti dalla scheda,
+     o aver toccato un altro bottoncino: allora questo tocco non vale */
+  if (giro !== giroVariante || !currentListing
+      || document.querySelector('.view.active')?.id !== 'view-dettaglio') return;
+  const box = el('famigliaScelta');
+  const sottoIlDito = box ? box.getBoundingClientRect().top : null;
   navSostituisci = true;
   openDetail(id);
+  const dopo = el('famigliaScelta');
+  if (sottoIlDito !== null && dopo)
+    window.scrollTo(0, Math.max(0, Math.round(window.scrollY
+      + dopo.getBoundingClientRect().top - sottoIlDito)));
 }
 
 /* ---------------- lightbox: foto a tutto schermo con zoom ----------------
