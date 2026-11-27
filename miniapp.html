@@ -1957,6 +1957,58 @@
     gap:4px;color:#FAF4E4;font-size:13px;font-weight:800}
   .sc-riserva .sc-emoji{font-size:30px;line-height:1}
   .scoprire-card img + .sc-riserva{display:none}
+  /* GLI EFFETTI DELLA CARD GRANDE (27 nov 2026, AndreAI, scelti dopo sei
+     prove in video): solo sulla card di una pagina che li dichiara (il
+     server manda `effetti`). Tre strati sopra il disegno, tutti CSS:
+     - il CODICE 0/1 che scende piano a sinistra, dentro una maschera
+       (`<slug>-codice.webp`) trasparente intorno alle scritte: le scritte
+       restano davanti e il codice passa «dietro» (Andrea: «le scritte del
+       titolo devono stare in primo piano rispetto al codice»);
+     - il RIFLESSO che attraversa la foto UNA volta, un secondo e mezzo
+       dopo l'apertura dell'app, mai in giro (Andrea: «non in loop»);
+     - la LINEA del bordo che parte dal basso, sale dal lato sinistro e
+       sfuma in una polvere leggera in alto MENTRE ancora gira (Andrea:
+       «più che si ferma sparisce mentre continua a muoversi»).
+     Riflesso, linea e polvere nascono solo al PRIMO disegno della card in
+     questa apertura (vedi effettiScoprireHTML); con gli effetti ridotti
+     la regola universale li ferma, e la linea, che ferma resterebbe
+     accesa, sparisce nel blocco in fondo. */
+  @property --sc-fx-giro{syntax:'<angle>';inherits:false;initial-value:180deg}
+  .sc-fx-codice{position:absolute;inset:0;overflow:hidden;pointer-events:none;
+    -webkit-mask-size:100% 100%;mask-size:100% 100%;
+    -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+  .sc-fx-codice b{position:absolute;top:-100%;color:#FF9A4A;
+    font:600 7px/8px ui-monospace,Menlo,Consolas,monospace;
+    animation:scFxCade linear infinite}
+  @keyframes scFxCade{from{transform:translateY(0)}to{transform:translateY(200%)}}
+  .sc-fx-riflesso{position:absolute;overflow:hidden;pointer-events:none;
+    mix-blend-mode:screen;
+    -webkit-mask-image:radial-gradient(60% 55% at 55% 45%,#000 40%,transparent 75%);
+    mask-image:radial-gradient(60% 55% at 55% 45%,#000 40%,transparent 75%)}
+  .sc-fx-riflesso::before{content:'';position:absolute;top:-30%;bottom:-30%;
+    width:35%;left:-60%;transform:skewX(-20deg);
+    background:linear-gradient(100deg,rgba(255,255,255,0) 0%,
+      rgba(255,255,255,.35) 48%,rgba(255,255,255,.6) 50%,
+      rgba(255,255,255,.35) 52%,rgba(255,255,255,0) 100%);
+    animation:scFxLampo 2.6s ease-in-out 1.5s 1 both}
+  @keyframes scFxLampo{from{left:-60%}to{left:130%}}
+  .sc-fx-linea{position:absolute;inset:0;border-radius:inherit;padding:2px;
+    pointer-events:none;
+    background:conic-gradient(from var(--sc-fx-giro),transparent 0deg,
+      transparent 250deg,#FF7A2F 320deg,#FFD29A 350deg,transparent 360deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+    animation:scFxEntra .8s ease-out 0s 1 both,scFxGiro 8s linear 0s 1 both,
+      scFxSvela 2s ease-in 4.8s 1 forwards}
+  @keyframes scFxGiro{from{--sc-fx-giro:180deg}to{--sc-fx-giro:420deg}}
+  @keyframes scFxEntra{from{opacity:0}to{opacity:1}}
+  @keyframes scFxSvela{from{opacity:1}to{opacity:0}}
+  .sc-fx-polvere{position:absolute;width:1.5px;height:1.5px;border-radius:50%;
+    background:#FFC58A;box-shadow:0 0 2px rgba(255,138,61,.6);opacity:0;
+    pointer-events:none;animation:scFxPolvere var(--d) ease-out var(--r) 1 both}
+  @keyframes scFxPolvere{0%{opacity:0;transform:translate(0,0) scale(1)}
+    15%{opacity:.55}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(.3)}}
   /* IL TITOLO LO SCRIVE L'APP, FERMO SOPRA IL DISEGNO CHE SI MUOVE
      (ago 2026, decisione di Andrea che ROVESCIA il testo-nel-disegno
      della nascita): e' un FRATELLO dell'img e mai un suo involucro —
@@ -14619,6 +14671,9 @@
   html.fx-ridotti.p2p-sfocata #app > nav{filter:none}
   html.fx-ridotti .btn.orange.in-evidenza{
     box-shadow:var(--b-sh),0 0 0 4px rgba(247,147,26,.35)}
+  /* 4) la linea del bordo della card grande (27 nov 2026): ferma
+        resterebbe accesa in fondo alla card, quindi non c'e' */
+  html.fx-ridotti .sc-fx-linea{display:none}
 
   /* ---------- L'ARRIVO SECCO (23 set 2026) ----------
      Quando Chrome ha gia' fatto vedere la pagina d'arrivo con la sua
@@ -27766,6 +27821,57 @@ const OCCASIONI = [
      in un indirizzo e in un attributo.
      L'ID PORTA LO SLUG (`sponsor-<slug>`): due card sponsor devono potersi
      distinguere al tocco e nella firma della fila. */
+/* GLI EFFETTI DELLA CARD GRANDE (27 nov 2026, AndreAI): la busta del
+   server, `{riflesso: [sinistra, alto, larghezza, altezza]}` in
+   percentuali intere; qualunque altra forma vale «niente effetti» */
+function effettiValidi(e){
+  const z = e && Array.isArray(e.riflesso) ? e.riflesso : null;
+  return z && z.length === 4 && z.every(n => Number.isInteger(n) && n >= 0 && n <= 100)
+    ? {riflesso: z.slice()} : null;
+}
+/* ...e il loro markup. Il codice c'e' sempre; riflesso, linea e polvere
+   solo al PRIMO disegno della card in questa apertura dell'app: la fila
+   si ridisegna quando cambia (una busta nuova, il barattolo), e il
+   riflesso ripartirebbe da capo (Andrea: «solo la prima volta che apri
+   l'app»). La linea vuole @property per girare: dove manca (Safari
+   prima della 16.4) non nasce, invece di restare ferma in basso.
+   Le posizioni si scrivono in percentuali: la card cambia larghezza col
+   telefono, il rapporto 272/130 no. */
+const scoprireFxVisti = new Set();
+function effettiScoprireHTML(v){
+  const z = v.effetti && v.effetti.riflesso;
+  if (!z || !/^[a-z0-9-]{2,40}$/.test(v.slug || '')) return '';
+  const caso = (a, b) => a + Math.random() * (b - a);
+  let colonne = '';
+  for (let i = 0; i < 17; i++){
+    const cifre = Array.from({length: 40}, () => Math.random() < .5 ? '0' : '1');
+    colonne += `<b style="left:${(1.5 + i * 3.6).toFixed(1)}%;animation-duration:${caso(16, 26).toFixed(1)}s;`
+      + `animation-delay:-${caso(0, 26).toFixed(1)}s;opacity:${caso(.10, .28).toFixed(2)}">${cifre.join('<br>')}</b>`;
+  }
+  const maschera = `url('/assets/scoprire/${v.slug}-codice.webp')`;
+  let fx = `<span class="sc-fx-codice" aria-hidden="true" style="-webkit-mask-image:${maschera};mask-image:${maschera}">${colonne}</span>`;
+  if (scoprireFxVisti.has(v.id)) return fx;
+  scoprireFxVisti.add(v.id);
+  fx += `<span class="sc-fx-riflesso" aria-hidden="true" style="left:${z[0]}%;top:${z[1]}%;width:${z[2]}%;height:${z[3]}%"></span>`;
+  if (!(window.CSS && CSS.registerProperty)) return fx;
+  fx += '<span class="sc-fx-linea" aria-hidden="true"></span>';
+  /* la polvere: dove passa la linea mentre sfuma (da 4,8 a 6,8 secondi,
+     30 gradi al secondo dai 180 del fondo), un granello per istante */
+  const W = 272, H = 130;
+  for (let n = 0; n < 55; n++){
+    const t = caso(4.8, 6.8), testa = 180 + 30 * t;
+    const ang = (testa - 110 * Math.pow(Math.random(), 1.6)) * Math.PI / 180;
+    const dx = Math.sin(ang), dy = -Math.cos(ang);
+    const k = Math.min((W / 2) / Math.max(Math.abs(dx), 1e-6), (H / 2) / Math.max(Math.abs(dy), 1e-6));
+    const x = W / 2 + dx * k, y = H / 2 + dy * k;
+    const vx = (x < W / 2 ? 1 : -1) * caso(2, 7) + caso(-2, 4);
+    const vy = (y < H / 2 ? 1 : -1) * caso(2, 6) - caso(3, 9);
+    fx += `<i class="sc-fx-polvere" aria-hidden="true" style="left:${(Math.min(Math.max(x, 1), W - 2) / W * 100).toFixed(1)}%;`
+      + `top:${(Math.min(Math.max(y, 1), H - 2) / H * 100).toFixed(1)}%;--x:${vx.toFixed(1)}px;--y:${vy.toFixed(1)}px;`
+      + `--d:${caso(1.6, 2.8).toFixed(2)}s;--r:${t.toFixed(2)}s"></i>`;
+  }
+  return fx;
+}
 function vociSponsor(){
   /* la foto del quadrato: un numero da 1 a 9 (una foto della storia) o
      'logo' (il ritratto della card «Consigliati»), e nient'altro */
@@ -27788,6 +27894,9 @@ function vociSponsor(){
          dei quadratini di AndreAI e To The Moon) */
       quadro: quadroSponsor(slug, casa && casa.quadro != null ? casa.quadro : s.quadro),
       testo: String((casa ? casa.titolo : s.titolo) || ''),
+      /* gli effetti della card (27 nov 2026): solo per le pagine del
+         server che li dichiarano, con la zona del riflesso in forma */
+      effetti: casa ? null : effettiValidi(s.effetti),
       /* (il bottone «Entra» sulla card grande e' stato TOLTO, 26 nov
          2026 a tarda sera, AndreAI: «alla fine non mi piace lì», dopo
          averlo provato a destra e poi in fondo a sinistra. Il server
@@ -27988,7 +28097,7 @@ function renderScoprire(){
       <img src="${v.img ? esc(v.img) : '/assets/scoprire/' + file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
       ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
-      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
+      >${titolo}${lancio}${quadra}${v.logo ? `<img class="sc-logo" src="${esc(v.logo)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}${effettiScoprireHTML(v)}
     </div>`;
   }).join('');
   /* una card sola sta al centro; con due o piu' la prima resta a

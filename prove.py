@@ -53471,6 +53471,10 @@ def prove_scoprire_p2p(mini=None, node=None):
              # (24 nov 2026) i due banner sopra la griglia, VERI
              + "\n" + _fetta("const OCCASIONI = [", "\n];")
              + "\n" + _fetta("let occasioniFirma = '';", "\n}")
+             # (27 nov 2026) gli effetti della card, VERI
+             + "\n" + _fetta("function effettiValidi(e){", "\n}")
+             + "\n" + _fetta("const scoprireFxVisti = ", ";")
+             + "\n" + _fetta("function effettiScoprireHTML(v){", "\n}")
              + "\n" + _fetta("function vociSponsor(){", "\n}") + "\n"
              # (23 nov 2026, promozioni) i negozi pagati e il turno
              # VERI: la fila passa da loro prima di arrivare qui
@@ -54083,8 +54087,10 @@ def prove_sponsor():
                  "sponsor_fino", "sponsor_accesi", "sponsorizzati_pubblici",
                  "imposta_sponsor", "imposta_ordine_sponsor",
                  "racconto_stato", "_banner_consigliato",
-                 "_venditore_racconto", "entra_della_pagina"):
+                 "_venditore_racconto", "entra_della_pagina",
+                 "effetti_della_card"):
         exec(pezzo(nome), amb)
+    amb.setdefault("os", os)
     # il giudice del bottone «Entra» sulla card (26 nov 2026, clic-entra)
     amb.setdefault("re", re)
     exec(re.search(r"^_RE_LINK_ENTRA = re\.compile\(\n.*?\)\n", src, re.M | re.S).group(), amb)
@@ -56143,6 +56149,73 @@ def prove_racconti_bozza():
            'class="sc-entra"' in mini,
            "${quadra}${v.logo ?" in mini,
            ".scoprire-card .sc-entra{" in mini))
+    # GLI EFFETTI DELLA CARD GRANDE (27 nov 2026, AndreAI, dopo sei prove
+    # in video): codice dietro le scritte, riflesso una volta, linea che
+    # sale dal basso e sfuma in polvere
+    _efx = {"os": os, "RACCONTI_NEGOZI": {
+        "con": {"effetti": {"riflesso": [66, 12, 28, 70]}},
+        "storta": {"effetti": {"riflesso": [66, 12, 28]}},
+        "fuori": {"effetti": {"riflesso": [66, 12, 28, 170]}},
+        "testo": {"effetti": {"riflesso": ["66", 12, 28, 70]}},
+        "senza": {}}}
+    exec(pezzo("effetti_della_card"), _efx)
+    _fx_file = os.path.join("assets", "scoprire", "con-codice.webp")
+    _fx_c = _efx["effetti_della_card"]
+    _fx_senza_file = _fx_c("con")
+    open(_fx_file, "wb").close()
+    try:
+        _fx_esiti = [_fx_c(x) for x in ("con", "storta", "fuori", "testo", "senza", "boh")]
+    finally:
+        os.remove(_fx_file)
+    prova("gli effetti escono solo con la zona del riflesso in forma E col "
+          "file della maschera del codice",
+          ({}, [{"riflesso": [66, 12, 28, 70]}, {}, {}, {}, {}, {}]),
+          (_fx_senza_file, _fx_esiti))
+    prova("...la busta dello spazio li porta, e la maschera si serve solo "
+          "a pagina pubblicata col banner e con gli effetti",
+          (True, True, True),
+          ('voce["effetti"] = fx' in _spp,
+           "if not (_banner_consigliato(nome) or _codice_consigliato(nome)):" in src,
+           "_banner_consigliato(slug + \".webp\")\n                and effetti_della_card(slug)" in pezzo("_codice_consigliato")))
+    prova("...e la pagina che li ha dichiarati ha la sua maschera, WebP",
+          [], [sl for sl, r in CAT.items() if r.get("effetti")
+               and not os.path.exists(os.path.join("assets", "scoprire", sl + "-codice.webp"))])
+    _fxjs = (pezzo_js(mini, "function effettiValidi(e){", "\n}\n") + "\n}\n"
+             + "const scoprireFxVisti = new Set();\n"
+             + pezzo_js(mini, "function effettiScoprireHTML(v){", "\n}\n") + "\n}\n" + """
+const conta = (h, c) => (h.match(new RegExp('class="' + c + '"', 'g')) || []).length;
+const v = {id: 'sponsor-xx', slug: 'xx', effetti: effettiValidi({riflesso: [66, 12, 28, 70]})};
+const uno = effettiScoprireHTML(v), due = effettiScoprireHTML(v);
+const w = {id: 'sponsor-yy', slug: 'yy', effetti: {riflesso: [1, 2, 3, 4]}};
+globalThis.window = {}; const senzaProp = effettiScoprireHTML(w);
+console.log(JSON.stringify({
+  valide: [effettiValidi({riflesso: [1, 2, 3]}), effettiValidi({riflesso: [1, 2, 3, 101]}),
+           effettiValidi({riflesso: ['1', 2, 3, 4]}), effettiValidi(null), effettiValidi({riflesso: [0, 0, 100, 100]})],
+  uno: [conta(uno, 'sc-fx-codice'), conta(uno, 'sc-fx-riflesso'), conta(uno, 'sc-fx-linea'), conta(uno, 'sc-fx-polvere')],
+  due: [conta(due, 'sc-fx-codice'), conta(due, 'sc-fx-riflesso'), conta(due, 'sc-fx-linea'), conta(due, 'sc-fx-polvere')],
+  senzaProp: [conta(senzaProp, 'sc-fx-codice'), conta(senzaProp, 'sc-fx-riflesso'), conta(senzaProp, 'sc-fx-linea')],
+  maschera: uno.includes("url('/assets/scoprire/xx-codice.webp')"),
+  storto: effettiScoprireHTML({id: 'zz', slug: "xx');a", effetti: {riflesso: [1, 2, 3, 4]}}),
+  vuota: effettiScoprireHTML({id: 'zz', slug: 'xx'})}));""")
+    _fxo = subprocess.run(["node", "-e", "globalThis.window = {CSS: {registerProperty(){}}}; globalThis.CSS = window.CSS;\n" + _fxjs],
+                          capture_output=True, text=True, timeout=30)
+    try:
+        _fxr = json.loads(_fxo.stdout)
+    except ValueError:
+        _fxr = _fxo.stderr[-300:]
+    prova("il client: la busta storta non accende niente; al primo disegno "
+          "codice, riflesso, linea e 55 granelli, al secondo solo il codice "
+          "(Andrea: «il riflesso solo la prima volta che apri l'app»); "
+          "senza @property niente linea; uno slug storto niente di niente",
+          {"valide": [None, None, None, None, {"riflesso": [0, 0, 100, 100]}],
+           "uno": [1, 1, 1, 55], "due": [1, 0, 0, 0], "senzaProp": [1, 1, 0],
+           "maschera": True, "storto": "", "vuota": ""}, _fxr)
+    prova("...il markup sta in fondo alla card, dopo la riserva (che deve "
+          "restare accanto all'immagine), e la linea con gli effetti "
+          "ridotti non c'e'", (True, True, True),
+          ("onerror=\"this.remove()\">` : ''}${effettiScoprireHTML(v)}\n    </div>`;" in mini,
+           "effetti: casa ? null : effettiValidi(s.effetti)," in mini,
+           "html.fx-ridotti .sc-fx-linea{display:none}" in mini))
     try:
         os.remove(_db_en)
     except OSError:
@@ -144906,6 +144979,10 @@ def _consigliati_rotte(src, mini, _pz):
     amb_b = dict(amb_a, RACCONTI_NEGOZI=cat_b,
                  FILE_SCOPRIRE=("lampo.webp", "to-the-moon.webp"))
     exec(_pz(src, "def _banner_consigliato(", "\n\n\n"), amb_b)
+    # (27 nov 2026) la maschera del codice della card con gli effetti
+    amb_b.setdefault("os", os)
+    exec(_pz(src, "def effetti_della_card(", "\n\n\n"), amb_b)
+    exec(_pz(src, "def _codice_consigliato(", "\n\n\n"), amb_b)
     _rs = _pz(src, "def asset_scoprire(", "\n\n\n")
     exec(_rs, amb_b)
 
@@ -144925,6 +145002,9 @@ def _consigliati_rotte(src, mini, _pz):
     prova("...ne' un nome fuori forma", [404] * 4,
           [_scopri(n) for n in ("pubblicata", "pubblicata.png",
                                 "../pubblicata.webp", "pubblicata.webp/..")])
+    prova("...e la maschera del codice solo a una pagina che dichiara gli "
+          "effetti (e non a «pubblicata», che non li ha)", [404, 404],
+          [_scopri(n) for n in ("pubblicata-codice.webp", "-codice.webp")])
     prova("...e la cartella resta quella di «Da scoprire»", True,
           'os.path.join("assets", "scoprire", nome)' in _rs)
 
@@ -145033,7 +145113,11 @@ def _consigliati_file(src, mini, _pz):
     prova("nella cartella di «Da scoprire» nessun file orfano", [],
           sorted(f for f in os.listdir(os.path.join("assets", "scoprire"))
                  if f not in _elenco
-                 and f[:-5] not in banner_server))
+                 and f[:-5] not in banner_server
+                 # la maschera del codice di una pagina con gli effetti
+                 # (27 nov 2026)
+                 and not (f.endswith("-codice.webp")
+                          and CAT.get(f[:-12], {}).get("effetti"))))
 
 
 def _consigliati_porte(src, mini, _pz):
@@ -225356,7 +225440,8 @@ let sponsorizzati = [{slug: 'pagina-a', negozio: 'bbb222', quadro: 4},
   {slug: 'pagina-c', negozio: 'bbb222', quadro: 12},
   {slug: 'pagina-d', negozio: 'bbb222'},
   {slug: 'pagina-e', negozio: 'bbb222', quadro: 'logo'}];
-""" + _qr + "\n" + pezzo_js(mini, "function vociSponsor(){", "\n}") + "\n}\n" + """
+""" + _qr + "\n" + pezzo_js(mini, "function effettiValidi(e){", "\n}") + "\n}\n"
+  + pezzo_js(mini, "function vociSponsor(){", "\n}") + "\n}\n" + """
 const v = vociSponsor();
 renderQuadriScoprire([v[0], v[3]]);
 console.log(JSON.stringify([v.map(x => x.quadro),
