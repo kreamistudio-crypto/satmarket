@@ -203,6 +203,14 @@ def main():
           (v2["mio"]["numero"], v2["mio"]["biglietto"]))
     prova("la seconda persona ha il 2", 2,
           partecipa(codice, 333)["estrazione"]["mio"]["numero"])
+    # dalla pagina dell'annuncio, senza il codice (28 nov 2026: «tutti
+    # possano partecipare»): la stessa estrazione, lo stesso biglietto
+    banco.come(111)
+    v3 = banco.chiama(SRV.partecipa_estrazione, None, "x", "",
+                      corpo={"annuncio": ps4})["estrazione"]
+    prova("dall'annuncio senza codice si entra (stesso biglietto)",
+          (1, v["mio"]["biglietto"]),
+          (v3["mio"]["numero"], v3["mio"]["biglietto"]))
     banco.come(222)
     no = errore(SRV.partecipa_estrazione, None, "x", "",
                 corpo={"codice": codice})

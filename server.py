@@ -112962,21 +112962,42 @@ def leggi_estrazione(annuncio_id: int, x_tg_init_data: str = Header(""),
 async def partecipa_estrazione(req: Request, x_tg_init_data: str = Header(""),
                                barattolo_sessione: str = Cookie("")):
     """Il «Partecipo» del modo 'link'. Body: {"codice": "..."} — quello
-    del link dedicato: senza, non si entra (e' il link a contare chi
-    arriva per quest'estrazione)."""
+    del link dedicato — oppure {"annuncio": id}, il bottone premuto
+    sulla pagina dell'annuncio.
+    IL CODICE NON E' PIU' UN CANCELLO (28 nov 2026, «Puoi controllare
+    che tutti possano partecipare?», Andrea): chi trovava l'annuncio
+    dal canale, dalla vetrina o dalla Mini App non aveva il codice in
+    tasca e non vedeva il bottone, mentre chi apriva il link si'. Il
+    link dedicato resta (porta il codice invito di chi regala), ma
+    entra chiunque guardi l'annuncio con un account Telegram."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     codice = str(d.get("codice") or "").strip().upper()
-    if not _FORMA_CODICE_ESTRAZIONE.fullmatch(codice):
+    try:
+        annuncio_id = int(d.get("annuncio") or 0)
+    except (TypeError, ValueError):
+        annuncio_id = 0
+    if not _FORMA_CODICE_ESTRAZIONE.fullmatch(codice) and annuncio_id <= 0:
         raise HTTPException(404, "Estrazione non trovata")
     if not _estrazione_ammessa(user["id"]):
         raise HTTPException(400, "Le estrazioni sono per chi entra con "
                                  "Telegram: apri Barattolo dal bot e "
                                  "riprova")
     con = db()
-    e = con.execute("SELECT e.*, a.stato AS stato_annuncio FROM estrazioni "
-                    "e JOIN annunci a ON a.id = e.annuncio_id WHERE "
-                    "e.codice=? AND e.modo='link'", (codice,)).fetchone()
+    if _FORMA_CODICE_ESTRAZIONE.fullmatch(codice):
+        e = con.execute("SELECT e.*, a.stato AS stato_annuncio FROM "
+                        "estrazioni e JOIN annunci a ON a.id = "
+                        "e.annuncio_id WHERE e.codice=? AND e.modo='link'",
+                        (codice,)).fetchone()
+    else:
+        # l'ultima estrazione 'link' dell'annuncio: quella aperta, se
+        # c'e' (le chiuse cadono sotto, con «Questa estrazione è chiusa»)
+        e = con.execute("SELECT e.*, a.stato AS stato_annuncio FROM "
+                        "estrazioni e JOIN annunci a ON a.id = "
+                        "e.annuncio_id WHERE e.annuncio_id=? AND "
+                        "e.modo='link' AND e.stato != 'annullata' "
+                        "ORDER BY e.id DESC LIMIT 1",
+                        (annuncio_id,)).fetchone()
     if not e:
         con.close()
         raise HTTPException(404, "Estrazione non trovata")

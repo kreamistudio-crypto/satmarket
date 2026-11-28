@@ -34925,8 +34925,11 @@ function aggiornaBarraCompra(view){
   /* Il negozio in ferie non compra e non tratta: la barra non nasce
      proprio e resta la tab bar, come su un annuncio non attivo. La
      riga della scheda dice gia' quando si torna. */
+  /* ...ne' l'oggetto IN PALIO (28 nov 2026): si vince, non si compra
+     ne' si tratta — «Acquista» e «Fai un'offerta» portavano solo al
+     «non si compra» del server */
   const su = view==='dettaglio' && !!l && !mio
-             && (l.stato||'attivo')==='attivo' && !inFerie(l);
+             && (l.stato||'attivo')==='attivo' && !inFerie(l) && !l.inPalio;
   document.body.classList.toggle('con-barra', su);
   if (!su) return;
   /* Lo stepper dei pezzi vive anche qui dentro (gemello di quello in
@@ -62081,10 +62084,13 @@ function htmlEstrazione(e, id){
       ${impronta}${conto}${lista}</details>` : '';
   if (e.stato === 'aperta') {
     const come = e.modo === 'link'
-      ? 'Partecipa chi apre il link dell\'estrazione e preme «Partecipo».'
+      ? 'Partecipa chi preme «Partecipo» qui sotto.'
       : 'Partecipa chi si iscrive a Barattolo col link d\'invito di chi lo regala, entro la chiusura.';
-    const codice = codiceEstrazionePer(id);
-    const partecipa = (!e.mia && !e.mio && e.modo === 'link' && codice)
+    /* PER TUTTI (28 nov 2026, «Puoi controllare che tutti possano
+       partecipare?», Andrea): il bottone c'e' per chiunque guardi,
+       anche senza il codice del link — chi arrivava dal canale o dalla
+       Mini App non lo vedeva. Il codice, se c'e', viaggia ancora. */
+    const partecipa = (!e.mia && !e.mio && e.modo === 'link')
       ? `<div style="margin-top:8px;font-size:13px;color:var(--muted)">Partecipano solo account Telegram. Se vinci, chi regala riceve il tuo contatto Telegram per la consegna.</div>
          <button class="btn orange" onclick="partecipaEstrazione(this, ${id})">🎟 Partecipo</button>` : '';
     const mia = e.mia
@@ -62144,13 +62150,19 @@ async function partecipaEstrazione(btn, id){
   if (VETRINA) {
     invitoTelegram('Per partecipare all\'estrazione entra con Telegram: '
       + 'al ritorno trovi il bottone «Partecipo» qui.', 'estrazione');
+    /* senza un invito in attesa, la porta apre la Mini App DRITTA su
+       quest'annuncio (`annuncio_<id>`), non sulla home del bot */
+    if (!invitoInAttesa()
+        && /^https:\/\/t\.me\/[A-Za-z][A-Za-z0-9_]{3,31}(\/[A-Za-z0-9_]{3,30})?$/.test(tgMiniappLink))
+      el('invitoTg').href = `${tgMiniappLink}?startapp=annuncio_${id}`;
     return;
   }
   const ripristina = bottoneInAttesa(btn, '🎟 Un attimo…');
   try {
     const r = await fetch(`${API_BASE}/estrazioni/partecipa`, {
       method:'POST', headers:{'X-Tg-Init-Data':authHdr(), 'Content-Type':'application/json'},
-      body: JSON.stringify({codice: codiceEstrazionePer(id)})});
+      body: JSON.stringify(codiceEstrazionePer(id)
+        ? {codice: codiceEstrazionePer(id)} : {annuncio: id})});
     const d = await r.json().catch(()=>({}));
     ripristina();
     if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
