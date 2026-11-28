@@ -8535,6 +8535,19 @@
   riscritto col ✅ non cambiano faccia. Nel P2P `_caption_canale_p2p`
   mette i metodi in «💳 Metodi di pagamento accettati», uno per riga, con
   la zona del contanti dentro.
+  I CANALI COME RICH MESSAGE (28 nov 2026, «un dropdown menu con il rich
+  text message»): le tendine qui sopra sono ora, di serie, veri
+  `<details><summary>` di un `sendRichMessage` (Bot API 10.1+). Le stesse
+  funzioni pure danno le due facce (`come_rich=True`: righe in `<p>`,
+  `_corpo_tendina_rich`, `_rich_da_testo`, niente tetto dei 1024);
+  `_manda_post_canale(dove, caption, foto, rich)` prova il rich (foto
+  come `<img>` in testa, `_rich_con_foto`) e, se Telegram non risponde
+  ok, ripiega sulla caption di sempre scrivendo «Rich message rifiutato,
+  ripiego». Leva `POST_CANALI_RICH`. Il post uscito rich si ricorda in
+  `post_rich(canale, message_id)`, e `_dati_riscrivi_post` sceglie come
+  rieditarlo: `editMessageText` con `rich_message` (✅ Venduto, ritiro
+  P2P e Cerco) o la strada di ieri. Perché in CANTIERI, «I post dei canali
+  come rich message».
   IL CERCO NEI CANALI (stesso giorno, «vorrei aggiungere il cerco»):
   `_posta_richiesta_nei_canali` (lanciata alla nascita della richiesta,
   fail-open, leva `POST_CERCO_CANALI`) manda `_caption_canale_cerco`

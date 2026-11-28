@@ -1066,3 +1066,9 @@ frase: Le richieste di «Cerco» escono anche nei canali Telegram: chi cerca una
 dove: I canali Telegram di Barattolo; la richiesta nasce da Cerco → «📣 Chiedilo a tutti».
 leva: POST_CERCO_CANALI (accesa di serie)
 pubblico: sì
+
+## 2026-11-28 · canali-rich
+frase: Le tendine dei post nei canali Telegram diventano vere tendine: «Info di spedizione», «Altri articoli del negozio» (tutti e dieci, senza tagli) e «Metodi di pagamento accettati» si aprono con un tocco e stanno chiuse di serie, con la foto in cima al post.
+dove: I canali Telegram di Barattolo, sotto ogni nuovo annuncio, ordine P2P e richiesta di Cerco.
+leva: POST_CANALI_RICH (accesa di serie)
+pubblico: sì

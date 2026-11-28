@@ -2231,6 +2231,12 @@ VETRINA_SI_PULISCE = True
 # accesa). Subito Crypto al massimo una a settimana per persona.
 # False = nessun post nuovo (quelli usciti restano).
 POST_CERCO_CANALI = True
+# I post dei canali come «rich message» (28 nov 2026): le tendine (Info di
+# spedizione, Altri articoli del negozio, Metodi di pagamento) sono veri
+# <details> chiusi di serie, e la foto e' un blocco in testa. Se Telegram
+# rifiuta il rich message il post esce lo stesso col formato di prima.
+# False = sempre il formato di prima (foto con caption).
+POST_CANALI_RICH = True
 # ...e l'annuncio venduto del mercatino: di serie resta nei canali col
 # «✅ Venduto» (scelta di Andrea). True = anche il suo post sparisce
 # (vale solo con VETRINA_SI_PULISCE accesa).

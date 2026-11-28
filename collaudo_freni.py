@@ -97,7 +97,7 @@ def main():
     # @username, Telegram senza, e un nativo Nostr (tg_id < 0)
     mandati = []
 
-    async def annota(dove, caption, foto):
+    async def annota(dove, caption, foto, rich=""):
         mandati.append((dove, caption))
         return 1
     prima = (S._manda_post_canale, S.canale_id, S.canale_vetrina,

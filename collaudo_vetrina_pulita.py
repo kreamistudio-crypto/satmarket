@@ -45,7 +45,7 @@ def main():
     contatore = {"n": 100}
     mandati, telegram = [], []
 
-    async def annota(dove, caption, foto):
+    async def annota(dove, caption, foto, rich=""):
         contatore["n"] += 1
         mandati.append((dove, contatore["n"]))
         return contatore["n"]

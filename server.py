@@ -1156,6 +1156,18 @@ try:
     from config import POST_CERCO_CANALI
 except ImportError:
     POST_CERCO_CANALI = True
+# I POST DEI CANALI COME «RICH MESSAGE» (28 nov 2026, Andrea: «sulle
+# vetrine di telegram volevo un dropdown menu con il rich text message»):
+# accesa, i post dei tre canali escono con `sendRichMessage` (Bot API
+# 10.1+), dove le tendine sono veri <details><summary> chiusi di serie e
+# la foto e' un blocco in testa. Se Telegram rifiuta il rich message il
+# post esce lo stesso nel formato di ieri (caption con citazioni
+# espandibili). Spenta: sempre il formato di ieri; i post rich gia'
+# usciti si riedita comunque come rich (se ne ricorda `post_rich`).
+try:
+    from config import POST_CANALI_RICH
+except ImportError:
+    POST_CANALI_RICH = True
 # ...E IL VENDUTO DEL MERCATINO RESTA COL ✅ (18 nov 2026, cantiere
 # venduto-resta; Andrea sulla scheda, due volte: «No, lì resta il ✅
 # Venduto», poi «Tieni il ✅ Venduto»). La cancellazione del post di un
@@ -7889,6 +7901,18 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_post_cerco_canale_richiesta
         ON post_cerco_canale(richiesta_id);
+    CREATE TABLE IF NOT EXISTS post_rich(
+        -- QUALI POST DEI CANALI SONO USCITI COME RICH MESSAGE (28 nov 2026,
+        -- cantiere canali-rich): una riga per post, uguale per annunci, P2P
+        -- e Cerco, perche' un message_id e' unico dentro il suo canale e
+        -- serve solo a sapere COME rieditarlo (editMessageText con
+        -- `rich_message` per i rich, la strada della caption per gli
+        -- altri). Un post senza riga e' un post di ieri: caption.
+        canale TEXT NOT NULL,
+        message_id INTEGER NOT NULL,
+        creato INTEGER NOT NULL,
+        PRIMARY KEY(canale, message_id)
+    );
     CREATE TABLE IF NOT EXISTS coda_vetrina(
         -- LA CODA DEL CANALE (ott 2026, decisione di Andrea): gli
         -- annunci che il freno «uno per venditore» ha lasciato fuori
@@ -25411,20 +25435,16 @@ async def comando_anteprima(mittente: dict, testo: str):
     a = dict(riga)
     altri = _altri_del_venditore(con, a)
     con.close()
-    caption = _caption_canale(a, await cambio_btc_eur(), altri=altri)
+    cambio = await cambio_btc_eur()
+    caption = _caption_canale(a, cambio, altri=altri)
+    rich = _caption_canale(a, cambio, altri=altri, come_rich=True)
     foto = _foto_url_nostr(a.get("foto", ""))
     nota = (f"👁 <i>Anteprima dell'annuncio #{a['id']} — così uscirebbe "
             f"nel canale. Non è stato pubblicato niente.</i>")
-    r = None
-    if foto:
-        r = await bot_api("sendPhoto", {
-            "chat_id": chat, "photo": foto[0], "caption": caption,
-            "parse_mode": "HTML"})
-    if not (r and r.get("ok")):
-        # lo stesso ripiego di `_posta_promo_singolo`: senza foto (o
-        # con una foto che Telegram non digerisce) il post e' testo
-        await bot_api("sendMessage", {
-            "chat_id": chat, "text": caption, "parse_mode": "HTML"})
+    # la fabbrica del canale, con la sua strada rich e i suoi ripieghi:
+    # l'anteprima e' il post VERO, nel formato in cui uscirebbe (28 nov
+    # 2026: prima faceva da se' il sendPhoto/sendMessage di ieri)
+    await _manda_post_canale(chat, caption, foto, rich)
     await bot_api("sendMessage", {"chat_id": chat, "text": nota,
                                   "parse_mode": "HTML",
                                   "reply_markup": tastiera_bot()})
@@ -41217,6 +41237,16 @@ def _leve_stato():
                          "a settimana per persona)",
                   spento="le richieste restano solo nell'app e negli "
                          "avvisi ai venditori; i post già usciti restano"),
+            # I POST COME RICH MESSAGE (28 nov 2026): accesa di serie
+            _leva("Post dei canali come rich message", "POST_CANALI_RICH",
+                  bool(POST_CANALI_RICH),
+                  acceso="i post dei canali escono con le tendine vere "
+                         "(Info di spedizione, Altri articoli, Metodi di "
+                         "pagamento); se Telegram li rifiuta, escono come "
+                         "caption col formato di prima",
+                  spento="i post escono sempre come foto con caption e "
+                         "citazioni espandibili; i rich già usciti si "
+                         "aggiornano come rich"),
             # LA VETRINA CHE SI PULISCE (18 nov 2026): accesa di serie
             _leva("I canali si puliscono da soli", "VETRINA_SI_PULISCE",
                   bool(VETRINA_SI_PULISCE),
@@ -64764,10 +64794,11 @@ async def promo_in_cima_canale(annuncio_id: int):
         if vecchio:
             await bot_api("deleteMessage", {"chat_id": canale_id(),
                                             "message_id": vecchio})
+        cambio = await cambio_btc_eur()
         nuovo = await _manda_post_canale(
-            canale_id(), _caption_canale(a, await cambio_btc_eur(),
-                                         altri=altri),
-            _foto_url_nostr(a.get("foto", "")))
+            canale_id(), _caption_canale(a, cambio, altri=altri),
+            _foto_url_nostr(a.get("foto", "")),
+            _caption_canale(a, cambio, altri=altri, come_rich=True))
         if nuovo:
             _post_promo_recenti.append(time.time())
             con = db()
@@ -66301,7 +66332,7 @@ TESTO_POST_CERCO_TOLTO = ("⌛ <b>Richiesta chiusa</b>\n"
                           "Chi cercava ha chiuso la richiesta, o è scaduta.")
 
 
-def _caption_canale_cerco(rich: dict, chi: dict) -> str:
+def _caption_canale_cerco(rich: dict, chi: dict, come_rich: bool = False) -> str:
     """La caption del post di una richiesta di Cerco nei canali. PURA:
     `rich` e' la riga di `richieste` (id, testo, categoria, budget_*),
     `chi` le chiavi del venditore come le vuole `_firma_venditore`
@@ -66321,7 +66352,7 @@ def _caption_canale_cerco(rich: dict, chi: dict) -> str:
     # piazza, cambia solo la parola davanti
     testo += "\n\n" + _firma_venditore(chi).replace("Annuncio da", "Richiesta da", 1)
     testo += "\n\n#cerco #barattolo"
-    return testo
+    return _rich_da_testo(testo) if come_rich else testo
 
 
 def _settimana_piena_vetrina(r_u, giorni: int, adesso: float) -> bool:
@@ -66383,11 +66414,13 @@ async def _posta_richiesta_nei_canali(richiesta_id: int) -> None:
             return
         rich = dict(r)
         caption = _caption_canale_cerco(rich, rich)
+        corpo_rich = _caption_canale_cerco(rich, rich, come_rich=True)
         adesso = int(time.time())
         usciti = []
         if canale_id():
             try:
-                mid = await _manda_post_canale(canale_id(), caption, [])
+                mid = await _manda_post_canale(canale_id(), caption, [],
+                                              corpo_rich)
                 if mid:
                     usciti.append((canale_id(), mid))
             except Exception as e:
@@ -66405,14 +66438,16 @@ async def _posta_richiesta_nei_canali(richiesta_id: int) -> None:
                                 "WHERE tg_id=?", (adesso, rich["tg_id"]))
                     con.commit()
                     con.close()
-                    mid = await _manda_post_canale(canale_vetrina(), caption, [])
+                    mid = await _manda_post_canale(canale_vetrina(), caption, [],
+                                                  corpo_rich)
                     if mid:
                         usciti.append((canale_vetrina(), mid))
             except Exception as e:
                 print(f"⚠️ Cerco su Subito Crypto saltato: {e}", flush=True)
         if canale_bitcoin_podcast():
             try:
-                mid = await _manda_post_canale(canale_bitcoin_podcast(), caption, [])
+                mid = await _manda_post_canale(canale_bitcoin_podcast(), caption, [],
+                                              corpo_rich)
                 if mid:
                     usciti.append((canale_bitcoin_podcast(), mid))
             except Exception as e:
@@ -66450,9 +66485,9 @@ async def ritira_post_cerco(richiesta_ids) -> int:
                     esito.get("description") or "").lower():
                 fatto = True          # gia' tolto a mano: e' quel che si voleva
             if not fatto:
-                esito = await bot_api("editMessageText", {
-                    **dati, "text": TESTO_POST_CERCO_TOLTO,
-                    "parse_mode": "HTML"})
+                esito = await bot_api("editMessageText", _dati_riscrivi_post(
+                    dati, TESTO_POST_CERCO_TOLTO,
+                    _rich_da_testo(TESTO_POST_CERCO_TOLTO)))
                 fatto = bool(esito and esito.get("ok"))
             if fatto:
                 tolti.append((r["canale"], r["message_id"]))
@@ -78446,7 +78481,8 @@ def _premio_canale_p2p(lato: str, premio: int) -> str:
 
 def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
                         premio=None, zona: str = "", valuta: str = "EUR",
-                        cifra_coin: str = "", euro_max: float = 0) -> str:
+                        cifra_coin: str = "", euro_max: float = 0,
+                        come_rich: bool = False) -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -78512,7 +78548,8 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
                      else f"💳 {html.escape(m)}")
         if m == "Contanti" and zona:
             righe.append(f"📍 {html.escape(zona)}")
-    testo += "\n" + _tendina_canale("💳 Metodi di pagamento accettati", righe)
+    testo += "\n" + _tendina_canale("💳 Metodi di pagamento accettati", righe,
+                                    come_rich)
     if zona and "Contanti" not in voci:
         testo += f"\n📍 {html.escape(zona)}"
     testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
@@ -78521,7 +78558,7 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
     testo += f"\n\n<a href=\"{_link_casa_telegram()}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
     testo += f"\n\n{_firma_venditore(venditore)}"
     testo += "\n\n#p2p #barattolo"
-    return testo
+    return _rich_da_testo(testo) if come_rich else testo
 
 
 @app.post("/api/p2p/canale")
@@ -78725,10 +78762,14 @@ async def annuncia_ordine_p2p_canale(req: Request,
                                           valuta, cifra_coin, euro_max)
             # i post usciti, per toglierli quando l'ordine esce dal libro
             # (LA VETRINA CHE SI PULISCE, 18 nov 2026)
+            corpo_rich = _caption_canale_p2p(lato, euro, metodo, venditore, premio,
+                                             zona, valuta, cifra_coin, euro_max,
+                                             come_rich=True)
             usciti = []
             if canale_id():
                 try:
-                    mid = await _manda_post_canale(canale_id(), caption, [])
+                    mid = await _manda_post_canale(canale_id(), caption, [],
+                                                   corpo_rich)
                     postato = bool(mid)
                     if mid:
                         usciti.append((canale_id(), mid))
@@ -78744,7 +78785,8 @@ async def annuncia_ordine_p2p_canale(req: Request,
                                 "WHERE tg_id=?", (int(adesso_canale), user["id"]))
                     con.commit()
                     con.close()
-                    mid = await _manda_post_canale(canale_vetrina(), caption, [])
+                    mid = await _manda_post_canale(canale_vetrina(), caption, [],
+                                                  corpo_rich)
                     if mid:
                         postato = True
                         usciti.append((canale_vetrina(), mid))
@@ -78752,7 +78794,8 @@ async def annuncia_ordine_p2p_canale(req: Request,
                     print(f"⚠️ Post P2P su Subito Crypto saltato: {e}")
             if canale_bitcoin_podcast():
                 try:
-                    mid = await _manda_post_canale(canale_bitcoin_podcast(), caption, [])
+                    mid = await _manda_post_canale(canale_bitcoin_podcast(), caption, [],
+                                                  corpo_rich)
                     if mid:
                         postato = True
                         usciti.append((canale_bitcoin_podcast(), mid))
@@ -78911,8 +78954,9 @@ async def ritira_post_p2p(ordini) -> int:
             if not fatto and esito and "not found" in str(esito.get("description") or "").lower():
                 fatto = True          # gia' tolto a mano: e' quel che si voleva
             if not fatto:
-                esito = await bot_api("editMessageText", {
-                    **dati, "text": TESTO_POST_P2P_TOLTO, "parse_mode": "HTML"})
+                esito = await bot_api("editMessageText", _dati_riscrivi_post(
+                    dati, TESTO_POST_P2P_TOLTO,
+                    _rich_da_testo(TESTO_POST_P2P_TOLTO)))
                 fatto = bool(esito and esito.get("ok"))
             if fatto:
                 tolti.append((r["canale"], r["message_id"]))
@@ -93829,11 +93873,62 @@ def _quanti_ne_stanno(costruisci, quanti: int,
     return n
 
 
-def _tendina_canale(titolo: str, righe: list) -> str:
-    """La tendina di un post: il titolo in grassetto FUORI, le righe
-    (gia' scappate dal chiamante) nella citazione espandibile. PURA."""
+def _corpo_tendina_rich(righe: list) -> str:
+    """Le righe di una tendina (gia' scappate) come contenuto rich: le
+    «• voce» consecutive diventano un elenco `<ul><li>`, i titoli di
+    strada («📦 A un indirizzo»...) un paragrafo in grassetto, il resto
+    un paragrafo. Niente a capo dentro: e' una stringa sola. PURA."""
+    fuori, voci = [], []
+
+    def chiudi():
+        if voci:
+            fuori.append("<ul>" + "".join(f"<li>{v}</li>" for v in voci)
+                         + "</ul>")
+            voci.clear()
+
+    for r in righe:
+        r = " ".join(str(r).split("\n"))    # un a capo spezzerebbe il blocco
+        if r.startswith("• "):
+            voci.append(r[2:])
+            continue
+        chiudi()
+        fuori.append(f"<p><b>{r}</b></p>" if r.startswith(("📦 ", "📮 ", "🤝 ", "💾 "))
+                     and "•" not in r else f"<p>{r}</p>")
+    chiudi()
+    return "".join(fuori)
+
+
+def _tendina_canale(titolo: str, righe: list, come_rich: bool = False) -> str:
+    """La tendina di un post. Nella caption (il formato di ieri): il
+    titolo in grassetto FUORI, le righe (gia' scappate dal chiamante)
+    nella citazione espandibile. Nel RICH MESSAGE (28 nov 2026): il vero
+    `<details><summary>`, chiuso di serie, con le righe dentro. PURA."""
+    if come_rich:
+        return (f"<details><summary>{titolo}</summary>"
+                + _corpo_tendina_rich(righe) + "</details>")
     return f"<b>{titolo}</b>\n<blockquote expandable>" \
            + "\n".join(righe) + "</blockquote>"
+
+
+def _rich_da_testo(testo: str) -> str:
+    """Dal testo a righe della caption al corpo del rich message: ogni
+    riga diventa un paragrafo `<p>`, tranne i blocchi gia' fatti (le
+    tendine `<details>`, che non hanno a capo dentro). PURA."""
+    blocchi = []
+    for riga in testo.split("\n"):
+        if not riga.strip():
+            continue
+        blocchi.append(riga if riga.startswith(("<details", "<ul", "<p>"))
+                       else f"<p>{riga}</p>")
+    return "".join(blocchi)
+
+
+def _rich_con_foto(rich: str, foto: list) -> str:
+    """Il corpo da mandare a Telegram: la foto (se c'e' e se e' un URL
+    http/https) come blocco `<img>` in testa, poi il testo rich. PURA."""
+    if foto and str(foto[0]).startswith(("http://", "https://")):
+        return f'<img src="{html.escape(str(foto[0]), quote=True)}"/>' + rich
+    return rich
 
 
 def _cifra_sped_promo(sats, eur, gratis: str = "<b>gratuita</b>") -> str:
@@ -93868,7 +93963,7 @@ def _reti_punto_promo(a: dict) -> list:
         return []
 
 
-def _righe_consegna_promo(a: dict) -> str:
+def _righe_consegna_promo(a: dict, come_rich: bool = False) -> str:
     """COME ARRIVA LA ROBA, nel post del canale: la TENDINA «🚚 Info di
     spedizione», gemella di quella della scheda (`infoSpedizioneScheda`
     nella Mini App) con le stesse regole e le stesse parole — una voce
@@ -93937,11 +94032,12 @@ def _righe_consegna_promo(a: dict) -> str:
     if righe and digitale:
         righe.append("💾 Codice online")
     if righe:
-        return _tendina_canale("🚚 Info di spedizione", righe)
+        return _tendina_canale("🚚 Info di spedizione", righe, come_rich)
     return "💾 Codice online, subito" if digitale else ""
 
 
-def _vetrina_venditore(a: dict, altri: list, ce_altro: bool = False) -> str:
+def _vetrina_venditore(a: dict, altri: list, ce_altro: bool = False,
+                       come_rich: bool = False) -> str:
     """Gli altri articoli del venditore, nella tendina sotto al post.
 
     E' la contropartita del freno (ago 2026, decisione di Andrea): un
@@ -93961,18 +94057,22 @@ def _vetrina_venditore(a: dict, altri: list, ce_altro: bool = False) -> str:
     voci = []
     for x in altri:
         t = (x.get("titolo") or "").strip()
-        if len(t) > 46:
-            t = t[:45].rstrip() + "…"
+        # il tetto dei 46 e' della caption (1024 visibili): nel rich i
+        # titoli stanno interi, entro un argine largo
+        tetto = 90 if come_rich else 46
+        if len(t) > tetto:
+            t = t[:tetto - 1].rstrip() + "…"
         link = link_telegram('annuncio', x['id'])
         voci.append(f"• <a href=\"{link}\">{html.escape(t)}</a>")
     if ce_altro and a.get("venditore_negozio"):
         voci.append(f"<a href=\"{URL_PUBBLICO}/negozio/"
                     f"{a['venditore_negozio']}\">Vedi tutto il negozio ›</a>")
-    return "\n\n" + _tendina_canale("🛍 Altri articoli del negozio", voci)
+    return "\n\n" + _tendina_canale("🛍 Altri articoli del negozio", voci,
+                                     come_rich)
 
 
 def _caption_canale(a: dict, cambio: float, venduto: bool = False,
-                    altri: list | None = None) -> str:
+                    altri: list | None = None, come_rich: bool = False) -> str:
     """La caption HTML del post nel canale Telegram (usata anche per
     RICOSTRUIRE il testo quando si edita col ✅ Venduto: cosi' non
     serve salvarlo da nessuna parte — ed e' il motivo per cui questa
@@ -93995,7 +94095,12 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False,
     IL TETTO DEI 1024 VISIBILI lo tengono gli articoli: se con dieci
     la caption sfora, se ne tolgono dal fondo finche' ci sta (la
     sezione sparisce se non ne entra nessuno, ma «Vedi tutto il
-    negozio ›» resta a dire che ce ne sono altri)."""
+    negozio ›» resta a dire che ce ne sono altri).
+    `come_rich=True` (28 nov 2026): lo STESSO post come corpo del RICH
+    MESSAGE — paragrafi `<p>`, le tendine `<details>` — senza il tetto dei
+    1024 (che e' della caption): porta sempre tutti gli articoli. Il
+    chiamante ci mette davanti la foto (`_rich_con_foto`). La caption
+    (`come_rich=False`) resta byte per byte quella di ieri."""
     link = f"{link_telegram('annuncio', a['id'])}"
     elenco = list(altri or [])
     primi = elenco[:MAX_VETRINA_PROMO]
@@ -94005,20 +94110,22 @@ def _caption_canale(a: dict, cambio: float, venduto: bool = False,
         testo += f"\n💰 {_prezzo_promo(a, cambio)}"
         if a.get("zona"):
             testo += f"\n📍 {html.escape(a['zona'])}"
-        consegna = _righe_consegna_promo(a)
+        consegna = _righe_consegna_promo(a, come_rich)
         if consegna:
-            testo += f"\n\n{consegna}" if consegna.startswith("<b>") \
-                else f"\n{consegna}"
+            testo += f"\n\n{consegna}" if consegna.startswith(
+                ("<b>", "<details")) else f"\n{consegna}"
         testo += f"\n\n<a href=\"{link}\">🫙 Apri su Barattolo</a>"
         testo += "\n⚡ Pagabile in Satoshi"
         testo += _vetrina_venditore(
-            a, primi[:n], ce_altro=len(elenco) > n)
+            a, primi[:n], ce_altro=len(elenco) > n, come_rich=come_rich)
         testo += f"\n\n{_firma_venditore(a)}"
         testo += f"\n\n{_hashtag_promo(a)}"
         if venduto:
             testo += "\n\n✅ Venduto"
-        return testo
+        return _rich_da_testo(testo) if come_rich else testo
 
+    if come_rich:
+        return costruisci(len(primi))
     return costruisci(_quanti_ne_stanno(costruisci, len(primi)))
 
 
@@ -94292,7 +94399,55 @@ def _post_podcast(a) -> int:
         return 0
 
 
-async def _manda_post_canale(dove: str, caption: str, foto: list) -> int:
+def _segna_post_rich(canale, message_id: int) -> None:
+    """Ricorda che questo post e' uscito come RICH MESSAGE: serve a
+    rieditarlo come tale. Fail-open: una riga saltata vuol dire che il
+    ✅ Venduto proverebbe la strada della caption e fallirebbe in
+    silenzio, mai un post che non esce. Pota anche le righe di oltre un
+    anno (un post cosi' vecchio non lo riscrive piu' nessuno)."""
+    try:
+        con = db()
+        try:
+            adesso = int(time.time())
+            con.execute("INSERT OR IGNORE INTO post_rich(canale, message_id, "
+                        "creato) VALUES(?,?,?)",
+                        (str(canale), int(message_id), adesso))
+            con.execute("DELETE FROM post_rich WHERE creato<?",
+                        (adesso - 400 * 86400,))
+            con.commit()
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ Rich message: riferimento non salvato ({e})", flush=True)
+
+
+def _post_e_rich(canale, message_id) -> bool:
+    """Il post e' uscito come rich message? Senza riga (o col database
+    muto) no: e' un post di ieri, si riedita come caption."""
+    try:
+        con = db()
+        try:
+            return con.execute(
+                "SELECT 1 FROM post_rich WHERE canale=? AND message_id=?",
+                (str(canale), int(message_id))).fetchone() is not None
+        finally:
+            con.close()
+    except Exception:
+        return False
+
+
+def _dati_riscrivi_post(dati: dict, testo_html: str, rich: str) -> dict:
+    """Il corpo di `editMessageText` per riscrivere un post di testo dei
+    canali: se il post e' uscito come rich message, `rich_message` col
+    suo HTML rich; sennò il `text` con parse_mode HTML, come ieri. `dati`
+    porta chat_id e message_id. PURA salvo la lettura di `post_rich`."""
+    if _post_e_rich(dati["chat_id"], dati["message_id"]):
+        return {**dati, "rich_message": {"html": rich}}
+    return {**dati, "text": testo_html, "parse_mode": "HTML"}
+
+
+async def _manda_post_canale(dove: str, caption: str, foto: list,
+                             rich: str = "") -> int:
     """Manda UN post in UN canale e torna il suo message_id (0 se non
     e' partito).
 
@@ -94301,10 +94456,33 @@ async def _manda_post_canale(dove: str, caption: str, foto: list) -> int:
     scritto in due posti divergerebbe al primo ritocco — il ripiego
     senza foto, il parse_mode, la caption. Cambia solo il `dove`.
 
-    IL RIPIEGO E' QUELLO DI SEMPRE: con la foto il testo vive nella
-    caption, e se Telegram non la digerisce (URL irraggiungibile,
-    immagine troppo grande) il post esce come testo invece di non
-    uscire."""
+    LA STRADA RICH (28 nov 2026, cantiere canali-rich): se il chiamante
+    porta anche `rich` (il corpo HTML rich dello stesso post) e la leva
+    POST_CANALI_RICH e' accesa, si prova `sendRichMessage` — la foto
+    come blocco `<img>` in testa, le tendine come veri `<details>`. Se
+    Telegram lo rifiuta (metodo che non conosce, HTML non digerito, canale
+    senza permessi sui media) si scrive una riga nel journal e si RIPIEGA
+    sul post di sempre: il post esce comunque, e non e' mai la novita' a
+    farlo saltare. Un post uscito rich si ricorda in `post_rich`, per
+    sapere come rieditarlo.
+
+    IL RIPIEGO DI SEMPRE: con la foto il testo vive nella caption, e se
+    Telegram non la digerisce (URL irraggiungibile, immagine troppo
+    grande) il post esce come testo invece di non uscire."""
+    if rich and POST_CANALI_RICH:
+        try:
+            r = await bot_api("sendRichMessage", {
+                "chat_id": dove,
+                "rich_message": {"html": _rich_con_foto(rich, foto)}})
+        except Exception as e:
+            r = {"ok": False, "description": f"eccezione: {e}"}
+        if r and r.get("ok") and r.get("result", {}).get("message_id"):
+            mid = r["result"]["message_id"]
+            _segna_post_rich(dove, mid)
+            return mid
+        print(f"⚠️ Rich message rifiutato, ripiego: "
+              f"{(r or {}).get('description') or 'nessuna risposta'}",
+              flush=True)
     r = None
     if foto:
         r = await bot_api("sendPhoto", {
@@ -94357,9 +94535,11 @@ async def _posta_promo_singolo(a: dict, giorni: int):
     post_vetrina_id = 0
     post_bitcoin_podcast_id = 0
     caption = _caption_canale(a, cambio, altri=altri)
+    rich = _caption_canale(a, cambio, altri=altri, come_rich=True)
     foto = _foto_url_nostr(a.get("foto", ""))
     if canale_id():
-        post_canale_id = await _manda_post_canale(canale_id(), caption, foto)
+        post_canale_id = await _manda_post_canale(canale_id(), caption, foto,
+                                                  rich)
     # E IL CANALE DELLA COMUNITA' (ago 2026): lo STESSO post, in un
     # canale che non e' nostro, ma solo per chi ha un @USERNAME.
     # IL PERCHE' DEL FILTRO (decisione di Andrea): li' il pubblico e'
@@ -94373,11 +94553,11 @@ async def _posta_promo_singolo(a: dict, giorni: int):
     # piu' stretta e' quella di casa d'altri.
     if canale_vetrina() and (a.get("venditore_username") or ""):
         post_vetrina_id = await _manda_post_canale(
-            canale_vetrina(), caption, foto)
+            canale_vetrina(), caption, foto, rich)
     # BitcoinPodcastTelegram (ott 2026): nuovo canale, NO filtro @username
     if canale_bitcoin_podcast():
         post_bitcoin_podcast_id = await _manda_post_canale(
-            canale_bitcoin_podcast(), caption, foto)
+            canale_bitcoin_podcast(), caption, foto, rich)
     if post_nostr_id or post_canale_id or post_vetrina_id or post_bitcoin_podcast_id:
         con = db()
         con.execute(
@@ -96578,8 +96758,16 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
                         if col not in tolte]
                 if not any(c and m for c, m in dove):
                     return
-        caption = _caption_canale(dict(a), await cambio_btc_eur(),
+        cambio = await cambio_btc_eur()
+        caption = _caption_canale(dict(a), cambio,
                                   venduto=venduto, altri=altri)
+        # i post usciti come RICH MESSAGE si riscrivono come rich (la foto
+        # e' un blocco del corpo, quindi si rimette): `editMessageText`
+        # con `rich_message`. Gli altri, la strada di sempre.
+        rich = _rich_con_foto(
+            _caption_canale(dict(a), cambio, venduto=venduto, altri=altri,
+                            come_rich=True),
+            _foto_url_nostr(a["foto"]))
         # Con la foto il testo vive nella caption, senza nel body — ma
         # il ripiego sendMessage di _posta_promo_singolo rende il tipo
         # ambiguo: si tenta il piu' probabile e poi l'altro.
@@ -96589,6 +96777,11 @@ async def promo_venduto(annuncio_id: int, venduto: bool = True):
                      else ["editMessageText", "editMessageCaption"])
         for canale, msg in dove:
             if not (canale and msg):
+                continue
+            if _post_e_rich(canale, msg):
+                await bot_api("editMessageText", {
+                    "chat_id": canale, "message_id": msg,
+                    "rich_message": {"html": rich}})
                 continue
             dati = {"chat_id": canale, "message_id": msg,
                     "parse_mode": "HTML"}

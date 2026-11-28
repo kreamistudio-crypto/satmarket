@@ -1321,3 +1321,10 @@ ripremi: chi è già ritirato non si tocca. Poi «🔄 Sincronizza i
 distintivi», che dà lo Specchiato a chi ha già 25 affari.
 
 Fatto e con «0 da riprovare», questa voce si cancella.
+
+## Dopo il deploy · i canali come rich message (28 nov 2026, Andrea)
+PERCHÉ: i post escono con `sendRichMessage` (tendine vere) e non è provato dal vivo. Dopo il deploy guarda UN post nuovo in ciascun canale (Barattolo Vetrina, Subito Crypto, BitcoinPodcast). Se esce col vecchio formato (foto con citazioni), Telegram ha rifiutato il rich: cerca il motivo nel journal (sola lettura):
+
+    sudo journalctl -u barattolo --since "1 hour ago" | grep "Rich message rifiutato"
+
+Se serve tornare indietro subito: `POST_CANALI_RICH = False` nel config del VPS e riavvio. Fatto e visto, questa voce si cancella.

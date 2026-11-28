@@ -115,7 +115,7 @@ async def _finto_address(indirizzo, sats):
     return f"lnbc-da-{indirizzo}-{sats}"
 
 
-async def _finto_post(dove, caption, foto):
+async def _finto_post(dove, caption, foto, rich=""):
     POST.append((dove, caption))
     return 7000 + len(POST)
 

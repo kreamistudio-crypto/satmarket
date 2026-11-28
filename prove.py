@@ -28505,7 +28505,7 @@ def prove_indirizzo_giusto():
     # vecchia frase, che diceva SEMPRE «punto di ritiro», non deve tornare
     prova("server: la riga del canale non dice piu' «a un indirizzo o a un punto di ritiro»; c'e' la tendina", [0, 1],
           [src.count('"🚚 Spedizione a un indirizzo o a un punto di ritiro"'),
-           src.count('_tendina_canale("🚚 Info di spedizione", righe)')])
+           src.count('_tendina_canale("🚚 Info di spedizione", righe, come_rich)')])
 
     # --- IL GIUDICE DELLA CONFERMA, fatto girare ----------------------
     import time as _t
@@ -37619,7 +37619,8 @@ def prove_canale_bot():
               "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
               "_tendina_canale", "_cifra_sped_promo", "_reti_punto_promo",
               "_righe_consegna_promo", "_vetrina_venditore",
-              "link_telegram", "_caption_canale"):
+              "link_telegram", "_caption_canale", "_corpo_tendina_rich",
+              "_rich_da_testo"):
         exec(pezzo(f), cap)
     a = {"id": 42, "titolo": "Chitarra classica", "prezzo_sats": 80000,
          "valuta": "sats", "zona": "Torino (TO)", "categoria": "Strumenti musicali",
@@ -202988,9 +202989,14 @@ def prove_venduto_canale():
 
         amb = {"db": db, "bot_api": bot_api, "cambio_btc_eur": cambio,
                "_altri_del_venditore": lambda con, a: [],
-               "_caption_canale": lambda a, cambio, venduto=True, altri=None:
-                   ("✅ Venduto " if venduto else "") + a["titolo"],
+               "_caption_canale": lambda a, cambio, venduto=True, altri=None,
+                                       come_rich=False:
+                   ("✅ Venduto " if venduto else "") + a["titolo"]
+                   + (" (rich)" if come_rich else ""),
                "_foto_url_nostr": lambda foto: "",
+               # (canali-rich) di serie nessun post e' rich: la strada di ieri
+               "_post_e_rich": lambda canale, mid: False,
+               "_rich_con_foto": lambda rich, foto: rich,
                "canale_id": lambda: "@nostro", "canale_vetrina": lambda: "@vetrina",
                "canale_bitcoin_podcast": lambda: "@podcast",
                "_NOSTR": ("chiave", "pub"), "_spedisci_ai_relay": relay,
@@ -203216,7 +203222,8 @@ def prove_vetrina_pulita():
         exec(src[j:src.index("\n_TASK_POST_P2P", j)], a)
         a["_tag_evento_p2p"] = amb["_tag_evento_p2p"]
         a["_post_p2p_da_ritirare"] = giudice
-        for f in ("_segna_post_p2p", "_collega_post_p2p"):
+        for f in ("_segna_post_p2p", "_collega_post_p2p", "_post_e_rich",
+                  "_dati_riscrivi_post", "_rich_da_testo"):
             exec(_senza_prosa(pezzo(f)), a)
         for f in ("ritira_post_p2p", "_giro_post_p2p_canale"):
             exec("async " + _senza_prosa(pezzo(f)), a)
@@ -208060,6 +208067,353 @@ def prove_richieste():
                '"%s"' % _f in srv[srv.index("FILE_SCOPRIRE = ("):][:900]))
 
 
+def prove_canali_rich():
+    """I POST DEI CANALI COME «RICH MESSAGE» (28 nov 2026, Andrea: «sulle
+    vetrine di telegram volevo un dropdown menu con il rich text message,
+    non come e' ora»). Le tendine di ieri erano citazioni espandibili in
+    una caption; adesso sono veri `<details><summary>` di un
+    `sendRichMessage` (Bot API 10.1+), col ripiego sul post di ieri se
+    Telegram lo rifiuta. Qui:
+     · l'HTML rich delle tre caption (annuncio, P2P, Cerco): i details
+       chiusi, tutti e dieci gli articoli, l'escape, e la caption di ieri
+       che resta quella di ieri;
+     · la fabbrica `_manda_post_canale` con un Telegram di cartone: rich
+       riuscito (foto in testa, riga in `post_rich`), rich rifiutato →
+       ripiego (e riga nel journal), leva spenta = formato di ieri;
+     · le riedizioni: ✅ Venduto, ritiro del P2P e del Cerco riscrivono
+       con `editMessageText` + `rich_message` se il post e' rich, come
+       ieri se no;
+     · le sentinelle: leva, tabella, pannello."""
+    print("\n[i post dei canali come rich message]")
+    import asyncio as _asRC
+    import html as _htRC
+    import sqlite3 as _sqRC
+    import tempfile as _tfRC
+
+    # --- 1) L'HTML RICH DELLE TRE CAPTION -----------------------------
+    cap = {"html": _htRC, "re": re, "json": json, "URL_PUBBLICO": "https://barattolo.store",
+           "LINK_BOT": "https://t.me/ilbarattolobot",
+           "TETTO_CAPTION_VISIBILE": 1024, "MAX_VETRINA_PROMO": 10}
+    exec(next(r for r in _SORGENTE.split("\n") if r.startswith("CHARSET_BECH32")), cap)
+    for tabella, fine_t in (("ZONE_SPEDIZIONE = (", ")"), ("ZONA_ETICHETTA = {", "}"),
+                            ("ENCLAVI_DOMESTICO = {", "}"), ("PAESI_PER_ZONA = {", "\n}\n"),
+                            ("_PAESE_NOME = {", "righe}"), ("DOMESTICO_DEFAULT = ", "\n")):
+        i = _SORGENTE.index("\n" + tabella) + 1
+        exec(_SORGENTE[i:_SORGENTE.index(fine_t, i) + len(fine_t)], cap)
+    cap["SPEDIZIONIERI"] = ("Barattolo", "InPost", "Poste Italiane")
+    cap["RETE_BARATTOLO"] = "Barattolo"
+    cap["RETE_DEL_CORRIERE"] = {"InPost": "InPost", "Poste Italiane": "Poste Italiane"}
+    cap["rete_barattolo_viva"] = lambda: False
+    cap["_link_casa_telegram"] = lambda: "https://t.me/ilbarattolobot?startapp=casa"
+    for f in ("_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
+              "_npub_breve", "_npub_venditore", "nome_paese", "etichetta_zona",
+              "_fmt_sats", "_fmt_eur", "_prezzo_promo", "_slug_categoria", "_hashtag_promo",
+              "_firma_venditore", "_tariffa_dichiarata", "_zone_annuncio", "_non_spedisce_casa",
+              "reti_venditore", "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
+              "_corpo_tendina_rich", "_tendina_canale", "_rich_da_testo", "_rich_con_foto",
+              "_cifra_sped_promo", "_reti_punto_promo", "_righe_consegna_promo",
+              "_vetrina_venditore", "link_telegram", "_caption_canale", "_premio_canale_p2p",
+              "_caption_canale_p2p", "_riga_budget_richiesta", "_caption_canale_cerco"):
+        exec(pezzo(f), cap)
+    a = {"id": 42, "titolo": "Chitarra <classica> & co", "prezzo_sats": 80000, "valuta": "sats",
+         "zona": "Torino (TO)", "categoria": "Strumenti musicali", "venditore": "Alan",
+         "venditore_username": "AlanBimbati", "venditore_negozio": "abc12345",
+         "consegna": "entrambe", "anche_digitale": 0, "paese_domestico": "IT",
+         "venditore_spedizionieri": "|InPost|", "spedizione_punto_dichiarata": 1,
+         "spedizione_sats": 5000, "spedizione_eur": 0.0, "spedizione_punto_sats": 3000,
+         "spedizione_punto_eur": 0.0, "spedizione_zone": json.dumps(
+             {z: {"sats": 10000, "eur": 0} for z in ("eu", "nordamerica")})}
+    lunghi = [{"id": 100 + i, "titolo": f"{i} " + "Titolo lunghissimo da quarantacinque lettere ok <b>"}
+              for i in range(11)]
+    ric = cap["_caption_canale"](a, 0, altri=lunghi, come_rich=True)
+    prova("annuncio rich: la tendina «Info di spedizione» e' un <details> con il suo <summary>, SENZA blockquote",
+          (True, False),
+          ("<details><summary>🚚 Info di spedizione</summary>" in ric, "blockquote" in ric))
+    prova("...e le strade sono voci di un elenco, i titoli di strada in grassetto",
+          True, "<p><b>📦 A un indirizzo</b></p><ul><li>" in ric and "<li>Italia: " in ric
+          and "<p><b>📮 Locker / punto di ritiro</b></p>" in ric)
+    prova("...senza il tetto dei 1024: dieci articoli su undici letti, TUTTI coi titoli interi, e «Vedi tutto il negozio ›»",
+          (10, True, True),
+          (ric.count("startapp=annuncio_1"), "Vedi tutto il negozio ›" in ric,
+           ric.count("lettere ok &lt;b&gt;</a>") == 10))
+    prova("...«Altri articoli del negozio» e' un <details> con un elenco di link",
+          True, "<details><summary>🛍 Altri articoli del negozio</summary><ul><li><a href=" in ric)
+    prova("...le tendine si aprono e si chiudono in pari, e tutto il resto sta in paragrafi <p>",
+          (True, True),
+          (ric.count("<details>") == ric.count("</details>") == 2,
+           ric.count("<p>") == ric.count("</p>") and "\n" not in ric))
+    prova("...l'escape c'e' (il titolo, quello degli altri articoli), e nessun <b> nudo di un utente",
+          (True, True, False),
+          ("&lt;classica&gt; &amp; co" in ric, "ok &lt;b&gt;" in ric, "ok <b>" in ric))
+    prova("...titolo, prezzo, ancora, firma e hashtag, ognuno nel suo paragrafo",
+          True, all(x in ric for x in ("<p>🫙 <b>Chitarra", "<p>💰 ", "<p>📍 Torino (TO)</p>",
+                                       '<p><a href="https://t.me/ilbarattolobot?startapp=annuncio_42">'
+                                       "🫙 Apri su Barattolo</a></p>", "<p>⚡ Pagabile in Satoshi</p>",
+                                       "<p>#")))
+    prova("✅ Venduto in rich: il suo paragrafo in fondo", True,
+          cap["_caption_canale"](a, 0, venduto=True, come_rich=True).endswith("<p>✅ Venduto</p>"))
+    prova("la CAPTION di ieri non cambia: `come_rich=False` e il default dicono la stessa cosa, "
+          "e ci sono i blockquote",
+          (True, True),
+          (cap["_caption_canale"](a, 0, altri=lunghi) ==
+           cap["_caption_canale"](a, 0, altri=lunghi, come_rich=False),
+           "<blockquote expandable>" in cap["_caption_canale"](a, 0, altri=lunghi)))
+    prova("senza consegna dichiarata nessuna tendina di spedizione, e il solo codice online resta una riga",
+          (False, True),
+          ("Info di spedizione" in cap["_caption_canale"](dict(a, consegna=""), 0, come_rich=True),
+           "<p>💾 Codice online, subito</p>" in cap["_caption_canale"](
+               dict(a, consegna="digitale"), 0, come_rich=True)))
+    rosina = {"venditore": "Rosina", "venditore_username": "rosina", "venditore_negozio": "aaa11111"}
+    p2p = cap["_caption_canale_p2p"]("vendo", 50, "SEPA, Revolut, Contanti", rosina, None,
+                                     "Milano <centro>", come_rich=True)
+    prova("P2P rich: «Metodi di pagamento accettati» e' un <details> con un metodo per riga, e la zona di scambio sotto il contanti",
+          True, "<details><summary>💳 Metodi di pagamento accettati</summary><p>💳 SEPA</p>"
+          "<p>💳 Revolut</p><p>💵 Contanti</p><p>📍 Milano &lt;centro&gt;</p></details>" in p2p)
+    prova("...il resto del P2P in paragrafi, l'ancora e la firma comprese", True,
+          all(x in p2p for x in ("<p>🔁 <b>Vende BTC su Barattolo</b></p>", "<p>💶 50,00 €</p>",
+                                 "<p>🔒 Sats bloccati", "🫙 Apri lo Scambio P2P su Barattolo</a></p>",
+                                 "<p>#p2p #barattolo</p>")) and "blockquote" not in p2p)
+    prova("...e la caption P2P di ieri e' quella di ieri", True,
+          "<blockquote expandable>💳 SEPA\n💳 Revolut\n💵 Contanti\n📍 Milano &lt;centro&gt;</blockquote>"
+          in cap["_caption_canale_p2p"]("vendo", 50, "SEPA, Revolut, Contanti", rosina, None,
+                                        "Milano <centro>"))
+    cerco = cap["_caption_canale_cerco"](
+        {"id": 5, "testo": "Cerco <u>una</u> bici", "categoria": "Sport", "budget_sats": 0,
+         "budget_eur": 0}, rosina, come_rich=True)
+    prova("Cerco rich: solo paragrafi (niente tendine), con l'escape, e l'ancora «Fai un'offerta»",
+          (True, False, True),
+          ("<p>🙋 <b>Cerco su Barattolo</b></p>" in cerco and "Cerco &lt;u&gt;una&lt;/u&gt; bici" in cerco,
+           "<details" in cerco,
+           "Fai un'offerta su Barattolo</a></p>" in cerco and cerco.endswith("<p>#cerco #barattolo</p>")))
+    prova("la foto: un blocco <img> in testa, solo se e' un URL http/https (e l'URL e' scappato)",
+          ("<img", "", ""),
+          (cap["_rich_con_foto"]("<p>x</p>", ["https://x.example/f.jpg?a=1&b=2"])[:4],
+           cap["_rich_con_foto"]("<p>x</p>", ["javascript:1"])[:0],
+           cap["_rich_con_foto"]("<p>x</p>", [])[:0]))
+    prova("...e l'URL col & esce &amp; dentro l'attributo", True,
+          'src="https://x.example/f.jpg?a=1&amp;b=2"/><p>x</p>' in
+          cap["_rich_con_foto"]("<p>x</p>", ["https://x.example/f.jpg?a=1&b=2"]))
+
+    # --- 2) LA FABBRICA, CON UN TELEGRAM DI CARTONE --------------------
+    def banco(leva=True, rispondi=None):
+        percorso = os.path.join(_tfRC.mkdtemp(prefix="canali-rich-"), "t.db")
+        con = _sqRC.connect(percorso)
+        con.executescript("""
+            CREATE TABLE post_rich(canale TEXT NOT NULL, message_id INTEGER NOT NULL,
+                creato INTEGER NOT NULL, PRIMARY KEY(canale, message_id));""")
+        con.commit()
+        con.close()
+
+        def db():
+            c = _sqRC.connect(percorso)
+            c.row_factory = _sqRC.Row
+            return c
+        chiamate, stampe, n = [], [], [500]
+
+        async def bot_api(metodo, dati):
+            chiamate.append((metodo, dati))
+            if rispondi:
+                r = rispondi(metodo, dati)
+                if r != "ok":
+                    return r
+            n[0] += 1
+            return {"ok": True, "result": {"message_id": n[0]}}
+        amb = {"db": db, "bot_api": bot_api, "POST_CANALI_RICH": leva, "time": time, "html": _htRC,
+               "print": lambda *x, **k: stampe.append(" ".join(map(str, x)))}
+        for f in ("_rich_con_foto", "_segna_post_rich", "_post_e_rich", "_dati_riscrivi_post",
+                  "_rich_da_testo"):
+            exec(pezzo(f), amb)
+        exec("async " + pezzo("_manda_post_canale"), amb)
+        return amb, chiamate, stampe, db
+
+    def righe_rich(db):
+        c = db()
+        try:
+            return sorted((r["canale"], r["message_id"]) for r in c.execute("SELECT * FROM post_rich"))
+        finally:
+            c.close()
+    FOTO = ["https://barattolo.store/foto/a.jpg"]
+    amb, ch, st, db = banco()
+    mid = _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", FOTO, "<p>corpo</p>"))
+    prova("rich riuscito: UNA chiamata, sendRichMessage, e il message_id e' quello suo",
+          (["sendRichMessage"], 501), ([m for m, _d in ch], mid))
+    prova("...il corpo e' {rich_message: {html}} con la foto in testa, e NIENTE caption ne' parse_mode",
+          {"chat_id": "@nostro", "rich_message": {
+              "html": '<img src="https://barattolo.store/foto/a.jpg"/><p>corpo</p>'}}, ch[0][1])
+    prova("...e il post si ricorda come rich", ([("@nostro", 501)], True, False),
+          (righe_rich(db), amb["_post_e_rich"]("@nostro", 501), amb["_post_e_rich"]("@nostro", 999)))
+    amb, ch, st, db = banco()
+    _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", [], "<p>corpo</p>"))
+    prova("senza foto il corpo e' il solo testo rich", "<p>corpo</p>", ch[0][1]["rich_message"]["html"])
+    amb, ch, st, db = banco(rispondi=lambda m, d: (
+        {"ok": False, "error_code": 404, "description": "Not Found: method not found"}
+        if m == "sendRichMessage" else "ok"))
+    mid = _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", FOTO, "<p>corpo</p>"))
+    prova("rich rifiutato: si RIPIEGA sul sendPhoto di ieri, con la caption, e il post esce (id del ripiego)",
+          (["sendRichMessage", "sendPhoto"], 501, "CAPTION", "HTML"),
+          ([m for m, _d in ch], mid, ch[1][1]["caption"], ch[1][1]["parse_mode"]))
+    prova("...il journal lo dice («Rich message rifiutato, ripiego: ...») e il post NON e' segnato rich",
+          (True, []), (any("Rich message rifiutato, ripiego: Not Found: method not found" in r
+                           for r in st), righe_rich(db)))
+    amb, ch, st, db = banco(rispondi=lambda m, d: (
+        {"ok": False, "description": "x"} if m in ("sendRichMessage", "sendPhoto") else "ok"))
+    mid = _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", FOTO, "<p>corpo</p>"))
+    prova("...e se anche la foto e' rifiutata, esce come testo: tre strade, il post esce comunque",
+          (["sendRichMessage", "sendPhoto", "sendMessage"], 501),
+          ([m for m, _d in ch], mid))
+    amb, ch, st, db = banco(rispondi=lambda m, d: None if m == "sendRichMessage" else "ok")
+    mid = _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", [], "<p>corpo</p>"))
+    prova("...un Telegram muto (None) sul rich: ripiego sul testo, e la riga dice «nessuna risposta»",
+          (["sendRichMessage", "sendMessage"], 501, True),
+          ([m for m, _d in ch], mid, any("nessuna risposta" in r for r in st)))
+    amb, ch, st, db = banco(leva=False)
+    mid = _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", FOTO, "<p>corpo</p>"))
+    prova("leva POST_CANALI_RICH spenta: il formato di ieri (sendPhoto con la caption), nessun rich",
+          (["sendPhoto"], 501, []), ([m for m, _d in ch], mid, righe_rich(db)))
+    amb, ch, st, db = banco()
+    _asRC.run(amb["_manda_post_canale"]("@nostro", "CAPTION", FOTO))
+    prova("senza il corpo rich (i chiamanti di ieri) la fabbrica fa quel che faceva", ["sendPhoto"],
+          [m for m, _d in ch])
+    amb, ch, st, db = banco()
+    mid = _asRC.run(amb["_manda_post_canale"]("@n", "C", [], "<p>x</p>"))
+    prova("il corpo di riscrittura: rich_message per i post rich, text+HTML per gli altri",
+          ({"chat_id": "@n", "message_id": mid, "rich_message": {"html": "R"}},
+           {"chat_id": "@n", "message_id": 9, "text": "T", "parse_mode": "HTML"}),
+          (amb["_dati_riscrivi_post"]({"chat_id": "@n", "message_id": mid}, "T", "R"),
+           amb["_dati_riscrivi_post"]({"chat_id": "@n", "message_id": 9}, "T", "R")))
+
+    # --- 3) LE RIEDIZIONI ---------------------------------------------
+    # ✅ Venduto: la funzione VERA su un database sqlite vero
+    percorso = os.path.join(_tfRC.mkdtemp(prefix="canali-rich-v-"), "v.db")
+    con = _sqRC.connect(percorso)
+    con.executescript("""
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER, titolo TEXT,
+            foto TEXT DEFAULT '[]', post_canale_id INTEGER DEFAULT 0, post_vetrina_id INTEGER DEFAULT 0,
+            post_bitcoin_podcast_id INTEGER DEFAULT 0, post_nostr_id TEXT DEFAULT '');
+        CREATE TABLE utenti(tg_id INTEGER, nome TEXT, username TEXT, npub TEXT, npub_verificata INTEGER,
+            npub_accesso INTEGER, negozio TEXT, spedizionieri TEXT DEFAULT '', spedizioniere TEXT DEFAULT '');
+        CREATE TABLE post_rich(canale TEXT NOT NULL, message_id INTEGER NOT NULL, creato INTEGER NOT NULL,
+            PRIMARY KEY(canale, message_id));
+        INSERT INTO utenti(tg_id,nome,username,npub,npub_verificata,npub_accesso,negozio)
+            VALUES(222,'V','v','',0,0,'neg');
+        INSERT INTO annunci(id,venditore_id,titolo,foto,post_canale_id,post_vetrina_id,post_bitcoin_podcast_id)
+            VALUES(1,222,'T','[]',11,22,33);
+        INSERT INTO post_rich VALUES('@nostro',11,1),('@podcast',33,1);""")
+    con.commit()
+    con.close()
+
+    def db_v():
+        c = _sqRC.connect(percorso)
+        c.row_factory = _sqRC.Row
+        return c
+    chiamate_v = []
+
+    async def bot_v(metodo, dati):
+        chiamate_v.append((metodo, dati))
+        return {"ok": True}
+
+    async def cambio_v():
+        return 100_000.0
+    amb = {"db": db_v, "bot_api": bot_v, "cambio_btc_eur": cambio_v,
+           "_altri_del_venditore": lambda con, a: [],
+           "_caption_canale": lambda a, cambio, venduto=True, altri=None, come_rich=False:
+               ("<p>✅ Venduto</p>" if come_rich else "✅ Venduto ") + a["titolo"],
+           "_foto_url_nostr": lambda foto: ["https://barattolo.store/foto/a.jpg"],
+           "canale_id": lambda: "@nostro", "canale_vetrina": lambda: "@vetrina",
+           "canale_bitcoin_podcast": lambda: "@podcast", "_NOSTR": None,
+           "VETRINA_SI_PULISCE": False, "VETRINA_VENDUTI_SI_CANCELLANO": False,
+           "time": time, "html": _htRC, "print": lambda *x, **k: None}
+    for f in ("_post_vetrina", "_post_podcast", "_post_e_rich", "_rich_con_foto"):
+        exec(pezzo(f), amb)
+    exec("async " + pezzo("promo_venduto"), amb)
+    _asRC.run(amb["promo_venduto"](1))
+    prova("✅ Venduto: i post rich (nostro, podcast) si riscrivono con editMessageText + rich_message "
+          "(foto rimessa in testa), quello di ieri (vetrina) con la caption di sempre",
+          [("editMessageText", {"chat_id": "@nostro", "message_id": 11, "rich_message": {
+              "html": '<img src="https://barattolo.store/foto/a.jpg"/><p>✅ Venduto</p>T'}}),
+           ("editMessageCaption", {"chat_id": "@vetrina", "message_id": 22, "parse_mode": "HTML",
+                                   "caption": "✅ Venduto T"}),
+           ("editMessageText", {"chat_id": "@podcast", "message_id": 33, "rich_message": {
+               "html": '<img src="https://barattolo.store/foto/a.jpg"/><p>✅ Venduto</p>T'}})],
+          chiamate_v)
+    prova("...e per i post rich non si prova MAI editMessageCaption", False,
+          any(m == "editMessageCaption" and d["chat_id"] in ("@nostro", "@podcast") for m, d in chiamate_v))
+
+    # il ritiro di P2P e Cerco: cancellare e' rifiutato (oltre le 48 ore) → si riscrive
+    def ritiro(tabella, sorgenti, riga, funzione, args, testo_tolto):
+        percorso = os.path.join(_tfRC.mkdtemp(prefix="canali-rich-r-"), "r.db")
+        con = _sqRC.connect(percorso)
+        con.executescript(f"""
+            CREATE TABLE post_rich(canale TEXT NOT NULL, message_id INTEGER NOT NULL, creato INTEGER NOT NULL,
+                PRIMARY KEY(canale, message_id));
+            {tabella}
+            INSERT INTO post_rich VALUES('@nostro',11,1);""")
+        con.execute(riga[0], riga[1])
+        con.commit()
+        con.close()
+
+        def db_r():
+            c = _sqRC.connect(percorso)
+            c.row_factory = _sqRC.Row
+            return c
+        chiamate_r = []
+
+        async def bot_r(metodo, dati):
+            chiamate_r.append((metodo, dati))
+            return ({"ok": False, "description": "message can't be deleted"}
+                    if metodo == "deleteMessage" else {"ok": True})
+        a = {"db": db_r, "bot_api": bot_r, "VETRINA_SI_PULISCE": True, "print": lambda *x, **k: None,
+             "RICHIESTE_DURATE": (30, 60, 90), "time": time}
+        for f in ("_post_e_rich", "_dati_riscrivi_post", "_rich_da_testo"):
+            exec(pezzo(f), a)
+        i = _SORGENTE.index(testo_tolto + " = (")
+        exec(_SORGENTE[i:_SORGENTE.index("\n", _SORGENTE.index('"\n', i) + 1)], a) \
+            if False else exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)].split("\n_TASK")[0], a)
+        exec("async " + pezzo(funzione), a)
+        _asRC.run(a[funzione](args))
+        return chiamate_r
+    cr = ritiro("CREATE TABLE post_cerco_canale(richiesta_id INTEGER NOT NULL, canale TEXT NOT NULL, "
+                "message_id INTEGER NOT NULL, creato INTEGER NOT NULL, PRIMARY KEY(canale, message_id));"
+                "INSERT INTO post_cerco_canale VALUES(1,'@nostro',11,1),(1,'@vetrina',12,1);",
+                None, ("SELECT 1", ()), "ritira_post_cerco", [1], "TESTO_POST_CERCO_TOLTO")
+    prova("ritiro del Cerco, delete rifiutato: il post rich si riscrive con rich_message «Richiesta chiusa» "
+          "(paragrafi), quello di ieri con text+HTML",
+          ("<p>⌛ <b>Richiesta chiusa</b></p><p>Chi cercava ha chiuso la richiesta, o è scaduta.</p>",
+           True, True),
+          (cr[1][1]["rich_message"]["html"] if cr[1][0] == "editMessageText" else None,
+           "text" not in cr[1][1],
+           any(m == "editMessageText" and d.get("text", "").startswith("⌛ <b>Richiesta chiusa</b>")
+               and d["chat_id"] == "@vetrina" for m, d in cr)))
+    cp = ritiro("CREATE TABLE post_p2p_canale(canale TEXT NOT NULL, message_id INTEGER NOT NULL, "
+                "ordine TEXT DEFAULT '', tg_id INTEGER DEFAULT 0, creato INTEGER NOT NULL, "
+                "PRIMARY KEY(canale, message_id));"
+                "INSERT INTO post_p2p_canale VALUES('@nostro',11,'aaaa1111',1,1),('@vetrina',12,'aaaa1111',1,1);",
+                None, ("SELECT 1", ()), "ritira_post_p2p", ["aaaa1111"], "TESTO_POST_P2P_TOLTO")
+    prova("ritiro del P2P, delete rifiutato: lo stesso, «Ordine P2P non più disponibile» rich / testo",
+          (True, True),
+          ("<p>⌛ <b>Ordine P2P non più disponibile</b></p>" in cp[1][1].get("rich_message", {}).get("html", ""),
+           any(m == "editMessageText" and "rich_message" not in d and d["chat_id"] == "@vetrina"
+               and "non più disponibile" in d["text"] for m, d in cp)))
+
+    # --- 4) LE SENTINELLE ---------------------------------------------
+    srv = _SORGENTE
+    prova("la leva POST_CANALI_RICH: nel server (di serie accesa), nel config d'esempio e nel pannello",
+          (True, True, True),
+          ("except ImportError:\n    POST_CANALI_RICH = True\n" in srv,
+           "\nPOST_CANALI_RICH = True\n" in open("config_esempio.py", encoding="utf-8").read(),
+           '_leva("Post dei canali come rich message", "POST_CANALI_RICH",' in srv))
+    prova("la tabella post_rich c'e' nello schema", True,
+          "CREATE TABLE IF NOT EXISTS post_rich(" in srv)
+    prova("tutti i punti di invio passano il corpo rich alla fabbrica (annunci x3 + anteprima, P2P x3, Cerco x3, in cima)",
+          (True, True, True),
+          (len(re.findall(r"foto,\s*rich\)", srv)) >= 4, srv.count("corpo_rich)") >= 6,
+           "come_rich=True))" in pezzo("promo_in_cima_canale", "\n\n\ndef ")))
+    prova("la strada rich non tocca Nostr (`_nota_promo` resta com'era)", True,
+          "rich" not in pezzo("_nota_promo").replace("richiesta", "").replace("riche", ""))
+    prova("la fabbrica non nomina un canale: il `dove` e' l'unica cosa che cambia", True,
+          "canale_id()" not in pezzo("_manda_post_canale"))
+
+
 def prove_cerco_canali():
     """LE TENDINE E IL «CERCO» NEI CANALI (27 nov 2026, richiesta di Andrea:
     «io parlavo soprattutto dei canali su telegram. Inoltre vorrei
@@ -208104,7 +208458,8 @@ def prove_cerco_canali():
               "reti_venditore", "reti_punto", "_lunghezza_visibile", "_quanti_ne_stanno",
               "_tendina_canale", "_cifra_sped_promo", "_reti_punto_promo",
               "_righe_consegna_promo", "_vetrina_venditore", "link_telegram", "_caption_canale",
-              "_riga_budget_richiesta", "_caption_canale_cerco", "_settimana_piena_vetrina"):
+              "_riga_budget_richiesta", "_caption_canale_cerco", "_settimana_piena_vetrina",
+              "_corpo_tendina_rich", "_rich_da_testo"):
         exec(pezzo(f), cap)
     vis = cap["_lunghezza_visibile"]
     prova("i tag e gli href non contano, il testo dentro si' (e «&amp;» e' un carattere solo)", [3, 1, 3],
@@ -208274,6 +208629,7 @@ def prove_cerco_canali():
             return {"ok": True}
 
         amb = {"db": db, "bot_api": bot_api, "POST_CERCO_CANALI": leva,
+               "POST_CANALI_RICH": False,   # di serie la strada di ieri (canali-rich)
                "VETRINA_SI_PULISCE": True, "RICHIESTE_DURATE": (30, 60, 90),
                "canale_id": lambda: "@nostro" if canali else "",
                "canale_vetrina": lambda: "@vetrina" if canali else "",
@@ -208286,7 +208642,9 @@ def prove_cerco_canali():
         for nome in ("_bech32_polymod", "npub_to_hex", "hex_to_npub", "chiave_nostr_provata",
                      "_npub_breve", "_npub_venditore", "_fmt_sats", "_fmt_eur", "_firma_venditore",
                      "link_telegram", "_riga_budget_richiesta", "_caption_canale_cerco",
-                     "_settimana_piena_vetrina", "_segna_post_cerco"):
+                     "_settimana_piena_vetrina", "_segna_post_cerco", "_rich_da_testo",
+                     "_post_e_rich", "_dati_riscrivi_post", "_segna_post_rich",
+                     "_rich_con_foto"):
             exec(pezzo(nome), amb)
         exec("async " + pezzo("_manda_post_canale"), amb)
         i = _SORGENTE.index("TESTO_POST_CERCO_TOLTO = (")
@@ -228248,7 +228606,7 @@ CATEGORIE = {
     meta_cauzione_auto intervallo_obbligatorio
     """.split(),
     "mercatino": """
-    guida_wallet giroconto_interno non_hai_sats non_hai_sats_onchain chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste cerco_canali premi_fedelta app_negozio cassa_solo_negozio
+    guida_wallet giroconto_interno non_hai_sats non_hai_sats_onchain chiedi_al_venditore mappa_ritiro mappa_ritocchi feedback_modificabile recensioni_ricevute recensioni_nascondibili mancia_venditore raccolte richieste cerco_canali canali_rich premi_fedelta app_negozio cassa_solo_negozio
     filtro_italiano testo_evento tag_commercio tag_client
     consegna_firmata anello categorie senza_condizione sottocategorie
     sottocategorie_vetrina vetrina_reti_punto
@@ -229813,6 +230171,7 @@ def main():
               prove_raccolte,
               prove_richieste,
               prove_cerco_canali,
+              prove_canali_rich,
               prove_premi_fedelta,
               prove_app_negozio,
               prove_cassa_solo_negozio,
